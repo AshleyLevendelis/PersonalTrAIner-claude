@@ -1,0 +1,65 @@
+{
+  "case": "specific-why-this-exercise",
+  "why": "VISION: a coach has a reason for every choice, and the app promises 'Why this exercise' on screen. Asked in chat, the answer must be about this session's actual order and this person's actual plan, not a textbook paragraph on compound lifts.",
+  "checks": {},
+  "fingerprint": "a083355add94ea62",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-13T08:33:20.178Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "why are the romanian deadlifts after the squats and not before",
+      "reply": "Barbell Back Squats are your Tier 1 primary compound lift for today. They demand the absolute most from your central nervous system, quads, and core, so we program them first while you are completely fresh and have the highest energy. \n\nRomanian Deadlifts are a Tier 2 compound. While they are still a heavy, demanding movement, they focus more on the posterior chain (hamstrings and glutes) and don't require the same level of total-body stabilization as a heavy squat. Putting squats first ensures you can lift safely with maximum power, whereas squatting heavy after your hamstrings and lower back are already fatigued from RDLs would compromise your squat form and increase your injury risk.\n\nHow are your legs feeling today after last Tuesday's squat session?",
+      "raw": "Barbell Back Squats are your Tier 1 primary compound lift for today. They demand the absolute most from your central nervous system, quads, and core, so we program them first while you are completely fresh and have the highest energy. \n\nRomanian Deadlifts are a Tier 2 compound. While they are still a heavy, demanding movement, they focus more on the posterior chain (hamstrings and glutes) and don't require the same level of total-body stabilization as a heavy squat. Putting squats first ensures you can lift safely with maximum power, whereas squatting heavy after your hamstrings and lower back are already fatigued from RDLs would compromise your squat form and increase your injury risk.\n\nHow are your legs feeling today after last Tuesday's squat session?",
+      "error": null,
+      "action": null
+    }
+  ]
+}

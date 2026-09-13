@@ -1,0 +1,72 @@
+{
+  "case": "specific-plateau",
+  "why": "A plain training question where generic advice and the right answer look different. The context holds the actual lift, the actual weight and the actual completed session, so a coach that reads them can say what to do next week and a coach that does not can only say 'progressive overload'.",
+  "checks": {},
+  "fingerprint": "a083355add94ea62",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-13T08:33:20.178Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "my squat's been stuck for a bit, what should I do",
+      "reply": "To break through a squat plateau, we need to look at how we're managing fatigue and stimulus. Since you're squatting 45kg for sets of 8, your body is adapted to that specific demand, and simply trying to push for more reps or weight at the same volume can sometimes keep you stuck. \n\nHere are the three most effective ways to break a plateau:\n\n1. **Adjust the volume:** If you're carrying too much fatigue, dropping a set for a week (a mini-deload) can give your legs and nervous system the recovery they need to supercompensate and grow stronger. \n2. **Change the rep range:** Dropping the reps to 5 or 6 and pushing the weight up slightly can help build the absolute strength needed to make 45kg feel lighter when you come back to it.\n3. **Swap the variation:** Switching to a safety bar squat, box squat, or even a tempo squat for one training block can build strength in your weak points and give your joints a break from the exact same movement pattern.\n\nSince your lower body session is scheduled for today, we could make a adjustment to today's squats to start shaking things up. Would you rather try dropping the volume slightly today to manage recovery, or swap the squat out for a different variation this block to build strength differently?",
+      "raw": "To break through a squat plateau, we need to look at how we're managing fatigue and stimulus. Since you're squatting 45kg for sets of 8, your body is adapted to that specific demand, and simply trying to push for more reps or weight at the same volume can sometimes keep you stuck. \n\nHere are the three most effective ways to break a plateau:\n\n1. **Adjust the volume:** If you're carrying too much fatigue, dropping a set for a week (a mini-deload) can give your legs and nervous system the recovery they need to supercompensate and grow stronger. \n2. **Change the rep range:** Dropping the reps to 5 or 6 and pushing the weight up slightly can help build the absolute strength needed to make 45kg feel lighter when you come back to it.\n3. **Swap the variation:** Switching to a safety bar squat, box squat, or even a tempo squat for one training block can build strength in your weak points and give your joints a break from the exact same movement pattern.\n\nSince your lower body session is scheduled for today, we could make a adjustment to today's squats to start shaking things up. Would you rather try dropping the volume slightly today to manage recovery, or swap the squat out for a different variation this block to build strength differently?\n[QUICK_REPLIES: \"Lower the volume today\" | \"Swap the variation\" | \"Keep it as is today\"]",
+      "error": null,
+      "action": null
+    },
+    {
+      "user": "ok, and how long before I'd expect that to move",
+      "reply": "If we adjust the volume or swap the variation, you can generally expect to see the plateau break within 2 to 4 weeks. \n\nIn the first week or two, your body adapts neurologically to the new stimulus or sheds the accumulated fatigue that's been masking your strength. By week three or four, that translates into measurable progress—either you'll find yourself handling heavier loads in a new rep range, or you'll return to your standard back squat and find 45kg moving with much better speed and control.\n\nPlateaus are just a sign that it's time to change the question we're asking your muscles. Which route are you leaning toward trying first for today's session?",
+      "raw": "If we adjust the volume or swap the variation, you can generally expect to see the plateau break within 2 to 4 weeks. \n\nIn the first week or two, your body adapts neurologically to the new stimulus or sheds the accumulated fatigue that's been masking your strength. By week three or four, that translates into measurable progress—either you'll find yourself handling heavier loads in a new rep range, or you'll return to your standard back squat and find 45kg moving with much better speed and control.\n\nPlateaus are just a sign that it's time to change the question we're asking your muscles. Which route are you leaning toward trying first for today's session?\n[QUICK_REPLIES: \"Lower the volume today\" | \"Swap the variation\" | \"Keep it as is today\"]",
+      "error": null,
+      "action": null
+    }
+  ]
+}

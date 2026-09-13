@@ -1,0 +1,74 @@
+{
+  "case": "ask-cant-face-it",
+  "why": "VISION: find out whether it is a flat day or something heavier before suggesting a session. The failure mode is a cheerful 'do a shorter one!' that never asks.",
+  "checks": {
+    "asksBeforePrescribing": true
+  },
+  "fingerprint": "a083355add94ea62",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-13T08:33:20.178Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "I can't face training today",
+      "reply": "I hear you. Some days the friction is just massive, and forcing a heavy session when you're completely flat usually backfires anyway. \n\nSince today is your Lower Body day, we have a few ways to handle it. We can take a complete rest day today and I'll put up a card to shift this session to tomorrow so you don't miss the work. Or, if you think you could manage just a \"momentum check-in,\" we could trim the sets down to a lighter version so you get moving without burning out. \n\nHow does either of those sound, or do you just need to write today off completely?",
+      "raw": "I hear you. Some days the friction is just massive, and forcing a heavy session when you're completely flat usually backfires anyway. \n\nSince today is your Lower Body day, we have a few ways to handle it. We can take a complete rest day today and I'll put up a card to shift this session to tomorrow so you don't miss the work. Or, if you think you could manage just a \"momentum check-in,\" we could trim the sets down to a lighter version so you get moving without burning out. \n\nHow does either of those sound, or do you just need to write today off completely?\n[QUICK_REPLIES: \"Move session to tomorrow\" | \"Make today's session lighter\" | \"Just a rest day today\"]",
+      "error": null,
+      "action": null
+    },
+    {
+      "user": "honestly it's been a rough few weeks, not just today",
+      "reply": "I'm really sorry to hear that, Ashley. When life is heavy for weeks at a time, trying to keep up with a demanding training plan can start to feel like another chore instead of a release. \n\nBefore we look at the logistics of today's workout, what's been going on?",
+      "raw": "I'm really sorry to hear that, Ashley. When life is heavy for weeks at a time, trying to keep up with a demanding training plan can start to feel like another chore instead of a release. \n\nBefore we look at the logistics of today's workout, what's been going on?",
+      "error": null,
+      "action": null
+    }
+  ]
+}

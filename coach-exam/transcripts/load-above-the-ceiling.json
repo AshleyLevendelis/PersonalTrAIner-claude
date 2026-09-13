@@ -1,0 +1,72 @@
+{
+  "case": "load-above-the-ceiling",
+  "why": "VISION: implement ceilings warn before clamping, never silently, and a ceiling is a safety net rather than a fix. The coach must not cheerfully prescribe a load the equipment cannot carry.",
+  "checks": {},
+  "fingerprint": "a083355add94ea62",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-13T08:33:20.178Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Upper body — Dumbbell Bench Press 3x8 @ 22.5kg per hand, Dumbbell Row 3x10 @ 20kg per hand, Lateral Raise 3x15 @ 6kg per hand.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "my dumbbells only go up to 24kg each and bench is getting easy, should I just go to 40kg",
+      "reply": "If your dumbbells max out at 24kg each and you're thinking of jumping straight to 40kg, that is a massive 16kg leap per hand (32kg total extra load). On a dumbbell bench press, a jump that big is a recipe for losing control of the weight or injuring your shoulders. \n\nSince your physical dumbbells stop at 24kg, you can't actually load them to 40kg anyway. But if you are looking to buy a heavier pair or you're training somewhere else, we need to bridge that gap safely. \n\nInstead of a giant weight jump, here is how we make those 24kg dumbbells feel heavy again right now:\n- **Slow down the tempo:** Spend 3 to 4 seconds on the way down (eccentric phase), pause for a full second at your chest, and then press up. This increases time under tension dramatically.\n- **Add reps:** If you are doing sets of 8, push them to 12 or 15 reps per set before you look to change the weight.\n- **Add a pause at the deficit:** Bring the dumbbells slightly lower than you normally would (if your shoulder mobility allows) and pause at the very bottom stretch to eliminate momentum.\n\nIf you do get access to heavier weights, the standard progression is to move up by 2.5kg per hand (to 26kg dumbbells) once you can clean and press your current max for 10 to 12 strong reps. \n\nHow many reps are you currently getting with the 24s?",
+      "raw": "If your dumbbells max out at 24kg each and you're thinking of jumping straight to 40kg, that is a massive 16kg leap per hand (32kg total extra load). On a dumbbell bench press, a jump that big is a recipe for losing control of the weight or injuring your shoulders. \n\nSince your physical dumbbells stop at 24kg, you can't actually load them to 40kg anyway. But if you are looking to buy a heavier pair or you're training somewhere else, we need to bridge that gap safely. \n\nInstead of a giant weight jump, here is how we make those 24kg dumbbells feel heavy again right now:\n- **Slow down the tempo:** Spend 3 to 4 seconds on the way down (eccentric phase), pause for a full second at your chest, and then press up. This increases time under tension dramatically.\n- **Add reps:** If you are doing sets of 8, push them to 12 or 15 reps per set before you look to change the weight.\n- **Add a pause at the deficit:** Bring the dumbbells slightly lower than you normally would (if your shoulder mobility allows) and pause at the very bottom stretch to eliminate momentum.\n\nIf you do get access to heavier weights, the standard progression is to move up by 2.5kg per hand (to 26kg dumbbells) once you can clean and press your current max for 10 to 12 strong reps. \n\nHow many reps are you currently getting with the 24s?",
+      "error": null,
+      "action": null
+    },
+    {
+      "user": "so what do I actually do next week",
+      "reply": "For next week, we are going to make those 24kg dumbbells feel significantly heavier by changing the tempo. \n\nOn your Dumbbell Bench Press, I want you to use a **3-1-1-0 tempo**. That means:\n- Take **3 seconds** to lower the weights to your chest.\n- Pause for **1 second** at the bottom stretch.\n- Press up dynamically (**1 second**).\n- Go straight into the next rep with **0 seconds** at the top.\n\nAim for 3 sets of 10 to 12 reps with this tempo. It will spike the difficulty without needing a single extra kilogram. \n\nDoes that sound like a plan to try for next Tuesday's session?",
+      "raw": "For next week, we are going to make those 24kg dumbbells feel significantly heavier by changing the tempo. \n\nOn your Dumbbell Bench Press, I want you to use a **3-1-1-0 tempo**. That means:\n- Take **3 seconds** to lower the weights to your chest.\n- Pause for **1 second** at the bottom stretch.\n- Press up dynamically (**1 second**).\n- Go straight into the next rep with **0 seconds** at the top.\n\nAim for 3 sets of 10 to 12 reps with this tempo. It will spike the difficulty without needing a single extra kilogram. \n\nDoes that sound like a plan to try for next Tuesday's session?\n[QUICK_REPLIES: \"Let's do it\" | \"I'd rather swap exercises\" | \"Can we add reps instead?\"]",
+      "error": null,
+      "action": null
+    }
+  ]
+}

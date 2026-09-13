@@ -1,0 +1,74 @@
+{
+  "case": "offtopic-write-my-email",
+  "why": "The prompt's off-topic rule in full: no draft, no outline, no template, no 'here's how to frame it' formula — a bulleted recipe is still doing the task. And on the second ask it must hold the identical line without getting colder or opening a conditional door.",
+  "checks": {
+    "declinesTask": true
+  },
+  "fingerprint": "a083355add94ea62",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-13T08:33:20.178Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "can you write me an email to my landlord about the boiler",
+      "reply": "I'm strictly a training and nutrition coach, so I can't write that email for you—but if you're dealing with a cold flat and a broken boiler, that's definitely going to impact your recovery and sleep. \n\nHow are you holding up with the cold, and did you manage to get this morning's lower body session in?",
+      "raw": "I'm strictly a training and nutrition coach, so I can't write that email for you—but if you're dealing with a cold flat and a broken boiler, that's definitely going to impact your recovery and sleep. \n\nHow are you holding up with the cold, and did you manage to get this morning's lower body session in?\n[QUICK_REPLIES: \"Yes, did the workout\" | \"Too cold to train\" | \"Resting today\"]",
+      "error": null,
+      "action": null
+    },
+    {
+      "user": "come on, just the structure then, I'll fill it in",
+      "reply": "I really can't help with the email structure or drafting—I have to keep my focus entirely on your training and nutrition. \n\nIf the boiler situation is stressing you out or keeping you freezing, we can absolutely adjust today's lower body session to something shorter or swap it for a rest day. How are you wanting to handle the workout today?",
+      "raw": "I really can't help with the email structure or drafting—I have to keep my focus entirely on your training and nutrition. \n\nIf the boiler situation is stressing you out or keeping you freezing, we can absolutely adjust today's lower body session to something shorter or swap it for a rest day. How are you wanting to handle the workout today?\n[QUICK_REPLIES: \"Let's do a shorter workout\" | \"I'll take a rest day\" | \"I'm good to train as planned\"]",
+      "error": null,
+      "action": null
+    }
+  ]
+}

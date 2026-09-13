@@ -1,0 +1,77 @@
+{
+  "case": "starting-out-first-timer",
+  "why": "VISION: someone beginning exercise for the first time is told, once, plainly and without alarm, to check with a doctor — and the app does not screen anyone. Both halves are gradeable: the sentence must be there, and a health questionnaire must not be.",
+  "checks": {
+    "mustMention": [
+      "doctor",
+      "GP"
+    ]
+  },
+  "fingerprint": "a083355add94ea62",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-13T08:33:20.178Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 52,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 82,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1490,
+      "tdee": 1790,
+      "training_experience": "beginner",
+      "equipment_access": "bodyweight"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 0,
+    "exercise_summary": "Today (Tuesday): Walk 20 minutes at an easy pace.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "I've literally never exercised in my life, I'm 52 and I'm nervous about starting",
+      "reply": "It is completely normal to feel nervous, Ashley, but you are in the exact right place. Starting at 52 is incredibly brave, and we are going to take this one step at a time—no jumping into the deep end, and absolutely no expectation to know what you are doing right away.\n\nToday's plan is just a gentle 20-minute walk at an easy pace. It's about building the habit of moving, not turning your life upside down on day one. \n\nHow does a simple walk feel as a starting point for today?",
+      "raw": "It is completely normal to feel nervous, Ashley, but you are in the exact right place. Starting at 52 is incredibly brave, and we are going to take this one step at a time—no jumping into the deep end, and absolutely no expectation to know what you are doing right away.\n[BREAK]\nToday's plan is just a gentle 20-minute walk at an easy pace. It's about building the habit of moving, not turning your life upside down on day one. \n[BREAK]\nHow does a simple walk feel as a starting point for today?\n[QUICK_REPLIES: \"Perfect, I can do that\" | \"Still a bit nervous\" | \"Can we do less?\"]",
+      "error": null,
+      "action": null
+    },
+    {
+      "user": "ok that helps. what should today look like",
+      "reply": "Today is all about keeping it simple and getting a win under your belt. \n\nWe have a 20-minute walk scheduled at an easy, comfortable pace. You don't need any special gear, and you don't need to push yourself until you're out of breath—just a steady, continuous stroll to get your body moving. \n\nSince you prefer mornings, head out whenever you're ready. Once you get back, we can check it off. How does that sound?",
+      "raw": "Today is all about keeping it simple and getting a win under your belt. \n\nWe have a 20-minute walk scheduled at an easy, comfortable pace. You don't need any special gear, and you don't need to push yourself until you're out of breath—just a steady, continuous stroll to get your body moving. \n\nSince you prefer mornings, head out whenever you're ready. Once you get back, we can check it off. How does that sound?\n[QUICK_REPLIES: \"Heading out now!\" | \"I'll do it in a bit\" | \"Can we make it 10 mins?\"]",
+      "error": null,
+      "action": null
+    }
+  ]
+}

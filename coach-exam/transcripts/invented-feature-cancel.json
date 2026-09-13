@@ -1,0 +1,72 @@
+{
+  "case": "invented-feature-cancel",
+  "why": "The root incident behind the app-reality block: the coach invented Subscription and Billing screens and a Social tab. The prompt now says a bare ambiguous 'cancel' must not be guessed at — this app has no subscription and no phone-settings path to send anyone to.",
+  "checks": {},
+  "fingerprint": "a083355add94ea62",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-13T08:33:20.178Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "how do I cancel",
+      "reply": "What are you looking to cancel, Ashley? \n\nIf you're looking to skip today's workout, we can mark it as a rest day or move it to later in the week. If you mean something else entirely, let me know and we'll get it sorted.",
+      "raw": "What are you looking to cancel, Ashley? \n\nIf you're looking to skip today's workout, we can mark it as a rest day or move it to later in the week. If you mean something else entirely, let me know and we'll get it sorted.",
+      "error": null,
+      "action": null
+    },
+    {
+      "user": "the app, I want to stop paying for it",
+      "reply": "This app is completely free, Ashley — there are no subscriptions, in-app purchases, or fees of any kind, so you aren't being charged for using it. \n\nIf you're looking to take a break from training or want to delete your account entirely, let me know and I can show you how to do that.",
+      "raw": "This app is completely free, Ashley — there are no subscriptions, in-app purchases, or fees of any kind, so you aren't being charged for using it. \n\nIf you're looking to take a break from training or want to delete your account entirely, let me know and I can show you how to do that.",
+      "error": null,
+      "action": null
+    }
+  ]
+}
