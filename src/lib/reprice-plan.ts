@@ -108,6 +108,22 @@ export function headlineReprice(changes: RepricedLoad[]): RepricedLoad | null {
  * "your weights changed" is not something anyone can check, and the receipt
  * exists so she can see the correction landed.
  *
+ * IT NAMES THE WEEK THE CHANGE STARTS — ASHLEY'S RULING, 13 Sep 2026, from
+ * three options (name the week / lead with "nothing changes this week" / leave
+ * it). She chose naming the week because one sentence then works whether the
+ * change starts today or in two months.
+ *
+ * WHAT WAS WRONG WITH THE SENTENCE IT REPLACES, measured rather than guessed:
+ * it opened "I've redone your weights from this week" and then quoted the
+ * headline lift, which comes from the earliest week TOUCHED — not the earliest
+ * week re-priced. Raising a dumbbell ceiling from 30kg to 40kg on a real
+ * 16-week plan touches weeks 7, 9, 10 and 15 ONLY, because the lighter weeks
+ * were never near the old ceiling. So the receipt said "this week" and named a
+ * weight that is not on this week's screen. That is the same defect
+ * `headlineReprice` below was written to fix, one step narrower — the fix
+ * restricted the headline to the earliest week touched, and then the sentence
+ * went on asserting that week was this one.
+ *
  * THE NAME IS NEVER THE SUBJECT OF A VERB, and that is not fussiness. The
  * first version read "<name> goes down from 14kg to 4kg", which is fine for
  * "Goblet Squat" and wrong for most of the catalogue — read off a real plan
@@ -124,8 +140,8 @@ export function describeReprice(changes: RepricedLoad[]): string | null {
   const tail = others > 0
     ? ` ${others} other ${others === 1 ? 'weight' : 'weights'} moved with it.`
     : ''
-  return `I've redone your weights from this week — ${headline.exerciseName}: `
-    + `${direction} from ${headline.fromKg}kg to ${headline.toKg}kg.${tail}`
+  return `I've redone your weights. From week ${headline.weekNumber}, `
+    + `${headline.exerciseName}: ${direction} from ${headline.fromKg}kg to ${headline.toKg}kg.${tail}`
 }
 
 /**

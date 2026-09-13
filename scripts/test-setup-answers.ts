@@ -273,9 +273,15 @@ check('there is a receipt when something moved', !!receipt, receipt)
 check('it names a real exercise and both real numbers',
   !!receipt && receipt.includes(headline.exerciseName)
   && receipt.includes(`${headline.fromKg}kg`) && receipt.includes(`${headline.toKg}kg`), receipt)
-// THE SENTENCE SAYS "FROM THIS WEEK", SO THE NUMBER MUST BE THIS WEEK'S. The
-// first version quoted the largest move anywhere — a week-9 leg curl at 40kg —
-// beside a live week showing 22kg.
+// THE SENTENCE NAMES THE WEEK IT STARTS — Ashley's ruling, 13 Sep 2026, chosen
+// over leading with "nothing changes this week" and over leaving it. Two
+// wordings failed before it. The first quoted the largest move ANYWHERE — a
+// week-9 leg curl at 40kg — beside a live week showing 22kg. The second
+// restricted the quote to the earliest week TOUCHED but still opened "from
+// this week", and raising a ceiling touches weeks 7, 9, 10 and 15 only, so it
+// asserted "this week" over a week-7 number. Naming the week is true in both.
+check('it names the week the change starts, so the number can be found',
+  !!receipt && receipt.includes(`week ${headline.weekNumber}`), receipt)
 check('the number it quotes is from the earliest week it touched, the one she will see',
   headline.weekNumber === Math.min(...low.changes.map(c => c.weekNumber)),
   { quoted: headline.weekNumber, earliest: Math.min(...low.changes.map(c => c.weekNumber)) })

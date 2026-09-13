@@ -202,20 +202,25 @@ check('2a. the fixture plan has real weights to move', before.length > 0, before
 check('2b. a corrected cap can be typed', await typeInto('[data-testid="stated-ceilings"] input', 10))
 const receipt = await until(() => text('[data-testid="reprice-receipt"]'), v => v.length > 0)
 check('2c. correcting it produces a receipt', receipt.length > 0, receipt)
-check('2d. ...that names a lift and two weights', /: (up|down) from [\d.]+kg to [\d.]+kg/.test(receipt), receipt)
+check('2d. ...that names a week, a lift and two weights',
+  /From week \d+, .+: (up|down) from [\d.]+kg to [\d.]+kg/.test(receipt), receipt)
 
 // THE RECEIPT AGAINST THE PLAN, read out of the page rather than recomputed —
 // verify:exercise-add 4d's rule. A sentence that agrees only with itself is
 // what let "shortened to 20 min" sit beside "~26 min" on 13 Sep.
 const after = JSON.parse(await text('[data-testid="plan-weights"]'))
-const m = /— (.+?): (?:up|down) from ([\d.]+)kg to ([\d.]+)kg/.exec(receipt)
+const m = /From week (\d+), (.+?): (?:up|down) from ([\d.]+)kg to ([\d.]+)kg/.exec(receipt)
 check('2e. the receipt parses', !!m, receipt)
 if (m) {
-  const [, name, fromKg, toKg] = m
-  const nowInPlan = after.filter(e => e.n === name).map(e => e.kg)
-  const wasInPlan = before.filter(e => e.n === name).map(e => e.kg)
-  check('2f. the "to" weight is really in the plan now', nowInPlan.includes(Number(toKg)), { name, toKg, nowInPlan: nowInPlan.slice(0, 6) })
-  check('2g. ...and the "from" weight really was before', wasInPlan.includes(Number(fromKg)), { name, fromKg, wasInPlan: wasInPlan.slice(0, 6) })
+  const [, week, name, fromKg, toKg] = m
+  // IN THE WEEK THE SENTENCE NAMES, not merely somewhere in sixteen weeks.
+  // Ashley's ruling on 13 Sep was to name the week precisely because the old
+  // wording said "this week" and quoted a week-7 number; a check that accepts
+  // the weight anywhere in the plan would go green on exactly that.
+  const nowInPlan = after.filter(e => e.n === name && e.w === Number(week)).map(e => e.kg)
+  const wasInPlan = before.filter(e => e.n === name && e.w === Number(week)).map(e => e.kg)
+  check('2f. the named week really holds the "to" weight', nowInPlan.includes(Number(toKg)), { week, name, toKg, nowInPlan: nowInPlan.slice(0, 6) })
+  check('2g. ...and really held the "from" weight before', wasInPlan.includes(Number(fromKg)), { week, name, fromKg, wasInPlan: wasInPlan.slice(0, 6) })
 }
 check('2h. weights actually came down', after.some((e, i) => before[i] && e.kg < before[i].kg))
 check('2i. ...and the plan still holds the same exercises',

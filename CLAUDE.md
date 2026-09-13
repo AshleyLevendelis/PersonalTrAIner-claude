@@ -151,7 +151,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
     and correcting one re-prices the running plan from this week onward with
     the exercises untouched (her ruling that day, from four options). Shown
     only when the kit is limited, because a full-gym answer discards them.
-    `setup-answers`
+    `setup-answers`, `verify:setup-answers`. **A CHANGE RECEIPT NAMES THE WEEK
+    THE CHANGE STARTS** — her ruling 13 Sep 2026, from three options, and it
+    generalises beyond this one screen: "from this week" was ASSERTED while the
+    weight quoted came from week 7, because a correction only bites where the
+    old number was actually binding. If the app quotes a number, it says which
+    week that number is in, or she cannot go and look at it.
   - Exercise dislikes — **was never locked**: it is not a profile column at
     all, it becomes `user_facts` rows, the same shape a "never give me
     burpees" chat turn produces. So the COACH could always change it; the

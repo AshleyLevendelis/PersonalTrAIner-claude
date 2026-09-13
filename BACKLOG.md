@@ -47,22 +47,33 @@ Newest first. One line each.
   fixture: lowering the cap moves 91 weights, raising it moves 5. The driver now
   raises one too, and under the mutation the raise produced a DOWNWARD receipt
   for 72 weights.
-  **MUTATIONS: 9 tried, 9 caught — but only 8 on the first pass.** The ninth is
-  the one above, caught only after the driver was strengthened. Reported this
-  way deliberately: "9/9" alone would hide that the gate had to be fixed.
+  **MUTATIONS: 11 tried, 11 caught — but only 10 on the first pass.** The
+  eleventh is the ratio one above, caught only after the driver was
+  strengthened. Reported this way deliberately: "11/11" alone would hide that
+  the gate had to be fixed to catch it. The last two break the week-naming: one
+  reverts the sentence to asserting "this week" (caught by both gates), one
+  takes the week from a different change than the numbers, which printed "From
+  week 16" over week 1's weights and was caught by the named-week check.
   **FOUND AND NOT FIXED, named rather than omitted.** (a) The Daily steps
   placeholder is cut off mid-word — "10,000 (from activity" in a 176px box.
   Pre-existing; the fix is either a wording change or a wider box, and the
   wording is Ashley's. (b) The dialog's ✕ sits over the top row's unit label
   when the sheet is scrolled; the ✕ staying visible is deliberate (an earlier
   bug had it scrolling out of reach of long sheets), the collision is not.
-  (c) **The receipt can say "from this week" and quote a weight from week 7.**
+  (c) ~~The receipt can say "from this week" and quote a weight from week 7.~~
+  **FIXED in the same session — it became question (c) and she answered it.**
   `headlineReprice` restricts to the earliest week TOUCHED, not the earliest
   week re-priced. Measured: raising the cap 30→40 touches weeks 7, 9, 10 and 15
-  only, so the sentence opens with "this week" and names a number she cannot see
-  on this week's screen. This is the same defect the function's own comment says
-  it fixed, one step narrower. Mine, from 13 Sep. **A question for Ashley**
-  rather than a silent reword — it is what the app tells her.
+  only, so the sentence opened with "this week" and named a number she cannot
+  see on this week's screen — the same defect the function's own comment says
+  it fixed, one step narrower. Mine, from 13 Sep. **HER RULING**, from three
+  options (name the week / lead with "nothing changes this week" / leave it):
+  **name the week the change starts.** One sentence then works whether the
+  change starts today or in two months. It now reads "I've redone your weights.
+  From week 1, Romanian Deadlifts: down from 14kg to 4kg. 90 other weights
+  moved with it." Pinned on both sides: the browser check reads the "to" weight
+  out of THE NAMED WEEK rather than anywhere in sixteen, and the source gate
+  asserts the week appears in the sentence.
   (d) `test:bundle` fails on "a deploy re-downloads 292 kB, not 444" —
   pre-existing and identical with the changes stashed, and it fails because the
   number got BETTER than the check expects. A stale expectation, not a
