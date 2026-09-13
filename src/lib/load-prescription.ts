@@ -660,7 +660,25 @@ export function loadingMode(entry: ExerciseEntry): LoadingMode {
   // Olympic bar prescribed 20kg skull crushers to every user regardless of
   // size — too heavy for a lighter or newer lifter on an elbow-sensitive lift.
   if (entry.equipment.some(e => e === 'EZ bar')) return 'ez_bar'
-  if (entry.equipment.some(e => e === 'barbell' || e === 'trap bar' || e === 't-bar')) return 'barbell'
+  // A SMITH MACHINE IS A BARBELL ON RAILS, and the fall-through below would
+  // call it a stack — a 5kg pin floor on something that starts at bar weight.
+  // Added with the six machines above on 13 Sep 2026: turning the loaded flag
+  // on without this would have swapped one wrong number for another.
+  //
+  // A Smith bar's true weight varies by gym (a counterbalanced one can be 7kg,
+  // a plain one 20kg). The app already has the answer for "we do not know your
+  // starting number" — the calibration week finds it and the ramp takes over —
+  // so barbell is the consistent treatment rather than a new guess.
+  //
+  // A BELT SQUAT IS DELIBERATELY NOT HERE, and I had it wrong first. It is
+  // plate-loaded, so "barbell" looked right — but there is no bar, and the
+  // barbell mode's floor is an empty 20kg one. Its ceiling is already correct
+  // without this: getLoadingCeilingKg special-cases category 'leg_press'
+  // (which `belt squat` deliberately maps to, for the reason written at that
+  // rule) to 400kg BEFORE it ever consults the loading mode. So 'stack' gives
+  // it the honest 5kg floor and costs it nothing at the top.
+  if (entry.equipment.some(e => e === 'barbell' || e === 'trap bar' || e === 't-bar'
+    || e === 'smith machine')) return 'barbell'
   return 'stack'
 }
 
@@ -965,10 +983,49 @@ export function getLoadIncrementKg(entry: ExerciseEntry, category: string | null
 // resistance bands have no meaningful kg value, and cardio machines are not
 // loaded at all. Matching on a loose substring like 'machine' would wrongly
 // sweep all of those in.
-const LOADED_EQUIPMENT = new Set([
+export const LOADED_EQUIPMENT = new Set([
   'barbell', 'dumbbell', 'dumbbells', 'EZ bar', 'kettlebell', 'trap bar',
   't-bar', 'cable machine', 'machine', 'leg press machine',
   'hack squat machine', 'farmer handles', 'medicine ball', 'weighted backpack',
+  // ADDED 13 Sep 2026. The machine-floor catalogue expansion (12 Sep) brought
+  // six new equipment strings and this Set never grew with them, so every
+  // exercise using one was prescribed "Bodyweight" — measured at 26% of
+  // generated plans (14 of 54 across the gym/style/goal/experience spread).
+  // A Smith machine shoulder press with no weight on it.
+  'smith machine', 'hip thrust machine', 'glute kickback machine',
+  'hip abduction machine', 'hip adduction machine', 'belt squat machine',
+])
+
+/**
+ * EVERYTHING ELSE, NAMED — the half that makes this a partition instead of an
+ * allowlist, and the actual fix.
+ *
+ * `isExternallyLoaded` used to answer "is this string in the loaded set?",
+ * which means an equipment string nobody has classified reads as NO WEIGHT.
+ * That failure is silent and it is open: adding an exercise to the catalogue
+ * could put "Bodyweight" on a loaded machine without anything objecting. It
+ * did exactly that.
+ *
+ * Listing the unloaded ones does not change what `isExternallyLoaded` returns.
+ * It gives `test:load-ceilings` something to check the catalogue AGAINST, so
+ * an unrecognised string fails a build rather than quietly costing someone
+ * their working weight.
+ *
+ * THREE OF THESE LOOK LIKE MISSES AND ARE NOT. An ASSISTED pull-up or dip
+ * machine subtracts weight rather than adding it and is prescribed through
+ * `suggested_assistance_kg`. A resistance band's resistance is real but is not
+ * expressible in kilos. The cardio machines have no load to set at all.
+ */
+export const UNLOADED_EQUIPMENT = new Set([
+  'bodyweight', 'resistance band', 'pull-up bar', 'dip bars',
+  'assisted pull-up machine',
+  // Furniture the lift happens on or in, never the load itself — anything
+  // loaded that uses one also carries its own implement string.
+  'bench', 'incline bench', 'preacher bench', 'squat rack', 'box', 'plyo box',
+  // Implements with no settable weight.
+  'ab wheel', 'jump rope', 'battle ropes',
+  // Cardio.
+  'treadmill', 'stationary bike', 'rowing machine', 'elliptical machine',
 ])
 
 export function isExternallyLoaded(entry: ExerciseEntry): boolean {

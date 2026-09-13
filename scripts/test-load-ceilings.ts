@@ -27,6 +27,7 @@ import { EXERCISE_DATABASE, getExerciseEntry } from '../src/lib/exercise-db'
 import {
   prescribeLoad, isExternallyLoaded, categorize,
   getLoadingCeilingKg, effectiveLoadingCeilingKg, statedCeilingKg,
+  loadingMode, LOADED_EQUIPMENT, UNLOADED_EQUIPMENT,
 } from '../src/lib/load-prescription'
 import {
   ceilingKindFor, ceilingToAskFor, hasStatedCeiling, isValidCeilingKg,
@@ -214,6 +215,67 @@ console.log('\n6. The question itself')
   }
   check('every kind maps to a real column',
     Object.values(LOAD_CEILING_COLUMN).every(c => /^max_.*_kg$/.test(c)), Object.values(LOAD_CEILING_COLUMN).join(', '))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n7. Every piece of equipment is classified, so none can mean "no weight" by accident')
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT THIS EXISTS FOR, measured 13 Sep 2026. `isExternallyLoaded` asked
+// "is this equipment string in the LOADED set?" — an allowlist, which means a
+// string nobody has classified reads as NO EXTERNAL LOAD. The machine-floor
+// catalogue expansion (12 Sep) added six equipment strings and the Set never
+// grew with them, so a Smith machine shoulder press was prescribed
+// "Bodyweight". Fourteen of fifty-four generated plans carried at least one.
+//
+// Nothing objected, because the failure is SILENT AND OPEN. So the fix is not
+// the six names — it is this: the two sets must PARTITION the catalogue, and
+// an unrecognised string fails here instead of quietly costing someone their
+// working weight.
+{
+  const strings = new Set<string>()
+  for (const entry of Object.values(EXERCISE_DATABASE) as { equipment?: string[] }[]) {
+    for (const e of entry.equipment ?? []) strings.add(e)
+  }
+  check('the catalogue actually has equipment to classify (sanity check on this check)', strings.size > 20, strings.size)
+
+  const unclassified = [...strings].filter(e => !LOADED_EQUIPMENT.has(e) && !UNLOADED_EQUIPMENT.has(e))
+  check('every equipment string is either loaded or explicitly not', unclassified.length === 0, unclassified)
+
+  // AND NEITHER WAY ROUND. A string in both sets is a table somebody edited
+  // twice with two different intentions, and `isExternallyLoaded` would
+  // silently pick the loaded one.
+  const both = [...strings].filter(e => LOADED_EQUIPMENT.has(e) && UNLOADED_EQUIPMENT.has(e))
+  check('...and never both', both.length === 0, both)
+
+  // THE NAMED MACHINES, so a revert is loud. These are the six the expansion
+  // brought and the classifier missed.
+  for (const e of ['smith machine', 'hip thrust machine', 'glute kickback machine',
+    'hip abduction machine', 'hip adduction machine', 'belt squat machine']) {
+    check(`"${e}" counts as external load`, LOADED_EQUIPMENT.has(e))
+  }
+  // AND THE THREE THAT LOOK LIKE MISSES AND ARE NOT. An assisted machine
+  // subtracts weight, a band's resistance is not expressible in kg, and a
+  // treadmill has no load to set — putting any of them in the loaded set
+  // would invent a number rather than fix one.
+  for (const e of ['assisted pull-up machine', 'resistance band', 'treadmill']) {
+    check(`"${e}" is deliberately NOT external load`, UNLOADED_EQUIPMENT.has(e) && !LOADED_EQUIPMENT.has(e))
+  }
+
+  // A SMITH MACHINE IS A BAR, NOT A STACK — otherwise it gets a 5kg pin floor.
+  const smithSquat = getExerciseEntry('Smith Machine Squat')
+  check('a Smith machine loads like a barbell', !!smithSquat && loadingMode(smithSquat) === 'barbell', smithSquat && loadingMode(smithSquat))
+  // A BELT SQUAT IS NOT, and that is deliberate: there is no bar to floor it
+  // at 20kg, and its ceiling comes from its leg_press category regardless.
+  const beltSquat = getExerciseEntry('Belt Squat')
+  check('...and a belt squat is not, because it has no bar', !!beltSquat && loadingMode(beltSquat) === 'stack', beltSquat && loadingMode(beltSquat))
+
+  // THE WHOLE POINT, driven rather than asserted: none of the eight may come
+  // back as bodyweight.
+  const NAMED = ['Smith Machine Bench Press', 'Smith Machine Shoulder Press', 'Smith Machine Squat',
+    'Machine Hip Thrust', 'Glute Kickback Machine', 'Hip Abduction Machine', 'Hip Adduction Machine', 'Belt Squat']
+  const stillBodyweight = NAMED.filter(n => { const e = getExerciseEntry(n); return !e || !isExternallyLoaded(e) })
+  check('not one of the eight machines is bodyweight any more', stillBodyweight.length === 0, stillBodyweight)
 }
 
 console.log(failures === 0 ? '\nAll load-ceiling checks passed.\n' : `\n${failures} FAILED\n`)

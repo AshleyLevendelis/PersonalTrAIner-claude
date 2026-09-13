@@ -2,6 +2,62 @@
 
 Newest first. One line each.
 
+- [x] **A SMITH MACHINE SHOULDER PRESS TOLD PEOPLE TO LIFT BODYWEIGHT.**
+  Found 13 Sep 2026 while probing the add-an-exercise path — not caused by it.
+  Generation path, on plans today.
+  **MEASURED: 14 of 54 generated plans** (every combination of gym x style x
+  goal x experience) carried at least one loaded machine prescribed as
+  "Bodyweight" with no kilos. Eight catalogue entries: Smith Machine Bench
+  Press / Shoulder Press / Squat, Machine Hip Thrust, Glute Kickback Machine,
+  Hip Abduction Machine, Hip Adduction Machine, Belt Squat.
+  **ROOT CAUSE, and the half that matters more.** `isExternallyLoaded` tested
+  equipment against `LOADED_EQUIPMENT`, an allowlist of exact strings. The
+  machine-floor catalogue expansion (12 Sep) added six equipment strings the
+  Set never gained — and the lookup **fails silently and open**: a string
+  nobody has classified reads as "no external load". Nothing objected. So the
+  eight names are the symptom; the defect is a classifier whose "I don't
+  recognise this" answer is "no weight".
+  **FIXED AS A PARTITION, not a longer allowlist.** The six machines join
+  `LOADED_EQUIPMENT`; a new `UNLOADED_EQUIPMENT` names the other 18 strings in
+  the catalogue; and `test:load-ceilings` §7 fails when any equipment string in
+  `EXERCISE_DATABASE` is in neither set, or in both. Three entries are
+  deliberately unloaded and say so in the code: an ASSISTED pull-up/dip machine
+  subtracts weight (it uses `suggested_assistance_kg`), a band's resistance is
+  not expressible in kg, and cardio machines have no load to set.
+  **TWO THINGS I GOT WRONG AND CORRECTED BEFORE SHIPPING**, both caught by
+  printing the numbers rather than reasoning about them.
+  1. I first routed **belt squat** to barbell loading mode — "plate-loaded,
+     therefore barbell". Wrong twice: there is no bar, so the 20kg barbell
+     floor is a fiction, and the 100kg stack ceiling was never the risk —
+     `getLoadingCeilingKg` special-cases `category === 'leg_press'` (which
+     `belt squat` deliberately maps to) to 400kg BEFORE it consults the loading
+     mode. It stays a stack. The 160kg-for-a-novice it produced is the
+     leg-press standard and is correct; the floor under it was not.
+  2. My first defect probe counted "externally loaded but no kilos", which
+     swept in a **larger, pre-existing group**: Russian Twist, Medicine Ball
+     Slams, Cable Woodchops, Kettlebell Swings and two forearm movements —
+     40 of 54 plans BEFORE this change, 34 after (the drop is only the machines
+     leaving the category). **Unchanged by this work and NOT established as a
+     defect.** Kettlebell Swings is tiered `primer`, where the primer guard
+     deliberately forces "Light" and no kilos, and BACKLOG already carries a
+     COMPLETED "Close the tag-loaded / effectively-loadless gap (Russian
+     Twist)". Recorded in the plan doc as a lead to re-measure, not a fact.
+  **AFTER, on the same profiles:** Smith bench 45kg = barbell bench 45kg;
+  Smith shoulder press 30kg = overhead press 30kg; Smith squat 72.5kg; the four
+  selectorised machines 35-47.5kg (novice, 80kg male). The Smith machine is the
+  one equipment string routed to barbell loading, because it genuinely is a bar
+  — its true weight varies by gym, and the calibration week is the app's
+  existing answer for an unknown starting number.
+  **FLAGGED FOR ASHLEY, overrulable:** a Smith bar assumed to be a 20kg barbell
+  starts a novice heavier than a counterbalanced Smith would. Calibration
+  corrects it, the same protection every unknown lift has — but if Smith should
+  start lighter than a free barbell, that is a coaching call.
+  **MUTATIONS: 6 tried, 6 caught**, including the one the whole change is for —
+  a fabricated exercise carrying an equipment string nobody classified now
+  fails the gate instead of shipping with no weight.
+  **Deploys:** frontend on merge. No edge function, no migration. Weights simply
+  change (her 10 Sep ruling: no live users, no message).
+
 - [x] **TOOLS, FRAME 4a — ONE CARD ALWAYS THERE, AND THE PROTOCOLS BESIDE IT.**
   Ashley re-sent `design_handoff_tools_grocery` on 13 Sep 2026 and said
   "implement this". **The archive was named *Chat layout improvements* and did
