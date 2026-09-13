@@ -144,9 +144,25 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `rebuild-offer`, `profile-restore`, `coach-volume-schedule`,
   `injury-rebuild`, `enforcement-gaps`, `concurrent-activity`
 - Session length — `screen only`; targets and macro mode — `screen only`
-- Eight onboarding answers cannot be changed afterwards from the Profile
-  screen: the three known lifts, exercise dislikes, the three implement
-  ceilings, the starting preference — `MISSING` on screen
+- Onboarding answers that cannot be changed afterwards from the Profile
+  screen. CORRECTED 13 Sep 2026, having measured what the old "eight locked
+  answers" line actually covered:
+  - The three implement ceilings — **now editable**, in "You" beside Equipment,
+    and correcting one re-prices the running plan from this week onward with
+    the exercises untouched (her ruling that day, from four options). Shown
+    only when the kit is limited, because a full-gym answer discards them.
+    `setup-answers`
+  - Exercise dislikes — **was never locked**: it is not a profile column at
+    all, it becomes `user_facts` rows, the same shape a "never give me
+    burpees" chat turn produces. So the COACH could always change it; the
+    SCREEN still cannot. `coach only`, not `MISSING`
+  - The three known lifts — still `MISSING`, and now with a measured reason:
+    they are a generation-time seed (`knownWorkingWeights`), not something
+    `prescribeLoad` reads, so the re-price path is blind to them by design and
+    `setup-answers` §7 pins that. Unlocking them needs the anchor machinery,
+    which refuses downward moves
+  - The starting preference — still `MISSING`; plan-shaping, so it belongs on
+    the rebuild-offer path with goal and style, not the re-price one
 - Weights actually lifted flow into the printed plan — automatic from
   calibration week, offered after — `calibration-search`,
   `beat-target-offer`, `logged-reanchor`

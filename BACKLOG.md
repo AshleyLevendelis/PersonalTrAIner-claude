@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **THE THREE WEIGHT CAPS YOU GAVE AT SETUP CAN NOW BE CORRECTED, AND THE
+  PLAN REACTS.** Ashley chose "unlock the locked setup answers" on 13 Sep 2026.
+  Six of the eight are numbers that feed prescribed weight, and none could be
+  seen or changed — so a wrong one was wrong on every session until the plan
+  ended. `statedCeilingKg` treats any number it finds as a HARD CLAMP, so a
+  gym whose dumbbells actually go to 40kg being recorded as 30 held every
+  dumbbell session below what she could do, silently, for sixteen weeks.
+  **HER RULING**, from four options: update this plan's weights NOW, from this
+  week onward, exercises unchanged, and say what moved. Rejected: waiting for
+  the next block, asking each time, and a split rule for caps versus lifts.
+  **THE NOTE IN CLAUDE.md WAS RIGHT ABOUT THE SCREEN AND WRONG ABOUT "LOCKED",
+  measured before building.** Exercise dislikes was never a profile column — it
+  becomes `user_facts` rows, "the same shape a later 'never give me burpees'
+  chat turn produces", so the COACH could always change it and only the screen
+  could not. And the three ceilings already had a second entry point: the
+  in-session prompt asks for one, and `ceiling-reconcile` applies it on the
+  next app load — silently, by full regeneration, on an earlier ruling of hers.
+  **WHAT WAS ACTUALLY MISSING** was a way to re-price a running plan without
+  re-selecting its exercises. `rebuildAgainstProfile` re-runs generation and can
+  change which exercises the plan holds; every load-only patcher was one slot,
+  one block. `reprice-plan.ts` is the plan-wide one, and it MAY GO DOWNWARD —
+  the difference from `patchBlockFromLiftedKg`, which is NEVER DOWNWARD because
+  it is fed by a logged lift and must not act as a brake.
+  **THREE THINGS I GOT WRONG, all caught by driving real code, not by reading.**
+  1. The first re-price re-prescribed every slot from scratch. Lowering a
+     DUMBBELL ceiling moved 174 weights and raised a Barbell Bench Press from
+     37.5kg to 57.5kg. The invariant that exposed it: re-pricing against an
+     UNCHANGED profile moved the same 174, because a bare `prescribeLoad` cannot
+     reproduce a stored weight carrying the block's progression. It now prices
+     each slot twice — old profile and new — and moves the stored weight by the
+     ratio, so an unrelated fact gives a ratio of 1 and nothing moves.
+  2. The receipt said "from this week" and quoted the largest move anywhere: a
+     week-9 leg curl at 40kg, beside a live week showing 22kg.
+  3. I put the rows in a FIFTH Profile group. `test:profile-groups` pins exactly
+     four by design, and was right to — three rows do not justify starting the
+     drift back to "eight headings and every editor open at once". They moved
+     into "You", beside Equipment, the field that decides whether they apply.
+     A gate blocking a change that should fit the design instead of bending it.
+  **MEASURED, AND IT NARROWED THE WORK: the three KNOWN LIFTS are not
+  re-priceable.** They are a generation-time seed — `exercise-plan.ts` packs
+  them into `knownWorkingWeights` for `generateMesocycle`; `prescribeLoad` never
+  reads them off the profile. So this path is blind to them, correctly. §7 of
+  the gate pins that as a deliberate no-op rather than letting it be
+  re-discovered as a bug. Unlocking them needs the anchor machinery, which
+  refuses downward moves and cannot simply be reused.
+  **NOT IN THIS SLICE, named per rule 1:** the three known lifts (above);
+  exercise dislikes (a pool change — belongs with the coach's ban work); the
+  starting preference (plan-shaping — belongs on the rebuild-offer path); and
+  coach parity for all of it, which rule 4 counts as a gap until built.
+  **MUTATIONS: 11 tried, 11 caught** — 3 only after the gate was fixed. Writing
+  only `suggested_load_kg` and leaving the printed string stale was invisible.
+  So was deleting the loadless-slot guard, twice: the natural fixture has no
+  loadable movement the plan leaves unweighted, and the first forge picked a
+  slot already under the ceiling, so it was never re-priced at all.
+  **VERIFIED:** `test:setup-answers` (43 checks, new). **NOT yet verified in a
+  browser** — the `verify:` driver for the new rows is outstanding, which the
+  standing rule requires for anything visible.
+  **Deploys:** frontend on merge. No migration — every column already exists.
+
 - [x] **YOU CAN NOW PUT AN EXERCISE INTO A SESSION.** The last `MISSING` line in
   the "Changing one exercise" grain, chosen by Ashley on 13 Sep 2026 over
   unlocking the eight locked setup answers and wiring the coach's ban. Before

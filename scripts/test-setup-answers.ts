@@ -40,7 +40,14 @@ import {
   repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice, headlineReprice,
 } from '../src/lib/reprice-plan'
 import { getExerciseEntry } from '../src/lib/exercise-db'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import type { UserProfile, MesocycleWeek } from '../src/lib/types'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
+const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 let failures = 0
 function check(label: string, ok: boolean, extra?: unknown) {
@@ -318,6 +325,62 @@ const strongCeiling = repriceForCorrectedProfile(
   strongMeso, strongBase, { ...strongBase, max_dumbbell_kg: 8 } as unknown as UserProfile, strongWeeks)
 check('...while a ceiling correction on the SAME profile does move weights',
   strongCeiling.changes.length > 0, strongCeiling.changes.length)
+
+// ---------------------------------------------------------------------------
+console.log('\n8. The screen offers it, and saving it actually re-prices')
+// ---------------------------------------------------------------------------
+const screen = strip(read('src/components/ProfileScreen.tsx'))
+const app = strip(read('src/App.tsx'))
+
+// PINNED AS ROWS, NOT AS A GROUP, and the gate beside this one is why. The
+// first attempt added a fifth Profile group; test:profile-groups pins exactly
+// four, deliberately — the design handoff's answer to "eight headings and
+// every editor open at once". Three rows did not justify starting the drift
+// back, so they live in "You", beside Equipment, which is the field that
+// decides whether they apply at all.
+check('the Profile screen offers the three ceilings',
+  /data-testid="stated-ceilings"/.test(screen)
+  && ['max_dumbbell_kg', 'max_single_implement_kg', 'max_improvised_kg'].every(f => screen.includes(f)))
+check('...as rows inside an existing group, not a fifth one',
+  !/Group label="What you can lift"/.test(screen))
+check('...beside Equipment, the field that governs them',
+  /Row label="Equipment"[\s\S]{0,3000}data-testid="stated-ceilings"/.test(screen))
+// A FULL-GYM TRAINEE MUST NOT SEE THEM. assembleProfile discards all three for
+// full_gym, so offering the rows there would be a control that cannot take
+// effect — the one thing the must-have list forbids.
+check('...shown only when the kit is limited, never at a full gym',
+  /equipment_access !== 'full_gym'[\s\S]{0,200}data-testid="stated-ceilings"/.test(screen))
+check('...and a decline stays reversible', /load_ceilings_declined/.test(screen))
+
+check('saving one signals the correction upward', /onCeilingsCorrected/.test(screen))
+check('...only after the write lands, like the invalidation beside it',
+  /updateProfileField\(profileId, patch\)\.then\([\s\S]{0,400}?onCeilingsCorrected/.test(screen))
+check('...and only when a ceiling actually moved',
+  /CEILING_FIELDS\.some\([\s\S]{0,120}?patch\[k\] !== profile\[k\]/.test(screen))
+
+check('App re-prices rather than rebuilding', /handleCeilingsCorrected/.test(app)
+  && /repriceForCorrectedProfile/.test(app))
+check('...from the live week onward', /repriceableWeekNumbers\(mesocycle, liveWeek\)/.test(app))
+check('...saving only the weeks that moved', /touched\.has\(w\.week_number\)/.test(app))
+check('...reverting the plan in memory when the save fails',
+  /setMesocycle\(previous\)[\s\S]{0,200}setWriteError/.test(app))
+check('...and telling her what moved', /describeReprice\(changes\)/.test(app))
+// HER RULING WAS APPLY, NOT ASK. A confirm dialog here would be the wrong
+// shape — and would contradict ceiling-reconcile, which already applies a
+// stated ceiling without asking.
+// BOUNDED TO THE HANDLER'S OWN BODY. A window measured from the first
+// occurrence of the name ran into the JSX mount, where
+// `onCeilingsCorrected={handleCeilingsCorrected}` sits one line from
+// `onPlanInvalidated={setPlanInvalidation}` — so the check failed on correct
+// code, reading the two props next to each other as the handler asking for a
+// dialog.
+const ceilingHandlerAt = app.indexOf('const handleCeilingsCorrected = async')
+const nextHandlerAt = app.indexOf('  const handleConfirmRebuild', ceilingHandlerAt + 1)
+const ceilingBody = ceilingHandlerAt === -1 ? '' : app.slice(ceilingHandlerAt, nextHandlerAt)
+check('the handler was found and bounded', ceilingBody.length > 200 && nextHandlerAt > ceilingHandlerAt,
+  { len: ceilingBody.length })
+check('...and it never asks: no rebuild dialog, no regeneration',
+  !/setPlanInvalidation|rebuildFromCurrentWeek|rebuildAgainstProfile/.test(ceilingBody))
 
 console.log(failures === 0 ? '\nAll setup-answer checks passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)

@@ -95,6 +95,19 @@ interface ProfileScreenProps {
    * explicit confirm changes a plan.
    */
   onPlanInvalidated?: (invalidation: PlanInvalidation) => void
+  /**
+   * Fired after a corrected implement ceiling is SAVED — the three numbers
+   * that cap every prescribed weight.
+   *
+   * Separate from `onPlanInvalidated` on purpose, and the separation is the
+   * point: those fields invalidate the PLAN (which exercises it holds) and end
+   * in a confirm dialog. A ceiling invalidates only the WEIGHTS, and Ashley's
+   * ruling of 13 Sep 2026 was to apply it rather than ask — the same shape
+   * ceiling-reconcile already runs on. Reporting it the same way would put a
+   * "Rebuild my plan" dialog in front of a change that must not rebuild
+   * anything.
+   */
+  onCeilingsCorrected?: (corrected: Partial<UserProfile>) => void
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
@@ -376,7 +389,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
@@ -622,6 +635,13 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     window.location.reload()
   }
 
+  /**
+   * The three columns `statedCeilingKg` reads. Named once here rather than
+   * spelled out at the comparison, so adding a fourth implement cannot leave
+   * the re-price silently not firing for it.
+   */
+  const CEILING_FIELDS = ['max_dumbbell_kg', 'max_single_implement_kg', 'max_improvised_kg'] as const
+
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
     const revertPatch = Object.fromEntries(
@@ -631,12 +651,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     // patch to an already-updated profile would find no change and offer
     // nothing, which is how this fix would silently do nothing at all.
     const invalidation = detectPlanInvalidation(profile, patch)
+    // A CORRECTED CEILING IS A DIFFERENT KIND OF WRONG. Compared here, before
+    // the merge, for the same reason the invalidation is.
+    const ceilingsMoved = CEILING_FIELDS.some(k => k in patch && patch[k] !== profile[k])
     onProfileChanged(patch)
     updateProfileField(profileId, patch).then(() => {
       // Only once the write actually lands. Offering to rebuild around an
       // injury whose save then failed would rebuild the plan around something
       // the database does not know about.
       if (invalidation) onPlanInvalidated?.(invalidation)
+      if (ceilingsMoved) onCeilingsCorrected?.(patch)
     }).catch(err => {
       console.error('Profile field save failed — reverting', err)
       onProfileChanged(revertPatch)
@@ -721,6 +745,68 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 these rows vanishing mid-edit. */}
             <Row label="Experience"><EditableSelectField value={profile.training_experience ?? ''} options={EXPERIENCE_OPTIONS} onSave={v => savePatch({ training_experience: v as TrainingExperience })} /></Row>
             <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
+            {/* WHAT YOU CAN LIFT — added 13 Sep 2026, beside Equipment
+                because that is the field that decides whether these apply at
+                all, and because they are the same kind of fact: what this
+                person's training actually has available.
+
+                NOT A FIFTH GROUP, though the first attempt made one.
+                test:profile-groups pins exactly four, and it is right to:
+                the design handoff's answer to "eight headings and every
+                editor open at once" was four named groups, and a fifth for
+                three rows would start the drift back. The gate blocked a
+                change that should have fitted the design instead of bending
+                it.
+
+                These three were collected at setup and then locked — no way
+                to see them, no way to correct them. They are not preferences:
+                `statedCeilingKg` treats any number it finds as a HARD CLAMP
+                on every prescribed weight (load-prescription.ts:818), so a
+                wrong one quietly holds every session below what she can
+                actually do, and she had no way to say so.
+
+                ONLY FOR A TRAINEE WHOSE KIT IS LIMITED. `assembleProfile`
+                discards all three for a full-gym answer
+                (onboarding-slots.ts:1138) — "a FULL-GYM ANSWER DISCARDS
+                THEM… writing it anyway would clamp a gym trainee to a home
+                number for sixteen weeks". Offering the rows to a gym trainee
+                would be a control that must not take effect. */}
+            {profile.equipment_access !== 'full_gym' && (
+              <div data-testid="stated-ceilings">
+                <Row label="Heaviest dumbbell (per hand)">
+                  <EditableTextField
+                    value={profile.max_dumbbell_kg ?? undefined}
+                    unit="kg" min={1} max={100}
+                    onSave={n => savePatch({ max_dumbbell_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                <Row label="Heaviest single weight">
+                  <EditableTextField
+                    value={profile.max_single_implement_kg ?? undefined}
+                    unit="kg" min={1} max={100}
+                    onSave={n => savePatch({ max_single_implement_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                <Row label="What your backpack holds">
+                  <EditableTextField
+                    value={profile.max_improvised_kg ?? undefined}
+                    unit="kg" min={1} max={60}
+                    onSave={n => savePatch({ max_improvised_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                {/* A DECLINE IS A VALUE, NOT AN ABSENCE — the reason
+                    load_ceilings_declined is its own column. Reversible from
+                    here, because "I'm not sure" stops the app asking and
+                    somebody who later finds out needs a way back in. */}
+                {profile.load_ceilings_declined && (
+                  <p className="pt-1 text-xs text-muted-foreground" data-testid="ceilings-declined">
+                    You said you weren't sure what these weigh, so nothing is capped. Fill any of them
+                    in and I'll use it.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1">
               <span className="text-muted-foreground">Training days</span>
               <TrainingDaysEditor days={profile.training_days} onSave={v => savePatch({ training_days: v })} />

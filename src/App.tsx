@@ -32,6 +32,7 @@ import { GroceryScreen } from '@/components/GroceryScreen'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
@@ -2063,6 +2064,50 @@ function App() {
    * remember doing. rebuildFromCurrentWeek enforces that; this just supplies
    * the week to start from.
    */
+  /**
+   * A corrected implement ceiling, applied to the plan she is already in.
+   *
+   * ASHLEY'S RULING, 13 Sep 2026: update this plan's weights now, from this
+   * week onward, exercises unchanged, and say what moved. So this APPLIES
+   * rather than offering — there is no confirm dialog — but it is never
+   * silent: the receipt names the largest move and its two numbers.
+   *
+   * It is not `handleConfirmRebuild`'s sibling by accident of placement. That
+   * one regenerates weeks and can change which exercises the plan holds; this
+   * one may not, which is why it goes through `repriceForCorrectedProfile`
+   * rather than `rebuildFromCurrentWeek`.
+   */
+  const handleCeilingsCorrected = async (patch: Partial<UserProfile>) => {
+    if (!profile?.id || mesocycle.length === 0) return
+    const corrected = { ...profile, ...patch } as UserProfile
+    const liveWeek = getActiveMesocycleWeek(
+      mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4,
+    )
+    const { mesocycle: repriced, changes } = repriceForCorrectedProfile(
+      mesocycle, profile, corrected, repriceableWeekNumbers(mesocycle, liveWeek),
+    )
+    if (changes.length === 0) return
+
+    const previous = mesocycle
+    setMesocycle(repriced)
+    try {
+      // ONLY THE WEEKS THAT MOVED. Re-saving untouched weeks is how a resave
+      // rewinds live-week detection (weight-basis-offer.ts:386) — and there is
+      // no reason to write a week whose numbers are the same.
+      const touched = new Set(changes.map(c => c.weekNumber))
+      await Promise.all(
+        repriced.filter(w => touched.has(w.week_number)).map(w => saveMesocycleWeek(profile.id!, w)),
+      )
+    } catch (err) {
+      console.error('Re-pricing after a corrected ceiling failed to save — reverting', err)
+      setMesocycle(previous)
+      setWriteError("Your weights couldn't be updated just now — the plan is unchanged.")
+      return
+    }
+    const text = describeReprice(changes)
+    if (text) setAdaptationMessages(prev => [...prev, { text }])
+  }
+
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
     setRebuilding(true)
@@ -2700,6 +2745,7 @@ function App() {
         latestWeightKg={latestWeightKg}
         onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
         onPlanInvalidated={setPlanInvalidation}
+        onCeilingsCorrected={handleCeilingsCorrected}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
