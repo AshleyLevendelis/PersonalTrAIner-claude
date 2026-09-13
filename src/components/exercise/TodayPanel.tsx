@@ -1008,23 +1008,31 @@ export function TodayPanel({
               reason written there — two ways into one dialog is how they
               drift apart. Only shown where an edit can actually be saved,
               the same gate onRemove and onMove use. */}
-          {profileId && mesocycle && (
+          {/* A COLUMN, NOT TWO BUTTONS LEFT TO FLOW. A <button> is inline, and
+              while there was only one of these at the foot of the list that
+              never showed; the second landed beside it on the same line, so
+              the screen read "＋ Add an exercise＋ Add unplanned work" as one
+              run-on string with abutting tap targets. Found by reading a
+              screenshot at 390px on 13 Sep 2026 — every check was green. */}
+          <div className="flex flex-col items-start gap-1" data-testid="session-foot-actions">
+            {profileId && mesocycle && (
+              <button
+                type="button"
+                data-testid="add-exercise"
+                onClick={() => setAddOpen(true)}
+                className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+              >
+                ＋ Add an exercise
+              </button>
+            )}
             <button
               type="button"
-              data-testid="add-exercise"
-              onClick={() => setAddOpen(true)}
+              onClick={() => setUnplannedWorkOpen(true)}
               className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
             >
-              ＋ Add an exercise
+              ＋ Add unplanned work
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setUnplannedWorkOpen(true)}
-            className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
-          >
-            ＋ Add unplanned work
-          </button>
+          </div>
           <AddUnplannedWork
             open={unplannedWorkOpen}
             onOpenChange={setUnplannedWorkOpen}

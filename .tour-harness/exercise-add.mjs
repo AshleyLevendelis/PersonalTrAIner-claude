@@ -80,6 +80,16 @@ const feet = await ev(`[...document.querySelectorAll('button')].map(b => b.textC
 check('1b. ...beside, and distinct from, "Add unplanned work"',
   feet.filter(t => /add an exercise/i.test(t)).length === 1 && feet.some(t => /unplanned/i.test(t)), feet)
 
+// STACKED, NOT SIDE BY SIDE. Both are plain <button>s, which are inline, so
+// the second one landed on the same line as the first and the screen read
+// "＋ Add an exercise＋ Add unplanned work" — one run-on string with abutting
+// tap targets, on a screen meant to be used one-handed in a gym. Every check
+// was green; a screenshot found it. Compared by top edge rather than by any
+// class name, so a different layout that still stacks them passes.
+const footTops = await ev(`[...document.querySelectorAll('[data-testid="session-foot-actions"] button')].map(b => Math.round(b.getBoundingClientRect().top))`)
+check('1c. ...on its own line, not run together with it',
+  Array.isArray(footTops) && footTops.length === 2 && footTops[1] - footTops[0] >= 16, footTops)
+
 check('2a. tapping it opens the sheet', (await tap('[data-testid="add-exercise"]')) && (await until(() => has('[data-testid="add-exercise-sheet"]'), v => v)))
 await shoot('exercise-add-1-suggestions')
 
