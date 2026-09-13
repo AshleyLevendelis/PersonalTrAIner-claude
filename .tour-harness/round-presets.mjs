@@ -60,60 +60,60 @@ console.log('\nONE-TAP PRESETS, ON THE REAL SCREEN\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(4000)
 
-// The tile says EMOM again — and now there is one. Checked as "says it AND
-// has it", so deleting the preset while leaving the word fails here too.
-// RE-ANCHORED 12 Sep 2026 (design handoff 2a). The six-tile grid became one
-// timer surface and the three number inputs became chips, so every read below
-// that used to go through `fields()` now goes through the SUMMARY LINE — the
-// one place the chosen numbers appear together, and the line she actually
-// reads before tapping Start. The properties are unchanged: a preset fills
-// the setup without starting it, a second preset replaces the first, and the
-// words on the tab name only protocols that exist.
-// THE SUMMARY ROW, by its own marker. Matching on the text instead found the
-// EMOM PRESET CHIP — describeRoundPreset writes "10 × every 60s" too — so the
-// reader returned the button it was about to tap rather than the state that
-// tap produced, and three checks compared a string with itself.
-const setupSummary = () => ev(`(() => {
-  const el = document.querySelector('[data-round-summary]')
-  return el ? el.textContent.trim() : null
-})()`)
-const rowText = (await ev(`document.body.innerText`)).match(/Change the intervals[^\n]*\n[^\n]*/)?.[0] ?? ''
-check('0. the Tools interval row names EMOM', /EMOM/.test(rowText), rowText)
-check('1. the round setup opens', await tap('[data-change-intervals]'))
-await wait(900)
+// RE-ANCHORED AGAIN 13 Sep 2026 (frame 4a). The presets were a tile, then a
+// grid inside a setup panel behind a row, and are now the CHIP ROW that is the
+// tab's whole control surface. Two things changed for this driver and nothing
+// else did: there is no setup to open, and the state a tap produces is read
+// off the CARD — which is the point of 4a, since the card is what she is
+// looking at when she decides.
+//
+// THE PROPERTIES ARE UNCHANGED: the tab names only protocols that exist, a
+// preset fills the choice without starting it, a second preset replaces the
+// first rather than merging, and every one of them is thumb-sized.
+const cardText = () => ev(`document.querySelector('[data-round-card]')?.innerText?.replace(/\\s+/g, ' ')?.trim() || ''`)
+const chip = key => `[data-protocol="${key}"]`
 
-const text = await ev(`document.body.innerText`)
-check('2. Tabata is on the screen as a button', /Tabata/.test(text), text.slice(0, 200))
-check('3. ...with its numbers under it, so nothing is opaque', /8 × 20s \/ 10s/.test(text),
-  (text.match(/Tabata[^\n]*\n[^\n]*/) || ['not found'])[0])
+const tabText = await ev(`document.body.innerText`)
+check('0. the Tools tab names EMOM', /EMOM/.test(tabText), tabText.slice(0, 240))
+check('1. the protocols are on the tab, with no setup to open first',
+  (await ev(`document.querySelectorAll('[data-protocol]').length`)) >= 5
+  && !(await ev(`!!document.querySelector('[data-change-intervals]')`)))
 
-const before = await setupSummary()
+check('2. Tabata is on the screen as a button', await ev(`!!document.querySelector('[data-protocol="tabata"]')`))
+const tabataChip = await ev(`document.querySelector('[data-protocol="tabata"]')?.textContent?.trim() || ''`)
+check('3. ...with its numbers beside it, so nothing is opaque', /8×20\/10/.test(tabataChip), tabataChip)
+
+// Start somewhere else, so "tapping Tabata" has something to change.
+await tap(chip('boxing'))
+await wait(500)
+const before = await cardText()
 await shoot('round-presets')
 
-check('4. tapping Tabata registers', await tap('[data-preset="tabata"]'))
+check('4. tapping Tabata registers', await tap(chip('tabata')))
 await wait(600)
-const after = await setupSummary()
-check('5. ...and it filled the setup with 8 / 20s / 10s',
-  after === '8 × 20s work · 10s rest', { before, after })
+const after = await cardText()
+check('5. ...and the card now describes Tabata — 8 rounds, 3:50, 20s/10s',
+  after !== before && /READY · 8 ROUNDS/i.test(after) && /3:50/.test(after) && /20s work · 10s rest/.test(after),
+  { before, after })
 
 // THE THING THAT WOULD BE WORST TO GET WRONG. A preset that STARTS on tap
 // runs four minutes of work from one mis-tap, with the numbers never shown.
-check('6. ...without starting the timer — the setup is still up',
-  await ev(`!!document.querySelector('[data-preset]')`)
+check('6. ...without starting the timer',
+  await ev(`!!document.querySelector('[data-protocol]')`)
   && !(await ev(`/GET READY|Round 1 of/i.test(document.body.innerText)`)), null)
 
 check('7. a second preset overwrites the first rather than merging with it',
-  await tap('[data-preset="boxing"]'))
+  await tap(chip('boxing')))
 await wait(600)
-const boxing = await setupSummary()
-check('8. ...boxing rounds reads 3 × 3 min / 1 min',
-  boxing === '3 × 3 min work · 1 min rest', boxing)
+const boxing = await cardText()
+check('8. ...boxing reads 3 rounds of 3 minutes with a minute off',
+  /READY · 3 ROUNDS/i.test(boxing) && /3 min work · 1 min rest/.test(boxing) && /11:00/.test(boxing), boxing)
 
 // ONE-HANDED ON A GYM FLOOR. 44px is the floor the rest of this app is held to.
-const small = await ev(`(() => [...document.querySelectorAll('[data-preset]')]
-  .map(n => ({ p: n.getAttribute('data-preset'), h: Math.round(n.getBoundingClientRect().height), w: Math.round(n.getBoundingClientRect().width) }))
+const small = await ev(`(() => [...document.querySelectorAll('[data-protocol]')]
+  .map(n => ({ p: n.getAttribute('data-protocol'), h: Math.round(n.getBoundingClientRect().height), w: Math.round(n.getBoundingClientRect().width) }))
   .filter(x => x.h < 44 || x.w < 44))()`)
-check('9. every preset button is big enough to hit', Array.isArray(small) && small.length === 0, small)
+check('9. every protocol chip is big enough to hit', Array.isArray(small) && small.length === 0, small)
 
 await shoot('round-presets-tabata')
 
@@ -123,29 +123,24 @@ await shoot('round-presets-tabata')
 // countdown that never moves and prove nothing (the lead-in driver records
 // the same trap).
 console.log('\n  EMOM')
-check('10. there is an EMOM button now', await tap('[data-preset="emom"]'))
+check('10. there is an EMOM chip now', await tap(chip('emom')))
 await wait(600)
-const emomSummary = await setupSummary()
-check('11. ...and it is ten sixty-second intervals', emomSummary === '10 × every 1 min', emomSummary)
-// AN EMOM HAS NO REST TO FILL IN, and with chips that is "None is the one
-// selected" rather than "the box is absent".
-const restChip = await ev(`(() => {
-  const el = document.querySelector('[data-rest="0"]')
-  return el ? { label: el.textContent.trim(), on: el.getAttribute('aria-pressed') } : null
-})()`)
-check('12. ...with None chosen on the rest row, because an EMOM has no rest',
-  restChip?.label === 'None' && restChip?.on === 'true', restChip)
-const emomText = await ev(`document.body.innerText`)
-check('13. the form counts them in MINUTES, not rounds',
-  /\bminutes\b/i.test(emomText) && !/Work \(s\)/.test(emomText),
-  (emomText.match(/Minutes[\s\S]{0,60}/) || ['not found'])[0])
-check('14. ...and says plainly what the protocol is',
-  /whatever is left is your rest/i.test(emomText), null)
+const emomCard = await cardText()
+check('11. ...and the card reads ten sixty-second intervals',
+  /READY · 10 INTERVALS/i.test(emomCard) && /every 1 min/.test(emomCard) && /10:00/.test(emomCard), emomCard)
+// AN EMOM HAS NO REST TO NAME, and the card must not invent one — the whole
+// reason `style` exists is that the numbers alone cannot tell an EMOM from
+// ten continuous intervals.
+check('12. ...and names no rest, because an EMOM has none', !/rest/i.test(emomCard), emomCard)
+// AND ITS OWN CHIP SAYS ITS LENGTH rather than a work/rest pair it lacks.
+const emomChip = await ev(`document.querySelector('[data-protocol="emom"]')?.textContent?.trim() || ''`)
+check('13. the chip states the block, not a rest interval',
+  /10 min/.test(emomChip) && !/\//.test(emomChip), emomChip)
 await shoot('round-presets-emom')
 
 // A ten-minute EMOM with a ten-second lead-in: start it, skip the countdown,
 // and read what the running screen calls the interval.
-check('15. Start is pressed', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim())); if (!b) return false; b.click(); return true })()`))
+check('15. Start is pressed', await ev(`(() => { const b = document.querySelector('[data-round-card-start]'); if (!b) return false; b.click(); return true })()`))
 await wait(1200)
 check('16. it counts you in first, same as any round', await ev(`/GET READY/i.test(document.body.innerText)`),
   (await ev(`document.body.innerText`)).slice(0, 120))
@@ -169,18 +164,21 @@ await shoot('round-presets-emom-running')
 // with the shortest round the form allows, so the finished state is reachable
 // in seconds rather than minutes.
 console.log('\n  LOGGING A FINISHED ROUND')
-// CLEAR THE EMOM STILL RUNNING FROM THE SECTION ABOVE. A live round holds the
-// whole tab, so without this the tile grid is never on screen and every check
-// below fails for the wrong reason — which is exactly what the first run did.
-await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Reset$/.test(x.textContent.trim())); if (b) b.click(); return !!b })()`)
-await wait(1200)
+// CLEAR THE EMOM STILL RUNNING FROM THE SECTION ABOVE. The previous section
+// leaves the flooded field up, whose Reset is the one to press — from the
+// card the tab is still usable, but from the field it is not.
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Reset$/.test((x.textContent||'').trim())); if (b) b.click(); return !!b })()`)
+await wait(1500)
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(3500)
-const gridUp = await ev(`/Change the intervals/.test(document.body.innerText)`)
-check('20b. the round released the tab, so the interval row is back', gridUp === true,
+// RE-ANCHORED 13 Sep 2026 (frame 4a): there is no row to come back to. What
+// "released the tab" means now is that the card is back to IDLE and the rest
+// of the tab is reachable under it.
+const released = await ev(`!!document.querySelector('[data-round-card][data-round-phase="idle"]') && /Also here/i.test(document.body.innerText)`)
+check('20b. the round released the tab, so the idle card and the list are back', released === true,
   (await ev(`document.body.innerText`)).slice(0, 120))
-check('21. the round setup opens again', await tap('[data-change-intervals]'))
-await wait(800)
+check('21. the Custom setup opens again', await tap('[data-protocol="custom"]') && (await wait(700), await ev(`!!document.querySelector('[data-round-setup]')`)))
+await wait(300)
 // 2 rounds x 1s work / 1s rest, and skip the ten-second countdown.
 // The short round this section needs is not on the chip rows — they hold
 // human values — so it goes through the Custom escape hatch on both, then
@@ -194,11 +192,17 @@ await ev(`(() => {
   const set = (el, v) => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })) }
   const ins = [...document.querySelectorAll('input[type=number]')]
   if (ins.length >= 2) { set(ins[0], '1'); set(ins[1], '1') }
-  const down = document.querySelector('[data-rounds-down]')
-  if (down) for (let i = 0; i < 6; i++) down.click()
 })()`)
 await wait(500)
-check('22. Start is pressed', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim())); if (!b) return false; b.click(); return true })()`))
+// ONE TAP AT A TIME. A synchronous burst is batched into one render, so every
+// handler reads the same stale count and the last write wins.
+for (let i = 0; i < 14; i++) {
+  const n = await ev(`document.querySelector('[data-round-card]')?.innerText?.match(/READY · (\\d+)/i)?.[1] || ''`)
+  if (Number(n) <= 2) break
+  await ev(`(() => { const b = document.querySelector('[data-rounds-down]'); if (b) b.click(); return !!b })()`)
+  await wait(120)
+}
+check('22. Start is pressed', await ev(`(() => { const b = document.querySelector('[data-round-card-start]'); if (!b) return false; b.click(); return true })()`))
 await wait(1000)
 await tap('[data-round-card-fullscreen]')
 await wait(500)

@@ -116,9 +116,20 @@ export const TOUR_STEPS: TourStep[] = [
     copy: "Logged — that easy. Leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own.",
   },
   {
-    key: 'tools', tab: 'tools', target: 'toolsall',
+    // CORRECTED 13 Sep 2026, TWICE OVER.
+    //
+    // The copy named the grocery list, and grocery LEFT this tab on 12 Sep —
+    // it has its own screen and a card on Home now. So the tour had been
+    // pointing at a tab and describing something that is not on it, which is
+    // the exact class of claim `chat-app-reality` polices for the coach and
+    // nothing was policing for the tour.
+    //
+    // The target moved from the whole tab to the timer section, because 4a
+    // made the tab taller than a phone screen and the spotlight hole fell off
+    // the bottom of it.
+    key: 'tools', tab: 'tools', target: 'toolstimer',
     nav: 'navTools', tapHint: 'Tap Tools', teaser: 'Two doors left.',
-    copy: 'Timers and your grocery list. The list builds itself from your meal plan — nothing to type.',
+    copy: 'Your interval timer, and every protocol right here — Tabata, EMOM, or your own. Start one and it keeps going while you use the rest of the app.',
   },
   {
     key: 'settings', tab: 'tools', target: 'settings',

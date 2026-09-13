@@ -253,7 +253,13 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Every write succeeds or says it did not — `silent-writes`,
   `queue-listeners`, `stale-after-write`
 - Nothing is offered that is not built — `equipment-labels`,
-  `says-what-it-contains`, `injury-coverage`, `enforcement-gaps`
+  `says-what-it-contains`, `injury-coverage`, `enforcement-gaps`. **The APP
+  TOUR's copy is `UNGUARDED` for exactly this class of claim** and it has
+  already been wrong: it told every new user the grocery list was on the Tools
+  tab for a day after grocery moved off it (12→13 Sep 2026). `chat-app-reality`
+  holds the COACH honest about what the app contains and nothing holds the tour
+  to the same standard. Found by a spotlight overflowing the screen, not by a
+  check — which is the definition of unguarded
 - Safety ships correct or not at all — `injury-adaptation-safety`,
   `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`

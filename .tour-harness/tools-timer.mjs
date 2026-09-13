@@ -1,18 +1,21 @@
 // ---------------------------------------------------------------------------
 // TOOLS IS ONE TIMER, AND A RUNNING ROUND NO LONGER TAKES THE TAB.
 //
-// Design handoff 2a, 12 Sep 2026. Three claims, none of them checkable
-// anywhere but in a browser:
+// Design handoff 2a (12 Sep 2026), then frame 4a (13 Sep). Claims that are
+// only checkable in a browser:
 //
-//   1. Tools leads with the timer and the six-tile grid is gone, grocery with
-//      it.
-//   2. A running round leaves the rest of the tab reachable — that is the
-//      whole behaviour change. Before this, "Also here" and everything under
-//      it were unreachable until the round was reset.
-//   3. The card colour-codes its phase, and the flooded screen only appears
+//   1. Tools leads with the timer, the six-tile grid is gone, grocery with it,
+//      and the protocols are ON the tab rather than behind a second screen.
+//   2. The card is ALWAYS there — idle it holds the total you would start —
+//      and starting swaps the clock in without the layout moving.
+//   3. A running round leaves the rest of the tab reachable. Before 2a,
+//      everything below the timer was unreachable until the round was reset.
+//   4. The card colour-codes its phase, and the flooded screen only appears
 //      once she taps Full screen — and can be left again.
+//   5. A tap on a different protocol MID-ROUND queues rather than restarting,
+//      says which round it lands on, and can be undone.
 //
-// Runs a real 2 x 1s / 1s round so the phases actually arrive.
+// Runs a real short round through the Custom panel so the phases arrive.
 // ---------------------------------------------------------------------------
 import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
@@ -83,35 +86,43 @@ await wait(2500)
 
 // --- 1. the settled tab -----------------------------------------------------
 const settled = await text()
-check('1a. Tools leads with the timers', /timers/i.test(settled || ''), (settled || '').slice(0, 200))
-check('1b. ...with one row to change the intervals', await seen('[data-change-intervals]'))
-check('1c. ...and the truth about the rest timer', /runs itself/.test(settled || ''))
+check('1a. Tools leads with the timer', /round timer/i.test(settled || ''), (settled || '').slice(0, 200))
+check('1b. ...and the card is there before anything is running', await seen('[data-round-card][data-round-phase="idle"]'))
+check('1c. ...and the truth about the rest timer', /runs itself in the session dock/.test(settled || ''))
 check('1d. the six-tile grid is gone', !/Rest timer/.test(settled || ''), (settled || '').slice(0, 300))
 check('1e. Also here carries what is left', /Also here/i.test(settled || '') && /Stopwatch/.test(settled || ''))
 check('1f. ...and grocery is not on this tab at all', !/Grocery/i.test(settled || ''), (settled || '').slice(0, 400))
-// THE SUBTITLE LENGTH CHECK, MEASURED. test:tools-grid counts characters and
-// says it is a proxy for wrapping; this is the thing it proxies for.
-const subLines = await ev(`(() => {
-  const el = [...document.querySelectorAll('[data-change-intervals] span')].find(s => (s.textContent || '').trim().startsWith('Tabata'))
-  if (!el) return null
-  const lh = parseFloat(getComputedStyle(el).lineHeight) || 16
-  return Math.round(el.getBoundingClientRect().height / lh)
-})()`)
-const subBox = await ev(`(() => {
-  const el = [...document.querySelectorAll('[data-change-intervals] span')].find(s => (s.textContent || '').trim().startsWith('Tabata'))
-  if (!el) return null
-  const cs = getComputedStyle(el)
-  return { w: Math.round(el.getBoundingClientRect().width), font: cs.font, text: el.textContent.trim(), chars: el.textContent.trim().length }
-})()`)
-console.log('    [measure] subtitle box:', JSON.stringify(subBox))
-check('1g. the interval subtitle sits on one line', subLines === 1, subLines)
+// THE ROW IS GONE AND THE PROTOCOLS TOOK ITS PLACE — frame 4a.
+check('1g. there is no row to a second screen any more', !(await seen('[data-change-intervals]')))
+const chipTexts = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => b.textContent.trim())`)
+check('1h. the protocols are chips on the tab', Array.isArray(chipTexts) && chipTexts.length >= 5, chipTexts)
+check('1i. ...each carrying its own numbers', chipTexts.every(t => /\d/.test(t)), chipTexts)
+check('1j. ...and none of them says its numbers twice',
+  !chipTexts.some(t => { const m = t.match(/(\d+)\/(\d+)/g); return m && m.length > 1 }), chipTexts)
+// EVERY CHIP ON ONE LINE. test:tools-grid counts characters as a proxy for
+// wrapping; this is the thing it proxies for, measured at 390px.
+const chipLines = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => Math.round(b.getBoundingClientRect().height))`)
+check('1k. every chip is a single 44px pill, not a wrapped one', chipLines.every(h => h <= 48), chipLines)
+// THE IDLE CARD SAYS WHAT YOU WOULD BE STARTING.
+const idleCard = await ev(`document.querySelector('[data-round-card]')?.innerText || ''`)
+check('1l. the idle card holds a total and what it is made of',
+  /READY · 8 ROUNDS/i.test(idleCard) && /3:50/.test(idleCard) && /20s work · 10s rest/.test(idleCard), idleCard)
+check('1m. ...and promises the countdown before you press', /10s countdown/.test(idleCard), idleCard)
 await shoot('tools-timer-settled')
 
-// --- 2. start a real round --------------------------------------------------
-check('2a. the setup opens', await tapSel('[data-change-intervals]'))
-await wait(700)
-// THE SETUP IS CHIPS NOW, not three number boxes (design handoff 2a). The
-// short work and rest this run needs are not on the chip rows — they are
+// --- 2. the card re-reads as a protocol is chosen ---------------------------
+const clockNow = () => ev(`document.querySelector('[data-round-card-clock]')?.textContent?.trim() || ''`)
+const beforePick = await clockNow()
+check('2a. tapping a different protocol', await tapSel('[data-protocol="boxing"]'))
+await wait(500)
+const afterPick = await clockNow()
+check('2b. ...re-reads the card\'s total, with no second screen in between',
+  afterPick !== beforePick && afterPick === '11:00', { beforePick, afterPick })
+check('2c. ...and nothing started', !(await seen('[data-round-card-primary]')))
+
+// --- 3. Custom unfolds in place, and starts a short round -------------------
+check('3a. the Custom chip opens the setup where it stands', await tapSel('[data-protocol="custom"]') && (await wait(500), await seen('[data-round-setup]')))
+// The short work and rest this run needs are not on the chip rows — they are
 // deliberately human values — so it goes through the Custom escape hatch,
 // which is the part of the redesign most likely to be quietly dropped.
 const hatches = await ev(`(() => {
@@ -120,7 +131,7 @@ const hatches = await ev(`(() => {
   if (!tap('[data-rest="custom"]')) return 'no rest custom'
   return 'chips'
 })()`)
-check('2b. work and rest have a custom escape hatch', hatches === 'chips', hatches)
+check('3b. work and rest have a custom escape hatch', hatches === 'chips', hatches)
 await wait(300)
 const typed = await ev(`(() => {
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
@@ -129,60 +140,106 @@ const typed = await ev(`(() => {
   ;[4, 2].forEach((v, i) => { setter.call(nums[i], String(v)); nums[i].dispatchEvent(new Event('input', { bubbles: true })) })
   return 'set'
 })()`)
-check('2c. a 4s work / 2s rest can be typed into them', typed === 'set', typed)
-// EIGHT ROUNDS BY DEFAULT, STEPPED DOWN TO TWO — the stepper is the only way
-// to set the count now, so the run exercises it rather than routing round it.
-const stepped = await ev(`(() => {
-  const b = document.querySelector('[data-rounds-down]')
-  if (!b) return 'no stepper'
-  for (let i = 0; i < 6; i++) b.click()
-  return 'stepped'
-})()`)
-check('2d. the rounds stepper takes it down to two', stepped === 'stepped', stepped)
-await wait(300)
-const summaryLine = await ev(`(() => {
-  const el = [...document.querySelectorAll('span')].find(s => /work · /.test(s.textContent || ''))
-  return el ? el.textContent.trim() : null
-})()`)
-check('2e. the summary states what is about to run', /^2 × 4s work · 2s rest$/.test(summaryLine || ''), summaryLine)
+check('3c. a 4s work / 2s rest can be typed into them', typed === 'set', typed)
+// STEPPED DOWN TO THREE — the stepper is the only way to set the count, so
+// the run exercises it rather than routing round it. Three, not two, so there
+// is a boundary left to queue a switch onto.
+//
+// ONE TAP AT A TIME, with a beat between. A burst of twelve synchronous
+// .click()s is batched into one render, so every handler reads the same stale
+// count and the last write wins — the stepper landed on 4 rather than 3 and
+// the failure looked like a stepper bug. It is a driver artefact: a thumb
+// cannot tap twelve times inside one frame.
+const roundsShown = () => ev(`document.querySelector('[data-round-card]')?.innerText?.match(/READY · (\\d+)/i)?.[1] || ''`)
+let stepped = 'no stepper'
+if (await seen('[data-rounds-down]')) {
+  for (let i = 0; i < 14 && Number(await roundsShown()) > 3; i++) { await tapSel('[data-rounds-down]'); await wait(120) }
+  for (let i = 0; i < 14 && Number(await roundsShown()) < 3; i++) { await tapSel('[data-rounds-up]'); await wait(120) }
+  stepped = (await roundsShown()) === '3' ? 'stepped' : `landed on ${await roundsShown()}`
+}
+check('3d. the rounds stepper sets the count', stepped === 'stepped', stepped)
+await wait(400)
+// THE CARD IS THE SUMMARY NOW. 4a: "Changing any chip re-reads the card's
+// total live, so the number you're about to commit to is always the one on
+// the card." So the check reads the CARD, not a line inside the panel.
+const customCard = await ev(`document.querySelector('[data-round-card]')?.innerText || ''`)
+check('3e. the card states what is about to run, live',
+  /READY · 3 ROUNDS/i.test(customCard) && /4s work · 2s rest/.test(customCard), customCard)
+await shoot('tools-timer-custom')
 const started = await ev(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim()))
+  const b = document.querySelector('[data-round-card-start]')
   if (!b) return false; b.click(); return true
 })()`)
-check('2f. ...and it starts', started)
+check('3f. ...and the card starts it', started)
 await wait(1500)
 
-// --- 3. the card, not the flood ---------------------------------------------
-check('3a. a running round shows as a card', await seen('[data-round-card]'))
-check('3b. ...and does NOT take the whole tab', /Also here/i.test((await text()) || ''), (await text() || '').slice(0, 300))
+// --- 4. the card, not the flood ---------------------------------------------
+check('4a. a running round shows as a card', await seen('[data-round-card]'))
+check('4b. ...and does NOT take the whole tab', /Also here/i.test((await text()) || ''), (await text() || '').slice(0, 300))
 const readySample = await cardPrimary()
-check('3c. the card offers Pause while it runs', readySample?.label === 'Pause' || readySample?.label === 'Resume', readySample)
+check('4c. the card offers Pause while it runs', readySample?.label === 'Pause' || readySample?.label === 'Resume', readySample)
+// THE STOPWATCH ROW IS BLOCKED WHILE A ROUND IS LIVE, and says why — switching
+// mode clears the timer record, so the old row destroyed a running round on
+// the way to a stopwatch. Under 4a the round is the tab's permanent content,
+// which makes a silent wipe far worse than it was.
+const swRow = await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => /^Stopwatch/.test((x.textContent||'').trim()))
+  return b ? { disabled: b.disabled, text: b.textContent.trim() } : null
+})()`)
+check('4d. the stopwatch cannot silently wipe the running round', swRow?.disabled === true, swRow)
+check('4e. ...and says why rather than just going grey', /Finish or reset your round first/.test(swRow?.text || ''), swRow)
 await shoot('tools-timer-card-ready')
 
-// --- 4. full screen is opt-in, and leaving it works -------------------------
-check('4a. tapping Full screen floods it', await tapSel('[data-round-card-fullscreen]'))
+// --- 5. full screen is opt-in, and leaving it works -------------------------
+check('5a. tapping Full screen floods it', await tapSel('[data-round-card-fullscreen]'))
 await wait(600)
-check('4b. ...the field is up', await ev(`!!document.querySelector('[role=status], [role=button]') && !document.querySelector('[data-round-card]')`))
-check('4c. ...and it can be left again', await tapSel('[aria-label^="Leave full screen"]'))
+check('5b. ...the field is up', await ev(`!!document.querySelector('[role=status], [role=button]') && !document.querySelector('[data-round-card]')`))
+check('5c. ...and it can be left again', await tapSel('[aria-label^="Leave full screen"]'))
 await wait(600)
-check('4d. back to the card, round still running', await seen('[data-round-card]'))
+check('5d. back to the card, round still running', await seen('[data-round-card]'))
 
-// --- 5. the three phases are three colours ----------------------------------
-// TEN SECONDS OF LEAD-IN come first, then 2x4s work and 1x2s rest — a round
+// --- 6. A TAP MID-ROUND QUEUES, IT DOES NOT LURCH ---------------------------
+//
+// Frame 4a's whole behavioural claim, and the one thing no source check can
+// see: that tapping 40/20 during a round changes nothing about the round you
+// are in, says which round it WILL change, and can be taken back.
+const roundNow = () => ev(`document.querySelector('[data-round-card]')?.innerText?.match(/ROUND (\\d+) OF (\\d+)/i)?.slice(1)?.join('/') || ''`)
+await wait(9500)
+const beforeQueue = await roundNow()
+check('6a. the round is under way and says where it is', /^\d+\/\d+$/.test(beforeQueue), beforeQueue)
+check('6b. tapping a different protocol mid-round', await tapSel('[data-protocol="tabata"]'))
+await wait(400)
+check('6c. ...changes nothing about the round in progress', (await roundNow()) === beforeQueue, { beforeQueue, now: await roundNow() })
+const strip = await ev(`document.querySelector('[data-round-queued]')?.innerText?.replace(/\\s+/g, ' ')?.trim() || ''`)
+check('6d. ...says what is coming and when', /^Switching to Tabata at round \d+/.test(strip), strip)
+const badge = await ev(`document.querySelector('[data-protocol-queued-badge]')?.textContent?.trim() || ''`)
+check('6e. ...and the chip itself is badged with the same round',
+  /^from round \d+$/.test(badge) && strip.includes(badge.replace('from round ', 'round ')), { strip, badge })
+await shoot('tools-timer-queued')
+check('6f. ...and it can be undone', await tapSel('[data-round-queued-undo]'))
+await wait(400)
+check('6g. ...which clears both the strip and the badge',
+  !(await seen('[data-round-queued]')) && !(await seen('[data-protocol-queued-badge]')))
+
+// --- 7. the phases are three colours ----------------------------------------
+// TEN SECONDS OF LEAD-IN come first, then 3x4s work and 2x2s rest — a round
 // deliberately slow enough that the WORK phase can be sampled at all. The
 // first version ran 2x1s/1s and sampled "work" during the countdown, so the
 // grey ready button stood in for mint; a mutation that painted the finished
 // card in the WORKING colour then passed, because grey and mint differ. Three
 // samples, three colours, all compared.
-await wait(9500)
 const workSample = await cardPrimary()
-check('5a. mid-round the card is in its working colour', !!workSample && workSample.bg !== readySample?.bg, { ready: readySample?.bg, work: workSample?.bg })
+check('7a. mid-round the card is in its working colour', !!workSample && workSample.bg !== readySample?.bg, { ready: readySample?.bg, work: workSample?.bg })
 await shoot('tools-timer-card-work')
 
-await wait(12000)
-const done = await cardPrimary()
-check('5b. the finished card offers to log the session', done?.label === 'Log session', done)
-check('5c. ...and it is not the working colour, nor the ready one',
+// POLLED, NOT GUESSED. The run's length moved when the fixture gained a round
+// for the queue test, and a fixed wait that is one second short reports "the
+// finished card never appeared" — a false failure that looks exactly like a
+// real one.
+let done = await cardPrimary()
+for (let i = 0; i < 40 && done?.label !== 'Log session'; i++) { await wait(1000); done = await cardPrimary() }
+check('7b. the finished card offers to log the session', done?.label === 'Log session', done)
+check('7c. ...and it is not the working colour, nor the ready one',
       !!done && !!workSample && done.bg !== workSample.bg && done.bg !== readySample?.bg,
       { ready: readySample?.bg, work: workSample?.bg, done: done?.bg })
 await shoot('tools-timer-card-done')

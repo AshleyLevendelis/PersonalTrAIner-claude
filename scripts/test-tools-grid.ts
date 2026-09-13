@@ -52,8 +52,14 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   check('no tile table survives', !/const TILES/.test(bare), bare.match(/const TILES/)?.[0])
   check('...and no grid layout with it', !/grid-cols-2/.test(bare))
 
-  // THE ROUND CARD IS THE TAB'S CONTENT while a round is live.
-  check('the live round renders as a card', /<RoundCard onLogSession=\{setRoundToLog\}/.test(tools))
+  // THE ROUND CARD IS THE TAB'S CONTENT — and since 4a it is ALWAYS there,
+  // holding the total you would be starting when nothing is running. Pinned
+  // as unconditional: a card behind `roundLive &&` would be the 2a layout
+  // again, with no idle state and nothing for the chips to describe.
+  check('the round card is the tab\'s content', /<RoundCard$/m.test(tools) || /<RoundCard\s/.test(tools))
+  check('...and it is always there, not only while a round runs',
+    /live=\{roundLive\}/.test(tools) && !/\{roundLive && <RoundCard/.test(tools))
+  check('...and a finished round can still be written down from it', /onLogSession=\{setRoundToLog\}/.test(tools))
   check('...only once a round is started and not reset', /const roundLive =/.test(tools) && /timers\.mode === 'round' && !!timers\.roundConfig/.test(tools))
   // PAUSED STILL COUNTS. pauseRound sets running:false, and a condition that
   // only checked `running` used to make the whole timer vanish on Pause.
@@ -72,16 +78,42 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   check('...and defines no second map', !/const FIELD/.test(card))
   check('...and derives the phase by the one rule', /roundPhaseOf\(timers\)/.test(card) && /export function roundPhaseOf/.test(field))
 
-  // THE ONE ROW THAT CHANGES THE INTERVALS, and the truth about the rest timer.
-  check('there is a row to change the intervals', /data-change-intervals/.test(tools))
-  check('...and it opens the round setup', /timers\.setMode\('round'\); setSetupOpen\(true\)/.test(tools))
-  check('the rest timer is explained, not faked', /runs itself — it starts the moment you log a set/.test(tools))
+  // THE PROTOCOLS ARE ON THE TAB, not behind a second screen — design handoff
+  // 4a, 13 Sep 2026. RE-ANCHORED off `data-change-intervals`, which this
+  // change deletes: the property was never "there is a row", it was that the
+  // interval choice is reachable without leaving the tab. Now it is the whole
+  // control surface, so the check reads the chips.
+  // UNCONDITIONAL, like the card. `{false && <ProtocolChips` left the string
+  // in place and the row off the screen — the same shape as the dead branch
+  // that satisfied two checks on 9 Sep, so it is pinned the same way.
+  check('the protocols are on the tab itself',
+    /<ProtocolChips/.test(bare) && !/data-change-intervals/.test(bare)
+    && !/&&\s*<ProtocolChips/.test(bare), bare.match(/.{0,24}<ProtocolChips/)?.[0])
+  check('...built from the preset table rather than a second list here',
+    /protocolChoices\(/.test(tools) && !/'Tabata'|'EMOM'|'40\/20'/.test(bare))
+  // MOUNTED IN PLACE, not routed to. Written to allow the Suspense wrapper the
+  // code-split needs — the property is that the setup appears INSIDE this tab
+  // when the chip is on, not that one particular JSX shape does it.
+  check('...and Custom unfolds in place rather than opening a screen',
+    /\{customOpen && \(?[\s\S]{0,120}?<RoundSetupPanel/.test(tools)
+    // NOT IN A MODAL EITHER. "In place" means under the chips on the tab; a
+    // dialog would satisfy the line above while putting the setup back behind
+    // a screen, which is the thing 4a removed.
+    && !/<DialogContent[\s\S]{0,300}?<RoundSetupPanel/.test(bare))
+  check('the rest timer is explained, not faked', /runs itself in the session dock/.test(tools))
   // THE SETUP PANEL IS NOT LEFT STANDING UNDER A RUNNING ROUND. It used to
   // stay mounted for as long as anything was running — which under the old
   // design was how you reached the round at all — and put a tab strip beneath
   // the card. Caught by reading the screenshot, not by any assertion here.
-  check('...and the setup panel is mounted only when opened', /\{setupOpen && \(/.test(tools))
-  check('...not merely because something is running', !/setupOpen \|\| timers\.running/.test(tools))
+  check('...and the setup is mounted only when asked for', /\{customOpen && [(<]/.test(tools))
+  check('...not merely because something is running', !/customOpen \|\| timers\.running/.test(tools))
+  // THE TAB STRIP IS GONE WITH IT (4a). Round is this tab's own content, so a
+  // tab labelled "Round" beside it was the surface competing with itself.
+  const panelSrc = read('src/components/timers/TimersPanel.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('no Stopwatch / Lap / Round tab strip survives',
+    !/TabsList|TabsTrigger/.test(panelSrc), panelSrc.match(/Tabs\w+/g)?.slice(0, 3))
+  check('...and the stopwatch is reached from the list, on its own',
+    /setStopwatchOpen\(true\)/.test(tools) && /<StopwatchPanel \/>/.test(tools))
   check('...and no control claims to configure it', !/'Rest timer'/.test(bare))
 
   // ALSO HERE — four rows, four handlers, no labels pretending to be controls.
@@ -106,12 +138,24 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // THE LENGTH LIMIT, AT ITS NEW SCALE. 40, not 23 — full-width rows, not
   // half-width tiles. The two numbers are not comparable.
   const SUB_MAX = 40
-  const staticSubs = [...alsoBlock.matchAll(/sub: '([^']+)'/g)].map(m => m[1])
-  staticSubs.push('Tabata, EMOM, rounds · 20s to 5 min')
+  // EVERY FIXED SUBTITLE IN THE BLOCK, however it is written. The stopwatch's
+  // is a ternary since 4a (it says why it is unavailable mid-round), so a
+  // pattern that only saw `sub: '...'` would silently stop measuring it —
+  // which is how a wrapping subtitle gets back in.
+  // Comment-stripped first: a note ABOUT a subtitle is not a subtitle, and
+  // measuring one would fail the check on prose.
+  const alsoBare = alsoBlock.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const staticSubs = [...alsoBare.matchAll(/sub:[^\n]+/g)]
+    .flatMap(m => [...m[0].matchAll(/'([^']+)'/g)].map(q => q[1]))
+    .filter(t => !t.includes('${'))
   check('the static subtitles were found (sanity check on this check)', staticSubs.length >= 3, staticSubs)
   const tooLong = staticSubs.filter(t => t.length > SUB_MAX)
   check(`every fixed subtitle fits one line (<=${SUB_MAX} chars)`, tooLong.length === 0, tooLong.map(t => ({ text: t, len: t.length })))
-  check('...and the interval row really carries that subtitle', tools.includes('Tabata, EMOM, rounds · 20s to 5 min'))
+  // AND THE CHIPS CARRY THEIR OWN NUMBERS, read from the config rather than
+  // typed beside the name — a chip cannot come to describe a protocol it does
+  // not run.
+  const chips = read('src/components/timers/ProtocolChips.tsx')
+  check('each protocol chip states its own numbers', /chipNumbers\(choice\.config[,)]/.test(chips))
 }
 
 console.log('\n2. The counts are read, not written\n')

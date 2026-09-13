@@ -171,7 +171,13 @@ console.log('\n6. The dock is never covered, and a live round owns the tab')
   // everything else on Tools unreachable mid-session. What holds now: the
   // round is always visible while it runs, as a card, and the flooded field
   // is what she opts into. The dock rule above is untouched.
-  check('a running round is always visible', /\{roundLive && <RoundCard/.test(tools))
+  // RE-ANCHORED 13 Sep 2026 (frame 4a). The card is no longer conditional at
+  // all — idle it holds the total you would be starting — so `roundLive &&
+  // <RoundCard` is now the shape that would be WRONG. The property is
+  // unchanged and stronger: while a round runs there is nothing that can hide
+  // the card short of asking for full screen.
+  check('a running round is always visible',
+    /<RoundCard\s+live=\{roundLive\}/.test(tools) && !/\{roundLive && <RoundCard/.test(tools))
   check('...and the field takes the tab only when she asks for it',
     /if \(roundLive && timers\.roundFullScreen\)/.test(tools))
   check('...and a finished one still holds, so the red state does not vanish',

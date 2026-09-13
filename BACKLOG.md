@@ -2,6 +2,96 @@
 
 Newest first. One line each.
 
+- [x] **TOOLS, FRAME 4a — ONE CARD ALWAYS THERE, AND THE PROTOCOLS BESIDE IT.**
+  Ashley re-sent `design_handoff_tools_grocery` on 13 Sep 2026 and said
+  "implement this". **The archive was named *Chat layout improvements* and did
+  not contain the chat handoff.** Asked which she meant — build the Tools
+  screen, or wait for the chat designs — she chose **build the Tools timer
+  screen**. The chat work stays blocked on a folder that has still not arrived.
+  **MEASURED BEFORE PLANNING, per the leads-not-facts rule.** Most of that
+  handoff shipped on 12 Sep: the round card with its derived phase colours,
+  full screen opt-in, grocery gone to its own screen with aisle groups, the
+  trolley row, the Home shop-day card and the `shopDay` preference. What was
+  NOT built is frame **4a**, which the README says supersedes 2a for this
+  layout: no "Change the intervals" row, no Stopwatch/Lap/Round tab strip, one
+  card always present, protocols as the whole control surface, and a mid-round
+  tap that queues instead of restarting.
+  **THE ONE REAL ENGINEERING PROBLEM, and the decision.** The timer engine's
+  single hard-won property is that everything derives from ONE immutable
+  anchor; its header records that a stored per-phase deadline is what corrupted
+  it before. "Rounds 4 to 8 at 40/20" is two schedules in one block. Restarting
+  with the new protocol is trivial and wrong — the card would say "Round 1 of
+  5" a second after promising "at round 4".
+  Chosen: **carry the completed part rather than re-anchor the meaning.**
+  `RoundConfig` gains ONE optional display-only field, `carried: { rounds,
+  seconds }`. The switch starts a genuinely new block whose `rounds` is only
+  what remains, with `leadInSeconds: 0` so there is no second countdown
+  mid-session, and two helpers keep every number a person reads counted in the
+  SESSION. `totalRoundSeconds` deliberately does not count it — that figure
+  banks the finished state and is a fact about the block. `roundLogSummary`
+  does, because eight rounds happened and a log saying five would be the app
+  disbelieving her, which is the defect that function's own header was written
+  about. Rejected: a second anchor per segment (the corruption the engine was
+  rewritten to remove) and a `switchedAt` flag (a second source of truth for a
+  number the config already carries).
+  **THREE THINGS THE SCREEN SHOWED THAT NO CHECK DID.** Every gate was green
+  each time.
+  1. **The 40/20 chip read "40/20 · 8×40/20"** — the numbers twice. The suffix
+     is read from the config, and for a protocol NAMED after its numbers the
+     useful half is how many rounds. Now "40/20 · 8 rds", decided from the
+     label rather than a list of which presets are numeric.
+  2. **"Custom · 6×1 min" silently dropped its 30-second rest.** The minute
+     form states the work alone and fired at 60s. The threshold is two minutes
+     now — a boxing round is three minutes, a one-minute round with a real rest
+     is "6×60/30". No check looked at a 60-second interval before; one does now.
+  3. **The app tour told people the grocery list was on Tools.** It has not
+     been since 12 Sep. Pre-existing, nothing caught it, and found only because
+     4a made the tab too tall for the tour's spotlight and sent me to read the
+     step. Copy corrected, and the stop now points at the timer rather than the
+     whole tab.
+  **ALSO FIXED, and it is not cosmetic.** The Stopwatch row called `setMode`,
+  which CLEARS the timer record — so tapping it destroyed a running round
+  silently. Harmless-ish when the round was a panel you had to go and find;
+  under 4a the round is the tab's permanent content. The row is disabled while
+  a round is live and says why. Letting both run at once is a bigger change
+  than this handoff.
+  **TWO DELIBERATE DEPARTURES FROM THE MOCK, both stated rather than buried.**
+  (a) The round count keeps its −/+ stepper; frame 4a draws a six-value chip
+  row, the README's own text says the stepper is the decided one, and chips
+  cannot express seven rounds. (b) The idle card's button reads "Start · 10s
+  countdown", not 4a's "Start": an app that pauses ten seconds after a tap
+  without having said it would is indistinguishable from one that has not
+  started, and that promise is a property `test:round-timer` already held.
+  **GATES.** `test:round-timer` gains a section on the switch — the carry
+  arithmetic, the headline, subline, done label and pips all counted in the
+  session, the log covering both halves, and the boundary conditions read off
+  the provider. `test:tools-grid`, `test:round-presets`, `test:timer-field`
+  and `test:bounds-and-boundaries` re-anchored off the deleted row onto the
+  properties they were always about. `verify:tools-timer` rewritten (44 checks
+  at 390x844) and now drives the queued switch end to end; `verify:round-presets`
+  and `verify:round-lead-in` re-anchored off the old setup panel.
+  **MUTATIONS: 29 tried, 29 caught — three MISSED on the first pass**, and the
+  misses were the useful part. The carried-pips branch was unreachable from any
+  fixture (its rounds were already marked done by the next branch) — now driven
+  directly through a countdown fixture. `chipNumbers` was checked only against
+  Tabata, so replacing the whole expression with the literal "8×20/10" passed:
+  the fixture WAS the answer. And `{false && <ProtocolChips` left the string in
+  place and the row off the screen — the same dead-branch shape that satisfied
+  two checks on 9 Sep, now pinned as unconditional the way the card already was.
+  **AND ONE THE GATES CAUGHT ON ME:** the app chunk went 1 kB over budget.
+  Both timer panels are code-split now — neither is on screen when the tab
+  loads — which took it from 1031 kB back to 1026 kB.
+  **A NOTE ON DRIVER ARTEFACTS, because two failures looked like product bugs
+  and were not.** A burst of twelve synchronous `.click()`s on the rounds
+  stepper is batched into one render, so every handler reads the same stale
+  count and the last write wins; the stepper landed on 4 instead of 3. A thumb
+  cannot tap twelve times inside one frame. Both drivers now tap with a beat
+  between, and the finished-round check polls rather than guessing a wait.
+  **PRE-EXISTING FAILURES, confirmed by stashing and re-running on untouched
+  code:** `verify:tour` (4) and `verify:six` (4) fail identically without this
+  change. Not investigated here; recorded so the next session does not.
+  **Deploys:** frontend on merge. No edge function, no migration.
+
 - [x] **"I'VE ONLY GOT 25 MINUTES TODAY" — SHORTEN OR LIGHTEN ONE SESSION,
   BOTH SURFACES.** Ashley chose this on 13 Sep 2026 from four remaining gaps.
   Two lines in the must-have list's *Changing one workout* block were `MISSING`

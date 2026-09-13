@@ -1,38 +1,49 @@
-import { useEffect, useState } from 'react'
-import { TimerReset, Disc, History, BookOpen, Timer, ChevronRight } from 'lucide-react'
-import { TimersPanel } from '@/components/timers/TimersPanel'
+import { useEffect, useState, lazy, Suspense } from 'react'
+import { Disc, History, BookOpen, Timer, ChevronRight } from 'lucide-react'
+// SPLIT OUT OF THE APP CHUNK. Neither of these is on screen when the tab
+// loads: the round setup unfolds only under the Custom chip and the stopwatch
+// opens from a row. Eagerly imported they pushed the app chunk 1 kB past its
+// budget (test:bundle, 13 Sep 2026) for two panels most sessions never open.
+const RoundSetupPanel = lazy(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.RoundSetupPanel })))
+const StopwatchPanel = lazy(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getSessionHistory } from '@/lib/exercise-history'
 import { getPRCache } from '@/lib/pr-engine'
 import { programHash } from '@/lib/app-route'
 import { RoundField } from '@/components/timers/RoundField'
 import { RoundCard } from '@/components/timers/RoundCard'
+import { ProtocolChips, protocolChoices } from '@/components/timers/ProtocolChips'
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
 import type { WorkoutDay, MesocycleWeek } from '@/lib/types'
 import type { RoundLogSummary } from '@/lib/timer-engine'
 import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
 
 // ---------------------------------------------------------------------------
-// TOOLS IS ONE TIMER SURFACE — design handoff 2a ("Tools becomes one timer
-// surface"), 12 Sep 2026.
+// TOOLS IS ONE TIMER SURFACE — design handoff 2a (12 Sep 2026), then 4a
+// (13 Sep 2026), which supersedes 2a for this layout.
 //
-// What was here: six tiles, of which two opened the same panel in different
-// modes, one ("Rest timer") could not do what its name said, and a grocery
-// section sat BELOW the grid that a tile scrolled you down to. A grid of six
-// where two are the same thing and one is a lie is a menu of nine possible
-// wrong taps.
+// WHAT WAS HERE ORIGINALLY: six tiles, of which two opened the same panel in
+// different modes, one ("Rest timer") could not do what its name said, and a
+// grocery section sat BELOW the grid that a tile scrolled you down to.
 //
-// What is here now: the round timer IS the tab's content — a live card that
-// colour-codes its phase — plus one row to change the intervals, then a short
-// "Also here" list for the things that genuinely are utilities. The stopwatch
-// loses its tile: it has no running state worth a card.
+// WHAT 2a LEFT: the round card, one row reading "Change the intervals", and a
+// short "Also here" list. Grocery had gone to its own screen.
 //
-// GROCERY LEFT THIS TAB ENTIRELY. It is built from the week's meals and it is
-// a weekly errand, so it surfaces as a Home card on shop day and otherwise
-// opens full screen from the link Nutrition already has. It was never a
-// utility; it was filed as one because this tab existed.
+// WHAT 4a CHANGES, and why the row had to go with it. Choosing between six
+// protocols that each fit on one line was a tap to a second screen, a scroll,
+// a decision and a tap back — on a gym floor, between rounds. The protocols
+// are chips now, always under the card, and the card is ALWAYS PRESENT: idle
+// it holds the total time you would be starting, running it holds the clock.
+// Same box, same buttons in the same places; starting swaps the clock in and
+// nothing moves.
+//
+// THE STOPWATCH / LAP / ROUND TAB STRIP IS GONE TOO. Round is this tab's
+// content, so a tab labelled "Round" beside it was the surface competing with
+// itself; the stopwatch is one row in "Also here" and opens on its own.
 //
 // FULL SCREEN IS OPT-IN. A running round no longer seizes the tab — the card
 // is the default and RoundField renders only after "Full screen" (the flag
@@ -63,7 +74,8 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
   const [plateOpen, setPlateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [setupOpen, setSetupOpen] = useState(false)
+  const [stopwatchOpen, setStopwatchOpen] = useState(false)
+  const [customOpen, setCustomOpen] = useState(false)
   // The finished round waiting to be written down, and the line that says it
   // was. Ashley, 12 Sep 2026: "I logged it but it doesn't show anywhere on the
   // app" — it never wrote anything, and it never said so either.
@@ -89,13 +101,20 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
     ? `${mesocycle.length} weeks · block ${blockOf(liveWeek ?? 1)} of ${Math.max(1, Math.ceil(mesocycle.length / 4))}`
     : 'Your whole plan, week by week'
 
-  // STARTED AND NOT RESET — the condition the card renders on. Paused counts:
-  // pauseRound sets running:false, and a round that only checked `running`
-  // used to make the whole timer vanish the moment you tapped Pause. You
-  // pause to catch your breath, not to lose your place.
+  // STARTED AND NOT RESET — the condition the running card renders on. Paused
+  // counts: pauseRound sets running:false, and a round that only checked
+  // `running` used to make the whole timer vanish the moment you tapped Pause.
+  // You pause to catch your breath, not to lose your place.
   const roundLive =
     timers.mode === 'round' && !!timers.roundConfig
     && (timers.running || timers.isRoundComplete || timers.isActive)
+
+  // WHAT THE IDLE CARD DESCRIBES, resolved in ONE place and handed to both the
+  // card and the chips. A fallback computed twice is a card describing Tabata
+  // above a chip row with nothing lit.
+  const todaysConfig = parseConditioningInterval(todaysConditioning?.activity)
+  const idleConfig = timers.selectedRoundConfig ?? todaysConfig ?? ROUND_PRESETS[0].config
+  const choices = protocolChoices(todaysConfig, timers.customRoundConfig)
 
   // THE SHEET WHERE THE FINISHED ROUND IS WRITTEN DOWN. Rendered once, beside
   // both branches, because the full-screen branch returns early and a sheet
@@ -125,19 +144,28 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
     // in the page's padding. RoundField is `fixed` and belongs to the
     // viewport, so this wrapper must stay unpositioned or it captures it again.
     return (
-      <div data-tour="toolsall">
+      <div>
         <RoundField onLogSession={setRoundToLog} />
         {logSheet}
       </div>
     )
   }
 
-  const alsoHere: { label: string; sub: string; icon: typeof Timer; onClick: () => void }[] = [
+  const alsoHere: { label: string; sub: string; icon: typeof Timer; onClick: () => void; disabled?: boolean }[] = [
     {
       // NO TILE OF ITS OWN. A stopwatch has no state worth a card — it is a
       // number that goes up — so it sits in the list with the rest.
-      label: 'Stopwatch', sub: 'With laps', icon: Timer,
-      onClick: () => { timers.setMode('stopwatch'); setSetupOpen(true) },
+      //
+      // AND IT IS BLOCKED WHILE A ROUND IS LIVE, on purpose. Switching mode
+      // clears the timer record, so this row used to destroy a running round
+      // silently on the way to a stopwatch. Under 4a the round is the tab's
+      // permanent content, which makes a silent wipe far worse than it was;
+      // saying why is the honest minimum until the two can run side by side.
+      label: 'Stopwatch',
+      sub: roundLive ? 'Finish or reset your round first' : 'With laps',
+      icon: Timer,
+      disabled: roundLive,
+      onClick: () => { if (roundLive) return; timers.setMode('lap'); setStopwatchOpen(true) },
     },
     {
       // "your plates" promised a plate inventory that has never existed —
@@ -157,7 +185,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
   ]
 
   return (
-    <div data-tour="toolsall" className="flex flex-col gap-[26px]">
+    <div className="flex flex-col gap-[26px]">
       {/* SAY THE WRITE HAPPENED. A cardio log is local-first and queued, so
           the round leaves the screen the instant it saves and there would
           otherwise be nothing at all to show for it — which is
@@ -175,36 +203,40 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
 
       <p className="text-[1.75rem] font-bold leading-none">Tools</p>
 
-      <div>
-        <p className="ds-label">Timers</p>
-        <div className="mt-1.5 flex flex-col gap-2.5">
-          {roundLive && <RoundCard onLogSession={setRoundToLog} />}
+      {/* THE TOUR STOPS HERE, not on the whole tab. Under 4a the tab is taller
+          than a phone screen — card, seven protocols, the list — and a
+          spotlight hole around all of it falls off the bottom of a 390x844
+          viewport (caught by verify:tour-real, 13 Sep 2026). The stop is
+          about the timer, so it points at the timer. */}
+      <div data-tour="toolstimer">
+        <p className="ds-label">Round timer</p>
+        <div className="mt-2.5 flex flex-col gap-3">
+          <RoundCard live={roundLive} idleConfig={idleConfig} onLogSession={setRoundToLog} />
 
-          {/* THE ONE ROW THAT CHANGES THE INTERVALS — and the whole Timers
-              section when nothing is running. */}
-          <button
-            type="button"
-            data-change-intervals
-            onClick={() => { timers.setMode('round'); setSetupOpen(true) }}
-            className="flex w-full items-center gap-3 rounded-2xl p-4 text-left"
-            style={{ background: 'var(--surface-raised)' }}
-          >
-            <TimerReset className="size-5 shrink-0" style={{ color: 'var(--primary-text)' }} aria-hidden />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[0.9375rem] font-semibold">Change the intervals</span>
-              <span className="mt-0.5 block text-[0.71875rem] leading-[1.3] text-muted-foreground">
-                Tabata, EMOM, rounds · 20s to 5 min
-              </span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          </button>
+          {/* THE WHOLE CONTROL SURFACE, always visible. No row, no second
+              screen — 4a. */}
+          <ProtocolChips
+            choices={choices}
+            live={roundLive}
+            selected={roundLive ? timers.roundConfig : idleConfig}
+            customOpen={customOpen}
+            onOpenCustom={setCustomOpen}
+          />
 
-          {/* THE TILE THAT LIED, REPLACED BY THE TRUTH. There was a "Rest
-              timer" tile pointing at a settings screen that has never
+          {/* CUSTOM UNFOLDS IN PLACE, beneath the chips it belongs to, so the
+              row stays put and the card's total re-reads as she taps. */}
+          {customOpen && (
+            <Suspense fallback={null}>
+              <RoundSetupPanel onDone={() => setCustomOpen(false)} />
+            </Suspense>
+          )}
+
+          {/* THE TILE THAT LIED, REPLACED BY ONE MUTED LINE. There was a
+              "Rest timer" tile pointing at a settings screen that has never
               existed — the rest timer is automatic and lives in the session
               dock. One sentence says so, and nothing pretends to configure it. */}
-          <p className="text-[0.71875rem] leading-[1.35] text-muted-foreground">
-            Your rest timer isn't here because it runs itself — it starts the moment you log a set, in the session dock.
+          <p className="text-[0.71875rem] leading-[1.45] text-muted-foreground">
+            Rest between sets runs itself in the session dock — this is for conditioning.
           </p>
         </div>
       </div>
@@ -217,7 +249,8 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
               key={row.label}
               type="button"
               onClick={row.onClick}
-              className="flex min-h-[44px] w-full items-center gap-3 py-3 text-left"
+              disabled={row.disabled}
+              className="flex min-h-[44px] w-full items-center gap-3 py-3 text-left disabled:opacity-55"
               style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
             >
               <row.icon className="size-[18px] shrink-0" style={{ color: 'var(--primary-text)' }} aria-hidden />
@@ -231,18 +264,16 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
         </div>
       </div>
 
-      {/* SETUP ONLY, and only when asked for. It used to stay mounted for as
-          long as anything was running, which under the old design was how you
-          reached the round at all. The card is that now, so leaving the panel
-          up put a Stopwatch / Lap / Round tab strip under a running round —
-          exactly the junk-drawer stacking this redesign removes. Unmounting is
-          safe because the running state lives in the useTimers provider, not
-          in this panel. */}
-      {setupOpen && (
-        <div>
-          <TimersPanel todaysConditioning={todaysConditioning} />
-        </div>
-      )}
+      <Dialog open={stopwatchOpen} onOpenChange={setStopwatchOpen}>
+        <DialogContent className="max-w-[22rem]">
+          <DialogHeader>
+            <DialogTitle>Stopwatch</DialogTitle>
+          </DialogHeader>
+          <Suspense fallback={null}>
+            <StopwatchPanel />
+          </Suspense>
+        </DialogContent>
+      </Dialog>
 
       <PlateCalculator open={plateOpen} onOpenChange={setPlateOpen} />
       <SessionHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} profileId={profileId} />

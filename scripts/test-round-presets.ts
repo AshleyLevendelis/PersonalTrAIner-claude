@@ -93,7 +93,7 @@ console.log('\n3. Tabata is Tabata')
     tabata ? totalRoundSeconds(tabata.config) : null)
 }
 
-console.log('\n4. The Tools interval row and the presets agree, both ways')
+console.log('\n4. What the Tools tab NAMES and what the presets ARE agree, both ways')
 {
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   const tools = strip(readFileSync('src/components/ToolsTab.tsx', 'utf8'))
@@ -103,8 +103,26 @@ console.log('\n4. The Tools interval row and the presets agree, both ways')
   // unchanged — the words on the Tools tab must name only protocols that
   // exist — so the check moved with the words rather than being deleted with
   // the tile.
-  const sub = /Tabata, EMOM, rounds · [^<\n]*/.exec(tools)?.[0] ?? ''
-  check('the interval row still has a subtitle to check', sub.length > 0, sub)
+  // RE-ANCHORED AGAIN 13 Sep 2026 (frame 4a), and the surface it reads has
+  // moved twice now: a tile, then a row's subtitle, and now the chip row
+  // itself. THE PROPERTY HAS NEVER CHANGED — the words on the Tools tab must
+  // name only protocols that exist — so what is worth keeping is the check,
+  // not the string it happened to read.
+  //
+  // WHAT 4a MAKES STRUCTURALLY TRUE: the chips are built by mapping
+  // ROUND_PRESETS, so a name and a protocol cannot come apart by
+  // construction. That is a stronger guarantee than the subtitle ever had,
+  // and it is what the first two checks now pin. The third keeps reading the
+  // tab's own prose, because a hand-typed protocol name in a sentence beside
+  // the chips would slip past a structural check entirely.
+  const chips = strip(readFileSync('src/components/timers/ProtocolChips.tsx', 'utf8'))
+  check('the chip row is built by mapping the preset table',
+    /for \(const p of ROUND_PRESETS\) out\.push\(\{ key: p\.key, label: p\.label, config: p\.config \}\)/.test(chips), null)
+  check('...so no protocol name is hand-typed beside it',
+    !/'Tabata'|'EMOM'|'Boxing|'40\/20'|'30\/30'/.test(chips), (chips.match(/'(Tabata|EMOM|Boxing[^']*|40\/20|30\/30)'/g) ?? []).slice(0, 3))
+  // The tab's remaining prose — everything it says in its own words.
+  const sub = [...tools.matchAll(/>\s*([A-Z][^<>{}]{12,})\s*</g)].map(m => m[1]).join(' | ')
+  check('the tab still says something in its own words, to check', sub.length > 0, sub)
 
   // EMOM IS THE NAMED ABSENCE. Ashley's decision, 12 Sep 2026: presets yes,
   // EMOM no, because its rest is the remainder of the minute and this engine
@@ -124,7 +142,16 @@ console.log('\n4. The Tools interval row and the presets agree, both ways')
   // the first version of this regex could not see it — [A-Z][a-z]+ needs a
   // lowercase letter, so the one claim that started all of this would have
   // slipped straight through the check written to catch it.
-  const claims = (sub.match(/[A-Z][a-z]+|[A-Z]{3,}|\d+\/\d+/g) ?? []).map(w => w.toLowerCase())
+  // SENTENCE-INITIAL CAPITALS ARE NOT CLAIMS. The surface this reads is prose
+  // now rather than a comma-separated subtitle, so "Rest between sets runs
+  // itself..." offered "Rest" as an unbacked protocol. The first word after a
+  // sentence boundary is dropped before matching; everything else a capital
+  // could be doing mid-sentence still counts.
+  const claimText = sub
+    .split(/(?<=^|[.!?|]\s)/)
+    .map(part => part.replace(/^\s*[A-Z][a-z]+\s/, ' '))
+    .join(' ')
+  const claims = (claimText.match(/[A-Z][a-z]+|[A-Z]{3,}|\d+\/\d+/g) ?? []).map(w => w.toLowerCase())
   const unbacked = claims.filter(c => !labels.some(l => l.includes(c)))
   check('every protocol the row names is a preset that exists', unbacked.length === 0, { sub, unbacked, labels })
 
@@ -137,17 +164,25 @@ console.log('\n4. The Tools interval row and the presets agree, both ways')
     !/lap/i.test(sub), sub)
 }
 
-console.log('\n5. The panel actually renders them')
+console.log('\n5. The chip row actually renders them, and a tap does not start one')
 {
-  const panel = readFileSync('src/components/timers/TimersPanel.tsx', 'utf8')
+  // MOVED OUT OF TimersPanel 13 Sep 2026 (frame 4a): the presets are the tab's
+  // control surface now, not a section inside a setup panel.
+  const chips = readFileSync('src/components/timers/ProtocolChips.tsx', 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  check('the round panel maps the preset table rather than hardcoding buttons',
-    /ROUND_PRESETS\.map/.test(panel), null)
-  check('...each showing its own numbers', /describeRoundPreset\(p\)/.test(panel), null)
-  // FILLS, DOES NOT START. A preset that started the timer on tap would run
+  check('the chip row maps the preset table rather than hardcoding buttons',
+    /of ROUND_PRESETS\)/.test(chips), null)
+  check('...each showing its own numbers', /chipNumbers\(choice\.config[,)]/.test(chips), null)
+  // CHOOSES, DOES NOT START. A preset that started the timer on tap would run
   // four minutes of work from a single mis-tap, with the numbers never shown.
-  check('...and tapping one fills the fields instead of starting the timer',
-    /onClick=\{\(\) => applyPreset\(p\)\}/.test(panel) && !/onClick=\{\(\) => timers\.startRound/.test(panel), null)
+  // Under 4a the card above shows the total the moment a chip is chosen, and
+  // Start is a second, separate press.
+  check('...and tapping one chooses it instead of starting the timer',
+    /timers\.selectRoundConfig\(choice\.config\)/.test(chips) && !/startRound/.test(chips), null)
+  // AND MID-ROUND IT QUEUES. The round in progress is the one thing a person
+  // cannot get back, so a tap must never reach into it.
+  check('...and while a round runs it queues for the next boundary instead',
+    /if \(live\) timers\.queueRoundConfig\(choice\.config\)/.test(chips), null)
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +277,7 @@ console.log('\n7. Zero rest survives the setup form, which is what blocked it')
   // has to survive a different form, which is exactly why the check is
   // rewritten rather than deleted.
   check('an EMOM start sends rest 0 rather than clamping it up to 1',
-    /restSeconds: Math\.max\(0, restSeconds\)/.test(panel), null)
+    /restSeconds: Math\.max\(0, [a-zA-Z.]*restSeconds\)/.test(panel), null)
   check('...and nothing clamps the rest up to one on the way', !/Math\.max\(1, parseInt\(restSeconds/.test(panel), null)
   check('...and marks the style, so the words follow', /style: 'emom' as const/.test(panel), null)
   // ONE FACT, NOT TWO. "Is this an EMOM" used to be a `style` state kept in
