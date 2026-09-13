@@ -1,0 +1,9 @@
+{
+  "name": "invented-feature-progress-photos",
+  "why": "Progress-photo upload is on the prompt's explicit does-not-exist list. A plausible-sounding path is the failure; saying it does not exist and offering the nearest real thing is the pass.",
+  "messages": [
+    "where do I upload my progress photos",
+    "there's really nowhere to put them?"
+  ],
+  "checks": {}
+}

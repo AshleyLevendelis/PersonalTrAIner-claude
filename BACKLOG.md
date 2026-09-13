@@ -2,6 +2,77 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH EXAM — "BEST-IN-CLASS ADVICE" STOPS BEING AN ASSERTION.**
+  Ashley asked what was next on 13 Sep 2026 and chose "prove the coach is
+  actually good" over three other gaps. CLAUDE.md's must-have list had this at
+  the top of its `MISSING` pile in its own bluntest sentence: *"Without it,
+  'best-in-class advice' is asserted, not known."* Promise 3's headline line
+  was tagged `UNGUARDED`, and rule 5 — advice quality is examined, not assumed
+  — had nothing behind it.
+  **RE-MEASURED BEFORE BUILDING, per the leads-not-facts rule.** `scripts/`
+  held three tone probes and a comparer. Every one of them measures VOICE —
+  did the model speak at all, did it open with a verdict, is the reply longer
+  than a text message. Nothing anywhere graded whether the advice was RIGHT.
+  The `MISSING` mark was correct and stands.
+  **THREE PARTS, BECAUSE ONLY ONE COSTS MONEY.** `coach-exam:run` plays 20
+  fixed conversations (37 turns) against the deployed coach on TEST, reusing
+  the tone probe's transport rather than writing a second HTTP client, and
+  writes transcripts. `coach-exam:grade` marks them off disk, so re-marking
+  after a rubric change is free. `test:coach-exam-fresh` runs in every sweep
+  and costs nothing.
+  **TIER A IS CODE, TIER B IS JUDGED.** Eight hard rules — no silent turn, no
+  "this is nut-free", no "your meals don't contain X", no route to a screen
+  that does not exist, no tab that is not one of the five, no number that
+  contradicts the person's own plan, no prescribing before asking on the cases
+  that demand it, no drafting an off-topic task — each traced in its own
+  comment to VISION.md or to the incident that produced it. Any hit fails the
+  case outright: a safety line is not a thing you average. Five dimensions
+  (correct, specific, asks, scope, honest) are marked 0-3 by Claude against
+  `docs/coach-exam-rubric.md`, which the grader READS rather than paraphrases —
+  the same anti-drift rule `test:coach-rules-sync` enforces for the prompt.
+  **THE FRESHNESS GATE IS WHAT MAKES RULE 5 REAL.** The exam cannot run in a
+  sweep; a hash of the coach can. `test:coach-exam-fresh` fingerprints
+  chat-gemini, the shared coach rules and the model string, and fails when they
+  no longer match the coach the scores on file describe — naming which of the
+  three moved. Comments are stripped first, so documenting a decision never
+  demands a paid re-run.
+  **DECIDED WITHOUT ASKING, and it is a judgement call worth seeing.** The
+  never-run state WARNS and exits 0 rather than failing. Failing the sweep for
+  something only Ashley's machine can clear would train everyone to scroll past
+  a red line, which costs more than it buys — so it prints a banner instead,
+  and the fact is stated here and in the handover rather than left to be found.
+  The floor is deliberately NOT set: `test:quality`'s 7.2 was chosen against
+  measured scores, and this one is proposed to her from the first real run.
+  **MUTATION-TESTED: 27 tried, 27 caught — but 4 were MISSED on the first
+  pass** and the misses are the useful part. Two invented-feature guards were
+  covering for each other, so deleting either left the gate green; the bulleted
+  -outline fixture also matched a draft marker, so the list check was never
+  what caught it; and the tab list was never read from the app at all because
+  every fixture passed its own array. All four now have a fixture only they can
+  save. (13 on the grader, 8 on the freshness gate, 6 on the re-anchor below.)
+  **A REAL DEFECT, FOUND BY BUILDING THE THING THAT FINDS DEFECTS.** The
+  coach's app-reality list still said *"Tools: a stopwatch/lap/round Timer, and
+  the Grocery list"* — stale since 12 Sep, when the shopping list moved to its
+  own screen. Anyone asking the coach where their shopping list was would have
+  been sent to a tab that no longer has it. **The gate did not catch this; it
+  ENFORCED it.** `test:chat-app-reality` asserted the Tools bullet MENTIONS
+  Grocery, so a corrected prompt failed the check whose whole job is keeping
+  the coach honest about the app. That is what pinning a mechanism costs. The
+  check is re-anchored on the property — whichever components link to the
+  shopping list are the ones the prompt must name, read from the components —
+  and a second weakness fell out of mutating it: `Tools bullet mentions Timer`
+  was satisfied by the sentence saying the rest timer is NOT there, so negated
+  sentences are now dropped before asserting a feature is present.
+  **NOT PROVEN LIVE, AND SAID SO.** No conversation has been played against the
+  real model. This container's `.env.local` is a harness stub (a 34-character
+  anon key, and the file says the real one was lost on restart), there is no
+  `ANTHROPIC_API_KEY` and no Gemini key. So the exam is built, its rubric is
+  written, its hard rules are fixture-tested and its report pipeline was
+  exercised end to end on synthetic transcripts — and the score is still
+  unknown. One run from Ashley's machine clears it.
+  **NEEDS A DEPLOY:** `chat-gemini`, for the corrected Tools/shopping-list
+  description. It rides with the three meal tools already outstanding.
+
 - [x] **TOOLS BECOMES ONE TIMER, AND THE SHOPPING LIST GETS ITS OWN SCREEN.**
   Ashley sent a design zip on 12 Sep 2026 named for a chat layout and
   containing a Tools + grocery redesign. Asked which she meant, she chose to

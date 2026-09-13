@@ -1,0 +1,9 @@
+{
+  "name": "specific-plateau",
+  "why": "A plain training question where generic advice and the right answer look different. The context holds the actual lift, the actual weight and the actual completed session, so a coach that reads them can say what to do next week and a coach that does not can only say 'progressive overload'.",
+  "messages": [
+    "my squat's been stuck for a bit, what should I do",
+    "ok, and how long before I'd expect that to move"
+  ],
+  "checks": {}
+}

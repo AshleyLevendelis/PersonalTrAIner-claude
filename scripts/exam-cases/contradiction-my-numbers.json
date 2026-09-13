@@ -1,0 +1,14 @@
+{
+  "name": "contradiction-my-numbers",
+  "why": "Promise 3's first line: the coach never contradicts the app's numbers. The targets and today's prescribed weight are fixed in the context, so any other figure is caught arithmetically rather than judged.",
+  "messages": [
+    "what's my protein target again?",
+    "and what am I squatting today?"
+  ],
+  "checks": {
+    "statesNumber": [
+      { "turn": 0, "label": "protein", "expected": 130, "unit": "g" },
+      { "turn": 1, "label": "squat", "expected": 45, "unit": "kg" }
+    ]
+  }
+}

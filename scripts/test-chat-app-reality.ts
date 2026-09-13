@@ -137,12 +137,46 @@ async function main() {
     bulletNames,
   )
 
-  console.log('\n[3] The Tools tab bullet mentions its two real features (Timer, Grocery) — the most likely area to gain/lose a feature')
+  console.log('\n[3] The Tools tab bullet describes what is actually on Tools — the most likely area to gain/lose a feature')
   const toolsBulletMatch = appRealityBlock.match(/^- Tools:.*$/m)
   check('a Tools bullet exists', toolsBulletMatch !== null)
   const toolsBullet = toolsBulletMatch?.[0] ?? ''
-  check('Tools bullet mentions Timer', /timer/i.test(toolsBullet), toolsBullet)
-  check('Tools bullet mentions Grocery', /grocery/i.test(toolsBullet), toolsBullet)
+  // NEGATED SENTENCES DROPPED FIRST. The bullet now ends with "the rest timer
+  // is NOT set up here", which satisfied a bare /timer/i test — so the check
+  // stayed green through a mutation that removed the timer Tools actually has.
+  // Same shape as the repo's rule about stripping comments before asserting a
+  // string is absent: a sentence saying a thing is missing must not be able to
+  // stand in for the thing being there.
+  const affirmative = (text: string) =>
+    text.split(/(?<=[.!?])\s+/).filter(sentence => !/\bNOT\b|\bisn'?t\b|\bdoes ?n'?o?t\b|\bno longer\b/.test(sentence)).join(' ')
+  check('Tools bullet names the Timer as something Tools HAS', /timer/i.test(affirmative(toolsBullet)), toolsBullet)
+
+  // RE-ANCHORED 13 Sep 2026, and the reason is worth keeping. This used to
+  // assert `Tools bullet mentions Grocery`, which was true when it was written
+  // and became false on 12 Sep when the shopping list left that tab for a
+  // screen of its own. The gate did not catch the drift — it ENFORCED it: the
+  // one check whose job is keeping the coach honest about the app was the
+  // thing holding the stale sentence in place, and a corrected prompt failed
+  // it. That is what pinning a mechanism (this bullet says this word) instead
+  // of a property (the prompt says where the thing is) costs.
+  //
+  // The property, derived from the components rather than restated: whichever
+  // surfaces link to the shopping list are the surfaces the prompt must name,
+  // and the ones that do not must not claim it.
+  const linksGrocery = (file: string) => /groceryHash\(\)/.test(readFileSync(join(ROOT, file), 'utf-8'))
+  const toolsHasGrocery = linksGrocery('src/components/ToolsTab.tsx')
+  const nutritionHasGrocery = linksGrocery('src/components/MealPlan.tsx')
+  const homeHasGrocery = /ShopDayCard/.test(readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf-8'))
+  const claimsGroceryOnTools = /grocery|shopping list/i.test(toolsBullet)
+  check(
+    `Tools bullet claims the shopping list only if Tools actually opens it (it ${toolsHasGrocery ? 'does' : 'does not'})`,
+    claimsGroceryOnTools === toolsHasGrocery,
+    toolsBullet,
+  )
+  const shoppingLine = appRealityBlock.match(/^Shopping list:.*$/m)?.[0] ?? ''
+  check('the prompt describes the shopping list somewhere', shoppingLine.length > 0, appRealityBlock.slice(0, 200))
+  if (nutritionHasGrocery) check('...and says Nutrition opens it, because Nutrition does', /nutrition/i.test(shoppingLine), shoppingLine)
+  if (homeHasGrocery) check('...and says Home does, because the shop-day card is there', /home/i.test(shoppingLine), shoppingLine)
 
   console.log('\n[4] Regression guard: the confirmed-fabricated features stay on the "does NOT exist" list, never reintroduced as real')
   const doesNotExistMatch = appRealityBlock.match(/These do NOT exist[^]*?(?=\n\nIf asked)/)

@@ -172,7 +172,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `coach-sees-ingredients`, `coach-sees-technique`, `coach-volume-schedule`,
   `coach-phase-brief`, `context-is-read`, `week-load-consistency`
 - Accurate, current, specific advice at the level a qualified trainer and
-  nutritionist would sign — `UNGUARDED`: tone probes exist, no graded check
+  nutritionist would sign — still `UNGUARDED` in practice: the coach exam now
+  exists but has never been run, so the graded check is built and unused
 - It asks before prescribing and uses the answer — prompt rule, kept in sync
   by `coach-rules-sync`; whether it HAPPENS is `UNGUARDED`
 - It notices patterns and coaches to them — `block-review`,
@@ -188,8 +189,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `question-not-a-card`, `tool-reply`, `message-evidence`
 - **The coach exam** — a fixed set of realistic conversations graded against
   a written rubric, run against the real model whenever the prompt, model or
-  tools change, scores kept — `MISSING`. Without it, "best-in-class advice"
-  is asserted, not known.
+  tools change, scores kept — BUILT 13 Sep 2026, **NEVER RUN**. 20 cases and
+  37 turns (`coach-exam:run`); eight hard rules checked in code and five
+  judged dimensions marked against `docs/coach-exam-rubric.md`
+  (`coach-exam:grade`); and `coach-exam-fresh` in every sweep, which fails
+  when the coach changes and the exam has not been re-run — that gate is what
+  makes rule 5 enforceable rather than aspirational. The rules are
+  fixture-tested (`coach-exam-grader`, 13 mutations). No conversation has been
+  played against the real model, because that needs credentials a cloud
+  session does not have. So until it is run once, "best-in-class advice" is
+  still asserted, not known — and the floor is deliberately unset, to be
+  proposed from that first run's numbers.
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —
@@ -340,6 +350,14 @@ old — the commands were right and the context was missing.
   fails the next time those lines move and proves nothing when they don't.
   Anchor on "the moved-day branch is tested before the rest-day branch", not on
   the text of either.
+  **A mechanism-pinned check does not merely fail to catch a drift — it can
+  ENFORCE it.** `test:chat-app-reality` asserted the coach prompt's Tools
+  bullet MENTIONS the grocery list. The grocery list moved off Tools on 12 Sep
+  2026; the prompt went stale, the gate stayed green, and on 13 Sep the
+  CORRECTED prompt failed the check whose entire job is keeping the coach
+  honest about the app. Re-anchored on the property — whichever components
+  link to the shopping list are the ones the prompt must name, read from the
+  components. When a check blocks a fix, suspect the check.
 - Strip comments before asserting a string is ABSENT, or a note explaining why
   something was removed will satisfy the check that it was removed.
 - New check → register it in `package.json` → mutation-test it → say in the

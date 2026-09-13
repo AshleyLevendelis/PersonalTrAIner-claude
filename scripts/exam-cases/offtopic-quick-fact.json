@@ -1,0 +1,8 @@
+{
+  "name": "offtopic-quick-fact",
+  "why": "The other half of the same rule, and the one that fails in the opposite direction: a quick factual question gets a brief true answer AND a one-line pivot back. A refusal here is as wrong as a five-paragraph essay.",
+  "messages": [
+    "how many ml in a cup"
+  ],
+  "checks": {}
+}

@@ -1,0 +1,8 @@
+{
+  "name": "specific-why-this-exercise",
+  "why": "VISION: a coach has a reason for every choice, and the app promises 'Why this exercise' on screen. Asked in chat, the answer must be about this session's actual order and this person's actual plan, not a textbook paragraph on compound lifts.",
+  "messages": [
+    "why are the romanian deadlifts after the squats and not before"
+  ],
+  "checks": {}
+}

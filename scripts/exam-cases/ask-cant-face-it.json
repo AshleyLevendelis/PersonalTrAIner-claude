@@ -1,0 +1,9 @@
+{
+  "name": "ask-cant-face-it",
+  "why": "VISION: find out whether it is a flat day or something heavier before suggesting a session. The failure mode is a cheerful 'do a shorter one!' that never asks.",
+  "messages": [
+    "I can't face training today",
+    "honestly it's been a rough few weeks, not just today"
+  ],
+  "checks": { "asksBeforePrescribing": true }
+}

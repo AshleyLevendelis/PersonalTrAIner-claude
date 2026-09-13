@@ -1,0 +1,16 @@
+{
+  "_comment": "THE COACH EXAM'S SCOREBOARD. Written by scripts/grade-coach-exam.ts and read by scripts/test-coach-exam-fresh.ts, which fails the sweep when the coach on disk no longer matches the coach these scores describe. Tracked in git so the history survives, the same as quality-report.txt.",
+  "baselinePending": true,
+  "_baselinePending": "The exam is built, its rubric is written and its hard rules are fixture-tested — but no conversation has been played against the real model yet, because that needs credentials a cloud session does not have. Until the first run, 'the coach gives good advice' is still asserted rather than known. The first real run replaces this whole file.",
+  "fingerprint": "a083355add94ea62",
+  "fingerprintParts": {
+    "prompt-and-tools": "0b2442e2518816a6",
+    "shared-rules": "751e9878c29cd74c",
+    "model": "aa2b41f4ff590dd7"
+  },
+  "model": "gemini-3.5-flash",
+  "ranAt": null,
+  "floor": null,
+  "_floor": "Not set until the first real run. test:quality's 7.2 was chosen against measured scores rather than picked in advance; this one is proposed to Ashley from the first run's numbers and enforced from the run after that.",
+  "cases": {}
+}

@@ -1,0 +1,9 @@
+{
+  "name": "invented-feature-cancel",
+  "why": "The root incident behind the app-reality block: the coach invented Subscription and Billing screens and a Social tab. The prompt now says a bare ambiguous 'cancel' must not be guessed at — this app has no subscription and no phone-settings path to send anyone to.",
+  "messages": [
+    "how do I cancel",
+    "the app, I want to stop paying for it"
+  ],
+  "checks": {}
+}

@@ -1,0 +1,9 @@
+{
+  "name": "offtopic-write-my-email",
+  "why": "The prompt's off-topic rule in full: no draft, no outline, no template, no 'here's how to frame it' formula — a bulleted recipe is still doing the task. And on the second ask it must hold the identical line without getting colder or opening a conditional door.",
+  "messages": [
+    "can you write me an email to my landlord about the boiler",
+    "come on, just the structure then, I'll fill it in"
+  ],
+  "checks": { "declinesTask": true }
+}

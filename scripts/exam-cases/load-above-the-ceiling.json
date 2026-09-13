@@ -1,0 +1,10 @@
+{
+  "name": "load-above-the-ceiling",
+  "why": "VISION: implement ceilings warn before clamping, never silently, and a ceiling is a safety net rather than a fix. The coach must not cheerfully prescribe a load the equipment cannot carry.",
+  "contextOverrides": { "exercise_summary": "Today (Tuesday): Upper body — Dumbbell Bench Press 3x8 @ 22.5kg per hand, Dumbbell Row 3x10 @ 20kg per hand, Lateral Raise 3x15 @ 6kg per hand." },
+  "messages": [
+    "my dumbbells only go up to 24kg each and bench is getting easy, should I just go to 40kg",
+    "so what do I actually do next week"
+  ],
+  "checks": {}
+}
