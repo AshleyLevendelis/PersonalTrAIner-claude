@@ -120,6 +120,21 @@ check('"did it, not in the app" is a PAST-day verb only', /if \(isPast\) out\.pu
 check('"I missed it" needs a day that has happened, and not already declared', /\(isPast \|\| isToday\) && !declared\.missed\) out\.push\('missed'\)/.test(verbs))
 check('"something else instead" likewise', /\(isPast \|\| isToday\) && !declared\.swapped\) out\.push\('something_else'\)/.test(verbs))
 check('move and rest apply to any day with a session', /out\.push\('move'\)/.test(verbs) && /if \(!declared\.rest\) out\.push\('rest'\)/.test(verbs))
+// "I'VE ONLY GOT 25 MINUTES TODAY", 13 Sep 2026. Two verbs unlike the other
+// five: the rest declare what already happened to a day, these two CHANGE THE
+// PLAN. So they are gated twice — on the day still being a session you are
+// about to do, and on the surface having handed the sheet something to call.
+// The second gate is what keeps the sheet's no-database contract (:87) true:
+// a plan edit here would have to reach the database, so it does not happen
+// here at all.
+check('shortening and lightening are TODAY only, and only while the day is still ahead of you',
+  /if \(isToday && !declared\.rest && !declared\.missed && !declared\.swapped\)/.test(verbs))
+check('...and neither is offered on a surface that cannot edit the plan',
+  /if \(onShorten\) out\.push\('shorten'\)/.test(verbs) && /if \(onLighter\) out\.push\('lighter'\)/.test(verbs))
+check('...so the sheet itself still writes no plan edit — both hand back to the caller',
+  /onShorten!\(minutes\)/.test(sheet) && /onLighter!\(\)/.test(sheet) && !/saveScopedEdit|saveMesocycle/.test(sheet))
+check('a refusal from either is shown in its own words, not flattened to "couldn\'t save that"',
+  /refusal = await fn\(\)/.test(sheet) && /if \(refusal\) \{ setError\(refusal\); return \}/.test(sheet))
 check('today points at the grid rather than a shortcut', /Tick the sets below/.test(sheet) && !/is_completed: true/.test(sheet))
 const cands = sheet.slice(sheet.indexOf('const moveCandidates'), sheet.indexOf('const nextFree'))
 check('move destinations come from the coach\'s own resolver, one candidate per requested day',

@@ -5597,6 +5597,120 @@ export function sizeBlockToRestBudget(
   })
 }
 
+/**
+ * ONE DAY, FITTED TO THE TIME SOMEBODY ACTUALLY HAS — 13 Sep 2026.
+ *
+ * Ashley picked "I've only got 25 minutes today" as the next gap, and ruled on
+ * what gets cut: options were protect the main lift and drop accessories
+ * (recommended), take a set off everything, or shorten the rests. She chose
+ * PROTECT THE MAIN LIFT. You still squat, and you still squat properly; the
+ * accessory work at the end goes, from the bottom up, until it fits.
+ *
+ * ALMOST NONE OF THAT IS NEW. sizeBlockToRestBudget already trims a day to an
+ * explicit budget and already does it in exactly that order — its Phase A
+ * refuses to touch a `main` role's sets while anything else can still give,
+ * and its Phase B removes whole exercises lowest-tier-first, never a protected
+ * name, never below three. It has simply never been called with a budget
+ * SMALLER than the one the profile asks for, or pointed at a single day.
+ *
+ * ONE EXPORT, DOING THE PAIR, for the reason settleWeekBalance's comment gives
+ * a few hundred lines up: trimming sets and then trimming rest have to travel
+ * together, and trimWeekRestForBudget and getGoalPolicy stay private so no
+ * caller can reach for half of it.
+ *
+ * IT REPORTS WHAT IT COULD NOT DO. A day with three exercises and a long main
+ * lift may not reach 25 minutes at all; the honest answer is the day it CAN
+ * build plus the time that day really takes, so the confirm card can say "the
+ * closest I can get is 32 minutes" rather than quietly missing the target.
+ */
+export interface DayShortening {
+  week: MesocycleWeek
+  changed: boolean
+  /** Exercises that came out entirely, in the order they were dropped. */
+  droppedExercises: string[]
+  /** Working sets removed from exercises that stayed. */
+  setsRemoved: number
+  /** What the day actually takes now, rounded to a minute — not what was asked for. */
+  achievedMinutes: number
+  /** Why nothing happened, in words a person can read. Empty when `changed`. */
+  refusal?: string
+}
+
+/**
+ * The lifts a shortening must not touch: every genuine tier-1 compound on the
+ * day, or — on a day that has none — the one dayAnchorExercise promotes.
+ *
+ * dayAnchorExercise deliberately returns undefined when a real tier-1 is
+ * present (its own comment: so a caller can never confuse "promoted" with "was
+ * always the main lift"), which is why both halves are needed here.
+ */
+function mainLiftNamesOf(day: WorkoutDay): Set<string> {
+  const tierOne = day.exercises.filter(ex => findEntry(ex.name)?.mechanics_tier === 'tier1_compound')
+  if (tierOne.length > 0) return new Set(tierOne.map(ex => ex.name))
+  const promoted = dayAnchorExercise(day.exercises)
+  return new Set(promoted ? [promoted.name] : [])
+}
+
+export function shortenDayTo(
+  week: MesocycleWeek,
+  dayName: string,
+  profile: UserProfile,
+  minutes: number,
+): DayShortening {
+  const day = week.days.find(d => d.day === dayName)
+  const nothing = (refusal: string): DayShortening =>
+    ({ week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: 0, refusal })
+
+  if (!day || day.exercises.length === 0) return nothing(`There's no session on ${dayName} to shorten.`)
+  if (!Number.isFinite(minutes) || minutes <= 0) return nothing("I need a number of minutes to aim for.")
+
+  const budgetSeconds = Math.round(minutes * 60)
+  const before = estimateDaySeconds(day)
+  if (before <= budgetSeconds) {
+    return { week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: Math.round(before / 60), refusal: `${dayName}'s session already fits in ${minutes} minutes.` }
+  }
+
+  const policy = getGoalPolicy(profile.fitness_goal || 'hypertrophy')
+  // restAdjustSeconds 0: this day's rest is already prescribed and stored, so
+  // there is no block-level adjustment still to come. The estimate reads what
+  // the day actually says.
+  const [sized] = sizeBlockToRestBudget([day], 0, budgetSeconds, mainLiftNamesOf(day), policy)
+
+  // COPIED BEFORE THE MUTATING TRIM. sizeBlockToRestBudget returns a new day,
+  // but the exercises it did not touch are the caller's own objects — the
+  // trap settle-week.ts's header records paying for on 13 Sep.
+  const shortened: WorkoutDay = { ...sized, exercises: sized.exercises.map(e => ({ ...e })) }
+  trimWeekRestForBudget([shortened], budgetSeconds, undefined, policy.minLoadedMainLiftRestSeconds)
+
+  const keptBefore = new Map(day.exercises.map(ex => [ex.name, ex.sets]))
+  const droppedExercises = day.exercises.filter(ex => !shortened.exercises.some(e => e.name === ex.name)).map(ex => ex.name)
+  let setsRemoved = 0
+  for (const ex of shortened.exercises) {
+    const was = keptBefore.get(ex.name)
+    if (was !== undefined && was > ex.sets) setsRemoved += was - ex.sets
+  }
+
+  const after = estimateDaySeconds(shortened)
+  const changed = droppedExercises.length > 0 || setsRemoved > 0 || after < before
+  if (!changed) return nothing(`I can't get ${dayName} under ${minutes} minutes without cutting into the main lift.`)
+
+  // THE MARKER, AND WHY IT IS NOT block_size_note. sizeBlockToRestBudget writes
+  // that note when it drops something, in the block's own words ("heavier lifts
+  // need longer rest"), which is not what happened here. A day shortened on
+  // purpose says so in its own terms, and session-shortfall reads the same
+  // field to stay quiet rather than warning that a deliberately short session
+  // is short.
+  const marked: WorkoutDay = { ...shortened, shortened_to_minutes: minutes, block_size_note: day.block_size_note }
+
+  return {
+    week: { ...week, days: week.days.map(d => (d.day === dayName ? marked : d)) },
+    changed: true,
+    droppedExercises,
+    setsRemoved,
+    achievedMinutes: Math.round(after / 60),
+  }
+}
+
 // Below this underrun, a day is "close enough" and gets no filler — matches
 // the quality scorer's tighter (10%/20%) overrun bands staying strict while
 // underrun gets real headroom before anything is appended.

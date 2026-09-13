@@ -31,14 +31,24 @@ import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { isExternallyLoaded } from '@/lib/load-prescription'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { WorkoutDay } from '@/lib/types'
+import { estimateDaySeconds } from '@/lib/session-duration'
 
 export interface WhatHappenedTarget {
   date: string
   dayName: string
 }
 
-type Verb = 'did_elsewhere' | 'missed' | 'move' | 'rest' | 'something_else'
-type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded'
+type Verb = 'did_elsewhere' | 'missed' | 'move' | 'rest' | 'something_else' | 'shorten' | 'lighter'
+type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten'
+
+/**
+ * THE TIMES SOMEBODY ACTUALLY SAYS. "I've only got half an hour" — not a
+ * free-text minute box, which on a gym floor is a keyboard between you and
+ * your session. Filtered at render to the ones genuinely shorter than the day
+ * in front of them, so the sheet never offers to shorten a 30-minute session
+ * to 45.
+ */
+const SHORTEN_CHOICES = [20, 30, 40, 45] as const
 
 /** What the middle column counts, in the word the person would use. A 40m carry is not 40 reps. */
 const UNIT_WORD: Record<SetUnit, string> = { reps: 'reps', seconds: 'secs', meters: 'm' }
@@ -60,6 +70,8 @@ export function WhatHappenedSheet({
   weekOf,
   weekNumber,
   onChanged,
+  onShorten,
+  onLighter,
 }: {
   target: WhatHappenedTarget | null
   onClose: () => void
@@ -75,6 +87,19 @@ export function WhatHappenedSheet({
   weekNumber: number | null
   /** Fired after any write lands, so the strip, Home and the chat re-read. */
   onChanged: () => void
+  /**
+   * Cut today's session down to `minutes`. Returns a refusal to show, or null
+   * on success.
+   *
+   * OWNED BY THE CALLER, deliberately. Every other verb here writes a DAY FLAG
+   * and this sheet is asserted never to reach the database itself
+   * (test:what-happened). These two edit the PLAN, which is TodayPanel's job
+   * through applySessionEdit — the same route the exercise row menu already
+   * takes. Absent means the verb is not offered at all.
+   */
+  onShorten?: (minutes: number) => Promise<string | null>
+  /** Same contract: one step lighter, today only. */
+  onLighter?: () => Promise<string | null>
 }) {
   const [phase, setPhase] = useState<Phase>('menu')
   const [busy, setBusy] = useState(false)
@@ -111,8 +136,17 @@ export function WhatHappenedSheet({
     out.push('move')
     if (!declared.rest) out.push('rest')
     if ((isPast || isToday) && !declared.swapped) out.push('something_else')
+    // TODAY ONLY, and only while there is still a session to change. A past
+    // day cannot be made shorter — it already happened — and a future one is
+    // the ongoing volume change's job, not this one's. Both are also gated on
+    // the caller supplying a handler, so a surface that cannot edit the plan
+    // never shows a control that would do nothing.
+    if (isToday && !declared.rest && !declared.missed && !declared.swapped) {
+      if (onShorten) out.push('shorten')
+      if (onLighter) out.push('lighter')
+    }
     return out
-  }, [target, isDone, hasSession, movedAway, isPast, isToday, declared.missed, declared.rest, declared.swapped])
+  }, [target, isDone, hasSession, movedAway, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter])
 
   // Every day this week the resolver would accept as a destination — the
   // same function, the same rules (a free day, inside this mesocycle week,
@@ -155,6 +189,39 @@ export function WhatHappenedSheet({
   const undoRest = () => run(() => setDeliberateRest(profileId!, date, false), 'close')
   const undoSwap = () => run(() => setSwappedForActivity(profileId!, date, null), 'close')
   const undoMove = () => run(() => setSessionMove(profileId!, date, null), 'close')
+
+  /**
+   * The two plan edits, run through the CALLER rather than through `run`.
+   *
+   * `run` is for day flags: it takes a `Promise<boolean>` and turns false into
+   * one sentence. These return a refusal STRING instead, because a shortening
+   * can fail in ways worth reading ("that session already fits in 30 minutes",
+   * "every exercise is already at its minimum") and flattening them all to
+   * "couldn't save that" would throw away the only useful part.
+   */
+  const runEdit = async (fn: () => Promise<string | null>) => {
+    setBusy(true); setError(null)
+    let refusal: string | null = null
+    try { refusal = await fn() } catch (e) { console.error('[what-happened]', e); refusal = "Couldn't change that — try again in a moment." }
+    setBusy(false)
+    if (refusal) { setError(refusal); return }
+    onChanged()
+    close()
+  }
+  const runShorten = (minutes: number) => runEdit(() => onShorten!(minutes))
+  const runLighter = () => runEdit(() => onLighter!())
+
+  /**
+   * Only times genuinely shorter than the session in front of them, with a
+   * five-minute margin so "shorten my 32-minute session to 30" is not offered
+   * as though it were worth a tap.
+   */
+  const shortenChoices = useMemo(() => {
+    const day = plan.find(d => d.day === target?.dayName)
+    if (!day || day.exercises.length === 0) return [] as number[]
+    const nowMinutes = estimateDaySeconds(day) / 60
+    return SHORTEN_CHOICES.filter(m => m <= nowMinutes - 5)
+  }, [plan, target?.dayName])
 
   const saveSomethingElse = () => {
     const name = activity.trim()
@@ -283,6 +350,32 @@ export function WhatHappenedSheet({
             {verbs.includes('something_else') && (
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('something_else')} data-verb="something_else">I did something else instead</Button>
             )}
+            {verbs.includes('shorten') && (
+              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('shorten')} data-verb="shorten">I&rsquo;m short of time today</Button>
+            )}
+            {verbs.includes('lighter') && (
+              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={runLighter} data-verb="lighter">Make it easier today</Button>
+            )}
+          </div>
+        )}
+
+        {phase === 'shorten' && (
+          <div className="space-y-2" data-testid="what-happened-shorten">
+            <p className="text-sm">How long have you got?</p>
+            <p className="text-xs text-muted-foreground">
+              Your main lift stays exactly as it is, and so do at least two others. The accessory work at the end
+              comes out until it fits — or until only those are left, whichever comes first. {when} is back to the
+              full session next week.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {shortenChoices.map(m => (
+                <Button key={m} size="sm" variant="outline" disabled={busy} onClick={() => runShorten(m)} data-shorten-minutes={m}>{m} min</Button>
+              ))}
+            </div>
+            {shortenChoices.length === 0 && (
+              <p className="text-sm text-muted-foreground">This session is already about as short as it gets.</p>
+            )}
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
           </div>
         )}
 

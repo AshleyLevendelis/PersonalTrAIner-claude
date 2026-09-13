@@ -536,6 +536,24 @@ export interface WorkoutDay {
    * just explains why this block looks lighter than an earlier one.
    */
   block_size_note?: string
+  /**
+   * Set when this ONE day was deliberately cut down to fit the time somebody
+   * actually had — "I've only got 25 minutes today", 13 Sep 2026. Holds the
+   * number of minutes that was asked for.
+   *
+   * Rides in the week row's existing `days` jsonb, so it costs no migration.
+   *
+   * It earns its place twice. The screen says the session was shortened on
+   * purpose rather than showing a thin day with no explanation; and
+   * describeSessionShortfall reads it and stays QUIET, because warning that a
+   * deliberately shortened session is short is the app arguing with a decision
+   * the person just made.
+   *
+   * Scoped by which week row gets written, not by anything here: a shortening
+   * saved with scope 'today' touches only this week, so the same day next week
+   * is the full session again.
+   */
+  shortened_to_minutes?: number
 }
 
 export interface ConstraintTraceEntry {
@@ -619,7 +637,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_session_shorten' | 'propose_schedule_change' | 'propose_style_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string

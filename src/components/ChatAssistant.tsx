@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -47,6 +47,8 @@ import { resolveSwapTarget } from '@/lib/swap-target'
 import { removeExerciseFromSession, moveExerciseInSession } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { settleWeek } from '@/lib/settle-week'
+import { shortenDayTo } from '@/lib/exercise-plan'
+import { estimateDaySeconds } from '@/lib/session-duration'
 import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
@@ -1678,6 +1680,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
     }
     if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
+    if (pendingAction.kind === 'propose_session_shorten') return "Here's that session cut down to fit:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
@@ -2169,10 +2172,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!dayName || !direction || mesocycle.length === 0) return null
 
     const startWeek = activeSession.liveWeek
+    // SCOPE, ADDED 13 Sep 2026. Until now this tool always meant "from this
+    // week to the end of the plan", which is the wrong answer to "I'm knackered
+    // today" — and it was the only lightening control the app had. 'today'
+    // narrows the set to the live week, so the same day next week is the full
+    // session again, exactly as a 'today' swap or removal already behaves.
+    //
+    // ONGOING IS THE DEFAULT because that is what the tool did before the
+    // parameter existed, so an older model turn that omits it keeps its old
+    // meaning rather than quietly shrinking.
+    const todayOnly = rawArgs.scope === 'today'
     // Deload weeks are excluded from the SET the proposal carries, not just
     // skipped at execute time — so the card never counts a week it won't touch.
     const weekNumbers = mesocycle
       .filter(w => w.week_number >= startWeek && isVolumeAdjustable(w))
+      .filter(w => !todayOnly || w.week_number === startWeek)
       .map(w => w.week_number)
     if (weekNumbers.length === 0) return null
 
@@ -2189,7 +2203,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       after: String(preview.setsAfter),
     }]
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Applies from week ${startWeek} on. Weeks you've already trained don't change.` },
+      {
+        severity: 'info',
+        text: todayOnly
+          ? `Just this week — ${day.day} is back to normal next week.`
+          : `Applies from week ${startWeek} on. Weeks you've already trained don't change.`,
+      },
     ]
     if (mesocycle.some(w => w.week_number >= startWeek && !isVolumeAdjustable(w))) {
       implications.push({ severity: 'info', text: 'Your deload week is left alone — it\'s already lighter on purpose.' })
@@ -2216,12 +2235,77 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     return {
-      scopeKey: `${profile.id}:propose_volume_change:${day.day}:${direction}:${startWeek}`,
+      scopeKey: `${profile.id}:propose_volume_change:${day.day}:${direction}:${startWeek}:${todayOnly ? 'today' : 'ongoing'}`,
       preconditions: { dayName: day.day, direction, startWeek, setsBefore: preview.setsBefore },
       payload: { dayName: day.day, direction, weekNumbers, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
         rows,
+        implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_session_shorten's card — "I've only got 25 minutes today".
+   *
+   * Trialled through the REAL shortenDayTo, never modelled: it is the only
+   * thing that knows which lift is the main one, where the role floors are and
+   * that a day never goes below three exercises, and the card has to say what
+   * will actually happen rather than what was asked for. A day that cannot
+   * reach 25 minutes says the closest it can get.
+   */
+  const buildSessionShortenProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: SessionShortenPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { refusal: string } | null => {
+    const minutes = Number(rawArgs.minutes)
+    if (!Number.isFinite(minutes) || minutes <= 0) return null
+    if (mesocycle.length === 0) return null
+    const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    if (!week) return null
+
+    // An absent day means today — the same default resolveSwapTarget uses, and
+    // the commonest shape of the request ("I've only got half an hour").
+    const wanted = String(rawArgs.day ?? '').trim() || activeSession.dayName
+    const day = week.days.find(d => d.day.toLowerCase() === wanted.toLowerCase())
+    if (!day) return null
+
+    const trial = shortenDayTo(week, day.day, profile, minutes)
+    if (!trial.changed) return { refusal: trial.refusal ?? "I couldn't shorten that one." }
+
+    const after = trial.week.days.find((d: WorkoutDay) => d.day === day.day)!
+    const settled = settleWeek(trial.week, day.day, profile)
+    const impact = describeEditImpact(week, settled.week, day.day)
+
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: `Just today — ${day.day} is back to the full session next week.` },
+    ]
+    // SAY IT WHEN IT COULD NOT GET THERE, rather than showing a card headed
+    // "25 min" for a session that takes 32.
+    if (trial.achievedMinutes > minutes) {
+      implications.push({ severity: 'warn', text: `${minutes} minutes isn't reachable without cutting into your main lift — about ${trial.achievedMinutes} is the closest.` })
+    }
+    if (impact.balancing) implications.push({ severity: 'info', text: impact.balancing })
+    if (impact.cost) implications.push({ severity: 'warn', text: impact.cost })
+
+    return {
+      scopeKey: `${profile.id}:propose_session_shorten:${day.day}:${activeSession.liveWeek}`,
+      preconditions: { day: day.day, exerciseCount: day.exercises.length },
+      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, minutes, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        lead: `I can cut ${day.day} down to about ${trial.achievedMinutes} minutes:`,
+        rows: [
+          { field: 'Time', before: `~${Math.round(estimateDaySeconds(day) / 60)} min`, after: `~${trial.achievedMinutes} min` },
+          { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
+        ],
+        unchanged: [`Your main lift — every set of it`],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
@@ -3555,6 +3639,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const volume = buildVolumeChangeProposal(result.proposal.rawArgs)
         if (volume) built = { scopeKey: volume.scopeKey, preconditions: volume.preconditions, payload: volume.payload as unknown as Record<string, unknown>, preImage: volume.preImage, diff: volume.diff }
         else refusal = "There's no room to move that session — everything on it is already at a limit."
+      } else if (result.proposal.kind === 'propose_session_shorten' && result.proposal.rawArgs) {
+        const shorten = buildSessionShortenProposal(result.proposal.rawArgs)
+        if (shorten && 'refusal' in shorten) refusal = shorten.refusal
+        else if (shorten) built = { scopeKey: shorten.scopeKey, preconditions: shorten.preconditions, payload: shorten.payload as unknown as Record<string, unknown>, preImage: shorten.preImage, diff: shorten.diff }
+        else refusal = "I couldn't work out which session you meant — tell me the day and how long you've got."
       } else if (result.proposal.kind === 'propose_schedule_change' && result.proposal.rawArgs) {
         const schedule = buildScheduleChangeProposal(result.proposal.rawArgs)
         if (schedule) built = { scopeKey: schedule.scopeKey, preconditions: schedule.preconditions, payload: schedule.payload as unknown as Record<string, unknown>, preImage: schedule.preImage, diff: schedule.diff }
@@ -4229,6 +4318,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           durationDays: payload.durationDays,
         })
       }
+    } else if (row.kind === 'propose_session_shorten') {
+      const payload = row.payload as unknown as SessionShortenPayload
+      const result = await executeSessionShorten(profile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Session shortened for today' : "Couldn't shorten it"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_volume_change') {
       const payload = row.payload as unknown as VolumeChangePayload
       const result = await executeVolumeChange(profile, mesocycle, payload)
@@ -4506,6 +4604,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const preImage = row.pre_image as MesocycleWeek[] | null
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
+        onMesocycleUpdated(preImage)
+      } else if (row.kind === 'propose_session_shorten') {
+        // ONE WEEK, not a run. Shortening is today-only by definition, so the
+        // undo restores exactly the week it wrote — the same shape a scoped
+        // swap's undo takes, not the week-range one below.
+        const payload = row.payload as unknown as SessionShortenPayload
+        const preImage = row.pre_image as MesocycleWeek[] | null
+        if (!preImage || !planCreatedAt) return
+        await undoExerciseSwap(profile.id, preImage, payload.weekNumber, 'today', planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_concurrent_activity') {
         // Both wrote a RUN of weeks, so undo restores the same run rather

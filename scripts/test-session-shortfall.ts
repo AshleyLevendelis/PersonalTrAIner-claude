@@ -89,12 +89,37 @@ console.log('\n4. It changed what is said, and not one set')
   const panel = stripComments(readFileSync(join(ROOT, 'src/components/exercise/TodayPanel.tsx'), 'utf8'))
   check('today computes the estimate from the app\'s own estimator',
     /estimateDaySeconds\(workout\)/.test(panel))
+  // RE-ANCHORED 13 Sep 2026. This used to pin the exact expression handed to
+  // the row, and "I've only got 25 minutes today" added a second note beside
+  // the shortfall one — so the check failed on a change that improved the
+  // screen. The property is that the DESCRIBER'S VERDICT is what reaches the
+  // row, whatever else is alongside it.
   check('...and passes both the number and the reason',
     /estimatedMinutes=\{sessionEstimate\.minutes\}/.test(panel) &&
-    /shortfallNote=\{sessionEstimate\.shortfall\?\.note\}/.test(panel))
+    /shortfallNote=\{sessionEstimate\.note\}/.test(panel) &&
+    /describeSessionShortfall\(/.test(panel) &&
+    /note: \[[^\]]*shortfall\?\.note[^\]]*\]/.test(panel))
   check('...telling it about deloads and low recovery, so it can stay quiet for those',
     /isDeload: currentMesoWeekObj\?\.is_deload/.test(panel) &&
     /lowRecovery: !!profile && effectiveRecoveryCapacity\(profile\) === 'low'/.test(panel))
+
+  // A DAY SOMEBODY SHORTENED ON PURPOSE — 13 Sep 2026. Warning that the
+  // session they just asked to be short is short would be the app arguing
+  // with a decision it had carried out one tap earlier.
+  check('a day shortened on purpose is exempt, and the describer is what decides',
+    /if \(options\.shortenedToMinutes != null\) return null/.test(mod) &&
+    /shortenedToMinutes: shortened/.test(panel))
+  // The exemption has to be OBSERVABLE. If the panel branched before calling
+  // the describer, deleting the exemption would change nothing on screen and
+  // this gate would guard dead code. Both notes are collected and joined, so
+  // losing the exemption puts the two contradicting sentences side by side.
+  check('...and the two notes are joined rather than one skipping the other, so losing it shows',
+    /\[shortenedLine, shortfall\?\.note\]/.test(panel))
+  // And the shortened line itself must never state a length the row's own
+  // estimate contradicts: the main lift is protected and three exercises are
+  // the floor, so a 48-minute day asked down to 20 lands at 26.
+  check('...and the line never claims a time the session did not reach',
+    /actual <= shortened/.test(panel) && /as low as this one goes/.test(panel))
 
   const row = stripComments(readFileSync(join(ROOT, 'src/components/exercise/WeekContextRow.tsx'), 'utf8'))
   check('the reason is shown next to the number, not hidden behind the expander',

@@ -2,6 +2,96 @@
 
 Newest first. One line each.
 
+- [x] **"I'VE ONLY GOT 25 MINUTES TODAY" — SHORTEN OR LIGHTEN ONE SESSION,
+  BOTH SURFACES.** Ashley chose this on 13 Sep 2026 from four remaining gaps.
+  Two lines in the must-have list's *Changing one workout* block were `MISSING`
+  and they are the two that come up most in a real week: shorten or lighten
+  TODAY only, and rebuild today from scratch. Everything else you can do to a
+  workout already existed — move it, miss it, rest it, swap it for a class.
+  The only lightening control was the coach's volume change, which reaches from
+  this week to the end of the plan: the wrong tool for one bad night's sleep.
+  **HER RULING, asked and answered this session.** What should be cut when 50
+  minutes becomes 25? Options were protect the main lift and drop accessories
+  (my recommendation), cut a set off everything, or cut the rests. **She chose
+  protect the main lift.** You still squat, and you still squat properly; the
+  accessory work at the end goes, from the bottom up, until it fits.
+  **WHAT IS BUILT.** One new export, `shortenDayTo`, doing generation's own
+  pair in generation's own order — `sizeBlockToRestBudget` against an explicit
+  smaller budget with the day's main lift(s) named as protected, then
+  `trimWeekRestForBudget` against the same budget. Both of those stay private,
+  for the same reason `settleWeekBalance` did on 13 Sep: exporting the rest
+  trimmer alone hands every caller a way to blow the time cap. The day carries
+  a new `shortened_to_minutes`, which rides in the existing `days` jsonb — **no
+  migration**. Lighter-today is the existing `adjustDayVolume` narrowed to one
+  week. Both paths run the shared settling tail and both save with scope
+  `today`, so next week's row is never written and the full session comes back
+  on its own. Entry points: two verbs on the day menu, and on the coach a new
+  `propose_session_shorten` plus a `today | ongoing` scope on the volume tool.
+  **A DEFECT THE BROWSER FOUND THAT NO UNIT CHECK WOULD HAVE.** A 48-minute
+  session asked down to 20 lands at **26** — the main lift is protected and
+  three exercises are the floor, so it cannot go lower. The screen printed
+  "Shortened to 20 min" three lines under its own "~26 min". The app arguing
+  with itself, in the one place a person looks to see whether their request
+  landed. Now it says either the number asked for (when it reached it) or
+  *"26 min is as low as this one goes without touching your main lift"*, and
+  the sheet states the floor BEFORE the tap — "your main lift stays exactly as
+  it is, and so do at least two others". Fixed as mechanical, not asked: an app
+  contradicting its own displayed number has a right answer.
+  **A SECOND ONE, found by mutation-testing rather than by reading.** The
+  shortfall warning's exemption for a deliberately shortened day was live code
+  that nothing could observe: the panel branched before ever calling the
+  describer, so deleting the exemption changed nothing on screen. Both notes
+  are now collected and joined, which makes that exemption the only thing
+  keeping "you shortened this to 26 min" and "this runs shorter than the 45-60
+  you asked for" off the same screen — and makes deleting it something a check
+  can see.
+  **GATES.** New `test:today-only` (7 sections: the main lift keeps every set
+  across a spread of profiles; the three-exercise floor; the marker; the
+  refusals; **week N+1 untouched**; lighter-today; both surfaces declare it and
+  neither is a declining stub). New browser driver `verify:shorten-today` (31
+  checks at 390x844, screenshots read). `test:edit-keeps-the-bar` gains both
+  paths in its `PATHS` array, which hands them the forged-violation battery and
+  **the 7.2 re-score** for free.
+  **MUTATIONS: 21 tried, 19 caught across the two new gates, and both misses
+  are named rather than papered over.**
+  *test:today-only — 12 tried, 11 caught.* Six were missed on the first pass and
+  five were fixed (main-lift protection needed a fixture with the lift moved
+  LAST, or the trimmer never reaches it; an "untouched" check compared an object
+  with itself; the already-fits refusal needed its specific wording; the rest
+  trim needed the impossible-target case). **The one real miss:** a defensive
+  copy before the mutating rest trim guards a window where
+  `sizeBlockToRestBudget` returns its input object unchanged while
+  `estimateDaySeconds` says the day is over budget. A scan of every budget below
+  the day's own estimate found no such budget on a real generated plan, so no
+  reachable fixture enters it. The copy stays — correct and cheap — and is
+  recorded here as unobservable rather than claimed as guarded.
+  *verify:shorten-today — 9 tried, 8 caught.* **The one miss:** deleting the
+  main-lift protection entirely leaves this driver green, because on an
+  upper/lower day the main lift is the FIRST exercise and the whole-exercise
+  removal walks backwards from the end and stops at three. `protectedNames`
+  cannot bite on that fixture. The property is real and is held by
+  `test:today-only` §2, on a fixture built to reach it. A tenth mutation was
+  written and withdrawn as not a mutation at all — it reordered a spread whose
+  keys were already identical.
+  **BROWSER-VERIFIED at 390x844, screenshots read.** The session visibly loses
+  its tail; the main lift is compared WHOLE — name, sets, reps and weight, read
+  from under the app's own "Main lift" label rather than by position — and is
+  byte-identical after; the shortening survives leaving the tab; lighter-today
+  changes the sets without losing an exercise; and a day already declared missed
+  is no longer offered either verb.
+  **NOT BUILT, AND WHY — rebuilding today from scratch.** Nothing regenerates
+  below a whole week. The one function that assembles a day is private with
+  fifteen parameters including the cross-day dedupe set, and the cheap route —
+  regenerate the week, keep one day — picks that day without knowing what the
+  rest of the week now holds, so it can hand you the same exercise twice. It
+  also carries a question that is Ashley's, not mine: a rebuilt day loses the
+  progression thread on the main lift. Left `MISSING` in CLAUDE.md with that
+  reason written down.
+  **Deploys:** frontend on merge. **`chat-gemini` IS needed** for this one — the
+  new coach tool and the volume tool's new scope are both server-side
+  declarations. Still outstanding from the meal work and the 13 Sep
+  shopping-list correction too, so one deploy covers all three.
+
 - [x] **ADJUSTMENT KEEPS THE BAR — ONE SETTLING TAIL FOR EVERY EDIT.**
   Ashley chose this on 13 Sep 2026 from four remaining gaps. Her promise has a
   conjunction in the middle — plans "which can be adjusted to fit the user's

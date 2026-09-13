@@ -93,9 +93,24 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `verify:what-happened`
 - Swap the session for an activity — both; `what-happened`,
   `verify:swapped-day`, `verify:what-happened`
-- Shorten or lighten TODAY only — `MISSING` (the volume toggle changes the
-  plan going forward: `coach-volume-schedule`)
-- Rebuild today's session as a whole, for today — `MISSING`
+- Shorten or lighten TODAY only — both surfaces since 13 Sep 2026. Her ruling
+  that day, from three options: **protect the main lift and drop accessories**
+  — you still squat and squat properly, and the accessory work at the end goes,
+  from the bottom up, until it fits. Never below three exercises. `today-only`,
+  `verify:shorten-today`, `edit-keeps-the-bar`, `session-shortfall`,
+  `what-happened`, `coach-volume-schedule`.
+  CORRECTED the line that stood here: it said the only lightening control was
+  the coach's volume change, which reaches to the end of the plan. True, and
+  still true — this adds a second, narrower one beside it rather than changing
+  that one.
+- Rebuild today's session as a whole, for today — `MISSING`, named rather than
+  half-built. Nothing regenerates below a whole week; the one function that
+  assembles a day is private with fifteen parameters including the cross-day
+  dedupe set; and the cheap route — regenerate the week, keep one day — picks
+  that day without knowing what the rest of the week now holds, so it can hand
+  you the same exercise twice. It also carries a question that is Ashley's: a
+  rebuilt day loses the progression thread on the main lift, and whether that
+  is acceptable for a one-off is a coaching call
 
 **Changing one meal** — mirrored from exercise, because meals are plans too
 - Replace it, regenerate it, ask for more — both; `meal-swap-rotation`

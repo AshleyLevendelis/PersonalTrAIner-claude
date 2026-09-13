@@ -20,6 +20,7 @@ import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession } from './session-edit'
 import { settleWeek } from './settle-week'
+import { shortenDayTo } from './exercise-plan'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
@@ -757,6 +758,59 @@ export async function executeVolumeChange(
     preImage,
     receipt: { landed, failed },
   }
+}
+
+export interface SessionShortenPayload {
+  weekNumber: number
+  dayName: string
+  minutes: number
+  reason?: string
+}
+
+/**
+ * "I'VE ONLY GOT 25 MINUTES TODAY", from the coach — 13 Sep 2026.
+ *
+ * The mirror of TodayPanel's shortenToday, and deliberately the same three
+ * steps in the same order: shortenDayTo (which protects the main lift and
+ * drops the accessory tail — Ashley's ruling), then settleWeek so a shortened
+ * day gets the same tail every other edit does, then ONE week row written.
+ *
+ * SCOPE IS NOT A PARAMETER HERE. Shortening is today-only by definition — the
+ * whole point is that next week's session is the full one — so this writes the
+ * live week and nothing else, and there is no way for a caller to widen it.
+ */
+export async function executeSessionShorten(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: SessionShortenPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const week = mesocycle.find(w => w.week_number === payload.weekNumber)
+  if (!week) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'shorten', error: "I can't see that week on your plan just now." }] } }
+  }
+
+  const result = shortenDayTo(week, payload.dayName, profile, payload.minutes)
+  if (!result.changed) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'shorten', error: result.refusal ?? "I couldn't shorten that one." }] } }
+  }
+
+  const settled = settleWeek(result.week, payload.dayName, profile)
+  const next = mesocycle.map(w => (w.week_number === payload.weekNumber ? settled.week : w))
+
+  landed.push(
+    `${payload.dayName}: about ${result.achievedMinutes} min` +
+    (result.droppedExercises.length > 0 ? ` — out came ${result.droppedExercises.join(', ')}` : '') +
+    (result.setsRemoved > 0 ? `${result.droppedExercises.length > 0 ? ', and' : ' —'} ${result.setsRemoved} set${result.setsRemoved === 1 ? '' : 's'} off what stayed` : ''),
+  )
+
+  try { if (profile.id) await saveMesocycleWeek(profile.id, settled.week) }
+  catch { failed.push({ op: 'save', error: "That didn't save — try again in a moment." }) }
+
+  return { mesocycle: next, preImage, receipt: { landed, failed } }
 }
 
 export interface ScheduleChangePayload {

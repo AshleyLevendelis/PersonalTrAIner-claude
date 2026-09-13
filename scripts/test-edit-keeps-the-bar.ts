@@ -1,4 +1,4 @@
-import { generateMesocycle, setRandomSource, resetRandomSource, enforceSetHierarchy, enforceLoadCoherence } from '../src/lib/exercise-plan'
+import { generateMesocycle, setRandomSource, resetRandomSource, enforceSetHierarchy, enforceLoadCoherence, shortenDayTo } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { scorePlan } from '../src/lib/quality-score'
 import { removeExerciseFromSession, moveExerciseInSession } from '../src/lib/session-edit'
@@ -105,6 +105,31 @@ const PATHS: EditPath[] = [
     apply: async (m, dayName) => {
       const victim = dayOf(m, dayName).exercises[0].name
       return banExerciseFromMesocycle({ mesocycle: m, profile: PROFILE, bannedName: victim, exclusions: [victim] })
+    },
+  },
+  {
+    // "I've only got 25 minutes today", 13 Sep 2026. Joins the battery rather
+    // than getting a battery of its own: it edits a day like every path above
+    // it, so it has to repair the same forged violations, leave no stale
+    // warm-up, and not write to the plan it was handed.
+    name: 'shorten',
+    apply: async (m, dayName) => {
+      const week = weekOf(m)
+      const r = shortenDayTo(week, dayName, PROFILE, 25)
+      if (!r.changed) return m
+      const settled = settleWeek(r.week, dayName, PROFILE)
+      return m.map(w => (w.week_number === WEEK ? settled.week : w))
+    },
+  },
+  {
+    name: 'lighter-today',
+    apply: async (m, dayName) => {
+      const week = weekOf(m)
+      const day = dayOf(m, dayName)
+      const r = adjustDayVolume(day, 'lighter', PROFILE)
+      if (!r.changed) return m
+      const settled = settleWeek({ ...week, days: week.days.map(d => (d.day === dayName ? r.day : d)) }, dayName, PROFILE)
+      return m.map(w => (w.week_number === WEEK ? settled.week : w))
     },
   },
   {
@@ -379,6 +404,20 @@ async function main() {
               return c ? await swapExerciseInMesocycle({ mesocycle: meso, profile, currentWeekNumber: WEEK, dayName: day.day, exIndex: 0, newExercise: c, scope: 'today' }) : meso
             }
             case 'ban': return await banExerciseFromMesocycle({ mesocycle: meso, profile, bannedName: day.exercises[0].name, exclusions: [day.exercises[0].name] })
+            case 'shorten': {
+              const week = meso.find(w => w.week_number === WEEK)!
+              const r = shortenDayTo(week, day.day, profile, 25)
+              if (!r.changed) return meso
+              const settled = settleWeek(r.week, day.day, profile)
+              return meso.map(w => (w.week_number === WEEK ? settled.week : w))
+            }
+            case 'lighter-today': {
+              const week = meso.find(w => w.week_number === WEEK)!
+              const r = adjustDayVolume(day, 'lighter', profile)
+              if (!r.changed) return meso
+              const settled = settleWeek({ ...week, days: week.days.map(d => (d.day === day.day ? r.day : d)) }, day.day, profile)
+              return meso.map(w => (w.week_number === WEEK ? settled.week : w))
+            }
             default: {
               const week = meso.find(w => w.week_number === WEEK)!
               const r = adjustDayVolume(day, 'heavier', profile)

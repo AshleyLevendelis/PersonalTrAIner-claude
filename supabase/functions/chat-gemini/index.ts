@@ -719,7 +719,7 @@ const toolDeclarations = [
   {
     name: "propose_volume_change",
     description:
-      "PROPOSES moving a day's set count up or down, from this week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. DIRECTION ONLY: you say lighter or heavier, the app decides by how much. It will not go below the floor that keeps an exercise worth doing, will not let an accessory outgrow the main lift it supports, will not push the session past the length the user asked for, and never touches a deload week. If a bound stops it, the card says so rather than silently doing less than it claimed.",
+      "PROPOSES moving a day's set count up or down — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. DIRECTION ONLY: you say lighter or heavier, the app decides by how much. It will not go below the floor that keeps an exercise worth doing, will not let an accessory outgrow the main lift it supports, will not push the session past the length the user asked for, and never touches a deload week. If a bound stops it, the card says so rather than silently doing less than it claimed. SCOPE MATTERS AND IS OFTEN THE WHOLE POINT: 'today' changes only this week's session and it is back to normal next week — that is what someone means by 'I'm knackered today', 'go easy on me this morning', 'I slept badly'. 'ongoing' changes it from this week to the end of the plan, which is what 'Tuesdays are always too much' or 'this is more than I can keep up with' means. When it is genuinely ambiguous, ask which they meant rather than guessing — an ongoing change made from one bad night is the wrong answer in a way that is easy to make and hard to notice.",
     parameters: {
       type: "object",
       properties: {
@@ -732,6 +732,11 @@ const toolDeclarations = [
           enum: ["lighter", "heavier"],
           description: "lighter = fewer sets (time pressure, fatigue, too much work). heavier = more sets (session feels easy, wants more). There is no magnitude parameter — do not try to express one, the app owns the size of the step.",
         },
+        scope: {
+          type: "string",
+          enum: ["today", "ongoing"],
+          description: "today = this week's session only, back to normal next week (one bad night, one busy day). ongoing = from this week to the end of the plan (the day is always too much). Defaults to ongoing when absent, which is what this tool did before scope existed — so say 'today' explicitly whenever the user is talking about one session.",
+        },
         reason: {
           type: "string",
           description: "One short sentence on what the user described (e.g. 'only has 30 minutes on Tuesdays') — shown on the card as the rationale.",
@@ -742,6 +747,34 @@ const toolDeclarations = [
         },
       },
       required: ["day", "direction", "origin_verbatim_quote"],
+    },
+  },
+
+  {
+    name: "propose_session_shorten",
+    description:
+      "PROPOSES cutting ONE day's session down to the time the user actually has — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it whenever somebody says how long they have and it is less than their session: 'I've only got half an hour', 'I can do 25 minutes before work', 'I need to be out by 7'. WHAT IT DOES, so you can say it plainly: their MAIN LIFT is protected — every set of it stays — and the accessory work at the end comes out from the bottom until the session fits. It never goes below three exercises. It is for TODAY only; the same day next week is the full session again. If the day cannot reach the number they gave without cutting into the main lift, the card says the closest it can get rather than pretending. This is NOT the tool for 'that session is always too long' — that is a lasting change to how long their sessions are, which they set on the Profile screen.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day of the week whose session should be cut down (Monday ... Sunday). Absent means today.",
+        },
+        minutes: {
+          type: "number",
+          description: "How many minutes they actually have. Take the number they said; do not round it up to be helpful, and do not invent one — if they only said 'I'm short of time', ask how long they have.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what they described (e.g. 'has to leave for work at 8') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["minutes", "origin_verbatim_quote"],
     },
   },
 
@@ -1698,9 +1731,16 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 - Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly, and know what each one actually assumes: minimalist assumes dumbbells, kettlebells, bands, a pull-up bar and a weighted bag; bodyweight still assumes a pull-up bar and a weighted bag. So "dumbbells only" maps to minimalist as the CLOSEST fit, not an exact one — say so if it comes up, don't pretend it's exact.
 - It reverts automatically once the period ends — mention this once, not every turn.
 
+=== 3d2. NOT ENOUGH TIME TODAY (propose_session_shorten) ===
+- "I've only got 25 minutes", "I can do half an hour before work", "I need to be out by 7" — call propose_session_shorten with the number of minutes they said. If they say they are short of time but no number, ASK how long they have; do not guess one.
+- Say what it will do, in their terms: the main lift stays exactly as it is, the accessory work at the end comes out until it fits, and the day is back to the full session next week. Never name a specific exercise as the one that will go — the app decides that against the floors and you cannot see the result until the card renders.
+- This is TODAY. "Tuesdays are always too long" is not this tool: session length is a lasting setting they change on the Profile screen, and saying so is the honest answer.
+- Do not reach for propose_volume_change for a TIME problem. Fewer sets across the board is a different thing from a shorter session, and time is what they told you about.
+
 === 3d. SESSION VOLUME (propose_volume_change) ===
 When the user wants a day's session to be more or less work ("Tuesdays are too much", "I only get 30 minutes on Wednesdays", "this feels easy now, give me more"):
 - Call propose_volume_change with the day and a DIRECTION — lighter or heavier. There is no magnitude to choose and you must not try to express one: never say "I'll halve it", "I'll take two sets off each exercise", or any specific number of sets. The app decides the size of the step against the floors, the role ceilings and the session's own time budget, and the card shows the user exactly what moved before they confirm.
+- SCOPE IS PART OF THE ANSWER, not an afterthought. "I'm knackered today", "go easy on me this morning", "I slept badly" are ONE session: send scope "today", and the day is back to normal next week. "Tuesdays are always too much", "this is more than I can keep up with" are lasting: send scope "ongoing". If it is genuinely unclear, ask which they meant — an ongoing cut made because of one bad night is easy to do and hard for them to notice afterwards.
 - It applies from THIS week forward, and skips deload weeks — a recovery week is already reduced on purpose. Say that plainly if it comes up.
 - If everything on that day is already at a limit, the card will say so rather than claiming a change. Do not promise a result you haven't seen.
 - §3's "trim a set to keep momentum" coaching is exactly this tool once they actually ask for it. Coach first, propose when they say yes.
@@ -1741,7 +1781,7 @@ When the user tells you about something they do OUTSIDE this plan on a regular w
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1938,7 +1978,7 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "training_days", "training_style", "concurrent_activities", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
@@ -3305,7 +3345,28 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_volume_change",
-              rawArgs: { day: args.day, direction: args.direction, reason: args.reason },
+              // `scope` added 13 Sep 2026 and it MUST be forwarded: the
+              // client reads it to decide between this week only and the
+              // rest of the plan, and an arg dropped here reads there as
+              // "ongoing" — silently the more far-reaching of the two.
+              rawArgs: { day: args.day, direction: args.direction, scope: args.scope, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_shorten") {
+        // Same courier shape as propose_volume_change: no server write, raw
+        // args forwarded, the client builds the diff. shortenDayTo lives in
+        // src/lib and cannot be reached from Deno, and it is the only thing
+        // that knows which lift is the main one and where the floors are.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_shorten",
+              rawArgs: { day: args.day, minutes: args.minutes, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

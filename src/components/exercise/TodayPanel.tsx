@@ -43,6 +43,9 @@ import type { RemoveTarget } from './RemoveExerciseSheet'
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
 import { removeExerciseFromSession, moveExerciseInSession, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
+import { shortenDayTo } from '@/lib/exercise-plan'
+import { settleWeek } from '@/lib/settle-week'
+import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
@@ -294,6 +297,56 @@ export function TodayPanel({
     )
   }
 
+  /**
+   * "I'VE ONLY GOT 25 MINUTES TODAY" — 13 Sep 2026.
+   *
+   * Ashley's ruling: the main lift is protected and the accessory work at the
+   * end comes out until it fits. shortenDayTo carries that; this is the route
+   * from the day menu to it, through applySessionEdit like every other plan
+   * edit on this screen, and with scope 'today' so the same day next week is
+   * the full session again.
+   *
+   * settleWeek runs inside applySessionEdit's callee for the other edits; this
+   * one goes through it explicitly, so a shortened day gets the same
+   * hierarchy/coherence/warm-up/balance tail everything else does.
+   */
+  const shortenToday = async (minutes: number): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const week = mesocycle.find(w => w.week_number === liveWeek)
+    if (!week) return "I can't see this week on your plan just now."
+    const result = shortenDayTo(week, effectiveDayName, profile, minutes)
+    if (!result.changed) return result.refusal ?? "I couldn't shorten that one."
+    const settled = settleWeek(result.week, effectiveDayName, profile)
+    return applySessionEdit(
+      { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
+      'today',
+    )
+  }
+
+  /** One step lighter, this week's session only — the same tail, the same scope. */
+  const lighterToday = async (): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const week = mesocycle.find(w => w.week_number === liveWeek)
+    const day = week?.days.find(d => d.day === effectiveDayName)
+    if (!week || !day) return "I can't see today's session just now."
+    if (!isVolumeAdjustable(week)) return "This is a deload week — it's already lighter on purpose."
+    const result = adjustDayVolume(day, 'lighter', profile)
+    if (!result.changed) {
+      return result.blocked[0]
+        ? `Nothing left to take out — ${result.blocked[0].name} is ${result.blocked[0].reason}.`
+        : 'Every exercise is already at its minimum.'
+    }
+    const settled = settleWeek(
+      { ...week, days: week.days.map(d => (d.day === effectiveDayName ? result.day : d)) },
+      effectiveDayName,
+      profile,
+    )
+    return applySessionEdit(
+      { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
+      'today',
+    )
+  }
+
   const [moveError, setMoveError] = useState<string | null>(null)
   const moveExercise = async (exIndex: number, direction: -1 | 1) => {
     if (!profile || !mesocycle) return
@@ -518,14 +571,39 @@ export function TodayPanel({
   // a WeekContextRow prop and documented in its header — it had simply never
   // been passed, so the "~52 min" chip it describes never rendered at all.
   const sessionEstimate = (() => {
-    if (!workout || workout.exercises.length === 0) return { minutes: undefined, shortfall: null }
+    if (!workout || workout.exercises.length === 0) return { minutes: undefined, note: undefined }
     const seconds = estimateDaySeconds(workout)
+    // A DAY SOMEBODY SHORTENED SAYS SO. Otherwise the only trace of "I've only
+    // got 25 minutes" is a session that is quietly two exercises thinner than
+    // yesterday's, which reads as the app having lost something. The shortfall
+    // warning is suppressed for exactly the same day (see the describer), so
+    // this replaces it rather than stacking with it.
+    //
+    // AND IT NEVER STATES A LENGTH THE HEADER CONTRADICTS. A 48-minute session
+    // asked down to 20 lands at 26, because the main lift is protected and
+    // three exercises are the floor — so printing "shortened to 20 min" beside
+    // this row's own "~26 min" would be the app arguing with itself. Found on
+    // a real screen, 13 Sep 2026, by the browser driver comparing the two.
+    const shortened = workout.shortened_to_minutes
+    const actual = Math.round(seconds / 60)
+    const shortenedLine = shortened == null ? null
+      : actual <= shortened
+        ? `Shortened to ${shortened} min for today. Your main lift is untouched, and it’s back to the full session next week.`
+        : `Shortened for today — ${actual} min is as low as this one goes without touching your main lift. Back to the full session next week.`
+    // THE DESCRIBER OWNS THE SUPPRESSION, not this branch. Both notes are
+    // collected and joined rather than one short-circuiting the other, so the
+    // exemption inside describeSessionShortfall is the only thing keeping "you
+    // shortened this to 26 min" and "this runs shorter than the 45-60 you asked
+    // for" off the same screen — which is what makes deleting that exemption
+    // something a check can see.
+    const shortfall = describeSessionShortfall(seconds, profile?.session_duration_preference, {
+      isDeload: currentMesoWeekObj?.is_deload,
+      lowRecovery: !!profile && effectiveRecoveryCapacity(profile) === 'low',
+      shortenedToMinutes: shortened,
+    })
     return {
-      minutes: Math.round(seconds / 60),
-      shortfall: describeSessionShortfall(seconds, profile?.session_duration_preference, {
-        isDeload: currentMesoWeekObj?.is_deload,
-        lowRecovery: !!profile && effectiveRecoveryCapacity(profile) === 'low',
-      }),
+      minutes: actual,
+      note: [shortenedLine, shortfall?.note].filter(Boolean).join(' ') || undefined,
     }
   })()
 
@@ -574,7 +652,7 @@ export function TodayPanel({
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
         estimatedMinutes={sessionEstimate.minutes}
-        shortfallNote={sessionEstimate.shortfall?.note}
+        shortfallNote={sessionEstimate.note}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
         onOpenWhatHappened={profileId ? openWhatHappened : undefined}
@@ -594,6 +672,8 @@ export function TodayPanel({
         weekOf={d => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)}
         weekNumber={liveWeek}
         onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+        onShorten={shortenToday}
+        onLighter={lighterToday}
       />
       </Suspense>
       <Suspense fallback={null}>
