@@ -1,7 +1,8 @@
 import { generateMesocycle, setRandomSource, resetRandomSource, enforceSetHierarchy, enforceLoadCoherence, shortenDayTo } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { scorePlan } from '../src/lib/quality-score'
-import { removeExerciseFromSession, moveExerciseInSession } from '../src/lib/session-edit'
+import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession } from '../src/lib/session-edit'
+import { getAdditionCandidates } from '../src/lib/exercise-add-candidates'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, getReplacementCandidates } from '../src/lib/mesocycle-edit'
 import { settleWeek } from '../src/lib/settle-week'
 import { adjustDayVolume } from '../src/lib/volume-adjust'
@@ -90,6 +91,18 @@ const PATHS: EditPath[] = [
   {
     name: 'move',
     apply: async (m, dayName) => moveExerciseInSession({ mesocycle: m, profile: PROFILE, weekNumber: WEEK, dayName, fromIndex: 1, toIndex: 0, scope: 'today' }).mesocycle,
+  },
+  {
+    // UNPRICED, deliberately: this battery is about the structural passes, and
+    // the coach's own card builds its trial the same way. Pricing here would
+    // make every forged-violation case await the progression engine for a
+    // number none of them reads.
+    name: 'add',
+    apply: async (m, dayName) => {
+      const entry = getAdditionCandidates(dayOf(m, dayName), PROFILE, [])[0]?.exercise
+      if (!entry) return m
+      return addExerciseToSession({ mesocycle: m, profile: PROFILE, weekNumber: WEEK, dayName, entry, load: null, scope: 'today' }).mesocycle
+    },
   },
   {
     name: 'swap',
@@ -402,6 +415,10 @@ async function main() {
             case 'swap': {
               const c = getReplacementCandidates(day.exercises[0].name, profile, [])[0]?.exercise
               return c ? await swapExerciseInMesocycle({ mesocycle: meso, profile, currentWeekNumber: WEEK, dayName: day.day, exIndex: 0, newExercise: c, scope: 'today' }) : meso
+            }
+            case 'add': {
+              const e = getAdditionCandidates(day, profile, [])[0]?.exercise
+              return e ? addExerciseToSession({ mesocycle: meso, profile, weekNumber: WEEK, dayName: day.day, entry: e, load: null, scope: 'today' }).mesocycle : meso
             }
             case 'ban': return await banExerciseFromMesocycle({ mesocycle: meso, profile, bannedName: day.exercises[0].name, exclusions: [day.exercises[0].name] })
             case 'shorten': {

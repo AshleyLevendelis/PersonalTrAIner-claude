@@ -164,7 +164,12 @@ console.log('\n7. Nothing applies without a Confirm, and the server writes nothi
 {
   const chat = stripComments(readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8'))
 
-  for (const tool of ['propose_volume_change', 'propose_session_shorten', 'propose_schedule_change']) {
+  // propose_exercise_add joined this loop on 13 Sep 2026. It has its own gate
+  // (test:exercise-add §8) that checks the same four properties, and it is
+  // here as well deliberately: this is the GENERAL per-tool loop, and the hole
+  // CLAUDE.md names — nothing distinguishing a declared tool from a declining
+  // stub — closes one tool at a time by tools joining it.
+  for (const tool of ['propose_volume_change', 'propose_session_shorten', 'propose_schedule_change', 'propose_exercise_add']) {
     check(`${tool} is declared to the model`, new RegExp(`name: "${tool}"`).test(chat))
     // The handler must forward a PROPOSAL, not act. A handler that reached
     // for the database here would be the exact defect §2.4 closed: the old

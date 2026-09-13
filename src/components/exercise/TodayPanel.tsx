@@ -12,7 +12,7 @@ import { TrainerNudge } from '@/components/TrainerNudge'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
-import { estimateDaySeconds } from '@/lib/session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -41,18 +41,22 @@ import type { RemoveTarget } from './RemoveExerciseSheet'
 // for the coach's side of the same two operations, so the bundler keeps it in
 // the main chunk either way, and the dynamic form only added an await between
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
-import { removeExerciseFromSession, moveExerciseInSession, type SessionEditResult } from '@/lib/session-edit'
+import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
-import { shortenDayTo } from '@/lib/exercise-plan'
+import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
 import { settleWeek } from '@/lib/settle-week'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
-import type { SwapScope } from '@/lib/mesocycle-edit'
+import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
+import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
 // opened from a menu item, by a person who has something to explain about a
 // day — not a screen every load pays for. test:bundle holds the budget.
 const WhatHappenedSheet = lazy(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
 const RemoveExerciseSheet = lazy(() => import('./RemoveExerciseSheet').then(m => ({ default: m.RemoveExerciseSheet })))
+// Same bargain as the two above: a sheet reached from one button at the foot
+// of the list, carrying the whole exercise catalogue's search with it.
+const AddExerciseSheet = lazy(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
@@ -159,6 +163,7 @@ export function TodayPanel({
   // to the day-level "⋮" menu (WeekContextRow) — this is that controlled
   // open state.
   const [unplannedWorkOpen, setUnplannedWorkOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
   const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
@@ -362,6 +367,71 @@ export function TodayPanel({
         'today',
       ),
     )
+  }
+
+  /**
+   * PUT ONE EXERCISE INTO THE SESSION — the last operation in the exercise
+   * grain, and the only one that makes the day longer.
+   *
+   * Pricing happens here rather than inside session-edit because
+   * `recomputeLoad` is async and that module is not. `peerProgrammingFor`
+   * gives BOTH sides the same peer, so the weight on the card is computed for
+   * the sets and reps the plan actually receives.
+   *
+   * The reset branch (`isMainLiftReset: true`) is right for any tier here:
+   * it means "a movement with no history in this plan", and its basis already
+   * reads "find your working weight this session".
+   */
+  const priceAddition = async (entry: ExerciseEntry) => {
+    if (!profile || !mesocycle) return null
+    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === effectiveDayName)
+    if (!day) return null
+    const tier = mapTier(entry.mechanics_tier)
+    const programming = peerProgrammingFor(day.exercises, tier)
+    if (!programming) return null
+    const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
+    return { load, day }
+  }
+
+  const addExercise = async (entry: ExerciseEntry, scope: SwapScope): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const priced = await priceAddition(entry)
+    if (!priced) return `I couldn't work out what to prescribe for ${entry.name} here.`
+    return applySessionEdit(
+      addExerciseToSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, entry, load: priced.load, scope }),
+      scope,
+    )
+  }
+
+  /**
+   * What adding this one does to the week AND to the clock — read off a TRIAL
+   * of the real edit, the same rule `removalBalanceCost` keeps below.
+   *
+   * ASHLEY'S RULING, 13 Sep 2026: the session gets longer and the app says so
+   * rather than trimming something else to pay for it. The minutes come from
+   * `estimateDaySeconds`, which is what the header prints, so the card and the
+   * screen cannot disagree about one day's length.
+   */
+  const additionImpact = async (entry: ExerciseEntry) => {
+    const nothing = { cost: null, balancing: null, minutes: null, overBy: null }
+    if (!profile || !mesocycle) return nothing
+    const priced = await priceAddition(entry)
+    if (!priced) return nothing
+    const result = addExerciseToSession({
+      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName,
+      entry, load: priced.load, scope: 'today',
+    })
+    if (!result.changed) return nothing
+    const afterWeek = result.mesocycle.find(w => w.week_number === liveWeek)
+    const afterDay = afterWeek?.days.find(d => d.day === effectiveDayName)
+    const minutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : null
+    const capMinutes = Math.round(getSessionMaximumSeconds(profile.session_duration_preference) / 60)
+    const overBy = minutes != null && minutes > capMinutes ? minutes - capMinutes : null
+    return {
+      ...describeEditImpact(mesocycle.find(w => w.week_number === liveWeek), afterWeek, effectiveDayName),
+      minutes,
+      overBy,
+    }
   }
 
   /**
@@ -677,6 +747,16 @@ export function TodayPanel({
       />
       </Suspense>
       <Suspense fallback={null}>
+      <AddExerciseSheet
+        target={addOpen && workout ? { dayName: effectiveDayName, day: workout } : null}
+        onClose={() => setAddOpen(false)}
+        profile={profile}
+        exclusions={exclusions}
+        onConfirm={addExercise}
+        impactFor={additionImpact}
+      />
+      </Suspense>
+      <Suspense fallback={null}>
       <RemoveExerciseSheet
         target={removeTarget}
         onClose={() => setRemoveTarget(null)}
@@ -921,6 +1001,23 @@ export function TodayPanel({
               it behind that menu; the polish handoff puts it back at the foot
               of the list, which is where someone finishing a session looks
               for "I also did…". One entry point either way. */}
+          {/* PUT ONE IN THE PLAN — beside "I also did…", and above it, because
+              this one changes the session and the other only records what
+              happened outside it. ONE entry point, deliberately: the day
+              header's menu lost "Add unplanned work" on 6 Sep for exactly the
+              reason written there — two ways into one dialog is how they
+              drift apart. Only shown where an edit can actually be saved,
+              the same gate onRemove and onMove use. */}
+          {profileId && mesocycle && (
+            <button
+              type="button"
+              data-testid="add-exercise"
+              onClick={() => setAddOpen(true)}
+              className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+            >
+              ＋ Add an exercise
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setUnplannedWorkOpen(true)}

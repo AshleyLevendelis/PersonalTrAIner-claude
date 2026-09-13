@@ -64,8 +64,16 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   the ban button" (chat-gemini `:598`, handler `:3087`) — because a ban is the
   highest-blast-radius mutation in the app. I wrote "both" from the tool list
   without reading the handler
-- Add one to a session AS PART OF THE PLAN — `MISSING` (extra work can be
-  logged; it does not join the plan)
+- Add one to a session AS PART OF THE PLAN — both surfaces since 13 Sep 2026.
+  Her ruling that day, from three options: **add it and say the session is now
+  longer** — you asked for the exercise, so you get it, and the app never
+  quietly removes work to pay for work you requested. And her second, on the
+  picker: **show everything, warn me** — the suggested list is the constrained
+  pool, the search box beside it reaches the whole catalogue and states the
+  clash on the row, which is what swap already did. Logging extra work
+  (`AddUnplannedWork`) is still the different thing it always was: it never
+  joins the plan. `exercise-add`, `edit-keeps-the-bar`, `session-edit`,
+  `coach-volume-schedule`, `verify:exercise-add`
 - Remove it from one session without banning it — both surfaces since 11 Sep
   2026; asks whether to drop it or put something else there (her ruling);
   `session-edit`, `verify:session-edit`
@@ -191,7 +199,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   screen does that the coach cannot (banning an exercise is the eighth — see
   the correction above), 3 the coach does that the screen cannot (add a food,
   add a meal, custom meal — the four day-level ones closed 10 Sep; table in the
-  audit) — partial. **No GENERAL gate distinguishes a declared coach tool from
+  audit) — partial. **Adding an exercise (13 Sep) changes neither count**: it
+  existed on no surface, and arrived on both at once. Recorded because the
+  obvious assumption is that a new capability moves one of these numbers. **No GENERAL gate distinguishes a declared coach tool from
   a declining stub**, which is the hole the ban error fell through;
   `meal-food-edit` §8 does it for its own three tools and is the shape the
   general one should take

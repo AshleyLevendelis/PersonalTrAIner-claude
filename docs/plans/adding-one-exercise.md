@@ -43,9 +43,23 @@ silent trim.
 
 1. **Search is unfiltered.** `searchExerciseCatalog` reads the catalogue, not
    the pool, so it will happily return a barbell lift to someone with no
-   barbell and a movement that loads an injured joint. Every candidate list
-   this feature shows MUST be intersected with `getConstrainedPool`. This is
-   the injury-filtering path, which is why this file exists before any code.
+   barbell and a movement that loads an injured joint.
+
+   **CORRECTED 13 Sep 2026, and the original line is left below because the
+   correction matters more than the retraction.** What I wrote was: *"Every
+   candidate list this feature shows MUST be intersected with
+   `getConstrainedPool`. This is the injury-filtering path."* Right about the
+   RANKED list and wrong about the search box, and I wrote it from the two
+   function signatures without reading `getExerciseCompatibilityWarnings`
+   (`exercise-plan.ts:4498`), whose own header records the deliberate opposite
+   decision for swap: a filtered-only list dead-ends when every ranked option
+   is also unavailable, so the fix chosen then was to let the user pick
+   anything and SEE why it might not fit. Ashley ruled the same way for adding
+   on 13 Sep — *show everything, warn me* — so the built behaviour is: ranked
+   list from the pool, search across the catalogue with the clash stated on the
+   row. The same error shape to watch for elsewhere: reasoning about what a
+   function should do from its name and signature, when the file it lives in
+   already says why it does something else.
 2. **There is no slot to copy programming from.** Every generation-time
    construction of sets/reps/rest lives inside private functions taking the
    whole day's context.

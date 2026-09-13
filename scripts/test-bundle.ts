@@ -127,7 +127,15 @@ console.log('\n3. Nothing has crept back up')
   // round card, the chip setup) and the grocery screen with its shop-day card.
   // 1,030 leaves the same ~15 kB of headroom rather than parking the line just
   // above wherever today's build happens to sit.
-  const APP_CHUNK_BUDGET_KB = 1030
+  // AND AGAIN, 13 Sep 2026: 1,030 kB -> 1,050 kB. MEASURED by stashing this
+  // branch's work and rebuilding: app chunk 1,026 kB before, 1,036 kB after.
+  // +10 kB for adding one exercise to a session on BOTH surfaces — the ranked
+  // candidate module, the coach's builder, confirm and undo, the executor with
+  // its re-resolution, and the screen's trial. The sheet itself is NOT in this
+  // number: it is lazy, 6 kB in its own chunk, loaded only when opened.
+  // 1,050 leaves ~14 kB of headroom rather than parking the line just above
+  // wherever today's build sits.
+  const APP_CHUNK_BUDGET_KB = 1050
   const app = find('index-')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
     !!app && app.raw < APP_CHUNK_BUDGET_KB * 1024, app ? kb(app.raw) : null)
@@ -145,7 +153,13 @@ console.log('\n3. Nothing has crept back up')
   // one exercise out, and move one": 1,704 kB; after: 1,719 kB — +15 kB, the
   // same feature as the app-chunk note above plus its lazy sheet. 1,740 keeps
   // the ~20 kB of headroom.
-  const TOTAL_BUDGET_KB = 1770
+  // AND AGAIN, 13 Sep 2026: 1,770 kB -> 1,805 kB. Same measurement: 1,770 kB
+  // before, 1,786 kB after — +16 kB, the app-chunk +10 plus the lazy sheet.
+  // WORTH SAYING, because the convention above is about headroom: the previous
+  // raise left NONE on this line. 1,770 before this work was 1,770 exactly, so
+  // the next feature of any size was always going to trip it. 1,805 restores
+  // the ~19 kB the note above says this line is supposed to carry.
+  const TOTAL_BUDGET_KB = 1805
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
 

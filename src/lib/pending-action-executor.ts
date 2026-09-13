@@ -18,7 +18,7 @@ import { updateProfileField } from './profile-store'
 import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity } from './types'
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
-import { removeExerciseFromSession, moveExerciseInSession } from './session-edit'
+import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
 import { settleWeek } from './settle-week'
 import { shortenDayTo } from './exercise-plan'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-persistence'
@@ -119,6 +119,13 @@ export interface ExerciseRemovePayload {
   scope: SwapScope
 }
 
+export interface ExerciseAddPayload {
+  weekNumber: number
+  dayName: string
+  exerciseName: string
+  scope: SwapScope
+}
+
 export interface ExerciseReorderPayload {
   weekNumber: number
   dayName: string
@@ -175,6 +182,75 @@ export async function executeExerciseRemove(
   return {
     mesocycle: result.mesocycle, preImage,
     receipt: { landed: [`${payload.dayName}: ${payload.exerciseName} removed`], failed: [] },
+  }
+}
+
+/**
+ * Put one exercise INTO a session. The pure decision is session-edit's; this
+ * shell resolves the movement, prices it and persists.
+ *
+ * THE RESOLUTION IS THE SAFETY STEP AND IT HAPPENS HERE, NOT IN THE MODEL.
+ * The coach sends a NAME in the user's words; `getConstrainedPool` is what
+ * decides whether that name is something this person can be prescribed, with
+ * their equipment and their injuries. A movement that is not in the pool is
+ * refused — so a hallucinated exercise, or a real one this profile is
+ * filtered out of, fails closed instead of entering the plan.
+ *
+ * Pricing happens here rather than in the card for the reason recorded on the
+ * swap path: the builder is synchronous, and previewing a number that confirm
+ * supersedes anyway would duplicate real logic to be approximately wrong.
+ */
+export async function executeExerciseAdd(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: ExerciseAddPayload,
+  /** The bans, passed in rather than read off the profile — the same way the
+   *  injury and equipment executors take theirs, because the live list is the
+   *  one the chat surface holds, not a stale copy on the profile row. */
+  exclusions: string[] = [],
+): Promise<SessionEditExecResult> {
+  const preImage = mesocycle
+  const fail = (error: string): SessionEditExecResult =>
+    ({ mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_add', error }] } })
+
+  const { mapTier } = await import('./exercise-plan')
+  const { resolveAdditionRequest } = await import('./exercise-add-candidates')
+  // RE-RESOLVED AT CONFIRM, not trusted from the payload. The card may have
+  // been sitting for a while, and equipment or injuries can have changed under
+  // it — the same reason every other confirm re-runs its edit rather than
+  // replaying a stored diff.
+  const entry = resolveAdditionRequest(payload.exerciseName, profile, exclusions)
+  if (!entry) return fail(`I can't add ${payload.exerciseName} — it isn't something I can prescribe with your equipment and injuries.`)
+
+  const day = mesocycle
+    .find(w => w.week_number === payload.weekNumber)?.days
+    .find(d => d.day === payload.dayName)
+  if (!day) return fail("I couldn't find that day on your plan.")
+
+  const programming = peerProgrammingFor(day.exercises, mapTier(entry.mechanics_tier))
+  if (!programming) return fail(`${payload.dayName} is a rest day. Make it a training day first, then add to it.`)
+
+  const { recomputeLoad } = await import('./mesocycle-edit')
+  const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
+
+  const result = addExerciseToSession({
+    mesocycle, profile,
+    weekNumber: payload.weekNumber, dayName: payload.dayName,
+    entry, load, scope: payload.scope,
+  })
+  if (!result.changed) return fail(result.refusal ?? "That couldn't be added")
+  if (!profile.id) {
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
+  } catch (err) {
+    console.error('executeExerciseAdd: persisting failed', err)
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+  }
+  return {
+    mesocycle: result.mesocycle, preImage,
+    receipt: { landed: [`${payload.dayName}: ${entry.name} added`], failed: [] },
   }
 }
 

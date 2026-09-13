@@ -2,6 +2,112 @@
 
 Newest first. One line each.
 
+- [x] **YOU CAN NOW PUT AN EXERCISE INTO A SESSION.** The last `MISSING` line in
+  the "Changing one exercise" grain, chosen by Ashley on 13 Sep 2026 over
+  unlocking the eight locked setup answers and wiring the coach's ban. Before
+  this you could swap, remove, move and ban an exercise, and you could LOG extra
+  work — which is a different thing, and says so in its own code: a logged extra
+  never counts towards the week's prescribed volume, the balance passes never
+  see it, and the coach cannot plan around it.
+  **HER TWO RULINGS, both built.**
+  1. **The clock (asked earlier that day).** A Tuesday going from 55 to 64
+     minutes: say the new length, trim accessories to fit, or ask every time.
+     *She chose: add it, and say it is now 64 minutes.* You asked for the
+     exercise, so you get the exercise. The card states the new length before
+     the tap and nothing else on the day is touched — measured on a real screen:
+     adding to a 4-day plan's Sunday said "Sunday becomes about 52 min, still
+     inside the session length you asked for", and the whole-week diff showed
+     exactly one change, the added exercise. Recorded risk, unchanged: three
+     additions across a block and sessions drift twenty minutes longer, one
+     reasonable decision at a time. If that shows up the fix is a nudge, not a
+     silent trim.
+  2. **The picker (asked today).** Given three options — only what fits her,
+     everything with warnings, or warn on kit but block on injury — *she chose
+     show everything, warn me.* The suggested list is the constrained pool; the
+     search box underneath reaches the whole catalogue and states the clash on
+     the row. That is the swap dialog's existing behaviour to the letter, so the
+     app now gives ONE answer to "may I choose this", not two.
+  **A CORRECTION TO A PLAN DOC THIS SUPERSEDES.** `add-remove-move-one-exercise.md`
+  (11 Sep) specified the opposite of ruling 1 — *refuse when the day no longer
+  fits its time cap*. Her 13 Sep ruling replaces it; the old line stays there as
+  history.
+  **A CORRECTION TO MY OWN NOTE.** `adding-one-exercise.md` said every candidate
+  list "MUST be intersected with getConstrainedPool". Right for the ranked list,
+  wrong for the search box, and I wrote it without reading
+  `getExerciseCompatibilityWarnings` — whose own header records the deliberate
+  decision that swap's search reads the whole catalogue, because a filtered list
+  dead-ends when every ranked option is also unavailable.
+  **THREE THINGS THE BUILD GOT WRONG AND FIXED, each caught by looking rather
+  than by reasoning.**
+  1. **The first ranker offered squats on a bench day.** It scored an exercise
+     UP for training a major muscle the session did not touch, on the reasoning
+     that a gap is what a session is short of. Driven on a real generated push
+     day it offered, in order, Air Squat, Belt Squat, Bodyweight Good Morning.
+     True to the rule and wrong as coaching. The gap it measured is a property
+     of the WEEK, which the balance pass already owns; within one session the
+     useful question is the opposite one. Now it ranks by overlap with what the
+     day already trains — and, after the gate caught deadlifts still slipping in
+     via a shared secondary muscle, a squat/hinge/lunge must also be a pattern
+     the day already has.
+  2. **"cardio · cardio".** Battle Ropes' movement pattern and mechanics tier
+     are both the word "cardio", so the row printed it twice. Found by reading a
+     screenshot; no check saw it.
+  3. **"Archer Push-Ups — your core gets the least work in this session".** The
+     reason named the least-served muscle the exercise touched, which for a
+     push-up is its secondary core. True, and it reads as though the app thinks
+     a push-up is core work. Now it names the muscle the exercise LEADS with
+     among those the day trains.
+  **A MEASURED FINDING THAT CHANGED THE CODE:** `clearOrphanedSupersetLabels`
+  returns early on any slot with no superset label, so it can never repair a
+  newly inserted slot that copied `rest: "alternate"` from a superset peer — an
+  instruction to alternate with nothing. The repair is explicit, and the gate
+  forges a day where every exercise is half of a pair to reach it.
+  **KNOWN AND NOT FIXED HERE, pre-existing and shared with swap:** the load is
+  priced for the peer's set count, and the week-balance pass may then trim the
+  new slot's sets (3 to 2 on the day I measured). Nothing on screen contradicts
+  anything — no set count is promised before the tap — but the weight was
+  computed for a set count the plan did not receive. Swapping has always worked
+  this way; fixing it means re-pricing after the tail, on both paths.
+  **MUTATIONS: 19 tried, 19 caught — but 5 of them only after the gate was
+  fixed.** Four of the five are the same shape CLAUDE.md already warns about, met
+  twice more here: a check that searched a file for a function's NAME stayed
+  green when the call was replaced, because the name was still on the import
+  line. The resolution step is now ONE exported function that the card and the
+  confirm both use, and the gate calls it and runs the executor rather than
+  reading either. The other miss was a forge that could not reach the code it
+  named: it labelled one exercise as a superset half, and `peerTemplate` prefers
+  plain slots, so the template was never the labelled one.
+  **VERIFIED:** `test:exercise-add` (74 checks, new), the add path in
+  `test:edit-keeps-the-bar`'s battery (forged set-hierarchy and 20x load
+  violations repaired, no stale warm-up, input unmutated, re-scored 11.2-12.0
+  against the 7.2 floor on four profiles), `propose_exercise_add` in
+  `test:coach-volume-schedule`'s general per-tool loop, and `verify:exercise-add`
+  (19 checks, new) driving a real Chromium at 390x844 — screenshots read, not
+  just green.
+  **Deploys:** frontend on merge, and **`chat-gemini`** for the new coach tool.
+
+- [ ] **THE SWAP EXECUTOR STILL DOES NOT USE THE SHARED SAVER.** Surfaced 13 Sep
+  2026 by re-anchoring `test:session-edit`'s "the coach saves through it too"
+  from a hardcoded count of two calls onto the property. `executeExerciseAdd`,
+  `executeExerciseRemove` and `executeExerciseReorder` all persist through
+  `saveScopedEdit`; `executeExerciseSwap` predates it and still branches on
+  scope itself through `saveMesocycleWeek`, duplicating the saver's own two
+  branches. Not fixed here — it is not this change's subject and swapping works
+  — but it is a second implementation of one rule, which is how the two drift.
+  The gate is scoped to the session-edit-backed executors, which is a
+  principled boundary rather than a carve-out, and names swap as outside it.
+
+- [ ] **THE SWEEP IS NOT SLOWED BY DEV LOGGING — my hypothesis was wrong.**
+  I recorded that `test:quality` was taking ~60 minutes against CLAUDE.md's ~22,
+  and blamed `enforceWeeklyPatternBalance`'s `console.debug` narration, which is
+  on under tsx because `import.meta.env` is undefined there. **Measured 13 Sep
+  2026 before fixing anything, and the fix would have done nothing:** the real
+  quality script, bounded to 120 profiles, took 22.7s with the debug lines live
+  (5,848 of them) and 22.6s with `console.debug` swallowed. The lines are free.
+  That extrapolates to ~29 minutes for the full 9,216, not 60. So: no fix, the
+  hypothesis is closed, and what remains is to re-measure the full run on an
+  unloaded machine and correct CLAUDE.md's ~22 minute figure if it is wrong.
+
 - [x] **A SMITH MACHINE SHOULDER PRESS TOLD PEOPLE TO LIFT BODYWEIGHT.**
   Found 13 Sep 2026 while probing the add-an-exercise path — not caused by it.
   Generation path, on plans today.

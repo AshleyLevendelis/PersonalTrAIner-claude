@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -44,10 +44,11 @@ import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { resolveSwapTarget } from '@/lib/swap-target'
-import { removeExerciseFromSession, moveExerciseInSession } from '@/lib/session-edit'
+import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
+import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { estimateDaySeconds } from '@/lib/session-duration'
 import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
@@ -1790,6 +1791,90 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         rows: [{ field: 'Exercise', before: oldEx.name, after: newEntry.name }],
         unchanged: [`${day.day}'s other ${day.exercises.length - 1} exercise${day.exercises.length - 1 === 1 ? '' : 's'}`, `Sets × reps: ${oldEx.sets}×${oldEx.reps}`],
         implications: [{ severity: 'info', text: 'Load recomputed for the new movement once you confirm.' }],
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        editable: [{ field: 'scope', options: ['today', 'permanent'] }],
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_exercise_add's card — "add some face pulls on Thursday".
+   *
+   * THE MODEL NAMES A MOVEMENT; THIS RESOLVES IT, AND THAT IS THE SAFETY STEP.
+   * `getConstrainedPool` is what applies equipment, injuries, style and skill,
+   * so a name that is not in it — a hallucinated exercise, or a real one this
+   * person is filtered out of — fails closed with a sentence rather than
+   * entering the plan. The screen's sheet reaches the same pool for its ranked
+   * list, so both surfaces answer "can I be prescribed this" identically.
+   *
+   * UNPRICED, DELIBERATELY. This builder is synchronous, like swap's, and for
+   * the reason recorded there: previewing a weight that confirm supersedes
+   * anyway would duplicate real logic to be approximately wrong.
+   * `executeExerciseAdd` prices it for real. The two things the card DOES
+   * state — the new length and the balance cost — do not read the weight, so
+   * they are exact.
+   */
+  const buildExerciseAddProposal = (rawArgs: Record<string, unknown>): {
+    ok: true
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: ExerciseAddPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { ok: false; reason: string } => {
+    const item = String(rawArgs.item ?? '')
+    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (!item) return { ok: false, reason: 'Which exercise did you want to add?' }
+    const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    if (!week) return { ok: false, reason: "I can't see this week on your plan just now — give it a moment and ask me again." }
+
+    const dayArg = String(rawArgs.day ?? '') || 'today'
+    const dayName = week.days.some(d => d.day.toLowerCase() === dayArg.toLowerCase())
+      ? week.days.find(d => d.day.toLowerCase() === dayArg.toLowerCase())!.day
+      : activeSession.dayName
+    const day = week.days.find(d => d.day === dayName)
+    if (!day) return { ok: false, reason: `I couldn't find ${dayArg} on your plan.` }
+
+    const entry = resolveAdditionRequest(item, profile, exerciseExclusions)
+    if (!entry) {
+      return { ok: false, reason: `I can't add ${item} — it isn't something I can prescribe with your equipment and injuries. Tell me what you have available and I'll find the closest thing.` }
+    }
+
+    const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
+    const trial = addExerciseToSession({
+      mesocycle, profile, weekNumber: activeSession.liveWeek,
+      dayName, entry, load: null, scope,
+    })
+    if (!trial.changed) return { ok: false, reason: trial.refusal ?? `I couldn't add ${entry.name} to ${dayName}.` }
+
+    const afterWeek = trial.mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    const afterDay = afterWeek?.days.find(d => d.day === dayName)
+    const impact = describeEditImpact(week, afterWeek, dayName)
+    const wasMinutes = Math.round(estimateDaySeconds(day) / 60)
+    const nowMinutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : wasMinutes
+
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_exercise_add:${dayName}:${entry.name}`,
+      preconditions: { day: dayName, exerciseName: entry.name },
+      payload: { weekNumber: activeSession.liveWeek, dayName, exerciseName: entry.name, scope },
+      preImage: mesocycle,
+      diff: {
+        lead: `I can add **${entry.name}** to ${dayName}:`,
+        rows: [
+          { field: dayName, before: `${day.exercises.length} exercises`, after: `${day.exercises.length + 1} exercises` },
+          { field: 'Session length', before: `~${wasMinutes} min`, after: `~${nowMinutes} min` },
+        ],
+        unchanged: [`Everything else on ${dayName}`],
+        implications: [
+          // HER RULING, 13 Sep 2026: the session gets longer and the app says
+          // so. It does NOT quietly take something out to pay for the work she
+          // asked for, and the card says that too, so nobody has to wonder.
+          { severity: 'info', text: `The session gets longer — nothing else is taken out to make room. Its weight is set when you confirm; it starts conservative because you haven't done it in this plan yet.` },
+          ...(impact.balancing ? [{ severity: 'info' as const, text: impact.balancing }] : []),
+          ...(impact.cost ? [{ severity: 'warn' as const, text: impact.cost }] : []),
+        ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         editable: [{ field: 'scope', options: ['today', 'permanent'] }],
         reversible: true,
@@ -3686,6 +3771,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
         else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
+      } else if (result.proposal.kind === 'propose_exercise_add' && result.proposal.rawArgs) {
+        const ad = buildExerciseAddProposal(result.proposal.rawArgs)
+        if (ad.ok) built = { scopeKey: ad.scopeKey, preconditions: ad.preconditions, payload: ad.payload as unknown as Record<string, unknown>, preImage: ad.preImage, diff: ad.diff }
+        else refusal = ad.reason
       } else if (result.proposal.kind === 'propose_exercise_remove' && result.proposal.rawArgs) {
         const rm = buildExerciseRemoveProposal(result.proposal.rawArgs)
         if (rm.ok) built = { scopeKey: rm.scopeKey, preconditions: rm.preconditions, payload: rm.payload as unknown as Record<string, unknown>, preImage: rm.preImage, diff: rm.diff }
@@ -4396,6 +4485,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // touch the plan, so there is nothing to restore beyond clearing the
       // flag — which is exactly what undoRestDay does.
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_exercise_add') {
+      const result = await executeExerciseAdd(profile, mesocycle, row.payload as unknown as ExerciseAddPayload, exerciseExclusions)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Added' : "Couldn't add that"
+      rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
+      undoToken = ok ? row.id : undefined
+      if (ok) onMesocycleUpdated(result.mesocycle)
     } else if (row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
       const isRemove = row.kind === 'propose_exercise_remove'
       const result = isRemove
@@ -4660,7 +4757,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
         onLogsUpdated?.()
-      } else if (row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
+      } else if (row.kind === 'propose_exercise_add' || row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
         const payload = row.payload as unknown as { weekNumber: number; scope: SwapScope }
         const preImage = row.pre_image as unknown as MesocycleWeek[] | null
         if (!preImage) return

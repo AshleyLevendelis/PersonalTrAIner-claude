@@ -81,6 +81,12 @@ Mirrors `mesocycle-edit.ts` in shape and reuses its `SwapScope`
   - **Refuse when it does not fit**: `estimateDaySeconds > getSessionMaximumSeconds`,
     in the same try/catch shape as `volume-adjust.ts:94-101`, with the reason in
     words. A time cap is a promise (VISION.md:48).
+    **SUPERSEDED 13 Sep 2026. Ashley was asked this exact question — a Tuesday
+    going from 55 to 64 minutes — and chose the opposite: add it, and say the
+    session is now 64 minutes.** You asked for the exercise, so you get the
+    exercise; the app does not refuse it and does not quietly remove other work
+    to make room. Built that way; this line is kept as history, not as the
+    rule. See `adding-one-exercise.md` and the BACKLOG entry for that day.
 - **`removeExerciseFromSession({ …, exIndex, scope })`**
   - Refuse below a 3-exercise floor — the same floor `sizeBlockToRestBudget`
     Phase B already keeps (`:5472-5493`).

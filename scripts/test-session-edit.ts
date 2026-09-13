@@ -356,7 +356,34 @@ console.log('\n6. One saver, two surfaces — and the coach on the proposal rail
   const panel = strip(read('src/components/exercise/TodayPanel.tsx'))
   const executor = strip(read('src/lib/pending-action-executor.ts'))
   check('the screen saves through it', /saveScopedEdit\(profileId, next\.mesocycle, liveWeek, scope\)/.test(panel))
-  check('the coach saves through it too', (executor.match(/saveScopedEdit\(profile\.id, result\.mesocycle, payload\.weekNumber, payload\.scope\)/g) || []).length === 2)
+  // RE-ANCHORED 13 Sep 2026, from "there are exactly two of these calls" to
+  // "every session-edit executor makes one". The count was a mechanism: adding
+  // a third session edit (putting an exercise IN) broke a check whose subject
+  // had not changed, which is CLAUDE.md's "when a check blocks a fix, suspect
+  // the check" arriving on schedule. The property is that no session-edit
+  // executor persists any other way.
+  const sessionExecutors = [...executor.matchAll(/export async function (executeExercise\w+)\(/g)].map(m => m[1])
+  check('the session-edit executors are found by name', sessionExecutors.length >= 2, sessionExecutors)
+  const bodyOf = (name: string) => {
+    const at = executor.indexOf(`export async function ${name}(`)
+    const next = executor.indexOf('\nexport ', at + 1)
+    return executor.slice(at, next === -1 ? executor.length : next)
+  }
+  // SCOPED TO THE EXECUTORS BACKED BY session-edit, and that boundary is
+  // principled rather than a carve-out: those three take a scope and a week
+  // number, which is exactly what saveScopedEdit's two branches are for.
+  // executeExerciseSwap is deliberately outside it — it predates the shared
+  // saver and still branches on scope itself through saveMesocycleWeek, which
+  // this check surfaced on 13 Sep 2026 and which is recorded in BACKLOG as a
+  // lead rather than fixed here.
+  const sessionEditBacked = sessionExecutors.filter(n =>
+    /addExerciseToSession|removeExerciseFromSession|moveExerciseInSession/.test(bodyOf(n)))
+  check('the session-edit-backed executors are found', sessionEditBacked.length >= 3, sessionEditBacked)
+  const notSaving = sessionEditBacked.filter(n =>
+    !/saveScopedEdit\(profile\.id, result\.mesocycle, payload\.weekNumber, payload\.scope\)/.test(bodyOf(n)))
+  check('every one of them saves through the one scoped saver', notSaving.length === 0, notSaving)
+  const sideWriting = sessionEditBacked.filter(n => /saveMesocycleWeek\(|\.from\(/.test(bodyOf(n)))
+  check('...and none of them writes a week any other way', sideWriting.length === 0, sideWriting)
   check('neither re-implements the branch', !/scope === 'today'[\s\S]{0,120}saveMesocycleWeek/.test(panel))
 
   const row = strip(read('src/components/exercise/ExerciseRow.tsx'))

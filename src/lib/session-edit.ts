@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EDITING ONE SESSION'S EXERCISE LIST — remove, and reorder.
+// EDITING ONE SESSION'S EXERCISE LIST — add, remove, and reorder.
 //
 // Ashley, 11 Sep 2026, from the must-have audit: an exercise could be swapped
 // or banned and nothing else. Banning rewrites every week of every block
@@ -29,9 +29,12 @@
 // (week, day), 'permanent' the rest of THIS block. A third meaning would be a
 // third thing for someone to get wrong.
 // ---------------------------------------------------------------------------
-import type { MesocycleWeek, Exercise, UserProfile } from './types'
+import type { MesocycleWeek, Exercise, UserProfile, ExerciseTier } from './types'
+import type { ExerciseEntry } from './exercise-db'
+import type { LoadPrescription } from './load-prescription'
 import { settleWeek } from './settle-week'
-import { type SwapScope } from './mesocycle-edit'
+import { applyReplacement, type SwapScope } from './mesocycle-edit'
+import { mapTier } from './exercise-plan'
 
 /**
  * The fewest exercises a session may be reduced to. The same floor
@@ -109,6 +112,209 @@ export function removeExerciseFromSession(params: RemoveExerciseParams): Session
   return changed
     ? { mesocycle: next, changed: true }
     : { mesocycle, changed: false, refusal: "I couldn't find that exercise on that day." }
+}
+
+/**
+ * WHERE A NEW EXERCISE GOES IN THE ORDER — generation's own sequence, not the
+ * end of the list. Appending blindly would put a squat after the calf raises.
+ */
+const TIER_RANK: Record<ExerciseTier, number> = {
+  tier_0_primer: 0,
+  tier_1_primary: 1,
+  tier_2_secondary: 2,
+  tier_3_isolation: 3,
+  tier_4_finisher: 4,
+}
+
+export interface AddExerciseParams {
+  mesocycle: MesocycleWeek[]
+  profile: UserProfile
+  weekNumber: number
+  dayName: string
+  /**
+   * The movement to add. RESOLVED AGAINST THE CONSTRAINED POOL BY THE CALLER,
+   * never by a name typed here or by the model: `getConstrainedPool` is what
+   * applies equipment, injuries and bans, and an addition that skipped it
+   * would be the one path into the plan that those filters do not guard.
+   */
+  entry: ExerciseEntry
+  /**
+   * What to prescribe. Computed by the caller because `recomputeLoad` is async
+   * (it reaches for the progression engine) and this file is not — the same
+   * split the swap dialog already makes.
+   *
+   * NULL MEANS "NOT PRICED YET", and it is a real case rather than a lazy
+   * default. The coach's proposal builders are synchronous by a decision
+   * already recorded for swap (ChatAssistant: mirroring recomputeLoad's
+   * composition to preview a number that confirm supersedes anyway would
+   * duplicate real logic to be approximately wrong), so the coach's card is
+   * built from an UNPRICED trial and `executeExerciseAdd` prices it for real
+   * at confirm. The length and the balance cost the card states do not read
+   * the weight, so both are exact either way.
+   *
+   * Explicitly null rather than a fabricated prescription: passing a made-up
+   * one through `applyReplacement` is how a peer's weight ends up under a
+   * different movement's name, which is the leak its primer guard and its
+   * ramp_up clearing both exist to stop.
+   */
+  load: LoadPrescription | null
+  scope: SwapScope
+}
+
+/**
+ * What an unpriced slot says instead of a weight — the same sentence the
+ * reset branch of `recomputeLoad` produces, so the card and the confirmed
+ * plan do not tell two different stories about a lift with no history.
+ */
+const UNPRICED_BASIS = 'New lift — find your working weight this session, then let it ramp from here.'
+
+/**
+ * Put one exercise INTO a session, as part of the plan.
+ *
+ * The last missing operation in the exercise grain. Extra work could always be
+ * LOGGED (AddUnplannedWork), which is a different thing: a logged extra never
+ * counts towards the week's prescribed volume, the balance passes never see
+ * it, and the coach cannot plan around it.
+ *
+ * WHERE THE NUMBERS COME FROM — a PEER, not an invention. Sets, reps and rest
+ * are taken from the nearest exercise in the same day at the same tier, so the
+ * addition looks like the session it is joining AND inherits numbers that have
+ * already been through this week's progression, deload and duration passes.
+ * `applyReplacement` does the carrying, which also buys the primer guard, the
+ * prescription-unit rule, and the clearing of ramp blocks and selection notes
+ * that belong to a different movement.
+ *
+ * ASHLEY'S RULING, 13 Sep 2026, on what this does to the clock: adding work
+ * makes the session longer, and the app SAYS the new length rather than
+ * trimming something else to pay for it. So nothing here touches any other
+ * exercise. The caller states the cost before the tap.
+ */
+export function addExerciseToSession(params: AddExerciseParams): SessionEditResult {
+  const { mesocycle, profile, weekNumber, dayName, entry, load, scope } = params
+  const week = mesocycle.find(w => w.week_number === weekNumber)
+  const day = week?.days.find(d => d.day === dayName)
+  if (!week || !day) return { mesocycle, changed: false, refusal: "I couldn't find that day on your plan." }
+  // A REST DAY IS NOT A SESSION TO ADD TO. Silently turning one into a
+  // one-exercise workout would change what the week is without being asked.
+  if (day.exercises.length === 0) {
+    return { mesocycle, changed: false, refusal: `${dayName} is a rest day. Make it a training day first, then add to it.` }
+  }
+  if (day.exercises.some(e => e.name === entry.name)) {
+    return { mesocycle, changed: false, refusal: `${entry.name} is already on ${dayName}.` }
+  }
+
+  const newTier = mapTier(entry.mechanics_tier)
+  const weeks = new Set(targetWeekNumbers(mesocycle, weekNumber, scope))
+  let changed = false
+  const next = mesocycle.map(w => {
+    if (!weeks.has(w.week_number)) return w
+    const d = w.days.find(x => x.day === dayName)
+    if (!d || d.exercises.length === 0) return w
+    // A later week may have rotated its accessories; adding a duplicate there
+    // is not what was asked for either.
+    if (d.exercises.some(e => e.name === entry.name)) return w
+
+    const template = peerTemplate(d.exercises, newTier)
+    if (!template) return w
+    const priced = load ?? {
+      display: 'Find your working weight',
+      starting_weight_kg: null,
+      per_set: null,
+      basis: UNPRICED_BASIS,
+    } as unknown as LoadPrescription
+    const slot: Exercise = {
+      ...applyReplacement(template, entry, priced, profile.session_duration_preference),
+      // THE PEER'S SUPERSET REST DOES NOT COME WITH IT. applyReplacement
+      // clears `superset_label` but carries `rest`, and a peer that was half
+      // of a pair carries `rest: 'alternate'` — which on a slot with no
+      // partner is an instruction to alternate with nothing.
+      // clearOrphanedSupersetLabels in the tail repairs orphaned LABELS and
+      // would never see this one, because this slot has no label to orphan.
+      ...(template.rest === 'alternate' ? { rest: fallbackRest(d.exercises) } : {}),
+    }
+
+    changed = true
+    const exercises = insertByTier(d.exercises, slot, newTier)
+    const grown = { ...d, exercises }
+    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? grown : x)) }, dayName, profile).week
+  })
+
+  return changed
+    ? { mesocycle: next, changed: true }
+    : { mesocycle, changed: false, refusal: `I couldn't add ${entry.name} to ${dayName}.` }
+}
+
+/**
+ * The programming a newly added exercise would inherit on this day — the peer
+ * template's sets, reps and effort, read WITHOUT performing the edit.
+ *
+ * Exported because pricing the incoming lift is async (`recomputeLoad` reaches
+ * the progression engine) and this module is not, so the caller has to price
+ * it BEFORE calling `addExerciseToSession`. Both sides therefore have to agree
+ * on which peer they are copying: if the caller guessed its own sets and reps,
+ * the weight on the card could be computed for a set count the plan never
+ * receives. One function, one answer.
+ *
+ * Returns null when there is no peer to copy — an empty day, which the add
+ * itself refuses anyway.
+ */
+export function peerProgrammingFor(
+  exercises: Exercise[],
+  tier: ExerciseTier,
+): { sets: number; reps: string; intensity: string } | null {
+  const template = peerTemplate(exercises, tier)
+  if (!template) return null
+  return { sets: template.sets, reps: template.reps, intensity: template.intensity ?? 'RPE 7-8' }
+}
+
+/**
+ * The exercise whose programming the new one should copy: same tier first,
+ * then the nearest tier, and never a superset half if a plain slot exists —
+ * a pair's numbers are chosen to alternate and read oddly on their own.
+ */
+function peerTemplate(exercises: Exercise[], tier: ExerciseTier): Exercise | null {
+  const rank = TIER_RANK[tier]
+  const plain = exercises.filter(e => !e.superset_label)
+  const pool = plain.length > 0 ? plain : exercises
+  const sameTier = pool.filter(e => e.tier === tier)
+  if (sameTier.length > 0) return sameTier[sameTier.length - 1]
+  // Nearest by tier distance, preferring the one BELOW (an accessory's numbers
+  // under-prescribe a compound rather than over-prescribing it, which is the
+  // safer way to be wrong about a movement nobody has done yet).
+  return [...pool].sort((a, b) => {
+    const da = Math.abs((a.tier ? TIER_RANK[a.tier] : 3) - rank)
+    const db = Math.abs((b.tier ? TIER_RANK[b.tier] : 3) - rank)
+    if (da !== db) return da - db
+    return (b.tier ? TIER_RANK[b.tier] : 3) - (a.tier ? TIER_RANK[a.tier] : 3)
+  })[0] ?? null
+}
+
+/** A plain rest for a slot that inherited a superset's 'alternate'. */
+function fallbackRest(exercises: Exercise[]): string {
+  const plain = exercises.find(e => e.rest && e.rest !== 'alternate')
+  return plain?.rest ?? '90s'
+}
+
+/**
+ * Insert in generation's tier order, and NEVER between the two halves of a
+ * labelled superset — buildSupersetPairs goes out of its way to make them
+ * adjacent and the scorer deducts for `superset_not_adjacent`, so landing in
+ * the middle of one would break the thing the label means.
+ */
+function insertByTier(exercises: Exercise[], slot: Exercise, tier: ExerciseTier): Exercise[] {
+  const rank = TIER_RANK[tier]
+  let at = exercises.length
+  for (let i = 0; i < exercises.length; i++) {
+    const theirs = exercises[i].tier ? TIER_RANK[exercises[i].tier!] : 3
+    if (theirs > rank) { at = i; break }
+  }
+  // Nudge forward off a superset seam.
+  while (
+    at > 0 && at < exercises.length
+    && exercises[at - 1].superset_label
+    && exercises[at - 1].superset_label === exercises[at].superset_label
+  ) at++
+  return [...exercises.slice(0, at), slot, ...exercises.slice(at)]
 }
 
 export interface MoveExerciseParams {

@@ -586,6 +586,38 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_exercise_add",
+    description:
+      "PROPOSES putting ONE exercise INTO one session, as part of the plan — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they want to DO something that isn't in the session ('add some face pulls', 'can I put curls in on Thursday', 'I want more calf work today'). ADDING IS NOT LOGGING: log_history and the app's 'add unplanned work' record something already done, which never joins the plan or counts towards the week's volume; this puts it in the session so it is prescribed, sized and progressed like everything else. It is NOT propose_exercise_swap — swap takes something out to put something in, this takes nothing out. The session gets LONGER and the app says the new length on the card; never offer to shorten something else to make room. A rest day is refused (make it a training day first), and so is an exercise already on that day, so do not promise either as done before the card comes back.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day the session is on — a weekday name, or 'today'/'tomorrow'. Defaults to today when they don't say.",
+        },
+        item: {
+          type: "string",
+          description: "The exercise to add, in their words. The app resolves it against what it would actually plan for them; a movement it cannot place is refused rather than invented.",
+        },
+        scope: {
+          type: "string",
+          enum: ["today", "permanent"],
+          description: "'today' (default) adds it to this one session. 'permanent' adds it to that day for the rest of this block. Only send 'permanent' when they say something lasting ('every week', 'for the rest of the block').",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the addition. Copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["item", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_exercise_reorder",
     description:
       "PROPOSES moving ONE exercise earlier or later within its session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they ask for a different order ('do the rows before the bench press', 'put the curls at the end', 'squats first'). NAME THE NEIGHBOUR, never a count: pass before_item or after_item naming another exercise in that same session. If they say something you cannot pin to a named neighbour ('move it up a bit', 'two earlier'), ask which exercise they want it next to instead of guessing — a wrong order is a wrong session. Nothing about the weights or sets changes; this is order only.",
@@ -1859,6 +1891,7 @@ SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the cu
 - You understand exercise taxonomy: movement_pattern (push/pull/hinge/squat/carry/rotation/isolation), tier (tier_0_primer through tier_4_finisher), fatigue_cost (low/moderate/high).
 - When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
+- Trigger propose_exercise_add when they want to DO something the session does not contain ("add some face pulls", "can I put curls in on Thursday", "I want more calf work"). ADDING IS NOT LOGGING and the distinction matters: log_history records something already done and it never joins the plan, while this puts the exercise IN the session so it is prescribed and progressed. Adding takes nothing out — if they name something to drop in exchange, that is propose_exercise_swap. The session gets longer and the card says the new length; never offer to cut something else to make room, and never say by how much yourself — the card does the arithmetic.
 - Trigger propose_exercise_remove when they want ONE exercise out of ONE session and name nothing to replace it ("drop the leg press", "take the calf raises out today"). Removing is not banning — a ban is every week of every block and you cannot do it from chat. If they name a replacement, that is propose_exercise_swap.
 - Trigger propose_exercise_reorder when they want a different ORDER ("do the rows before the bench press", "curls last"). Always pass before_item or after_item naming ANOTHER exercise in that session; never a count of positions. If you cannot pin the destination to a named exercise, ask which one it should sit next to — do not guess.
 - For ban_exercise: this tool does NOT ban anything yet. Acknowledge the preference warmly, say plainly you cannot do it from chat, and point them at the ban button in the exercise row's menu. Never say you have removed it.
@@ -2161,7 +2194,7 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
 6. INTENTIONS ARE NOT APPOINTMENTS, WITH ONE EXCEPTION. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for a TIME OF DAY and no screen that shows one. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place. THE EXCEPTION, added 8 Sep 2026: moving a prescribed session to another DAY is now real — call propose_session_move (rule 7). Even then it is a card they confirm, so the same rule applies until they tap it: nothing has happened yet, so do not say it has.
 
-6b. THE THREE EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order. None of them bans — ban_exercise is every week of every block and is not wired to chat. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
+6b. THE FOUR EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order; propose_exercise_add puts a new slot in and takes nothing out, which makes the session longer. None of them bans — ban_exercise is every week of every block and is not wired to chat. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
 
 7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
@@ -3387,6 +3420,32 @@ Keep this context in mind to ensure your greetings and questions naturally align
         return new Response(
           JSON.stringify({
             reply: "I can't ban exercises through chat yet — that's coming in an update soon. For now, use the ban button on the exercise itself.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_exercise_add") {
+        // ITS OWN BRANCH, not the shared remove/reorder one, and deliberately.
+        // That branch emits `kind: name`, which reads correctly at runtime and
+        // is invisible to the per-tool gate loop (it looks for the literal
+        // `kind: "<tool>"`). A tool whose courier shape no check can see is
+        // exactly the hole ban_exercise fell through. Same rail otherwise:
+        // this function cannot import session-edit, so the client resolves the
+        // named movement against the plan, builds the diff and confirms. The
+        // server writes nothing.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_exercise_add",
+              rawArgs: {
+                day: args.day,
+                item: args.item,
+                scope: args.scope,
+                reason: args.reason,
+              },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
