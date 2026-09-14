@@ -61,6 +61,24 @@ await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 
+console.log('\nA LOOSELY-NAMED SWAP FINDS THE EXERCISE\n')
+
+// WHICH LIFT TO ASK FOR — read off the page, not typed here. This used to name
+// "squats" and assert the card said Squats. Its own comment claimed the plan
+// was read from the page, through `window.__todayExercises`, which no page has
+// ever published: the read came back null every time and the hard-coded name
+// was the whole test. Once "today" stopped drifting with the calendar, today's
+// session had no squats on it and the resolver correctly said so — which the
+// check reported as the dead end coming back.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/` })
+await wait(3000)
+const swapTarget = await ev(`window.__swapTarget`)
+check('0a. today’s session holds a lift with a loose name to ask for',
+  !!swapTarget && !!swapTarget.full && !!swapTarget.loose, swapTarget)
+if (!swapTarget) { console.error('\nNo usable lift on today’s session.\n'); ws.close(); chrome.kill(); server.close(); process.exit(1) }
+console.log(`asking for "${swapTarget.loose}" — the plan spells it "${swapTarget.full}"`)
+const TARGET_FULL = swapTarget.full
+
 // THE SLOPPY ARGUMENTS ARE THE TEST. No day at all, and the old exercise named
 // the way a person says it rather than the way the catalogue spells it. Both
 // were dead ends before; either alone was enough.
@@ -76,25 +94,19 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
         reply: '',
         proposal: {
           kind: 'propose_exercise_swap',
-          rawArgs: { day: '', old_item: 'squats', new_item: 'leg press', scope: 'today', reason: 'Rack is busy.' },
+          rawArgs: { day: '', old_item: ${JSON.stringify(swapTarget.loose)}, new_item: 'leg press', scope: 'today', reason: 'Rack is busy.' },
         },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     return realFetch(url, init)
   }
 ` })
-
-console.log('\nA LOOSELY-NAMED SWAP FINDS THE EXERCISE\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/` })
 await wait(4000)
 
-// The plan the harness generated — read from the page so the assertions are
-// about THIS run's plan rather than a name hard-coded here.
-const planToday = await ev(`(() => (window.__todayExercises || null))()`)
-
 let ready = await ev(`!!document.querySelector('textarea')`)
 for (let i = 0; i < 20 && !ready; i++) { await wait(500); ready = await ev(`!!document.querySelector('textarea')`) }
-check('0. the chat is up', ready === true)
+check('0b. the chat is up', ready === true)
 
 const setValue = `(el, v) => {
   const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype
@@ -120,7 +132,7 @@ const READ = String.raw`(() => {
     hasProposal: /Proposed change/i.test(text)
       && [...document.querySelectorAll('button')].some(b => /^Apply/.test((b.textContent || '').trim()))
       && [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Keep'),
-    mentionsSquats: /Squats/i.test(text),
+    mentionsTarget: text.indexOf(${JSON.stringify(TARGET_FULL)}) !== -1,
     mentionsLegPress: /Leg Press/i.test(text),
     buttons: [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean),
     tail: text.replace(/\s+/g, ' ').slice(-320),
@@ -131,7 +143,8 @@ for (let i = 0; i < 24 && !state.hasProposal && !state.deadEnd; i++) { await wai
 
 check('2a. THE DEAD END IS GONE', state.deadEnd === false, state.tail)
 check('2b. ...and a real proposal came back instead', state.hasProposal === true, state.buttons)
-check('2c. ...for the exercise that is actually on the day', state.mentionsSquats === true, state.tail)
+check('2c. ...for the exercise that is actually on the day, spelled the way the plan spells it',
+  state.mentionsTarget === true, { asked: swapTarget.loose, expected: TARGET_FULL, tail: state.tail })
 check('2d. ...swapped to the one that was asked for', state.mentionsLegPress === true, state.tail)
 await shoot('swap-request-proposal')
 

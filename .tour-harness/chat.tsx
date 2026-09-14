@@ -92,6 +92,41 @@ const mesocycle = generateMesocycle(profile)
 resetRandomSource()
 const macros: MacroTargets | null = computeTargets(profile)
 
+// WHICH LIFT A LOOSE REQUEST SHOULD RESOLVE TO — read off today's session,
+// published for verify:swap-request, 14 Sep 2026.
+//
+// WHY. That driver stubbed the model saying `old_item: 'squats'` and then
+// asserted the card named Squats. Its own comment claimed the plan was "read
+// from the page so the assertions are about THIS run's plan" — via
+// `window.__todayExercises`, which no page has ever published, so the read
+// always came back null and the hard-coded name was the only thing in play.
+// Once "today" stopped moving with the calendar, today's session was Upper
+// Pull & Core and there were no squats on it, so the resolver correctly failed
+// and the check called that a defect.
+//
+// THE PROPERTY IS FUZZY MATCHING, NOT SQUATS: a lift named the way a person
+// says it, with no day given, resolves to the catalogue entry on today's plan.
+// So pick a lift that IS on today, and degrade its name the way a person would
+// — last word, lowercased — choosing one whose last word belongs to only one
+// exercise in the day, so the resolver has a single right answer and the check
+// is not really testing tie-breaking.
+const swapTarget = (() => {
+  const todayName = DAYS[todayIdx]
+  const names = (mesocycle[0].days.find(d => d.day === todayName)?.exercises ?? []).map(e => e.name)
+  // Whitespace only, never hyphens: "Chin-Ups" is how a person says it, and
+  // splitting it further gives "ups", which nobody types.
+  const loosely = (n: string) => n.trim().split(/\s+/).pop()!.toLowerCase()
+  const unique = names.filter(n => loosely(n) !== n.toLowerCase()
+    && names.filter(m => loosely(m) === loosely(n)).length === 1)
+  const full = unique[0] ?? null
+  return full ? { full, loose: loosely(full) } : null
+})()
+;(window as unknown as { __swapTarget: unknown }).__swapTarget = swapTarget
+
+// ...and the same on this page, for the other half of that comparison.
+;(window as unknown as { __todayFocus: unknown }).__todayFocus =
+  mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.focus ?? null
+
 // A conversation long enough to overflow the card, seeded through the SAME
 // cache the real chat restores from — an empty thread cannot show whether the
 // newest message is reachable, which is the whole question.

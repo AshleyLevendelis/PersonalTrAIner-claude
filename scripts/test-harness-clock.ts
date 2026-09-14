@@ -124,6 +124,18 @@ check('...computed with formatRampSets — the screen\u2019s own predicate, so t
 check('...naming a date for the calibration week as well as the nearest one',
   /calibrationDate/.test(realSrc) && /nearestAnchorDate\(/.test(realSrc))
 
+// THE SAME MISTAKE IN THE CHAT HARNESS, found the same day. swap-request
+// stubbed the coach asking to swap "squats" and asserted the card named Squats,
+// while its own comment claimed the plan was read from the page — through
+// `window.__todayExercises`, which no page has ever published. Once today
+// stopped drifting, today's session had no squats and the resolver correctly
+// refused. The property is fuzzy matching, so the lift has to come off the plan.
+const chatSrc = bare(readFileSync(join(DIR, 'chat.tsx'), 'utf-8'))
+check('chat.tsx publishes a swap target off today\u2019s session',
+  /__swapTarget/.test(chatSrc) && /mesocycle\[0\]\.days\.find/.test(chatSrc))
+check('swap-request.mjs asks for the lift the page named, not one typed in',
+  /__swapTarget/.test(bare(readFileSync(join(DIR, 'swap-request.mjs'), 'utf-8'))))
+
 for (const f of drivers) {
   const src = bare(readFileSync(join(DIR, f), 'utf-8'))
   // 5a. THE PAGE OWNS THE CLOCK. A driver that writes the key itself is

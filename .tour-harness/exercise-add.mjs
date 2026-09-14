@@ -130,8 +130,33 @@ const after = await until(order, o => Array.isArray(o) && o.includes(picked))
 check('4a. the exercise is in the session afterwards', (after ?? []).includes(picked), after)
 check('4b. ...and nothing else left it', (start ?? []).every(n => (after ?? []).includes(n)),
   (start ?? []).filter(n => !(after ?? []).includes(n)))
-check('4c. ...it was not simply appended to the end',
-  after[after.length - 1] !== picked || start.length === 0, after)
+// TIER ORDER, NOT "NOT LAST". This used to assert the added exercise was not
+// the last row, which is a proxy for the rule this driver's own header names —
+// that it lands IN TIER ORDER. An exercise whose tier genuinely belongs at the
+// end (a core or isolation lift) lands there correctly, and the proxy called
+// that a defect: on 14 Sep the pick was Bird Dog and the check went red against
+// an insertion that was right.
+//
+// Tier rank is not on screen — the row says "Accessory", not tier_3_isolation —
+// and the added lift is not in the harness page's module-scope plan, so it is
+// read off the LIVE mesocycle the page publishes after every edit.
+const RANK = { tier_0_primer: 0, tier_1_primary: 1, tier_2_secondary: 2, tier_3_isolation: 3, tier_4_finisher: 4 }
+const live = await until(() => ev(`window.__liveToday`), l => Array.isArray(l) && l.some(x => x.name === picked))
+const at = (live ?? []).findIndex(x => x.name === picked)
+const rankOf = x => (x.tier in RANK ? RANK[x.tier] : 3)
+// Superset members are skipped: insertByTier deliberately nudges a slot PAST a
+// labelled pair rather than landing between its halves, so a pair one tier
+// heavier can legitimately sit above the new row.
+const above = (live ?? []).slice(0, at).filter(x => !x.superset)
+const below = (live ?? []).slice(at + 1).filter(x => !x.superset)
+// BOTH DIRECTIONS, or the check cannot fail. "Nothing heavier above it" alone
+// is satisfied by prepending; "nothing lighter below it" alone is satisfied by
+// appending. Each mutation is caught by exactly one half.
+check('4c. ...it landed in tier order, not just on the end',
+  at >= 0
+  && above.every(x => rankOf(x) <= rankOf(live[at]))
+  && below.every(x => rankOf(x) >= rankOf(live[at])),
+  { picked, at, order: (live ?? []).map(x => `${x.name}:${x.tier}`) })
 const afterHeader = await until(headerMinutes, h => Number.isFinite(h.mins))
 check('4d. the header now shows the longer session the card promised',
   afterHeader.mins === cardMins, { header: afterHeader.mins, card: cardMins })

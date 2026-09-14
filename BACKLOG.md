@@ -2,6 +2,75 @@
 
 Newest first. One line each.
 
+- [x] **THE LAST FOUR RED CHECKS: THREE WERE WRONG, ONE FOUND A REAL BUG.**
+  Ashley chose "finish the clear-out" over three other pieces of work. All four
+  are green; the suite has no known reliably-red driver left.
+  **`verify:tour` — driving the wrong page, for four checks' worth of nothing.**
+  It walked the build folder for "the first .html it finds", which was right
+  when the harness built one page and quietly wrong from the day it built four:
+  it picked the COACH page and reported that the app tour was not on it. All
+  four failures were downstream of the first. It now names the page it means and
+  stops loudly if that page is missing. Underneath, the tour was fine — but two
+  of its checks were three days stale: they still asserted that Skip stores your
+  place and offers a "Resume the tour" pill, which is exactly the behaviour
+  ASHLEY RULED OUT ("the skip tour doesn't actually skip it… won't go away until
+  you fully complete it"). Skip now does what Finish does, with the Replay row
+  in settings as the way back, and the check says so. Its walk to the end was
+  hand-listed from a resume path that no longer exists; it is now generic — tap
+  whatever the tour is pulsing, otherwise press the CTA — plus a structural
+  "every tab was visited" that no rewording can rot. **The old walk pressed
+  Skip**, because the CTA at a waiting stop IS Skip and one frame of a settling
+  pulse read as "not waiting": a driver killing the thing it was inspecting.
+  **`verify:swap-request` — the same lie as the ramp, in the chat harness.** It
+  stubbed the coach asking to swap "squats" and asserted the card named Squats,
+  while its own comment claimed the lift was read from the page — through a
+  global no page has ever published, so the read was null every time and the
+  typed-in name was the whole test. Once today stopped drifting, today's session
+  had no squats and the resolver correctly refused. The property is FUZZY
+  MATCHING, so the chat page now publishes a lift that IS on today plus the
+  loose form a person would type; the run asked for "row" and got
+  "Seated Cable Row", which is a better test than the one it replaced.
+  **`verify:exercise-add` — a proxy calling a correct insertion a defect.** The
+  check was "it was not simply appended to the end". The rule, named in that
+  driver's own header, is that the add lands IN TIER ORDER — and an exercise
+  whose tier belongs at the end lands there correctly. The pick was Bird Dog.
+  It now reads the live session's tiers off the page and asserts the new row has
+  nothing heavier above it and nothing lighter below it.
+  **`verify:rest-day-race` — comparing two universes, and it found a real bug.**
+  Its last check said "the coach named the same session Home shows", reading the
+  coach off the chat harness page and Home off the app harness page. Those are
+  two separately generated plans, so the same weekday holds a different session
+  on each; it could only ever pass by luck. Each page now publishes the focus
+  its OWN plan holds and each surface is held to its own — which is the promise
+  underneath ("the coach never contradicts the app's numbers"), and is a claim
+  within one universe.
+  **THE REAL BUG, in app code, found on the way.** `firstRunSessionBrief` read
+  `new Date()` directly — the one "what day is it" in the coach component that
+  did not go through the app's own clock, while the opener's week, the greeting
+  hour and the block checks beside it all did. So the coach's very first message
+  named a different day's session from every other surface. INERT FOR A LIVE
+  USER, and said plainly rather than dressed up: with no dev-clock override the
+  app's clock returns the real one, so nothing a user sees today is wrong. It is
+  fixed because the app should have one notion of today, and two more raw clock
+  reads in the same file went with it (the opener's session pick, the
+  accountability check-in's hour).
+  **Mutations: 7 tried, 6 caught, 1 named as uncatchable and why.** The swap
+  resolver restricted to exact names (3 checks red); the chat page no longer
+  publishing its lift; the driver going back to a typed-in name; the insertion
+  always prepending (caught); the insertion always APPENDING — **NOT caught**,
+  and it cannot be with this pick, because appending Bird Dog IS its correct
+  tier position. Covering that needs a second add of a lighter-tier lift through
+  the search box; named here rather than left implied. Then Skip reverted to the
+  ruled-out resume pill (2 red), and the tour overlay swallowing taps (4 red).
+  **VERIFIED:** the four drivers green — 37, 8, 20 and 18 checks; seventeen
+  other drivers on the same two harness pages re-run clean; `test:harness-clock`
+  (now 86 checks), `calibration-search`, `ramp-visibility`, `exercise-add`,
+  `coach-promises`, `chat-app-reality` and `npx tsc --noEmit` clean.
+  **DECIDED WITHOUT ASKING** — every judgement was mechanical or already ruled.
+  The Skip question looked like Ashley's until the code answered it: her ruling
+  was already recorded beside the handler, and the check simply predated it.
+  **Deploys:** frontend on merge. No edge function touched.
+
 - [x] **THE WARM-UP RAMP WAS ON SCREEN ALL ALONG. THREE CHECKS WERE LOOKING AT
   THE WRONG DAY.** Ashley chose this from four options: three of the five
   reliably-red browser drivers failed on one symptom — no ramp strip on the

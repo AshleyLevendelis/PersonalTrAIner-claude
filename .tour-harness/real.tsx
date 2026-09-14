@@ -60,6 +60,7 @@ import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
+import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 
@@ -252,6 +253,16 @@ const rampTarget = (() => {
   })
 })()
 ;(window as unknown as { __rampTarget: unknown }).__rampTarget = rampTarget
+
+// TODAY'S FOCUS, from THIS page's plan — for verify:rest-day-race, 14 Sep 2026.
+// Its last check compared the coach's first bubble with Home's session name,
+// but read the coach off chat.html and Home off real.html: two harness pages,
+// two separately generated plans, so the same weekday holds a different
+// session and the comparison could only ever pass by coincidence. Each page
+// now names its own, and the check asks each surface to agree with the plan it
+// is actually rendering.
+;(window as unknown as { __todayFocus: unknown }).__todayFocus =
+  exercisePlan.find(d => d.day === DAYS[anchorDate().getDay()])?.focus ?? null
 const macros: MacroTargets | null = computeTargets(profile)
 
 const today = isoOf(anchorDate())
@@ -437,6 +448,25 @@ function Harness() {
   // The app was wired correctly and the harness could not show it. App.tsx
   // owns this state and hands setMesocycle down (App.tsx:2547); so does this.
   const [editedMeso, setEditedMeso] = useState(mesocycle)
+
+  // THE LIVE SESSION'S TIERS, published for verify:exercise-add, 14 Sep 2026.
+  //
+  // WHY. Its check 4c said "it was not simply appended to the end", which is a
+  // proxy: the real rule, named in that driver's own header, is that the add
+  // lands IN TIER ORDER. An exercise whose tier genuinely belongs last — a core
+  // or isolation lift — lands last correctly, and the proxy called that a
+  // defect. Tier is not on the screen at the rank level (the row says
+  // "Accessory", not tier_3_isolation), and the added lift is not in this
+  // file's module-scope plan, so it has to come off the LIVE mesocycle.
+  useEffect(() => {
+    // THE WEEK THE SCREEN IS SHOWING, not week 1. The fixture's plan is nine
+    // days old, so the live week is 2 — publishing week 1 gave a list the added
+    // exercise was correctly absent from.
+    const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, new Date(TODAY_ISO + 'T12:00:00'), editedMeso.length)
+    const day = editedMeso.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[new Date(TODAY_ISO + 'T12:00:00').getDay()])
+    ;(window as unknown as { __liveToday: unknown }).__liveToday =
+      (day?.exercises ?? []).map(e => ({ name: e.name, tier: e.tier ?? null, superset: e.superset_label ?? null }))
+  }, [editedMeso])
   const livePlan = planArrived ? exercisePlan : []
   const liveMeso = planArrived ? editedMeso : []
 

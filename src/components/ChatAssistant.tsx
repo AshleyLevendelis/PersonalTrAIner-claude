@@ -331,7 +331,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // in onboarding, so anyone rendering this screen has one.
     if (exercisePlan.length === 0) return PLAN_UNKNOWN_TEXT
 
-    const now = new Date()
+    // getAppNow for the same reason as firstRunSessionBrief below: this decides
+    // which session the opener names, and the app has one notion of today.
+    const now = getAppNow(profile.id)
     const hour = now.getHours()
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' })
     const todaySession = exercisePlan.find(d => d.day === dayName)
@@ -359,7 +361,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * instead of asked about a rest they have not earned.
    */
   const firstRunSessionBrief = (): FirstRunSessionBrief | null => {
-    const now = new Date()
+    // getAppNow, NOT new Date(). This was the one "what day is it" in the
+    // component that read the machine's clock directly, while every other one
+    // beside it (the opener's week, the greeting's hour, the block checks) goes
+    // through the dev-clock seam. Found 14 Sep 2026 by verify:rest-day-race:
+    // the coach's very first message named Monday's session as "today" while
+    // every other surface named Wednesday's, because only this line had not
+    // been told what day the app thinks it is. Inert for a live user — getAppNow
+    // returns new Date() when there is no override — but the app has one notion
+    // of today and this is now part of it.
+    const now = getAppNow(profile.id)
     const nameOfDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long' })
     const sessionOn = (d: Date) => exercisePlan.find(x => x.day === nameOfDay(d))
     // A walk day carries its whole prescription in plannedActivity and has
@@ -1380,7 +1391,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       ? Math.floor((Date.now() - new Date(lastWeighIn.date).getTime()) / 86400000)
       : null
     const line = pickAccountabilityCheckIn({
-      hour: new Date().getHours(),
+      hour: getAppNow(profile.id).getHours(),
       proteinEaten: proactiveData.proteinEaten,
       proteinTarget: proactiveData.proteinTarget,
       caloriesEaten: proactiveData.caloriesEaten,
