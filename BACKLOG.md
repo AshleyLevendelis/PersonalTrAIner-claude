@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **BUILT — meals now get the same question exercise does.** Ashley, 14 Sep
+  2026, choosing from three: *"Work through all three one at a time until [all]
+  are completed."* First of the three.
+  **WHAT CHANGES ON HER PHONE.** Ask the coach to take the salmon out of dinner
+  and, where it genuinely costs her, she gets a question instead of a card:
+  *"That puts your day at 96g protein against a 160g target — enough short that
+  you'd feel it in how you recover from this week's sessions. Want to keep it to
+  today, or shall I do it anyway?"* — read off a real screen, not composed here.
+  Nothing is ever refused; the change is exactly one tap further away, and the
+  second identical request goes straight to a card.
+  **WHAT WAS ACTUALLY THERE BEFORE, measured:** of the coach's seventeen
+  proposal builders, three carried the trade-off — all exercise — and the app
+  held exactly ONE `shouldAsk` call site. No meal change had ever asked
+  anything. What meal cards showed was a macro table with signed deltas, which
+  says the number moved and never says what it means.
+  **CORRECTION to my own earlier reading**, an hour old at the time: I reported
+  `macroShortfallLine` as the meal side's cost sentence. It is not — it answers
+  "what is left to eat today" and fires on the day's progress, not on an edit.
+  The meal edit paths said nothing about cost at all, which is worse than I had
+  said. I reached the wrong one by grepping for "cost"-shaped code in the meal
+  libs and stopping at the first hit instead of reading who calls it.
+  **THE COACHING CALLS, mine under the same delegation as the exercise
+  thresholds, flagged rather than buried:** protein leads in every goal, because
+  it is the hardest thing to make up later in the day. The calorie direction
+  that counts as failure DEPENDS ON THE GOAL — over the target undoes a
+  fat-loss deficit, under it starves a growth block — and the gate checks the
+  same day gives opposite verdicts on the two. Carbs and fat are never spoken
+  about alone. And the third goal-damaging change in a block is asked about
+  whatever today's one looks like on its own: that is the case no single card
+  can ever see, and the one that actually costs somebody their result.
+  **TWO DEFECTS FOUND BY LOOKING RATHER THAN BY CHECKS.** The screenshot showed
+  the coach asking *"Want a higher-protein version…"* above chips offering only
+  "Just today" and "Do it anyway" — promising a route it had no way to take,
+  because the pool had handed up no alternative. The closing clause is now built
+  from what is actually on offer. And the chat harness passes an empty meal
+  plan, which totals zero protein and would have turned EVERY card into a
+  question: "no planned day, no judgement" now sits in the module beside "no
+  living targets, no judgement", where it can be broken on purpose.
+  **Mutations: 12 attempted, 12 caught — 3 of them only after the check that
+  should have caught them was fixed.** One fed the no-targets guard an
+  on-target day, so "silent because no targets" and "silent because the day is
+  fine" were the same observation; one lived only in the browser driver, which
+  cannot reach a guard the harness never triggers; one promised-route check did
+  not exist until the screenshot produced it.
+  Plan: `docs/plans/meals-are-plans-too.md`. New: `test:meal-tradeoff`,
+  `verify:meal-tradeoff`.
+  **STILL EXERCISE-ONLY, named rather than omitted:** the Nutrition screen's own
+  row menu reaches the same builders but has not been wired, so this is the
+  COACH surface today. Next.
+
 - [x] **FIXED — four of the five things Ashley hit while training, 14 Sep 2026.**
   **1. ONE LIFT, ONE NUMBER.** Her words: *"the main header prominently displays
   40kg, but the pre-filled numbers in the set input rows show 35kg."* Both

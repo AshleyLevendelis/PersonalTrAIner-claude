@@ -31,7 +31,7 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { removeExerciseFromSession } from '@/lib/session-edit'
 import { assessEdit } from '@/lib/edit-tradeoff'
-import type { UserProfile, MacroTargets } from '@/lib/types'
+import type { MacroTargets, Meal, MealPlanDay, UserProfile } from '@/lib/types'
 
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { AppearanceProvider } from '@/hooks/useAppearance'
@@ -105,6 +105,45 @@ setRandomSource(seededRngFromKey('chat-shell'))
 const mesocycle = generateMesocycle(profile)
 resetRandomSource()
 const macros: MacroTargets | null = computeTargets(profile)
+
+// A REAL DAY OF MEALS, for verify:meal-tradeoff (14 Sep 2026).
+//
+// The chat harness passed `mealPlan={[]}` since it was written, because no
+// driver had ever needed one. With meals joining the trade-off step that stops
+// being harmless: an empty day has zero protein, so EVERY meal change would
+// look like it left somebody on nothing. The app guards that case (no day, no
+// judgement) — which is exactly why the driver needs a real day to see
+// anything at all.
+//
+// Built to land ON the profile's own targets, so a change AWAY from it is the
+// only thing that moves the verdict, and the numbers are the app's own rather
+// than three figures chosen to make a threshold fire.
+const mealPlan: MealPlanDay[] = (() => {
+  if (!macros) return []
+  const share = [0.25, 0.35, 0.4]
+  const names = ['Greek yoghurt and oats', 'Chicken and rice bowl', 'Salmon, potatoes and greens']
+  // REAL INGREDIENT LINES, from the app's own food table. The food-edit
+  // builders match a named food against these and then re-verify the whole
+  // meal, so a meal with no ingredients can only ever produce "I can't find
+  // that in your dinner" — a refusal, which is not the path under test.
+  const lines = [
+    ['greek yoghurt 0% 250g', 'oats 60g', 'blueberries 80g'],
+    ['chicken breast 180g', 'white rice cooked 220g', 'broccoli 100g'],
+    ['salmon 200g', 'potato boiled 250g', 'broccoli 120g'],
+  ]
+  return ['breakfast', 'lunch', 'dinner'].map((meal, i) => ({
+    meal,
+    items: [{
+      name: names[i],
+      calories: Math.round(macros.calories * share[i]),
+      protein: Math.round(macros.protein * share[i]),
+      carbs: Math.round(macros.carbs * share[i]),
+      fat: Math.round(macros.fat * share[i]),
+      ingredients: lines[i],
+    } as unknown as Meal],
+  }))
+})()
+;(window as unknown as { __mealDay: unknown }).__mealDay = { targets: macros, plan: mealPlan }
 
 // WHICH LIFT A LOOSE REQUEST SHOULD RESOLVE TO — read off today's session,
 // published for verify:swap-request, 14 Sep 2026.
@@ -376,7 +415,7 @@ function Harness() {
               exercisePlan={livePlan}
               mesocycle={liveMeso}
               planCreatedAt={profile.created_at}
-              mealPlan={[]}
+              mealPlan={mealPlan}
               exerciseExclusions={[]}
               latestWeightKg={80}
               onPlanUpdate={noop}

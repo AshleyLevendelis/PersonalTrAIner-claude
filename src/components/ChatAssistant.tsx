@@ -52,6 +52,7 @@ import {
   assessEdit, applyTradeoff, askText, askKey, shouldAsk, downgradeToCard,
   type Tradeoff, type EditContext,
 } from '@/lib/edit-tradeoff'
+import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } from '@/lib/meal-tradeoff'
 import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
@@ -560,6 +561,77 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * would do.
    */
   type EditAdvice = { verdict: Tradeoff; key: string; scope: EditContext['scope'] }
+  /**
+   * THE SAME QUESTION, ABOUT FOOD. Ashley's 14 Sep ruling built for exercise;
+   * this is the meal half. See meal-tradeoff.ts for why protein leads and why
+   * the calorie direction depends on the goal.
+   *
+   * READS THE DAY OFF `mealPlan`, which the chat already holds, and the new
+   * macros off the built PAYLOAD rather than off the card's rows. The payload
+   * carries the VERIFIED option — the numbers verifyProposal re-measured — and
+   * the rows are formatted strings built FROM those numbers. Parsing "142g"
+   * back out of a row would be the three-views-of-one-number trap in a new
+   * costume.
+   */
+  const MEAL_KINDS: Record<string, MealEditKind> = {
+    propose_meal_swap: 'meal_swap',
+    propose_meal_food_remove: 'meal_food_remove',
+    propose_meal_food_replace: 'meal_food_replace',
+    propose_meal_food_resize: 'meal_food_resize',
+    propose_meal_addition: 'meal_addition',
+    propose_meal_food_add: 'meal_food_add',
+    propose_custom_meal: 'custom_meal',
+  }
+
+  const adviseMealEdit = (
+    proposalKind: string,
+    payload: Record<string, unknown>,
+    foodName?: string,
+  ): EditAdvice | null => {
+    const kind = MEAL_KINDS[proposalKind]
+    if (!kind) return null
+    const slot = String((payload as { slot?: unknown }).slot ?? '').toLowerCase()
+    const option = (payload as { option?: { macros?: MacroTargets } }).option
+    if (!slot || !option?.macros) return null
+
+    const sum = (rows: { calories: number; protein: number; carbs: number; fat: number }[]) =>
+      rows.reduce((a, r) => ({
+        calories: a.calories + r.calories, protein: a.protein + r.protein,
+        carbs: a.carbs + r.carbs, fat: a.fat + r.fat,
+      }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+
+    const items = mealPlan.map(m => ({ slot: m.meal.toLowerCase(), it: m.items[0] })).filter(x => !!x.it)
+    const dayBefore = sum(items.map(x => x.it))
+    // The edited slot leaves at its old numbers and comes back at its new ones.
+    // A slot that is not currently on the plan (an ADDITION) simply has nothing
+    // to subtract, which is the correct arithmetic rather than a special case.
+    const leaving = items.find(x => x.slot === slot)?.it
+    const dayAfter = {
+      calories: dayBefore.calories - (leaving?.calories ?? 0) + option.macros.calories,
+      protein: dayBefore.protein - (leaving?.protein ?? 0) + option.macros.protein,
+      carbs: dayBefore.carbs - (leaving?.carbs ?? 0) + option.macros.carbs,
+      fat: dayBefore.fat - (leaving?.fat ?? 0) + option.macros.fat,
+    }
+
+    // WHICH BLOCK, off the live plan — the same derivation the exercise side
+    // uses, so the two "once per block" counters roll over together.
+    const block = mesocycle.find(w => w.week_number === activeSession.liveWeek)?.block_number ?? 1
+    const key = mealAskKey({ kind, slot, foodName }, block)
+
+    // ONLY MEAL ASKS FROM THIS BLOCK COUNT. Counting every asked key would let
+    // three exercise questions trigger the meal repetition sentence, which
+    // would be the app drawing a conclusion about somebody's eating from
+    // something they did in the gym.
+    const prefix = `${block}:meal`
+    const priorCostlyChangesThisBlock = [...readAskedKeys()].filter(k => k.startsWith(prefix)).length
+
+    const ctx: MealEditContext = {
+      profile, targets: macros, dayBefore, dayAfter, kind, slot, foodName,
+      priorCostlyChangesThisBlock,
+    }
+    return { verdict: assessMealEdit(ctx), key, scope: 'permanent' }
+  }
+
   const adviseEdit = (ctx: EditContext): EditAdvice => {
     const block = ctx.before.find(w => w.week_number === ctx.weekNumber)?.block_number ?? 1
     return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope }
@@ -4098,6 +4170,20 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // 14 Sep 2026 and the reason this sits here rather than on the card: an
       // ask that still wrote a pending action would be a warning with a
       // Confirm button under it, which is the thing it was chosen over.
+      // MEALS JOIN THE SAME STEP, rather than getting a second one beside it.
+      // Derived from the built payload, so every meal kind that produces a
+      // verified option is covered by construction — including any added
+      // later, which a per-branch wiring would silently miss. Only when a
+      // per-kind branch has not already produced advice (none do today; this
+      // is the precedence a future exercise/meal hybrid would need).
+      if (!advice && built) {
+        advice = adviseMealEdit(
+          kindOverride ?? result.proposal.kind,
+          built.payload,
+          typeof result.proposal.rawArgs?.food === 'string' ? result.proposal.rawArgs.food : undefined,
+        )
+      }
+
       if (advice) {
         const guards = { alreadyAsked: readAskedKeys(), sessionRunning: activeSession.status === 'running' }
         if (shouldAsk(advice.verdict, advice.key, advice.scope, guards)) {
