@@ -116,6 +116,12 @@ console.log('\n2. Sets per muscle are counted the way a person counts them')
   // warns about — the map could be present and unreached and it would pass.
   // These build a real one-exercise week from the real catalogue entry and
   // assert the two spellings land on the SAME key.
+  //
+  // THE MAP ITSELF IS exercise-db's, since 14 Sep 2026. edit-tradeoff.ts
+  // briefly shipped its own copy, which would have meant the chest:back
+  // sentence on a card and the per-muscle sentence beside it counting
+  // different chests. These checks are unchanged by that fix, which is the
+  // point of them being behavioural.
   const oneExerciseWeek = (name: string): MesocycleWeek => ({
     week_number: 1, label: 'probe',
     days: [{ day: 'Monday', focus: 'probe', exercises: [{ name, sets: 3 }] }],

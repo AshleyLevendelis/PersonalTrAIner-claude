@@ -1,5 +1,5 @@
 import type { MesocycleWeek, UserProfile, WorkoutDay, FitnessGoal } from './types'
-import { EXERCISE_DATABASE, type ExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
 import { scorePlan, ONE_RULE, DIMENSION_KEYS, type DimensionKey } from './quality-score'
 
 // ---------------------------------------------------------------------------
@@ -81,36 +81,26 @@ export interface Tradeoff {
 export const DO_IT_ANYWAY = 'Do it anyway'
 
 // ---------------------------------------------------------------------------
-// MUSCLE GROUPS — the words a person uses, not the catalogue's anatomy.
+// MUSCLE GROUPS — exercise-db's, NOT a second copy.
 //
-// `primary_muscles` is written for accuracy and says 'quadriceps' in one entry
-// and 'quads' in another, 'biceps' and 'biceps brachii', 'anterior deltoid'
-// and 'shoulders'. Summing those raw would report two different muscles that
-// are one muscle. This maps them onto the ten groups people actually name.
-// Anything unmapped is ignored rather than guessed at: 'cardiovascular system'
-// is not a muscle group someone counts sets for.
+// The first version of this file defined its own name->group map, and it was
+// wrong to: `muscleGroupsOf` has existed in exercise-db.ts all along, is what
+// `weekMuscleBalance` counts with, and already handles the catalogue spelling
+// one muscle two ways ('quadriceps' and 'quads', 'biceps brachii' and
+// 'biceps'). Two maps would have meant the chest:back balance sentence on a
+// card and the per-muscle sentence beside it counting different chests.
+//
+// Found by a probe crashing inside exercise-add-candidates.ts, which uses the
+// same pair for the same purpose. Worth recording, because this file's own
+// header argues against a second implementation of the SCORER three screens
+// further up, and then shipped one of the muscle map.
 // ---------------------------------------------------------------------------
-export type MuscleGroup = 'chest' | 'back' | 'shoulders' | 'biceps' | 'triceps' | 'quads' | 'hamstrings' | 'glutes' | 'calves' | 'core'
 
-const MUSCLE_GROUP: Record<string, MuscleGroup> = {
-  'chest': 'chest', 'upper chest': 'chest', 'lower chest': 'chest', 'pectorals': 'chest',
-  'lats': 'back', 'rhomboids': 'back', 'mid traps': 'back', 'traps': 'back', 'teres major': 'back',
-  'upper back': 'back', 'erectors': 'back', 'spinal erectors': 'back', 'lower back': 'back',
-  'anterior deltoid': 'shoulders', 'lateral deltoid': 'shoulders', 'rear deltoid': 'shoulders',
-  'posterior deltoid': 'shoulders', 'shoulders': 'shoulders', 'deltoids': 'shoulders', 'rotator cuff': 'shoulders',
-  'biceps': 'biceps', 'biceps brachii': 'biceps', 'brachialis': 'biceps', 'forearms': 'biceps',
-  'triceps': 'triceps',
-  'quadriceps': 'quads', 'quads': 'quads',
-  'hamstrings': 'hamstrings',
-  'glutes': 'glutes', 'glute medius': 'glutes', 'hip flexors': 'glutes', 'adductors': 'glutes', 'abductors': 'glutes',
-  'calves': 'calves', 'soleus': 'calves',
-  'core': 'core', 'obliques': 'core', 'transverse abdominis': 'core', 'abs': 'core', 'rectus abdominis': 'core',
-}
-
-/** How a group is named mid-sentence. */
+/** How a group is named mid-sentence. Only the naming is local; the grouping is not. */
 const GROUP_LABEL: Record<MuscleGroup, string> = {
-  chest: 'chest', back: 'back', shoulders: 'shoulders', biceps: 'biceps', triceps: 'triceps',
-  quads: 'quads', hamstrings: 'hamstrings', glutes: 'glutes', calves: 'calves', core: 'core',
+  chest: 'chest', back: 'back', erectors: 'lower back', shoulders: 'shoulders',
+  biceps: 'biceps', triceps: 'triceps', quads: 'quads', hamstrings: 'hamstrings',
+  glutes: 'glutes', calves: 'calves', core: 'core',
 }
 
 const entryFor = (name: string): ExerciseEntry | undefined =>
@@ -135,12 +125,7 @@ export function weeklySetsByMuscle(week: MesocycleWeek | undefined): Partial<Rec
       if (ex.tier === 'tier_0_primer') continue
       const entry = entryFor(ex.name)
       if (!entry) continue
-      const groups = new Set<MuscleGroup>()
-      for (const m of entry.primary_muscles) {
-        const g = MUSCLE_GROUP[m.trim().toLowerCase()]
-        if (g) groups.add(g)
-      }
-      for (const g of groups) out[g] = (out[g] ?? 0) + (ex.sets ?? 0)
+      for (const g of muscleGroupsOf(entry)) out[g] = (out[g] ?? 0) + (ex.sets ?? 0)
     }
   }
   return out

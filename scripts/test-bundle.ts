@@ -231,7 +231,31 @@ console.log('\n3. Nothing has crept back up')
   // total went up by the two extra chunk headers. The number people feel got
   // better; the number that counts everything got bigger. Both are true and
   // the budgets now say so.
-  const TOTAL_BUDGET_KB = 1835
+  // 1,835 -> 1,870, 14 Sep 2026, for the trade-off engine — a change that
+  // works against someone's goal is now asked about rather than silently
+  // allowed, and pricing it needs the plan scorer in the browser for the first
+  // time.
+  //
+  // THE APP CHUNK DID NOT MOVE: 909 kB, same as before, because all of it
+  // lands in the deferred ChatAssistant chunk (151 -> 171 kB). First paint is
+  // the number people feel and it is unchanged; this is the number that counts
+  // everything.
+  //
+  // THE 21 kB IS THE SCORER, AND IT WAS MEASURED BEFORE IT WAS ACCEPTED rather
+  // than waved through as "new capability". Stubbing quality-score out put the
+  // total at 1,828 — under the old budget — so the question was whether the
+  // scorer earns its weight at card-build time. Probed across 581 real edits
+  // (remove / add / volume / shorten) on twelve goal-and-experience profiles:
+  //
+  //   the score is the ONLY signal    109  (19%)
+  //   both it and weekly muscle sets   98
+  //   weekly muscle sets only         133
+  //
+  // Dropping it would make the app go quiet on nearly a fifth of the edits
+  // that genuinely cost something — an added exercise that breaks the set
+  // hierarchy, a removed primer, a week that stops building on the last. That
+  // is not a rounding error, so the budget moves and the reason is here.
+  const TOTAL_BUDGET_KB = 1870
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
 
