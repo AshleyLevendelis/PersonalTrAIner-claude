@@ -83,3 +83,21 @@ export function daysAhead(n) {
 export function anchorNowMs() {
   return anchorDate().getTime()
 }
+
+/**
+ * The occurrence of a weekday NEAREST the anchor — e.g. `'Monday'` from a
+ * Wednesday anchor is the Monday two days before, not the one five days after.
+ *
+ * Why "nearest" rather than "the Monday of the anchor's week": a driver that
+ * pins today to this date is standing a day or two either side of the anchor,
+ * so the fixture's seeded history (logged sessions a few days back, a moved
+ * session a few days on) still reads the way it was seeded. Ties go to the
+ * earlier date, so the answer never depends on which way you happened to look.
+ */
+export function nearestAnchorDate(dayName) {
+  const target = DAY_NAMES.indexOf(dayName)
+  if (target < 0) throw new Error(`nearestAnchorDate: not a weekday name — ${dayName}`)
+  const forward = (target - anchorDate().getDay() + 7) % 7
+  const offset = forward <= 3 ? forward : forward - 7
+  return iso(daysAhead(offset))
+}

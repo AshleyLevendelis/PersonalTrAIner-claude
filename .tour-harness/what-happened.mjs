@@ -54,7 +54,12 @@ const NAMES = DAY_NAMES
 const pinned = anchorDate()
 const TODAY = ANCHOR_ISO; const TODAY_NAME = NAMES[pinned.getDay()]
 console.log('pinning today to', TODAY, `(${TODAY_NAME})`)
-const pin = async date => (await send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('fitplan_dev_clock_00000000-0000-4000-8000-000000000001', JSON.stringify({date:'${date}',enabled:true})) } catch {}` })).result.identifier
+// NO PIN HERE ANY MORE, 14 Sep 2026. This wrote the dev-clock key itself before
+// navigation — and real.tsx writes the same key at module scope, so the page's
+// value always won. It happened to be the SAME value (the anchor), so nothing
+// broke; three other drivers pinned a DIFFERENT day and lost silently. One
+// owner for the clock now: the page. A driver that needs a different day passes
+// `?today=`, from a date the page published. test:harness-clock §5 pins that.
 
 // Real pointer events at the element's centre — Radix menus open on pointerdown, not on .click().
 const rectOf = sel => ev(`(() => { const n = document.querySelector(${JSON.stringify(sel)}); if (!n) return null; n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 } })()`)
@@ -76,7 +81,6 @@ const untilClosed = async () => { for (let i = 0; i < 16 && await has('[data-tes
 const untilCell = async (day, re) => { let c = await cell(day); for (let i = 0; i < 16 && !re.test(c || ''); i++) { await wait(300); c = await cell(day) } return c }
 
 console.log('\nWHAT HAPPENED TO TODAY’S SESSION — on the screen\n')
-await pin(TODAY)
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
 await wait(4000)
 check(`0. today (${TODAY_NAME}) is a due training day`, new RegExp(`^${TODAY_NAME}: due$`).test(await cell(TODAY_NAME) || ''), await cell(TODAY_NAME))

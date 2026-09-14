@@ -59,7 +59,8 @@ import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { setDevClockOverride } from '@/lib/dev-clock'
-import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf } from './anchor.mjs'
+import { formatRampSets } from '@/lib/session-derive'
+import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
@@ -70,7 +71,26 @@ const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001'
 // one driver under two timezones a day apart and getting 0 failures in one and
 // 2 in the other, on identical code. Doing it HERE rather than in each driver
 // means all 37 inherit it and none can forget.
-setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
+//
+// ?today=YYYY-MM-DD — THE ONE SANCTIONED WAY A DRIVER MOVES "TODAY", added
+// 14 Sep 2026. Some screens only exist on a day that holds a particular kind
+// of session: the warm-up ramp renders on TODAY'S card and only a loaded main
+// lift has one, so a driver checking the ramp has to stand on such a day. It
+// used to do that by writing the dev-clock key itself before navigation — which
+// this file then silently overwrote the moment it ran, leaving three drivers
+// pinning a day the app never adopted.
+//
+// The value a driver passes comes from `nearestAnchorDate` off a day this file
+// PUBLISHED (see __rampTarget below), so it is still derived from the anchor and
+// never from the machine's calendar — test:harness-clock §4 pins that.
+//
+// NOTE WHAT THIS DOES NOT MOVE: the plan's shape. `todayIdx` below stays on the
+// anchor, so which weekdays train and what is on them is identical in every run.
+// The parameter changes which of those days you are standing on, nothing else —
+// otherwise pinning a day would reshape the week and move the day you were
+// aiming at.
+const TODAY_ISO = new URLSearchParams(location.search).get('today') ?? ANCHOR_ISO
+setDevClockOverride(PROFILE_ID, TODAY_ISO)
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // TODAY MUST BE A TRAINING DAY or the tour legitimately drops its set stop
@@ -161,6 +181,77 @@ const mesocycle = tilt !== 'lopsided' ? generated : generated.map(w => ({
     : { ...d, exercises: d.exercises.map(e => ({ ...e, sets: e.sets * 3 })) }),
 }))
 const exercisePlan = mesocycle[0].days
+
+// The date on which a given weekday falls inside PLAN WEEK 1 — the seven days
+// from the plan's creation. getActiveMesocycleWeek floors elapsed days over 7,
+// and getAppNow reads noon, so created_at's own date through +6 is week 1.
+function planWeekOneDate(dayName: string): string {
+  const start = new Date(profile.created_at as string)
+  const startMidnight = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startMidnight)
+    d.setDate(d.getDate() + i)
+    if (DAYS[d.getDay()] === dayName) return isoOf(d)
+  }
+  throw new Error(`planWeekOneDate: no ${dayName} in plan week 1`)
+}
+
+// WHICH DAY ACTUALLY HOLDS A RAMPED MAIN LIFT — read off the plan, published
+// for the drivers, 14 Sep 2026.
+//
+// WHY. `ramp-ticks` and `calibration-search` each said, in a comment,
+// "PIN TODAY TO A MONDAY … the bench press on Monday does" and then hunted for
+// the literal string "Barbell Bench Press". That held only while the drivers'
+// Monday and this file's training days were both derived from the same real
+// weekday. Fixing the clock moved this file to the anchor and left the drivers
+// computing a Monday, so they pinned a day the bench press had left — three
+// drivers red for a reason that was never about the app.
+//
+// `formatRampSets` is the SCREEN'S OWN predicate (session-derive.ts:98) — the
+// one ExerciseRow calls to decide whether to render the strip at all. Using it
+// here means a driver cannot disagree with the screen about what "has a ramp"
+// means; a day published here is a day the strip really renders on, or both
+// are wrong together and the check fails honestly.
+const rampTarget = (() => {
+  const withRamp = exercisePlan
+    .map(day => ({
+      day: day.day,
+      // kind === 'kg', not merely "has a ramp": both drivers read real weights
+      // off the strip and the log grid beside it, so a bodyweight ramp would
+      // satisfy the predicate and fail the checks. Named rather than assumed —
+      // it does mean a bodyweight ramp is not covered by these two drivers.
+      exercise: day.exercises.find(e => formatRampSets(e)?.kind === 'kg')?.name,
+      // A LOADLESS ROW ON THE SAME DAY. calibration-search §12-14 needs one to
+      // prove the search's "type it" default does not leak onto a lift nobody
+      // loads; it used to name "Scapular Push-Ups", the same mechanism-pin.
+      bodyweight: day.exercises.find(e => e.suggested_load_kg == null)?.name ?? null,
+    }))
+    .filter((d): d is { day: string; exercise: string; bodyweight: string | null } => !!d.exercise)
+    // TWO DATES FOR THE SAME DAY, because two drivers want different weeks of
+    // the same session. `date` is the occurrence nearest the anchor — what a
+    // driver wants when it only cares that the day trains. `calibrationDate` is
+    // the occurrence inside PLAN WEEK 1, which is the calibration week: the
+    // probe line, the START HERE label and the next-weight chips exist only
+    // there, and the fixture's plan is nine days old, so the anchor sits in
+    // week 2 and the nearest occurrence would show none of them.
+    //
+    // This is the second half of the same bug. verify:calibration-search used
+    // to pin "the Monday of the current week", which landed in week 1 or week 2
+    // depending on which weekday the machine woke up on — so it too was green
+    // or red by calendar rather than by code.
+    .map(d => ({ ...d, date: nearestAnchorDate(d.day), calibrationDate: planWeekOneDate(d.day) }))
+  if (withRamp.length === 0) return null
+  // Nearest the anchor, ties to the earlier day — so the pin stays within a
+  // couple of days of the seeded history and does not depend on plan order.
+  const anchorMs = anchorDate().getTime()
+  return withRamp.reduce((best, d) => {
+    const dist = (x: { date: string }) => Math.abs(new Date(`${x.date}T12:00:00`).getTime() - anchorMs)
+    if (dist(d) < dist(best)) return d
+    if (dist(d) > dist(best)) return best
+    return d.date < best.date ? d : best
+  })
+})()
+;(window as unknown as { __rampTarget: unknown }).__rampTarget = rampTarget
 const macros: MacroTargets | null = computeTargets(profile)
 
 const today = isoOf(anchorDate())

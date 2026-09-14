@@ -86,12 +86,59 @@ for (const f of files) {
 
 console.log('\n4. The pages pin the app clock, so no driver has to remember\n')
 // The property that makes every driver inherit a fixed today: each harness page
-// writes the app's own dev-clock override before it renders.
+// writes the app's own dev-clock override before it renders, from a value that
+// comes from the anchor.
+//
+// NOT `setDevClockOverride(PROFILE_ID, ANCHOR_ISO)` VERBATIM, which is what this
+// asked for until 14 Sep 2026 — real.tsx now pins `TODAY_ISO`, which is the
+// anchor unless a driver passed `?today=`. The literal spelling was the
+// mechanism; "the value traces back to the anchor" is the property, and §2
+// already guarantees no file can read a real calendar to get one.
 for (const page of ['real.tsx', 'chat.tsx', 'profile.tsx']) {
   const src = bare(readFileSync(join(DIR, page), 'utf-8'))
-  check(`${page} pins the dev clock to the anchor`,
-    /setDevClockOverride\(\s*PROFILE_ID\s*,\s*ANCHOR_ISO\s*\)/.test(src),
-    src.match(/setDevClockOverride\([^)]*\)/)?.[0])
+  const call = src.match(/setDevClockOverride\(\s*PROFILE_ID\s*,\s*([A-Za-z_$][\w$]*)\s*\)/)
+  const arg = call?.[1]
+  const tracesToAnchor = arg === 'ANCHOR_ISO'
+    || (!!arg && new RegExp(`const ${arg}\\b[^\n]*ANCHOR_ISO`).test(src))
+  check(`${page} pins the dev clock to a date that comes from the anchor`, tracesToAnchor,
+    { arg, call: src.match(/setDevClockOverride\([^)]*\)/)?.[0] })
+}
+
+console.log('\n5. One owner for "today", and a day is found rather than named\n')
+// WHY THIS SECTION EXISTS, measured 14 Sep 2026. Three drivers checked the
+// warm-up ramp. Each needed to stand on a day whose session HAS a ramp, and
+// each got there by writing the dev-clock key itself before navigation and
+// naming a weekday — "the anchor's Monday" — then hunting for the literal
+// "Barbell Bench Press". Two things were wrong with that and both are pinned
+// below: the page overwrites that key when it loads, so the pin never took;
+// and a weekday name is the mechanism, not the property. The property is "a day
+// whose session holds a ramped, loaded main lift", and only the plan knows
+// which day that is.
+const drivers = files.filter(f => f.endsWith('.mjs'))
+
+const realSrc = bare(readFileSync(join(DIR, 'real.tsx'), 'utf-8'))
+check('real.tsx publishes a ramp target for the drivers to read',
+  /__rampTarget/.test(realSrc))
+check('...computed with formatRampSets — the screen\u2019s own predicate, so the two cannot disagree',
+  /formatRampSets\(/.test(realSrc) && /import \{[^}]*formatRampSets/.test(realSrc))
+check('...naming a date for the calibration week as well as the nearest one',
+  /calibrationDate/.test(realSrc) && /nearestAnchorDate\(/.test(realSrc))
+
+for (const f of drivers) {
+  const src = bare(readFileSync(join(DIR, f), 'utf-8'))
+  // 5a. THE PAGE OWNS THE CLOCK. A driver that writes the key itself is
+  // overwritten by real.tsx at module scope and never learns.
+  check(`${f}: does not write the dev-clock key itself`, !/fitplan_dev_clock_/.test(src),
+    src.match(/.{0,60}fitplan_dev_clock_.{0,40}/)?.[0])
+  // 5b. `?today=` is the seam, and its value is read off the page, never typed.
+  const pins = src.match(/today=\$?\{?[^&`'"\s]*/g) ?? []
+  for (const pin of pins) {
+    check(`${f}: the day it stands on is interpolated, not a literal date — ${pin}`,
+      pin.startsWith('today=$'), pin)
+  }
+  if (pins.length > 0) {
+    check(`${f}: ...and it reads that day off the page`, /__rampTarget/.test(src))
+  }
 }
 
 console.log(failures === 0

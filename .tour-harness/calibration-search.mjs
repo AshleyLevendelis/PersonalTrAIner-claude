@@ -11,15 +11,15 @@
 // not, ticking set 1 makes the next-weight chips appear, tapping one fills the
 // box, and a tick on an empty set 3 is refused rather than logging the guess.
 //
-// TODAY IS PINNED TO A MONDAY via the dev clock (the verify:ramp-ticks trick):
-// the harness's real today has no ramped main lift; Monday's bench press does,
-// and the harness plan's week 1 is a calibration week.
+// TODAY IS PINNED TO A DAY THAT HOLDS A RAMPED, LOADED MAIN LIFT (the
+// verify:ramp-ticks trick): the anchor's own today has none, and the harness
+// plan's week 1 is a calibration week. WHICH day, and which lift, the page
+// tells us — see below. Nothing here names a weekday or an exercise.
 // ---------------------------------------------------------------------------
 import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
-import { ANCHOR_ISO, anchorDate, DAY_NAMES, iso as anchorIso } from './anchor.mjs'
 const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => { const p = q.url.split('?')[0]; const f = join(DIST, p === '/' ? '/.tour-harness/real.html' : p); if (!existsSync(f)) { r.writeHead(404); r.end('nf'); return } r.writeHead(200, { 'Content-Type': T[extname(f)] ?? 'application/octet-stream' }); r.end(readFileSync(f)) })
@@ -35,28 +35,40 @@ const ev = async x => (await send('Runtime.evaluate', { expression: x, returnByV
 const shoot = async name => { const s = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(new URL(`./${name}.png`, import.meta.url).pathname, Buffer.from(s.result.data, 'base64')) }
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
-// THE ANCHOR'S Monday, not this machine's — see .tour-harness/anchor.mjs.
-const monday = (() => { const d = anchorDate(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return anchorIso(d) })()
-console.log('pinning today to', monday)
-await send('Page.addScriptToEvaluateOnNewDocument', { source: `
-  try { localStorage.setItem('fitplan_dev_clock_00000000-0000-4000-8000-000000000001', JSON.stringify({date:'${monday}',enabled:true})) } catch {}
-` })
+// ASK THE PAGE WHICH DAY, DON'T ASSERT IT. This used to pin "the anchor's
+// Monday" and grep for "Barbell Bench Press" — the mechanism, not the property.
+// The property is "a day whose session holds a ramped, loaded main lift", and
+// real.tsx computes it with formatRampSets, the screen's OWN predicate.
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
-await wait(4000)
-// Expand the main lift: the ramp, the number and the grid all live in its expanded body.
-await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&/Barbell Bench Press/.test(x.textContent.trim()));
- if(!n) return false; let p=n; for(let i=0;i<6&&p.parentElement;i++){p=p.parentElement; if(p.tagName==='BUTTON'||p.getAttribute('role')==='button'){p.click();return true}} return false})()`)
-await wait(1500)
+await wait(3000)
+const target = await ev(`window.__rampTarget`)
 
 let failures = 0
 const check = (name, ok, detail) => {
   if (ok) console.log(`    \u2713 ${name}`)
   else { failures++; console.error(`    \u2717 ${name}${detail !== undefined ? ` \u2014 ${JSON.stringify(detail).slice(0, 400)}` : ''}`) }
 }
+// A missing target means the fixture plan has no ramped loaded lift on any day,
+// or that day has no loadless row. Either is a finding, not a reason to skip.
+check('0a. the fixture plan holds a ramped, loaded main lift somewhere', !!target && !!target.date && !!target.exercise, target)
+check('0b. ...on a day that also holds a loadless row', !!target && !!target.bodyweight, target)
+if (!target || !target.bodyweight) { console.error('\nNo usable calibration day in the fixture plan.\n'); ws.close(); chrome.kill(); server.close(); process.exit(1) }
+// calibrationDate, NOT date: this driver is about the calibration week, which
+// is plan week 1. The nearest occurrence of that weekday is in week 2, where
+// the probe line and the chips correctly do not exist.
+console.log(`pinning today to ${target.day} ${target.calibrationDate}; main lift ${target.exercise}, loadless row ${target.bodyweight}`)
+const MAIN = JSON.stringify(target.exercise)
+const BW = JSON.stringify(target.bodyweight)
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&today=${target.calibrationDate}#/tab/exercise` })
+await wait(4000)
+// Expand the main lift: the ramp, the number and the grid all live in its expanded body.
+await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${MAIN});
+ if(!n) return false; let p=n; for(let i=0;i<6&&p.parentElement;i++){p=p.parentElement; if(p.tagName==='BUTTON'||p.getAttribute('role')==='button'){p.click();return true}} return false})()`)
+await wait(1500)
 
-// The smallest ancestor of the bench-press label that also holds the weight inputs: the expanded row.
+// The smallest ancestor of the main lift's label that also holds the weight inputs: the expanded row.
 const SECTION = `(() => {
-  const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&/Barbell Bench Press/.test(x.textContent.trim()))
+  const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${MAIN})
   if(!n) return null; let p=n
   for(let i=0;i<12&&p.parentElement;i++){ p=p.parentElement; if(p.querySelector('input[id^="setgrid-weight-"]')) return p }
   return null
@@ -73,7 +85,7 @@ const scrollTo = re => ev(`(() => { const sec = ${SECTION}; if (!sec) return fal
   const n = [...sec.querySelectorAll('*')].find(x => x.children.length === 0 && ${re}.test(x.textContent.trim())); (n || sec).scrollIntoView({ block: 'center' }); return true })()`)
 
 console.log('\nCALIBRATION WEEK, ON THE SCREEN\n')
-check('0. the expanded bench-press row with its log grid is on screen', (await ev(`!!(${SECTION})`)) === true)
+check('0. the expanded main-lift row with its log grid is on screen', (await ev(`!!(${SECTION})`)) === true)
 const rampTop = await ev(leafTop('/Ramp up first/i'))
 const numberTop = await ev(`(() => { const sec = ${SECTION}; const n = sec && sec.querySelector('.ds-num-lg'); return n ? Math.round(n.getBoundingClientRect().top) : null })()`)
 check('1. the ramp block is drawn ABOVE the start number', rampTop != null && numberTop != null && rampTop < numberTop, { rampTop, numberTop })
@@ -112,11 +124,12 @@ check('11c. ...and nothing was logged for it', (await savedState(3)) === 'Save s
 await scrollTo('/set 1 was the probe/i'); await wait(400); await shoot('calibration-search-refused')
 
 // A BODYWEIGHT ROW IN THE SAME SESSION IS NOT PART OF THE SEARCH. Found by
-// reading the first screenshot on 10 Sep 2026, not by a check: Scapular
-// Push-Ups sat above the bench press with "type it" in its weight column, and
-// a tick there would have been refused for want of a weight nobody lifts.
+// reading the first screenshot on 10 Sep 2026, not by a check: a loadless row
+// sat above the main lift with "type it" in its weight column, and a tick there
+// would have been refused for want of a weight nobody lifts. WHICH row is now
+// read off the page too — it used to name "Scapular Push-Ups".
 const BW_SECTION = `(() => {
-  const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&/Scapular Push-Ups/.test(x.textContent.trim()))
+  const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${BW})
   if(!n) return null; let p=n
   for(let i=0;i<12&&p.parentElement;i++){ p=p.parentElement; if(p.querySelector('input[id^="setgrid-weight-"]')) return p }
   return null

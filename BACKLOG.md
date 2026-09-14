@@ -2,6 +2,85 @@
 
 Newest first. One line each.
 
+- [x] **THE WARM-UP RAMP WAS ON SCREEN ALL ALONG. THREE CHECKS WERE LOOKING AT
+  THE WRONG DAY.** Ashley chose this from four options: three of the five
+  reliably-red browser drivers failed on one symptom — no ramp strip on the
+  exercise card — and that was 29 of 35 failing checks. Warm-ups are
+  safety-adjacent, so it got an investigation before a build.
+  **THE APP IS FINE, AND THAT IS NOW PROVEN BY LOOKING.** A screenshot read,
+  not a tick: the strip renders above the working weight, reading
+  "RAMP UP FIRST: 20kg×10 · 25kg×5 · 32.5kg×3 · 40kg×2 → then set 1", each step
+  bordered, circled and tappable before it is tapped; two ticked steps come
+  back struck through with checks, and every working-set counter still reads
+  "0 logged", so a warm-up tick still logs nothing.
+  **THREE CAUSES, ALL IN THE CHECKS, AND ONE OF THEM MINE.**
+  (1) `ramp-ticks` and `calibration-search` each wrote the app's dev-clock key
+  themselves before navigating, to stand on a day with a ramped lift. The
+  harness page writes that same key when it loads. The page won, every time, so
+  those pins had quietly stopped working the moment the clock fix landed that
+  morning — my change, reported the same evening as "five real defects".
+  (2) All three named a weekday ("the anchor's Monday") and a lift ("Barbell
+  Bench Press"). Which weekday holds which lift is generated, not fixed.
+  (3) `six-from-her-phone` searched for a heading reading "RAMP:". It reads
+  "Ramp up first:" and has since 10 Sep, deliberately — the strip's own comment
+  says "the order is the instruction". Four checks went red against a strip
+  that was on screen. `calibration-search` had a fourth: it needs the
+  calibration week, which is plan week 1, and the fixture's plan is nine days
+  old, so the nearest matching day is in week 2 where the probe line correctly
+  does not exist.
+  **THE FIX IS PROPERTY-OVER-MECHANISM APPLIED TO DRIVERS.** The page now
+  computes which day holds a ramped, loaded main lift using `formatRampSets` —
+  the predicate the screen itself calls to decide whether to draw the strip, so
+  a driver and the screen cannot disagree — and publishes that day, that lift, a
+  loadless row beside it, and two dates: the occurrence nearest the anchor, and
+  the one inside plan week 1. A driver reads it and passes `?today=`, the one
+  sanctioned seam, which the page honours. Nothing names a weekday or an
+  exercise. The ramp reader is anchored on a step being a labelled, pressable
+  control rather than on the heading above it.
+  **ONE OWNER FOR "TODAY".** No driver writes the dev-clock key any more —
+  `what-happened` still did, harmlessly, pinning the same value the page did.
+  **`test:harness-clock` §5 KEEPS IT**, and §4 was re-anchored: it demanded the
+  literal `setDevClockOverride(PROFILE_ID, ANCHOR_ISO)`, which is the mechanism;
+  it now asks that the pinned value traces back to the anchor, which is the
+  property. **Mutations: 9 tried, 9 caught** — 7 on the source check (a page
+  pinning an unrelated date, a page that stops publishing the target, a target
+  computed by exercise name instead of the screen's predicate, a missing
+  calibration-week date, a literal date typed into `today=`, a driver writing
+  the clock key again, a driver inventing the day instead of reading it) and 2
+  on the drivers themselves: deleting the strip turns all three red (6, 2 and
+  10 checks), and making no exercise report a ramp fails them loudly on the new
+  check 0 rather than letting them skip.
+  **VERIFIED:** the four affected drivers run identically under
+  `TZ=Pacific/Kiritimati` (Mon) and `TZ=Etc/GMT+12` (Sun) — checks RUN recorded
+  as well as failed, per the rule added this morning: 8/23/36/36 run, 0 failed,
+  both days. `npx tsc --noEmit` clean. Two screenshots read.
+  **DECIDED WITHOUT ASKING** — mechanical throughout: no app behaviour changed,
+  no user-facing copy, nothing in the safety path. The one judgement worth
+  recording is that the ramp target requires a LOADED ramp (`kind === 'kg'`),
+  because both drivers read real weights off the strip; a bodyweight ramp is
+  therefore still uncovered by these two drivers, and is named here rather than
+  left implied.
+  **NO REGRESSION ELSEWHERE:** twelve other drivers that read the same harness
+  page re-run clean — `moved-session`, `session-move`, `coach-week-move`,
+  `program-move`, `single-implement`, `swapped-day`, `shorten-today`,
+  `session-edit`, `walk`, `tap-targets` (83), and `what-happened` (36), which
+  lost its now-redundant pin.
+  **AND TWO MORE RED ONES, FOUND BY RUNNING A WIDER SET THAN THIS MORNING'S.**
+  `rest-day-race` (1: the coach's opener names a different session from Home)
+  and `exercise-add` (1: an added exercise lands at the end of the list). Both
+  fail IDENTICALLY on stashed code — checked, not assumed — so neither is mine;
+  they were simply not among the eleven drivers re-measured this morning, which
+  means "five reliably red" was five OF ELEVEN, not five of thirty-seven.
+  **STILL RED after this:** `verify:tour` (4), `verify:swap-request` (2),
+  `verify:rest-day-race` (1), `verify:exercise-add` (1).
+  **A COUNTING SLIP WORTH KEEPING**, because it is the shape CLAUDE.md warns
+  about: my tally counted lines containing ✓ or ✗, and `tap-targets` prints
+  "ok:"/"FAIL:". It reported "ran=0, failed=0" — a run that looks like a pass
+  and proves nothing. Read directly, it was 83 checks green. The rule already
+  says compare checks RUN as well as failed; the lesson today is that the
+  counter itself has to match how the driver speaks.
+  **Deploys:** none — harness and checks only, no app code touched.
+
 - [x] **THE BROWSER CHECKS DEPENDED ON WHAT DAY IT WAS. NOW THEY DON'T.**
   Ashley asked what was next. Re-measuring last night's "eight red drivers"
   before proposing anything found only five red — `ramp-ticks`,
@@ -34,6 +113,16 @@ Newest first. One line each.
   `six` (4), and **`ramp-ticks` (6), which was GREEN this morning** — green by
   luck. Five real defects, now reproducible on any day, which is the state they
   needed to be in before anyone diagnoses them.
+  **CORRECTED LATER THE SAME DAY, having actually read the three ramp drivers.**
+  "Five real defects" was wrong about three of them, and "green by luck" was
+  half right for the wrong reason. `ramp-ticks` and `calibration-search` were
+  genuinely day-dependent before this fix — each pinned "the Monday of the
+  current week" and hunted for a named lift on it — so the morning's green was
+  indeed luck. But the 6 and 19 failures counted THAT EVENING were not the old
+  defect: this very fix caused them. Each driver wrote the dev-clock key itself
+  before navigating, and `real.tsx` now writes the same key at module scope, so
+  the page's value won every time and the drivers' pins stopped taking effect
+  at all. Nothing was wrong with the app. See the entry above this one.
   **`test:harness-clock` KEEPS IT.** No harness file may read the calendar;
   `Date.now()` is allowed ONLY as a stopwatch (elapsed ms in a poll budget),
   because a blanket ban would be wrong and would get worked around. Comments
@@ -201,6 +290,12 @@ Newest first. One line each.
   on screen at all. That cluster is one lead, not three. **Named here as a gap
   rather than fixed**, because it is a separate piece of work and merging does
   not make it worse.
+  **CORRECTED 14 Sep 2026 (later).** "A ramp block that is not on screen at
+  all" was read off three failing checks, not off a screen. The block was on
+  screen the whole time. Two of the three had lost the day they were standing
+  on; the third was looking for a heading that had been reworded. And it was
+  not one lead: the third driver's cause is unrelated to the other two's. See
+  the ramp entry at the top.
   **THE NINTH WAS MINE, AND IT IS THE INSTRUCTIVE ONE.** `verify:what-happened`
   §2 asserted the day menu offers EXACTLY four ways out of today. Adding
   "shorten" and "lighter" on 13 Sep — Ashley's own ruling that day — made it
