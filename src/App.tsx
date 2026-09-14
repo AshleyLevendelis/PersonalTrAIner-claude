@@ -11,7 +11,6 @@ import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
 import { ToolsTab } from '@/components/ToolsTab'
-import { ChatAssistant } from '@/components/ChatAssistant'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
@@ -71,6 +70,26 @@ const ConversationalOnboarding = lazy(() =>
   import('@/components/onboarding/ConversationalOnboarding').then(m => ({ default: m.ConversationalOnboarding })))
 const DevTestPage = lazy(() =>
   import('@/components/DevTestPage').then(m => ({ default: m.DevTestPage })))
+
+// THE COACH, OFF THE CRITICAL PATH — Ashley's ruling, 14 Sep 2026, from three
+// options. The app's first download was 292 kB gzipped against a 292 kB budget:
+// grown into its ceiling, so the next feature tipped it over. Measured by
+// splitting each large module into its own chunk and reading the real build,
+// the coach chat was 85 kB of that 292 — nearly a third, and the only large
+// piece that comes out cleanly.
+//
+// IT IS STILL FORCE-MOUNTED, which is the whole point of it being here: the
+// coach speaks first, and the dot on the chat button comes from state this
+// component owns. So this changes WHEN the code arrives, not whether the coach
+// is live. React renders the chat tab immediately, the import starts
+// immediately, and it mounts a beat later — off the bundle the browser has to
+// parse before it can paint anything.
+//
+// HER RULING NAMED THE COST and it is stated rather than buried: the opener and
+// the dot land a fraction of a second later than they used to, and a tap on the
+// chat inside that first instant sees the app's own loading spinner briefly.
+const ChatAssistant = lazy(() =>
+  import('@/components/ChatAssistant').then(m => ({ default: m.ChatAssistant })))
 
 /** The one loading state this app has, reused so a lazy chunk never introduces a second. */
 function ScreenLoading() {
@@ -2679,6 +2698,10 @@ function App() {
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
+            {/* The fallback is the app's one loading state, and on an inactive
+                tab it is hidden anyway — so the only person who ever sees it is
+                someone who opens the chat in the first instant after launch. */}
+            <Suspense fallback={<ScreenLoading />}>
             <ChatAssistant
               profile={profile}
               macros={macros}
@@ -2719,6 +2742,7 @@ function App() {
               onAttentionChange={setChatAttention}
               chatVisible={activeTab === 'chat'}
             />
+            </Suspense>
           </TabsContent>
         </Tabs>
       </main>

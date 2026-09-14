@@ -21,7 +21,7 @@
 // If App.tsx's wrapper changes, this diverges silently. `test:chat-shell`
 // is what holds the two together.
 // ---------------------------------------------------------------------------
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useState, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { setSupabaseClient } from '@/lib/supabase'
@@ -31,7 +31,6 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import type { UserProfile, MacroTargets } from '@/lib/types'
 
-import { ChatAssistant } from '@/components/ChatAssistant'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
@@ -42,6 +41,19 @@ import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import '@/index.css'
 
 window.addEventListener('error', e => { (window as never as Record<string, unknown>).__err = String(e.message) })
+
+// LAZY, EXACTLY AS App.tsx LOADS IT — 14 Sep 2026. This file's whole premise
+// is "the real ChatAssistant, in the real container App.tsx puts it in", and
+// App.tsx now loads the coach as a separate chunk behind a Suspense boundary so
+// it is off the first-paint path (Ashley's ruling; the first download was at
+// its ceiling and the coach was the largest separable piece).
+//
+// Mirroring it here is not decoration: no harness page mounts App.tsx, so
+// without this the lazy boundary would ship with NO browser coverage at all.
+// With it, every chat driver — the opener, the shell, the swap, the race —
+// exercises the coach arriving late, which is the only thing that could break.
+const ChatAssistant = lazy(() =>
+  import('@/components/ChatAssistant').then(m => ({ default: m.ChatAssistant })))
 
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001'
 
@@ -252,6 +264,7 @@ function Harness() {
       <div className="min-h-screen bg-background">
         <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
           <div className="space-y-6">
+            <Suspense fallback={<div>Loading the coach…</div>}>
             <ChatAssistant
               profile={profile}
               macros={macros}
@@ -276,6 +289,7 @@ function Harness() {
               onAttentionChange={setChatAttention}
               chatVisible={!SEED_NUDGE}
             />
+            </Suspense>
           </div>
         </main>
         <BottomTabBar activeTab={SEED_NUDGE ? 'dashboard' : 'chat'} onTabChange={noop} chatAttention={chatAttention && SEED_NUDGE} />

@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAME OFF THE PATH TO FIRST PAINT.** Ashley chose this over
+  three other pieces of work, then chose how, from three options.
+  **A CORRECTION FIRST, because it changes what the finding meant.** I told her
+  `test:bundle` was failing on a stale 444 kB expectation. It was not. The check
+  measured 292 kB gzipped against a 292 kB ceiling — the app had grown INTO its
+  budget, so the next feature would tip it over. I read the sentence "not 444"
+  in the check's own label and reported the comparison backwards without reading
+  the line under it. A stale expectation and a real breach call for opposite
+  actions, which is why this is corrected rather than quietly fixed.
+  **MEASURED, NOT GUESSED, AND THE FIRST MEASUREMENT WAS WRONG TOO.** Splitting
+  each large module into its own chunk said the coach chat was 85 kB of the 292.
+  That over-counted: an isolated chunk carries shared code that would otherwise
+  sit in the app chunk once. The real extraction is **44 kB**, and the number a
+  phone feels is the whole first-paint set, which went **483 -> 403 kB gzipped,
+  a 17% cut** — not the ~30% I quoted Ashley when putting the options. The extra
+  came free: the markdown renderer (36 kB) is used by nothing but the coach, so
+  it left the first load with it.
+  **HER RULING:** take the coach off the first-paint path rather than raise the
+  ceiling a second time, with the cost stated — the opener and the chat-button
+  dot land a fraction later, and a tap on the chat in that first instant sees
+  the app's own spinner. The two rejected options were raising the limit
+  ("that's the second time, and it stops being a budget") and trimming the
+  Profile screen and plan builder instead (smaller, more tangled, more risk).
+  **IT IS STILL FORCE-MOUNTED.** That is the point: the coach speaks first and
+  owns the dot. What changed is when its code arrives, not whether it runs.
+  **THE BROWSER COVERAGE WAS THE HARD PART, and it is why this is not just a
+  build-time change.** No harness page mounts App.tsx, so the lazy boundary
+  would have shipped with NO browser coverage at all. `.tour-harness/chat.tsx`
+  already exists to be "the real ChatAssistant in the real container App.tsx
+  puts it in", so it now mirrors the same lazy + Suspense shape — and the four
+  chat drivers become the proof: `rest-day-race` (18), `coach-speaks-first` (9),
+  `swap-request` (8) and `chat-shell` (8) all green with the coach arriving
+  late, which is the only thing that could have broken.
+  **`test:bundle` §2b IS NEW**, and pins the property rather than the config:
+  the coach is its own chunk, its copy really left the app chunk, that copy is
+  still findable in the chunk that was split out (so a rewording cannot make the
+  check vacuous), the first-paint set read from index.html is under 420 kB, and
+  neither the coach nor the markdown renderer is in it. Budgets moved DOWN:
+  292 -> 256 kB gzipped, 1050 -> 910 kB raw.
+  **Mutations: 2 tried, 2 caught.** The coach reverted to a static import (7
+  checks red, including the old 292 reappearing); the composer's placeholder
+  reworded (the vacuity guard alone, exactly as designed).
+  **NOT VERIFIED, AND NAMED:** the change is in App.tsx, which nothing in this
+  environment can run — the real app needs database credentials a cloud session
+  does not have. What is proven in a browser is the lazy boundary and the coach
+  arriving late, through the harness page that mirrors it. App.tsx's own wiring
+  is proven by construction and by `npx tsc --noEmit`. Worth a look on a real
+  phone after the merge.
+  **Deploys:** frontend on merge. No edge function touched.
+
 - [x] **THE LAST FOUR RED CHECKS: THREE WERE WRONG, ONE FOUND A REAL BUG.**
   Ashley chose "finish the clear-out" over three other pieces of work. All four
   are green; the suite has no known reliably-red driver left.

@@ -72,7 +72,16 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 12 Sep 2026: 280 -> 292 kB gzipped, alongside the two raw budgets
   // below and for the same reason. Same ~8 kB of headroom over the measured
   // 284 that the old number had over its own baseline.
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 292, appGzip)
+  //
+  // MOVED DOWN 14 Sep 2026: 292 -> 256, because the app got SMALLER rather than
+  // because it got bigger. On 14 Sep this check failed at exactly 292 against a
+  // 292 ceiling — the app had grown into its budget, so the next feature tipped
+  // it. I first reported that as "a stale 444 expectation"; it was not, and the
+  // correction matters because the two call for opposite actions.
+  // Ashley's ruling, from three options: take the coach off the first-paint
+  // path rather than raise the ceiling a second time. Measured 248; 256 keeps
+  // the same ~8 kB of headroom this file has always allowed.
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 256, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -97,6 +106,46 @@ console.log('\n2. Two screens no ordinary load needs are not in it')
   check('...while still being present in the chunk that was split out',
     !!devChunk && readFileSync(join(DIST, devChunk.name), 'utf8').includes(devOnlyText),
     'the marker is in neither chunk — it may simply have been deleted, which would make the check above vacuous')
+}
+
+console.log('\n2b. The coach is not on the path to first paint')
+{
+  // ASHLEY'S RULING, 14 Sep 2026, and the reason the budget above could come
+  // down instead of up. The coach chat is the largest separable piece of the
+  // app — 44 kB gzipped of its own, and it drags the markdown renderer (36 kB)
+  // behind it, because nothing else renders markdown. It stays force-mounted,
+  // so the coach still speaks first; what changed is that its code is no longer
+  // in the bundle the browser must parse before it can paint.
+  //
+  // THREE CHECKS, BECAUSE ONE IS NOT ENOUGH. A lazy import reverted to a static
+  // one still leaves a chunk on disk if something else imports it, so "the
+  // chunk exists" alone would stay green through the regression this guards.
+  // What actually matters is the set of files index.html tells the browser to
+  // fetch before first paint — read from the real build, like everything else
+  // here.
+  const chatChunk = find('ChatAssistant')
+  check('the coach is a chunk of its own', chatChunk !== undefined)
+
+  const app = find('index-')
+  const appSrc = app ? readFileSync(join(DIST, app.name), 'utf8') : ''
+  // User-visible text, for the same reason §2 gives: the minifier renames
+  // every symbol it can, so only copy survives intact.
+  const coachOnlyText = 'Ask about your plan or request changes'
+  check('...and its code really left the main chunk',
+    appSrc.length > 0 && !appSrc.includes(coachOnlyText), `"${coachOnlyText}" found in the app chunk`)
+  check('...while still being present in the chunk that was split out',
+    !!chatChunk && readFileSync(join(DIST, chatChunk.name), 'utf8').includes(coachOnlyText),
+    'the marker is in neither chunk — it may simply have been reworded, which would make the check above vacuous')
+
+  // THE NUMBER A PHONE ACTUALLY FEELS: everything index.html asks for up front.
+  const html = readFileSync(join(DIST, '..', 'index.html'), 'utf8')
+  const firstLoad = chunks.filter(c => html.includes(c.name))
+  const firstLoadGzip = kb(firstLoad.reduce((n, c) => n + c.gzip, 0))
+  check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
+    firstLoadGzip < 420, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+  check('...and neither the coach nor the markdown renderer is among those files',
+    !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
+    firstLoad.map(c => c.name))
 }
 
 console.log('\n3. Nothing has crept back up')
@@ -135,7 +184,8 @@ console.log('\n3. Nothing has crept back up')
   // number: it is lazy, 6 kB in its own chunk, loaded only when opened.
   // 1,050 leaves ~14 kB of headroom rather than parking the line just above
   // wherever today's build sits.
-  const APP_CHUNK_BUDGET_KB = 1050
+  // 14 Sep 2026: 1050 -> 910, the raw half of the same move — measured 895.
+  const APP_CHUNK_BUDGET_KB = 910
   const app = find('index-')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
     !!app && app.raw < APP_CHUNK_BUDGET_KB * 1024, app ? kb(app.raw) : null)
