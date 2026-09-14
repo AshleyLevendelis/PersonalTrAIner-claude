@@ -2,6 +2,42 @@
 
 Newest first. One line each.
 
+- [ ] **THE SLOW CHECK RUNS ON ONE CORE OF FOUR — AND THE REASON WRITTEN DOWN
+  FOR IT WAS WRONG.** Ashley chose "make the checks run much faster" from four
+  options, on the strength of a backlog line saying the sweep was 3x slow
+  because dev logging was left on under tsx.
+  **MEASURED FIRST, AND THE PREMISE DID NOT SURVIVE.** The logging IS on —
+  `BALANCE_DEV_LOGGING` resolves true because NODE_ENV is undefined under tsx —
+  but it costs nothing: 40 plans took **6729 ms with it on and 6901 ms with it
+  off**, twice, 952 log lines over 640 weeks. `test:quality` is simply CPU-bound
+  in plan generation: 9,216 plans at ~165 ms each is ~25 minutes, on one core of
+  four. Acting on the note without measuring would have "fixed" a thing that was
+  not costing anything and left the 25 minutes exactly where they were.
+  **THE LOGGING IS STILL A PROBLEM, FOR A DIFFERENT REASON, and that is the half
+  the note was sensing.** This sweep's quality log is **59 MB and 392,000 lines**
+  of balance chatter with the actual report buried at the bottom — and it is
+  what broke the first version of this work, because `console.debug` IS
+  `console.log` in Node, so it corrupted the payload the shards were handing
+  back on stdout. Both bulk checks now run with NODE_ENV=production, and the
+  shards hand back FILES, which nothing a future change happens to print can
+  corrupt.
+  **THE FIX IS THE OTHER THREE CORES.** `--shard=k/n` scores every nth
+  combination; the parent forks one per core and merges back in index order.
+  `--serial` keeps the old path so the two can always be compared.
+  **SAFE BECAUSE EACH COMBINATION IS SEEDED BY ITS OWN KEY** — `scoreOne` calls
+  `setRandomSource(seededRngFromKey(key))`, so a plan depends on its key and
+  nothing else, not on what ran before it or in which process. PROVEN, not
+  argued: the same combination scored under three different shard layouts
+  (0/512, 0/256, 0/64) gives a byte-identical result hash.
+  **NOT YET PROVEN, AND THIS ENTRY STAYS OPEN UNTIL IT IS:** that the parallel
+  run produces the IDENTICAL report to the serial one end to end. The comparison
+  is queued behind a serial baseline still running. It matters because the
+  report is not purely aggregate — `worst10` sorts stably, the dimension labels
+  are read off the first combination, and the deduction listing walks the array
+  in order — so a merge that lost or reordered entries would show up. The merge
+  also fails loudly on a missing index rather than reporting a short run.
+  **Deploys:** none — a check script and two npm scripts.
+
 - [x] **THE COACH CAME OFF THE PATH TO FIRST PAINT.** Ashley chose this over
   three other pieces of work, then chose how, from three options.
   **A CORRECTION FIRST, because it changes what the finding meant.** I told her
