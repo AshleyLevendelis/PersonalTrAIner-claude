@@ -2,6 +2,49 @@
 
 Newest first. One line each.
 
+- [x] **FIXED — four weight chips above "3 working sets".** Ashley saw it on a
+  real card while training. The chips and the count line are two views of one
+  number, and they disagreed.
+  **WHAT CHANGES ON HER PHONE.** Nothing else moves: the weights, the reps and
+  the rest are all as they were. The row simply stops showing a weight for a
+  set that is not there.
+  **HOW BIG IT WAS.** 149 of 1,029 loaded exercises across four profiles —
+  one in seven.
+  **I NAMED THE CAUSE WRONG TWICE, AND THE SECOND TIME WAS THE WORSE ONE.**
+  The first note said the weekly balance pass BUMPED a set count. The direction
+  alone disproved that: a bump leaves too FEW chips, and what she saw was too
+  many. The correction then named the time-cap set trimmer as the cause — true
+  of most of them, and still the wrong shape of answer, because patching the
+  two places it lives left 52 behind, and hunting the next writer left 72 more.
+  The last of them turned out to be the balance pass after all, TRIMMING rather
+  than bumping. Both errors came from reasoning about which pass could produce
+  the symptom instead of reconciling where the plan is handed over and
+  measuring what was left. `sets` is moved by at least five passes after the
+  weights are built, and more will be added.
+  **SO THE FIX IS PLACED, NOT PATCHED.** One pass runs at each point a plan
+  leaves generation — the single week, and every week of the mesocycle as it is
+  pushed — and re-derives the chips for whatever set count the day ended up
+  with. A dropped set is a re-derived ramp, not a truncation: 70/80/90/100%
+  becomes the ramp generation would have built for three sets, so the working
+  set survives. A mid-pipeline call added during the hunt was measured
+  redundant once the handover point was covered, and removed.
+  **GATES.** New `test:chips-match-sets`, which sweeps both public generation
+  entry points over four profiles and refuses to pass on an empty read.
+  `verify:one-number` §9 reads it off a real phone screen at 390x844 — three
+  chips above "3 working sets · 0 logged" above three log rows, screenshot
+  read, not a tick trusted.
+  **Mutations: 9 attempted, 9 caught.** Two of them exposed weak checks first.
+  The screen section was initially GREEN with the fix removed, twice over: it
+  stood on the anchor Wednesday, which the fixture's plan happens to build
+  clean, and its row finder let a bodyweight primer that renders no chips climb
+  out of its own card and report the NEXT lift's three as its own — a false
+  RED, on correct code, on the same run. It now stands on the Monday the
+  defect actually lands on (derived from the fixed anchor, never the machine's
+  calendar) and each row is bounded to the one exercise that states its count.
+  **A `test:` gate could not have caught this alone** and the new one says so in
+  its own header: `resizePerSetLoads` is trivially correct in isolation and a
+  unit test of it would have passed throughout. What was wrong was where it ran.
+
 - [x] **BUILT — meals now get the same question exercise does.** Ashley, 14 Sep
   2026, choosing from three: *"Work through all three one at a time until [all]
   are completed."* First of the three.
@@ -118,9 +161,15 @@ Newest first. One line each.
   inline, Move/Take out/Ban in the ⋮ menu). Two defensible layouts, so it is
   asked rather than guessed.
   **FOUND AND NOT FIXED, recorded as a lead:** 30 of 272 exercises in one
-  generated plan show one more per-set weight chip than the lift has sets. The
-  weekly-balance pass bumps a lift's set count and leaves the chips at their old
-  length. Pre-existing, unrelated, its own fix — re-measure before acting on it.
+  generated plan show one more per-set weight chip than the lift has sets.
+  Pre-existing, unrelated, its own fix — re-measure before acting on it.
+  **CORRECTED 14 Sep 2026, and the correction is the useful part.** This line
+  originally read "the weekly-balance pass BUMPS a lift's set count and leaves
+  the chips at their old length". The direction was backwards on its own terms:
+  a bump leaves too FEW chips, and the defect is too many. The pass named turned
+  out to be involved after all — but by TRIMMING, and only for the last 72 of
+  149; most came from the time-cap trimmer. See the entry at the top of this
+  file, where it is now fixed and the whole diagnosis is written out.
   **Mutations: 26 attempted, 24 caught first time. Two survived and each
   exposed a weak check rather than safe code** — a top-set guard the fixture
   could not reach, and an all-short-phrase branch tested with a three-letter

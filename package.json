@@ -167,6 +167,7 @@
     "test:assumed-body": "tsx scripts/test-assumed-body-loads.ts",
     "test:weight-basis": "tsx scripts/test-weight-basis-offer.ts",
     "test:per-side-load": "tsx scripts/test-per-side-load.ts",
+    "test:chips-match-sets": "tsx scripts/test-chips-match-sets.ts",
     "test:single-implement": "tsx scripts/test-single-implement.ts",
     "test:calibration-search": "tsx scripts/test-calibration-search.ts",
     "test:what-happened": "tsx scripts/test-what-happened.ts",

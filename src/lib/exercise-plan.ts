@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
@@ -3054,7 +3054,42 @@ function substituteFloorClampedIsolation(
 // Exported for test:single-leg-calf, which runs the pass on a two-exercise
 // day directly: the plan-level version of that check passed under mutation
 // by one stack rounding step (12kg cap -> 12.5kg, "more than twice 6kg").
+/**
+ * THE WEIGHT CHIPS MATCH THE SET COUNT.
+ *
+ * Ashley saw a card reading "3 working sets" above FOUR weight chips.
+ * Measured across four profiles: 149 of 1,029 loaded exercises (14.5%) shipped
+ * a `per_set_load` whose length disagreed with `sets`.
+ *
+ * TWO CAUSES, OPPOSITE DIRECTIONS, and the split is worth keeping because my
+ * first written note got it wrong. 145 of the 149 were chips LONGER than sets,
+ * from the time-cap trimmers decrementing after the loads were built
+ * (`enforceDayDurationBudget`, `sizeBlockToRestBudget`). The other 4 were chips
+ * SHORTER, from the weekly balance pass bumping a set on. The note named only
+ * the balance pass and had the common case's direction backwards — it accounts
+ * for 3% of this, not for it. The direction alone disproves it: a bump leaves
+ * too FEW chips.
+ *
+ * ONE PASS, NOT A PATCH AT EACH WRITER. Sets are changed in at least four
+ * places and more will be added; fixing each is the three-copies-of-one-rule
+ * failure this file keeps finding. Called wherever days are FINALISED, which
+ * is the only ordering that holds: `enforceLoadCoherence` alone left 52 of the
+ * 149 behind, because the day-duration trimmer runs on the very next line
+ * after it. Measured, not assumed — that number is why this is a function.
+ */
+export function reconcilePerSetLoads(days: WorkoutDay[]): void {
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const entry = findEntry(ex.name)
+      if (!entry || !ex.per_set_load?.length || ex.per_set_load.length === ex.sets) continue
+      ex.per_set_load = resizePerSetLoads(ex.per_set_load, ex.sets, entry)
+    }
+  }
+}
+
 export function enforceLoadCoherence(days: WorkoutDay[]): void {
+  reconcilePerSetLoads(days)
+
   for (const day of days) {
     const mainLifts = day.exercises.filter(ex => {
       const entry = findEntry(ex.name)
@@ -4811,6 +4846,11 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   enforceLoadCoherence(days)
 
   const budgetedDays = days.map(d => enforceDayDurationBudget(d, totalBudgetSeconds, getFlaggedJoints(profile.injuries ?? [])))
+  // FINALISATION POINT for the single-week plan this function returns. The
+  // duration-budget pass above trims SETS, and it runs after
+  // enforceLoadCoherence, so the chips would ship one longer than the count
+  // beside them.
+  reconcilePerSetLoads(budgetedDays)
   // Last step, after every rest-modifying stage (style assignment,
   // stageTimeCap's per-day trimming, this duration-budget pass) — the
   // periodized mesocycle inherits this base plan's warmup/rest fields
@@ -7397,6 +7437,14 @@ export function generateMesocycle(
         }
       }
 
+      // FINALISATION POINT for this week. Deliberately the LAST thing before
+      // the week is handed over, because four separate passes between here
+      // and enforceLoadCoherence change `sets` — the weekly pattern-balance
+      // pass in both directions, the duration filler, the conditioning
+      // progression and the rest trimmer. Reconciling at each of them is the
+      // three-copies-of-one-rule failure this file keeps finding; reconciling
+      // here holds for writers that do not exist yet.
+      reconcilePerSetLoads(days)
       weeks.push({
         week_number: weekCounter,
         block_number: blockIndex + 1,

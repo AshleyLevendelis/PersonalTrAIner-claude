@@ -1350,6 +1350,57 @@ function buildPerSetLoads(
 }
 
 /**
+ * KEEP THE WEIGHT CHIPS IN STEP WHEN THE SET COUNT CHANGES.
+ *
+ * Measured 14 Sep 2026 across four profiles: 149 of 1,029 loaded exercises
+ * (14.5%) shipped a `per_set_load` whose length did not match `sets` — a card
+ * reading "3 working sets" above four weight chips. Ashley saw it on a real
+ * screen.
+ *
+ * MANY WRITERS, BOTH DIRECTIONS. `sets` is changed by at least five passes
+ * after the loads are built: the time-cap set trimmer (two sites), the
+ * duration-budget pass, the duration filler, the conditioning progression,
+ * and the weekly pattern-balance pass — which both bumps AND trims. Chips
+ * longer than sets is the common shape; chips shorter happens too.
+ *
+ * I NAMED THE CAUSE WRONG TWICE, which is why this paragraph exists rather
+ * than a single culprit. The first note said the balance pass bumped sets;
+ * the direction alone disproved that, since the observed defect was too MANY
+ * chips. The correction then named the time-cap trimmer as "the" cause —
+ * true of the majority, and still wrong as a diagnosis, because patching
+ * those two sites left 52 behind and the last 72 came from the balance pass
+ * after all, trimming rather than bumping. Both errors came from reasoning
+ * about which pass could produce the symptom instead of reconciling at the
+ * point where days are handed over and measuring what was left.
+ *
+ * WHY RE-DERIVED, NOT SLICED. A ramp is 70/80/90/100% of the top set, so
+ * dropping a set is not "delete an entry" — it is a different ramp. Taking it
+ * through `getSetPercents` means a resized ramp is the same shape generation
+ * would have produced for that many sets, rather than a truncation that only
+ * looks right.
+ *
+ * Ramping is read off the array rather than passed in: if every entry is the
+ * same weight it was never a ramp, and inventing one here would add work
+ * nobody prescribed.
+ */
+export function resizePerSetLoads(
+  perSet: PerSetLoad[] | null | undefined,
+  sets: number,
+  entry: ExerciseEntry,
+): PerSetLoad[] | null {
+  if (!perSet || perSet.length === 0) return perSet ?? null
+  if (sets <= 0) return perSet
+  if (perSet.length === sets) return perSet
+  const mode = loadingMode(entry)
+  const labelMode = labelModeForEntry(entry)
+  // The top set is what every percent is a percent OF, and it survives a
+  // resize unchanged — you lose or gain a lighter set, never the working one.
+  const top = perSet.reduce((max, p) => Math.max(max, p.load_kg), 0)
+  const ramping = new Set(perSet.map(p => p.load_kg)).size > 1
+  return buildPerSetLoads(top, sets, mode, labelMode, ramping)
+}
+
+/**
  * Phrases the double-progression rule against the actual rep range and
  * increment size, so "the rep range must be meaningful" isn't just a number
  * — the trainee is told exactly what triggers the next bump.

@@ -29,6 +29,11 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { nearestAnchorDate } from './anchor.mjs'
+
+// The harness's four training days are Wednesday (the anchor), Friday, Sunday
+// and Monday. Section 9 needs the Monday — see its own note.
+const MONDAY = nearestAnchorDate('Monday')
 
 const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -164,8 +169,79 @@ const distinct = [...new Set(all)]
 check('7. across the headline, the chips, the note and the boxes there is ONE weight',
   distinct.length === 1 && distinct[0] === lifted, { distinct, lifted })
 
+// ---------------------------------------------------------------------------
+// 9. THE COUNT, not just the numbers — every row on one day's screen.
+//
+// Ashley's second report from the same training session: a card reading "3
+// working sets" above FOUR weight chips. Two views of one count, disagreeing,
+// exactly as the header and the chips were two views of one weight above.
+//
+// WHY IT STANDS ON A DIFFERENT DAY. The defect is generation's: a later pass
+// moves `sets` and the chips stay at the old length. It lands where that pass
+// fired, not on a day this driver picked. Measured against the harness's own
+// seeded plan with the fix removed — the anchor Wednesday is clean and the
+// Monday carries it — so checking the anchor day alone would have been green
+// either way, which is what the first version of this section was.
+//
+// The date is derived from the anchor, never from the machine's calendar.
+// ---------------------------------------------------------------------------
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&today=${MONDAY}#/tab/exercise` })
+await wait(5000)
+
+// The count line and the chips live inside an EXPANDED row, so open every one
+// first. ExerciseLine's header is a div[role=button][tabindex=0] — not a
+// <button>, deliberately, because the expanded body contains buttons of its
+// own and a button may not nest.
+const opened = await ev(`(() => {
+  const heads = [...document.querySelectorAll('div[role="button"][tabindex="0"]')]
+  heads.forEach(h => h.click())
+  return heads.length
+})()`)
+await wait(2000)
+
+const rows = await ev(`(() => {
+  // ONE ROW, BOUNDED. Each exercise states its own count in the "N working
+  // sets · M logged" line. Walk up from that line only while the ancestor
+  // still contains exactly ONE such line — the moment it would swallow a
+  // second exercise, stop. Without that bound a bodyweight primer, which
+  // renders no chips of its own, climbs until it finds the NEXT lift's chips
+  // and reports them as its own: measured, and it read as a real defect.
+  const countsIn = el => [...el.querySelectorAll('*')].filter(x => x.children.length === 0 && /^\\d+ working sets/.test((x.textContent||'').trim())).length
+  const out = []
+  const leaves = [...document.querySelectorAll('*')].filter(x => x.children.length === 0 && /^\\d+ working sets/.test((x.textContent||'').trim()))
+  for (const leaf of leaves) {
+    const sets = Number(/^(\\d+) working sets/.exec(leaf.textContent.trim())[1])
+    let card = leaf
+    while (card.parentElement && countsIn(card.parentElement) === 1) card = card.parentElement
+    const chips = [...card.querySelectorAll('span')]
+      .map(n => (n.textContent||'').trim())
+      .filter(t => /^S\\d+:\\s*[\\d.]+kg$/.test(t))
+    // A row that renders no chips is recorded as such rather than scored as
+    // agreement — an empty read must never read as a pass.
+    out.push({ sets, chips: chips.length, name: (card.innerText||'').replace(/\\s+/g, ' ').slice(0, 90) })
+  }
+  return out
+})()`)
+
+const withChips = rows.filter(r => r.chips > 0)
+check(`9a. the ${MONDAY} session shows rows that state a set count AND render chips`,
+  rows.length > 1 && withChips.length > 0, { opened, rows: rows.length, withChips: withChips.length, sample: rows.slice(0, 3) })
+check('9b. every row shows exactly as many weight chips as the sets it claims',
+  withChips.length > 0 && withChips.every(r => r.chips === r.sets),
+  withChips.filter(r => r.chips !== r.sets))
+
+// Frame the screenshot on a row that shows BOTH halves — the chips and the
+// count line beneath them — so the picture is evidence and not just a page.
+await ev(`(() => {
+  const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && /^\\d+ working sets/.test((x.textContent||'').trim()))
+  if (leaf) leaf.scrollIntoView({ block: 'center' })
+})()`)
+await wait(700)
+const shot9 = await send('Page.captureScreenshot', { format: 'png' })
+writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/one-number-chips.png', Buffer.from(shot9.result.data, 'base64'))
+
 const err = await ev('window.__err ?? null')
-check('8. no uncaught error on the page', err === null, err)
+check('10. no uncaught error on the page', err === null, err)
 
 console.log(failures === 0 ? '\nThe card shows one weight, and it is the one the log earned.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
