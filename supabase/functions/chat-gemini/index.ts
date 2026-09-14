@@ -836,7 +836,7 @@ const toolDeclarations = [
   {
     name: "ban_exercise",
     description:
-      "NOT WIRED UP YET — calling this returns a decline pointing the user at the ban button on the exercise row. Do not call it expecting a write, and never tell the user you have banned anything. (Intended behaviour once built: permanently exclude an exercise from future plan generations.) Call this when the user says 'I hate X', 'never give me X again', 'remove X permanently', or explicitly flags an exercise to never appear. This adds it to their exclusion list so the generation engine blacklists it from all future weekly cycles.",
+      "PROPOSES banning ONE exercise from EVERY week of EVERY block — the largest single change in the app. This does NOT apply anything: the app shows a card stating how many sessions the ban reaches, and the user taps Confirm. Call this when the user says 'I hate X', 'never give me X again', 'remove X permanently', or explicitly flags an exercise to never appear again. It is NOT propose_exercise_remove, which takes it out of ONE session and leaves every other week alone — if they mean just today or just this session, that is the tool. It is NOT propose_exercise_swap, which keeps the slot and changes what fills it. Never say it is banned before the card comes back confirmed, and never quote a number of sessions yourself; the card carries the app's own count.",
     parameters: {
       type: "object",
       properties: {

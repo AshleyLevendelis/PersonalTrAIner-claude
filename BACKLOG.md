@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH WAS STILL BEING TOLD IT COULD NOT BAN AN EXERCISE — three
+  days after it was wired. Found by re-measuring her question, not by a check,
+  and the check that should have caught it was looking the other way.**
+  **WHAT WAS WRONG ON HER PHONE.** Banning an exercise from chat was built on
+  14 Sep: the app resolves the name, counts how many sessions the ban reaches
+  and shows a card to confirm. But the description the coach itself reads still
+  opened "NOT WIRED UP YET — calling this returns a decline pointing the user at
+  the ban button... never tell the user you have banned anything." So the model
+  was instructed, in the same breath as the working tool, not to use it and not
+  to believe it. The likely symptom is the old one coming back: asked to ban
+  something, the coach sends her to find a button.
+  **HOW THE CHECK MISSED IT, which is the more useful half.** There are two
+  halves to one rule and they used DIFFERENT WORD LISTS. A tool that declines
+  must SAY so — the phrase list for that is "NOT WIRED UP YET" and two
+  siblings. A tool that works must not CLAIM to be unbuilt — that list was only
+  "coming in an update". So the exact sentence a decliner was required to carry
+  was not one a working tool was forbidden to keep, and the section went green
+  with the contradiction sitting in it. One vocabulary now serves both
+  directions. **Mutations: 2 tried, 2 caught** — the original sentence put back
+  verbatim, and a lowercase paraphrase of it.
+  **A SECOND STALE LINE, corrected where it sat.** The written parity list said
+  moving a meal "to another day or slot" was on neither surface. The slot half
+  was wrong on the day it was written — the table three lines above it records
+  the same move as built on both surfaces, and the coaching question it cited
+  had already been answered twice. The cross-DAY move is the part that is
+  genuinely missing, for a different reason: no screen shows another day's
+  meals.
+  **WHAT THIS SAYS.** Both were found by reading the tool list against the
+  handlers when Ashley asked what was still outstanding — not by any gate. The
+  first one is the exact shape CLAUDE.md warns about: a check that proves the
+  past. It is worth asking of the other half of every two-sided rule whether
+  both halves are written in the same words.
+  NEEDS THE COACH DEPLOY to reach her phone; it is a server-side string.
+
 - [x] **THE COACH'S SWAP CARD NOW SAYS WHAT IT COSTS — the last edit surface
   that stayed silent. And two versions of the check that proves it were
   worthless; both were found by breaking the code, not by reading them.**

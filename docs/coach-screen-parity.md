@@ -73,10 +73,15 @@ path, it belongs here with a reason.
 
 ## Deliberately on neither surface
 
-- **Moving a meal to another day or slot.** A dinner dropped into a breakfast
-  slot does not fit breakfast's budget, and whether the app should refuse,
-  refit or rescale is a coaching decision, not a wiring one. Named in CLAUDE.md
-  as Ashley's call and still open.
+- **Moving a meal to another DAY.** CORRECTED 14 Sep 2026: this bullet said "to
+  another day or slot" and the slot half was already wrong when it was written
+  — the row above records `propose_meal_move` as SCREEN the same day, and the
+  coaching question it cited (refuse / refit / rescale) was answered by Ashley
+  on 13 Sep ("resize it to fit") and again on 14 Sep ("they swap places"). What
+  is genuinely on neither surface is the cross-DAY move, and for a different
+  reason: no screen renders another day's meals, so the destination is
+  somewhere she cannot see, check or undo by looking. It needs a future-day
+  meal view first.
 - **Rebuilding today's session from scratch.** Nothing regenerates below a whole
   week, and a rebuilt day loses the progression thread on the main lift — also
   a coaching call.

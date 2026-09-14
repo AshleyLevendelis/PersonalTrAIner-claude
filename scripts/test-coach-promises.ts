@@ -701,7 +701,22 @@ console.log('\n7. A tool that declines says so in its own description')
   // And the reverse: a tool that DOES write must not describe itself as
   // unavailable, which is how log_meal came to talk a user out of a button
   // that was right there.
-  const liars = declared.filter(t => !decliners.includes(t) && /coming in an update|in the next update/i.test(descriptionOf(t)))
+  //
+  // THE TWO HALVES OF THIS RULE USED DIFFERENT WORD LISTS, and that is exactly
+  // how the next one got through. A decliner had to say "NOT WIRED UP YET"
+  // (MARKS_ITSELF above) while a worker was only forbidden from saying "coming
+  // in an update" — so the sentence a decliner was REQUIRED to carry was not
+  // one a worker was forbidden to keep. `ban_exercise` was wired on 14 Sep
+  // 2026 and its description kept "NOT WIRED UP YET — calling this returns a
+  // decline... never tell the user you have banned anything", about a tool
+  // that by then proposed a real card. The whole section went green, because
+  // the only list that contained that phrase pointed the other way.
+  // ONE VOCABULARY, BOTH DIRECTIONS. Found by reading the tool list against
+  // the handlers, not by a check — which is what made it worth fixing here.
+  const CLAIMS_UNBUILT = (desc: string) =>
+    MARKS_ITSELF.test(desc) ||
+    /coming in an update|in the next update|arrives in the next|not (?:yet )?wired up/i.test(desc)
+  const liars = declared.filter(t => !decliners.includes(t) && CLAIMS_UNBUILT(descriptionOf(t)))
   check('no working tool describes itself as unbuilt', liars.length === 0, liars)
 
   // The prompt must not contradict a decline either — this is the sentence
