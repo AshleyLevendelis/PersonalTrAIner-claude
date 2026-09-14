@@ -9,7 +9,30 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useDeadlineTick } from './useDeadlineTick'
-import { getAppNow } from '@/lib/dev-clock'
+// ---------------------------------------------------------------------------
+// A TIMER MEASURES ELAPSED TIME, SO IT READS THE WALL CLOCK — NOT getAppNow.
+//
+// Every reading in this file used `getAppNow(profileId)`, the app's answer to
+// "what day is it". That is a CALENDAR clock: it honours the dev-clock
+// override, which returns a FIXED instant. So with an override set, every
+// timer in the app froze — the round timer's countdown sat on its starting
+// number and never moved.
+//
+// FOUND 14 Sep 2026 by three browser drivers going red at once
+// (verify:tools-timer, verify:round-presets, verify:round-lead-in), after the
+// harness started pinning the app clock. Before that the harness set no
+// override, getAppNow returned real time, and the fault was invisible.
+//
+// INERT FOR A LIVE USER, and said plainly: with no override getAppNow IS
+// new Date(), so a real trainee's timer has always counted correctly. It is
+// fixed because the distinction is real — what day it is and how long you have
+// been resting are different questions, and only one of them is allowed to be
+// pinned. It is the same rule .tour-harness/anchor.mjs applies to the checks,
+// pointing the other way.
+//
+// SELF-CONSISTENT EITHER WAY: startedAtIso is written and read with the same
+// clock, so the only thing that changes is which clock both ends use.
+const nowMs = () => Date.now()
 import { playTimerCue } from '@/lib/timer-cues'
 import {
   computeStopwatchElapsedMs,
@@ -151,13 +174,13 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
 
   const start = useCallback(() => {
     if (!profileId) return
-    persist({ ...record, running: true, startedAtIso: getAppNow(profileId).toISOString() })
+    persist({ ...record, running: true, startedAtIso: new Date(nowMs()).toISOString() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
   const stop = useCallback(() => {
     if (!profileId) return
-    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, getAppNow(profileId).getTime())
+    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, nowMs())
     persist({ ...record, running: false, accumulatedMs: elapsed, startedAtIso: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
@@ -183,7 +206,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
 
   const lap = useCallback(() => {
     if (!profileId) return
-    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, getAppNow(profileId).getTime())
+    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, nowMs())
     const nextLap: LapEntry = { lapNumber: record.laps.length + 1, elapsedMs: elapsed }
     persist({ ...record, laps: [...record.laps, nextLap] })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,14 +225,14 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
    */
   const pauseRound = useCallback(() => {
     if (!profileId || !record.startedAtIso || !record.running) return
-    const elapsed = getAppNow(profileId).getTime() - new Date(record.startedAtIso).getTime()
+    const elapsed = nowMs() - new Date(record.startedAtIso).getTime()
     persist({ ...record, running: false, accumulatedMs: Math.max(0, elapsed), startedAtIso: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
   const resumeRound = useCallback(() => {
     if (!profileId || record.running || !record.roundConfig) return
-    const anchor = getAppNow(profileId).getTime() - record.accumulatedMs
+    const anchor = nowMs() - record.accumulatedMs
     persist({ ...record, running: true, startedAtIso: new Date(anchor).toISOString() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
@@ -217,7 +240,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const startRound = useCallback((config: RoundConfig) => {
     if (!profileId) return
     setRoundFullScreen(false)
-    const now = getAppNow(profileId)
+    const now = new Date(nowMs())
     // startedAtIso is the round timer's single source of truth: round, phase
     // and remaining are all derived from (now - startedAt) against the
     // schedule. phaseEndsAtIso/currentRound/currentPhase stay in the record
@@ -291,7 +314,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     if (!profileId || !record.running || !record.startedAtIso || !record.roundConfig) return
     const leadInMs = leadInMsOf(record.roundConfig)
     if (leadInMs <= 0) return
-    const now = getAppNow(profileId).getTime()
+    const now = nowMs()
     // Already working — nothing to skip, and re-anchoring here would rewind
     // the run to the top of round 1.
     if (now - new Date(record.startedAtIso).getTime() >= leadInMs) return
@@ -302,7 +325,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const elapsedMs = useMemo(() => {
     if (!profileId) return record.accumulatedMs
     void tick
-    return computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, getAppNow(profileId).getTime())
+    return computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, nowMs())
   }, [profileId, record.accumulatedMs, record.startedAtIso, record.running, tick])
 
   /**
@@ -326,7 +349,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     if (!profileId || record.mode !== 'round' || !record.roundConfig) return null
     void tick
     const elapsedMs = record.running && record.startedAtIso
-      ? getAppNow(profileId).getTime() - new Date(record.startedAtIso).getTime()
+      ? nowMs() - new Date(record.startedAtIso).getTime()
       : record.accumulatedMs
     if (elapsedMs <= 0 && !record.running) return null
     return computeRoundState(record.roundConfig, EPOCH_ISO, Math.max(0, elapsedMs))
@@ -392,7 +415,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
         customRoundConfig: record.customRoundConfig ?? null,
         running: true,
         roundConfig: { ...queued, rounds: remaining, leadInSeconds: 0, carried },
-        startedAtIso: getAppNow(profileId).toISOString(),
+        startedAtIso: new Date(nowMs()).toISOString(),
         currentRound: 1,
         currentPhase: 'work',
       })

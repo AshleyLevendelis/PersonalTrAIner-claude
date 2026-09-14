@@ -70,21 +70,50 @@ for (const { path, text } of SOURCE) {
 }
 
 /**
- * The tab bar sets its attribute through a map — `data-tour={TOUR_KEY[tab]}`
- * — so no literal appears at the attribute site and the scan above finds
- * nothing there. That indirection is deliberate and worth keeping (it is what
- * stops a newly added tab from silently having no key), so the gate reads the
- * map instead of forcing the component to spell four literals.
+ * A COMPONENT MAY BIND THE ATTRIBUTE TO A VARIABLE, and several do. The tab bar
+ * writes `data-tour={TOUR_KEY[tab]}` from a map; ToolsTab writes
+ * `data-tour={row.tour}` from its row list. No literal appears at the attribute
+ * site in either, so the scan above finds nothing there.
  *
- * This half was written after the first run of this file reported all four nav
- * targets missing. They were not: the check was.
+ * THIS HAS NOW REPORTED A PHANTOM MISSING TAG TWICE. The first time it was all
+ * four nav targets, and a bespoke reader for the tab bar's map was added. On
+ * 14 Sep it was `toolstimer`, after the Tools rebuild moved the stop from the
+ * round card onto the Timers row — the tag was present and correct the whole
+ * time, and the check said the app tour pointed at nothing. A third bespoke
+ * reader would just move the next phantom one component along.
+ *
+ * So the rule is general instead: IN ANY FILE THAT BINDS data-tour TO AN
+ * EXPRESSION, every string literal that is a key some stop actually references
+ * counts as that file tagging it. Narrow, because it applies only to files that
+ * already bind the attribute, and comments are stripped first so a note naming
+ * a key cannot satisfy it.
  */
 {
-  const path = 'src/components/BottomTabBar.tsx'
-  const text = SOURCE.find(f => f.path === path)?.text ?? ''
-  const block = /const TOUR_KEY: Record<Tab, string> = \{([\s\S]*?)\}/.exec(text)
-  check('the tab bar still derives its tour keys from one map', !!block)
-  for (const m of (block?.[1] ?? '').matchAll(/(\w+):\s*'([\w-]+)'/g)) addAttr(m[2], path)
+  const stripComments = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/([^:])\/\/.*$/gm, '$1')
+  let boundFiles = 0
+  for (const { path, text } of SOURCE) {
+    if (path.startsWith('src/lib/app-tour-steps')) continue
+    const bare = stripComments(text)
+    // Every expression binding in this file, e.g. `TOUR_KEY[tab]`, `row.tour`.
+    const bindings = [...bare.matchAll(/data-tour=\{([^}]+)\}/g)].map(m => m[1].trim())
+    const indirect = bindings.filter(b => !/['"]/.test(b))
+    if (indirect.length === 0) continue
+    boundFiles++
+    for (const expr of indirect) {
+      // `row.tour` -> the property name; `TOUR_KEY[tab]` -> the object name.
+      const prop = /\.(\w+)\s*$/.exec(expr)?.[1]
+      const obj = /^(\w+)\s*\[/.exec(expr)?.[1]
+      if (prop) {
+        // Values given to that property anywhere in the file.
+        for (const m of bare.matchAll(new RegExp(`\\b${prop}\\s*:\\s*['"]([\\w-]+)['"]`, 'g'))) addAttr(m[1], path)
+      }
+      if (obj) {
+        const block = new RegExp(`const ${obj}[^=]*=\\s*\\{([\\s\\S]*?)\\n\\}`).exec(bare)
+        for (const m of (block?.[1] ?? '').matchAll(/['"]?[\w-]+['"]?\s*:\s*['"]([\w-]+)['"]/g)) addAttr(m[1], path)
+      }
+    }
+  }
+  check(`components bind data-tour to an expression, so this rule has teeth (${boundFiles})`, boundFiles > 0, boundFiles)
 }
 
 /** Keys the tour actually points at: a stop's spotlight target and its tap target. */

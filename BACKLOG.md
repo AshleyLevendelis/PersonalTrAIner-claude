@@ -2,6 +2,51 @@
 
 Newest first. One line each.
 
+- [x] **THE TIMERS FROZE IF YOU TOLD THE APP WHAT DAY IT WAS — and the tour's
+  Tools stop was reported broken when it was not.** Two defects found by the
+  first full sweep since the harness clock landed: 214 checks, 8 red, of which
+  three are the known environmental ones (`meal-quality`, `schema-parity`,
+  `rls` — all need a live database this machine cannot reach).
+  **1. A STOPWATCH WAS READING THE CALENDAR.** Every clock reading in
+  `useTimers` — start, stop, pause, resume, the round schedule, the elapsed
+  display — called `getAppNow(profileId)`, which is the app's answer to *what
+  day is it* and honours the dev-clock override by returning a FIXED instant.
+  With an override set, every timer in the app stops dead: the round timer's
+  countdown sits on its starting number. Three drivers went red together
+  (`tools-timer` 7a/7b, `round-presets` 24/25, `round-lead-in` 6/7 — "the count
+  really falls: 10, 10").
+  **INERT FOR A LIVE USER, said plainly rather than dressed up:** with no
+  override `getAppNow` IS `new Date()`, so a real trainee's timer has always
+  counted correctly. Fixed because the distinction is real — what day it is and
+  how long you have been resting are different questions and only one of them
+  may be pinned. It is the same rule `anchor.mjs` applies to the checks, facing
+  the other way. All eleven readings now use the wall clock; start and read use
+  the same one, so nothing else changes. **Drivers: 43, 32 and 15 checks, 0
+  failures.**
+  **MY CHANGE EXPOSED IT, and that is worth recording.** Before the harness
+  pinned a clock there was no override anywhere, `getAppNow` returned real time,
+  and this could not be seen. A day-independent harness is what made a
+  day-dependent bug visible.
+  **2. THE TOUR CHECK REPORTED A PHANTOM.** `test:app-tour` said the Tools stop
+  pointed at nothing: `data-tour="toolstimer"` missing. It is present and
+  correct — the Tools rebuild moved the stop from the round card onto the Timers
+  row, where the attribute is bound as `data-tour={row.tour}` with
+  `tour: 'toolstimer'` in the row. The scanner looked for a LITERAL attribute
+  string, so it could not see it.
+  **THIS WAS THE SECOND PHANTOM FROM THE SAME CAUSE.** The first was all four
+  nav targets, and the answer then was a bespoke reader for the tab bar's map —
+  which is why a third component with a third indirection produced a third
+  phantom. The rule is now derived from the binding itself: in a file that binds
+  `data-tour` to an expression, the expression names where the values live
+  (`row.tour` -> the `tour:` property; `TOUR_KEY[tab]` -> that const), and those
+  values are collected. Comments stripped first, so a note naming a key cannot
+  satisfy it. Orphan detection still works, which the first attempt broke — it
+  collected only keys some stop referenced, so an unreferenced tag became
+  invisible and `navHome` stopped being the one expected orphan.
+  **Mutations: 3 tried, 3 caught** — the Tools row losing its key; the key left
+  as a comment only; a tag nobody points at. **145 checks green.**
+  **Deploys:** frontend on merge. No edge function touched.
+
 - [ ] **THE SLOW CHECK RUNS ON ONE CORE OF FOUR — AND THE REASON WRITTEN DOWN
   FOR IT WAS WRONG.** Ashley chose "make the checks run much faster" from four
   options, on the strength of a backlog line saying the sweep was 3x slow
