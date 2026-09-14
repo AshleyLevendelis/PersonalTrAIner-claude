@@ -1,6 +1,8 @@
 # Running the coach exam for the first time
 
 Written 13 Sep 2026, the day the exam was built. It has never been run.
+Updated 14 Sep 2026: a second freshness tell and a second live check, both for
+the meal-move tool the coach gained that day.
 
 ## Why this document exists
 
@@ -53,14 +55,20 @@ once. Run:
   git log --oneline -1
   ls scripts/exam-cases/*.json | wc -l
   grep -c "Shopping list: its own full screen" supabase/functions/chat-gemini/index.ts
+  grep -c "MOVING A WHOLE MEAL TO A DIFFERENT SLOT" supabase/functions/chat-gemini/index.ts
   npx tsx scripts/run-coach-exam.mts --dry
 
-Expected: 20 case files, the grep returns 1, and the dry run prints
+Expected: 20 case files, BOTH greps return 1, and the dry run prints
 "cases: 20  turns: 37" and the project ref vswuurrtbzbrgubddefv.
 
-If the grep returns 0, STOP and tell me. The coach prompt on disk is not the
+If either grep returns 0, STOP and tell me. The coach prompt on disk is not the
 one that was merged, and running the exam against it would measure the wrong
-coach. Do not edit the file to make the grep pass.
+coach. Do not edit the file to make a grep pass.
+
+The two greps date from different days on purpose. The first is the 12 Sep
+shopping-list move; the second is the 14 Sep meal-move tool. A checkout that
+passes the older one and fails the newer is exactly the "three merges old"
+failure this project has hit before, and one tell alone cannot see it.
 
 STEP 2 — DEPLOY THE CHAT FUNCTION TO TEST. YOU CAN DO THIS ONE. Only the
 PRODUCTION deploy stops for a typed phrase; the TEST target does not:
@@ -93,12 +101,21 @@ STEP 4 — READ THESE BACK TO ME, and nothing else. Not the whole report.
   - The dimension averages block and the OVERALL line.
   - Any case marked "not marked" and why.
 
-STEP 5 — ONE LIVE CHECK I CARE ABOUT SPECIFICALLY. In the transcripts, find the
-case "where-is-the-shopping-list" and read me the coach's answer verbatim. The
-shopping list moved off the Tools tab on 12 Sep and the coach's own description
-of the app was still saying it was there. It is fixed in this code — so if the
-answer sends me to Tools, step 2 did not take and everything above is measuring
-an old function.
+STEP 5 — TWO LIVE CHECKS I CARE ABOUT SPECIFICALLY.
+
+(a) In the transcripts, find the case "where-is-the-shopping-list" and read me
+the coach's answer verbatim. The shopping list moved off the Tools tab on
+12 Sep and the coach's own description of the app was still saying it was
+there. It is fixed in this code — so if the answer sends me to Tools, step 2
+did not take and everything above is measuring an old function.
+
+(b) NOT IN THE EXAM — do this one by hand, in the app, after step 2. Open the
+chat and type: "I'll have my dinner as my snack instead". The coach should come
+back with a card offering to swap the two meals, showing both new calorie
+numbers. That capability shipped on 14 Sep. If it says it cannot do that, or
+points you at a button, the TEST deploy did not take — and again, the exam
+numbers above are describing an older coach than the one in the repo.
+Tell me which of these two happened rather than assuming the run was fine.
 
 THEN COMMIT. coach-exam-report.txt and coach-exam-scores.json are both tracked;
 the scores file is what test:coach-exam-fresh reads to decide whether the exam

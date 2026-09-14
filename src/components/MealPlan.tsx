@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   UtensilsCrossed,
@@ -16,8 +16,14 @@ import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestr
 import type { PoolOption } from '@/lib/meal-generation'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
-import { MealMoveSheet, type MealMoveContext } from './nutrition/MealMoveSheet'
-import { MealFoodAddSheet } from './nutrition/MealFoodAddSheet'
+// DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
+// Add food, so paying for them on first paint is paying for a screen most
+// opens never reach. Caught by test:bundle going 11 kB over its ceiling the
+// day they were added — the honest fix is to defer them, not to raise the
+// budget, which is the one thing that check exists to stop.
+import type { MealMoveContext } from './nutrition/MealMoveSheet'
+const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
+const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
 /** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
 export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -888,7 +894,7 @@ function MealSlotRow({
             const ctx = editContextFor(option)
             if (!ctx) return null
             return (
-              <MealFoodAddSheet
+              <Suspense fallback={null}><MealFoodAddSheet
                 ctx={{
                   profileId: ctx.profileId, date: ctx.date, slot: ctx.slot, targets: ctx.targets,
                   mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
@@ -898,18 +904,20 @@ function MealSlotRow({
                 onPick={onMealPickApplied}
                 onDone={summary => { setAddOpen(false); setAddNote(summary) }}
                 onCancel={() => setAddOpen(false)}
-              />
+              /></Suspense>
             )
           })()}
           {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
 
           {moveOpen && moveContext && onMealPickApplied && (
-            <MealMoveSheet
-              ctx={moveContext}
-              onPick={onMealPickApplied}
-              onDone={summary => { setMoveOpen(false); setMoveNote(summary) }}
-              onCancel={() => setMoveOpen(false)}
-            />
+            <Suspense fallback={null}>
+              <MealMoveSheet
+                ctx={moveContext}
+                onPick={onMealPickApplied}
+                onDone={summary => { setMoveOpen(false); setMoveNote(summary) }}
+                onCancel={() => setMoveOpen(false)}
+              />
+            </Suspense>
           )}
           {moveNote && <p className="text-[0.71875rem] text-muted-foreground">{moveNote}. Both were resized to fit where they landed.</p>}
 

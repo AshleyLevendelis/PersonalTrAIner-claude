@@ -184,7 +184,17 @@ console.log('\n5. A SCREEN claim is derived, not merely asserted\n')
     if (reachable.has(file) || file === CHAT_CLIENT) return
     reachable.add(file)
     const src = readFileSync(file, 'utf8')
-    for (const m of src.matchAll(/from ['"]([^'"]+)['"]/g)) {
+    // STATIC AND DEFERRED IMPORTS BOTH.
+    //
+    // This followed `from '...'` only. The app deliberately defers components
+    // that are not on the path to first paint — the coach client, and from
+    // 14 Sep the two meal sheets — and those arrive as `import('...')` inside a
+    // lazy() call, with no `from` anywhere. So the crawl stopped at the meal
+    // rows and reported that no screen reached the Add-food builder, minutes
+    // after a browser driver had opened that very control. A reachability check
+    // that cannot see a lazy boundary will get less accurate every time the
+    // bundle is split further, which is the direction this app is going.
+    for (const m of src.matchAll(/(?:from|import\s*\()\s*['"]([^'"]+)['"]/g)) {
       const spec = m[1]
       let base: string
       if (spec.startsWith('@/')) base = join('src', spec.slice(2))

@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP CAUGHT FOUR THINGS THE PER-CHECK RUNS DID NOT — three of
+  them mine, and one of my own checks was enforcing a bug.**
+  **1. THE APP CHUNK WENT 11 kB OVER.** Two new sheets shipped today and both
+  were bundled into first paint. The fix was NOT to raise that budget — both are
+  deferred behind their own chunks now, so first load came back under. Measured
+  the way this file's own convention demands, on a clean checkout of the commit
+  before the batch: app 897 -> 908 kB, total 1,797 -> 1,817 kB. Unsplit it would
+  have been 921. The total budget rises to 1,835 for the twenty kilobytes of
+  genuinely new capability; the app budget rises 910 -> 920 for HEADROOM, not
+  for growth — 908 under 910 is the same two-kilobyte trap this file already
+  warns about, where the next feature of any size trips it and the temptation is
+  to raise the ceiling instead of doing the deferring.
+  **2. A CHECK WAS ENFORCING THE BUG IT SHOULD HAVE GUARDED.** `timer-field`
+  pinned `getAppNow(profileId).getTime() - accumulatedMs`. Timers moved onto the
+  wall clock today — a real fix, because what DAY it is and how long you have
+  been resting are different questions and only one may be pinned to a harness
+  anchor. The behaviour the check is NAMED for never changed; it went red anyway
+  and, left alone, would have forced the timer back onto the frozen clock. That
+  is CLAUDE.md's mechanism-pinning warning in its second and worse form.
+  Re-anchored on the subtraction — and, measured, NOTHING guarded the wall-clock
+  rule at all, so that fix was one edit from being silently undone. It is
+  guarded now.
+  **3. MY OWN PARITY CRAWLER COULD NOT SEE A LAZY IMPORT.** Deferring the two
+  sheets (fix 1) immediately broke the reachability check I wrote this morning:
+  it followed `from '...'` only, and a deferred component arrives as
+  `import('...')` inside a lazy() call. So it reported that no screen reached
+  the Add-food builder, minutes after a browser driver had opened that very
+  control. Widened to follow both — and mutation-tested after, to confirm it
+  still catches a genuinely removed control rather than just going quiet.
+  **4. ONE TIMEOUT UNDER LOAD**, `onboarding-reachable`, which timed out waiting
+  for an input while three of my own builds were running beside it on a
+  four-core box. Re-run in isolation before it is called anything.
+  **WHAT THIS SAYS ABOUT THE PER-CHECK HABIT.** Every one of these passed when
+  run on its own during the work. Three only appear when the whole thing is
+  built and measured together, which is exactly the argument for the sweep
+  before a merge rather than after it.
+  NOTED: this sweep spanned my edits, so checks that ran before them tested the
+  older tree. The affected ones are re-run after it finishes rather than
+  reported from the stale pass.
+
 - [x] **NO SETUP ANSWER IS LOCKED ANY MORE — the three known lifts were the
   last, and the reason for leaving them was measured against the wrong path.**
   The remainder of Ashley's first screenshot.
