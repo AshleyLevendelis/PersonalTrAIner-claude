@@ -532,16 +532,36 @@ export interface TradeoffCardFields {
 /**
  * The tier-1 sentence, on the card, in the same amber the balance cost uses.
  *
- * APPENDED, NEVER REPLACING. The card's existing implications are what the
- * app DID — the balancing it ran, the load it will recompute. This is what it
- * COST. Both are true and a person needs both, so the cost joins the list
- * rather than standing in for it.
+ * ONE AMBER LINE, NOT TWO — and this is a correction, made 14 Sep 2026 when
+ * `verify:swap-request` went red and was right to. The first version appended,
+ * on the reasoning that the balance cost is what the app COULD NOT FIX and
+ * this is what the edit COST, so a person needs both. On a real card that read:
+ *
+ *   That leaves your week push-heavy — 5 pushing sets to 3 pulling.
+ *   Your back goes from 14 sets this week to 9 — back grows from the work
+ *   you do for it.
+ *
+ * Which is the same fact twice: the back work leaving IS why the week went
+ * push-heavy. Two amber lines about one edit is the "a list is not a nudge"
+ * failure `macro-shortfall.ts` already names, and it is exactly what
+ * `docs/how-the-app-talks-about-a-change.md` §5 forbids — "never the same
+ * warning twice".
+ *
+ * So the trade-off's cost REPLACES an existing warning rather than joining it:
+ * both describe the same edit, and the goal's terms are the more useful of the
+ * two. When the trade-off has nothing to say, the balance cost stands exactly
+ * as it did before — nothing is lost, it is chosen between.
+ *
+ * INFO lines are untouched. "Load recomputed once you confirm" and "I'll trim
+ * a set on Sunday to keep your week balanced" are what the app DID, not what
+ * it cost, and a person needs those alongside.
  */
 export function applyTradeoff<T extends TradeoffCardFields>(diff: T, t: Tradeoff): T {
   if (t.tier === 0 || !t.cost) return diff
+  const kept = (diff.implications ?? []).filter(i => i.severity !== 'warn')
   return {
     ...diff,
-    implications: [...(diff.implications ?? []), { severity: 'warn' as const, text: t.cost }],
+    implications: [...kept, { severity: 'warn' as const, text: t.cost }],
     // The existing alternatives win their places: a meal removal's verified
     // swaps are specific to the food that left, and this must not push them
     // off the card.

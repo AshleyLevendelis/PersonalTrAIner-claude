@@ -40,11 +40,38 @@ Newest first. One line each.
   entire feature and all twelve wiring checks still passed. That is why
   `verify:tradeoff` exists, and it catches that mutation with five failures.
   The source check now says plainly that it is not proof.
-  **MUTATIONS: 25 tried, 25 caught** — 12 on the engine, 9 on the wiring (two
+  **ONE AMBER LINE, NOT TWO — a correction the gates forced.** The first
+  version APPENDED the goal cost to the card, so a swap read "That leaves your
+  week push-heavy — 5 pushing sets to 3 pulling" AND "Your back goes from 14
+  sets this week to 9". Same fact twice: the back work leaving IS why the week
+  went push-heavy. `verify:swap-request` went red and was right to. The
+  trade-off's sentence now REPLACES the structural one — nothing is lost, it is
+  chosen between — and what the app DID ("load recomputed", "I'll trim a set on
+  Sunday") is untouched beside it. That check then had to be re-anchored too: it
+  pinned the balance pass's exact wording, which is the mechanism, not the
+  property. It now asks for two real numbers and the unit, and three mutations
+  confirm it still catches a vague warning.
+  **I ALSO SHIPPED A SECOND MUSCLE MAP** and caught it a commit later: the
+  catalogue has exported `muscleGroupsOf` all along, which is what the
+  chest:back balance counts with. Two maps would have meant one card counting
+  two different chests. Recorded because this module's own header argues
+  against a second copy of the SCORER, then shipped one of the muscle map.
+  **THE BUNDLE WENT OVER, AND THE 21 kB WAS MEASURED BEFORE IT WAS ACCEPTED.**
+  Stubbing the scorer out came in under the old budget, so the question was
+  whether it earns its weight on a phone. Probed across 581 real edits on
+  twelve profiles: the score is the ONLY signal on 109 of them (19%) — an added
+  exercise that breaks the set hierarchy, a removed warm-up, a week that stops
+  building on the last. Dropping it would make the app go quiet on a fifth of
+  the edits that cost something, so the total budget moves 1,835 → 1,870. First
+  paint is unchanged at 909 kB; all of it lands in the deferred chat chunk.
+  **MUTATIONS: 27 tried, 27 caught** — 12 on the engine, 9 on the wiring (two
   retried after one survived, which is how the dead-branch hole was found), 4
   on the driver. One early mutation was recorded as a crash-catch rather than a
   clean one and retried honestly. Checks RAN was compared, not only failures.
-  Screenshot read at 390x844, not inferred.
+  Screenshot read at 390x844, not inferred. Plan quality re-run in full:
+  9,216 combinations, average 11.56/12, **0 below the 7.2 floor** — the scorer
+  change altered nothing about generation, which is what the option defaulting
+  to off is supposed to guarantee.
   STILL TO BUILD: the reason chips (busy / don't like it / hurts / no time /
   don't have it / too tired), the screen-side sheets, and the block-end review.
   NEEDS THE FRONTEND DEPLOY on merge; no function deploy (this is client-side).

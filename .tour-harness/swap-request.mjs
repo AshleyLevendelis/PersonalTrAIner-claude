@@ -226,9 +226,22 @@ if (cross) {
   // AND THE NUMBERS ARE IN THE SENTENCE SHE READS, not merely somewhere on the
   // card: a warning that says "your week is unbalanced" and nothing else is
   // the thing this was built to avoid.
-  const COUNTED = /\b\d+ (?:pushing|chest) sets to \d+ (?:pulling|back)\b/i
+  // THE PROPERTY IS "IT NAMES REAL NUMBERS", NOT ONE SENTENCE'S WORDING.
+  //
+  // This pinned `N pushing sets to M pulling` — the balance pass's exact
+  // shape — and went red on 14 Sep 2026 when the card started carrying the
+  // cost in the GOAL's terms instead ("Your back goes from 14 sets this week
+  // to 9"). That sentence names both counts perfectly well; the check was
+  // describing the mechanism it happened to be written against, which is
+  // precisely what CLAUDE.md says a check must not do.
+  //
+  // Re-anchored on what a person needs from the line: two numbers and the
+  // unit, so it cannot degrade into "your week is unbalanced". The
+  // empty-side sentences are the one honest exception — "that leaves nothing
+  // pulling this week" has no second number to give.
+  const COUNTED = /\d+[^.]*\bsets?\b[^.]*\d+|\d+\s+sets?\b[\s\S]{0,40}?\bto\b\s*\d+/i
   const EMPTY_SIDE = /leaves nothing (?:pulling|pushing) this week|leaves nothing for your (?:back|chest) this week/i
-  check('4f. ...naming both set counts, not a vague warning',
+  check('4f. ...naming real set counts, not a vague warning',
     costs.every(c => COUNTED.test(c) || EMPTY_SIDE.test(c)), costs)
   // AND NOT ON EVERY SWAP. A card that warned every time would be wallpaper —
   // session-balance-cost's own header says a week no worse after gets silence.

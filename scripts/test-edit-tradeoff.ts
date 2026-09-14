@@ -408,9 +408,29 @@ console.log('\n9. The card and the ask are built from the verdict, not re-derive
     alternatives: [{ label: 'Tuna', note: 'same protein', prompt: 'use tuna' }],
   }
   const merged = applyTradeoff(existing, tier1)
-  check('the cost is appended as a warning, after what the app did',
+  check('the cost lands as the warning, after what the app did',
     merged.implications.length === 2 && merged.implications[1].severity === 'warn' && merged.implications[0].text.includes('Load recomputed'),
     merged.implications)
+
+  // ONE AMBER LINE, NOT TWO. A card that already carries a balance warning —
+  // "that leaves your week push-heavy" — and then adds "your back goes from 14
+  // sets to 9" is saying the same fact twice, because the back work leaving IS
+  // why the week went push-heavy. Caught by verify:swap-request going red.
+  const withBalanceWarning = {
+    implications: [
+      { severity: 'info' as const, text: 'Load recomputed once you confirm.' },
+      { severity: 'warn' as const, text: 'That leaves your week push-heavy — 5 pushing sets to 3 pulling.' },
+    ],
+    alternatives: [],
+  }
+  const single = applyTradeoff(withBalanceWarning, tier1)
+  const warns = single.implications.filter(i => i.severity === 'warn')
+  check('a card never carries two warnings about one edit', warns.length === 1, single.implications)
+  check('...and the one it keeps is in the goal\u2019s terms', warns[0].text === tier1.cost, warns[0])
+  check('...while what the app DID survives untouched',
+    single.implications.some(i => i.severity === 'info' && /Load recomputed/.test(i.text)), single.implications)
+  check('a free edit leaves an existing balance warning alone',
+    applyTradeoff(withBalanceWarning, tier0) === withBalanceWarning)
   check('...and the existing offers keep their places', merged.alternatives[0].label === 'Tuna' && merged.alternatives.length === 2, merged.alternatives)
   check('a free edit leaves the card exactly as it was', applyTradeoff(existing, tier0) === existing)
 
