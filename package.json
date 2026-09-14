@@ -215,6 +215,7 @@
     "verify:modal-close": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/modal-close.mjs",
     "verify:correction-loop": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/correction-loop.mjs",
     "verify:coach-ban": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-ban.mjs",
+    "verify:tradeoff": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tradeoff.mjs",
     "verify:swap-request": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/swap-request.mjs",
     "verify:rest-day-race": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/rest-day-race.mjs",
     "verify:session-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-move.mjs",

@@ -365,8 +365,36 @@ reason chips run on swap and remove on both surfaces; the sentences are the
 app's, from one phrasebook, so the exam can grade them; the block-end review
 is the release valve that makes "ask once per block" safe.
 
-**Not built.** This is a decision, recorded here, in BACKLOG and in CLAUDE.md.
-It waits on an explicit "build it".
+**BUILT 14 Sep 2026** on Ashley's "Build it". What shipped, and the three
+places the build corrected this document:
+
+1. **The floor became a delta.** §2 said tier 2 includes "the trial would take
+   the plan below the same quality floor". Measured: `scorePlan` is 12 ms for
+   most profiles but **475 ms** for fat-loss-with-low-recovery, because two
+   checks inside goal alignment regenerate a whole comparison plan for a
+   *different* profile. Scoring before and after would cost ~950 ms on a dev
+   box — two to three seconds on a phone — per card. So the scorer gained one
+   option that drops exactly those two checks (470 ms → 13 ms, measured), and
+   tier 2 is now the seven pinned cases **or a dimension losing one whole rule**
+   (the scorer's own 0.4 penalty). A delta is also better coaching than a
+   floor: "this drops you below 7.2" means nothing to a person.
+2. **The muscle numbers came from the person's own plan, not a textbook.** §4
+   said "under the 10 sets that keeps them growing". Dropped: the app has no
+   such constant anywhere else, and a set counts once per primary muscle, so an
+   absolute would fire wrongly. The comparison is now what *their* plan was
+   built to deliver — a lasting 40% drop asks, 25% tells.
+3. **There is no "strength" goal to key off.** §4's strength vocabulary was
+   written as though there were; the four goals are fat loss, hypertrophy,
+   functional and conditioning. The strength cases key off the **phase** the
+   person is actually in, which is better: it is about where they are now.
+
+Live behaviour, read off a real phone-sized screen: *"That would take your
+chest from 3 sets a week down to 0 for the rest of the block. Just today, or is
+there something about it you want gone for good?"* — with **Just today**, **Put
+something else there**, **Do it anyway**, and no card until one is tapped.
+
+Still to build: the reason chips (§3), the screen-side sheets, and the
+block-end review (§7).
 
 ## 11. If approved, the order
 

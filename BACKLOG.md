@@ -2,6 +2,53 @@
 
 Newest first. One line each.
 
+- [x] **BUILT — a change that works against your goal is now ASKED about, not
+  just allowed.** Ashley, 14 Sep 2026: "Build it."
+  **WHAT CHANGES ON HER PHONE.** Ask the coach to drop an exercise for the rest
+  of the block and, where it genuinely costs her, she gets a question instead
+  of a card: *"That would take your chest from 3 sets a week down to 0 for the
+  rest of the block. Just today, or is there something about it you want gone
+  for good?"* — with **Just today**, **Put something else there** and **Do it
+  anyway**. Tapping Do it anyway brings the card straight up. Nothing is ever
+  refused that is not unsafe; the change is exactly one tap further away. Asked
+  ONCE per block per thing — the second time it goes straight to a card that
+  still states the cost. Never mid-session for a today-only change, never on
+  the starting-out plan.
+  **THREE MEASURED CORRECTIONS TO THE WRITTEN DECISION**, all flagged rather
+  than quietly absorbed. (1) The plan-quality score was to decide tier 2
+  against its floor. It costs 12ms for most people and **475ms** for
+  fat-loss-with-low-recovery, because goal alignment regenerates a whole
+  comparison plan for a different profile — before+after is two to three
+  seconds on a phone, per card. The scorer gained ONE option dropping exactly
+  those two checks (470→13ms measured) and tier 2 now reads "a dimension lost
+  one whole rule", which is also better coaching than a floor nobody can
+  picture. (2) The per-muscle sentences were to use a literature number ("under
+  the 10 sets that keeps them growing"); they use the person's OWN plan
+  instead, because the app has no such constant anywhere else and a set counts
+  once per primary muscle, so an absolute would fire wrongly. (3) The strength
+  vocabulary assumed a strength GOAL; there isn't one, so it keys off the phase
+  they are actually in.
+  **TWO DEFECTS FOUND IN THE GATES WHILE BUILDING THIS.**
+  *test:coach-promises had a dead zone*: an early `process.exit` sits part-way
+  up the file, everything below accumulated failures that were never read, and
+  the last line said "All coach-promise checks passed" unconditionally. So the
+  last third of that gate printed FAIL and exited 0 — including the swap-card
+  section added the day before, which has therefore never been able to fail a
+  sweep. Found by writing a section that failed twelve checks and watching the
+  gate report success.
+  *A source gate cannot see a dead branch*: `if (false && advice)` disabled the
+  entire feature and all twelve wiring checks still passed. That is why
+  `verify:tradeoff` exists, and it catches that mutation with five failures.
+  The source check now says plainly that it is not proof.
+  **MUTATIONS: 25 tried, 25 caught** — 12 on the engine, 9 on the wiring (two
+  retried after one survived, which is how the dead-branch hole was found), 4
+  on the driver. One early mutation was recorded as a crash-catch rather than a
+  clean one and retried honestly. Checks RAN was compared, not only failures.
+  Screenshot read at 390x844, not inferred.
+  STILL TO BUILD: the reason chips (busy / don't like it / hurts / no time /
+  don't have it / too tired), the screen-side sheets, and the block-end review.
+  NEEDS THE FRONTEND DEPLOY on merge; no function deploy (this is client-side).
+
 - [ ] **DECIDED — when a change works against the goal, the app asks first,
   then allows. Never refuses what isn't unsafe.** Ashley, 14 Sep 2026, on the
   proposal's one open question: *"You decide what you think is best and then

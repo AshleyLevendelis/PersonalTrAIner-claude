@@ -290,8 +290,28 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   of the short list in `docs/how-the-app-talks-about-a-change.md` §10. Asked
   ONCE per block per thing; never for a "today" change mid-session; never on
   the starting-out plan. The sentences are the app's, from one phrasebook
-  shared by both surfaces, so the exam can grade them. NOT BUILT — a decision
-  awaiting "build it"
+  shared by both surfaces, so the exam can grade them.
+  **BUILT 14 Sep 2026** on her "Build it" — `edit-tradeoff.ts`, wired into the
+  coach's swap, remove and add cards; `edit-tradeoff`, `coach-promises` and
+  `verify:tradeoff` hold it. Live: *"That would take your chest from 3 sets a
+  week down to 0 for the rest of the block. Just today, or is there something
+  about it you want gone for good?"* with a **Do it anyway** chip and no card.
+  THREE CORRECTIONS THE BUILD MADE TO THE RECORDED DECISION, all measured:
+  the floor became a DELTA (`scorePlan` is 475ms for fat-loss/low-recovery
+  because goal alignment regenerates a comparison plan; before+after per card
+  is unaffordable, so it gained a `skipComparisons` option — 470→13ms — and
+  tier 2 reads "a dimension lost one whole rule" instead of an absolute, which
+  is also better coaching); the per-muscle numbers come from the PERSON'S OWN
+  PLAN, not a literature constant the app has nowhere else; and the "strength"
+  vocabulary keys off the PHASE, because the four goals are fat loss,
+  hypertrophy, functional and conditioning — there is no strength goal.
+  STILL TO BUILD: the reason chips, the screen-side sheets, the block-end review
+- **A `test:` gate can never prove a branch is REACHED.** Measured 14 Sep 2026:
+  disabling the whole trade-off step with `if (false && advice)` left all
+  twelve of its source checks green, because they read text and the text was
+  still there. Anything whose failure mode is "the code is there but never
+  runs" needs a `verify:` driver, and the source check should say so rather
+  than letting the next reader take it for proof
 
 ### Promise 2 — everything by hand or by asking
 

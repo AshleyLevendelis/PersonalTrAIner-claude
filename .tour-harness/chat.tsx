@@ -29,6 +29,8 @@ import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
+import { removeExerciseFromSession } from '@/lib/session-edit'
+import { assessEdit } from '@/lib/edit-tradeoff'
 import type { UserProfile, MacroTargets } from '@/lib/types'
 
 import { BottomTabBar } from '@/components/BottomTabBar'
@@ -161,6 +163,50 @@ const crossPatternSwap = (() => {
   }
 })()
 ;(window as unknown as { __crossPatternSwap: unknown }).__crossPatternSwap = crossPatternSwap
+
+// A REMOVAL THAT COSTS A MUSCLE REAL WORK — for verify:tradeoff, 14 Sep 2026,
+// when a change that works against the goal started being ASKED about rather
+// than warned on.
+//
+// WHY IT IS COMPUTED HERE AND NOT NAMED IN THE DRIVER: the tier-2 rule is a
+// lasting drop of 40% or more in one muscle group's weekly sets, and whether a
+// given lift crosses that depends entirely on what else the generated week
+// holds. A driver naming "Barbell Bench Press" would be asserting against a
+// plan that may not contain it — the exact mistake __swapTarget's own comment
+// records. So the page runs the real engine over the real week and publishes
+// the lift that genuinely trips it, or null if none does, which is a finding
+// the driver reports rather than a check it skips.
+//
+// TODAY FIRST, THEN ANY TRAINING DAY — and the second half is not a
+// convenience. The first version searched today only and came back null every
+// time, because the harness's fixed today (2026-09-16) is a WEDNESDAY and this
+// profile trains Mon/Tue/Thu/Fri: it was looping over a rest day's empty
+// exercise list. That is the same mistake __swapTarget's comment above
+// records, made again three lines further down the same file.
+const tradeoffRemoval = (() => {
+  const todayName = DAYS[todayIdx]
+  const week = mesocycle[0]
+  const ordered = [
+    ...week.days.filter(d => d.day === todayName),
+    ...week.days.filter(d => d.day !== todayName),
+  ].filter(d => d.exercises.length > 0)
+  for (const day of ordered) {
+    for (let i = 0; i < day.exercises.length; i++) {
+      const name = day.exercises[i].name
+      const trial = removeExerciseFromSession({
+        mesocycle, profile, weekNumber: 1, dayName: day.day, exIndex: i, scope: 'permanent',
+      })
+      if (!trial.changed) continue
+      const verdict = assessEdit({
+        profile, before: mesocycle, after: trial.mesocycle, weekNumber: 1,
+        dayName: day.day, kind: 'remove', scope: 'permanent', exerciseName: name,
+      })
+      if (verdict.tier === 2) return { name, day: day.day, reason: verdict.reason }
+    }
+  }
+  return null
+})()
+;(window as unknown as { __tradeoffRemoval: unknown }).__tradeoffRemoval = tradeoffRemoval
 
 // A NAME THAT MEANS ONE THING ACROSS THE WHOLE PLAN — for verify:coach-ban.
 //
