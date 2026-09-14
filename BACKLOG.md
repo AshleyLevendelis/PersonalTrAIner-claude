@@ -2,6 +2,55 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S SWAP CARD NOW SAYS WHAT IT COSTS — the last edit surface
+  that stayed silent. And two versions of the check that proves it were
+  worthless; both were found by breaking the code, not by reading them.**
+  **WHAT CHANGES ON HER PHONE.** Ask the coach to swap an exercise and the card
+  now carries the same amber line every other edit path has carried since
+  13 Sep: "That leaves your week push-heavy — 5 pushing sets to 3 pulling." It
+  also says what the app already fixed for her on other days. A swap that costs
+  the week nothing still says nothing, so the warning keeps meaning something.
+  The weight is still left to confirm, deliberately.
+  **WHY IT WAS SILENT, AND WHY THAT REASONING WAS WRONG.** CLAUDE.md named this
+  card as the one surface still quiet, because "its builder is synchronous and a
+  faithful trial needs the async load recompute". Both halves true; the
+  conclusion did not follow. The single place that dispatches every proposal is
+  already async and already awaits two sibling builders — so the builder simply
+  awaits the same trial confirm runs. No second implementation of the cost, and
+  no risk of the card disagreeing with what the tap produces, which is the thing
+  the original silence was right to refuse. Corrected where it sat, in CLAUDE.md.
+  **THE CHECK THAT PROVED NOTHING, TWICE.**
+  *First version* asserted only that the two cards DIFFER. They always do — the
+  exercise names differ. It would have passed on a card with no cost at all. A
+  screenshot showed the real amber line and showed the check was not what made
+  it green.
+  *Second version* matched the whole card's text for a balance sentence
+  containing a number. Deleting "pushing sets to" out of the real sentence left
+  it GREEN: "Unchanged: … Sets × reps: 2×8" sits in the same card and satisfied
+  "names real set counts". The check was reading a row it was never about.
+  *Third version, the one that holds:* the card now marks each line with its own
+  severity, and the driver reads the WARN lines. Nothing else on the card is
+  one, so neither a silent card nor a neighbouring row can satisfy it — and
+  losing the marker fails a separately-named check instead of masquerading as a
+  card that went quiet. This is CLAUDE.md's property-over-mechanism rule with
+  the mechanism being "text that looks like a cost" and the property being "the
+  line the app itself calls a cost".
+  **MUTATIONS: 9 tried, 9 caught.** Five on the wiring (`coach-promises`): card
+  goes silent, cost downgraded to a note, call site stops awaiting, cost
+  invented locally instead of read from the trial, trial persisted. Four on the
+  browser driver: silence the cost (caught), strip the units out of the sentence
+  (caught by the third version, MISSED by the second), a constant cost on every
+  swap (caught), remove the severity marker (caught, by its own check).
+  **ONE MUTATION RUN CRASHED BEFORE IT APPLIED** — a quoting error in the script
+  that edits the file — and the run that followed was the clean baseline reading
+  as a mutation survived. Caught by the rule this file already carries: compare
+  how many checks RAN, not only how many failed.
+  Read off a real screen at 390x844, not inferred: the first card amber and
+  specific, the second card quiet.
+  NOT DONE: nothing here reaches Ashley's phone until the coach function is
+  deployed — this is client-side, so it ships with the frontend, but the swap
+  tool it rides on is already live.
+
 - [x] **THE SWEEP CAUGHT FOUR THINGS THE PER-CHECK RUNS DID NOT — three of
   them mine, and one of my own checks was enforcing a bug.**
   **1. THE APP CHUNK WENT 11 kB OVER.** Two new sheets shipped today and both

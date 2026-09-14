@@ -33,7 +33,7 @@ import { executeMealMove } from '@/lib/pending-action-executor'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
-import type { SwapScope } from '@/lib/mesocycle-edit'
+import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
 import { updateProfileField } from '@/lib/profile-store'
 import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from '@/lib/plan-adaptations'
@@ -1737,14 +1737,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * lives in swap-target.ts, tolerantly, and what comes back says which part
    * did not resolve.
    */
-  const buildExerciseSwapProposal = (rawArgs: Record<string, unknown>): {
+  const buildExerciseSwapProposal = async (rawArgs: Record<string, unknown>): Promise<{
     ok: true
     scopeKey: string
     preconditions: Record<string, unknown>
     payload: ExerciseSwapPayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
-  } | { ok: false; reason: string } => {
+  } | { ok: false; reason: string }> => {
     const dayArg = String(rawArgs.day ?? '')
     const oldItem = String(rawArgs.old_item ?? '')
     const newItem = String(rawArgs.new_item ?? '')
@@ -1794,6 +1794,31 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       scope,
     }
 
+    // WHAT IT COSTS THE WEEK, BEFORE THE TAP — added 14 Sep 2026 on Ashley's
+    // go-ahead, closing the one surface CLAUDE.md named as still silent.
+    //
+    // THE TRIAL IS THE SOURCE, and it is the same call confirm makes. Deriving
+    // a balance cost from the old and new exercise without running it would be
+    // a second implementation of what the settle tail does, and a card that
+    // disagrees with what confirm produces is worse than a card that says
+    // nothing — which is exactly why this was left silent rather than guessed.
+    //
+    // AWAITING IS WHY THIS IS NOW POSSIBLE. The old note said the builder was
+    // synchronous and a faithful trial needs the async load recompute. Both
+    // true; what did not follow is that the card had to stay quiet. The one
+    // dispatch site is already async and already awaits two sibling builders.
+    //
+    // THE TRIAL IS READ, NEVER SAVED. It produces a whole mesocycle and two
+    // sentences are taken off it. The payload stays the swap's DESCRIPTION;
+    // confirm does the real work against the live plan.
+    const trial = await swapExerciseInMesocycle({
+      mesocycle, profile, currentWeekNumber: activeSession.liveWeek,
+      dayName: day.day, exIndex, newExercise: newEntry, scope,
+    })
+    const impact = describeEditImpact(
+      week, trial.find(w => w.week_number === activeSession.liveWeek), day.day,
+    )
+
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_exercise_swap:${day.day}:${exIndex}`,
@@ -1803,7 +1828,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       diff: {
         rows: [{ field: 'Exercise', before: oldEx.name, after: newEntry.name }],
         unchanged: [`${day.day}'s other ${day.exercises.length - 1} exercise${day.exercises.length - 1 === 1 ? '' : 's'}`, `Sets × reps: ${oldEx.sets}×${oldEx.reps}`],
-        implications: [{ severity: 'info', text: 'Load recomputed for the new movement once you confirm.' }],
+        implications: [
+          // THE WEIGHT STAYS DEFERRED, and that part of the old note was right:
+          // the trial's weights are real, but confirm re-runs against the live
+          // plan, and quoting a number here that confirm could supersede is the
+          // thing this card was correct to refuse.
+          { severity: 'info', text: 'Load recomputed for the new movement once you confirm.' },
+          ...(impact.balancing ? [{ severity: 'info' as const, text: impact.balancing }] : []),
+          ...(impact.cost ? [{ severity: 'warn' as const, text: impact.cost }] : []),
+        ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         editable: [{ field: 'scope', options: ['today', 'permanent'] }],
         reversible: true,
@@ -3873,7 +3906,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           else refusal = custom.reason
         }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
-        const swap = buildExerciseSwapProposal(result.proposal.rawArgs)
+        const swap = await buildExerciseSwapProposal(result.proposal.rawArgs)
         if (swap.ok) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
         else refusal = swap.reason
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {

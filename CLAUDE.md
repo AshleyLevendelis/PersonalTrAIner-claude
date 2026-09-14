@@ -246,10 +246,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   and it is stated, never silent. What it could not fix is still reported as a
   cost, now on remove, swap and volume rather than remove alone
   (`edit-keeps-the-bar` §5, `session-edit` §5, `verify:session-edit` §6 reading
-  it off a real screen). ONE SURFACE STILL SILENT, named: the COACH's swap card
-  — its builder is synchronous and a faithful trial needs the async load
-  recompute, so it says nothing rather than something that might not match what
-  confirm does.
+  it off a real screen). CLOSED 14 Sep 2026 on the last surface: the COACH's
+  swap card now states the cost too, so EVERY edit path — screen and coach —
+  says what it costs the week before the tap. CORRECTED: the line here said
+  that card had to stay silent because "its builder is synchronous and a
+  faithful trial needs the async load recompute". Both halves were true and the
+  conclusion did not follow — the one place that dispatches proposals is
+  already async and already awaits two sibling builders, so the builder could
+  simply await the same trial confirm runs. The weight is still deferred, and
+  that half of the old note was right: the trial's numbers are real but confirm
+  re-runs against the live plan. `verify:swap-request` §4 reads it off a real
+  screen; `coach-promises` holds the wiring.
   CORRECTED: this said removal reported push:pull **and chest:back**. It never
   measured chest:back — `session-balance-cost.ts` defined push and pull and
   nothing else, while its own header cited the 1.25 chest:back band. It does

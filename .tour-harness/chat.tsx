@@ -135,6 +135,33 @@ const swapTarget = (() => {
 })()
 ;(window as unknown as { __swapTarget: unknown }).__swapTarget = swapTarget
 
+// A REPLACEMENT FROM A DIFFERENT DAY'S FOCUS — for verify:swap-request's cost
+// section, added 14 Sep 2026 when the coach's swap card started stating what a
+// swap costs the week.
+//
+// WHY IT HAS TO COME FROM ELSEWHERE: the card's cost sentence is the week's
+// push:pull and chest:back balance moving. Swapping a lift for another on the
+// SAME day is usually like-for-like and costs nothing, which is the correct
+// answer and proves nothing about whether the card can report a cost at all. A
+// lift off a differently-focused day is the one that moves the balance — so the
+// driver can propose both and show the card DIFFERS, which is the only way to
+// tell a real trial from a printed constant.
+const crossPatternSwap = (() => {
+  const todayName = DAYS[todayIdx]
+  const week = mesocycle[0]
+  const today = week.days.find(d => d.day === todayName)
+  if (!today || today.exercises.length === 0) return null
+  const otherDay = week.days.find(d => d.day !== todayName && d.focus !== today.focus && d.exercises.length > 0)
+  if (!otherDay) return null
+  return {
+    from: today.exercises[0].name,
+    to: otherDay.exercises[0].name,
+    fromFocus: today.focus,
+    toFocus: otherDay.focus,
+  }
+})()
+;(window as unknown as { __crossPatternSwap: unknown }).__crossPatternSwap = crossPatternSwap
+
 // A NAME THAT MEANS ONE THING ACROSS THE WHOLE PLAN — for verify:coach-ban.
 //
 // A swap is scoped to a day, so a loose name unique within that day is enough.

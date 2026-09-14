@@ -920,4 +920,55 @@ if (failures > 0) {
     /End most turns with a SPECIFIC question/.test(src), null)
 }
 
+console.log('\nEVERY EDIT CARD SAYS WHAT IT COSTS THE WEEK — including the swap (14 Sep 2026)\n')
+{
+  // THE LAST SILENT SURFACE. CLAUDE.md named it: every other edit path states
+  // its cost before the tap — removing an exercise, changing volume, adding
+  // one, moving a meal — and the coach's SWAP said nothing. The reason was real
+  // but narrow: its builder was synchronous and a faithful trial needs the
+  // async load recompute, so it stayed quiet rather than guess. What did not
+  // follow is that it had to stay quiet; the one dispatch site is already async
+  // and already awaits two sibling builders.
+  //
+  // MEASURED BEFORE BUILDING: no check anywhere referenced describeEditImpact,
+  // and nothing asserted the swap was silent. So this adds the guarantee rather
+  // than flipping one.
+  // Comments stripped before any absence is asserted — the note explaining a
+  // removal must not satisfy the check that it was removed.
+  const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const at = chat.indexOf('const buildExerciseSwapProposal')
+  const body = at === -1 ? '' : chat.slice(at, chat.indexOf('const buildExerciseAddProposal', at + 10))
+  check('the swap builder was found and bounded (sanity check on this check)', body.length > 400, body.length)
+
+  check('the swap card reads its cost from a real trial, not a second guess',
+    /await swapExerciseInMesocycle\(/.test(body), body.slice(0, 200))
+  check('...turned into words by the one shared describer',
+    /describeEditImpact\(/.test(body))
+  check('...and both halves reach the card — what was fixed, and what it cost',
+    /impact\.balancing/.test(body) && /impact\.cost/.test(body), body.slice(-400))
+  // SEVERITY IS THE DIFFERENCE BETWEEN A NOTE AND A WARNING, and the cost is
+  // the half she needs to actually see.
+  check('...with the cost carried as a warning, not a footnote',
+    /impact\.cost \?[^\n]*severity: 'warn'/.test(body), body.slice(-400))
+
+  // THE TRIAL IS READ, NEVER SAVED. It produces a whole mesocycle; two
+  // sentences come off it. A builder that persisted it would be doing the edit
+  // at propose time, which is the one thing a proposal must not do.
+  check('...and the trial is never persisted from the builder',
+    !/saveMesocycle|onMesocycleUpdated|saveMesocycleWeek/.test(body), body)
+
+  // THE WEIGHT STAYS DEFERRED. The original refusal was right about this half:
+  // the trial's weights are real, but confirm re-runs against the live plan,
+  // and a number here that confirm supersedes is worse than no number.
+  check('...while the weight is still left to confirm rather than quoted',
+    /Load recomputed for the new movement once you confirm/.test(body), body.slice(-400))
+
+  // AND THE CALL SITE ACTUALLY AWAITS IT. Without this the card renders from a
+  // Promise and every field reads undefined — the failure that would look like
+  // "the coach stopped proposing swaps" rather than like a missing await.
+  check('the one dispatch site awaits the builder',
+    /const swap = await buildExerciseSwapProposal\(/.test(chat))
+}
+
 console.log('\nAll coach-promise checks passed.\n')
