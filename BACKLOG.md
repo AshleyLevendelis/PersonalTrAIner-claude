@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [ ] **PROPOSAL ONLY — how the app should talk about a change.** Ashley,
+  14 Sep 2026: allowing any change without advising on it leaves people with
+  a plan that does not meet their goal; think about what happens now and how
+  to speak to the trade-offs. `docs/how-the-app-talks-about-a-change.md`.
+  MEASURED FIRST: every change is proposed then confirmed; the card states the
+  structural cost (balance, length, −protein) but never the cost to the GOAL;
+  the app never asks why; and the plan quality score — six dimensions, proven
+  by test to survive edits on four sample profiles — has ZERO call sites in
+  the app itself, so it is never run on a real person's real edit (11 ms).
+  The coach's sentence is written before the phone computes the card's cost.
+  PROPOSED: one principle — allowed, priced in the goal's own terms, and
+  offered a cheaper way — in four tiers (free / costs something / against the
+  goal → the coach asks first / unsafe → refused, unchanged). Reason chips on
+  swap and remove (busy · don't like · hurts · no time · don't have it · too
+  tired) as the hinge that picks the tool. A per-goal vocabulary. A two-
+  sentence shape, app-authored from the trial, shared by both surfaces so the
+  exam can grade it. A block-end review of accumulated edits.
+  ONE QUESTION PUT TO ASHLEY: how firm at tier 2 — tell-then-allow / ask-
+  first-then-allow (recommended) / reason required / refuse. Open.
+  NOTHING BUILT.
+
 - [ ] **REPORT ONLY — what every plan edit does going forward, and what a coach
   would do instead.** Ashley, 14 Sep 2026: think as a certified trainer and
   nutritionist about how swapping, removing, adding and moving affect a plan
