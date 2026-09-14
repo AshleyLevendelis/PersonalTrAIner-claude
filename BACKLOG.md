@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **MERGED TO `main` AND LIVE — thirteen commits, on Ashley's explicit word,
+  14 Sep 2026.** She asked to merge after seeing the sweep result, including
+  that eight browser drivers are red and were **already red on what her phone
+  was running**. Her reasoning, and it is right: holding finished work behind
+  unrelated old failures does not fix them.
+  **WHAT SHIPPED:** the shared settling tail on every in-place edit; shorten or
+  lighten today; the Tools 4a frame (round card always present, protocols as
+  chips); adding an exercise to a session on both surfaces; the equipment
+  classifier partition that stopped machines being prescribed as "Bodyweight";
+  the re-price primitive and the three editable weight caps; the first browser
+  driver Profile has ever had; and the day-menu check re-anchored on its
+  property.
+  **A CLEAN FAST-FORWARD**, verified before and after: `main` was an ancestor of
+  the branch, so no merge commit and no conflict resolution. `main` read back
+  from the remote as `29221cf`, not inferred from a successful push — that line
+  has been wrong here before.
+  **PROVEN LIVE, not by construction:** the Vercel PRODUCTION deployment reports
+  `state: READY` at `githubCommitSha 29221cf` off `main`. A push succeeding is
+  not evidence the deploy carries the code; the SHA on the deployment is.
+  **STILL OUTSTANDING, and it is a one-surface gap until it is done:**
+  `chat-gemini` changed in these thirteen and carries two NEW coach tools,
+  `propose_exercise_add` and `propose_session_shorten`. Until it is deployed the
+  SCREEN halves of adding an exercise and shortening today work and the COACH
+  halves do not — exactly what must-have rule 1 forbids shipping silently.
+  `deploy:functions:prod` refuses without a TTY by design, so it is Ashley's to
+  type; handed over as a copy-pasteable prompt.
+  **ALSO STILL OPEN, carried forward rather than quietly inherited:** the eight
+  pre-existing red drivers (three of them one lead — a warm-up ramp that never
+  renders); the coach exam still never run; and
+  `20260910160000_add_marked_missed`, still listed as needing a database push
+  and unverified from a cloud session.
+  **Deploys:** frontend DONE and confirmed live. `chat-gemini` outstanding.
+
 - [x] **A FULL SWEEP, AND THE FIRST HONEST COUNT OF WHAT IS ACTUALLY RED.**
   Ashley opened the app on her phone on 13 Sep and saw the old Tools tab. She
   was right and nothing was broken: production is `main`, `main` was twelve
