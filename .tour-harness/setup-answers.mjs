@@ -330,6 +330,43 @@ check('6h. ...and NO weights were silently re-priced behind it',
   { was: receiptWas, now: await text('[data-testid="reprice-receipt"]') })
 await shoot('setup-answers-5-rebuild-offer')
 
+// --- EXERCISES TO AVOID, added 14 Sep 2026 --------------------------------
+// CLAUDE.md recorded exercise dislikes as coach-only. Measured, that was half
+// wrong: this screen already listed them with edit and delete. What it could
+// not do was ADD one, and the group is hidden entirely when there are none —
+// so a first dislike had no screen route at all.
+const avoidRow = await ev(`(() => {
+  const label = [...document.querySelectorAll('span')].find(s => /^Exercises to avoid$/.test((s.textContent || '').trim()))
+  if (!label) return null
+  const box = label.parentElement
+  return {
+    hint: (box.querySelector('p')?.textContent || '').trim(),
+    hasInput: !!box.querySelector('input'),
+  }
+})()`)
+check('7a. the Profile screen offers exercises to avoid', !!avoidRow, avoidRow)
+check('7b. ...with somewhere to type one, not just a list to read',
+  !!avoidRow && avoidRow.hasInput, avoidRow)
+check('7c. ...and says what it is for in plain words',
+  !!avoidRow && avoidRow.hint.length > 10, avoidRow?.hint)
+// BESIDE FOODS TO AVOID, because they are the same kind of promise and the
+// person looking for one will look where the other is.
+// ADJACENT IN THE DOM, not within N characters of rendered text. The first
+// version measured a character distance and failed at 400 for no reason worth
+// pinning: the two rows are siblings, and how much text the tag lists happen
+// to contain between them is not the property.
+const avoidNeighbours = await ev(`(() => {
+  const labels = [...document.querySelectorAll('span')]
+  const f = labels.find(s => /^Foods to avoid$/.test((s.textContent || '').trim()))
+  const e = labels.find(s => /^Exercises to avoid$/.test((s.textContent || '').trim()))
+  if (!f || !e) return null
+  const fb = f.parentElement, eb = e.parentElement
+  return { siblings: fb.parentElement === eb.parentElement, adjacent: fb.nextElementSibling === eb }
+})()`)
+check('7d. ...in the same group as Foods to avoid', !!avoidNeighbours && avoidNeighbours.siblings, avoidNeighbours)
+check('7e. ...and right beside it', !!avoidNeighbours && avoidNeighbours.adjacent, avoidNeighbours)
+await shoot('setup-answers-6-exercises-to-avoid')
+
 // --- and is absent where it must not take effect ---------------------------
 // assembleProfile DISCARDS all three for a full-gym answer, so a row here
 // would be a control that cannot do anything — the one thing the must-have

@@ -45,6 +45,8 @@ import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invali
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
+import { resolveExerciseName } from '@/lib/set-parse'
+import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -563,6 +565,78 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     await onMemoryChanged()
   }
 
+  /**
+   * EXERCISES SHE NEVER WANTS TO SEE — added 14 Sep 2026, closing the half of
+   * this the screen could not do.
+   *
+   * CLAUDE.md recorded exercise dislikes as `coach only`. Measured on 14 Sep,
+   * that was half wrong: this screen already LISTS every exercise_preference
+   * fact with edit and delete, so an existing one could always be changed or
+   * removed here. What it could not do was ADD one — and the whole group is
+   * hidden when there are none, so a first dislike had no screen route at all.
+   * The accurate line was "edit and delete on both, add on the coach only",
+   * and this closes it.
+   *
+   * THE SAME SHAPE AS "FOODS TO AVOID", deliberately: same component, same
+   * create/delete pair, same failure handling. A dislike that silently failed
+   * to save would leave someone believing an exercise is banned when the app
+   * has no record of it — the exercise version of the one thing the dietary
+   * list must never do.
+   */
+  const exerciseDislikes = facts.filter(f => f.kind === 'exercise_preference' && f.polarity === 'dislike')
+  const exerciseDislikeValues = exerciseDislikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
+
+  const saveDislikedExercises = async (next: string[]) => {
+    if (!profileId) return
+    const added = next.filter(v => !exerciseDislikeValues.includes(v))
+    const removed = exerciseDislikes.filter(f => !next.includes(f.resolved_refs?.[0] ?? f.display_text))
+
+    // RESOLVED AGAINST THE CATALOGUE, NEVER STORED AS TYPED.
+    //
+    // The exclusion filter matches a FULL exercise name, case-insensitively
+    // (exercise-plan.ts: `ex.toLowerCase() === e.name.toLowerCase()`). So
+    // "squats" stored verbatim matches nothing the catalogue is called —
+    // the tag would sit on this screen looking like a ban and never remove a
+    // single exercise. A control that appears to work and does not is worse
+    // than no control.
+    //
+    // AND AMBIGUITY IS A QUESTION, NOT A GUESS — the rule the coach's ban card
+    // already follows, for the same reason and off the same resolver. "row"
+    // resolves to "Rowing Machine", a cardio machine; banning it on a guess is
+    // silent and permanent.
+    const resolutions: { typed: string; name: string }[] = []
+    for (const typed of added) {
+      const out = resolveExerciseDislike(typed, resolveExerciseName)
+      if (out.ok) { resolutions.push({ typed, name: out.name }); continue }
+      setSaveError(out.reason)
+      throw new Error('unresolved exercise dislike')
+    }
+
+    try {
+      await Promise.all([
+        ...resolutions.map(({ typed, name }) => createFact({
+          profileId, kind: 'exercise_preference', source: 'manual',
+          rawPhrase: typed, displayText: `won't do ${name}`,
+          polarity: 'dislike', hardness: 'hard', resolvedRefs: [name],
+        })),
+        ...removed.map(f => deleteFactPermanently(f.id)),
+      ])
+    } catch (err) {
+      console.error('Saving exercises to avoid failed:', err)
+      await reload().catch(() => {})
+      await Promise.resolve(onMemoryChanged()).catch(() => {})
+      setSaveError(
+        added.length > 0
+          ? "That wasn't saved, so it is NOT being avoided yet. Check your connection and add it again."
+          : "That wasn't removed — it's still being avoided. Check your connection and try again.",
+      )
+      throw err
+    }
+    setSaveError(null)
+    await reload()
+    await onMemoryChanged()
+  }
+
   const grouped = (['food_preference', 'exercise_preference', 'timing_rule', 'hard_constraint'] as const)
     .map(kind => ({
       kind,
@@ -942,6 +1016,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <span className="text-muted-foreground">Foods to avoid</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
               <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
+            </div>
+            {/* EXERCISES TO AVOID — the same control, the other side of the
+                app. These become the same user_facts rows a "never give me
+                burpees" chat turn produces, so the coach and the screen are
+                writing to one place rather than two. */}
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground">Exercises to avoid</span>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything you'd rather never see in a session.</p>
+              <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
                 canonical picker's tag-based checks AND the free-text

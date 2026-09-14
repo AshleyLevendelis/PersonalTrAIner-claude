@@ -178,9 +178,16 @@ facts: re-measure before acting on one, correct it here when it is wrong.
     `exercise_preference` fact with edit and delete, so an existing dislike can
     be CHANGED or REMOVED from the screen. What the screen cannot do is ADD one
     — and the group is hidden entirely when there are none, so a first dislike
-    has no screen route at all. So: **edit and delete on both, add on the coach
-    only**. The old line came from reading the profile FIELDS and not the memory
-    section below them
+    has no screen route at all. **CLOSED the same day**: "Exercises to avoid"
+    now sits beside "Foods to avoid" on Profile, so it is **both** on every
+    operation. The typed word is RESOLVED against the catalogue before it is
+    stored, because the exclusion filter matches a full exercise name — "squats"
+    stored as typed bans nothing while looking on screen exactly like a ban that
+    worked — and an ambiguous word asks which rather than guessing, the rule the
+    coach's ban card already follows off the same resolver.
+    `food-dislike-is-a-ban` §7, `verify:setup-answers` §7.
+    The old line came from reading the profile FIELDS and not the memory section
+    below them
   - The three known lifts — still `MISSING`, and now with a measured reason:
     they are a generation-time seed (`knownWorkingWeights`), not something
     `prescribeLoad` reads, so the re-price path is blind to them by design and

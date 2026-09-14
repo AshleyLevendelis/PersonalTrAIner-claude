@@ -176,3 +176,33 @@ export function compileKnownLiftOverrides(goals: UserGoalRow[]): KnownLiftOverri
   }
   return overrides
 }
+
+/**
+ * WHAT A TYPED EXERCISE DISLIKE RESOLVES TO — or why it cannot be saved.
+ *
+ * Lives here, as a pure function, because the Profile screen's own copy of it
+ * could only ever be checked by reading the source for strings. That check
+ * passed while the behaviour was gutted: a mutation that guessed on ambiguity
+ * instead of asking left both the word "ambiguous" and the "Which one did you
+ * mean" sentence sitting in a dead branch, and the regex found them. CLAUDE.md
+ * names that exact shape — "asserted a call APPEARED in the file rather than
+ * that its value was used".
+ *
+ * THE RULE IT ENFORCES: the exclusion filter matches a FULL exercise name
+ * (exercise-plan.ts, `ex.toLowerCase() === e.name.toLowerCase()`), so a word
+ * stored as typed — "squats" — bans nothing while looking on screen exactly
+ * like a ban that worked. And an ambiguous word is a QUESTION, never a guess:
+ * "row" resolves to Rowing Machine, a cardio machine, and a permanent dislike
+ * placed on a guess is silent and wide. That is the rule the coach's ban card
+ * already follows, off this same resolver.
+ */
+export function resolveExerciseDislike(typed: string, resolve: (phrase: string, plan: string[]) => {
+  resolution: string; exerciseName?: string; candidates?: { name: string }[]
+}): { ok: true; name: string } | { ok: false; reason: string } {
+  const res = resolve(typed, [])
+  if (res.resolution === 'resolved' && res.exerciseName) return { ok: true, name: res.exerciseName }
+  if (res.resolution === 'ambiguous' && res.candidates?.length) {
+    return { ok: false, reason: `"${typed}" could be ${res.candidates.map(c => c.name).slice(0, 3).join(', ')}. Which one did you mean?` }
+  }
+  return { ok: false, reason: `I don't have an exercise called "${typed}". Try the name as it appears in your plan, or tell me in chat.` }
+}

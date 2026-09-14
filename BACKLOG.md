@@ -2,6 +2,38 @@
 
 Newest first. One line each.
 
+- [x] **"EXERCISES TO AVOID" ON THE PROFILE SCREEN — closing the correction I
+  made this morning.** Earlier today I recorded that CLAUDE.md was half wrong
+  about exercise dislikes: the screen could already edit and delete them, but
+  not ADD one, and the whole group is hidden when there are none, so a first
+  dislike had no screen route at all. This closes it, beside "Foods to avoid",
+  the same control and the same failure handling.
+  **THE TRAP IT WOULD HAVE WALKED INTO.** The exclusion filter matches a FULL
+  exercise name, case-insensitively. So "squats" stored as typed matches nothing
+  the catalogue is called: the tag would sit on the Profile screen looking
+  exactly like a ban that worked, and never remove a single exercise. A control
+  that appears to work and does not is worse than no control. Every typed word
+  is now resolved against the catalogue and the RESOLVED name is what gets
+  stored — and an ambiguous word asks which one rather than guessing, which is
+  the rule the coach's ban card already follows off this same resolver, for the
+  same reason: "row" resolves to Rowing Machine, a cardio machine.
+  **A CHECK I WROTE WAS SATISFIED BY A DEAD BRANCH.** The first version tested
+  the screen's source for the word "ambiguous" and the sentence "Which one did
+  you mean". A mutation that GUESSED instead of asking left both strings sitting
+  in an unreachable branch, and the check passed. CLAUDE.md names that shape
+  exactly — asserting a call appears in the file rather than that its value is
+  used. Fixed properly rather than patched: the decision moved out of the
+  component into `resolveExerciseDislike`, a pure function the gate RUNS.
+  **MUTATIONS: 5 tried, 4 caught, 1 missed and the check rebuilt** (caught
+  after). The miss is the dead-branch one above. The caught ones: the typed word
+  stored verbatim, ambiguity guessed, anything accepted, and a "resolved"
+  verdict with no name slipping through.
+  Verified on the real screen at 390x844: the row is there, it has somewhere to
+  type, it says what it is for, and it sits immediately beside Foods to avoid.
+  Gates: `test:food-dislike-is-a-ban` §7 (new, 12 checks),
+  `verify:setup-answers` §7 (new, 5 checks).
+  Frontend deploy on merge. No function deploy, no migration.
+
 - [x] **ADD A FOOD FROM THE SCREEN — and the parity list stops being something
   you can just assert.** The rest of Ashley's meals screenshot, plus the part of
   her parity screenshot that a written list alone never answered.

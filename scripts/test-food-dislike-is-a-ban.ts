@@ -26,7 +26,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { compileFoodDislikes, compileSoftFoodPreferences, compileSoftExercisePreferences, compileExerciseExclusions } from '../src/lib/fact-compiler'
+import { compileFoodDislikes, compileSoftFoodPreferences, compileSoftExercisePreferences, compileExerciseExclusions, resolveExerciseDislike } from '../src/lib/fact-compiler'
 import type { UserFactRow } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -121,6 +121,79 @@ check('...with the app named as the thing that enforces it', /The app enforces t
 check('...and the exception scoped to dislikes only', /This exception is for food DISLIKES only/.test(prompt))
 check('the soft/hard distinction survives for everything else',
   /'soft' = a lean, not a ban/.test(prompt))
+
+console.log('\n7. An exercise dislike typed on the Profile screen actually bites')
+{
+  // ADDED 14 Sep 2026, closing the half of exercise dislikes the screen could
+  // not do — and guarding the trap that half walks straight into.
+  //
+  // THE TRAP: the exclusion filter matches a FULL exercise name
+  // (exercise-plan.ts, `ex.toLowerCase() === e.name.toLowerCase()`). A typed
+  // word stored verbatim — "squats" — matches nothing the catalogue is called,
+  // so the tag sits on the Profile screen looking like a ban and never removes
+  // a single exercise. That is a control that appears to work and does not,
+  // which is worse than no control at all.
+  const screen = readFileSync(join(ROOT, 'src/components/ProfileScreen.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const at = screen.indexOf('const saveDislikedExercises')
+  const body = at === -1 ? '' : screen.slice(at, screen.indexOf('\n  const ', at + 10))
+  check('the exercise-dislike writer was found and bounded (sanity check on this check)', body.length > 200, body.length)
+  check('it resolves what was typed through the shared decision, not its own copy',
+    /resolveExerciseDislike\(/.test(body) && !/resolution === 'ambiguous'/.test(body), body.slice(0, 400))
+  check('...and stores the RESOLVED name, never the typed one',
+    /resolvedRefs: \[name\]/.test(body) && !/resolvedRefs: \[v\]|resolvedRefs: \[typed\]/.test(body), body)
+  // AMBIGUITY IS A QUESTION, NOT A GUESS — the rule the coach's ban card
+  // already follows, off this same resolver. "row" resolves to "Rowing
+  // Machine", a cardio machine; a permanent dislike on a guess is silent and
+  // wide.
+  // THE DECISION ITSELF, RUN — not read out of the file.
+  //
+  // These two used to be regexes over the screen's source. A mutation that
+  // GUESSED on ambiguity instead of asking left both the word "ambiguous" and
+  // the "Which one did you mean" sentence in a dead branch, and the regexes
+  // found them and passed. CLAUDE.md names that shape exactly: "asserted a
+  // call APPEARED in the file rather than that its value was used." So the
+  // decision moved into resolveExerciseDislike, where it can be executed.
+  const stub = (r: string, name?: string, candidates?: { name: string }[]) =>
+    () => ({ resolution: r, exerciseName: name, candidates })
+  const resolved = resolveExerciseDislike('squats', stub('resolved', 'Barbell Back Squat'))
+  check('a resolvable word comes back as the CATALOGUE name, not what was typed',
+    resolved.ok === true && resolved.name === 'Barbell Back Squat', resolved)
+  const ambiguous = resolveExerciseDislike('row', stub('ambiguous', undefined, [{ name: 'Rowing Machine' }, { name: 'Barbell Row' }]))
+  check('...an ambiguous word is refused, never guessed', ambiguous.ok === false, ambiguous)
+  check('...and asks which, naming the candidates',
+    ambiguous.ok === false && /Which one did you mean/.test(ambiguous.reason) && ambiguous.reason.includes('Rowing Machine'), ambiguous)
+  const unknown = resolveExerciseDislike('flargle', stub('not_found'))
+  check('...an unknown word is refused and says so', unknown.ok === false, unknown)
+  check('...rather than failing silently or storing the word',
+    unknown.ok === false && /don't have an exercise called/.test(unknown.reason), unknown)
+  // A 'resolved' verdict with no NAME is still not a name. Belt and braces on
+  // the one branch that could hand back undefined and look fine.
+  const nameless = resolveExerciseDislike('squats', stub('resolved'))
+  check('...and a resolution with no name is refused too', nameless.ok === false, nameless)
+
+  check('it writes the same hard exclusion shape the compiler reads',
+    /kind: 'exercise_preference'/.test(body) && /hardness: 'hard'/.test(body) && /polarity: 'dislike'/.test(body), body)
+
+  // AND THE SHAPE IT WRITES REALLY IS THE ONE THAT BANS. Not asserted from the
+  // source above — run through the compiler, so the two halves cannot drift.
+  const written = fact({
+    kind: 'exercise_preference', polarity: 'dislike', hardness: 'hard',
+    resolved_refs: ['Barbell Back Squat'],
+  })
+  check('a dislike written this way reaches the exclusions channel',
+    compileExerciseExclusions([written]).includes('Barbell Back Squat'),
+    compileExerciseExclusions([written]))
+  // THE CONTRAST, so the line above cannot pass on a compiler that returns
+  // everything: a typed word that was never resolved must NOT look banned.
+  const verbatim = fact({
+    kind: 'exercise_preference', polarity: 'dislike', hardness: 'hard',
+    resolved_refs: ['squats'],
+  })
+  check('...and the filter is a full-name match, which is why resolving matters',
+    !compileExerciseExclusions([verbatim]).includes('Barbell Back Squat'),
+    compileExerciseExclusions([verbatim]))
+}
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)
