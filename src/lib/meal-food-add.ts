@@ -120,7 +120,13 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
     implications: [
       { severity: 'info', text: `Your ${slot} keeps everything it had — ${added} joins it at the amount you said, no re-portioning.` },
       { severity: 'info', text: `The rest of the day re-fits around it${vsBudget !== 0 ? ` (${vsBudget > 0 ? `${vsBudget} kcal over` : `${-vsBudget} kcal under`} the usual ${slot} share)` : ''}.` },
-      { severity: 'info', text: `Becomes your ${slot} for ${date}; the original stays in your ${slot} options.` },
+      // "today", not "2026-09-16" — meal-food-edit.ts's rule, which this file
+      // did not follow: a date she can read off her own phone's clock is not
+      // information, it is the app talking to itself in front of her. Invisible
+      // while this was coach-only and the sentence scrolled past in a chat
+      // bubble; found the moment it went on a screen and the screenshot was
+      // read.
+      { severity: 'info', text: `Becomes your ${slot} for ${date === input.todayDate ? 'today' : date}; the original stays in your ${slot} options.` },
     ],
     rationale: typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote.trim() ? rawArgs.origin_verbatim_quote.trim() : undefined,
     reversible: true,

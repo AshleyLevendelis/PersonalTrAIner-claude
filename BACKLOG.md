@@ -2,6 +2,55 @@
 
 Newest first. One line each.
 
+- [x] **ADD A FOOD FROM THE SCREEN — and the parity list stops being something
+  you can just assert.** The rest of Ashley's meals screenshot, plus the part of
+  her parity screenshot that a written list alone never answered.
+  **THE EXCEPTION'S REASON WAS TOO STRONG.** Three rows of the exceptions list
+  shared one sentence: "there is no free-text food entry on the screen, and
+  adding one is a design question." For adding a FOOD that is simply not true —
+  the foods the app can COST are a known list, so the screen SEARCHES it. That
+  is strictly more honest than free text: a food the app cannot cost is never
+  offered, rather than typed and then refused. Same builder, same verifier,
+  same executor as the coach's path, because two implementations of "and then
+  it becomes the meal" is how the two doors stop agreeing.
+  The other two exceptions keep their status with their reasons SEPARATED from
+  the borrowed one: asking for a dish BY NAME is a model call, not a lookup —
+  there is no list of dishes to search the way there is a list of foods.
+  **THE BIGGER FIX: A `SCREEN` CLAIM IS NOW DERIVED.** `test:coach-parity`
+  checked that every tool had a row and that the row said SCREEN or EXCEPTION.
+  Nothing checked the row was TRUE — so the list could claim a screen path that
+  did not exist, which is the failure the list was written to prevent, moved
+  one level up. It now derives it: a tool with a shared builder in `src/lib`
+  must have that builder reached from one of App's own tab roots.
+  **TWO VERSIONS OF THAT CHECK WERE WRONG, both found by running them:**
+  - The first skipped a tool when no component imported its builder — which
+    skipped exactly the case the check exists to fail on. The loop could not
+    produce a failure at all. A check that cannot fail is worse than no check,
+    and it read fine.
+  - The second counted `ChatAssistant.tsx` as a screen. Most builders are
+    DEFINED inside it, so it was proving the COACH had a builder — the opposite
+    of the claim. The coach's own client is now excluded by name, with a sanity
+    check so a rename cannot turn the exclusion into a silent no-op.
+  - And a third weakness: searching the whole components folder passed even
+    when nothing rendered the control, because the control's own file still
+    mentioned the builder. Reachability from a tab root fixes it — measured by
+    deleting the import that renders it.
+  **ONE OLD DEFECT SURFACED BY PUTTING IT ON A SCREEN.** The add card said
+  "Becomes your breakfast for 2026-09-16". `meal-food-edit.ts` has carried the
+  rule since it was written — "a date she can read off her own phone's clock is
+  not information; it is the app talking to itself in front of her" — and
+  `meal-food-add.ts` never followed it. Invisible while the sentence only
+  scrolled past in a chat bubble. Found by reading the screenshot.
+  **MUTATIONS: 7 tried, 7 caught** — a SCREEN claim with no screen path, the
+  Add-food control unwired, the Move control unwired, the raw date restored,
+  every day called "today", and two on the reachability derivation.
+  Verified on the real screen at 390x844, screenshot read: search finds
+  "almond butter", the amount is editable, the full macro cost is stated before
+  the tap, and a word the database does not know says so and points at chat.
+  Gates: `test:coach-parity` §5 (new, 9 checks; 203 → 216), `test:meal-food-add`
+  §8 (new, 4 checks), `verify:meal-food-edit` §5 (new, 8 checks).
+  Frontend deploy on merge. No function deploy, no migration.
+
 - [x] **A MEAL CAN BE MOVED TO ANOTHER SLOT, ON BOTH SURFACES — and the two
   meals swap places, resized.** Fourth of Ashley's four screenshots. This was
   the last operation on the meal grain that existed nowhere, and CLAUDE.md had

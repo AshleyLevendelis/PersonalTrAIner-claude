@@ -34,7 +34,7 @@ it is wrong.
 | `log_workout_session` | SCREEN | Exercise → finish session. |
 | `log_workout_set` | SCREEN | Exercise → the set grid's tick. |
 | `propose_concurrent_activity` | SCREEN | Profile → other sports. |
-| `propose_custom_meal` | EXCEPTION | Coach-only. Building a meal from what is in the fridge is a conversation — the screen has no free-text food entry, and adding one is a design question, not a wiring one. |
+| `propose_custom_meal` | EXCEPTION | Coach-only. NARROWED 14 Sep 2026: the "no free-text entry" half of this reason is gone — the food search built for `propose_meal_food_add` could serve here too. What is left is the real reason: a custom meal is an open-ended list of foods AND a dish name AND a decision about what the rest of the day does around it, which is a screen someone has to design, not a control to bolt onto a row. |
 | `propose_equipment_adaptation` | SCREEN | Profile → Equipment. |
 | `propose_exercise_add` | SCREEN | The session's "Add an exercise" row. Both surfaces since 13 Sep 2026. |
 | `propose_exercise_remove` | SCREEN | The exercise row's menu. |
@@ -43,8 +43,8 @@ it is wrong.
 | `propose_injury_adaptation` | SCREEN | Profile → Injuries. |
 | `propose_injury_as_lasting` | SCREEN | Profile → Injuries. |
 | `propose_injury_recovered` | SCREEN | Profile → Injuries. |
-| `propose_meal_addition` | EXCEPTION | Coach-only. Asking for a dish by name and having it re-portioned to the slot's targets needs a name and a description; the screen offers the verified pool instead. |
-| `propose_meal_food_add` | EXCEPTION | Coach-only. Same reason as `propose_custom_meal` — there is no free-text food entry on the screen. The three food EDIT tools below are on the row menu; only ADDING a food is not. |
+| `propose_meal_addition` | EXCEPTION | Coach-only. Asking for a dish BY NAME and having the app work out its ingredients is a model call, not a lookup — there is no list of dishes to search the way there is a list of foods. The screen offers the verified pool and "find more options" instead. |
+| `propose_meal_food_add` | SCREEN | The meal row's "Add food" control, since 14 Sep 2026. The old exception said this needed free-text entry the screen does not have. That reason was too strong: the foods the app can cost are a KNOWN LIST, so the screen SEARCHES it — strictly more honest than free text, because a food that cannot be costed is never offered rather than typed and then refused. |
 | `propose_meal_food_remove` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_food_replace` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_food_resize` | SCREEN | The food row's menu, since 12 Sep 2026. |

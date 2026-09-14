@@ -17,6 +17,7 @@ import type { PoolOption } from '@/lib/meal-generation'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 import { MealMoveSheet, type MealMoveContext } from './nutrition/MealMoveSheet'
+import { MealFoodAddSheet } from './nutrition/MealFoodAddSheet'
 
 /** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
 export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -534,6 +535,8 @@ function MealSlotRow({
   const [busy, setBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addNote, setAddNote] = useState<string | null>(null)
   const [moveNote, setMoveNote] = useState<string | null>(null)
   /** Which ingredient line has its edit open, by index. One at a time. */
   const [editingLine, setEditingLine] = useState<number | null>(null)
@@ -852,6 +855,22 @@ function MealSlotRow({
                 Move
               </button>
             )}
+            {/* ADD A FOOD — the last thing on this row the coach could do and
+                the screen could not. Same builder, same verifier, same
+                executor as the coach's path; the only difference is that the
+                screen picks from the food list rather than taking free text,
+                which is strictly more honest — a food the app cannot cost is
+                never offered rather than typed and then refused. */}
+            {editContextFor(option) && onMealPickApplied && (
+              <button
+                type="button"
+                onClick={() => { setAddOpen(prev => !prev); setAddNote(null) }}
+                className="text-xs text-muted-foreground"
+                data-testid="meal-food-add-open"
+              >
+                Add food
+              </button>
+            )}
             {(otherOptions.length > 0 || onFindMore) && (
               <button
                 type="button"
@@ -864,6 +883,25 @@ function MealSlotRow({
               </button>
             )}
           </div>
+
+          {addOpen && onMealPickApplied && (() => {
+            const ctx = editContextFor(option)
+            if (!ctx) return null
+            return (
+              <MealFoodAddSheet
+                ctx={{
+                  profileId: ctx.profileId, date: ctx.date, slot: ctx.slot, targets: ctx.targets,
+                  mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
+                  dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods,
+                  meal: ctx.meal,
+                }}
+                onPick={onMealPickApplied}
+                onDone={summary => { setAddOpen(false); setAddNote(summary) }}
+                onCancel={() => setAddOpen(false)}
+              />
+            )
+          })()}
+          {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
 
           {moveOpen && moveContext && onMealPickApplied && (
             <MealMoveSheet

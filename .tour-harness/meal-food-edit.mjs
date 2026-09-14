@@ -179,6 +179,67 @@ check('3e. ...and the food is gone from the meal',
       Array.isArray(gone) && gone.length === lines.length - 1 && !gone.includes(lines[0]), { was: lines, now: gone })
 await shoot('meal-food-edit-applied')
 
+// --- 5. ADDING a food, the fourth verb -----------------------------------
+// The last thing on this row the coach could do and the screen could not. The
+// written parity list called it a deliberate exception — "no free-text food
+// entry on the screen" — and that reason was too strong: the foods the app can
+// cost are a KNOWN LIST, so the screen searches it. A food that cannot be
+// costed is never offered, rather than typed and then refused.
+const tapById = t => ev('(() => { const b = document.querySelector(\'[data-testid="' + t + '"]\'); if (!b || b.disabled) return false; b.click(); return true })()')
+const byId = t => ev('(() => { const b = document.querySelector(\'[data-testid="' + t + '"]\'); return b ? b.innerText.replace(/\\s+/g, " ").trim() : null })()')
+
+check('5a. the meal row offers Add food', await ev(`!!document.querySelector('[data-testid="meal-food-add-open"]')`))
+check('5b. tapping it opens a search', await tapById('meal-food-add-open'))
+await wait(400)
+check('5c. ...with a real search field', await ev(`!!document.querySelector('[data-testid="meal-food-add-search"]')`))
+
+// A FOOD THE DATABASE HAS. Typed through the prototype setter plus an input
+// event, the way every controlled field in this harness is driven.
+await ev(`(() => {
+  const n = document.querySelector('[data-testid="meal-food-add-search"]')
+  if (!n) return false
+  n.focus()
+  Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(n, 'almond')
+  n.dispatchEvent(new Event('input', { bubbles: true }))
+  return true
+})()`)
+await wait(500)
+const results = await ev(`[...document.querySelectorAll('[data-testid="meal-food-add-result"]')].map(b => b.textContent.trim())`)
+check('5d. ...that finds foods the app can actually cost', Array.isArray(results) && results.length > 0, results)
+
+// AND A WORD IT CANNOT. The honest outcome is a sentence pointing at chat, not
+// an empty list the user has to interpret.
+await ev(`(() => {
+  const n = document.querySelector('[data-testid="meal-food-add-search"]')
+  n.focus()
+  Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(n, 'zzqqx')
+  n.dispatchEvent(new Event('input', { bubbles: true }))
+})()`)
+await wait(400)
+const nomatch = await byId('meal-food-add-nomatch')
+check('5e. a food it does not know says so, and points at chat',
+  !!nomatch && /chat/i.test(nomatch), nomatch)
+
+if (Array.isArray(results) && results.length > 0) {
+  await ev(`(() => {
+    const n = document.querySelector('[data-testid="meal-food-add-search"]')
+    n.focus()
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(n, 'almond')
+    n.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await wait(400)
+  check('5f. a found food can be chosen', await ev(`(() => {
+    const b = document.querySelector('[data-testid="meal-food-add-result"]')
+    if (!b) return false
+    b.click(); return true
+  })()`))
+  await wait(500)
+  const addPreview = await byId('meal-food-add-preview')
+  check('5g. ...and what it costs is stated BEFORE the tap', !!addPreview, addPreview)
+  check('5h. ...with real macro numbers on it', /\d+ kcal/.test(addPreview ?? ''), addPreview)
+  await shoot('meal-food-add-preview')
+}
+
 const err = await ev('window.__err ?? null')
 check('4. no uncaught error on the page', err === null, err)
 

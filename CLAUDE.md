@@ -122,8 +122,16 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 
 **Changing one meal** — mirrored from exercise, because meals are plans too
 - Replace it, regenerate it, ask for more — both; `meal-swap-rotation`
-- Add a food to it; add a meal to the day — `coach only`; `meal-food-add`,
-  `meal-addition`
+- Add a food to it — both surfaces since 14 Sep 2026. The exception list said
+  this needed free-text entry the screen does not have; that reason was too
+  strong. The foods the app can COST are a known list, so the screen searches
+  it — strictly more honest than free text, because a food that cannot be
+  costed is never offered rather than typed and then refused. `meal-food-add`,
+  `verify:meal-food-edit` §5, `coach-parity` §5.
+  Add a MEAL to the day — still `coach only`, with the real reason now
+  separated from the borrowed one: asking for a dish BY NAME and having the app
+  work out its ingredients is a model call, not a lookup. There is no list of
+  dishes to search the way there is a list of foods. `meal-addition`
 - Remove or replace one food within it — both surfaces since 12 Sep 2026;
   a removal states what it costs and offers 2-3 verified swaps (her ruling);
   `meal-food-edit`, `verify:meal-food-edit`
@@ -235,11 +243,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 ### Promise 2 — everything by hand or by asking
 
 - Every screen action has a coach path and every coach tool a screen path —
-  measured 10 Sep 2026, corrected 11 Sep: 32 coach tools; **8** things the
-  screen does that the coach cannot (banning an exercise is the eighth — see
-  the correction above), 3 the coach does that the screen cannot (add a food,
-  add a meal, custom meal — the four day-level ones closed 10 Sep; table in the
-  audit) — partial. **Adding an exercise (13 Sep) changes neither count**: it
+  measured 10 Sep 2026, corrected 11 and 14 Sep. **The written exceptions list
+  now exists and is CHECKED**: `docs/coach-screen-parity.md`, held by
+  `coach-parity`. Coach-only is down to two, each with its own reason rather
+  than a shared one: adding a MEAL by name and building a CUSTOM meal, both
+  because a dish name is a model call and not a lookup. Adding a FOOD closed
+  14 Sep. **And a SCREEN claim in that list is now DERIVED rather than
+  asserted** (`coach-parity` §5): a tool with a shared builder must have that
+  builder reached from a real tab root, excluding the coach's own client. Two
+  earlier versions of that check were wrong in ways worth remembering — one
+  skipped exactly the case it existed to fail on, the other counted
+  ChatAssistant as a screen and so proved the COACH had a builder. **Adding an exercise (13 Sep) changes neither count**: it
   existed on no surface, and arrived on both at once. Recorded because the
   obvious assumption is that a new capability moves one of these numbers. **No GENERAL gate distinguishes a declared coach tool from
   a declining stub**, which is the hole the ban error fell through;
