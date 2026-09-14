@@ -49,6 +49,20 @@ console.log('\nTHE COUNTDOWN BEFORE ROUND 1 — on the screen, real clock\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(4000)
 
+// 4b (14 Sep 2026): THE ROUND TIMER IS NO LONGER ON THE TAB. Ashley asked for
+// it to sit behind a "Timers" row with the stopwatch and the lap timer rather
+// than permanently at the top of Tools. Everything this driver checks is
+// unchanged in substance — the card, the chips, the numbers — it is two taps
+// further in. Anchored on the row's TEXT and the choice's data attribute, not
+// on position, so re-ordering the list does not break it.
+const openRoundTimer = async () => {
+  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Timers/.test((x.innerText || '').trim())); if (b) b.click(); return !!b })()`)
+  await wait(700)
+  await ev(`(() => { const b = document.querySelector('[data-timer-choice="round"]'); if (b) b.click(); return !!b })()`)
+  await wait(700)
+}
+await openRoundTimer()
+
 // RE-ANCHORED TWICE. This used to tap a tile in a six-tile grid (gone, 2a),
 // then a row that opened a setup panel (gone, 4a). What is being checked —
 // that a countdown is announced BEFORE it happens and that it really falls —

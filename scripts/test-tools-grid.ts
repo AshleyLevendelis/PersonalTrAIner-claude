@@ -52,13 +52,19 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   check('no tile table survives', !/const TILES/.test(bare), bare.match(/const TILES/)?.[0])
   check('...and no grid layout with it', !/grid-cols-2/.test(bare))
 
-  // THE ROUND CARD IS THE TAB'S CONTENT — and since 4a it is ALWAYS there,
-  // holding the total you would be starting when nothing is running. Pinned
-  // as unconditional: a card behind `roundLive &&` would be the 2a layout
-  // again, with no idle state and nothing for the chips to describe.
-  check('the round card is the tab\'s content', /<RoundCard$/m.test(tools) || /<RoundCard\s/.test(tools))
-  check('...and it is always there, not only while a round runs',
-    /live=\{roundLive\}/.test(tools) && !/\{roundLive && <RoundCard/.test(tools))
+  // THE ROUND CARD IS NOT ON THE TAB AT REST — 4b, and this REVERSES the 4a
+  // assertion that stood here ("it is always there"). Ashley, 14 Sep 2026, on
+  // the shipped screen: the round timer should not sit permanently at the top
+  // of Tools; it belongs behind a Timers row with the other two.
+  //
+  // The property is two-sided and both sides matter. At rest the card is
+  // absent, or her complaint is unfixed. While a round RUNS the card is on the
+  // tab, or a counting clock is hidden behind a row, which is worse than what
+  // she reported.
+  check('the round card exists at all', /<RoundCard/.test(tools))
+  check('...and is on the tab ONLY while a round is running',
+    /\{roundLive && \(/.test(tools) && /<RoundCard live idleConfig/.test(tools),
+    bare.match(/.{0,30}<RoundCard[^>]{0,40}/g))
   check('...and a finished round can still be written down from it', /onLogSession=\{setRoundToLog\}/.test(tools))
   check('...only once a round is started and not reset', /const roundLive =/.test(tools) && /timers\.mode === 'round' && !!timers\.roundConfig/.test(tools))
   // PAUSED STILL COUNTS. pauseRound sets running:false, and a condition that
@@ -86,20 +92,26 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // UNCONDITIONAL, like the card. `{false && <ProtocolChips` left the string
   // in place and the row off the screen — the same shape as the dead branch
   // that satisfied two checks on 9 Sep, so it is pinned the same way.
-  check('the protocols are on the tab itself',
+  // REACHABLE FROM TOOLS WITHOUT LEAVING IT — that was always the property,
+  // and it survives 4b: the sheet opens over Tools rather than routing away.
+  // What changed is that the chips are inside it rather than on the surface.
+  check('the protocols are still reachable without leaving Tools',
     /<ProtocolChips/.test(bare) && !/data-change-intervals/.test(bare)
-    && !/&&\s*<ProtocolChips/.test(bare), bare.match(/.{0,24}<ProtocolChips/)?.[0])
+    && !/window\.location\.hash = .*timer/i.test(bare), bare.match(/.{0,24}<ProtocolChips/)?.[0])
   check('...built from the preset table rather than a second list here',
     /protocolChoices\(/.test(tools) && !/'Tabata'|'EMOM'|'40\/20'/.test(bare))
   // MOUNTED IN PLACE, not routed to. Written to allow the Suspense wrapper the
   // code-split needs — the property is that the setup appears INSIDE this tab
   // when the chip is on, not that one particular JSX shape does it.
-  check('...and Custom unfolds in place rather than opening a screen',
-    /\{customOpen && \(?[\s\S]{0,120}?<RoundSetupPanel/.test(tools)
-    // NOT IN A MODAL EITHER. "In place" means under the chips on the tab; a
-    // dialog would satisfy the line above while putting the setup back behind
-    // a screen, which is the thing 4a removed.
-    && !/<DialogContent[\s\S]{0,300}?<RoundSetupPanel/.test(bare))
+  // STILL IN PLACE, now meaning "under the chips inside the timers sheet".
+  // The 4a version of this line also forbade a Dialog; under 4b the sheet IS
+  // a dialog, so that clause would forbid the layout Ashley asked for. What is
+  // still worth pinning is that Custom appears BENEATH the chips it belongs
+  // to, rather than being a further screen away — the chips and the panel in
+  // the same block, in that order.
+  check('...and Custom unfolds under the chips, not a screen further in',
+    /<ProtocolChips[\s\S]{0,400}?\{customOpen && \(?[\s\S]{0,120}?<RoundSetupPanel/.test(tools),
+    bare.match(/<ProtocolChips[\s\S]{0,60}/)?.[0])
   check('the rest timer is explained, not faked', /runs itself in the session dock/.test(tools))
   // THE SETUP PANEL IS NOT LEFT STANDING UNDER A RUNNING ROUND. It used to
   // stay mounted for as long as anything was running — which under the old
@@ -112,25 +124,64 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   const panelSrc = read('src/components/timers/TimersPanel.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('no Stopwatch / Lap / Round tab strip survives',
     !/TabsList|TabsTrigger/.test(panelSrc), panelSrc.match(/Tabs\w+/g)?.slice(0, 3))
-  check('...and the stopwatch is reached from the list, on its own',
-    /setStopwatchOpen\(true\)/.test(tools) && /<StopwatchPanel \/>/.test(tools))
-  check('...and no control claims to configure it', !/'Rest timer'/.test(bare))
+  check('...and no control claims to configure the rest timer', !/'Rest timer'/.test(bare))
+
+  // ALL THREE TIMERS, BY NAME, BEHIND ONE ROW — 4b, and the reason it is
+  // pinned on the MODE UNION rather than on three labels. Between 12 and 14
+  // Sep the tab offered "Stopwatch" as one row that called setMode('lap'):
+  // 'stopwatch' was a real mode in timer-store.ts and reachable from nowhere
+  // in the app. Ashley noticed the missing one from the outside ("the lap
+  // timer is also gone"). Reading the union means a fourth mode cannot be
+  // added and left unreachable the same way.
+  const modeUnion = read('src/lib/timer-store.ts').match(/export type TimerMode = ([^\n]+)/)?.[1] ?? ''
+  const modes = [...modeUnion.matchAll(/'([a-z]+)'/g)].map(m => m[1])
+  check(`timer-store declares ${modes.length} modes: ${modes.join(', ')}`, modes.length >= 3, modes)
+  for (const mode of modes) {
+    check(`...'${mode}' is offered by name in the timers sheet`,
+      new RegExp(`mode: '${mode}', label: '`).test(tools), tools.match(/mode: '[a-z]+', label: '[^']+'/g))
+  }
+  check('...and picking one really opens its panel',
+    /<StopwatchPanel \/>/.test(tools) && /timerPick === 'round'/.test(tools))
+  // A MODE SWITCH WIPES THE TIMER RECORD, so the chooser must refuse to walk
+  // away from a running round rather than destroying it silently.
+  // BOTH GUARDS, SEPARATELY. The first version of this check tested for the
+  // expression `roundLive && choice.mode !== 'round'` anywhere in the file —
+  // and passed with the click guard DELETED, because the same words remain in
+  // the `disabled` prop and in the subtitle beside it. Caught by mutation, not
+  // by reading. A disabled button is the visual half; the early return is what
+  // actually stops the mode switch if the button is reached any other way.
+  check('...and a live round cannot be silently wiped: the button is disabled',
+    /disabled=\{roundLive && choice\.mode !== 'round'\}/.test(tools))
+  check('...nor by the handler if it is reached anyway',
+    /if \(roundLive && choice\.mode !== 'round'\) return/.test(tools))
+
+  // GROCERY IS BACK ON TOOLS — hers, 14 Sep. Pinned on the route helper, the
+  // same property `chat-app-reality` reads to decide whether the coach may
+  // claim Tools opens the shopping list.
+  check('the grocery list is a row on Tools again', /groceryHash\(\)/.test(tools))
+  check('...with a live count rather than a fixed label', /subscribeGroceryStore/.test(tools))
 
   // ALSO HERE — four rows, four handlers, no labels pretending to be controls.
   // FROM the table TO the render — searched forward from the table's own
   // start, because '  return (' is a substring of the early return's
   // '    return (' higher up the file and indexOf would land there instead,
   // slicing an empty block and passing four checks about nothing.
-  const alsoStart = tools.indexOf('const alsoHere')
+  const alsoStart = tools.indexOf('const rows:')
   const alsoBlock = tools.slice(alsoStart, tools.indexOf('\n\n  return (', alsoStart))
   const labels = [...alsoBlock.matchAll(/label: '([^']+)'/g)].map(m => m[1])
   const handlers = [...alsoBlock.matchAll(/onClick: \(\) => (?!void)/g)].length
-  check(`four rows (${labels.length}): ${labels.join(', ')}`, labels.length === 4, labels)
-  check('...and four handlers', handlers === 4, handlers)
+  // FIVE ROWS UNDER 4b: Timers and Grocery list joined, Stopwatch left for the
+  // sheet. Counted rather than fixed at five, so the number and the list
+  // cannot drift apart.
+  check(`${labels.length} rows: ${labels.join(', ')}`, labels.length === handlers, { labels, handlers })
   check('...no handler is an empty body', !/onClick: \(\) => \{\s*\}/.test(alsoBlock))
-  for (const want of ['Stopwatch', 'Plate calculator', 'Session history', 'Your program']) {
+  for (const want of ['Timers', 'Grocery list', 'Plate calculator', 'Session history', 'Your program']) {
     check(`"${want}" is reachable`, labels.includes(want), labels)
   }
+  // THE TOUR POINTS AT SOMETHING THAT EXISTS. Its target was the round card,
+  // which is no longer on the tab at rest — a spotlight on an absent element
+  // is the tour bug this repo has already shipped once.
+  check('the tour target is on a row that is always rendered', /tour: 'toolstimer'/.test(alsoBlock))
   check('the plate calculator is really mounted', /<PlateCalculator open=\{plateOpen\}/.test(tools))
   check('the session history dialog is really mounted', /<SessionHistoryDialog open=\{historyOpen\}/.test(tools))
   check('the program row uses the route helper, not a hand-typed hash', /window\.location\.hash = programHash\(\)/.test(tools))
@@ -169,7 +220,7 @@ console.log('\n2. The counts are read, not written\n')
   check('...and an absent plan does too', /: 'Your whole plan, week by week'/.test(tools))
 }
 
-console.log('\n3. Grocery has left this tab\n')
+console.log('\n3. The grocery LIST is a screen of its own — Tools links to it, it is not rendered inline\n')
 {
   const bare = tools.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('the list is not rendered here any more', !/<GroceryList/.test(bare))

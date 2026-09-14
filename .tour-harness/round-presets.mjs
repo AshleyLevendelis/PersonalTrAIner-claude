@@ -60,6 +60,20 @@ console.log('\nONE-TAP PRESETS, ON THE REAL SCREEN\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(4000)
 
+// 4b (14 Sep 2026): THE ROUND TIMER IS NO LONGER ON THE TAB. Ashley asked for
+// it to sit behind a "Timers" row with the stopwatch and the lap timer rather
+// than permanently at the top of Tools. Everything this driver checks is
+// unchanged in substance — the card, the chips, the numbers — it is two taps
+// further in. Anchored on the row's TEXT and the choice's data attribute, not
+// on position, so re-ordering the list does not break it.
+const openRoundTimer = async () => {
+  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Timers/.test((x.innerText || '').trim())); if (b) b.click(); return !!b })()`)
+  await wait(700)
+  await ev(`(() => { const b = document.querySelector('[data-timer-choice="round"]'); if (b) b.click(); return !!b })()`)
+  await wait(700)
+}
+await openRoundTimer()
+
 // RE-ANCHORED AGAIN 13 Sep 2026 (frame 4a). The presets were a tile, then a
 // grid inside a setup panel behind a row, and are now the CHIP ROW that is the
 // tab's whole control surface. Two things changed for this driver and nothing
@@ -171,10 +185,21 @@ await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => 
 await wait(1500)
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(3500)
-// RE-ANCHORED 13 Sep 2026 (frame 4a): there is no row to come back to. What
-// "released the tab" means now is that the card is back to IDLE and the rest
-// of the tab is reachable under it.
-const released = await ev(`!!document.querySelector('[data-round-card][data-round-phase="idle"]') && /Also here/i.test(document.body.innerText)`)
+// A RELOAD PUTS THE ROUND TIMER BACK BEHIND THE ROW (4b), so the way back in
+// is the same two taps. A live round re-opens straight onto the round view —
+// the Timers row carries it — so this works whether or not one is running.
+await openRoundTimer()
+// RE-ANCHORED AGAIN 14 Sep 2026 (frame 4b). Under 4a "released the tab" meant
+// the card was back to IDLE with the list under it. Under 4b there is no card
+// on the tab at rest at all, so the property is two things instead: the TAB is
+// back to the plain list with the Timers row reading its idle subtitle rather
+// than "A round is running", and the idle card is still one tap in — which
+// openRoundTimer above has already taken.
+const released = await ev(`(() => {
+  const idleCard = !!document.querySelector('[data-round-card][data-round-phase="idle"]')
+  const t = document.body.innerText
+  return idleCard && /Everything here/i.test(t) && /Round timer, stopwatch, lap timer/i.test(t) && !/A round is running/i.test(t)
+})()`)
 check('20b. the round released the tab, so the idle card and the list are back', released === true,
   (await ev(`document.body.innerText`)).slice(0, 120))
 check('21. the Custom setup opens again', await tap('[data-protocol="custom"]') && (await wait(700), await ev(`!!document.querySelector('[data-round-setup]')`)))

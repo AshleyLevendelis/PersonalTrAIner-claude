@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
-import { Disc, History, BookOpen, Timer, ChevronRight } from 'lucide-react'
+import { Disc, History, BookOpen, Timer, ChevronRight, List, TimerReset, ArrowLeft } from 'lucide-react'
 // SPLIT OUT OF THE APP CHUNK. Neither of these is on screen when the tab
 // loads: the round setup unfolds only under the Custom chip and the stopwatch
 // opens from a row. Eagerly imported they pushed the app chunk 1 kB past its
@@ -11,7 +11,8 @@ import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getSessionHistory } from '@/lib/exercise-history'
 import { getPRCache } from '@/lib/pr-engine'
-import { programHash } from '@/lib/app-route'
+import { getAllItems, subscribeGroceryStore } from '@/lib/grocery-store'
+import { programHash, groceryHash } from '@/lib/app-route'
 import { RoundField } from '@/components/timers/RoundField'
 import { RoundCard } from '@/components/timers/RoundCard'
 import { ProtocolChips, protocolChoices } from '@/components/timers/ProtocolChips'
@@ -33,22 +34,47 @@ import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
 // WHAT 2a LEFT: the round card, one row reading "Change the intervals", and a
 // short "Also here" list. Grocery had gone to its own screen.
 //
-// WHAT 4a CHANGES, and why the row had to go with it. Choosing between six
-// protocols that each fit on one line was a tap to a second screen, a scroll,
-// a decision and a tap back — on a gym floor, between rounds. The protocols
-// are chips now, always under the card, and the card is ALWAYS PRESENT: idle
-// it holds the total time you would be starting, running it holds the clock.
-// Same box, same buttons in the same places; starting swaps the clock in and
-// nothing moves.
+// WHAT 4b CHANGES, AND IT REVERSES 4a — ASHLEY'S RULING, 14 Sep 2026, on the
+// shipped screen: *"I dont like that the round timer sits permanently at the
+// top of the page. The round timer should only be there once you select it
+// from inside the timers tab not permanently at the top of the tools section.
+// Inside tools there should be a timers tab and inside that is where you
+// select stopwatch lap timer or round timer and configure those settings."*
+// Asked which shape the tab itself should take, she chose the plain list over
+// the old six-tile grid.
 //
-// THE STOPWATCH / LAP / ROUND TAB STRIP IS GONE TOO. Round is this tab's
-// content, so a tab labelled "Round" beside it was the surface competing with
-// itself; the stopwatch is one row in "Also here" and opens on its own.
+// So: Tools is a LIST. One "Timers" row opens a sheet holding all three
+// timers the app has — `TimerMode` is 'stopwatch' | 'lap' | 'round', and 4a
+// had made only two of those reachable and neither of them by name. The round
+// card is NOT on this surface at rest.
+//
+// THE ONE THING THE RULING DOES NOT SAY, decided here and stated so it can be
+// overruled: a round that is actually RUNNING still shows its card on Tools.
+// Burying a live clock behind a row would be worse than the thing she asked to
+// fix, and "only there once you select it" is satisfied — you selected it.
+// The dock chip (BottomDock) already carries a running timer everywhere else,
+// so this is the second place it shows, not the only one.
+//
+// GROCERY IS BACK, also hers. It left on 12 Sep (6155405) and she reported it
+// missing on 14 Sep. It is a row here AND on Nutrition — one list, two doors,
+// which is what `test:chat-app-reality` now reads off these files to keep the
+// coach honest about.
 //
 // FULL SCREEN IS OPT-IN. A running round no longer seizes the tab — the card
 // is the default and RoundField renders only after "Full screen" (the flag
 // lives in useTimers, so a tab switch does not silently drop her out of it).
 // ---------------------------------------------------------------------------
+
+// THE THREE TIMERS THE APP ACTUALLY HAS. `TimerMode` in timer-store.ts is
+// 'stopwatch' | 'lap' | 'round' and this list is one entry per member — so a
+// fourth mode cannot be added without this row list going stale visibly,
+// rather than the mode simply being unreachable the way 'stopwatch' was
+// between 12 and 14 Sep 2026.
+const TIMER_CHOICES: { mode: 'round' | 'stopwatch' | 'lap'; label: string; sub: string; icon: typeof Timer }[] = [
+  { mode: 'round', label: 'Round timer', sub: 'Tabata, EMOM, intervals \u2014 or your own', icon: TimerReset },
+  { mode: 'stopwatch', label: 'Stopwatch', sub: 'Counts up, nothing else', icon: Timer },
+  { mode: 'lap', label: 'Lap timer', sub: 'Counts up and records each lap', icon: History },
+]
 
 export interface ToolsTabProps {
   profileId?: string
@@ -72,10 +98,15 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
   const todaysConditioning = (exercisePlan ?? []).find(d => d.day === dayName)?.recommendedCardio
 
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
+  const [groceryCount, setGroceryCount] = useState<{ total: number; checked: number } | null>(null)
   const [plateOpen, setPlateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [stopwatchOpen, setStopwatchOpen] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
+  // THE TIMERS SHEET, and which of the three is open inside it. `null` is the
+  // three-way chooser; the rest are the panels. One piece of state, so the
+  // sheet cannot be open on a timer it is not showing.
+  const [timersOpen, setTimersOpen] = useState(false)
+  const [timerPick, setTimerPick] = useState<'round' | 'stopwatch' | 'lap' | null>(null)
   // The finished round waiting to be written down, and the line that says it
   // was. Ashley, 12 Sep 2026: "I logged it but it doesn't show anywhere on the
   // app" — it never wrote anything, and it never said so either.
@@ -96,6 +127,27 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
     return () => { cancelled = true }
   }, [profileId])
 
+  // LIVE, NOT READ ONCE. The subtitle is a count, and a count that does not
+  // follow the list is the stale-after-write class this app has a gate for —
+  // tick an item off on the grocery screen, come back, and a fixed number
+  // would still claim the old total. subscribeGroceryStore is the same seam
+  // the grocery screen itself listens on.
+  useEffect(() => {
+    if (!profileId) return
+    let cancelled = false
+    const read = () => {
+      void getAllItems(profileId)
+        .then(rows => {
+          if (cancelled) return
+          setGroceryCount({ total: rows.length, checked: rows.filter(r => r.checked).length })
+        })
+        .catch(() => { if (!cancelled) setGroceryCount(null) })
+    }
+    read()
+    const unsubscribe = subscribeGroceryStore(read)
+    return () => { cancelled = true; unsubscribe() }
+  }, [profileId])
+
   const blockOf = (week: number) => Math.floor((week - 1) / 4) + 1
   const programSub = mesocycle && mesocycle.length > 0
     ? `${mesocycle.length} weeks · block ${blockOf(liveWeek ?? 1)} of ${Math.max(1, Math.ceil(mesocycle.length / 4))}`
@@ -108,6 +160,15 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
   const roundLive =
     timers.mode === 'round' && !!timers.roundConfig
     && (timers.running || timers.isRoundComplete || timers.isActive)
+
+  // START CLOSES THE SHEET — 4b. The card's Start button lives inside the
+  // sheet now, so without this you tap Start and keep staring at the sheet,
+  // with the running card behind it on the tab. Fires only on the transition
+  // into live, so re-opening the sheet on a running round (which the Timers
+  // row deliberately allows, to reach Pause and Log) does not slam it shut.
+  useEffect(() => {
+    if (roundLive) setTimersOpen(false)
+  }, [roundLive])
 
   // WHAT THE IDLE CARD DESCRIBES, resolved in ONE place and handed to both the
   // card and the chips. A fallback computed twice is a card describing Tabata
@@ -151,21 +212,27 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
     )
   }
 
-  const alsoHere: { label: string; sub: string; icon: typeof Timer; onClick: () => void; disabled?: boolean }[] = [
+  const rows: { label: string; sub: string; icon: typeof Timer; onClick: () => void; disabled?: boolean; tour?: string }[] = [
     {
-      // NO TILE OF ITS OWN. A stopwatch has no state worth a card — it is a
-      // number that goes up — so it sits in the list with the rest.
-      //
-      // AND IT IS BLOCKED WHILE A ROUND IS LIVE, on purpose. Switching mode
-      // clears the timer record, so this row used to destroy a running round
-      // silently on the way to a stopwatch. Under 4a the round is the tab's
-      // permanent content, which makes a silent wipe far worse than it was;
-      // saying why is the honest minimum until the two can run side by side.
-      label: 'Stopwatch',
-      sub: roundLive ? 'Finish or reset your round first' : 'With laps',
-      icon: Timer,
-      disabled: roundLive,
-      onClick: () => { if (roundLive) return; timers.setMode('lap'); setStopwatchOpen(true) },
+      // THE ONE DOOR TO ALL THREE TIMERS — 4b. It is first because it is what
+      // this tab is mostly for, and it carries the tour stop, which used to
+      // point at the round card that is no longer here at rest.
+      label: 'Timers',
+      sub: roundLive ? 'A round is running' : 'Round timer, stopwatch, lap timer',
+      icon: TimerReset,
+      tour: 'toolstimer',
+      onClick: () => { setTimerPick(roundLive ? 'round' : null); setTimersOpen(true) },
+    },
+    {
+      // BACK ON TOOLS — hers, 14 Sep. The subtitle is the live count rather
+      // than a fixed label, so the row answers "is there anything to buy"
+      // without opening it.
+      label: 'Grocery list',
+      sub: groceryCount
+        ? `${groceryCount.total} item${groceryCount.total === 1 ? '' : 's'} · ${groceryCount.checked} checked`
+        : 'This week\u2019s shopping',
+      icon: List,
+      onClick: () => { window.location.hash = groceryHash() },
     },
     {
       // "your plates" promised a plate inventory that has never existed —
@@ -203,51 +270,27 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
 
       <p className="text-[1.75rem] font-bold leading-none">Tools</p>
 
-      {/* THE TOUR STOPS HERE, not on the whole tab. Under 4a the tab is taller
-          than a phone screen — card, seven protocols, the list — and a
-          spotlight hole around all of it falls off the bottom of a 390x844
-          viewport (caught by verify:tour-real, 13 Sep 2026). The stop is
-          about the timer, so it points at the timer. */}
-      <div data-tour="toolstimer">
-        <p className="ds-label">Round timer</p>
-        <div className="mt-2.5 flex flex-col gap-3">
-          <RoundCard live={roundLive} idleConfig={idleConfig} onLogSession={setRoundToLog} />
-
-          {/* THE WHOLE CONTROL SURFACE, always visible. No row, no second
-              screen — 4a. */}
-          <ProtocolChips
-            choices={choices}
-            live={roundLive}
-            selected={roundLive ? timers.roundConfig : idleConfig}
-            customOpen={customOpen}
-            onOpenCustom={setCustomOpen}
-          />
-
-          {/* CUSTOM UNFOLDS IN PLACE, beneath the chips it belongs to, so the
-              row stays put and the card's total re-reads as she taps. */}
-          {customOpen && (
-            <Suspense fallback={null}>
-              <RoundSetupPanel onDone={() => setCustomOpen(false)} />
-            </Suspense>
-          )}
-
-          {/* THE TILE THAT LIED, REPLACED BY ONE MUTED LINE. There was a
-              "Rest timer" tile pointing at a settings screen that has never
-              existed — the rest timer is automatic and lives in the session
-              dock. One sentence says so, and nothing pretends to configure it. */}
-          <p className="text-[0.71875rem] leading-[1.45] text-muted-foreground">
-            Rest between sets runs itself in the session dock — this is for conditioning.
-          </p>
+      {/* ONLY WHEN IT IS ACTUALLY RUNNING — 4b. At rest this whole section
+          is absent and Tools is the list below; the timers live behind the
+          "Timers" row. A live round still shows, because hiding a clock that
+          is counting would be a worse bug than the one this fixes. */}
+      {roundLive && (
+        <div>
+          <p className="ds-label">Round timer</p>
+          <div className="mt-2.5 flex flex-col gap-3">
+            <RoundCard live idleConfig={idleConfig} onLogSession={setRoundToLog} />
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
-        <p className="ds-label">Also here</p>
+        <p className="ds-label">Everything here</p>
         <div className="mt-1.5">
-          {alsoHere.map((row, i) => (
+          {rows.map((row, i) => (
             <button
               key={row.label}
               type="button"
+              data-tour={row.tour}
               onClick={row.onClick}
               disabled={row.disabled}
               className="flex min-h-[44px] w-full items-center gap-3 py-3 text-left disabled:opacity-55"
@@ -264,14 +307,90 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
         </div>
       </div>
 
-      <Dialog open={stopwatchOpen} onOpenChange={setStopwatchOpen}>
-        <DialogContent className="max-w-[22rem]">
+      {/* THE TIMERS SHEET — pick one of the three, then configure it here.
+          Choosing a mode CLEARS the timer record, so the chooser refuses to
+          walk away from a live round rather than wiping it silently; that was
+          already true of the old stopwatch row and is stated on the row. */}
+      <Dialog open={timersOpen} onOpenChange={o => { setTimersOpen(o); if (!o) setCustomOpen(false) }}>
+        {/* NO max-w OVERRIDE. The stopwatch dialog this replaces carried
+            `max-w-[22rem]` (352px), which is NARROWER than DialogContent's own
+            `max-w-[calc(100%-2rem)]` (358px on a 390px phone) — so the round
+            card inside it had ~50px less room than it had on the tab and
+            "Full screen" wrapped onto two lines. Read off a screenshot, not
+            reasoned about. The default matches the tab, so the card renders
+            the same in both places. */}
+        <DialogContent className="[&_[data-slot=dialog-body]]:px-3">
           <DialogHeader>
-            <DialogTitle>Stopwatch</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {timerPick && (
+                <button
+                  type="button"
+                  aria-label="Back to the timer list"
+                  onClick={() => setTimerPick(null)}
+                  className="hit-slop-44 -ml-1 flex size-6 items-center justify-center"
+                >
+                  <ArrowLeft className="size-4" aria-hidden />
+                </button>
+              )}
+              {timerPick === 'round' ? 'Round timer' : timerPick === 'lap' ? 'Lap timer' : timerPick === 'stopwatch' ? 'Stopwatch' : 'Timers'}
+            </DialogTitle>
           </DialogHeader>
-          <Suspense fallback={null}>
-            <StopwatchPanel />
-          </Suspense>
+
+          {timerPick === null && (
+            <div data-testid="timer-choices">
+              {TIMER_CHOICES.map((choice, i) => (
+                <button
+                  key={choice.mode}
+                  type="button"
+                  data-timer-choice={choice.mode}
+                  disabled={roundLive && choice.mode !== 'round'}
+                  onClick={() => {
+                    if (roundLive && choice.mode !== 'round') return
+                    if (choice.mode !== 'round') timers.setMode(choice.mode)
+                    setTimerPick(choice.mode)
+                  }}
+                  className="flex min-h-[44px] w-full items-center gap-3 py-3 text-left disabled:opacity-55"
+                  style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+                >
+                  <choice.icon className="size-[18px] shrink-0" style={{ color: 'var(--primary-text)' }} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[0.9375rem] font-medium">{choice.label}</span>
+                    <span className="mt-0.5 block text-[0.71875rem] leading-[1.3] text-muted-foreground">
+                      {roundLive && choice.mode !== 'round' ? 'Finish or reset your round first' : choice.sub}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {timerPick === 'round' && (
+            <div className="flex flex-col gap-3">
+              <RoundCard live={roundLive} idleConfig={idleConfig} onLogSession={setRoundToLog} />
+              <ProtocolChips
+                choices={choices}
+                live={roundLive}
+                selected={roundLive ? timers.roundConfig : idleConfig}
+                customOpen={customOpen}
+                onOpenCustom={setCustomOpen}
+              />
+              {customOpen && (
+                <Suspense fallback={null}>
+                  <RoundSetupPanel onDone={() => setCustomOpen(false)} />
+                </Suspense>
+              )}
+              <p className="text-[0.71875rem] leading-[1.45] text-muted-foreground">
+                Rest between sets runs itself in the session dock — this is for conditioning.
+              </p>
+            </div>
+          )}
+
+          {(timerPick === 'stopwatch' || timerPick === 'lap') && (
+            <Suspense fallback={null}>
+              <StopwatchPanel />
+            </Suspense>
+          )}
         </DialogContent>
       </Dialog>
 

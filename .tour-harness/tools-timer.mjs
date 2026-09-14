@@ -84,14 +84,40 @@ const cardPrimary = () => ev(`(() => {
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(2500)
 
+// 4b (14 Sep 2026): THE ROUND TIMER IS NO LONGER ON THE TAB. Ashley asked for
+// it to sit behind a "Timers" row with the stopwatch and the lap timer rather
+// than permanently at the top of Tools. Everything this driver checks is
+// unchanged in substance — the card, the chips, the numbers — it is two taps
+// further in. Anchored on the row's TEXT and the choice's data attribute, not
+// on position, so re-ordering the list does not break it.
+const openRoundTimer = async () => {
+  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Timers/.test((x.innerText || '').trim())); if (b) b.click(); return !!b })()`)
+  await wait(700)
+  await ev(`(() => { const b = document.querySelector('[data-timer-choice="round"]'); if (b) b.click(); return !!b })()`)
+  await wait(700)
+}
+await openRoundTimer()
+
 // --- 1. the settled tab -----------------------------------------------------
 const settled = await text()
-check('1a. Tools leads with the timer', /round timer/i.test(settled || ''), (settled || '').slice(0, 200))
-check('1b. ...and the card is there before anything is running', await seen('[data-round-card][data-round-phase="idle"]'))
+// 4b REVERSES BOTH OF THESE, on Ashley's ruling of 14 Sep: at rest Tools leads
+// with the LIST, and there is no idle card on the tab at all. The idle card
+// still exists — it is inside the timers sheet, which `openRoundTimer` above
+// has already opened by this point, so 1b reads it there.
+check('1a. Tools leads with the list, not a timer',
+  /Everything here/i.test(settled || '') && /Timers\s*\n?\s*Round timer, stopwatch, lap timer/i.test(settled || ''),
+  (settled || '').slice(0, 200))
+check('1b. ...and the idle card is in the sheet, one tap in', await seen('[data-round-card][data-round-phase="idle"]'))
 check('1c. ...and the truth about the rest timer', /runs itself in the session dock/.test(settled || ''))
 check('1d. the six-tile grid is gone', !/Rest timer/.test(settled || ''), (settled || '').slice(0, 300))
-check('1e. Also here carries what is left', /Also here/i.test(settled || '') && /Stopwatch/.test(settled || ''))
-check('1f. ...and grocery is not on this tab at all', !/Grocery/i.test(settled || ''), (settled || '').slice(0, 400))
+// 4b: the list is the tab, and it is headed "Everything here" because it now
+// IS everything — the timers moved into it rather than sitting above it.
+check('1e. the list carries every tool, timers included',
+  /Everything here/i.test(settled || '') && /Timers/.test(settled || ''), (settled || '').slice(0, 300))
+// AND GROCERY IS BACK, which REVERSES the 12 Sep assertion that stood here.
+// Ashley reported it missing from Tools on 14 Sep; it is a row again, pointing
+// at the same one grocery screen Nutrition and Home point at.
+check('1f. ...and the grocery list is one of them again', /Grocery list/i.test(settled || ''), (settled || '').slice(0, 400))
 // THE ROW IS GONE AND THE PROTOCOLS TOOK ITS PLACE — frame 4a.
 check('1g. there is no row to a second screen any more', !(await seen('[data-change-intervals]')))
 const chipTexts = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => b.textContent.trim())`)
@@ -175,15 +201,29 @@ await wait(1500)
 
 // --- 4. the card, not the flood ---------------------------------------------
 check('4a. a running round shows as a card', await seen('[data-round-card]'))
-check('4b. ...and does NOT take the whole tab', /Also here/i.test((await text()) || ''), (await text() || '').slice(0, 300))
+// STILL THE POINT OF THIS CHECK: a running round is a card on the tab, not a
+// takeover — the list is still under it. Re-anchored off the heading text,
+// which 4b renamed.
+check('4b. ...and does NOT take the whole tab', /Everything here/i.test((await text()) || ''), (await text() || '').slice(0, 300))
 const readySample = await cardPrimary()
 check('4c. the card offers Pause while it runs', readySample?.label === 'Pause' || readySample?.label === 'Resume', readySample)
-// THE STOPWATCH ROW IS BLOCKED WHILE A ROUND IS LIVE, and says why — switching
-// mode clears the timer record, so the old row destroyed a running round on
-// the way to a stopwatch. Under 4a the round is the tab's permanent content,
-// which makes a silent wipe far worse than it was.
+// THE STOPWATCH IS BLOCKED WHILE A ROUND IS LIVE, and says why — switching
+// mode clears the timer record, so choosing one used to destroy a running
+// round on the way to a stopwatch. Under 4b the choice lives in the timers
+// sheet, so the sheet has to be open to read it; everything the check asserts
+// about it is unchanged.
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Timers/.test((x.innerText || '').trim())); if (b) b.click(); return !!b })()`)
+await wait(700)
+// WHILE A ROUND IS LIVE the row opens straight onto the round view — the
+// running clock is what you almost certainly wanted — so the chooser is one
+// Back away. That the way back EXISTS is part of what this checks: a sheet
+// that opened onto the round with no exit would strand the other two timers.
+check('4c2. ...and the sheet offers a way back to the other timers',
+  await ev(`!!document.querySelector('[aria-label="Back to the timer list"]')`))
+await ev(`(() => { const b = document.querySelector('[aria-label="Back to the timer list"]'); if (b) b.click(); return !!b })()`)
+await wait(500)
 const swRow = await ev(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => /^Stopwatch/.test((x.textContent||'').trim()))
+  const b = document.querySelector('[data-timer-choice="stopwatch"]')
   return b ? { disabled: b.disabled, text: b.textContent.trim() } : null
 })()`)
 check('4d. the stopwatch cannot silently wipe the running round', swRow?.disabled === true, swRow)
@@ -205,6 +245,11 @@ check('5d. back to the card, round still running', await seen('[data-round-card]
 // are in, says which round it WILL change, and can be taken back.
 const roundNow = () => ev(`document.querySelector('[data-round-card]')?.innerText?.match(/ROUND (\\d+) OF (\\d+)/i)?.slice(1)?.join('/') || ''`)
 await wait(9500)
+// 4b: starting a round CLOSES the timers sheet (you asked for a round, you get
+// the tab back with the clock on it), so the chips are two taps away again.
+// The Timers row opens straight onto the round view while one is live, which
+// is why this is the same helper and not a special case.
+await openRoundTimer()
 const beforeQueue = await roundNow()
 check('6a. the round is under way and says where it is', /^\d+\/\d+$/.test(beforeQueue), beforeQueue)
 check('6b. tapping a different protocol mid-round', await tapSel('[data-protocol="tabata"]'))

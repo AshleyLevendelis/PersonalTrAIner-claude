@@ -2,6 +2,76 @@
 
 Newest first. One line each.
 
+- [x] **TOOLS 4b — SHE SAW 4a ON HER PHONE AND REVERSED IT, and she was right.**
+  Ashley, 14 Sep 2026, within minutes of the merge landing: *"I dont like that
+  the round timer sits permanently at the top of the page. The round timer
+  should only be there once you select it from inside the timers tab not
+  permanently at the top of the tools section. Inside tools there should be a
+  timers tab and inside that is where you select stopwatch lap timer or round
+  timer and configure those settings."* Plus: the grocery list and the lap
+  timer had both gone. Asked which shape the tab should take, she chose a plain
+  list over the old six-tile grid.
+  **THREE REPORTS, AND ONLY ONE WAS WHAT IT LOOKED LIKE — measured first.**
+  1. **The round card.** Real, and exactly as described. Now on the tab ONLY
+     while a round is running; at rest Tools is the list.
+  2. **The grocery list.** Real, but it left on 12 Sep (6155405), not in the
+     merge she had just taken. Back as a row, with a live count that follows
+     the list rather than a fixed label.
+  3. **The lap timer was never gone.** `StopwatchPanel` has a Lap button and a
+     lap list, and the row called setMode('lap'). What was actually missing was
+     the PLAIN STOPWATCH: `TimerMode` is 'stopwatch' | 'lap' | 'round', 4a
+     collapsed two of them into one row named for one and behaving as the
+     other, and 'stopwatch' was reachable from nowhere in the app for two days.
+     She spotted a real defect from the outside and named it as its neighbour.
+  **SO THE CHECK IS PINNED ON THE MODE UNION, not on three labels.**
+  `test:tools-grid` now reads `TimerMode` out of timer-store.ts and asserts one
+  named row per member. A fourth mode cannot be added and left unreachable the
+  same way.
+  **THE ONE THING SHE DID NOT RULE ON, decided and stated so it can be
+  overruled:** a round that is actually RUNNING still shows its card on Tools.
+  Hiding a counting clock behind a row would be worse than what she reported,
+  and "only there once you select it" is satisfied — you selected it.
+  **THREE TRUTH-KEEPING GATES FIRED, all three correctly, and the second and
+  third are the interesting ones.**
+  - `chat-app-reality` refused the grocery row until the coach prompt admitted
+    Tools opens the shopping list. Exactly the property CLAUDE.md describes it
+    being re-anchored on.
+  - It also exposed that the SAME bullet still described *"one-tap presets
+    behind \"Change the intervals\""* — a control deleted on 13 Sep. The coach
+    had been describing a button that was not there since yesterday's merge,
+    and nothing caught it, because that half of the bullet is not property-
+    anchored to anything.
+  - `coach-rules-sync` then caught that the block is shared VERBATIM with
+    `onboarding-chat` via `_shared/coach-rules.ts` and I had edited one side.
+  **THE TOUR WAS WRONG TOO, and no gate holds it.** Its Tools stop said the
+  protocols were *"right here"* and pointed at the round card — both false the
+  moment the card left the tab. Corrected by hand. CLAUDE.md already names the
+  tour's copy as `UNGUARDED` for exactly this class of claim and records it
+  being wrong once before, over this same grocery/Tools move. Twice now.
+  **MUTATIONS: 6 tried, 6 caught — 5 on the first pass.** The miss is worth the
+  space: a check that the live round cannot be silently wiped by picking
+  another timer tested for the expression `roundLive && choice.mode !== 'round'`
+  ANYWHERE in the file, and passed with the click guard deleted, because the
+  same words survive in the `disabled` prop beside it. The same shape as the
+  9 Sep pair that asserted a call APPEARED rather than that its value was used.
+  Split into two checks, one per guard, and both now fail alone.
+  **TWO THINGS READ OFF SCREENSHOTS, not from any check.** The timers sheet
+  carried `max-w-[22rem]`, NARROWER than DialogContent's own default, so the
+  round card had ~50px less than on the tab; then `whitespace-nowrap` on "Full
+  screen" fixed the wrap and caused an overflow that cut "Tabata" off. Settled
+  on reduced sheet padding: nothing is clipped, and "Full screen" takes two
+  lines. **Named, not fixed** — chasing it further traded one visible defect
+  for a worse one twice already.
+  **VERIFIED:** `verify:tools-timer`, `verify:round-presets`,
+  `verify:round-lead-in` all green after re-anchoring (the round timer is two
+  taps further in, so each driver opens it first); `test:tools-grid`,
+  `chat-app-reality`, `coach-rules-sync`, `round-presets`, `round-logging`,
+  `timer-intent-copy`, `says-what-it-contains`, `a11y`, `tsc` clean. Three
+  screenshots read at 390x844. `test:bundle` still fails on its stale 444 kB
+  expectation, unchanged and pre-existing.
+  **Deploys:** frontend on merge — **AND `chat-gemini`, now for two reasons**:
+  the two coach tools from yesterday, and this corrected app description.
+
 - [x] **MERGED TO `main` AND LIVE — thirteen commits, on Ashley's explicit word,
   14 Sep 2026.** She asked to merge after seeing the sweep result, including
   that eight browser drivers are red and were **already red on what her phone

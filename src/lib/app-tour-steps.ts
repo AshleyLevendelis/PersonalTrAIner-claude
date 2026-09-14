@@ -126,10 +126,17 @@ export const TOUR_STEPS: TourStep[] = [
     //
     // The target moved from the whole tab to the timer section, because 4a
     // made the tab taller than a phone screen and the spotlight hole fell off
-    // the bottom of it.
+    // the bottom of it. Under 4b (14 Sep 2026) it points at the Timers ROW,
+    // because the card it used to point at is no longer on the tab at rest.
+    //
+    // AND THE COPY MOVED WITH IT. It said the protocols were "right here",
+    // which stopped being true the moment they went behind this row. The tour
+    // has no gate holding it to what the app contains — CLAUDE.md names that
+    // as unguarded and already wrong once, over this same grocery/Tools move —
+    // so it is corrected by hand and by reading the screen, not by a check.
     key: 'tools', tab: 'tools', target: 'toolstimer',
     nav: 'navTools', tapHint: 'Tap Tools', teaser: 'Two doors left.',
-    copy: 'Your interval timer, and every protocol right here — Tabata, EMOM, or your own. Start one and it keeps going while you use the rest of the app.',
+    copy: 'All three timers live behind here — a round timer with every protocol (Tabata, EMOM, or your own), a stopwatch, and a lap timer. Start one and it keeps going while you use the rest of the app.',
   },
   {
     key: 'settings', tab: 'tools', target: 'settings',
