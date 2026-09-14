@@ -156,6 +156,34 @@ check('2e. ...each a food with an amount', (offered||[]).length > 0 && offered.e
 await ev(`document.querySelector('[data-meal-food-edit]')?.scrollIntoView({ block: 'center' })`); await wait(400)
 await shoot('meal-food-edit-cost')
 
+// --- 2f. WHAT IT COSTS THE GOAL, not just what it does to the meal ---------
+//
+// Added 14 Sep 2026 with the meal trade-off. The card above already said the
+// calories and named swaps — a readout of one meal's numbers. What it never
+// said was what that does to the DAY against the person's target, which is the
+// only thing a coach would actually lead with.
+//
+// THIS IS HERE BECAUSE A SOURCE CHECK CANNOT SEE IT. Measured the same day:
+// discarding the verdict inside the sheet (`const t = null`) left the call to
+// assessMealEdit sitting in the file and test:meal-tradeoff's "the SCREEN runs
+// it too" still green — the exact call-appears-but-value-unused shape
+// CLAUDE.md names. Only the rendered card can tell the difference.
+//
+// PROPERTY, NOT PHRASE. It checks that the day and a target are spoken about
+// in grams — not the sentence, which lives in one phrasebook and is free to be
+// reworded there.
+const goalCost = (card || '').match(/(\d+)\s*g protein[\s\S]{0,60}?(\d+)\s*g target/i)
+check('2f. the card says what the change costs the DAY, against the target', goalCost !== null,
+  (card || '').slice(-320))
+if (goalCost) {
+  const [, after, targetG] = goalCost
+  check('2g. ...and the day it names is genuinely short of that target',
+    Number(after) < Number(targetG), { after, target: targetG })
+}
+// Never a refusal, on either surface: Apply is still there to tap.
+check('2h. ...and the change is still one tap away, never blocked',
+  await ev(`[...document.querySelectorAll('button')].some(b => /^Apply/i.test((b.textContent||'').trim()))`) === true)
+
 // --- 3. applying it moves the day by exactly that much ---------------------
 const promised = kcalCost ? Number(kcalCost[1]) : null
 check('3a. applying the change', await tapApply())

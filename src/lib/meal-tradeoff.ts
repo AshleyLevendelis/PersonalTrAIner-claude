@@ -33,8 +33,8 @@
 // See docs/plans/meals-are-plans-too.md.
 // ---------------------------------------------------------------------------
 
-import type { MacroTargets, UserProfile, FitnessGoal } from './types'
-import type { Tradeoff, TradeoffAlternative } from './edit-tradeoff'
+import type { MacroTargets, FitnessGoal } from './types'
+import type { Tradeoff, TradeoffAlternative } from './tradeoff-shape'
 
 /** Every meal path that CHANGES the plan. */
 export type MealEditKind =
@@ -72,7 +72,14 @@ export const REPEAT_CHANGES_THIS_BLOCK = 3
 export const CALORIE_OVERSHOOT_FRACTION = 0.1
 
 export interface MealEditContext {
-  profile: UserProfile
+  /**
+   * JUST THE GOAL, not a whole profile — because the goal is all this decides
+   * anything from, and saying so is what stops a caller manufacturing a
+   * profile-shaped object to satisfy a signature. The Nutrition sheet has no
+   * profile in scope and would have had to fake one; a cast that adds fields
+   * the object does not really have always compiles and can never be checked.
+   */
+  goal: FitnessGoal
   /** The day's living targets — the same numbers the Nutrition tab shows. */
   targets: MacroTargets | null
   /** The whole day's planned+eaten macros BEFORE this change. */
@@ -138,8 +145,7 @@ function alternativesFor(ctx: MealEditContext): TradeoffAlternative[] {
  * trial, exactly as the exercise side does. Reads, never writes.
  */
 export function assessMealEdit(ctx: MealEditContext): Tradeoff {
-  const { profile, targets, dayBefore, dayAfter, kind, slot } = ctx
-  const goal = (profile.fitness_goal ?? 'hypertrophy') as FitnessGoal
+  const { goal, targets, dayBefore, dayAfter, kind, slot } = ctx
 
   // NO TARGETS, NO JUDGEMENT. Without the day's numbers there is nothing to
   // measure against, and a guess about somebody's protein is worse than

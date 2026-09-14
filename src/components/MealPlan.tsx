@@ -10,7 +10,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
-import type { MacroTargets } from '@/lib/types'
+import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
@@ -45,6 +45,12 @@ interface MealPlanProps {
   /** Sum of the chosen options' macros. */
   totals: MacroTargets
   targets: MacroTargets | null
+  /**
+   * The goal a change is judged against — JUST the goal, because that is all
+   * the trade-off decides anything from. See MealEditContext for why this is
+   * not the whole profile.
+   */
+  fitnessGoal?: FitnessGoal
   isGenerating: boolean
   /**
    * Set when a (re)generate call failed or came back empty for one or more
@@ -99,6 +105,7 @@ interface MealPlanProps {
  * mirroring ExerciseRow's collapsed/expanded contract.
  */
 export function MealPlan({
+  fitnessGoal,
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
@@ -349,7 +356,7 @@ export function MealPlan({
             onMealPickApplied={onMealPickApplied}
             editContextFor={o => (profileId && targets && onMealPickApplied)
               ? {
-                  profileId, date, slot, targets,
+                  profileId, date, slot, targets, fitnessGoal,
                   mealsPerDay, includeSnacks,
                   dietaryPreferences: dietaryPreferences ?? [],
                   dislikedFoods: avoidFoods ?? [],
@@ -357,6 +364,12 @@ export function MealPlan({
                   // WHAT SHE IS ALREADY BEING SERVED, across every slot, so a
                   // removal's swaps lead with foods from her own plan.
                   pantryFoods: SLOT_ORDER.flatMap(sl => (chosen[sl]?.ingredients ?? []).map(formatIngredient)),
+                  // THE DAY AS IT STANDS. `totals` is already the sum of the
+                  // chosen options' macros — the number this screen renders at
+                  // the top — so the sheet judges against exactly what she is
+                  // looking at. Recomputing it here would be a second view of
+                  // one number, free to drift.
+                  dayTotals: totals,
                 }
               : null}
             moveContext={(profileId && targets && onMealPickApplied)

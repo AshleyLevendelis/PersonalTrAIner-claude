@@ -358,8 +358,17 @@ console.log('\n7. Tier 2 is an ask, not a block')
 {
   const src = readFileSync(join(ROOT, 'src/lib/edit-tradeoff.ts'), 'utf8')
   const stripped = stripComments(src)
-  check('the "do it anyway" chip is exported for every caller to use', /export const DO_IT_ANYWAY/.test(stripped))
+  // EXECUTED, AND WHICH FILE IT LIVES IN IS NOT THE POINT. This grepped
+  // edit-tradeoff.ts for `export const DO_IT_ANYWAY`, so moving the chip into
+  // tradeoff-shape.ts (14 Sep 2026, to keep the exercise catalogue out of the
+  // Nutrition screen's bundle) turned it red over a property that had not
+  // changed — the chip was still exported, still re-exported from here, still
+  // on every ask. The property is that a tier-2 verdict RENDERS it.
+  check('the "do it anyway" chip is importable by every caller',
+    typeof DO_IT_ANYWAY === 'string' && DO_IT_ANYWAY.length > 0, DO_IT_ANYWAY)
   check(`...and it reads as permission, not a warning`, /Do it anyway/.test(DO_IT_ANYWAY))
+  check('...and every tier-2 ask actually carries it',
+    askText({ tier: 2, cost: 'x', alternatives: [], question: 'Really?', reason: 'r' }).includes(DO_IT_ANYWAY))
   // Nothing in this module may refuse. Tier 3 lives in the builders and this
   // file must not grow a second home for it.
   check('no tier above 2 exists here', !/tier:\s*3/.test(stripped))

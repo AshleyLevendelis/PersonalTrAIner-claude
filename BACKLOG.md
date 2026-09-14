@@ -48,9 +48,24 @@ Newest first. One line each.
   not exist until the screenshot produced it.
   Plan: `docs/plans/meals-are-plans-too.md`. New: `test:meal-tradeoff`,
   `verify:meal-tradeoff`.
-  **STILL EXERCISE-ONLY, named rather than omitted:** the Nutrition screen's own
-  row menu reaches the same builders but has not been wired, so this is the
-  COACH surface today. Next.
+  **BOTH SURFACES NOW.** The Nutrition screen's food sheet says the same
+  sentence, from the same phrasebook. A sheet has no conversational turn to ask
+  in, so it takes the shape the coach already falls back to when an ask is
+  guarded out: the cost stated, the cheaper route offered, Apply untouched.
+  That is a decision, not an omission, and the gate says so.
+  **A BUNDLE REGRESSION THAT WAS REALLY A DEPENDENCY BUG.** Wiring the sheet
+  made it import two pure helpers, and behind them came the 5,000-line exercise
+  CATALOGUE and the plan-quality SCORER — into the chunk every person downloads
+  before they see anything. The app chunk went 920 → 944 kB and `test:bundle`
+  caught it. Raising the budget would have been wrong twice: a nutrition sheet
+  has no business depending on the exercise catalogue at all, so the size was
+  the symptom and the dependency was the defect. The verdict and its plumbing
+  moved to their own module; the exercise assessment kept the heavy imports.
+  915 kB now — smaller than before this work started.
+  **AND A CHECK RE-ANCHORED BY THAT MOVE:** `test:edit-tradeoff` grepped one
+  FILE for the "Do it anyway" export, so relocating it went red over a property
+  that had not changed. It now executes a tier-2 ask and looks for the chip in
+  what comes out.
 
 - [x] **FIXED — four of the five things Ashley hit while training, 14 Sep 2026.**
   **1. ONE LIFT, ONE NUMBER.** Her words: *"the main header prominently displays

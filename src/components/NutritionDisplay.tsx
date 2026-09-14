@@ -390,6 +390,7 @@ export function NutritionDisplay({
       {macroNudge && <TrainerNudge text={macroNudge} openChat />}
 
       <MealPlan
+        fitnessGoal={profile.fitness_goal}
         profileId={profileId}
         date={date}
         pools={pools}

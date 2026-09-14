@@ -22,7 +22,7 @@ import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
-import type { ConcurrentActivity } from '@/lib/types'
+import type { ConcurrentActivity, FitnessGoal } from '@/lib/types'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
@@ -626,7 +626,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const priorCostlyChangesThisBlock = [...readAskedKeys()].filter(k => k.startsWith(prefix)).length
 
     const ctx: MealEditContext = {
-      profile, targets: macros, dayBefore, dayAfter, kind, slot, foodName,
+      goal: (profile.fitness_goal ?? 'hypertrophy') as FitnessGoal,
+      targets: macros, dayBefore, dayAfter, kind, slot, foodName,
       priorCostlyChangesThisBlock,
     }
     return { verdict: assessMealEdit(ctx), key, scope: 'permanent' }

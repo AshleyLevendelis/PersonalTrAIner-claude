@@ -25,7 +25,7 @@ import {
   type MealEditContext,
 } from '../src/lib/meal-tradeoff'
 import { DO_IT_ANYWAY, askText, shouldAsk, downgradeToCard, applyTradeoff } from '../src/lib/edit-tradeoff'
-import type { MacroTargets, UserProfile } from '../src/lib/types'
+import type { MacroTargets, FitnessGoal } from '../src/lib/types'
 
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -34,7 +34,7 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 }
 
 const TARGETS: MacroTargets = { calories: 2400, protein: 150, carbs: 250, fat: 80 }
-const profileFor = (goal: string) => ({ fitness_goal: goal } as unknown as UserProfile)
+
 
 /** A day sitting exactly on target, which every case below moves away from. */
 const onTarget: MacroTargets = { ...TARGETS }
@@ -42,7 +42,7 @@ const day = (protein: number, calories = TARGETS.calories): MacroTargets =>
   ({ ...TARGETS, protein, calories })
 
 const ctx = (over: Partial<MealEditContext> = {}): MealEditContext => ({
-  profile: profileFor('hypertrophy'),
+  goal: 'hypertrophy' as FitnessGoal,
   targets: TARGETS,
   dayBefore: onTarget,
   dayAfter: onTarget,
@@ -85,20 +85,20 @@ console.log('\n3. The question names the goal\'s own terms, never a score')
 console.log('\n4. Calories cut the way the GOAL cuts, not one way for everybody')
 {
   const over = day(TARGETS.protein, TARGETS.calories * (1 + CALORIE_OVERSHOOT_FRACTION + 0.05))
-  const cutting = assessMealEdit(ctx({ profile: profileFor('fat_loss'), dayAfter: over }))
+  const cutting = assessMealEdit(ctx({ goal: 'fat_loss' as FitnessGoal, dayAfter: over }))
   check('fat loss going OVER is asked about', cutting.tier === 2, cutting)
   check('...in deficit language, not protein language', /deficit/i.test(cutting.question ?? ''), cutting.question)
 
   // THE SAME DAY, a different goal. Going over is not a failure when growing.
-  const growing = assessMealEdit(ctx({ profile: profileFor('hypertrophy'), dayAfter: over }))
+  const growing = assessMealEdit(ctx({ goal: 'hypertrophy' as FitnessGoal, dayAfter: over }))
   check('the SAME day on a hypertrophy block is not asked about', growing.tier < 2, growing)
 
   // And the mirror: under-eating is the failure for everybody who is not cutting.
   const short = day(TARGETS.protein, TARGETS.calories * 0.8)
   check('under-eating on a growth block costs something',
-    assessMealEdit(ctx({ profile: profileFor('hypertrophy'), dayBefore: onTarget, dayAfter: short })).tier >= 1)
+    assessMealEdit(ctx({ goal: 'hypertrophy' as FitnessGoal, dayBefore: onTarget, dayAfter: short })).tier >= 1)
   check('...while under on a fat-loss block is not a complaint',
-    assessMealEdit(ctx({ profile: profileFor('fat_loss'), dayBefore: onTarget, dayAfter: short })).tier === 0)
+    assessMealEdit(ctx({ goal: 'fat_loss' as FitnessGoal, dayBefore: onTarget, dayAfter: short })).tier === 0)
 }
 
 console.log('\n5. The repetition, which no single card can see')
@@ -118,7 +118,7 @@ console.log('\n6. Never blocked — the escape is always one tap')
 {
   for (const t of [
     assessMealEdit(ctx({ dayAfter: day(90) })),
-    assessMealEdit(ctx({ profile: profileFor('fat_loss'), dayAfter: day(TARGETS.protein, 3000) })),
+    assessMealEdit(ctx({ goal: 'fat_loss' as FitnessGoal, dayAfter: day(TARGETS.protein, 3000) })),
     assessMealEdit({ ...ctx(), priorCostlyChangesThisBlock: 5 }),
   ]) {
     check(`tier ${t.tier} offers a cheaper route`, t.alternatives.length > 0, t)
@@ -152,7 +152,7 @@ console.log('\n7. The question never offers a route the chips do not carry')
 
   // The general property, over every tier-2 shape this module can produce.
   for (const t of [without, withOne,
-    assessMealEdit(ctx({ profile: profileFor('fat_loss'), dayAfter: day(TARGETS.protein, 3000) })),
+    assessMealEdit(ctx({ goal: 'fat_loss' as FitnessGoal, dayAfter: day(TARGETS.protein, 3000) })),
     assessMealEdit({ ...ctx(), priorCostlyChangesThisBlock: 5 })]) {
     if (!t.question) continue
     const promised = /higher-protein/i.test(t.question)
@@ -217,6 +217,30 @@ console.log('\n9. It plugs into the plumbing the exercise side already uses')
   const diff = applyTradeoff({ rows: [], implications: [{ severity: 'info' as const, text: 'Protein 150g → 90g' }] }, carded)
   check('...and the cost lands on the card as a warning',
     diff.implications?.some(i => i.severity === 'warn' && !!i.text) === true, diff.implications)
+}
+
+console.log('\n10. BOTH SURFACES, and the screen is the guarded-out shape by construction')
+{
+  const { readFileSync } = await import('fs')
+  const { join, dirname } = await import('path')
+  const { fileURLToPath } = await import('url')
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const chat = strip(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
+  const sheet = strip(readFileSync(join(ROOT, 'src/components/nutrition/MealFoodEditSheet.tsx'), 'utf8'))
+
+  check('the coach runs it', /assessMealEdit\(/.test(chat))
+  check('the SCREEN runs it too', /assessMealEdit\(/.test(sheet))
+  // ONE PHRASEBOOK. The two surfaces may differ on whether it becomes a
+  // question; they must not differ on the sentence, which is what the coach
+  // exam grades.
+  check('...and neither writes its own sentence',
+    !/protein against a/i.test(chat) && !/protein against a/i.test(sheet))
+  // A sheet has no conversational turn to ask in, so it takes the shape the
+  // coach falls back to when an ask is guarded out. Stated here so the
+  // difference reads as a decision rather than an omission.
+  check('the screen takes the guarded-out shape deliberately', /downgradeToCard\(/.test(sheet))
+  check('...and never blocks: it has no shouldAsk of its own', !/shouldAsk\(/.test(sheet))
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
