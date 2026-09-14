@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -1888,6 +1888,127 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         editable: [{ field: 'scope', options: ['today', 'permanent'] }],
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_exercise_ban's card — "never give me burpees again".
+   *
+   * THE LAST THING A SCREEN COULD DO THAT CHAT COULD NOT, wired 14 Sep 2026 on
+   * Ashley's instruction. The server used to decline it and point at the ban
+   * button in the exercise row's menu.
+   *
+   * THE CARD'S JOB IS THE BLAST RADIUS. A ban is not a removal: it reaches every
+   * week of every block, and where no substitute exists the slot goes entirely.
+   * That is invisible from a chat sentence, so the card counts the sessions it
+   * would touch, across the whole plan, and says so BEFORE the tap — which is
+   * more than the screen's own ban button does.
+   *
+   * NO SCOPE, deliberately. Every other exercise tool offers today/permanent;
+   * offering it here would imply a ban could be narrow, and it cannot be.
+   */
+  const buildExerciseBanProposal = (rawArgs: Record<string, unknown>): {
+    ok: true
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: ExerciseBanPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { ok: false; reason: string } => {
+    const item = String(rawArgs.item ?? '').trim()
+    if (!item) return { ok: false, reason: 'Which exercise did you want me to stop giving you?' }
+    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+
+    // Resolved against the CATALOGUE, so the ban is recorded under the name the
+    // app prescribes by rather than the one they typed — a fact keyed to
+    // "burpee" would not match "Burpees" at the next regeneration.
+    // THE PLAN FIRST, THE CATALOGUE SECOND — and that order is the whole fix.
+    //
+    // The first version handed the plan's names to resolveExerciseName as a
+    // preference list and trusted the answer. Asking to ban "row" came back
+    // "Rowing Machine" — a cardio machine nowhere near the Seated Cable Row on
+    // the plan — because the catalogue has a closer-looking prefix match. That
+    // would have recorded a permanent ban on the wrong exercise, which is the
+    // worst outcome available to this path: silent, wide, and about the thing
+    // they never asked for.
+    //
+    // "Never give me that again" is almost always about something they HAVE
+    // been given, so a name that matches one exercise on the plan wins outright.
+    // Two matches is a question, not a guess. Only when the plan matches nothing
+    // does the catalogue get a say — that is the "I never want to see burpees"
+    // case, where the point is to keep it out of FUTURE plans.
+    const everyName = [...new Set(mesocycle.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))]
+    const needle = item.toLowerCase()
+    const onPlan = everyName.filter(n => n.toLowerCase() === needle
+      || new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(n.toLowerCase()))
+    if (onPlan.length > 1) {
+      return { ok: false, reason: `Did you mean ${onPlan.slice(0, 3).join(', ')}?` }
+    }
+    let name = onPlan[0]
+    if (!name) {
+      const resolved = resolveExerciseName(item, [])
+      if (resolved.resolution === 'ambiguous') {
+        return { ok: false, reason: `Did you mean ${resolved.candidates.slice(0, 3).map(c => c.name).join(', ')}?` }
+      }
+      name = resolved.resolution === 'resolved' ? resolved.exerciseName : item
+    }
+    if (exerciseExclusions.some(e => e.toLowerCase() === name.toLowerCase())) {
+      return { ok: false, reason: `${name} is already on your never-again list — it won't come back.` }
+    }
+
+    // Count across the WHOLE plan, not this week: that is what a ban means.
+    let sessions = 0
+    const weeksTouched = new Set<number>()
+    for (const w of mesocycle) {
+      for (const d of w.days) {
+        if (d.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())) {
+          sessions++
+          weeksTouched.add(w.week_number)
+        }
+      }
+    }
+    if (sessions === 0) {
+      // Still worth recording: it keeps the exercise out of FUTURE plans and
+      // out of every swap suggestion, which is what they actually asked for.
+      return {
+        ok: true,
+        scopeKey: `${profile.id}:propose_exercise_ban:${name}`,
+        preconditions: { exerciseName: name },
+        payload: { exerciseName: name, sessionsAffected: 0 },
+        preImage: mesocycle,
+        diff: {
+          lead: `I can stop giving you **${name}** for good:`,
+          rows: [{ field: 'On this plan', before: 'not scheduled', after: 'not scheduled' }],
+          unchanged: ['Every session you already have'],
+          implications: [
+            { severity: 'info', text: `It isn't on this plan anywhere, so nothing changes today — but it will never be chosen for you again, in this plan or the next one, and it won't be offered as a swap.` },
+          ],
+          rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+          reversible: true,
+        },
+      }
+    }
+
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_exercise_ban:${name}`,
+      preconditions: { exerciseName: name },
+      payload: { exerciseName: name, sessionsAffected: sessions },
+      preImage: mesocycle,
+      diff: {
+        lead: `I can stop giving you **${name}** for good:`,
+        rows: [
+          { field: 'Sessions it appears in', before: `${sessions}`, after: '0' },
+          { field: 'Weeks affected', before: `${weeksTouched.size} of ${mesocycle.length}`, after: 'all rebuilt' },
+        ],
+        unchanged: ['Every other exercise, and the shape of each session'],
+        implications: [
+          { severity: 'warn', text: `This is every week of your plan, not just today — ${sessions} session${sessions === 1 ? '' : 's'} get${sessions === 1 ? 's' : ''} rebuilt. Each one gets the closest alternative your kit and injuries allow.` },
+          { severity: 'info', text: `Where there's no good alternative, that slot comes out rather than being filled with something worse. It will never be chosen for you again, in this plan or the next.` },
+        ],
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
       },
     }
@@ -3786,6 +3907,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const ad = buildExerciseAddProposal(result.proposal.rawArgs)
         if (ad.ok) built = { scopeKey: ad.scopeKey, preconditions: ad.preconditions, payload: ad.payload as unknown as Record<string, unknown>, preImage: ad.preImage, diff: ad.diff }
         else refusal = ad.reason
+      } else if (result.proposal.kind === 'propose_exercise_ban' && result.proposal.rawArgs) {
+        const bn = buildExerciseBanProposal(result.proposal.rawArgs)
+        if (bn.ok) built = { scopeKey: bn.scopeKey, preconditions: bn.preconditions, payload: bn.payload as unknown as Record<string, unknown>, preImage: bn.preImage, diff: bn.diff }
+        else refusal = bn.reason
       } else if (result.proposal.kind === 'propose_exercise_remove' && result.proposal.rawArgs) {
         const rm = buildExerciseRemoveProposal(result.proposal.rawArgs)
         if (rm.ok) built = { scopeKey: rm.scopeKey, preconditions: rm.preconditions, payload: rm.payload as unknown as Record<string, unknown>, preImage: rm.preImage, diff: rm.diff }
@@ -4504,6 +4629,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
       if (ok) onMesocycleUpdated(result.mesocycle)
+    } else if (row.kind === 'propose_exercise_ban') {
+      // The live ban list is passed in, not read off the profile — the same
+      // reason the add path does it: this surface holds the fresh one.
+      const result = await executeExerciseBan(profile, mesocycle, row.payload as unknown as ExerciseBanPayload, exerciseExclusions, planCreatedAt)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Never again' : "Couldn't do that"
+      rows = receipt.landed.map(line => ({ label: line, detail: '' }))
+      undoToken = undefined // A ban is a preference, not a session edit — taken back in Profile, not here.
+      if (ok) {
+        onMesocycleUpdated(result.mesocycle)
+        // The fact row is what makes it stick across regenerations, so the
+        // memory the coach reads has to be refreshed or it will offer the
+        // banned exercise back on the next swap.
+        await onMemoryChanged?.()
+      }
     } else if (row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
       const isRemove = row.kind === 'propose_exercise_remove'
       const result = isRemove

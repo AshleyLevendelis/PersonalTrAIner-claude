@@ -135,6 +135,38 @@ const swapTarget = (() => {
 })()
 ;(window as unknown as { __swapTarget: unknown }).__swapTarget = swapTarget
 
+// A NAME THAT MEANS ONE THING ACROSS THE WHOLE PLAN — for verify:coach-ban.
+//
+// A swap is scoped to a day, so a loose name unique within that day is enough.
+// A BAN IS THE WHOLE PLAN, and "row" is three different lifts across sixteen
+// weeks — the app correctly asks "did you mean...?" rather than banning one of
+// them. So the ban driver needs its own target: a lift whose loose name matches
+// nothing else anywhere. Publishing both also lets that driver prove the
+// ambiguous case asks rather than guesses, using the swap target as the
+// deliberately ambiguous one.
+const banTarget = (() => {
+  const all = [...new Set(mesocycle.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))]
+  const loosely = (n: string) => n.trim().split(/\s+/).pop()!.toLowerCase()
+  // WORD SETS, NOT A REGEXP BUILT FROM A NAME. The first version compiled
+  // `new RegExp('\\b' + lastWord + '\\b')` per exercise, which throws the moment
+  // a catalogue name contains a regex metacharacter — and a throw here is at
+  // module scope, so it took the whole page down silently and the driver saw
+  // only a null target.
+  const words = (n: string) => new Set(n.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+  const unique = all.filter(n => {
+    const l = loosely(n)
+    return l !== n.toLowerCase() && all.filter(m => words(m).has(l)).length === 1
+  })
+  // A UNIQUE LAST WORD IF THE PLAN HAS ONE, otherwise the full name — which is
+  // unique by construction. A plan can legitimately hold three Rows and two
+  // Presses and no lift with a one-word handle of its own, and the ban path
+  // still has to be drivable on such a plan.
+  const full = unique[0] ?? all[0] ?? null
+  if (!full) return null
+  return { full, loose: unique.includes(full) ? loosely(full) : full }
+})()
+;(window as unknown as { __banTarget: unknown }).__banTarget = banTarget
+
 // ...and the same on this page, for the other half of that comparison.
 ;(window as unknown as { __todayFocus: unknown }).__todayFocus =
   mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.focus ?? null

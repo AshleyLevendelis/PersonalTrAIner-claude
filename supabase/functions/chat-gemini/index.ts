@@ -556,7 +556,7 @@ const toolDeclarations = [
   {
     name: "propose_exercise_remove",
     description:
-      "PROPOSES taking ONE exercise out of ONE session, leaving the rest of it alone — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they ask to drop, skip, cut or take out a specific exercise ('drop the leg press today', 'take the calf raises out', 'I'm not doing the lunges'). It is NOT ban_exercise: a ban removes it from every week of every block and is not available from chat. It is NOT propose_exercise_swap: if they name something to do INSTEAD, swap is the tool. If removing it would leave the session with fewer than three exercises the app refuses and says so, so do not promise it first. When they clearly want the whole day off rather than one exercise, that is propose_rest_day.",
+      "PROPOSES taking ONE exercise out of ONE session, leaving the rest of it alone — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they ask to drop, skip, cut or take out a specific exercise ('drop the leg press today', 'take the calf raises out', 'I'm not doing the lunges'). It is NOT ban_exercise: a ban removes it from every week of every block, which is a different and much larger request. It is NOT propose_exercise_swap: if they name something to do INSTEAD, swap is the tool. If removing it would leave the session with fewer than three exercises the app refuses and says so, so do not promise it first. When they clearly want the whole day off rather than one exercise, that is propose_rest_day.",
     parameters: {
       type: "object",
       properties: {
@@ -1894,8 +1894,7 @@ SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the cu
 - Trigger propose_exercise_add when they want to DO something the session does not contain ("add some face pulls", "can I put curls in on Thursday", "I want more calf work"). ADDING IS NOT LOGGING and the distinction matters: log_history records something already done and it never joins the plan, while this puts the exercise IN the session so it is prescribed and progressed. Adding takes nothing out — if they name something to drop in exchange, that is propose_exercise_swap. The session gets longer and the card says the new length; never offer to cut something else to make room, and never say by how much yourself — the card does the arithmetic.
 - Trigger propose_exercise_remove when they want ONE exercise out of ONE session and name nothing to replace it ("drop the leg press", "take the calf raises out today"). Removing is not banning — a ban is every week of every block and you cannot do it from chat. If they name a replacement, that is propose_exercise_swap.
 - Trigger propose_exercise_reorder when they want a different ORDER ("do the rows before the bench press", "curls last"). Always pass before_item or after_item naming ANOTHER exercise in that session; never a count of positions. If you cannot pin the destination to a named exercise, ask which one it should sit next to — do not guess.
-- For ban_exercise: this tool does NOT ban anything yet. Acknowledge the preference warmly, say plainly you cannot do it from chat, and point them at the ban button in the exercise row's menu. Never say you have removed it.
-- For ban_exercise: never confirm a ban — see above; it is not wired up.
+- For ban_exercise: the app shows a card stating how many sessions the ban reaches, and they tap Confirm. Never say it is done before that — and never quote a number of sessions yourself; the card carries the app's own count.
 - Reference the user's ACTUAL exercise plan below — never invent a generic split.
 - If asked why a specific exercise is in their plan: some entries in the exercise plan below carry a "[why: ...]" note — that's the real, specific reason the engine picked it over the next-best alternative. If the exercise you're asked about has one, use it directly. If it doesn't (most exercises won't — it was simply the best fit with nothing especially notable about the call), say so honestly: it was the best available option for that slot given their equipment/experience/goal, not a specific tradeoff worth spelling out. Never invent a specific reason for an exercise that has no "[why: ...]" note.
 
@@ -2194,7 +2193,7 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
 6. INTENTIONS ARE NOT APPOINTMENTS, WITH ONE EXCEPTION. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for a TIME OF DAY and no screen that shows one. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place. THE EXCEPTION, added 8 Sep 2026: moving a prescribed session to another DAY is now real — call propose_session_move (rule 7). Even then it is a card they confirm, so the same rule applies until they tap it: nothing has happened yet, so do not say it has.
 
-6b. THE FOUR EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order; propose_exercise_add puts a new slot in and takes nothing out, which makes the session longer. None of them bans — ban_exercise is every week of every block and is not wired to chat. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
+6b. THE FOUR EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order; propose_exercise_add puts a new slot in and takes nothing out, which makes the session longer. None of them bans — ban_exercise is every week of every block, and its card says how many sessions that reaches before you confirm. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
 
 7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
@@ -3407,19 +3406,36 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
 
       if (name === "ban_exercise") {
-        // VISION-ARCHITECTURE.md §7.2 phase A0/§2.1: ban_exercise touches
-        // every week of every block and can drop a slot entirely when no
-        // substitute exists — the highest-blast-radius mutation in the
-        // app. It used to fall through to the generic catch-all below with
-        // no real server-side handling at all (whatever the model sent
-        // just got echoed back as an action). Explicit decline now, same
-        // as adjust_volume/update_workout_schedule — this is a one-line
-        // safety fix, not a re-enable; §2.1 demotes ban to PROPOSING and
-        // it stays disabled via chat this round (Part 3 only re-enables
-        // exercise swap and meal swap).
+        // PROPOSES a ban — 14 Sep 2026, on Ashley's instruction, and the last
+        // thing a screen could do that chat could not.
+        //
+        // WHAT WAS HERE BEFORE, and why it was right at the time: an explicit
+        // decline ("use the ban button on the exercise itself"). Before THAT
+        // this tool fell through to the generic catch-all with no server-side
+        // handling at all, so whatever the model sent was echoed back as if it
+        // had happened — on the highest-blast-radius mutation in the app. The
+        // decline was a safety fix, not a design.
+        //
+        // It is a PROPOSAL, on the same rail as every other exercise-level
+        // tool, for the same reason: this function cannot import
+        // mesocycle-edit, so the client resolves the name against the live
+        // plan, counts what the ban would touch, shows it, and only writes
+        // after Confirm. The server still writes nothing.
+        //
+        // THE BLAST RADIUS IS THE POINT OF THE CARD. Every week of every block,
+        // and a slot can disappear where no substitute exists — so the card
+        // states how many sessions it reaches BEFORE the tap, which is exactly
+        // what the screen's own ban button does not do.
         return new Response(
           JSON.stringify({
-            reply: "I can't ban exercises through chat yet — that's coming in an update soon. For now, use the ban button on the exercise itself.",
+            reply: "",
+            proposal: {
+              kind: "propose_exercise_ban",
+              rawArgs: {
+                item: args.exercise_name ?? args.item,
+                reason: args.reason,
+              },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

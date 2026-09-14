@@ -126,6 +126,17 @@ export interface ExerciseAddPayload {
   scope: SwapScope
 }
 
+/**
+ * A ban is the widest edit in the app: every week of every block, and a slot
+ * can vanish entirely where no substitute exists. There is no weekNumber and no
+ * scope, deliberately — those would imply it could be narrower, and it cannot.
+ */
+export interface ExerciseBanPayload {
+  exerciseName: string
+  /** Sessions the ban will touch, counted when the card was built — for the receipt. */
+  sessionsAffected: number
+}
+
 export interface ExerciseReorderPayload {
   weekNumber: number
   dayName: string
@@ -251,6 +262,86 @@ export async function executeExerciseAdd(
   return {
     mesocycle: result.mesocycle, preImage,
     receipt: { landed: [`${payload.dayName}: ${entry.name} added`], failed: [] },
+  }
+}
+
+/**
+ * BAN ONE EXERCISE, EVERYWHERE — the coach's half of the button on the exercise
+ * row, wired 14 Sep 2026 on Ashley's instruction.
+ *
+ * It was the LAST thing a screen could do that chat could not, and it was left
+ * out on purpose: `ban_exercise` was declared to the model, then declined by
+ * the handler with "use the ban button on the exercise itself". That decline
+ * was itself a safety fix — before it, whatever the model sent was echoed back
+ * as if it had happened.
+ *
+ * THE SAME TWO WRITES THE SCREEN MAKES, in the same order, because a ban that
+ * rewrote the plan without recording the preference would come back at the next
+ * regeneration:
+ *   1. a user_facts row (an independent INSERT, so two bans cannot clobber each
+ *      other the way a shared array column did), then
+ *   2. the rebuilt mesocycle, every week, saved whole.
+ * If the fact lands and the plan save fails, the ban is still real and the
+ * receipt says exactly that rather than the generic "didn't save" — the same
+ * distinction App.tsx draws, for the same reason: otherwise someone re-taps a
+ * thing that already worked.
+ */
+export async function executeExerciseBan(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: ExerciseBanPayload,
+  /** The live ban list, passed in rather than read off the profile — as the add,
+   *  injury and equipment executors all take theirs. */
+  exclusions: string[] = [],
+  /** Preserved so a ban does not rewind live-week detection to week 1. */
+  planCreatedAt?: string,
+): Promise<SessionEditExecResult> {
+  const preImage = mesocycle
+  const fail = (error: string): SessionEditExecResult =>
+    ({ mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_ban', error }] } })
+
+  const name = payload.exerciseName
+  if (!profile.id) return fail('No profile to save against')
+  if (exclusions.some(e => e.toLowerCase() === name.toLowerCase())) {
+    return fail(`${name} is already on your never-again list.`)
+  }
+  if (mesocycle.length === 0) return fail("Your plan hasn't loaded yet — give it a moment and ask me again.")
+
+  const { createFact } = await import('./memory-store')
+  try {
+    await createFact({
+      profileId: profile.id,
+      kind: 'exercise_preference',
+      source: 'chat',
+      rawPhrase: name,
+      displayText: `won't eat/do ${name}`,
+      polarity: 'dislike',
+      hardness: 'hard',
+      resolvedRefs: [name],
+    })
+  } catch (err) {
+    console.error('executeExerciseBan: recording the ban failed', err)
+    return fail(`Couldn't save that — ${name} hasn't been removed. Check your connection and try again.`)
+  }
+
+  const updated = [...new Set([...exclusions, name])]
+  const { banExerciseFromMesocycle } = await import('./mesocycle-edit')
+  const next = await banExerciseFromMesocycle({ mesocycle, profile, bannedName: name, exclusions: updated })
+
+  try {
+    await saveMesocycle(profile.id, next, planCreatedAt ?? profile.created_at)
+  } catch (err) {
+    console.error('executeExerciseBan: persisting failed', err)
+    // THE FACT LANDED, so the ban is real and survives — only this plan's
+    // rewrite failed. Say that, not "didn't save".
+    return {
+      mesocycle: next, preImage,
+      receipt: { landed: [`${name} won't be picked again`], failed: [{ op: 'save', error: `${name} won't be picked again, but this plan couldn't be updated — reopen the app to retry.` }] },
+    }
+  }
+  return {
+    mesocycle: next, preImage,
+    receipt: { landed: [`${name} removed from ${payload.sessionsAffected} session${payload.sessionsAffected === 1 ? '' : 's'}, and never picked again`], failed: [] },
   }
 }
 

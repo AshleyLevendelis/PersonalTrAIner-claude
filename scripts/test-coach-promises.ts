@@ -258,12 +258,27 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // the check guarding it went red for being right. A handler that declines
   // says so in its own reply string; read that instead. The window is cut at
   // the NEXT handler so one decliner cannot make its neighbour look like one.
-  const handlerAt = [...chat.matchAll(/if \(name === "([a-z_]+)"\)/g)]
-  const decliningStubs = handlerAt.filter((m, i) => {
-    const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
-    return /coming in an update soon/.test(body)
-  }).map(m => m[1])
-  check('something still declines, so this check has teeth', decliningStubs.length > 0, decliningStubs)
+  const findDecliners = (src: string): string[] => {
+    const at = [...src.matchAll(/if \(name === "([a-z_]+)"\)/g)]
+    return at.filter((m, i) => {
+      const body = src.slice(m.index!, at[i + 1]?.index ?? m.index! + 2000)
+      return /coming in an update soon/.test(body)
+    }).map(m => m[1])
+  }
+  const decliningStubs = findDecliners(chat)
+  // THE TEETH USED TO BE "at least one tool still declines", which is a check
+  // that depends on a defect existing. On 14 Sep ban_exercise was wired —
+  // Ashley's instruction, and the last screen-only capability — so nothing
+  // declines any more and that guard went red for being right.
+  //
+  // The detector is proved on a synthetic handler instead, so it cannot go
+  // vacuous, and the real count being ZERO is now the property rather than the
+  // failure. If a declining stub is ever added back, the second check catches
+  // it and names it.
+  const SYNTHETIC = 'if (name === "synthetic_decliner") { return json({ reply: "coming in an update soon" }) }\nif (name === "other") { return json({ reply: "" }) }'
+  check('the decline detector actually detects (proved on a synthetic stub)',
+    findDecliners(SYNTHETIC).includes('synthetic_decliner'), findDecliners(SYNTHETIC))
+  check('...and no declared tool declines any more', decliningStubs.length === 0, decliningStubs)
   const declared = new Set([...chat.matchAll(/^\s*name:\s*"([a-z_]+)",\s*$/gm)].map(m => m[1]))
   const executed = new Set([...chat.matchAll(/name\s*===\s*"([a-z_]+)"/g)].map(m => m[1]))
 
@@ -666,11 +681,18 @@ console.log('\n7. A tool that declines says so in its own description')
   // Sanity check on this check: if the phrase list stops matching anything,
   // the loop below is vacuous and passes on a prompt full of false promises.
   //
-  // Was ">= 2" until 7 Sep 2026, when log_meal stopped declining — it now
-  // proposes a confirmation card and the app records the meal on the tap. The
-  // floor is 1 rather than 0 so the loop cannot go vacuous, and the list is
-  // printed so a change in WHICH tools decline is visible rather than silent.
-  check('the decline detector still finds the tools that decline', decliners.length >= 1, decliners)
+  // Was ">= 2" until 7 Sep 2026 when log_meal stopped declining, then ">= 1".
+  // On 14 Sep ban_exercise was wired too — Ashley's instruction — and the last
+  // decliner went with it, so a floor of 1 would demand that a defect exist in
+  // order for the check to pass.
+  //
+  // The phrase list is proved against a synthetic handler instead. The loop
+  // below then runs over however many real decliners there are, which is now
+  // none — and the count is asserted, so adding one back is visible rather
+  // than silent.
+  check('the decline phrases still match a decline (proved on a synthetic handler)',
+    DECLINE_PHRASES.test('I can\'t do that through chat yet — that\'s coming in an update soon.'))
+  check('...and no declared tool declines any more', decliners.length === 0, decliners)
   for (const tool of decliners) {
     check(`${tool} declines, and its description says so up front`,
       MARKS_ITSELF.test(descriptionOf(tool)), descriptionOf(tool).slice(0, 160))
@@ -860,8 +882,12 @@ if (failures > 0) {
     /functionCall for an undeclared tool/.test(src), null)
   check('the dead ban_exercise branch that would claim a removal is gone',
     !/I've permanently removed/.test(src), null)
-  check('...while the real ban_exercise decline still stands',
-    /can't ban exercises through chat yet/.test(src), null)
+  // FLIPPED 14 Sep 2026. This used to assert the decline still stood — "I
+  // can't ban exercises through chat yet" — which was correct while the ban
+  // was deliberately unavailable from chat. Ashley asked for it wired, so the
+  // decline is now the regression and the courier is the property.
+  check('...and ban_exercise is a courier now, not a decline',
+    /kind: "propose_exercise_ban"/.test(src) && !/can't ban exercises through chat yet/.test(src), null)
 
   // A plain question turn had no second chance at all.
   check('a plain turn gets the reply guarantee',

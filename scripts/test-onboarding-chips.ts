@@ -191,7 +191,15 @@ console.log('\n4. The opening messages')
     const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
     return /coming in an update soon/.test(body)
   }).map(m => m[1])
-  check('something still declines, so this check means something', decliningStubs.length > 0, decliningStubs)
+  // TEETH WITHOUT NEEDING A DEFECT. This asserted at least one tool still
+  // declines, so it depended on a declining stub existing. On 14 Sep 2026
+  // ban_exercise was wired — Ashley's instruction, the last screen-only
+  // capability — and nothing declines any more, so the guard went red for
+  // being right. The detector is proved on a synthetic handler instead, and
+  // the real count being zero is the property.
+  check('the decline detector actually detects (proved on a synthetic stub)',
+    /coming in an update soon/.test('reply: "that is coming in an update soon"'))
+  check('...and no declared tool declines any more', decliningStubs.length === 0, decliningStubs)
   const OVERCLAIM: Array<[RegExp, string]> = [
     [/\bre-?schedul/i, 'propose_schedule_change'],
     [/\bchange your (training )?days?\b/i, 'propose_schedule_change'],

@@ -209,7 +209,15 @@ console.log('\n4. Nothing the tour promises is a capability the coach declines')
     const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
     return /coming in an update soon/.test(body)
   }).map(m => m[1])
-  check('something still declines, so this check has teeth', decliningStubs.length > 0, decliningStubs)
+  // TEETH WITHOUT NEEDING A DEFECT. This asserted at least one tool still
+  // declines, so it depended on a declining stub existing. On 14 Sep 2026
+  // ban_exercise was wired — Ashley's instruction, the last screen-only
+  // capability — and nothing declines any more, so the guard went red for
+  // being right. The detector is proved on a synthetic handler instead, and
+  // the real count being zero is the property.
+  check('the decline detector actually detects (proved on a synthetic stub)',
+    /coming in an update soon/.test('reply: "that is coming in an update soon"'))
+  check('...and no declared tool declines any more', decliningStubs.length === 0, decliningStubs)
 
   // Vocabulary that would have the user ask for one of them. Narrower than the
   // chip screen: the tour DESCRIBES rather than puts words in the user's

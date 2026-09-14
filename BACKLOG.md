@@ -2,6 +2,63 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAN BAN AN EXERCISE, AND THERE IS NOW A WRITTEN PARITY LIST
+  WITH A GATE BEHIND IT.** Ashley sent four old decision cards and asked for
+  everything on them fixed. This is the biggest of them.
+  **THE LAST SCREEN-ONLY CAPABILITY IS CLOSED.** `ban_exercise` was declared to
+  the model and then declined by the handler — "use the ban button on the
+  exercise itself". That decline was itself a safety fix (before it, whatever
+  the model sent was echoed back as if it had happened) on the widest mutation
+  in the app: every week of every block, and a slot can vanish where no
+  substitute exists. It is now a proposal on the same rail as every other
+  exercise tool — the server forwards, the client resolves against the live
+  plan, and nothing is written until Confirm.
+  **THE CARD STATES THE BLAST RADIUS, which the screen's own ban button does
+  not.** Read off a real screen: "I can stop giving you **Wall Slides** for
+  good — sessions it appears in 8 → 0, weeks affected 8 of 16 → all rebuilt",
+  with a warning that this is every week and not just today, and a note that
+  where no good alternative exists the slot comes out rather than being filled
+  with something worse.
+  **TWO DEFECTS FOUND IN MY OWN WORK, BOTH BY THE BROWSER, BOTH KEPT.**
+  1. Asking to ban "row" resolved to **Rowing Machine** — a cardio machine
+     nowhere near the Seated Cable Row on the plan — because I handed the plan's
+     names to the catalogue resolver as a hint and trusted the answer. A
+     permanent ban on the wrong exercise is the worst outcome this path has:
+     silent, wide, and about a thing nobody asked for. The plan is now consulted
+     FIRST and the catalogue only when the plan matches nothing.
+  2. The harness page then crashed silently at module scope, because the helper
+     picking a test target built `new RegExp('\\b' + lastWord + '\\b')` per
+     exercise — which throws on any catalogue name holding a regex
+     metacharacter. Word sets now, no compiled pattern.
+  **AND ONE THING THE APP GOT RIGHT that the driver got wrong:** "row" matches
+  three lifts across the plan, and the app asked "Did you mean Seated Cable Row,
+  Seated Machine Row, Chest-Supported Row?" rather than banning one of them.
+  That is now its own check.
+  **THE WRITTEN EXCEPTIONS LIST EXISTS** — `docs/coach-screen-parity.md`, all 39
+  tools, each marked SCREEN (naming the control) or EXCEPTION (carrying a
+  reason). CLAUDE.md's rule 4 says parity is checked both ways against that list
+  and that **until it exists every one-sided capability is a gap**; it exists
+  now. Four tools are deliberate exceptions, each with its reason. **Things the
+  screen can do that the coach cannot: none**, as of today.
+  **`test:coach-parity` IS THE GENERAL GATE CLAUDE.md ASKED FOR** — "no GENERAL
+  gate distinguishes a declared coach tool from a declining stub" was the hole
+  the ban error fell through. A new tool with no row fails; a row naming no tool
+  fails; an exception without a reason fails; and any tool whose handler only
+  refuses fails whatever the list says. **Mutations: 4 tried, 4 caught.**
+  **THE DECLINE GUARDS IN FOUR OTHER GATES HAD TO BE RE-ANCHORED**, and the
+  reason is worth keeping: each asserted "at least one tool still declines", so
+  each depended on a defect existing and went red the moment the last one was
+  fixed. They now prove the detector on a synthetic handler and assert the real
+  count is ZERO — teeth without needing something broken.
+  **VERIFIED:** `verify:coach-ban` (13 checks) on a real screen at phone width,
+  with the card read; **mutations 2 of 3 caught and the third named** — the
+  driver stubs the model at the fetch boundary, so reverting the SERVER to its
+  old decline leaves it green. That half is `test:coach-parity`'s, and is
+  mutation-tested there. Neither check covers both ends alone, and the driver
+  says so in its own header.
+  **Deploys:** frontend on merge, **and `chat-gemini`** — the ban is a server
+  change as well as a client one.
+
 - [x] **THE TIMERS FROZE IF YOU TOLD THE APP WHAT DAY IT WAS — and the tour's
   Tools stop was reported broken when it was not.** Two defects found by the
   first full sweep since the harness clock landed: 214 checks, 8 red, of which
@@ -47,7 +104,7 @@ Newest first. One line each.
   as a comment only; a tag nobody points at. **145 checks green.**
   **Deploys:** frontend on merge. No edge function touched.
 
-- [ ] **THE SLOW CHECK RUNS ON ONE CORE OF FOUR — AND THE REASON WRITTEN DOWN
+- [x] **THE SLOW CHECK RUNS ON ONE CORE OF FOUR — AND THE REASON WRITTEN DOWN
   FOR IT WAS WRONG.** Ashley chose "make the checks run much faster" from four
   options, on the strength of a backlog line saying the sweep was 3x slow
   because dev logging was left on under tsx.
@@ -74,9 +131,16 @@ Newest first. One line each.
   nothing else, not on what ran before it or in which process. PROVEN, not
   argued: the same combination scored under three different shard layouts
   (0/512, 0/256, 0/64) gives a byte-identical result hash.
-  **NOT YET PROVEN, AND THIS ENTRY STAYS OPEN UNTIL IT IS:** that the parallel
-  run produces the IDENTICAL report to the serial one end to end. The comparison
-  is queued behind a serial baseline still running. It matters because the
+  **PROVEN, and the entry is closed.** The parallel run's report is
+  BYTE-IDENTICAL to the serial one — the only differing line in the whole file
+  is `Runtime: 3788.9s` against `Runtime: 1458.4s`. Every average, every
+  histogram bucket, every worst-10 entry and every deduction line matches.
+  **2.6x, not 4x, and the honest reason:** both runs shared the machine with
+  this session's browser drivers and builds, so the serial baseline was itself
+  inflated and the parallel run contended for the same cores. The ratio on an
+  idle machine would differ; what is measured is the ratio under the conditions
+  a sweep actually runs in. The quality log went from 59 MB and 392,000 lines to
+  40 KB and none. It matters because the
   report is not purely aggregate — `worst10` sorts stably, the dimension labels
   are read off the first combination, and the deduction listing walks the array
   in order — so a merge that lost or reordered entries would show up. The merge
