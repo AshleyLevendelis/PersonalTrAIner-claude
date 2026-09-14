@@ -288,8 +288,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   a declining stub**, which is the hole the ban error fell through;
   `meal-food-edit` §8 does it for its own three tools and is the shape the
   general one should take
-- A written exceptions list, each with a reason, Ashley's to change —
-  `MISSING`
+- A written exceptions list, each with a reason, Ashley's to change — EXISTS
+  since 14 Sep 2026, `docs/coach-screen-parity.md`, held by `coach-parity`.
+  CORRECTED: this line still said `MISSING` after the list was written and the
+  bullet above it had already been updated to name the file — two lines about
+  one fact, only one of them changed. Two exceptions stand, both coach-only and
+  both for the same reason: a dish NAME is a model call, not a lookup
 - The coach acts; it never sends anyone to a control, never describes one
   that does not exist — `chat-app-reality`, `coach-promises`,
   `says-what-it-contains`
@@ -337,7 +341,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —
-  `onboarding-corrections`, `profile-restore`; eight answers cannot (above)
+  `onboarding-corrections`, `profile-restore`. CORRECTED 14 Sep 2026: this said
+  "eight answers cannot (above)", which the section above had already stopped
+  saying — the last of the eight was unlocked that day. Every answer can be
+  changed now
 - Progress is visible — history, PRs, weight trend, streak —
   `exercise-history`, `dashboard`, `activity-streak`, `home-week-strip`
 - Accountability is active — the coach opens, asks how it went, follows up
