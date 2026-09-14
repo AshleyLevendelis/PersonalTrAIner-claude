@@ -267,7 +267,31 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   and held to the same 7.2 floor `quality` holds generated plans to. Her
   ruling the same day: the score stays behind the scenes as a guarantee we
   check, never a number on screen — what a person reads is the specific thing
-  that changed, in plain words
+  that changed, in plain words.
+  MEASURED 14 Sep 2026, and worth knowing: that is a GATE. `scorePlan` has
+  zero call sites in the app itself, so it is never run on a real person's
+  real edit. The cards price every change against the plan's STRUCTURE
+  (balance, length, −protein) and never against the person's GOAL
+- When a change works AGAINST the goal, the app asks first, then allows — it
+  never refuses anything that is not unsafe. DECIDED 14 Sep 2026 by the
+  session on Ashley's explicit delegation (*"You decide what you think is best
+  and then tell me what you decided and why"*), from four options: tell-then-
+  allow / ask-first-then-allow / reason required / refuse. Chosen ASK FIRST,
+  THEN ALLOW because it is the house style already used for pain, low
+  calories and "I can't face it"; because a refusal contradicts "you asked,
+  you get it" and teaches people to stop asking; and because a cost line on a
+  card is tapped past. The shape, so it cannot become nagging, is part of the
+  ruling: four tiers by consequence — free (silent) / costs something (one
+  sentence in the goal's OWN terms plus the cheaper route, one tap) / against
+  the goal (a QUESTION with chips, one of which is always "do it anyway", so
+  the change is exactly one tap further away) / unsafe (refused, unchanged).
+  "Against the goal" is PINNED: the trial would take the plan below the floor
+  generated plans must clear (the dimension named, never the number), or one
+  of the short list in `docs/how-the-app-talks-about-a-change.md` §10. Asked
+  ONCE per block per thing; never for a "today" change mid-session; never on
+  the starting-out plan. The sentences are the app's, from one phrasebook
+  shared by both surfaces, so the exam can grade them. NOT BUILT — a decision
+  awaiting "build it"
 
 ### Promise 2 — everything by hand or by asking
 

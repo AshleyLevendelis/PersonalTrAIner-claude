@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [ ] **DECIDED — when a change works against the goal, the app asks first,
+  then allows. Never refuses what isn't unsafe.** Ashley, 14 Sep 2026, on the
+  proposal's one open question: *"You decide what you think is best and then
+  tell me what you decided and why."* So this was decided BY THE SESSION on
+  her explicit delegation, not unprompted and not by her — recorded as such.
+  THE OPTIONS: tell-then-allow (a line on the card, one tap) · ask-first-then-
+  allow (a question with chips before any card, one tap further) · reason
+  required (no card until a chip is picked) · refuse goal-damaging changes.
+  CHOSEN: ask first, then allow. WHY: it is the house style already used for
+  pain, a very low calorie number and "I can't face it"; a refusal contradicts
+  "you asked, you get it" and teaches people to stop asking; a cost line on a
+  card is tapped past (the deload advice in the prompt is the evidence); and a
+  required reason taxes every change including the free ones, on a gym floor.
+  THE GUARDRAILS ARE PART OF THE DECISION: the ask is a question with chips,
+  one of which is always "do it anyway" → the card at once; asked once per
+  block per thing, then a plain card; never for a "today" change mid-session;
+  never on the starting-out plan; safety stays refused. "Against the goal" is
+  pinned: below the generated-plan floor (dimension named, never the number),
+  or one of seven named cases in `docs/how-the-app-talks-about-a-change.md`
+  §10. Recorded in CLAUDE.md as a standing ruling.
+  NOT BUILT. Awaits "build it". If given: chips first, then the score on the
+  trial, then the phrasebook, then sets-per-muscle, then the block-end review;
+  plan docs for anything touching load or diet.
+
 - [ ] **PROPOSAL ONLY — how the app should talk about a change.** Ashley,
   14 Sep 2026: allowing any change without advising on it leaves people with
   a plan that does not meet their goal; think about what happens now and how

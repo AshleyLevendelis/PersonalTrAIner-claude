@@ -301,23 +301,72 @@ change is "today".
 
 ---
 
-## 10. The one decision that is Ashley's
+## 10. The decision — ask first, then allow
 
-**How firm should the app be when a change works against the goal (Tier 2)?**
+**Decided 14 Sep 2026 by the session, on Ashley's explicit delegation** —
+*"You decide what you think is best and then tell me what you decided and
+why."* Four options were put to her: tell-then-allow, ask-first-then-allow,
+reason required, refuse. **Chosen: ask first, then allow.**
 
-1. **Tell, then allow** — one sentence on the card, the alternative beside the
-   button. Everything is still one tap. *Least friction; the cost is easy to
-   tap past.*
-2. **Ask first, then allow** *(recommended)* — the coach asks why and offers
-   the better route before any card appears; the change is one tap further
-   away, never blocked. *Matches the house style already used for pain and
-   calories; a permanent problem stops getting a one-day fix.*
-3. **Reason required** — no card until a chip is picked. *Cleanest data; a
-   fifth tap on a gym floor.*
-4. **Refuse goal-damaging changes** — *not recommended: it contradicts "you
-   asked, you get it", and the person often knows something the app doesn't.*
+**Why this one.**
 
-Either way, Tier 1 stays "tell, then allow" and Tier 3 stays refused.
+- It is the house style the app already has. For pain, for a very low calorie
+  number, for "I can't face training today", the coach asks one question
+  before it prescribes. A change that works against the goal is the same
+  situation wearing different clothes.
+- A refusal contradicts "you asked, you get it", and it teaches people to stop
+  asking — the person who stops asking the coach stops using the app. The
+  person also often knows something the app cannot: the machine is broken,
+  the shoulder is sore.
+- "Tell, then allow" is what the cards already do in spirit, and a line on a
+  card is tapped past. The prompt's own deload advice is the evidence — people
+  push through a recovery week with the reason written in front of them.
+- "Reason required" puts a tap on every change including the free ones. The
+  gym floor is the wrong place for that friction.
+
+**Why the other three were not chosen** is above. What follows is the shape
+that stops "ask first" from becoming nagging — and the shape is part of the
+decision, not an afterthought.
+
+**The guardrails.**
+
+1. **The ask is a question with chips, never a card.** It names the cost in
+   the goal's terms and offers the better route — and one chip is always *"do
+   it anyway"*, which produces the card immediately. So the change is exactly
+   one tap further away, never two, never blocked.
+2. **Once per block, per thing.** The first time a Tier 2 change is asked for
+   on a given day, exercise or meal in a block, the app asks. The second time
+   it goes straight to a Tier 1 card. Say it once, then trust them.
+3. **Never mid-session for "today".** A today-scoped change made during a live
+   session is Tier 1 at most. Nobody is asked a coaching question between
+   sets.
+4. **Never on the starting-out plan.** Consistency beats everything there.
+5. **Safety stays refused.** Tier 3 is unchanged.
+
+**What counts as "against the goal" — pinned, not left to judgement.** Either
+the trial would take the plan below the same quality floor every generated
+plan must clear — the dimension that dropped is named, never the number, per
+her ruling — **or** it is on this short list, which catches what the score does
+not yet measure:
+
+- an ongoing volume cut during an accumulation phase;
+- removing or banning a main lift in a strength block;
+- swapping a barbell main lift for a machine for the rest of a strength block;
+- adding sets or weight to a deload week;
+- the third same-weekday shortening in a block;
+- a fat-loss client's third protein removal in a week;
+- moving the main lift to last in a strength block.
+
+Anything not on the list and not below the floor is Tier 1 or Tier 0.
+
+**And the rest stands as proposed:** Tier 1 is tell-then-allow in the goal's
+own terms with the cheaper route beside the button; Tier 0 is silent; the
+reason chips run on swap and remove on both surfaces; the sentences are the
+app's, from one phrasebook, so the exam can grade them; the block-end review
+is the release valve that makes "ask once per block" safe.
+
+**Not built.** This is a decision, recorded here, in BACKLOG and in CLAUDE.md.
+It waits on an explicit "build it".
 
 ## 11. If approved, the order
 
