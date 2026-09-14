@@ -451,13 +451,35 @@ const startCeiling = repriceForCorrectedProfile(
 check('...while the SAME plan does re-price for a ceiling correction',
   startCeiling.changes.length > 0, startCeiling.changes.length)
 
-// WHAT IS STILL LOCKED, counted rather than remembered. Three known lifts,
-// pinned by §7 above with the reason. If a fourth answer ever becomes locked,
-// or one of these three is unlocked, this line is where it gets noticed.
-const stillLocked = ['known_bench_kg', 'known_squat_kg', 'known_deadlift_kg']
-  .filter(f => !startScreen.includes(f))
-check('the only setup answers still unreachable from the screen are the three known lifts',
-  stillLocked.length === 3, stillLocked)
+// NOTHING IS LOCKED ANY MORE — corrected 14 Sep 2026, the same day this line
+// was written saying three answers were.
+//
+// The three known lifts were the last, and the reason recorded for leaving
+// them was measured against the wrong path. §7 above is still exactly right:
+// the RE-PRICE path is blind to them by design, because they are a
+// generation-time seed and `prescribeLoad` never reads them. What that does
+// NOT follow from — and what the old note assumed — is that nothing can act on
+// them. `rebuildAgainstProfile` regenerates FROM the profile, so a corrected
+// lift flows straight through it. They went on the rebuild road, with goal,
+// style and the starting point, rather than the re-price one.
+//
+// Ashley's ruling, 14 Sep 2026, from three options: "rebuild only when it
+// matters". `knownWorkingWeights` is packed from these three ONLY when the
+// calibration week was skipped; after a real calibration week the plan is
+// anchored to what was actually lifted, so correcting the setup guess changes
+// no weight and offering a rebuild would ask someone to give up their
+// progression for nothing. test:rebuild-offer §2b holds both halves.
+const KNOWN_LIFTS = ['known_bench_kg', 'known_squat_kg', 'known_deadlift_kg']
+const missingFromScreen = KNOWN_LIFTS.filter(f => !startScreen.includes(f))
+check('every setup answer is now reachable from the screen — including the three known lifts',
+  missingFromScreen.length === 0, missingFromScreen)
+check('...shown only where they were asked, never as three empty boxes',
+  /skip_calibration_week \|\| knownLiftsAnswered/.test(startScreen))
+// AND THE HONEST LINE FOR THE OTHER CASE. After a calibration week the
+// correction changes nothing, and the screen has to say so or the app is
+// silently doing nothing.
+check('...and a calibrated plan is told the correction changes no weights',
+  /data-testid="known-lifts-record-only"/.test(startScreen))
 
 console.log(failures === 0 ? '\nAll setup-answer checks passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)

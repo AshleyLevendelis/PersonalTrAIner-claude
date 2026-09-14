@@ -158,9 +158,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `rebuild-offer`, `profile-restore`, `coach-volume-schedule`,
   `injury-rebuild`, `enforcement-gaps`, `concurrent-activity`
 - Session length — `screen only`; targets and macro mode — `screen only`
-- Onboarding answers that cannot be changed afterwards from the Profile
-  screen. CORRECTED 13 Sep 2026, having measured what the old "eight locked
-  answers" line actually covered:
+- Onboarding answers and the Profile screen. **As of 14 Sep 2026 there are no
+  locked answers left** — every one can be corrected. The history is kept
+  because each unlocking needed a different road and the reasons are the useful
+  part. CORRECTED 13 Sep, again 14 Sep:
   - The three implement ceilings — **now editable**, in "You" beside Equipment,
     and correcting one re-prices the running plan from this week onward with
     the exercises untouched (her ruling that day, from four options). Shown
@@ -188,11 +189,25 @@ facts: re-measure before acting on one, correct it here when it is wrong.
     `food-dislike-is-a-ban` §7, `verify:setup-answers` §7.
     The old line came from reading the profile FIELDS and not the memory section
     below them
-  - The three known lifts — still `MISSING`, and now with a measured reason:
-    they are a generation-time seed (`knownWorkingWeights`), not something
-    `prescribeLoad` reads, so the re-price path is blind to them by design and
-    `setup-answers` §7 pins that. Unlocking them needs the anchor machinery,
-    which refuses downward moves
+  - The three known lifts — **now editable**, 14 Sep 2026, and with them NO
+    SETUP ANSWER IS LOCKED. CORRECTED: the old line said unlocking them "needs
+    the anchor machinery, which refuses downward moves". That followed from a
+    true fact about the WRONG path. They are a generation-time seed
+    (`knownWorkingWeights`), so `prescribeLoad` never reads them and the
+    RE-PRICE path is blind to them by design — `setup-answers` §7 still pins
+    exactly that. What does not follow is that nothing can act on them:
+    `rebuildAgainstProfile` regenerates FROM the profile, so a corrected lift
+    flows straight through it. They went on the rebuild road with goal, style
+    and the starting point.
+    **Her ruling, 14 Sep 2026, from three options: "rebuild only when it
+    matters"** — and the condition is the point, not an optimisation.
+    `knownWorkingWeights` is packed from these three ONLY when the calibration
+    week was skipped; after a real calibration week the plan is anchored to what
+    was actually lifted, so correcting the setup guess changes no weight and
+    offering a rebuild would ask someone to give up their progression for
+    nothing. The screen says so in that case rather than doing nothing quietly.
+    They are shown only where they were asked, never as three empty boxes.
+    `rebuild-offer` §2b, `setup-answers` §9, `verify:setup-answers` §8
   - The starting preference — **now editable**, in "You" beside Equipment,
     14 Sep 2026. It goes on the REBUILD-OFFER path with goal and style, not the
     re-price one, and that is the point rather than a detail: `move_more` and

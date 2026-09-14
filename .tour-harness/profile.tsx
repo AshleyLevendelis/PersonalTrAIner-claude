@@ -74,6 +74,14 @@ const baseProfile: UserProfile = {
   // switching to 'move_more' is the interesting direction: it is the one that
   // means the plan on screen is the wrong KIND of plan.
   start_preference: 'train',
+  // SKIPPED THE CALIBRATION WEEK, with the three lifts answered — the case
+  // where correcting one genuinely changes the plan, and so the case worth
+  // driving. Her ruling's other half (a calibrated plan is told the correction
+  // changes nothing) is held by test:setup-answers §9 off the source.
+  skip_calibration_week: true,
+  known_squat_kg: 100,
+  known_bench_kg: 60,
+  known_deadlift_kg: 120,
   // A STATED CEILING ALREADY SET, so the rows render with a value in them and
   // the driver's edit is a CORRECTION rather than a first answer — which is
   // the case this feature exists for.

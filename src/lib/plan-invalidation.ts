@@ -53,7 +53,18 @@ import { rebuildAgainstProfile } from './plan-adaptations'
 // (starting-out.ts reads exactly this field), 'train' produces a lifting plan.
 // Changing it is therefore not a re-price — it is a different plan — so it
 // belongs here with goal and style rather than on the ceilings path.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference'] as const
+// The three known lifts joined 14 Sep 2026, on Ashley's ruling "rebuild only
+// when it matters", chosen over always offering and over never offering.
+//
+// THEY ARE CONDITIONAL, which nothing else on this list is, and the condition
+// is the whole point. `knownWorkingWeights` (exercise-plan.ts) is packed from
+// these three ONLY when `skip_calibration_week` is set — otherwise the plan is
+// anchored to what was actually lifted in the calibration week and these
+// numbers are a record. So correcting one after a calibration week changes no
+// weight, and offering to rebuild would be the app asking someone to give up
+// their progression for nothing. See detectPlanInvalidation's branch.
+export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_deadlift_kg'] as const
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 export interface PlanInvalidation {
@@ -153,6 +164,24 @@ export function detectPlanInvalidation(
         'Your current plan was built for the style you had before, so the exercises and rep ' +
         'ranges still follow it. I can rebuild it from this week onwards in the new style. ' +
         'Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  // THE THREE KNOWN LIFTS — and the condition is her ruling, not an
+  // optimisation. See KNOWN_LIFT_FIELDS above for why a calibrated plan must
+  // NOT be offered a rebuild over these.
+  const movedLifts = KNOWN_LIFT_FIELDS.filter(f => f in patch && patch[f] != null && patch[f] !== before[f])
+  if (movedLifts.length > 0 && before.skip_calibration_week) {
+    const LIFT_WORDS: Record<string, string> = {
+      known_squat_kg: 'squat', known_bench_kg: 'bench press', known_deadlift_kg: 'deadlift',
+    }
+    const named = movedLifts.map(f => LIFT_WORDS[f]).join(' and ')
+    return {
+      field: movedLifts[0] as PlanInvalidatingField,
+      title: `Rebuild around your ${named}?`,
+      detail: `You skipped the first week's testing, so your weights were worked out from the numbers `
+        + `you gave at setup — including that one. I can rebuild your plan from this week onwards `
+        + `around the corrected figure. Everything you have already logged stays exactly as it is.`,
     }
   }
 

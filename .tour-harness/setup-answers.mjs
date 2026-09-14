@@ -330,6 +330,29 @@ check('6h. ...and NO weights were silently re-priced behind it',
   { was: receiptWas, now: await text('[data-testid="reprice-receipt"]') })
 await shoot('setup-answers-5-rebuild-offer')
 
+// --- THE THREE KNOWN LIFTS, added 14 Sep 2026 -----------------------------
+// The last setup answers that could never be corrected. §7 of the source gate
+// holds why the RE-PRICE path cannot act on them; this holds that they are on
+// the screen at all, which is what "locked" actually meant to somebody using
+// the app.
+const knownLifts = await ev(`(() => {
+  const box = document.querySelector('[data-testid="known-lifts"]')
+  if (!box) return null
+  return [...box.querySelectorAll('input')].map(i => {
+    const row = i.closest('div').parentElement
+    return { value: i.value, label: (row?.querySelector('span')?.textContent || '').trim() }
+  })
+})()`)
+check('8a. the three known lifts are on the screen', Array.isArray(knownLifts) && knownLifts.length === 3, knownLifts)
+check('8b. ...each showing the number already given', (knownLifts ?? []).every(r => r.value !== ''), knownLifts)
+check('8c. ...named as lifts, not as fields',
+  (knownLifts ?? []).every(r => /squat|bench|deadlift/i.test(r.label)), (knownLifts ?? []).map(r => r.label))
+// THIS FIXTURE SKIPPED CALIBRATION, so the "changes no weights" line must NOT
+// be showing — it would be false here.
+check('8d. ...and a plan built FROM them is not told they change nothing',
+  !(await ev(`!!document.querySelector('[data-testid="known-lifts-record-only"]')`)))
+await shoot('setup-answers-7-known-lifts')
+
 // --- EXERCISES TO AVOID, added 14 Sep 2026 --------------------------------
 // CLAUDE.md recorded exercise dislikes as coach-only. Measured, that was half
 // wrong: this screen already listed them with edit and delete. What it could

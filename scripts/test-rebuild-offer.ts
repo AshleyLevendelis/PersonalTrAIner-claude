@@ -108,8 +108,11 @@ console.log('\n2. And nothing else does')
   // them: starting-out.ts reads exactly this field to decide whether the app
   // builds the easing-in walking plan or a training plan, so a wrong answer
   // meant being stuck on the wrong KIND of plan with no way to say so.
+  // The three known lifts joined 14 Sep 2026, on Ashley's ruling "rebuild only
+  // when it matters" — and they are the first CONDITIONAL entries on this
+  // list. §2b below is the condition.
   check('the invalidating list is exactly the fields that change what the plan contains',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,start_preference,training_days,training_style',
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,start_preference,training_days,training_style',
     PLAN_INVALIDATING_FIELDS)
 
   // BOTH DIRECTIONS, because the copy differs and only one of them is the
@@ -150,6 +153,46 @@ console.log('\n2. And nothing else does')
     [toTrain?.detail, toEase?.detail])
   const sameStart = detectPlanInvalidation(base({ start_preference: 'train' }), { start_preference: 'train' })
   check('...and saving the same answer offers nothing', sameStart === null, sameStart)
+
+  // -------------------------------------------------------------------------
+  // 2b. THE KNOWN LIFTS, AND THE CONDITION THAT IS HER RULING
+  // -------------------------------------------------------------------------
+  // Asked on 14 Sep 2026 what a corrected setup lift should do, from three
+  // options, she chose "rebuild only when it matters" over always offering and
+  // over never offering. The reason it matters: `knownWorkingWeights` is packed
+  // from these three ONLY when skip_calibration_week is set. After a real
+  // calibration week the plan is anchored to what was actually lifted, so
+  // correcting the setup guess changes no weight — and offering a rebuild would
+  // be asking someone to give up their progression for nothing.
+  const skipped = (o: Partial<UserProfile>) => base({ skip_calibration_week: true, known_bench_kg: 60, ...o } as Partial<UserProfile>)
+  const calibrated = (o: Partial<UserProfile>) => base({ skip_calibration_week: false, known_bench_kg: 60, ...o } as Partial<UserProfile>)
+
+  const benchFixed = detectPlanInvalidation(skipped({}), { known_bench_kg: 90 } as Partial<UserProfile>)
+  check('correcting a lift the weights were BUILT from offers the rebuild',
+    benchFixed?.field === 'known_bench_kg', benchFixed)
+  check('...naming the lift in her words, not the field', /bench press/i.test(benchFixed?.title ?? ''), benchFixed?.title)
+  check('...saying WHY it bears on the plan — the testing week was skipped',
+    /skipped the first week/i.test(benchFixed?.detail ?? ''), benchFixed?.detail)
+  check('...from this week, not from week 1', /from this week/i.test(benchFixed?.detail ?? ''), benchFixed?.detail)
+  check('...and promising nothing logged is lost', /already logged stays/i.test(benchFixed?.detail ?? ''), benchFixed?.detail)
+
+  // THE HALF THAT IS THE RULING. Same correction, a plan that was calibrated:
+  // no offer, because nothing would change.
+  const afterCalibration = detectPlanInvalidation(calibrated({}), { known_bench_kg: 90 } as Partial<UserProfile>)
+  check('...while the SAME correction after a calibration week offers nothing',
+    afterCalibration === null, afterCalibration)
+
+  check('...and re-saving the same number offers nothing either',
+    detectPlanInvalidation(skipped({}), { known_bench_kg: 60 } as Partial<UserProfile>) === null)
+  // CLEARING one is not correcting it, and must not rebuild around a blank.
+  check('...nor does clearing one', detectPlanInvalidation(skipped({}), { known_bench_kg: null } as unknown as Partial<UserProfile>) === null)
+
+  // ALL THREE, not just the one that happened to be wired first.
+  for (const [field, word] of [['known_squat_kg', 'squat'], ['known_deadlift_kg', 'deadlift']] as const) {
+    const r = detectPlanInvalidation(skipped({ [field]: 100 } as Partial<UserProfile>), { [field]: 140 } as Partial<UserProfile>)
+    check(`...and ${word} is wired too, not just the bench`, r?.field === field, r)
+    check(`...naming the ${word} in her words`, new RegExp(word, 'i').test(r?.title ?? ''), r?.title)
+  }
 
   const daysChanged = detectPlanInvalidation(
     base({ training_days: [{ day: 'Monday', available: true }, { day: 'Tuesday', available: true }] }),

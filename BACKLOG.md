@@ -2,6 +2,38 @@
 
 Newest first. One line each.
 
+- [x] **NO SETUP ANSWER IS LOCKED ANY MORE — the three known lifts were the
+  last, and the reason for leaving them was measured against the wrong path.**
+  The remainder of Ashley's first screenshot.
+  **THE CORRECTION.** CLAUDE.md said unlocking these "needs the anchor
+  machinery, which refuses downward moves". That followed from a fact that IS
+  true — they are a generation-time seed, `prescribeLoad` never reads them, and
+  the RE-PRICE path is blind to them by design — but the conclusion does not
+  follow from it. `rebuildAgainstProfile` regenerates FROM the profile, so a
+  corrected lift flows straight through it. They belonged on the rebuild road
+  with goal, style and the starting point, and always had. I wrote the old note
+  from the re-price investigation and never asked what the OTHER road did.
+  **HER RULING, from three options: "rebuild only when it matters."** These are
+  the first CONDITIONAL entries on the invalidating list, and the condition is
+  the point rather than an optimisation: `knownWorkingWeights` is packed from
+  them ONLY when the calibration week was skipped. After a real calibration week
+  the plan is anchored to what was actually lifted, so correcting the setup
+  guess changes no weight — and offering a rebuild there would be asking
+  somebody to give up their progression for nothing. In that case the screen
+  says so, in plain words, rather than doing nothing quietly.
+  Shown only where they were asked, never as three empty boxes — the same rule
+  the weight caps follow for a full-gym profile.
+  **MUTATIONS: 4 tried, 4 caught** — the condition dropped so a calibrated plan
+  is offered a rebuild, clearing a lift treated as correcting one, the lift not
+  named in her words, and only the bench wired.
+  Verified on the real screen at 390x844: the three rows are there with the
+  numbers already given, named as lifts rather than fields, and a fixture that
+  SKIPPED calibration is correctly not shown the "changes nothing" line.
+  Gates: `test:rebuild-offer` §2b (new, 12 checks; 49 → 62),
+  `test:setup-answers` §9 (corrected — it asserted these were still locked),
+  `verify:setup-answers` §8 (new, 4 checks).
+  Frontend deploy on merge. No function deploy, no migration.
+
 - [x] **"EXERCISES TO AVOID" ON THE PROFILE SCREEN — closing the correction I
   made this morning.** Earlier today I recorded that CLAUDE.md was half wrong
   about exercise dislikes: the screen could already edit and delete them, but

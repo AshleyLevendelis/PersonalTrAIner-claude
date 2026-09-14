@@ -727,6 +727,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
    */
   const CEILING_FIELDS = ['max_dumbbell_kg', 'max_single_implement_kg', 'max_improvised_kg'] as const
 
+  /**
+   * Whether the three known lifts were ever answered. Onboarding asks them of
+   * somebody skipping the calibration week and keeps any that were volunteered
+   * otherwise, so "answered" is the honest test for showing the rows rather
+   * than the skip flag alone.
+   */
+  const knownLiftsAnswered = profile.known_squat_kg != null
+    || profile.known_bench_kg != null
+    || profile.known_deadlift_kg != null
+
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
     const revertPatch = Object.fromEntries(
@@ -914,6 +924,52 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   <p className="pt-1 text-xs text-muted-foreground" data-testid="ceilings-declined">
                     You said you weren't sure what these weigh, so nothing is capped. Fill any of them
                     in and I'll use it.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* THE THREE KNOWN LIFTS — the last setup answers that could never
+                be corrected. Added 14 Sep 2026 on Ashley's ruling: "rebuild
+                only when it matters".
+                ONLY SHOWN WHEN THEY WERE ASKED. Onboarding asks these of
+                someone skipping the calibration week, or keeps whatever was
+                volunteered. Rendering three empty boxes to somebody who was
+                never asked would be a control that cannot take effect — the
+                same rule the weight caps above follow for a full-gym profile. */}
+            {(profile.skip_calibration_week || knownLiftsAnswered) && (
+              <div data-testid="known-lifts" className="space-y-1">
+                <Row label="Your squat">
+                  <EditableTextField
+                    value={profile.known_squat_kg ?? undefined}
+                    unit="kg" min={20} max={400}
+                    onSave={n => savePatch({ known_squat_kg: n })}
+                  />
+                </Row>
+                <Row label="Your bench press">
+                  <EditableTextField
+                    value={profile.known_bench_kg ?? undefined}
+                    unit="kg" min={20} max={300}
+                    onSave={n => savePatch({ known_bench_kg: n })}
+                  />
+                </Row>
+                <Row label="Your deadlift">
+                  <EditableTextField
+                    value={profile.known_deadlift_kg ?? undefined}
+                    unit="kg" min={20} max={500}
+                    onSave={n => savePatch({ known_deadlift_kg: n })}
+                  />
+                </Row>
+                {/* HER RULING'S OTHER HALF, and it has to be on the screen or
+                    the app is silently doing nothing. After a calibration week
+                    the plan is anchored to what was actually lifted, so these
+                    numbers are a record and correcting one changes no weight.
+                    Saying so is the difference between "nothing happened" and
+                    "nothing happened, and here is why". */}
+                {!profile.skip_calibration_week && (
+                  <p className="pt-1 text-xs text-muted-foreground" data-testid="known-lifts-record-only">
+                    Your plan follows what you've actually lifted since your first week, so correcting
+                    one of these updates the record and changes no weights.
                   </p>
                 )}
               </div>
