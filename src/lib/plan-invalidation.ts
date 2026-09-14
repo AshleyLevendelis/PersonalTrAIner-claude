@@ -47,7 +47,13 @@ import { rebuildAgainstProfile } from './plan-adaptations'
 // rep-range shift per tier, which phases are allowed, the split, and the
 // conditioning profile — more of the programme than style touches. Put to her
 // as a question; she chose to offer the rebuild, same as style.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal'] as const
+// start_preference joined 14 Sep 2026, on Ashley's instruction to close the
+// setup answers that could never be changed. It is the most plan-shaping of the
+// four remaining locked ones: 'move_more' produces the starting-out walking plan
+// (starting-out.ts reads exactly this field), 'train' produces a lifting plan.
+// Changing it is therefore not a re-price — it is a different plan — so it
+// belongs here with goal and style rather than on the ceilings path.
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference'] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 export interface PlanInvalidation {
@@ -147,6 +153,21 @@ export function detectPlanInvalidation(
         'Your current plan was built for the style you had before, so the exercises and rep ' +
         'ranges still follow it. I can rebuild it from this week onwards in the new style. ' +
         'Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  if ('start_preference' in patch && patch.start_preference !== before.start_preference) {
+    const toTraining = patch.start_preference === 'train'
+    return {
+      field: 'start_preference',
+      title: toTraining ? 'Build you a training plan?' : 'Go back to easing in?',
+      detail: toTraining
+        ? 'Your current plan is the easing-in one — walks and easy movement, built for starting '
+          + 'from scratch. I can build you a proper training plan from this week onwards. '
+          + 'Everything you have already logged stays exactly as it is.'
+        : 'Your current plan is a training plan. I can rebuild it from this week onwards as the '
+          + 'easing-in one — walks and easy movement, building a little at a time. Everything '
+          + 'you have already logged stays exactly as it is.',
     }
   }
 

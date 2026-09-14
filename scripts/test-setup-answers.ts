@@ -33,6 +33,11 @@
  *  5. The past is never rewritten.
  *  6. The receipt says something true and checkable.
  *  7. A corrected known lift is out of reach here, and the gate says so.
+ *  8. The screen offers the ceilings, and saving one actually re-prices.
+ *  9. The STARTING POINT is no longer locked — and is on the rebuild path,
+ *     not this one. Added 14 Sep 2026 on Ashley's instruction to close the
+ *     setup answers she could never change. It is the only one of the four
+ *     remaining that changes WHICH PLAN you have rather than a number in it.
  */
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
@@ -40,6 +45,7 @@ import {
   repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice, headlineReprice,
 } from '../src/lib/reprice-plan'
 import { getExerciseEntry } from '../src/lib/exercise-db'
+import { PLAN_INVALIDATING_FIELDS } from '../src/lib/plan-invalidation'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -387,6 +393,71 @@ check('the handler was found and bounded', ceilingBody.length > 200 && nextHandl
   { len: ceilingBody.length })
 check('...and it never asks: no rebuild dialog, no regeneration',
   !/setPlanInvalidation|rebuildFromCurrentWeek|rebuildAgainstProfile/.test(ceilingBody))
+
+// ---------------------------------------------------------------------------
+console.log('\n9. The starting point is unlocked, and takes the rebuild road')
+// ---------------------------------------------------------------------------
+// WHY IT IS IN THIS FILE AND NOT ONLY IN test:rebuild-offer. The interesting
+// property is not "it offers a rebuild" — that gate owns it. It is that this
+// answer must NOT travel the re-price road the other setup answers travel.
+// Re-pricing keeps the exercises and moves the weights; 'move_more' and
+// 'train' do not share a set of exercises at all, so a re-price would leave
+// somebody who just said "I want to train properly" still walking, with
+// slightly different numbers. The two roads are one line apart in savePatch
+// and nothing but this check notices if it takes the wrong one.
+const startScreen = strip(read('src/components/ProfileScreen.tsx'))
+
+check('the Profile screen offers the starting point',
+  /Row label="Starting from"/.test(startScreen)
+  && /start_preference: v as StartPreference/.test(startScreen))
+// THE SAME WORDS ONBOARDING ASKED WITH. A second list of the same two options
+// is how Profile ends up wording the question differently enough that she
+// cannot tell it is the same one she answered at setup.
+// ON THE ROW ITSELF, not anywhere in the file. This first read
+// /START_PREFERENCE_OPTIONS/ across the whole source, which the IMPORT LINE
+// satisfies — so replacing the row's options with an inline copy of the same
+// two answers left the check green. Measured, not reasoned.
+check('...using onboarding\'s own option list, not a second copy of it',
+  /Row label="Starting from"[\s\S]{0,400}?options=\{START_PREFERENCE_OPTIONS\}/.test(startScreen)
+  && !/(const|let)\s+START_PREFERENCE_OPTIONS/.test(startScreen))
+check('...beside Equipment, with the rest of "You"',
+  /Row label="Equipment"[\s\S]{0,2000}Row label="Starting from"/.test(startScreen))
+// THE ROAD IT TAKES. CEILING_FIELDS is the re-price trigger's own list; this
+// answer must not be on it, and must be on the invalidating one instead.
+check('...and it is NOT on the re-price trigger\'s list of fields',
+  !/CEILING_FIELDS = \[[^\]]*start_preference/.test(startScreen))
+check('...it is on the rebuild list instead',
+  (PLAN_INVALIDATING_FIELDS as readonly string[]).includes('start_preference'),
+  PLAN_INVALIDATING_FIELDS)
+
+// AND THE ENGINE AGREES, not just the source. Re-pricing a plan against a
+// changed starting point moves nothing — which is what makes the re-price road
+// the wrong one for it, rather than merely an unconventional one.
+const startBase = withField({ start_preference: 'train' })
+const startMeso = silence(() => {
+  setRandomSource(seededRngFromKey('setup-answers-start'))
+  const m = generateMesocycle(startBase)
+  resetRandomSource()
+  return m
+})
+const startWeeks = repriceableWeekNumbers(startMeso, LIVE)
+const eased = repriceForCorrectedProfile(
+  startMeso, startBase, { ...startBase, start_preference: 'move_more' } as unknown as UserProfile, startWeeks)
+check('re-pricing cannot act on it at all — a different plan is not a different weight',
+  eased.changes.length === 0 && eased.mesocycle === startMeso, eased.changes.slice(0, 3))
+// THE CONTRAST, same fixture, so the line above cannot pass vacuously.
+const startCeiling = repriceForCorrectedProfile(
+  startMeso, startBase, { ...startBase, max_dumbbell_kg: 8 } as unknown as UserProfile, startWeeks)
+check('...while the SAME plan does re-price for a ceiling correction',
+  startCeiling.changes.length > 0, startCeiling.changes.length)
+
+// WHAT IS STILL LOCKED, counted rather than remembered. Three known lifts,
+// pinned by §7 above with the reason. If a fourth answer ever becomes locked,
+// or one of these three is unlocked, this line is where it gets noticed.
+const stillLocked = ['known_bench_kg', 'known_squat_kg', 'known_deadlift_kg']
+  .filter(f => !startScreen.includes(f))
+check('the only setup answers still unreachable from the screen are the three known lifts',
+  stillLocked.length === 3, stillLocked)
 
 console.log(failures === 0 ? '\nAll setup-answer checks passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)

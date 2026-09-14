@@ -159,15 +159,28 @@ facts: re-measure before acting on one, correct it here when it is wrong.
     week that number is in, or she cannot go and look at it.
   - Exercise dislikes — **was never locked**: it is not a profile column at
     all, it becomes `user_facts` rows, the same shape a "never give me
-    burpees" chat turn produces. So the COACH could always change it; the
-    SCREEN still cannot. `coach only`, not `MISSING`
+    burpees" chat turn produces. CORRECTED 14 Sep 2026, measured: the line here
+    said "the SCREEN still cannot", and that is half wrong. Profile lists every
+    `exercise_preference` fact with edit and delete, so an existing dislike can
+    be CHANGED or REMOVED from the screen. What the screen cannot do is ADD one
+    — and the group is hidden entirely when there are none, so a first dislike
+    has no screen route at all. So: **edit and delete on both, add on the coach
+    only**. The old line came from reading the profile FIELDS and not the memory
+    section below them
   - The three known lifts — still `MISSING`, and now with a measured reason:
     they are a generation-time seed (`knownWorkingWeights`), not something
     `prescribeLoad` reads, so the re-price path is blind to them by design and
     `setup-answers` §7 pins that. Unlocking them needs the anchor machinery,
     which refuses downward moves
-  - The starting preference — still `MISSING`; plan-shaping, so it belongs on
-    the rebuild-offer path with goal and style, not the re-price one
+  - The starting preference — **now editable**, in "You" beside Equipment,
+    14 Sep 2026. It goes on the REBUILD-OFFER path with goal and style, not the
+    re-price one, and that is the point rather than a detail: `move_more` and
+    `train` do not share a set of exercises, so a re-price would leave somebody
+    who just asked to train properly still walking, with slightly different
+    numbers. Measured, not reasoned — `repriceForCorrectedProfile` returns zero
+    changes for this field against a live fixture, with a same-fixture contrast
+    so the gate cannot pass vacuously. `setup-answers` §9,
+    `verify:setup-answers` §6, `rebuild-offer`
 - Weights actually lifted flow into the printed plan — automatic from
   calibration week, offered after — `calibration-search`,
   `beat-target-offer`, `logged-reanchor`

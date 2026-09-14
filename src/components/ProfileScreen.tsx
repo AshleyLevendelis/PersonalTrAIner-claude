@@ -36,14 +36,14 @@ import { AppearanceSection } from '@/components/AppearanceSection'
 import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
 import type { RevealSpeed } from '@/lib/reveal-speed-store'
 import {
-  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
+  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS, START_PREFERENCE_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
   DAYS_FULL, partitionInjuries, GOAL_OPTIONS,
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
-import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay } from '@/lib/types'
+import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
@@ -766,6 +766,23 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 these rows vanishing mid-edit. */}
             <Row label="Experience"><EditableSelectField value={profile.training_experience ?? ''} options={EXPERIENCE_OPTIONS} onSave={v => savePatch({ training_experience: v as TrainingExperience })} /></Row>
             <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
+            {/* WHERE YOU'RE STARTING FROM — added 14 Sep 2026, on Ashley's
+                instruction to close the setup answers that could never be
+                changed afterwards. This one was the most consequential of them:
+                starting-out.ts reads exactly this field to decide whether the
+                app builds the easing-in walking plan or a training plan, so
+                being stuck on the wrong answer meant being stuck on the wrong
+                KIND of plan with no way to say so.
+
+                It sits on the rebuild path with goal and style, not the
+                re-price one, because it does not change a number — it changes
+                which plan you have. detectPlanInvalidation offers the rebuild
+                and nothing happens until the offer is accepted. */}
+            <Row label="Starting from"><EditableSelectField
+              value={profile.start_preference ?? ''}
+              options={START_PREFERENCE_OPTIONS}
+              onSave={v => savePatch({ start_preference: v as StartPreference })}
+            /></Row>
             {/* WHAT YOU CAN LIFT — added 13 Sep 2026, beside Equipment
                 because that is the field that decides whether these apply at
                 all, and because they are the same kind of fact: what this

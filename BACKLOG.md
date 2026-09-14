@@ -2,6 +2,69 @@
 
 Newest first. One line each.
 
+- [x] **THE STARTING POINT IS NO LONGER LOCKED — and correcting it offers a
+  rebuild, not a re-price.** Second of the four screenshots Ashley sent asking
+  for "every issue here fixed": the setup answers that could never be changed
+  afterwards. This is the one that mattered most of the remaining four, because
+  it does not change a NUMBER in the plan — it changes WHICH PLAN you have.
+  `start_preference` is the field `starting-out.ts` reads to decide between the
+  easing-in walking plan and a training plan, so someone who answered "get
+  moving first" at setup and then got fitter had no way, on any screen, to say
+  so. A "Starting from" row now sits beside Equipment in "You", showing the
+  answer already given.
+  **IT TAKES THE REBUILD ROAD, DELIBERATELY.** The three implement ceilings
+  beside it re-price in place — same exercises, corrected weights. That is
+  exactly wrong here: 'move_more' and 'train' do not share a set of exercises,
+  so a re-price would leave someone who just asked to train properly still
+  walking, with slightly different numbers. So it joins goal and style on
+  `PLAN_INVALIDATING_FIELDS`, is offered, and nothing changes until she accepts.
+  Both directions get their own words, because training→easing-in is somebody
+  coming back from a break, not a downgrade.
+  **ONE LIST OF WORDS, NOT TWO.** The first cut declared its own two options on
+  the Profile screen. `onboarding-slots.ts` already held them — it is the one
+  place setup questions and their wording live — so it is exported and shared.
+  The screen now says "Get moving first" and "Straight into training", the same
+  words she answered with.
+  **VERIFIED ON A REAL SCREEN, screenshot read**: the row renders at 390x844
+  under Equipment, changing it to "Get moving first" raises the offer, and no
+  re-price receipt appears behind it.
+  **DECIDED WITHOUT ASKING**, because Ashley's instruction that day was "every
+  issue here fixed in whichever order you feel best". The road it takes
+  (rebuild, not re-price) is mechanical: a re-price provably cannot act on this
+  field at all — measured, `repriceForCorrectedProfile` returns zero changes for
+  it against a live fixture, and the gate pins that with a same-fixture contrast
+  so it cannot pass vacuously.
+  **MUTATIONS: 16 tried, 14 caught first time, 2 missed and the checks
+  re-anchored** (all 16 caught after).
+  The two misses are the same shape CLAUDE.md warns about, and both were found
+  by breaking the code rather than by reading the check:
+  - `/training plan/i` on the "moving to training" copy was satisfied by the
+    OTHER copy too — both sentences name both plans, because the sentence is
+    "you are on X, I can build you Y". Swapping the two branches left the
+    section green. Re-anchored on WHICH PLAN THE COPY ENDS ON, which is the
+    plan she would end up with and the only thing a reversal changes.
+  - `/START_PREFERENCE_OPTIONS/` across the whole source was satisfied by the
+    IMPORT LINE, so replacing the row's options with an inline copy of the same
+    two answers stayed green. Re-anchored on the row's own JSX.
+  One mutation is recorded as NOT caught and is not a hole: putting the field on
+  the re-price trigger's list changes nothing observable, because the re-price
+  cannot act on it either way. It would take two regressions at once to produce
+  a wrong number, and the browser check that watches for one is there for that.
+  **CORRECTION TO CLAUDE.md, measured today.** The must-have list says exercise
+  dislikes are `coach only` — "the SCREEN still cannot" change them. Half wrong:
+  the Profile screen lists every `exercise_preference` fact with edit and delete,
+  so an existing dislike CAN be changed or removed there. What it cannot do is
+  ADD one, and the group is hidden entirely when there are none. The accurate
+  line is "edit and delete on both, add on the coach only", and that gap is the
+  next slice. I wrote the old line from the fact that there is no dislikes
+  control in the profile FIELDS, without reading the memory section below them.
+  Still locked, and now the only ones: the three known lifts, for the reason
+  `test:setup-answers` §7 pins — they are a generation-time seed, not something
+  the re-price path reads.
+  Gates: `test:setup-answers` §9 (new, 8 checks), `test:rebuild-offer` (extended,
+  9 checks), `verify:setup-answers` §6 (new, 8 checks on the real screen).
+  Needs the frontend deploy on merge. No function deploy, no migration.
+
 - [x] **THE COACH CAN BAN AN EXERCISE, AND THERE IS NOW A WRITTEN PARITY LIST
   WITH A GATE BEHIND IT.** Ashley sent four old decision cards and asked for
   everything on them fixed. This is the biggest of them.

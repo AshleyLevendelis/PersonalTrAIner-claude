@@ -68,6 +68,12 @@ const baseProfile: UserProfile = {
   weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+  // ANSWERED, so the row renders with a value and the driver's change is a
+  // CORRECTION rather than a first answer — same reasoning as the ceilings
+  // below. 'train' is the answer that produced this (lifting) plan, so
+  // switching to 'move_more' is the interesting direction: it is the one that
+  // means the plan on screen is the wrong KIND of plan.
+  start_preference: 'train',
   // A STATED CEILING ALREADY SET, so the rows render with a value in them and
   // the driver's edit is a CORRECTION rather than a first answer — which is
   // the case this feature exists for.
@@ -96,6 +102,11 @@ function Harness() {
   const [profile, setProfile] = useState<UserProfile>(baseProfile)
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>(MESO)
   const [receipt, setReceipt] = useState<string | null>(null)
+  // App holds this in a dialog; here it is a plain element, for the same
+  // reason the receipt is: this page reproduces App's plumbing so the SCREEN
+  // can be driven, and test:rebuild-offer §4 holds App's own half by source
+  // (nothing rebuilds without a confirm, raised from exactly one place).
+  const [invalidation, setInvalidation] = useState<{ title: string; detail: string } | null>(null)
   const [open, setOpen] = useState(true)
 
   // App's handler, reproduced — see the header. The two functions it calls are
@@ -121,6 +132,12 @@ function Harness() {
         {receipt && (
           <p className="m-4 text-sm" data-testid="reprice-receipt">{receipt}</p>
         )}
+        {invalidation && (
+          <div className="m-4 text-sm" data-testid="plan-invalidation">
+            <p data-testid="plan-invalidation-title">{invalidation.title}</p>
+            <p data-testid="plan-invalidation-detail">{invalidation.detail}</p>
+          </div>
+        )}
         {/* THE PLAN'S OWN WEIGHTS, so the driver can check the receipt against
             what the plan actually holds rather than against itself. */}
         <div hidden data-testid="plan-weights">{JSON.stringify(
@@ -136,6 +153,7 @@ function Harness() {
           latestWeightKg={80}
           onProfileChanged={patch => setProfile(prev => ({ ...prev, ...patch }))}
           onCeilingsCorrected={onCeilingsCorrected}
+          onPlanInvalidated={setInvalidation}
           onMemoryChanged={() => {}}
           revealSpeed="normal"
           onRevealSpeedChange={() => {}}

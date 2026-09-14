@@ -261,6 +261,75 @@ const afterUp = JSON.parse(await text('[data-testid="plan-weights"]'))
 check('5c. ...and the plan really holds heavier weights now',
   afterUp.some((e, i) => beforeUp[i] && e.kg > beforeUp[i].kg))
 
+// --- THE STARTING POINT, added 14 Sep 2026 ---------------------------------
+// The last setup answer she could see but never change was the one that
+// decides WHICH PLAN she has: 'move_more' builds the easing-in walking plan,
+// 'train' builds a lifting one. Being stuck on the wrong answer meant being
+// stuck on the wrong kind of plan with nothing on any screen to say so.
+//
+// WHAT THIS HOLDS THAT NO SOURCE CHECK CAN: that the row is really on the
+// screen at 390x844 next to Equipment, that it shows the answer already given
+// in the words onboarding used, that a thumb reaches it, and — the one that
+// matters — that changing it produces the REBUILD OFFER and not the silent
+// re-price the three rows below it produce. Those two roads are one line apart
+// in the same function.
+const startRow = () => ev(`(() => {
+  const reaches = ${REACH}
+  const label = [...document.querySelectorAll('span')].find(s => /^Starting from$/.test((s.textContent || '').trim()))
+  if (!label) return null
+  const row = label.parentElement
+  const control = row.querySelector('button, [role="combobox"], select')
+  return {
+    shown: (row.textContent || '').replace(/\s+/g, ' ').trim(),
+    hasControl: !!control,
+    reachable: control ? reaches(control) : false,
+  }
+})()`)
+
+const start = await until(startRow, v => v && v.hasControl)
+check('6a. the starting point is on the screen at all', !!start, start)
+check('6b. ...showing the answer already given, not an empty box',
+  !!start && /get moving first|straight into training/i.test(start.shown), start?.shown)
+check('6c. ...and a thumb reaches it', !!start && start.reachable, start)
+await shoot('setup-answers-4-starting-point')
+
+// CHANGING IT. The control is a Radix Select, so the option list is portalled
+// to the body rather than living inside the row — which is why this opens it
+// and then picks by the option's own text instead of setting a value.
+const receiptWas = await text('[data-testid="reprice-receipt"]')
+await ev(`(() => {
+  const label = [...document.querySelectorAll('span')].find(s => /^Starting from$/.test((s.textContent || '').trim()))
+  const c = label && label.parentElement.querySelector('button, [role="combobox"]')
+  if (c) c.click()
+})()`)
+await wait(500)
+const picked = await ev(`(() => {
+  const o = [...document.querySelectorAll('[role="option"]')].find(x => /get moving first/i.test(x.textContent || ''))
+  if (!o) return [...document.querySelectorAll('[role="option"]')].map(x => (x.textContent||'').trim())
+  o.click(); return true
+})()`)
+check('6d. the other answer can be chosen', picked === true, picked)
+await wait(600)
+
+const offer = await until(() => text('[data-testid="plan-invalidation"]'), v => v.length > 0)
+check('6e. changing it OFFERS a rebuild — it does not change anything by itself',
+  offer.length > 0, offer)
+// THE WORDS SHE READS. Ashley's standing rule is that a changed plan is
+// described in plain terms, and the only thing that makes this offer useful is
+// knowing which plan she would end up with.
+check('6f. ...naming the plan she would get, and when it starts',
+  /walks and easy movement/i.test(offer) && /from this week/i.test(offer), offer)
+check('6g. ...and promising her logged work survives it',
+  /already logged stays/i.test(offer), offer)
+// THE ROAD NOT TAKEN, and the whole reason this section is in THIS driver: a
+// re-price receipt appearing here would mean the starting point had been
+// treated as a number to adjust rather than a plan to rebuild — the same
+// exercises, slightly different weights, and still walking.
+check('6h. ...and NO weights were silently re-priced behind it',
+  (await text('[data-testid="reprice-receipt"]')) === receiptWas,
+  { was: receiptWas, now: await text('[data-testid="reprice-receipt"]') })
+await shoot('setup-answers-5-rebuild-offer')
+
 // --- and is absent where it must not take effect ---------------------------
 // assembleProfile DISCARDS all three for a full-gym answer, so a row here
 // would be a control that cannot do anything — the one thing the must-have

@@ -103,9 +103,53 @@ console.log('\n2. And nothing else does')
   // while the plan on screen was still the other. Found while building the
   // chat tool for it; fixing only chat would have made chat the more honest
   // door, the opposite of parity.
+  // start_preference joined 14 Sep 2026, on Ashley's instruction to close the
+  // setup answers that could never be changed. It is the most plan-shaping of
+  // them: starting-out.ts reads exactly this field to decide whether the app
+  // builds the easing-in walking plan or a training plan, so a wrong answer
+  // meant being stuck on the wrong KIND of plan with no way to say so.
   check('the invalidating list is exactly the fields that change what the plan contains',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,training_days,training_style',
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,start_preference,training_days,training_style',
     PLAN_INVALIDATING_FIELDS)
+
+  // BOTH DIRECTIONS, because the copy differs and only one of them is the
+  // obvious case: easing-in -> training is someone getting fitter, and
+  // training -> easing-in is someone coming back from a break or an illness.
+  // THE DIRECTION IS THE TEST, and asserting on a phrase is not enough to
+  // catch it getting reversed. Both copies name BOTH plans — they have to, the
+  // sentence is "you are on X, I can build you Y" — so /training plan/ matched
+  // the easing-in copy too and swapping the two branches left this section
+  // fully green. Measured, not reasoned: the swap was applied and the check
+  // passed. So anchor on WHICH PLAN THE COPY ENDS ON, which is the plan the
+  // person would end up with, and is the only thing the reversal changes.
+  const endsOn = (detail: string): 'training' | 'easing' | 'unclear' => {
+    const training = detail.toLowerCase().lastIndexOf('training plan')
+    const easing = Math.max(detail.toLowerCase().lastIndexOf('easing-in'),
+      detail.toLowerCase().lastIndexOf('walks and easy movement'))
+    if (training < 0 || easing < 0) return 'unclear'
+    return training > easing ? 'training' : 'easing'
+  }
+  const toTrain = detectPlanInvalidation(base({ start_preference: 'move_more' }), { start_preference: 'train' })
+  check('moving to a training plan offers the rebuild', toTrain?.field === 'start_preference', toTrain)
+  check('...and the copy ends on the plan she would GET — the training one',
+    endsOn(toTrain?.detail ?? '') === 'training', toTrain?.detail)
+  check('...and the heading names it too', /training/i.test(toTrain?.title ?? ''), toTrain?.title)
+  const toEase = detectPlanInvalidation(base({ start_preference: 'train' }), { start_preference: 'move_more' })
+  check('moving back to easing in offers it too', toEase?.field === 'start_preference', toEase)
+  check('...and THAT copy ends on the easing-in plan, not the training one',
+    endsOn(toEase?.detail ?? '') === 'easing', toEase?.detail)
+  check('...with a heading that does not promise training',
+    /easing in/i.test(toEase?.title ?? '') && !/training/i.test(toEase?.title ?? ''), toEase?.title)
+  check('...and the two are not the same words either way',
+    (toTrain?.detail ?? 'x') !== (toEase?.detail ?? 'y'), [toTrain?.detail, toEase?.detail])
+  check('...both saying the change starts from this week, not from week 1',
+    /from this week/i.test(toTrain?.detail ?? '') && /from this week/i.test(toEase?.detail ?? ''),
+    [toTrain?.detail, toEase?.detail])
+  check('...and both promising nothing logged is lost',
+    /already logged stays/i.test(toTrain?.detail ?? '') && /already logged stays/i.test(toEase?.detail ?? ''),
+    [toTrain?.detail, toEase?.detail])
+  const sameStart = detectPlanInvalidation(base({ start_preference: 'train' }), { start_preference: 'train' })
+  check('...and saving the same answer offers nothing', sameStart === null, sameStart)
 
   const daysChanged = detectPlanInvalidation(
     base({ training_days: [{ day: 'Monday', available: true }, { day: 'Tuesday', available: true }] }),

@@ -73,7 +73,12 @@ export const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; de
  * someone who just wants to be a bit more active or someone who wants to
  * start exercising in a gym with weights", asked only when it can't tell.
  */
-const START_PREFERENCE_OPTIONS: { value: StartPreference; icon: string; label: string; description: string }[] = [
+// EXPORTED 14 Sep 2026 so the Profile screen shows the SAME WORDS this asked
+// with. The screen had its own copy for about an hour; two lists of the same
+// two options is the drift that ends with Profile offering an answer
+// onboarding never asked, or wording it differently enough that she cannot
+// tell it is the same question.
+export const START_PREFERENCE_OPTIONS: { value: StartPreference; icon: string; label: string; description: string }[] = [
   { value: 'move_more', icon: '🚶', label: 'Get moving first', description: 'Walks and easy activity, building up week by week' },
   { value: 'train', icon: '🏋️', label: 'Straight into training', description: 'Proper sessions from week one' },
 ]
