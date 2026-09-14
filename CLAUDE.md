@@ -130,10 +130,16 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Build a custom meal from what is in the fridge — `coach only`; `custom-meal`
 - Log what was eaten — both; `meal-log`, `meal-ledger-snapshot`,
   `diary-preservation`
-- Move a meal to another slot or day — `MISSING`, and deliberately: a dinner
-  dropped into a breakfast slot does not fit breakfast's budget, and refuse /
-  refit / rescale is Ashley's call. Meals per day and snacks — `screen only`
-  (Profile)
+- Move a meal to another SLOT — both surfaces since 14 Sep 2026, with the two
+  rulings it was waiting on. **"Resize it to fit"** (13 Sep), over refusing and
+  over leaving the portions alone; and on the slot the meal LEAVES, from three
+  options, **"they swap places"** (14 Sep) — dinner becomes the snack, the
+  snack becomes dinner, both resized, both new sizes stated before the tap.
+  `meal-move`, `verify:meal-move`, `coach-parity`.
+  Moving to another DAY stays `MISSING` and is now named with its reason: no
+  screen renders another day's meals, so the destination is somewhere she
+  cannot see, check or undo by looking. It needs a future-day meal view first.
+  Meals per day and snacks — `screen only` (Profile)
 - Scale a portion — both surfaces since 12 Sep 2026, the same row menu;
   `meal-food-edit`, `verify:meal-food-edit`
 

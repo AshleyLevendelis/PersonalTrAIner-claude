@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL CAN BE MOVED TO ANOTHER SLOT, ON BOTH SURFACES — and the two
+  meals swap places, resized.** Fourth of Ashley's four screenshots. This was
+  the last operation on the meal grain that existed nowhere, and CLAUDE.md had
+  it MISSING "deliberately: refuse / refit / rescale is Ashley's call."
+  **BOTH CALLS MADE.** "Resize it to fit" (13 Sep) over refusing or leaving the
+  portions alone. And, asked what happens to the slot the meal LEFT, from three
+  options: "they swap places" (14 Sep) — the only one where the day stays
+  complete without the app inventing a change she did not ask for.
+  **MOVING TO ANOTHER DAY IS NOT BUILT, and is named rather than dropped.** No
+  screen renders another day's meals — `NutritionDisplay` is handed today's
+  session date, full stop — so the destination would be somewhere she cannot
+  see, check or undo by looking. It needs a future-day meal view first.
+  **ONE DEFECT FOUND BY READING A SCREENSHOT, not by any check.** The card said
+  "so your day still adds up the same". It does not: a 480 kcal breakfast
+  became an 840 kcal dinner while a 780 kcal dinner became a 516 kcal
+  breakfast, a net +96 the card called unchanged. The claim can never be right
+  in general — each meal is resized to its DESTINATION's budget, and the meals
+  were not sitting at their own budgets to begin with. It now computes the net
+  and says it ("your day goes up about 96 kcal"), with a check that fails on
+  the old sentence.
+  **THE REFUSAL PATH IS REAL AND CORRECT**, found the same way: a ~250 kcal
+  yoghurt breakfast cannot become a lunch worth three times that, and
+  portion-scaler refuses past 2.5x rather than serving three breakfasts. The
+  screen says so in plain words and offers the swap list instead. The browser
+  driver tries each destination and drives the first that fits, rather than
+  tripping over the honest refusal.
+  **MUTATIONS: 12 tried, 11 real ones all caught, 1 invalid** — an attempt to
+  assign to a const crashed the gate, which showed as 3 checks RUN instead of
+  45 and zero failures. That is exactly the "a crash reads as a pass" trap
+  CLAUDE.md names; comparing the RAN count caught it. Redone properly and
+  caught. Among the caught: the dietary checks bypassed on both legs, the
+  second leg never coming back, an absurd resize forced through (which produced
+  a 15g chicken breast and a 3.6kg one), the moved meal keeping its name, the
+  ingredient line re-rendered instead of renumbered ("2slice wholemeal bread"),
+  and the rollback removed.
+  **ONE NEW TEST HOOK IN PRODUCTION CODE**, `data-meal-name`, and it earned its
+  place: the driver first scraped the text under each slot heading, which broke
+  the moment the Move sheet put the words "Lunch" and "Dinner" inside an
+  expanded row — the driver read a destination BUTTON as the slot's meal and
+  reported the plan had changed when nothing had.
+  Verified on the real screen at 390x844, screenshots read: the card states
+  both new sizes and the day's real change, nothing moves until Confirm, and
+  afterwards breakfast holds the salmon at 516 and dinner the yoghurt at 840,
+  with the day reading 2076 — the +96 the card promised.
+  Gates: `test:meal-move` (new, 49 checks), `verify:meal-move` (new, 26 checks),
+  `test:coach-parity` (the new tool recorded in the written exceptions list —
+  that gate went red for the right reason and is what made me record it).
+  **NEEDS THE `chat-gemini` DEPLOY** as well as the frontend on merge: the
+  coach's `propose_meal_move` tool and its prompt rule are a server change.
+  No migration.
+
 - [x] **THE APP TOUR NOW HAS TO TELL THE TRUTH, and the check derives the
   truth rather than being told it.** Third of Ashley's four screenshots. The
   must-have list recorded the tour's copy as UNGUARDED for one specific class

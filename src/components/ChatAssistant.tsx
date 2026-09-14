@@ -28,6 +28,8 @@ import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-
 import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
+import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
+import { executeMealMove } from '@/lib/pending-action-executor'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
@@ -3775,10 +3777,44 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: foodAdd.diff }
           else refusal = foodAdd.reason
         }
+      } else if (result.proposal.kind === 'propose_meal_move') {
+        // MOVING A WHOLE MEAL TO ANOTHER SLOT. Resolved here, not on the
+        // server, for the same reason every meal proposal is: only the client
+        // knows what is in each slot today and what each slot's budget is, and
+        // the resize is computed from both.
+        if (!macros) {
+          refusal = "I need your height, weight, age and sex before I can move a meal around — you can add them in Profile."
+        } else {
+          const mealsBySlot: Partial<Record<MealSlotName, { name: string; ingredients: string[]; macros: MacroTargets }>> = {}
+          for (const day of mealPlan) {
+            const slot = day.meal.toLowerCase() as MealSlotName
+            const item = day.items[0]
+            if (!item) continue
+            mealsBySlot[slot] = {
+              name: item.name,
+              ingredients: item.ingredients ?? [],
+              macros: { calories: item.calories, protein: item.protein, carbs: item.carbs, fat: item.fat },
+            }
+          }
+          const moved = buildMealMoveProposal({
+            rawArgs: result.proposal.rawArgs ?? {},
+            mealsBySlot,
+            profileId: profile.id,
+            targets: macros,
+            mealsPerDay: profile.meals_per_day,
+            includeSnacks: profile.include_snacks,
+            dietaryPreferences: profile.dietary_preferences ?? [],
+            dislikedFoods: profile.disliked_foods ?? [],
+            todayDate: getSessionDateContext(profile.id).date,
+          })
+          if (moved.ok) built = { scopeKey: moved.scopeKey, preconditions: moved.preconditions, payload: moved.payload as unknown as Record<string, unknown>, diff: moved.diff }
+          else refusal = moved.reason
+        }
       } else if (
         result.proposal.kind === 'propose_meal_food_remove'
         || result.proposal.kind === 'propose_meal_food_replace'
         || result.proposal.kind === 'propose_meal_food_resize'
+        || result.proposal.kind === 'propose_meal_move'
       ) {
         // CHANGING ONE FOOD ALREADY IN THE MEAL — the same door as the add
         // above, opening the other way. One branch for all three because the
@@ -4478,6 +4514,26 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? (EDIT_TITLES[row.kind] ?? 'Added') : "Couldn't change the meal"
       rows = ok ? [{ label: payload.slot, detail: `+ ${payload.option.name}` }] : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_meal_move') {
+      // BOTH LEGS OR NEITHER — executeMealMove rolls the first back if the
+      // second fails, so a swap can never leave the same meal in two slots.
+      const payload = row.payload as unknown as MealMovePayload
+      const moveProfileId = profile.id
+      receipt = await executeMealMove(moveProfileId, payload, async p => {
+        if (p.date === getSessionDateContext(moveProfileId).date) return await onMealSwapApplied(p.slot, p.option.name)
+        try { await setMealPick(moveProfileId, p.date, p.slot, p.option.name); return true } catch { return false }
+      })
+      const ok = receipt.failed.length === 0
+      title = ok
+        ? (payload.legs.length === 2 ? 'Swapped over' : 'Moved')
+        : "Couldn't move the meal"
+      rows = ok ? payload.legs.map(l => ({ label: l.slot, detail: `${l.originalName} · ${l.afterKcal} kcal` })) : []
+      // NO UNDO TOKEN, and said rather than left ambiguous: undoing a two-leg
+      // move means removing two pool options and restoring two picks, and the
+      // receipt carries one opaque token. Wiring that is real work and belongs
+      // in its own change rather than bolted on half-done — the same call the
+      // meal LOG made for the same reason. Moving it back is one more move.
+      undoToken = undefined
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload
       const result = await executeInjuryAdaptation(profile, mesocycle, payload)

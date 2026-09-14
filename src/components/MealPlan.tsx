@@ -16,6 +16,7 @@ import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestr
 import type { PoolOption } from '@/lib/meal-generation'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
+import { MealMoveSheet, type MealMoveContext } from './nutrition/MealMoveSheet'
 
 /** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
 export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -351,6 +352,24 @@ export function MealPlan({
                   pantryFoods: SLOT_ORDER.flatMap(sl => (chosen[sl]?.ingredients ?? []).map(formatIngredient)),
                 }
               : null}
+            moveContext={(profileId && targets && onMealPickApplied)
+              ? {
+                  profileId, date, fromSlot: slot, targets,
+                  mealsPerDay, includeSnacks,
+                  dietaryPreferences: dietaryPreferences ?? [],
+                  dislikedFoods: avoidFoods ?? [],
+                  // EVERY SLOT'S MEAL, because the destination's is what comes
+                  // back the other way — Ashley's ruling that they swap places
+                  // rather than one of them vanishing.
+                  mealsBySlot: Object.fromEntries(SLOT_ORDER
+                    .filter(sl => chosen[sl])
+                    .map(sl => [sl, {
+                      name: chosen[sl]!.name,
+                      ingredients: chosen[sl]!.ingredients.map(formatIngredient),
+                      macros: chosen[sl]!.macros,
+                    }])),
+                }
+              : null}
             onRegenerate={onRegenerateSlot}
             onFindMore={onFindMoreOptions}
             checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
@@ -478,6 +497,7 @@ function MealSlotRow({
   onLog,
   onUnlog,
   editContextFor,
+  moveContext,
   onMealPickApplied,
 }: {
   slot: MealSlotName
@@ -507,10 +527,14 @@ function MealSlotRow({
   onUnlog: (clientIds: string[]) => Promise<void>
   /** Null when the screen cannot finish an edit (no profile, no targets, no pick path) — the row menu then doesn't render at all. */
   editContextFor: (option: PoolOption) => MealFoodEditContext | null
+  /** Null for the same reasons editContextFor is — the Move control then doesn't render either. */
+  moveContext: MealMoveContext | null
   onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
 }) {
   const [busy, setBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
+  const [moveNote, setMoveNote] = useState<string | null>(null)
   /** Which ingredient line has its edit open, by index. One at a time. */
   const [editingLine, setEditingLine] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string | null>(null)
@@ -615,7 +639,17 @@ function MealSlotRow({
                   name in the pool while keeping the row compact. `min-w-0`
                   stays either way — without it the flex row refuses to shrink
                   and the macros beside it get pushed off. */}
-              <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}>
+              {/* data-meal-name: the one stable way to read which meal is in
+                  which slot. verify:meal-move used to scrape the rendered text
+                  under each slot heading, which broke the moment the Move
+                  sheet put the words "Lunch" and "Dinner" inside an expanded
+                  row — the driver then read a destination BUTTON as the slot's
+                  meal. A test hook beats a text scrape that any layout change
+                  can quietly redefine. */}
+              <span
+                data-meal-name={slot}
+                className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}
+              >
                 {displayName}
               </span>
               {!expanded && (
@@ -802,6 +836,22 @@ function MealSlotRow({
             <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             </Button>
+            {/* MOVE — beside Swap because they are the same kind of change to
+                the same meal, and because this is where she is already
+                looking when she decides she wants dinner as a snack. Hidden
+                when the screen cannot finish the job (no profile, no targets,
+                no pick path), on the same rule the food edits follow: a
+                control that cannot finish is worse than no control. */}
+            {moveContext && onMealPickApplied && (
+              <button
+                type="button"
+                onClick={() => { setMoveOpen(prev => !prev); setMoveNote(null) }}
+                className="text-xs text-muted-foreground"
+                data-testid="meal-move-open"
+              >
+                Move
+              </button>
+            )}
             {(otherOptions.length > 0 || onFindMore) && (
               <button
                 type="button"
@@ -814,6 +864,16 @@ function MealSlotRow({
               </button>
             )}
           </div>
+
+          {moveOpen && moveContext && onMealPickApplied && (
+            <MealMoveSheet
+              ctx={moveContext}
+              onPick={onMealPickApplied}
+              onDone={summary => { setMoveOpen(false); setMoveNote(summary) }}
+              onCancel={() => setMoveOpen(false)}
+            />
+          )}
+          {moveNote && <p className="text-[0.71875rem] text-muted-foreground">{moveNote}. Both were resized to fit where they landed.</p>}
 
           {swapOpen && (
             <div className="flex flex-col gap-1">

@@ -48,6 +48,7 @@ it is wrong.
 | `propose_meal_food_remove` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_food_replace` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_food_resize` | SCREEN | The food row's menu, since 12 Sep 2026. |
+| `propose_meal_move` | SCREEN | The meal row's Move control, since 14 Sep 2026. Same day only on BOTH surfaces alike: no screen renders another day's meals, so a cross-day move would change something nobody can see. |
 | `propose_meal_swap` | SCREEN | The meal row's swap control. |
 | `propose_missed_session` | SCREEN | The day menu → "What happened?". |
 | `propose_rest_day` | SCREEN | The day menu → "What happened?". |

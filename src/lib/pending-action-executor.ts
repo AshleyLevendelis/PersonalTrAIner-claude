@@ -29,6 +29,7 @@ import { setSessionMove, setDeliberateRest, setMarkedMissed } from './daily-trac
 import { saveCardioLog } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
+import type { MealMovePayload } from './meal-move'
 import { STYLE_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
@@ -615,6 +616,52 @@ export async function undoMealAddition(
   const picks = await getMealPicksForDate(profileId, date)
   if (picks[slot] === option.name) await clearMealPick(profileId, date, slot)
   return true
+}
+
+/**
+ * TWO MEALS TRADE PLACES — Ashley's ruling, 14 Sep 2026, on what happens to
+ * the slot a moved meal leaves: "they swap places".
+ *
+ * BOTH LEGS OR NEITHER. A swap that lands one half is a day with the same
+ * meal in two slots and the other meal gone — strictly worse than not moving
+ * at all, and invisible until she looks at her own plan. So each leg goes
+ * through `applyMealOptionToSlot` (pool write, then pick, with the pool write
+ * rolled back if the pick fails), and if the SECOND leg fails, the first is
+ * undone too.
+ *
+ * No new writer. The same two functions the swap, the addition and the food
+ * edits already use — for the same reason those share them: an edit made by
+ * tapping a row and the same edit made by asking the coach have to leave the
+ * plan in the same state.
+ */
+export async function executeMealMove(
+  profileId: string,
+  payload: MealMovePayload,
+  pick: (payload: MealAdditionPayload) => Promise<boolean>,
+): Promise<PendingActionReceipt> {
+  const landed: string[] = []
+  const done: { payload: MealAdditionPayload; poolIndex: number | null }[] = []
+
+  for (const leg of payload.legs) {
+    const result = await applyMealOptionToSlot(profileId, leg.payload, pick)
+    if (result.receipt.failed.length > 0) {
+      // Undo whatever already landed, so the plan is exactly as it was.
+      for (const prior of done) await undoMealAddition(profileId, prior.payload, prior.poolIndex)
+      return {
+        landed: [],
+        failed: [{
+          op: 'propose_meal_move',
+          error: done.length > 0
+            ? "The swap didn't save, so nothing moved — your meals are as they were"
+            : "The move didn't save — try again",
+        }],
+      }
+    }
+    done.push({ payload: leg.payload, poolIndex: result.poolIndex })
+    landed.push(`${leg.slot}: ${leg.originalName} (${leg.afterKcal} kcal)`)
+  }
+
+  return { landed, failed: [] }
 }
 
 export interface InjuryAdaptationPayload {

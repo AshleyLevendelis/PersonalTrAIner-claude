@@ -518,6 +518,29 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_meal_move",
+    description:
+      "PROPOSES moving a whole meal into a different slot TODAY — this does NOT apply the change, they tap Confirm. Call this for 'I'll have dinner as my snack instead', 'move lunch to breakfast', 'can I have my snack for dinner'. The meal is RESIZED to fit the slot it lands in, and if that slot already has a meal the two SWAP places, both resized. The card carries both new sizes; never state them yourself. This is SAME DAY ONLY — the app cannot move a meal to another day, because no screen shows another day's meals, so if they ask for tomorrow say plainly that you can't move meals between days yet rather than moving it somewhere else. Not for swapping a meal for a different dish (propose_meal_swap) and not for changing one food inside a meal (propose_meal_food_*).",
+    parameters: {
+      type: "object",
+      properties: {
+        from_slot: {
+          type: "string",
+          description: "The meal being moved: breakfast, lunch, dinner or snack.",
+        },
+        to_slot: {
+          type: "string",
+          description: "Where it is going: breakfast, lunch, dinner or snack. Must be a different slot from from_slot.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the move. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["from_slot", "to_slot", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_exercise_swap",
     description:
       "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
@@ -1813,7 +1836,7 @@ When the user tells you about something they do OUTSIDE this plan on a regular w
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1957,6 +1980,7 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - When someone asks to swap a meal AGAIN because they didn't like the alternative either, just call propose_meal_swap again — the app tracks what it has already shown them for that slot and, once they have been through the lot, offers to go and find new ones instead of re-serving the same list. Never tell them they have run out of options yourself; you can't see the pool.
 - ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
 - A FOOD JOINING A MEAL IS NEITHER. "Add a banana to my breakfast", "put 100g of rice with my dinner", "can I have an egg with lunch" — the meal on the plan stays as it is and the food joins it: call propose_meal_food_add with the food and its amount. Do not route these to propose_meal_addition (that would try to portion "Banana" as a whole meal and refuse) or to propose_custom_meal (that replaces the meal). If no amount is stated, ask how much — one question — then call it.
+- MOVING A WHOLE MEAL TO A DIFFERENT SLOT IS A FIFTH THING, and it is not a swap. "I'll have dinner as my snack instead", "move lunch to breakfast" is propose_meal_move. The meal keeps its foods and is RESIZED to fit the slot it lands in, and if that slot already has a meal the two swap places with both resized — so never describe it as one meal disappearing. The card carries both new sizes; do not state kcal yourself. SAME DAY ONLY: the app cannot move a meal to another day and no screen shows another day's meals, so if they ask for tomorrow, say you can't move meals between days yet — do not move it somewhere else instead and do not imply you have.
 - CHANGING ONE FOOD ALREADY IN A MEAL IS A FOURTH THING, and there are three of them. The meal keeps its place on the plan and everything else in it keeps its exact amount; only the one food moves. "Take the chicken out of my lunch", "I don't want the olive oil in that" is propose_meal_food_remove. "Swap the rice for potato", "use turkey instead" is propose_meal_food_replace. "Make it 150g of rice", "halve the chicken" is propose_meal_food_resize. Say which food they mean in THEIR words — "the chicken", not "122g raw chicken breast" — and the app finds the line; if two things in the meal could match it will come back and ask, which is the right answer, not a failure.
 - WHICH OF THE FOUR. Joining = propose_meal_food_add. Leaving = remove. One for another = replace. Same food, different amount = resize. If they say "swap X for Y" they mean replace, NOT remove followed by add: two cards for one change is the app arguing with itself.
 - A REMOVAL COSTS SOMETHING AND THE CARD SAYS SO, so you must not. Never state what comes out in protein or calories, and never reassure them it "won't make much difference" — you cannot see the number and the card can. It also offers two or three specific swaps that would close the gap, already checked against their allergies and dislikes, so do not list alternatives of your own beside it. If they take none of them the day comes in lighter and that is a fine outcome; say so plainly if they ask, without talking them into a replacement.
@@ -2556,6 +2580,28 @@ Keep this context in mind to ensure your greetings and questions naturally align
                 food: args.food,
                 amount: args.amount,
                 date: args.date,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_move") {
+        // Forwarded, not decided — the same shape every meal proposal takes.
+        // The client resolves it against the LIVE plan because only the client
+        // knows what is in each slot today and what each slot's budget is, and
+        // the resize is computed from both. A model picking the new portions
+        // here would be picking them from a plan it is only told about.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_move",
+              rawArgs: {
+                from_slot: args.from_slot,
+                to_slot: args.to_slot,
                 origin_verbatim_quote: args.origin_verbatim_quote,
               },
             },
