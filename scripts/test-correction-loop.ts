@@ -28,6 +28,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { parseSetsPhrase, parseWorkoutEntries, type WorkoutEntryInput, type ParsedSetGroup } from '../src/lib/set-parse'
+import { answerPlaceholderFor } from '../src/components/chat/ClarificationCard'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failures = 0
@@ -148,16 +149,36 @@ check('...shown only when there is nothing to tap instead',
   /\{!resolved && options\.length > 0 &&/.test(card) && /\{!resolved && answerPlaceholder &&/.test(card))
 
 const chat = code('src/components/ChatAssistant.tsx')
-check('a question without options always gets an answer box',
-  /const answerPlaceholder = options\.length > 0\s*\?\s*undefined/.test(chat))
+// EXECUTED, over every question the parser can ask. This used to pin the exact
+// text of a ternary in ChatAssistant — so adding a branch for the exercise
+// question (14 Sep 2026) turned it red while the property it names was not
+// merely intact but strictly better served. The property is that no question
+// is ever unanswerable; the ternary was the mechanism.
+{
+  const FIELDS = ['exercise_name', 'weight', 'sets_x_reps', undefined] as const
+  const unanswerable = FIELDS.flatMap(f =>
+    [true, false].map(hasOptions => ({ f, hasOptions, placeholder: answerPlaceholderFor(f, hasOptions) }))
+  ).filter(r => !r.hasOptions && !r.placeholder)
+  check('a question without options always gets an answer box', unanswerable.length === 0, unanswerable)
+  check('...and an exercise question gets one even WITH taps, for work that is not on the plan',
+    !!answerPlaceholderFor('exercise_name', true))
+  check('...while a pick-one question with taps does not need a box beside them',
+    answerPlaceholderFor('weight', true) === undefined)
+  check('...and the client asks that function rather than re-deciding it',
+    /const answerPlaceholder = answerPlaceholderFor\(/.test(chat))
+}
 check('...and it is passed to the card', /answerPlaceholder=\{msg\.clarification\.answerPlaceholder\}/.test(chat))
 check('the answer is merged into the entry it belongs to, not sent as a new message',
   /if \(field === 'exercise_name'\) return \{ \.\.\.e, exercisePhrase: value \}/.test(chat)
   && /setsPhrase: `\$\{e\.setsPhrase\} \$\{value\}`\.trim\(\)/.test(chat))
+// THE FLAG SURVIVES THE ROUND TRIP — held on the stored session and handed
+// back on resume. Anchored on those two facts rather than on the exact shape
+// of the object literal, which grew a field on 14 Sep 2026 (the user's own
+// message, for the traceability rule) and took this check red with it.
 check('A RESUMED CORRECTION IS STILL A CORRECTION',
   /correctsPrevious: boolean/.test(chat)
-  && /parseSessionsRef\.current\[resolverId\] = \{ entries, todaysPlanExerciseNames, correctsPrevious \}/.test(chat)
-  && /resolveAndMaybeLog\(updatedEntries, session\.correctsPrevious\)/.test(chat))
+  && /parseSessionsRef\.current\[resolverId\] = \{[^}]*\bcorrectsPrevious\b[^}]*\}/.test(chat)
+  && /resolveAndMaybeLog\(updatedEntries, session\.correctsPrevious\b/.test(chat))
 
 console.log(failures === 0 ? '\nAll correction-loop checks pass.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

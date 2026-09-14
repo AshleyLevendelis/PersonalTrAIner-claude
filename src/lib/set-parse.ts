@@ -65,6 +65,17 @@ export interface ParseWorkoutInput {
   entries: WorkoutEntryInput[]
   /** Today's plan exercise names — given priority in resolution order (§3.2). */
   todaysPlanExerciseNames: string[]
+  /**
+   * THE USER'S OWN MESSAGE, verbatim. The exercise name must be traceable to
+   * it or nothing is written — see isNamedByTheUser.
+   *
+   * OPTIONAL, AND ONLY BECAUSE OF WHO CALLS THIS. Every app caller is the chat
+   * client, and every one of them passes it; the gates that exercise the
+   * grammar itself have no user turn to trace to and omit it, which skips the
+   * check rather than failing it. If a second app-side caller ever appears,
+   * this stops being optional.
+   */
+  userSaid?: string
 }
 
 export interface ParseWorkoutResult {
@@ -248,6 +259,11 @@ const CARDIO_RE = /(\d+)\s*(?:min|mins|minutes)\b.*\b(bike|run|jog|row|swim|elli
 
 export function resolveExerciseName(phrase: string, todaysPlanExerciseNames: string[]): ExerciseResolution {
   const trimmed = phrase.trim()
+  // AN EMPTY PHRASE MATCHES NOTHING, and saying so here is not belt-and-braces.
+  // The in-plan filter below is `n.includes(lower) || lower.includes(n)`, and
+  // `'anything'.includes('')` is true — so a blank phrase silently matched
+  // EVERY exercise in today's plan, and on a one-exercise day resolved to it.
+  if (!trimmed) return { resolution: 'unknown', exerciseId: '', exerciseName: '' }
 
   // Exact catalog match.
   const exact = getExerciseEntry(trimmed)
@@ -280,6 +296,52 @@ export function resolveExerciseName(phrase: string, todaysPlanExerciseNames: str
 }
 
 // ---------------------------------------------------------------------------
+// DID THE USER ACTUALLY NAME THIS EXERCISE?
+//
+// Ashley, 14 Sep 2026, training: 'Sending "I did 1x10 @60kg" in chat
+// auto-logged the set under Trap Bar Deadlift without asking or confirming
+// which exercise was actually performed.'
+//
+// She never typed those words. The model filled them in from the conversation
+// — which the tool declaration forbids in as many words ("Never invent one —
+// if this entry's raw_text names no exercise, don't include it as an entry;
+// ask which exercise instead") and which it did anyway. That is the lesson,
+// not the incident: A PROMPT RULE IS NOT AN ENFORCEMENT. Everything the app
+// guarantees about its own writes has to be checkable in code, because the
+// model is the one thing in the system that cannot be gated.
+//
+// `raw_text` is no anchor either — it is also the model's copy. The only text
+// this app knows the user wrote is the message they sent, so that is what the
+// name is traced to.
+//
+// DELIBERATELY GENEROUS, because the cost of the two errors is not
+// symmetrical. Asking someone who did name their lift costs one tap; logging
+// a lift they never did puts a number in permanent history that every future
+// weight is calculated from. So one content word is enough — "bench" carries
+// "Barbell Bench Press", "flyes" carries "DB flyes" — and a word is matched as
+// a substring so plurals and possessives do not trip it.
+// ---------------------------------------------------------------------------
+
+/** Letters and digits only, lowercased — so "DB flyes," and "db flyes" agree. */
+function normalizeForTracing(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+export function isNamedByTheUser(phrase: string, userSaid: string): boolean {
+  const said = normalizeForTracing(userSaid)
+  if (!said) return false
+  const words = normalizeForTracing(phrase).split(' ').filter(w => w.length >= 3)
+  // A phrase of nothing but short tokens ("db", "ohp") is checked whole rather
+  // than dropped — returning true for "no long words" would be a hole exactly
+  // the shape of an abbreviation the model likes to expand.
+  if (words.length === 0) {
+    const whole = normalizeForTracing(phrase)
+    return whole.length > 0 && said.includes(whole)
+  }
+  return words.some(w => said.includes(w))
+}
+
+// ---------------------------------------------------------------------------
 // Top-level entry point
 // ---------------------------------------------------------------------------
 
@@ -293,6 +355,22 @@ export function parseWorkoutEntries(input: ParseWorkoutInput): ParseWorkoutResul
         sets: [],
         routesToCardio: true,
         cardioMinutes: parseInt(cardioMatch[1], 10),
+      }
+    }
+
+    // BEFORE RESOLUTION, because a name the user never said resolves perfectly
+    // — that is precisely what made it invisible. Today's session is offered as
+    // taps, and the card keeps its type-it box for work that was not on the
+    // plan at all.
+    if (input.userSaid !== undefined && !isNamedByTheUser(entry.exercisePhrase, input.userSaid)) {
+      return {
+        matchedRawPhrase: entry.rawText,
+        resolution: 'unknown',
+        sets: [],
+        ambiguousCandidates: input.todaysPlanExerciseNames
+          .map(n => getExerciseEntry(n))
+          .filter((e): e is ExerciseEntry => !!e),
+        ambiguity: { field: 'exercise_name', message: 'Which exercise was that?' },
       }
     }
 
@@ -321,6 +399,12 @@ export function parseWorkoutEntries(input: ParseWorkoutInput): ParseWorkoutResul
         matchedRawPhrase: entry.rawText,
         resolution: 'unknown',
         sets: [],
+        // Same taps as the untraceable branch above. This question used to
+        // render with no options at all — "a question with no way to answer
+        // it is the loop", as the card's own note puts it.
+        ambiguousCandidates: input.todaysPlanExerciseNames
+          .map(n => getExerciseEntry(n))
+          .filter((e): e is ExerciseEntry => !!e),
         ambiguity: { field: 'exercise_name', message: 'Which exercise was that?' },
       }
     }

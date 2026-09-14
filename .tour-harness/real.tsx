@@ -61,6 +61,7 @@ import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
+import { getExerciseId } from '@/lib/exercise-db'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 
@@ -254,6 +255,40 @@ const rampTarget = (() => {
 })()
 ;(window as unknown as { __rampTarget: unknown }).__rampTarget = rampTarget
 
+// ?logged=1 — A REAL PRIOR SESSION ON TODAY'S LIFT, lighter than the plan.
+//
+// Ashley, 14 Sep 2026, from a gym floor: "the main header prominently displays
+// 40kg, but the pre-filled numbers in the set input rows show 35kg." Today's
+// card asks the progression engine what the last logged session earned, and
+// used that answer for the chip's LABEL and the note underneath while the
+// figure between them stayed the one generation printed weeks earlier.
+//
+// No source check could see it — the line the gate grepped for was present and
+// flipping a label — so the proof has to be a real screen with a real log
+// behind it. This seeds exactly the shape she hit: a session two days ago,
+// BELOW the plan's number, with reps short of the top of the range, so double
+// progression HOLDS at what was lifted rather than adding to it.
+//
+// The lift is read off the live week rather than named, for the same reason
+// rampTarget is: naming one pins a weekday and a string, and both have moved
+// before. Ramped by preference — the per-set chips are a third view of the
+// same number and the place a flattened or unscaled ramp would show up.
+const LOGGED = new URLSearchParams(location.search).get('logged') === '1'
+const loggedTarget = (() => {
+  if (!LOGGED) return null
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
+  if (!day) return null
+  const loaded = day.exercises.filter(e => (e.suggested_load_kg ?? 0) > 10)
+  const ex = loaded.find(e => formatRampSets(e)?.kind === 'kg') ?? loaded[0]
+  if (!ex) return null
+  // Clearly below the plan's figure and clearly loadable: two plate pairs
+  // down, which no rounding can land back on the plan's number.
+  const liftedKg = Math.max(5, (ex.suggested_load_kg as number) - 5)
+  return { name: ex.name, planKg: ex.suggested_load_kg as number, liftedKg, sets: ex.sets }
+})()
+;(window as unknown as { __loggedTarget: unknown }).__loggedTarget = loggedTarget
+
 // TODAY'S FOCUS, from THIS page's plan — for verify:rest-day-race, 14 Sep 2026.
 // Its last check compared the coach's first bubble with Home's session name,
 // but read the coach off chat.html and Home off real.html: two harness pages,
@@ -282,12 +317,31 @@ const db: Db = {
   // 2 days back: the plan started 9 days ago so that date is inside the
   // CURRENT plan week, and it falls on one of the four available weekdays.
   // (1 and 3 days back are neither, which is why the first fixture read 0/1.)
-  exercise_set_logs: [1].map((back, i) => ({
-    id: `l${i}`, user_id: PROFILE_ID, exercise_name: 'Barbell Squats', set_number: 1,
-    weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
-    completed_at: new Date(anchorNowMs() - (back + 1) * 86400000).toISOString(),
-    date: isoOf(new Date(anchorNowMs() - (back + 1) * 86400000)),
-  })),
+  exercise_set_logs: [
+    ...[1].map((back, i) => ({
+      id: `l${i}`, user_id: PROFILE_ID, exercise_name: 'Barbell Squats', set_number: 1,
+      weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
+      completed_at: new Date(anchorNowMs() - (back + 1) * 86400000).toISOString(),
+      date: isoOf(new Date(anchorNowMs() - (back + 1) * 86400000)),
+    })),
+    // ?logged=1 (above). session_id and exercise_id are both required here and
+    // are not on the row beside it: getLastSessionSets filters on exercise_id
+    // and groups by session_id, while the consistency read that row serves
+    // uses neither. A row missing them reads as "nothing logged" — which looks
+    // exactly like the fixture working and the feature being absent.
+    ...(loggedTarget
+      ? Array.from({ length: Math.min(3, loggedTarget.sets) }, (_, i) => ({
+          id: `lg${i}`, user_id: PROFILE_ID, session_id: 'sess-logged',
+          exercise_id: getExerciseId(loggedTarget.name), exercise_name: loggedTarget.name,
+          set_number: i + 1, weight_kg: loggedTarget.liftedKg,
+          // ONE rep, so "hit the top of the range on every set" cannot be true
+          // whatever the range is — the hold branch, deterministically.
+          reps_completed: 1, is_bodyweight: false, is_warmup: false,
+          completed_at: new Date(anchorNowMs() - 2 * 86400000).toISOString(),
+          date: isoOf(new Date(anchorNowMs() - 2 * 86400000)),
+        }))
+      : []),
+  ],
   // ?swapped=1 — the day Ashley told the coach she had done Muay Thai instead.
   // Off by default so every existing run of this harness is unchanged. On, it
   // supplies the one row the panel reads through useTrainingWeek, which is the

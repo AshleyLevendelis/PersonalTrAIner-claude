@@ -1,8 +1,8 @@
 import { supabase } from './supabase'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
-import { categorize, getLoadIncrementKg, isExternallyLoaded } from './load-prescription'
+import { categorize, getLoadIncrementKg, isExternallyLoaded, getLoadingCeilingKg, loadingMode, roundToPlate, labelModeForEntry, formatLoad, effectiveLoadingCeilingKg } from './load-prescription'
 import { getLastSessionSets, getSetsForDate, isMalformedZeroWeight } from './set-log-store'
-import type { ExerciseTier, ExerciseSetLog } from './types'
+import type { ExerciseTier, ExerciseSetLog, Exercise, UserProfile } from './types'
 
 // ---------------------------------------------------------------------------
 // All progression reads run against the unified store (exercise_set_logs via
@@ -127,6 +127,93 @@ export interface DoubleProgressionRecommendation {
   /** True when every logged set from the last session hit the top of the rep range and the weight bumped up. */
   didProgress: boolean
   note: string
+}
+
+/**
+ * TODAY'S CARD SHOWS THE NUMBER THE LOG EARNED — in all three places it is
+ * written, not just in the label above it.
+ *
+ * Ashley, 14 Sep 2026, from a real session: "the main header prominently
+ * displays 40kg, but the pre-filled numbers in the set input rows show 35kg,
+ * making it confusing to know which weight to hit." Both numbers were the
+ * app's: 40 was what generation printed weeks ago, 35 was her last session.
+ * The card labelled the 40 "from your last session" and printed "Held at
+ * 35kg" underneath it.
+ *
+ * The cause was narrow. getDoubleProgressionRecommendation's answer reached
+ * the chip's SOURCE (so the label changed) and the note (so the sentence
+ * changed) and never reached the figure. The added-load path five lines away
+ * in TodayPanel already substituted, with a comment saying exactly why; the
+ * ordinary-weight case was left out. See docs/plans/one-lift-one-number-today.md.
+ *
+ * WHY A COPY. The stored plan is not touched. Re-anchoring the printed FUTURE
+ * weeks to logged numbers is deliberately an offer (beat-target-offer.ts).
+ * This is today's card only, which is why the browse and peek surfaces — which
+ * never receive a recommendation — keep showing plan figures and are right to.
+ *
+ * WHY ALL THREE FIELDS. rebuildLoadForExercise in exercise-plan.ts states the
+ * rule this function exists to keep: `suggested_load_kg`, `suggested_load` and
+ * `per_set_load` are three views of one number, every screen reads a different
+ * one, so they move together or they contradict each other. The header reads
+ * the first, the S-chips read the third, and the set-grid default reads the
+ * third then the first.
+ *
+ * WHY THE RAMP IS SCALED, NOT FLATTENED. per_set_load is built from
+ * getSetPercents, so a strength-phase main lift climbs to its top set.
+ * rebuildLoadForExercise flattens — safely, because neither of its callers
+ * ever meets a ramp — but flattening here would turn a ramped session into
+ * five top sets, which is materially harder work than the plan prescribed.
+ * Each set keeps its own share of the top and is re-rounded to something
+ * loadable.
+ *
+ * WHY THE CEILING IS APPLIED HERE. getDoubleProgressionRecommendation returns
+ * `lastWeight + increment` with no ceiling of its own, which was harmless
+ * while the number only chose a label. The moment it is displayed, somebody
+ * who hit their reps on the heaviest dumbbell they own would be shown a
+ * weight they cannot load.
+ */
+export function withWorkingLoadKg<T extends Exercise>(ex: T, targetKg: number, profile?: UserProfile): T {
+  const entry = getExerciseEntry(ex.name)
+  // No catalogue entry means no loading mode, no plate step and no ceiling —
+  // nothing to round or clamp against. Returning the exercise untouched keeps
+  // the plan's own (self-consistent) figures rather than inventing rounding.
+  if (!entry || ex.suggested_load_kg == null) return ex
+
+  const mode = loadingMode(entry)
+  const labelMode = labelModeForEntry(entry)
+  // PROFILE OPTIONAL, AND THE FALLBACK IS THE POINT. TodayPanel's row props
+  // declare it optional, so gating the whole substitution on it would have
+  // reintroduced the two-number screen on exactly the path where nobody was
+  // looking. Without a profile the app's own table still clamps; what is lost
+  // is only the downward correction from a stated kit ceiling.
+  const category = categorize(entry)
+  const ceiling = profile
+    ? effectiveLoadingCeilingKg(entry, category, profile)
+    : getLoadingCeilingKg(entry, category)
+  // NOT PLATE-ROUNDED, and this was measured rather than reasoned. Rounding a
+  // logged 9kg dumbbell to the app's 2kg rack step printed 10kg in the header
+  // above a note reading "Held at 9kg" and set rows prefilled at 9 — Ashley's
+  // own bug again, one kilo apart, reproduced by verify:one-number on its
+  // first run. roundToPlate exists to make a number the APP INVENTED
+  // loadable; a weight that came off the bar is loadable by proof, and a
+  // progressed one is that weight plus an implement-sized increment. The only
+  // invented number here is the ceiling, so that is the only one rounded — and
+  // downward, so a clamp can never raise what it was clamping.
+  const clamped = Math.min(targetKg, ceiling)
+  const top = clamped < targetKg ? Math.min(roundToPlate(clamped, mode), ceiling) : clamped
+
+  const planTop = ex.suggested_load_kg
+  const perSet = ex.per_set_load && ex.per_set_load.length > 0 && planTop > 0
+    ? ex.per_set_load.map(s => {
+        // The set's OWN share of the plan's top set, carried onto the new one.
+        // A set at 100% stays at the top exactly, so the heaviest chip and the
+        // header can never round apart.
+        const kg = s.load_kg >= planTop ? top : roundToPlate((top * s.load_kg) / planTop, mode)
+        return { ...s, load_kg: kg, display: formatLoad(kg, labelMode) }
+      })
+    : ex.per_set_load
+
+  return { ...ex, suggested_load_kg: top, suggested_load: formatLoad(top, labelMode), per_set_load: perSet }
 }
 
 /**

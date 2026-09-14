@@ -5,7 +5,7 @@ import { useWakeLock } from '@/hooks/useWakeLock'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
-import { getDoubleProgressionRecommendation, getAddedLoadProgression, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
+import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
@@ -1172,9 +1172,18 @@ function ExerciseList({
     // rather than mutating the plan — the peek and program-browse surfaces
     // deliberately show plan-derived numbers only.
     const progressedAdded = progressedAddedLoads[ex.name]
-    const rowEx = progressedAdded != null && ex.suggested_added_load_kg != null
+    const withAdded = progressedAdded != null && ex.suggested_added_load_kg != null
       ? { ...ex, suggested_added_load_kg: progressedAdded }
       : ex
+    // AND THE ORDINARY WEIGHT, for the same reason and on the same copy. The
+    // chip above already said "from your last session" and the note below
+    // already said "Held at 35kg" — the figure between them was still the
+    // plan's. withWorkingLoadKg moves all three views of it together and
+    // scales the ramp rather than flattening it; see its own note.
+    const progressedLoad = progressedLoads[ex.name]
+    const rowEx = progressedLoad != null
+      ? withWorkingLoadKg(withAdded, progressedLoad, profile)
+      : withAdded
     return {
       ex: rowEx,
       dayName,

@@ -76,7 +76,7 @@ import { buildCoachStepsSummary } from '@/lib/steps-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
-import { ClarificationCard } from '@/components/chat/ClarificationCard'
+import { ClarificationCard, answerPlaceholderFor } from '@/components/chat/ClarificationCard'
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView, TrainingStyle } from '@/lib/types'
 import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
@@ -283,7 +283,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // that turn. Without it the resumed write appended instead of replacing —
   // so a correction that needed one extra detail silently doubled the
   // session, which is the exact harm the executor's own comment describes.
-  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean }>>({})
+  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean; userSaid: string }>>({})
 
   // Chat round 2, item 4 — "at most one check-in per conversation" is
   // enforced HERE, not by asking the model to remember it said something.
@@ -3607,21 +3607,30 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    *   produced 6 logged sets against 3 prescribed, and every future weight
    *   would have built on three sets that never happened.
    */
-  const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
+  const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false, userSaid = ''): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
     const todaysWorkout = exercisePlan.find(d => d.day === activeSession.dayName)
     const todaysPlanExerciseNames = todaysWorkout?.exercises.map(e => e.name) ?? []
-    const parsed = parseWorkoutEntries({ entries, todaysPlanExerciseNames })
+    // THE USER'S OWN MESSAGE IS THE ANCHOR. An exercise name the model
+    // supplied from context — never typed — is asked about, not logged. See
+    // isNamedByTheUser's note for the incident behind it (Ashley, 14 Sep 2026:
+    // "I did 1x10 @60kg" written into history as a Trap Bar Deadlift).
+    const parsed = parseWorkoutEntries({ entries, todaysPlanExerciseNames, userSaid })
 
     if (parsed.needsClarification) {
       const idx = parsed.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
       const group = parsed.groups[idx]
       const resolverId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious }
+      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious, userSaid }
 
       const prompt = group.resolution === 'ambiguous'
         ? `Which "${group.matchedRawPhrase}" did you mean?`
         : group.ambiguity?.message ?? "I need one more detail before I can log this."
-      const options = group.resolution === 'ambiguous' && group.ambiguousCandidates
+      // WHENEVER THERE ARE CANDIDATES, not only on an 'ambiguous' resolution.
+      // "Which exercise was that?" used to render with no buttons at all —
+      // the shape the card's own note calls the loop — because the only
+      // branch that offered taps was the one where the model HAD named
+      // something and the catalogue could not choose between two meanings.
+      const options = group.ambiguousCandidates
         ? group.ambiguousCandidates.map(c => ({ label: c.name, value: c.name }))
         : []
       // A QUESTION WITH NO WAY TO ANSWER IT IS THE LOOP. Only the pick-one
@@ -3630,11 +3639,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // the card to type it — so the answer went back through the model as a
       // fresh turn, arrived here without the half-parsed entry it belonged
       // to, and was asked for again.
-      const answerPlaceholder = options.length > 0
-        ? undefined
-        : group.ambiguity?.field === 'weight' ? 'e.g. 60kg'
-        : group.ambiguity?.field === 'sets_x_reps' ? 'e.g. 3x8'
-        : 'Your answer'
+      // One rule, one place, beside the card that renders it — and executed by
+      // its gate rather than read as text. See answerPlaceholderFor's note.
+      const answerPlaceholder = answerPlaceholderFor(group.ambiguity?.field, options.length > 0)
       return { text: prompt, clarification: { prompt, options, answerPlaceholder, resolverId } }
     }
 
@@ -3704,7 +3711,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!session) return
     delete parseSessionsRef.current[msg.clarification.resolverId]
 
-    const priorParse = parseWorkoutEntries({ entries: session.entries, todaysPlanExerciseNames: session.todaysPlanExerciseNames })
+    // THE ANSWER IS THE USER'S WORDS. Re-parsing against the original message
+    // alone would block the entry a second time on the very name they just
+    // chose, which is the traceability rule eating its own clarification.
+    const said = `${session.userSaid} ${value}`.trim()
+    const priorParse = parseWorkoutEntries({ entries: session.entries, todaysPlanExerciseNames: session.todaysPlanExerciseNames, userSaid: session.userSaid })
     const idx = priorParse.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
     if (idx === -1) return
     // WHERE THE ANSWER GOES DEPENDS ON WHAT WAS ASKED. A name replaces the
@@ -3718,7 +3729,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       return { ...e, setsPhrase: `${e.setsPhrase} ${value}`.trim(), rawText: `${e.rawText} ${value}`.trim() }
     })
 
-    const outcome = resolveAndMaybeLog(updatedEntries, session.correctsPrevious)
+    const outcome = resolveAndMaybeLog(updatedEntries, session.correctsPrevious, said)
     setMessages(prev => prev.map((m, i) => (i === msgIndex ? { ...m, clarification: outcome.clarification, receipt: outcome.receipt, content: outcome.text } : m)))
   }
 
@@ -3731,7 +3742,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * rendered as if the write had already happened) — enforced here, not by
    * asking the model to behave, so no prompt-text discipline can regress it.
    */
-  const processResponse = async (result: ChatApiResponse): Promise<{
+  const processResponse = async (result: ChatApiResponse, userSaid = ''): Promise<{
     text: string
     action?: PlanAction
     pendingAction?: ChatPendingActionView
@@ -4121,7 +4132,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         exercisePhrase: e.exercise_phrase,
         setsPhrase: e.sets_phrase,
       }))
-      return resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true)
+      return resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid)
     }
     if (result.memoryIntent) {
       return resolveAndSaveMemory(result.memoryIntent)
@@ -4190,7 +4201,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     try {
       const result = await callGemini(userMsg.content)
-      const processed = await processResponse(result)
+      const processed = await processResponse(result, userMsg.content)
       const quickReplies = extractQuickReplies(processed.text)
       const cleanedText = stripTags(processed.text)
 
@@ -4291,7 +4302,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     try {
       const result = await callGemini(userText)
-      const processed = await processResponse(result)
+      const processed = await processResponse(result, userText)
       responseText = processed.text
       action = processed.action
       pendingAction = processed.pendingAction

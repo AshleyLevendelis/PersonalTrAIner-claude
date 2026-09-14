@@ -257,7 +257,9 @@
     "test:queue-listeners": "tsx scripts/test-queue-listeners.ts",
     "test:bounds-and-boundaries": "tsx scripts/test-bounds-and-boundaries.ts",
     "test:replace-without-losing": "tsx scripts/test-replace-without-losing.ts",
-    "test:concurrent-activity": "tsx scripts/test-concurrent-activity.ts"
+    "test:concurrent-activity": "tsx scripts/test-concurrent-activity.ts",
+    "verify:one-number": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-number.mjs",
+    "test:log-needs-your-words": "tsx scripts/test-log-needs-your-words.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
