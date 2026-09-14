@@ -2,6 +2,50 @@
 
 Newest first. One line each.
 
+- [x] **THE APP TOUR NOW HAS TO TELL THE TRUTH, and the check derives the
+  truth rather than being told it.** Third of Ashley's four screenshots. The
+  must-have list recorded the tour's copy as UNGUARDED for one specific class
+  of claim — saying a feature is on a tab it is not on — with the receipt: the
+  tour told every new user the grocery list was on Tools for a day after
+  grocery moved off it. It was found by a spotlight overflowing the screen, not
+  by a check.
+  **WHY THE EXISTING GATE MISSED IT.** §7 of the tour gate already ties claims
+  to source facts — steps, water, appearance, the settings loop — but one
+  hand-written row per claim. Grocery fell through because nobody wrote a fifth
+  row, and nobody would have.
+  **SO THE NEW SECTION DERIVES OWNERSHIP.** App.tsx renders each tab inside its
+  own `<TabsContent value="...">`; the components named there, plus the
+  components those import directly, ARE that tab. Move a component between tabs
+  and the owner moves with it. Then: no stop may claim a feature its tab does
+  not provide. Nothing is written down that could go stale except the feature
+  list itself, and each row carries two sanity checks — some tab must provide
+  it (or the marker has rotted) and not every tab may (or the row proves
+  nothing).
+  **TWO THINGS IT REFUSES TO CALL LIES**, both learned by running it against
+  copy that was already correct and watching it fail:
+  - Naming a feature is not claiming it. The Nutrition stop says the targets
+    "calories, macros, water" are set there. True — Nutrition sets the water
+    target, Home logs the water. A bare word match called that a lie, so each
+    feature matches the ACTION, not the noun.
+  - Pointing elsewhere is not claiming it. The Home stop says "Start session
+    hands you to Exercise, where every set gets logged... Home shows; it never
+    logs." A sentence naming a different tab is a signpost.
+  **MUTATIONS: 6 real, all 6 caught**; one control mutation correctly passed
+  (naming grocery on Tools is legal — grocery is back on Tools since 13 Sep),
+  and two attempts are recorded as INCOMPLETE rather than as misses: renaming
+  the grocery import out of Tools left the call site, so Tools genuinely still
+  owned it and the green was right.
+  **ONE FINDING ABOUT THE CHECK ITSELF.** A first version matched markers
+  against raw source, so a COMMENT mentioning a removed function satisfied the
+  check that the function was there — CLAUDE.md's own "strip comments" rule,
+  earned again. Proven both ways: a comment-only marker makes a lie legal
+  without stripping and illegal with it. I first added the stripping on a WRONG
+  diagnosis (I thought it was what was saving the grocery replay; it was not —
+  my mutation was incomplete), then verified it independently. It stays because
+  it is right, not because of the reason I first gave.
+  Gate: `test:app-tour` §9 (new, 28 checks; 145 → 175 total).
+  Frontend deploy on merge. No function deploy, no migration.
+
 - [x] **THE STARTING POINT IS NO LONGER LOCKED — and correcting it offers a
   rebuild, not a re-price.** Second of the four screenshots Ashley sent asking
   for "every issue here fixed": the setup answers that could never be changed

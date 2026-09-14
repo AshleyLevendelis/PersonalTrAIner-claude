@@ -298,12 +298,20 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `queue-listeners`, `stale-after-write`
 - Nothing is offered that is not built — `equipment-labels`,
   `says-what-it-contains`, `injury-coverage`, `enforcement-gaps`. **The APP
-  TOUR's copy is `UNGUARDED` for exactly this class of claim** and it has
-  already been wrong: it told every new user the grocery list was on the Tools
-  tab for a day after grocery moved off it (12→13 Sep 2026). `chat-app-reality`
-  holds the COACH honest about what the app contains and nothing holds the tour
-  to the same standard. Found by a spotlight overflowing the screen, not by a
-  check — which is the definition of unguarded
+  TOUR is GUARDED for this class of claim since 14 Sep 2026** — `app-tour` §9.
+  It was `UNGUARDED`, and it had already been wrong: it told every new user the
+  grocery list was on the Tools tab for a day after grocery moved off it
+  (12→13 Sep 2026), found by a spotlight overflowing the screen rather than by
+  a check. §7 had tied four claims to their source facts one row at a time, and
+  grocery fell through because nobody wrote a fifth row; §9 is the general form
+  — App.tsx's own `<TabsContent>` blocks say which components are on which tab,
+  so **which tab owns a feature is derived, never written down**, and no stop
+  may claim a feature its tab does not provide. Proven by replaying the real 12
+  Sep move. Two things it deliberately does not call lies, both learned by
+  running it against CORRECT copy: naming a feature is not claiming it (the
+  Nutrition stop truthfully says the water TARGET is set there while Home does
+  the logging), and a sentence that names another tab is a signpost, not a
+  claim about here
 - Safety ships correct or not at all — `injury-adaptation-safety`,
   `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`
