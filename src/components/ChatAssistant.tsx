@@ -48,6 +48,10 @@ import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type Wor
 import { resolveSwapTarget } from '@/lib/swap-target'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
+import {
+  assessEdit, applyTradeoff, askText, askKey, shouldAsk, downgradeToCard,
+  type Tradeoff, type EditContext,
+} from '@/lib/edit-tradeoff'
 import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
@@ -524,6 +528,42 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
   const [cardioLogHistory, setCardioLogHistory] = useState('')
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
+
+  // ---------------------------------------------------------------------
+  // "ONCE PER BLOCK, PER THING" — the guard that stops asking-first becoming
+  // nagging. Part of the decision recorded in CLAUDE.md on 14 Sep 2026.
+  //
+  // IN localStorage, NOT A REF, and the reason is the failure mode. A ref is
+  // wiped by a reload, so someone who asks, reloads, and asks again is asked
+  // twice about the same thing — which reads as an app that was not listening.
+  // Wrapped in try/catch because a private window or blocked site data throws,
+  // and the safe direction on failure is ASKING (mildly annoying) rather than
+  // going quiet (the failure this whole piece of work exists to fix).
+  const askedKeysRef = useRef<Set<string> | null>(null)
+  const ASKED_STORE = `tradeoff-asked:${profile.id ?? 'anon'}`
+  const readAskedKeys = (): Set<string> => {
+    if (askedKeysRef.current) return askedKeysRef.current
+    let seed: string[] = []
+    try { seed = JSON.parse(localStorage.getItem(ASKED_STORE) ?? '[]') } catch { seed = [] }
+    askedKeysRef.current = new Set(Array.isArray(seed) ? seed : [])
+    return askedKeysRef.current
+  }
+  const markAsked = (key: string) => {
+    const set = readAskedKeys()
+    set.add(key)
+    try { localStorage.setItem(ASKED_STORE, JSON.stringify([...set])) } catch { /* asked-again is the safe failure */ }
+  }
+
+  /**
+   * What an edit costs, and whether to ask about it — computed from the SAME
+   * trial the confirm will apply, never from a second guess at what the edit
+   * would do.
+   */
+  type EditAdvice = { verdict: Tradeoff; key: string; scope: EditContext['scope'] }
+  const adviseEdit = (ctx: EditContext): EditAdvice => {
+    const block = ctx.before.find(w => w.week_number === ctx.weekNumber)?.block_number ?? 1
+    return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope }
+  }
   /** Clear-chat's armed state — see handleClearChat for why this is not a window.confirm. */
   const [clearArmed, setClearArmed] = useState(false)
   const clearArmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1744,6 +1784,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     payload: ExerciseSwapPayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
+    advice: EditAdvice
   } | { ok: false; reason: string }> => {
     const dayArg = String(rawArgs.day ?? '')
     const oldItem = String(rawArgs.old_item ?? '')
@@ -1818,9 +1859,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const impact = describeEditImpact(
       week, trial.find(w => w.week_number === activeSession.liveWeek), day.day,
     )
+    // WHAT IT COSTS THE GOAL, off the same trial. describeEditImpact says what
+    // the WEEK's balance did; this says what the person's training loses.
+    const advice = adviseEdit({
+      profile, before: mesocycle, after: trial, weekNumber: activeSession.liveWeek,
+      dayName: day.day, kind: 'swap', scope, exerciseName: oldEx.name, newExerciseName: newEntry.name,
+    })
 
     return {
       ok: true,
+      advice,
       scopeKey: `${profile.id}:propose_exercise_swap:${day.day}:${exIndex}`,
       preconditions: { day: day.day, exIndex, currentExerciseName: oldEx.name },
       payload,
@@ -1868,6 +1916,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     payload: ExerciseAddPayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
+    advice: EditAdvice
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '')
     if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
@@ -1900,8 +1949,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const wasMinutes = Math.round(estimateDaySeconds(day) / 60)
     const nowMinutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : wasMinutes
 
+    const advice = adviseEdit({
+      profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
+      dayName, kind: 'add', scope, exerciseName: entry.name,
+    })
+
     return {
       ok: true,
+      advice,
       scopeKey: `${profile.id}:propose_exercise_add:${dayName}:${entry.name}`,
       preconditions: { day: dayName, exerciseName: entry.name },
       payload: { weekNumber: activeSession.liveWeek, dayName, exerciseName: entry.name, scope },
@@ -2067,6 +2122,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     payload: ExerciseRemovePayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
+    advice: EditAdvice
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '')
     if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
@@ -2088,8 +2144,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!trial.changed) return { ok: false, reason: trial.refusal ?? "I couldn't take that one out." }
 
     const impact = describeEditImpact(week, trial.mesocycle.find(w => w.week_number === activeSession.liveWeek), day.day)
+    const advice = adviseEdit({
+      profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
+      dayName: day.day, kind: 'remove', scope, exerciseName: target.exerciseName,
+    })
     return {
       ok: true,
+      advice,
       scopeKey: `${profile.id}:propose_exercise_remove:${day.day}:${target.exIndex}`,
       preconditions: { day: day.day, exIndex: target.exIndex, currentExerciseName: target.exerciseName },
       payload: { weekNumber: activeSession.liveWeek, dayName: day.day, exIndex: target.exIndex, exerciseName: target.exerciseName, scope },
@@ -3686,6 +3747,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // current plan" — which for a meal rejected on an allergen would be
       // both unhelpful and untrue.
       let refusal: string | null = null
+      // What the edit costs the person's GOAL, computed by whichever builder
+      // ran the trial. Null for the paths that have no trial to read.
+      let advice: EditAdvice | null = null
       // The exhausted-pool case answers a propose_meal_swap call with a
       // DIFFERENT kind of card. Plain text would have been the trap the
       // record_fact fix already documented here: an offer with no
@@ -3907,7 +3971,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
         const swap = await buildExerciseSwapProposal(result.proposal.rawArgs)
-        if (swap.ok) built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }
+        if (swap.ok) { built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }; advice = swap.advice }
         else refusal = swap.reason
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
@@ -3974,7 +4038,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
       } else if (result.proposal.kind === 'propose_exercise_add' && result.proposal.rawArgs) {
         const ad = buildExerciseAddProposal(result.proposal.rawArgs)
-        if (ad.ok) built = { scopeKey: ad.scopeKey, preconditions: ad.preconditions, payload: ad.payload as unknown as Record<string, unknown>, preImage: ad.preImage, diff: ad.diff }
+        if (ad.ok) { built = { scopeKey: ad.scopeKey, preconditions: ad.preconditions, payload: ad.payload as unknown as Record<string, unknown>, preImage: ad.preImage, diff: ad.diff }; advice = ad.advice }
         else refusal = ad.reason
       } else if (result.proposal.kind === 'propose_exercise_ban' && result.proposal.rawArgs) {
         const bn = buildExerciseBanProposal(result.proposal.rawArgs)
@@ -3982,7 +4046,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         else refusal = bn.reason
       } else if (result.proposal.kind === 'propose_exercise_remove' && result.proposal.rawArgs) {
         const rm = buildExerciseRemoveProposal(result.proposal.rawArgs)
-        if (rm.ok) built = { scopeKey: rm.scopeKey, preconditions: rm.preconditions, payload: rm.payload as unknown as Record<string, unknown>, preImage: rm.preImage, diff: rm.diff }
+        if (rm.ok) { built = { scopeKey: rm.scopeKey, preconditions: rm.preconditions, payload: rm.payload as unknown as Record<string, unknown>, preImage: rm.preImage, diff: rm.diff }; advice = rm.advice }
         else refusal = rm.reason
       } else if (result.proposal.kind === 'propose_exercise_reorder' && result.proposal.rawArgs) {
         const ro = buildExerciseReorderProposal(result.proposal.rawArgs)
@@ -4008,6 +4072,30 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
       if (!built) {
         return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked." }
+      }
+
+      // ---------------------------------------------------------------
+      // WHAT IT COSTS THE GOAL — one step, every path that computed it.
+      //
+      // Deliberately AFTER the per-kind branches and BEFORE the pending row
+      // is written, because those are the two facts that make it correct: by
+      // here the trial has been run by whichever builder owns it, and nothing
+      // has been persisted yet, so a tier-2 ask can still choose not to
+      // create a card at all.
+      //
+      // TIER 2 RETURNS A QUESTION AND NO ROW. That is the decision recorded on
+      // 14 Sep 2026 and the reason this sits here rather than on the card: an
+      // ask that still wrote a pending action would be a warning with a
+      // Confirm button under it, which is the thing it was chosen over.
+      if (advice) {
+        const guards = { alreadyAsked: readAskedKeys(), sessionRunning: activeSession.status === 'running' }
+        if (shouldAsk(advice.verdict, advice.key, advice.scope, guards)) {
+          markAsked(advice.key)
+          return { text: askText(advice.verdict) }
+        }
+        // Guarded out — asked already this block, or they are mid-session.
+        // It still cost something, so it goes on the card instead of vanishing.
+        built = { ...built, diff: applyTradeoff(built.diff, downgradeToCard(advice.verdict)) }
       }
 
       const proposalKind = kindOverride ?? result.proposal.kind

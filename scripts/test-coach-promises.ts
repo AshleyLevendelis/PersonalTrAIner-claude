@@ -986,4 +986,91 @@ console.log('\nEVERY EDIT CARD SAYS WHAT IT COSTS THE WEEK — including the swa
     /const swap = await buildExerciseSwapProposal\(/.test(chat))
 }
 
+console.log('\nA change that works against the goal is ASKED about, not just warned')
+{
+  // THE CLIENT, not the edge function. `chat` in this file is
+  // chat-gemini/index.ts; every rule below is about ChatAssistant.tsx, and
+  // the first version of this section read `chat` and failed twelve checks
+  // against a file that could never contain any of them.
+  const ui = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  // The decision recorded in CLAUDE.md, 14 Sep 2026, taken on Ashley's
+  // explicit delegation. The rules themselves live in edit-tradeoff.ts and
+  // test:edit-tradeoff runs them; this section guards the WIRING — that the
+  // client actually consults the verdict, and that a tier-2 ask does not
+  // quietly write a card anyway.
+
+  // EVERY BUILDER THAT RUNS A TRIAL READS IT. A builder that computed its own
+  // opinion of the cost instead would be the two-implementations defect this
+  // codebase keeps finding.
+  for (const [label, kind] of [['swap', 'swap'], ['remove', 'remove'], ['add', 'add']] as const) {
+    check(`the ${label} builder asks the engine what it costs the goal`,
+      new RegExp(`adviseEdit\\(\\{[\\s\\S]{0,400}?kind: '${kind}'`).test(ui))
+  }
+  check('...from the SAME trial the confirm will apply, never a second guess',
+    /adviseEdit\(\{[\s\S]{0,200}?after: trial/.test(ui))
+
+  // THE ORDER IS THE BEHAVIOUR. The verdict must be consulted AFTER the
+  // builders have run (so a trial exists) and BEFORE createPendingAction (so
+  // a tier-2 can decline to make a card at all). Pinned as an ORDER rather
+  // than on the text of either, per CLAUDE.md's property-not-mechanism rule.
+  const askAt = ui.indexOf('if (shouldAsk(advice.verdict')
+  const rowAt = ui.indexOf('const row = await createPendingAction(')
+  const builtAt = ui.indexOf('if (!built) {')
+  check('the verdict is consulted after the builders have run', askAt > builtAt && builtAt > 0, { builtAt, askAt })
+  check('...and BEFORE any pending action is written', askAt < rowAt && rowAt > 0, { askAt, rowAt })
+
+  // AND THE STEP IS REACHABLE — the one thing every check around it cannot
+  // see. Measured 14 Sep 2026: changing the guard to `if (false && advice)`
+  // disabled the whole trade-off step and all twelve checks in this section
+  // still passed, because the source text they read was all still there. That
+  // is CLAUDE.md's dead-branch trap, and a source gate cannot escape it.
+  //
+  // So this pins the guard's exact shape, which catches the realistic drift,
+  // and `verify:tradeoff` drives a REAL tier-2 in a browser, which is the only
+  // thing that actually proves the branch runs. Neither alone is enough; the
+  // comment says so rather than letting the next reader assume this is proof.
+  check('...and the step is not disabled by a constant',
+    /\n      if \(advice\) \{\n/.test(ui), ui.slice(askAt - 200, askAt).slice(-120))
+
+  // A TIER-2 ASK RETURNS A QUESTION AND NO ROW. An ask that still wrote a
+  // pending action would be a warning with a Confirm button under it — the
+  // thing "ask first" was chosen over.
+  const askBlock = ui.slice(askAt, rowAt)
+  check('the ask returns text only — no pendingAction in that branch',
+    /return \{ text: askText\(advice\.verdict\) \}/.test(askBlock) && !/pendingAction/.test(askBlock), askBlock.slice(0, 200))
+  check('...and records that it asked, so it asks once per block',
+    /markAsked\(advice\.key\)/.test(askBlock))
+
+  // A GUARDED-OUT TIER 2 STILL SAYS WHAT IT COST. Silence here would be the
+  // regression: the ask suppressed AND the cost dropped.
+  check('an ask that is guarded out falls through to a card that still states the cost',
+    /applyTradeoff\(built\.diff, downgradeToCard\(advice\.verdict\)\)/.test(ui))
+
+  // THE TWO GUARDS THAT KEEP IT FROM NAGGING, read off the real signals
+  // rather than trusted to the engine, which cannot see either.
+  check('mid-session is read from the live session, not guessed',
+    /sessionRunning: activeSession\.status === 'running'/.test(ui))
+  check('...and "asked already" survives a reload',
+    /localStorage\.setItem\(ASKED_STORE/.test(ui) && /localStorage\.getItem\(ASKED_STORE/.test(ui))
+  check('...failing safe — a storage error means ask again, never go quiet',
+    /catch \{ seed = \[\] \}/.test(ui))
+}
+
+// THE AUTHORITATIVE EXIT, and it was missing.
+//
+// There is an earlier `if (failures > 0) process.exit(1)` part-way up this
+// file — a fail-fast after the first phases. Everything added BELOW it
+// accumulated into `failures` and was never read again, and the last line of
+// the file said "All coach-promise checks passed" unconditionally. So every
+// check in the last third of this gate printed FAIL and exited 0.
+//
+// FOUND 14 Sep 2026 by writing a section that failed twelve checks and
+// watching the gate report success. It had been true of the swap-card section
+// added the day before, which means those checks have never been able to fail
+// a sweep. Both are live from here.
+if (failures > 0) {
+  console.error(`\n${failures} check(s) failed`)
+  process.exit(1)
+}
+
 console.log('\nAll coach-promise checks passed.\n')

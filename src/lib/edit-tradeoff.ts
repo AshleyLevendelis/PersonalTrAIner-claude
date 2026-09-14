@@ -527,3 +527,104 @@ export function assessEdit(ctx: EditContext): Tradeoff {
 
   return free(`no material change to weekly volume or plan quality (${GOAL_NOUN[goal]})`)
 }
+
+// ---------------------------------------------------------------------------
+// PUTTING IT ON A CARD, AND ASKING BEFORE ONE EXISTS
+//
+// STRUCTURALLY TYPED ON PURPOSE. The real diff type lives in
+// pending-actions-store.ts, which imports supabase.ts, which reads
+// import.meta.env at module-evaluation time — so importing it here would make
+// this module unloadable in a plain-node gate, and this module's whole value
+// is that a gate can run it. The shape below is the part of ProposalDiff these
+// functions touch; TypeScript checks the real one against it at the call site.
+// ---------------------------------------------------------------------------
+
+export interface TradeoffCardFields {
+  implications?: { severity: 'info' | 'warn'; text: string }[]
+  alternatives?: TradeoffAlternative[]
+}
+
+/**
+ * The tier-1 sentence, on the card, in the same amber the balance cost uses.
+ *
+ * APPENDED, NEVER REPLACING. The card's existing implications are what the
+ * app DID — the balancing it ran, the load it will recompute. This is what it
+ * COST. Both are true and a person needs both, so the cost joins the list
+ * rather than standing in for it.
+ */
+export function applyTradeoff<T extends TradeoffCardFields>(diff: T, t: Tradeoff): T {
+  if (t.tier === 0 || !t.cost) return diff
+  return {
+    ...diff,
+    implications: [...(diff.implications ?? []), { severity: 'warn' as const, text: t.cost }],
+    // The existing alternatives win their places: a meal removal's verified
+    // swaps are specific to the food that left, and this must not push them
+    // off the card.
+    alternatives: [...(diff.alternatives ?? []), ...t.alternatives],
+  }
+}
+
+/**
+ * The tier-2 question, as a chat turn — with the chips the existing
+ * `[QUICK_REPLIES: ...]` pipeline already extracts.
+ *
+ * NO NEW PLUMBING, and that is deliberate: the coach has rendered chips from
+ * this tag since the equipment question, so a tier-2 ask arrives through the
+ * path that is already proven rather than a second one written for it.
+ *
+ * DO_IT_ANYWAY IS ALWAYS LAST AND ALWAYS PRESENT. It is the whole of the
+ * decision — the change is one tap further away, never blocked — so it is
+ * added here rather than left to each call site to remember.
+ */
+export function askText(t: Tradeoff): string {
+  if (t.tier !== 2 || !t.question) return ''
+  const chips = [...t.alternatives.map(a => a.label), DO_IT_ANYWAY]
+    .slice(0, 4)
+    .map(c => `"${c}"`)
+    .join(' | ')
+  return `${t.question}\n[QUICK_REPLIES: ${chips}]`
+}
+
+/** Identifies the thing being asked about, so the ask happens once per block per thing. */
+export function askKey(ctx: Pick<EditContext, 'kind' | 'dayName' | 'exerciseName'>, blockNumber: number): string {
+  return `${blockNumber}:${ctx.kind}:${(ctx.exerciseName ?? ctx.dayName).toLowerCase()}`
+}
+
+export interface AskGuards {
+  /** Keys already asked about this block. */
+  alreadyAsked: ReadonlySet<string>
+  /** True while a session is actually running — no coaching questions between sets. */
+  sessionRunning: boolean
+}
+
+/**
+ * Whether to ASK, or to fall through to a normal card.
+ *
+ * The three guards that stop "ask first" becoming nagging, all from the
+ * recorded decision. Separated from `assessEdit` because they need state a
+ * pure assessment must not carry: what has been asked, and whether someone is
+ * mid-set right now.
+ *
+ * TAKES THE KEY, NOT THE CONTEXT. The first version took an EditContext and
+ * recomputed `askKey` from it — so a caller that already had the key had to
+ * either pass the whole context a second time or fake one, and I wrote exactly
+ * that fake at the first call site. A function that is awkward to call
+ * correctly gets called incorrectly.
+ */
+export function shouldAsk(t: Tradeoff, key: string, scope: EditContext['scope'], guards: AskGuards): boolean {
+  if (t.tier !== 2 || !t.question) return false
+  // NEVER BETWEEN SETS. A today-scoped change made during a live session is a
+  // person standing in a gym solving a problem now.
+  if (guards.sessionRunning && scope === 'today') return false
+  // ONCE PER BLOCK, PER THING. The second time, they get a plain card: say it
+  // once, then trust them.
+  return !guards.alreadyAsked.has(key)
+}
+
+/**
+ * A tier-2 that is NOT being asked (guarded out above) must not go silent —
+ * it still cost something. This is what the card carries instead.
+ */
+export function downgradeToCard(t: Tradeoff): Tradeoff {
+  return t.tier === 2 ? { ...t, tier: 1, question: null, reason: `${t.reason} (asked already, or mid-session)` } : t
+}

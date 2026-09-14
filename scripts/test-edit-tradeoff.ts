@@ -28,6 +28,7 @@ import { removeExerciseFromSession, moveExerciseInSession } from '../src/lib/ses
 import {
   assessEdit, weeklySetsByMuscle, muscleVolumeChange, scoreDrop,
   isStrengthPhase, isAccumulationPhase, isStartingOut, DO_IT_ANYWAY,
+  applyTradeoff, askText, askKey, shouldAsk, downgradeToCard,
   type EditContext,
 } from '../src/lib/edit-tradeoff'
 import type { MesocycleWeek, UserProfile, FitnessGoal } from '../src/lib/types'
@@ -383,6 +384,67 @@ console.log('\n8. The helpers the tier rules stand on are real')
   check('...and finds one when a day is emptied', moved !== null && moved.direction === 'down', moved)
 
   check('an unchanged plan shows no score drop', scoreDrop(hyper, hyperPlan, hyperPlan) === null)
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n9. The card and the ask are built from the verdict, not re-derived')
+// ---------------------------------------------------------------------------
+{
+  const tier1 = { tier: 1 as const, cost: 'Your chest goes from 12 sets this week to 8.', alternatives: [{ label: 'Just today', note: 'next week is unchanged', prompt: 'today only' }], question: null, reason: 'probe' }
+  const tier2 = { tier: 2 as const, cost: 'That is the lift this block is built around.', alternatives: [{ label: 'Swap it instead', note: 'keeps the slot', prompt: 'swap it' }], question: 'What is going on with it?', reason: 'probe' }
+  const tier0 = { tier: 0 as const, cost: null, alternatives: [], question: null, reason: 'probe' }
+
+  // THE COST JOINS THE CARD, it does not take it over. A meal removal's own
+  // verified swaps and the balancing sentence are what the app DID; this is
+  // what it COST, and a person needs both.
+  const existing = {
+    implications: [{ severity: 'info' as const, text: 'Load recomputed once you confirm.' }],
+    alternatives: [{ label: 'Tuna', note: 'same protein', prompt: 'use tuna' }],
+  }
+  const merged = applyTradeoff(existing, tier1)
+  check('the cost is appended as a warning, after what the app did',
+    merged.implications.length === 2 && merged.implications[1].severity === 'warn' && merged.implications[0].text.includes('Load recomputed'),
+    merged.implications)
+  check('...and the existing offers keep their places', merged.alternatives[0].label === 'Tuna' && merged.alternatives.length === 2, merged.alternatives)
+  check('a free edit leaves the card exactly as it was', applyTradeoff(existing, tier0) === existing)
+
+  // THE ASK CARRIES "DO IT ANYWAY", ALWAYS AND LAST. This is the whole of the
+  // decision: one tap further away, never blocked.
+  const ask = askText(tier2)
+  check('the ask is a question with chips', ask.includes('What is going on with it?') && ask.includes('[QUICK_REPLIES:'), ask)
+  check(`...always offering "${DO_IT_ANYWAY}"`, ask.includes(`"${DO_IT_ANYWAY}"`), ask)
+  check('...as the LAST chip, so the alternative is read first',
+    ask.lastIndexOf(`"${DO_IT_ANYWAY}"`) > ask.indexOf('"Swap it instead"'), ask)
+  check('a tier-1 produces no ask at all', askText(tier1) === '' && askText(tier0) === '')
+
+  // THE THREE GUARDS.
+  const none = { alreadyAsked: new Set<string>(), sessionRunning: false }
+  check('a tier-2 asks by default', shouldAsk(tier2, 'k', 'permanent', none))
+  check('...and a tier-1 never asks', !shouldAsk(tier1, 'k', 'permanent', none))
+  check('asked once already this block → no second ask',
+    !shouldAsk(tier2, 'k', 'permanent', { ...none, alreadyAsked: new Set(['k']) }))
+  check('...but a DIFFERENT thing in the same block still asks',
+    shouldAsk(tier2, 'other', 'permanent', { ...none, alreadyAsked: new Set(['k']) }))
+  check('mid-session, a TODAY change never interrupts',
+    !shouldAsk(tier2, 'k', 'today', { ...none, sessionRunning: true }))
+  check('...while a lasting change mid-session still asks',
+    shouldAsk(tier2, 'k', 'permanent', { ...none, sessionRunning: true }))
+
+  // A GUARDED-OUT TIER 2 MUST NOT GO SILENT. It still cost something.
+  const down = downgradeToCard(tier2)
+  check('a tier-2 that is not asked becomes a tier-1 card, not nothing',
+    down.tier === 1 && down.cost === tier2.cost && down.question === null, down)
+  check('...and says why it was downgraded, for the log', /asked already|mid-session/.test(down.reason), down.reason)
+  check('downgrading a tier-1 changes nothing', downgradeToCard(tier1) === tier1)
+
+  // askKey must separate the things a person would think of as separate.
+  const k = (kind: string, ex?: string, day = 'Monday') =>
+    askKey({ kind: kind as never, dayName: day, exerciseName: ex }, 2)
+  check('two different exercises are two different asks', k('remove', 'Squats') !== k('remove', 'Bench'))
+  check('two different edits to one exercise are two different asks', k('remove', 'Squats') !== k('swap', 'Squats'))
+  check('the same edit in a later block asks again',
+    askKey({ kind: 'remove' as never, dayName: 'Monday', exerciseName: 'Squats' }, 3) !== k('remove', 'Squats'))
+  check('...and case in the name never splits one thing into two', k('remove', 'SQUATS') === k('remove', 'squats'))
 }
 
 console.log(failures === 0 ? '\nAll edit trade-off checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
