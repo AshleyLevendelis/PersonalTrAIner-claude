@@ -2,6 +2,70 @@
 
 Newest first. One line each.
 
+- [x] **FIXED — four of the five things Ashley hit while training, 14 Sep 2026.**
+  **1. ONE LIFT, ONE NUMBER.** Her words: *"the main header prominently displays
+  40kg, but the pre-filled numbers in the set input rows show 35kg."* Both
+  figures were the app's. Today's card asks the progression engine what her last
+  session earned and used the answer for the LABEL above the number ("from your
+  last session") and the note below it ("Held at 35kg") — and never for the
+  number itself, which stayed the one generation printed weeks earlier. On her
+  phone: the headline, the per-set chips, that note and the boxes she types into
+  now all say the same weight, and it is the one her log earned. The stored plan
+  is untouched — re-anchoring future weeks stays an offer.
+  **The gate that should have caught it said, in its own words, "...and
+  OVERRIDES the plan number with what came back" — checked by a regex that
+  matched the line flipping the LABEL.** Green for eleven days over an override
+  that did not exist, and its module header asserted the same false thing in
+  prose. Both corrected; that check now EXECUTES the substitution and inspects
+  what comes out.
+  **Measured, not reasoned:** the first run of the new browser driver printed
+  10kg above a note reading "Held at 9kg", because the fix plate-rounded a
+  weight that came off the bar. Rounding exists to make a number the APP
+  invented loadable; a logged one is loadable by proof.
+  **2. NO LOGGING A LIFT NOBODY NAMED.** Her words: *"Sending 'I did 1x10
+  @60kg' in chat auto-logged the set under Trap Bar Deadlift without asking."*
+  She never typed those words — the model supplied them from context, and they
+  reached the parser looking exactly like a name someone had typed. Three sets
+  went into permanent history against a lift that may never have happened, and
+  every future weight is worked out from that history. The coach now asks
+  "Which exercise was that?" with today's session as buttons AND a box, unless
+  the name can be traced to her own message.
+  **The lesson worth keeping: a prompt rule is not an enforcement.** The tool
+  declaration already forbade exactly this, twice, in the imperative. The model
+  did it anyway. Anything the app guarantees about its own writes has to be
+  checkable in code.
+  Found underneath it: a blank exercise name matched EVERY exercise in the day's
+  plan, so on a one-lift day it resolved cleanly to that lift. Closed.
+  **3. "LOG SESSION" ON THE ROUND TIMER.** Her words: *"Tapping Log session
+  after finishing 6/6 rounds does nothing. The button doesn't even click."* It
+  fired every time. The form it opened was a plain block in the page, and the
+  full-screen timer is pinned over the whole viewport — so it opened
+  underneath, invisible and untappable. It is now a proper sheet over the
+  field, with what the timer just ran already filled in. The driver that
+  already checked the button EXISTS now taps it and asks the browser what a tap
+  in the middle of the form actually lands on.
+  **4. THE FINISHER SAYS WHAT THE FINISHER IS.** Her words: *"the finisher
+  title is truncated … impossible to see the full description, round breakdown,
+  or work/rest durations."* The whole prescription sits after a dash in the
+  plan's own string, so the ellipsis was eating the instruction. Name, minutes
+  and effort on one line; the rounds and the work/rest underneath.
+  **NOT FIXED, and it is hers to settle: the split exercise controls** (Swap
+  inline, Move/Take out/Ban in the ⋮ menu). Two defensible layouts, so it is
+  asked rather than guessed.
+  **FOUND AND NOT FIXED, recorded as a lead:** 30 of 272 exercises in one
+  generated plan show one more per-set weight chip than the lift has sets. The
+  weekly-balance pass bumps a lift's set count and leaves the chips at their old
+  length. Pre-existing, unrelated, its own fix — re-measure before acting on it.
+  **Mutations: 26 attempted, 24 caught first time. Two survived and each
+  exposed a weak check rather than safe code** — a top-set guard the fixture
+  could not reach, and an all-short-phrase branch tested with a three-letter
+  word. Both strengthened, both then caught.
+  **Two checks re-anchored, both red on correct changes** — one pinned the exact
+  text of a ternary, one pinned a whole object literal that grew a field. The
+  first is now executed over every question the parser can ask.
+  Plan: `docs/plans/one-lift-one-number-today.md`. New: `test:log-needs-your-words`,
+  `verify:one-number`, `verify:finisher`.
+
 - [x] **BUILT — a change that works against your goal is now ASKED about, not
   just allowed.** Ashley, 14 Sep 2026: "Build it."
   **WHAT CHANGES ON HER PHONE.** Ask the coach to drop an exercise for the rest

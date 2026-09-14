@@ -185,6 +185,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
       open={!!roundToLog}
       onOpenChange={o => { if (!o) setRoundToLog(null) }}
       hideTrigger
+      // ABOVE THE FIELD, NOT UNDER IT. The full-screen branch below renders
+      // this beside RoundField, which is fixed and opaque over the whole
+      // viewport — so an in-flow sheet opened where nobody could see it.
+      overlay
       prefill={roundToLog
         ? { activityName: roundToLog.activityName, durationMinutes: roundToLog.durationMinutes, notes: roundToLog.detail }
         : undefined}

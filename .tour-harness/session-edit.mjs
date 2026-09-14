@@ -80,6 +80,33 @@ check('1b. it offers move earlier, move later and take out', ['move-up', 'move-d
 check('1c. ...cheap first, the ban last', ids.indexOf('remove-exercise') < ids.length - 1 && /ban/i.test(items[items.length - 1].t), items.map(i => i.t))
 check('1d. the first exercise cannot move earlier', items.find(i => i.id === 'move-up')?.disabled === true, items.find(i => i.id === 'move-up'))
 check('1e. ...but can move later', items.find(i => i.id === 'move-down')?.disabled === false, items.find(i => i.id === 'move-down'))
+
+// ONE PLACE FOR EVERY CHANGE — Ashley's ruling, 14 Sep 2026, from three
+// options, after reporting: "Swap exercise is an inline link above the sets
+// table, while the rest of the actions are inside the 3-dot overflow menu."
+// She chose all of them behind the ⋮.
+check('1f. swapping is in the same menu as the rest', ids.includes('swap-exercise'), items.map(i => i.t))
+// THE OTHER HALF, AND THE ONE THAT WOULD ROT. "It is in the menu" stays true
+// if a copy is also left outside it, which is the state she reported. So the
+// row itself is read: every control on it that CHANGES the exercise must be
+// gone. Plate calculator is named as the deliberate exception rather than
+// allowlisted by silence — it changes nothing, and it is reached mid-set with
+// a bar in front of you.
+const strayVerbs = await ev(`(() => {
+  const rows = [...document.querySelectorAll('[data-exercise-name]')]
+  const out = []
+  for (const r of rows) {
+    for (const b of r.querySelectorAll('button')) {
+      if (b.closest('[role="menu"]')) continue
+      const t = (b.textContent || '').trim()
+      if (/swap|move (earlier|later)|take out|ban|never show/i.test(t)) out.push(t)
+    }
+  }
+  return [...new Set(out)]
+})()`)
+check('1g. ...and no change to an exercise is left loose on the row', (strayVerbs || []).length === 0, strayVerbs)
+check('1h. ...while the plate calculator, which changes nothing, stays one tap away',
+  (await ev(`[...document.querySelectorAll('[data-exercise-name] button')].some(b => /plate calculator/i.test(b.textContent || ''))`)) === true)
 await shoot('session-edit-menu')
 
 // --- moving ----------------------------------------------------------------

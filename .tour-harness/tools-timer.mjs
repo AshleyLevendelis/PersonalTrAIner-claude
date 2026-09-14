@@ -289,6 +289,60 @@ check('7c. ...and it is not the working colour, nor the ready one',
       { ready: readySample?.bg, work: workSample?.bg, done: done?.bg })
 await shoot('tools-timer-card-done')
 
+// --- 8. "LOG SESSION" ACTUALLY OPENS SOMETHING, ON THE SCREEN SHE TAPS IT FROM
+//
+// Ashley, 14 Sep 2026: "Tapping Log session in the Round Timer modal after
+// finishing 6/6 rounds does nothing. The button doesn't even click, and
+// nothing is logged or submitted."
+//
+// The button fired every time. The sheet it opened was a plain block in normal
+// document flow, and the full-screen field is `fixed … z-30` with an opaque
+// background — so the form mounted UNDERNEATH it. Nothing to see, nothing to
+// tap, no error.
+//
+// 7b above already checked that the finished card OFFERS to log. That is the
+// hole this closes: the button's existence was checked and its effect never
+// was. And it is checked from FULL SCREEN, because that is the only place the
+// defect existed and the place she hit it.
+check('8a. from the finished round, full screen still opens', await tapSel('[data-round-card-fullscreen]'))
+await wait(700)
+const fieldLog = await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => /Log session/i.test((x.textContent || '').trim()))
+  if (!b) return null
+  b.click()
+  return true
+})()`)
+check('8b. ...and the flooded field offers it too', fieldLog === true)
+await wait(900)
+await shoot('tools-timer-log-sheet')
+
+// WHAT IS ACTUALLY ON TOP, asked of the browser rather than inferred from a
+// z-index. elementFromPoint at the sheet's own centre answers the only
+// question that matters: if she taps where the form is, does she hit the form?
+// A check on "z-50 is in the class list" would have passed on a sheet rendered
+// inside a stacking context that flattened it.
+const sheet = await ev(`(() => {
+  const el = document.querySelector('[data-testid="unplanned-work-sheet"]')
+  if (!el) return { found: false }
+  const r = el.getBoundingClientRect()
+  const cs = getComputedStyle(el)
+  const hit = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2))
+  return {
+    found: true,
+    w: Math.round(r.width), h: Math.round(r.height),
+    visible: cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity || '1') > 0.5,
+    hitIsInside: !!hit && el.contains(hit),
+    hitTag: hit ? (hit.tagName + '.' + (hit.className || '').toString().slice(0, 40)) : null,
+    // The duration the timer just ran, carried in rather than retyped.
+    prefilled: [...el.querySelectorAll('input')].map(i => i.value).filter(Boolean),
+  }
+})()`)
+check('8c. the log sheet is really on screen', sheet.found === true && sheet.visible === true && sheet.h > 100, sheet)
+check('8d. ...and a tap in the middle of it lands ON it, not on the field behind',
+  sheet.hitIsInside === true, sheet)
+check('8e. ...with what the timer just ran already filled in',
+  (sheet.prefilled || []).length > 0, sheet.prefilled)
+
 const err = await ev('window.__err ?? null')
 check('6. no uncaught error on the page', err === null, err)
 

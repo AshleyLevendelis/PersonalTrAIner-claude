@@ -120,6 +120,16 @@ const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, 
 // unchanged.
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
 const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
+// ?finisher=1 — A POST-SESSION FINISHER ON A TRAINING DAY, for verify:finisher.
+//
+// The default profile's conditioning lands on REST days, where TodayPanel
+// shows the recovery card and FinisherRow is never rendered at all — so the
+// row Ashley reported truncated (14 Sep 2026) could not appear here. Measured
+// across four goal/preference pairs before picking this one: fat_loss with
+// conditioning_preference 'enjoy' is where the generator actually puts a
+// finisher after a session, rather than hand-seeding a row, which would have
+// proved only that a string written here renders. Same reasoning as ?legcurl.
+const FINISHER = new URLSearchParams(location.search).get('finisher') === '1'
 
 // ?planDelay=N — App.tsx holds exercisePlan/mesocycle at [] until its read
 // resolves (App.tsx:111,138). Every other run of this harness hands them over
@@ -131,7 +141,7 @@ export const STATED_DUMBBELL_KG = 24
 const profile: UserProfile = {
   id: PROFILE_ID,
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
-  fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
+  fitness_goal: FINISHER ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
   //
   // Dumbbell Leg Curl is not reachable at full_gym on an upper/lower split:
@@ -146,7 +156,7 @@ const profile: UserProfile = {
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
-  coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+  coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: FINISHER ? 'enjoy' : 'tolerate',
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
@@ -288,6 +298,31 @@ const loggedTarget = (() => {
   return { name: ex.name, planKg: ex.suggested_load_kg as number, liftedKg, sets: ex.sets }
 })()
 ;(window as unknown as { __loggedTarget: unknown }).__loggedTarget = loggedTarget
+
+// WHICH DAY CARRIES A FINISHER, and what the plan says it is — published for
+// verify:finisher, 14 Sep 2026. Same rule as rampTarget above: the driver asks
+// the page rather than naming a weekday and an activity string, both of which
+// have moved before. The longest one on offer, because the defect it guards is
+// a row that cut its own text off and the longest string is where that shows.
+;(window as unknown as { __finisherTarget: unknown }).__finisherTarget = (() => {
+  // TRAINING DAYS ONLY. FinisherRow renders inside TodayPanel's workout branch;
+  // a rest day shows the recovery card instead, so publishing one from there
+  // sends the driver to a screen that never had the row on it. Found by doing
+  // exactly that on the first run.
+  //
+  // AND FROM THE LIVE WEEK, NOT WEEK 1. The fixture's plan is nine days old, so
+  // the screen renders week 2 — where the duration has already progressed
+  // (18m in week 1, 20m on screen). Publishing week 1's number made the driver
+  // argue with the app about a figure both had right. Same trap
+  // calibrationDate above exists for.
+  const liveWeekForFinisher = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeekForFinisher)?.days ?? exercisePlan
+  const withFinisher = liveDays
+    .filter(d => d.exercises.length > 0 && !!d.recommendedCardio)
+    .map(d => ({ day: d.day, date: nearestAnchorDate(d.day), activity: d.recommendedCardio!.activity, duration: d.recommendedCardio!.duration, rpe: d.recommendedCardio!.targetRpe }))
+  if (withFinisher.length === 0) return null
+  return withFinisher.reduce((best, d) => (d.activity.length > best.activity.length ? d : best))
+})()
 
 // TODAY'S FOCUS, from THIS page's plan — for verify:rest-day-race, 14 Sep 2026.
 // Its last check compared the coach's first bubble with Home's session name,

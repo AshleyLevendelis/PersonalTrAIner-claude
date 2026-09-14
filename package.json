@@ -259,7 +259,8 @@
     "test:replace-without-losing": "tsx scripts/test-replace-without-losing.ts",
     "test:concurrent-activity": "tsx scripts/test-concurrent-activity.ts",
     "verify:one-number": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-number.mjs",
-    "test:log-needs-your-words": "tsx scripts/test-log-needs-your-words.ts"
+    "test:log-needs-your-words": "tsx scripts/test-log-needs-your-words.ts",
+    "verify:finisher": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/finisher-detail.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

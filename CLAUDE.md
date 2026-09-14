@@ -85,6 +85,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Change its sets, reps or weight for today — via logging only (extra sets,
   typed numbers); the plan itself is not edited
 
+**Every change to an exercise lives in one menu** — her ruling, 14 Sep 2026,
+from three options, after reporting that swapping sat outside the "⋮" while
+moving, removing and banning sat inside it: **all of them behind the ⋮**, over
+making them all inline and over keeping swap in both places. The line is
+"changes to the plan go in the menu", not "links go in the menu" — the plate
+calculator changes nothing and is reached mid-set, so it stays on the row.
+Browse already worked this way; today's card was the odd one out.
+`verify:session-edit` §1f-1h, which reads BOTH halves — that swapping is in the
+menu, AND that no change-verb is left loose on the row, because "it is in the
+menu" stays true when a copy is also left outside it.
+
 **Changing one workout**
 - Move it to another day; it leaves today on every screen — both surfaces
   since 10 Sep 2026 ("What happened?" on the day menu); `session-move`,
