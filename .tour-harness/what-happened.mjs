@@ -22,6 +22,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { ANCHOR_ISO, anchorDate, DAY_NAMES, iso as anchorIso } from './anchor.mjs'
 const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => { const p = q.url.split('?')[0]; const f = join(DIST, p === '/' ? '/.tour-harness/real.html' : p); if (!existsSync(f)) { r.writeHead(404); r.end('nf'); return } r.writeHead(200, { 'Content-Type': T[extname(f)] ?? 'application/octet-stream' }); r.end(readFileSync(f)) })
@@ -43,11 +44,15 @@ const check = (name, ok, detail) => {
   if (ok) console.log(`    ✓ ${name}`)
   else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 400)}` : ''}`) }
 }
-const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const real = new Date()
-const pinned = (() => { const d = new Date(real); if (d.getDay() === 1 || d.getDay() === 2) d.setDate(d.getDate() + 2); return d })()
-const TODAY = iso(pinned); const TODAY_NAME = NAMES[pinned.getDay()]
+// THE ANCHOR, not a nudged version of the real clock. This file already pinned
+// a date — it was the only driver that did — but it derived the pin from
+// `new Date()` and only stepped forward off a Monday or Tuesday, so "today"
+// still moved with the calendar and so did every TODAY_NAME assertion below.
+// One anchor for the pages and the drivers alike: .tour-harness/anchor.mjs.
+const iso = anchorIso
+const NAMES = DAY_NAMES
+const pinned = anchorDate()
+const TODAY = ANCHOR_ISO; const TODAY_NAME = NAMES[pinned.getDay()]
 console.log('pinning today to', TODAY, `(${TODAY_NAME})`)
 const pin = async date => (await send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('fitplan_dev_clock_00000000-0000-4000-8000-000000000001', JSON.stringify({date:'${date}',enabled:true})) } catch {}` })).result.identifier
 

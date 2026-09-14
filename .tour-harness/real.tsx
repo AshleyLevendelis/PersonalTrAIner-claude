@@ -58,17 +58,32 @@ import { AppearanceProvider } from '@/hooks/useAppearance'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
+import { setDevClockOverride } from '@/lib/dev-clock'
+import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import '@/index.css'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
+
+// PINNED BEFORE ANYTHING RENDERS — 14 Sep 2026. This is what makes a run
+// repeatable: every `getAppNow` in the app reads this override, so "today" is
+// the anchor rather than the machine's calendar. Proven necessary by running
+// one driver under two timezones a day apart and getting 0 failures in one and
+// 2 in the other, on identical code. Doing it HERE rather than in each driver
+// means all 37 inherit it and none can forget.
+setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // TODAY MUST BE A TRAINING DAY or the tour legitimately drops its set stop
 // (setStepSkipped) and the run proves nothing about the gated step. The four
-// available days are chosen relative to the real weekday rather than
-// hard-coded Mon-Thu, so this does not quietly stop testing the gate on a
-// Friday. Still a realistic 4-day split, not "every day available".
-const todayIdx = new Date().getDay()
+// available days are relative to the weekday rather than hard-coded Mon-Thu,
+// so the gate is still exercised wherever "today" falls. Still a realistic
+// 4-day split, not "every day available".
+//
+// RELATIVE TO THE ANCHOR, NOT THE REAL WEEKDAY (14 Sep 2026). The intent above
+// is unchanged and still holds — today is always a training day. What changed
+// is that it is always the SAME training day, so the plan every driver reads
+// stops being reshaped once a night.
+const todayIdx = anchorDate().getDay()
 const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 
 // ?absurd=1 — the weight-plausibility check, on the screen it argues on.
@@ -113,7 +128,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
+  created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
@@ -148,7 +163,7 @@ const mesocycle = tilt !== 'lopsided' ? generated : generated.map(w => ({
 const exercisePlan = mesocycle[0].days
 const macros: MacroTargets | null = computeTargets(profile)
 
-const today = new Date().toISOString().slice(0, 10)
+const today = isoOf(anchorDate())
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
   // A weigh-in so the Dashboard's trend has something real to draw rather
@@ -168,8 +183,8 @@ const db: Db = {
   exercise_set_logs: [1].map((back, i) => ({
     id: `l${i}`, user_id: PROFILE_ID, exercise_name: 'Barbell Squats', set_number: 1,
     weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
-    completed_at: new Date(Date.now() - (back + 1) * 86400000).toISOString(),
-    date: new Date(Date.now() - (back + 1) * 86400000).toISOString().slice(0, 10),
+    completed_at: new Date(anchorNowMs() - (back + 1) * 86400000).toISOString(),
+    date: isoOf(new Date(anchorNowMs() - (back + 1) * 86400000)),
   })),
   // ?swapped=1 — the day Ashley told the coach she had done Muay Thai instead.
   // Off by default so every existing run of this harness is unchanged. On, it
@@ -187,7 +202,7 @@ const db: Db = {
     ? [{
         id: 'ws-move', profile_id: PROFILE_ID, date: today, is_completed: false,
         split_type: 'moved', duration_minutes: 0,
-        moved_to_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+        moved_to_date: isoOf(new Date(anchorNowMs() + 86400000)),
       }]
     : [],
   cardio_logs: [],
@@ -199,12 +214,12 @@ const db: Db = {
         // Eaten under the name the slot still shows — the quiet-note case.
         { id: 'me1', profile_id: PROFILE_ID, date: today, slot: 'breakfast', event_type: 'confirmed',
           meal_name: 'Porridge with almond butter', macros: { kcal: 480, protein: 18, carbs: 60, fat: 18 },
-          source: 'manual', client_id: 'seed-breakfast', created_at: new Date().toISOString() },
+          source: 'manual', client_id: 'seed-breakfast', created_at: anchorDate().toISOString() },
         // Eaten under a name the plan has since moved away from — the
         // name-preservation case. 610, deliberately not the pick's 720.
         { id: 'me2', profile_id: PROFILE_ID, date: today, slot: 'lunch', event_type: 'confirmed',
           meal_name: 'Leftover chilli and rice', macros: { kcal: 610, protein: 40, carbs: 70, fat: 15 },
-          source: 'manual', client_id: 'seed-lunch', created_at: new Date().toISOString() },
+          source: 'manual', client_id: 'seed-lunch', created_at: anchorDate().toISOString() },
       ]
     : [],
   meal_plan_picks: [], meal_plan_slots: [],
@@ -227,7 +242,7 @@ if (ABSURD) {
   ;(window as unknown as { __absurdExercise: string }).__absurdExercise = name
   saveActiveSessionRecord({
     profileId: PROFILE_ID, date: today, dayName: DAYS[todayIdx], liveWeek: 1,
-    status: 'running', startedAtIso: new Date().toISOString(), lastActivityIso: new Date().toISOString(),
+    status: 'running', startedAtIso: anchorDate().toISOString(), lastActivityIso: anchorDate().toISOString(),
     declaredOffPlan: [name],
   })
 }

@@ -37,13 +37,20 @@ import { AppearanceProvider } from '@/hooks/useAppearance'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
+import { setDevClockOverride } from '@/lib/dev-clock'
+import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import '@/index.css'
 
 window.addEventListener('error', e => { (window as never as Record<string, unknown>).__err = String(e.message) })
 
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001'
+
+// PINNED BEFORE FIRST RENDER — see .tour-harness/anchor.mjs. One fixed
+// "today" for every run, so a driver's day-name assertions stop depending on
+// what day it is where the machine is.
+setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const todayIdx = new Date().getDay()
+const todayIdx = anchorDate().getDay()
 
 // ?movedin=1 — HER SITUATION, 9 Sep 2026: yesterday's session was moved onto
 // today, and today is not a training day of its own. That second half is why
@@ -62,7 +69,7 @@ const availableIdx = new Set(MOVED_IN
   ? [(todayIdx + 6) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
   : [todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 const iso = (offsetDays: number) => {
-  const d = new Date(); d.setDate(d.getDate() + offsetDays)
+  const d = anchorDate(); d.setDate(d.getDate() + offsetDays)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -77,7 +84,7 @@ const profile: UserProfile = {
   weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
-  created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
+  created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
 } as UserProfile
 
 setRandomSource(seededRngFromKey('chat-shell'))
@@ -129,7 +136,7 @@ else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 //     somewhere else in the app and the coach has something to say.
 // ---------------------------------------------------------------------------
 const SEED_NUDGE = new URLSearchParams(location.search).get('seed') === 'nudge'
-const todayStr = new Date().toISOString().slice(0, 10)
+const todayStr = isoOf(anchorDate())
 const OPENER_ROWS = Number(new URLSearchParams(location.search).get('rows') ?? '0')
 const seededRows = (SEED_NUDGE || (OPENER && OPENER_ROWS > 0))
   ? (SEED_NUDGE ? seeded : seeded.slice(0, OPENER_ROWS)).map((m, i) => ({
@@ -138,7 +145,7 @@ const seededRows = (SEED_NUDGE || (OPENER && OPENER_ROWS > 0))
       role: m.role,
       content: m.content,
       status: 'complete',
-      created_at: new Date(Date.now() - (seeded.length - i) * 60_000).toISOString(),
+      created_at: new Date(anchorNowMs() - (seeded.length - i) * 60_000).toISOString(),
     }))
   : []
 // The one row that makes today a day a session ARRIVED on. Same shape as

@@ -436,6 +436,22 @@ old — the commands were right and the context was missing.
   honest about the app. Re-anchored on the property — whichever components
   link to the shopping list are the ones the prompt must name, read from the
   components. When a check blocks a fix, suspect the check.
+- **A CHECK MUST GIVE THE SAME ANSWER ON A TUESDAY.** The browser harness has
+  ONE fixed "today" — `.tour-harness/anchor.mjs` — and every page and driver
+  asks it. No harness file reads the machine's calendar; `test:harness-clock`
+  enforces it, and allows `Date.now()` only as a stopwatch (elapsed
+  milliseconds in a poll budget), because a blanket ban would be wrong and
+  would get worked around.
+  Found 14 Sep 2026 the hard way: eight drivers were red on the 13th and three
+  were green on the 14th with no code change. Proven by running one driver
+  twice on one machine under two timezones a calendar day apart — 0 failures in
+  one, 2 in the other. **A red check is information; a check that flips with
+  the calendar means green is not evidence**, and nothing about looking at it
+  tells you which you have. It also meant a "these fail identically on main"
+  comparison reported the night before was worth less than it claimed.
+  So: **when comparing two runs, compare the number of checks that RAN as well
+  as the number that failed.** A crash produces zero failures and reads as a
+  pass — that happened once during this very fix.
 - Strip comments before asserting a string is ABSENT, or a note explaining why
   something was removed will satisfy the check that it was removed.
 - New check → register it in `package.json` → mutation-test it → say in the

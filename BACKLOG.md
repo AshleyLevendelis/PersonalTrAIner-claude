@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **THE BROWSER CHECKS DEPENDED ON WHAT DAY IT WAS. NOW THEY DON'T.**
+  Ashley asked what was next. Re-measuring last night's "eight red drivers"
+  before proposing anything found only five red — `ramp-ticks`,
+  `coach-week-move` and `program-move` had gone green overnight, same commit,
+  same machine. She chose fixing this over fixing the five failures, which was
+  the right order: the five were not worth diagnosing while the ground moved.
+  **PROVEN, NOT INFERRED.** One driver, one machine, two timezones a calendar
+  day apart: `TZ=Pacific/Kiritimati` (Monday) gave 11 checks run, 0 failed;
+  `TZ=Etc/GMT+12` (Sunday) gave 11 run, 2 failed. Identical code.
+  **WHY IT MATTERS MORE THAN FIVE RED CHECKS.** A red check is information. A
+  check that flips with the calendar means GREEN IS NOT EVIDENCE, and nothing
+  about looking at it tells you which kind you have.
+  **THE CAUSE, in three layers, all in the harness and none in the app.**
+  (1) `real.tsx` built its training-day pattern from `new Date().getDay()`, so
+  which day was due, which was rest and what "tomorrow" held moved nightly.
+  (2) A dozen fixture seeds were `Date.now()`-relative. (3) Only 2 of 37
+  drivers pinned a date, and the one that did seeded its pin from the real
+  clock too, stepping forward only off a Monday or Tuesday.
+  **THE FIX USES THE APP'S OWN SEAM.** `.tour-harness/anchor.mjs` holds one
+  absolute date; the three harness pages call the app's existing
+  `setDevClockOverride` before first render, so all 37 drivers inherit a fixed
+  today and none has to remember. `.mjs` rather than `.ts` because only a plain
+  ES module can be imported by both the TypeScript pages and the plain-Node
+  drivers, and two copies kept in sync is the drift this exists to end.
+  **THE RESULT, re-measured across both timezones — 11 drivers, all SAME:**
+  reliably green: `coach-week-move`, `program-move`, `moved-session`,
+  `session-move`, `what-happened`, and **`single-implement`, which was red this
+  morning** — it was failing on the day's shape, and pinning fixed it.
+  Reliably red: `tour` (4), `swap-request` (2), `calibration-search` (19),
+  `six` (4), and **`ramp-ticks` (6), which was GREEN this morning** — green by
+  luck. Five real defects, now reproducible on any day, which is the state they
+  needed to be in before anyone diagnoses them.
+  **`test:harness-clock` KEEPS IT.** No harness file may read the calendar;
+  `Date.now()` is allowed ONLY as a stopwatch (elapsed ms in a poll budget),
+  because a blanket ban would be wrong and would get worked around. Comments
+  stripped first, and that is load-bearing rather than ceremonial: anchor.mjs's
+  own header contains `new Date()` while explaining why it is banned, and the
+  first grep written for this work matched it. **Mutations: 4 tried, 4 caught**
+  — a driver reading the calendar again, a page that stops pinning, the anchor
+  itself reading the clock, and `Date.now()` used to build a date string.
+  **A MISTAKE WORTH KEEPING.** Mid-fix I compared two runs by failure count and
+  reported "0 failing in both — consistent". Both runs had CRASHED on a missing
+  import before running a single check. A crash yields zero failures and reads
+  exactly like a pass. Every comparison here now records the number of checks
+  that RAN alongside the number that failed; CLAUDE.md carries the rule.
+  **VERIFIED:** the 11 drivers byte-identical across two calendar days;
+  `test:harness-clock` green and mutation-tested; `tools-grid`, `a11y`,
+  `says-what-it-contains`, `chat-app-reality`, `npx tsc --noEmit` clean.
+  **Deploys:** none — harness and checks only, no app code touched.
+
 - [x] **TOOLS 4b — SHE SAW 4a ON HER PHONE AND REVERSED IT, and she was right.**
   Ashley, 14 Sep 2026, within minutes of the merge landing: *"I dont like that
   the round timer sits permanently at the top of the page. The round timer
@@ -136,7 +186,13 @@ Newest first. One line each.
   `verify:rls` is the same class: it says so itself, "28 of 28 tables never
   answered, so this run proves nothing."
   **NINE BROWSER DRIVERS WERE RED. EIGHT OF THEM ARE RED ON `main` TOO —
-  measured, not assumed.** A worktree at `9449087` ran the same nine; the set
+  measured, not assumed.** ~~three of them fail the same way, one lead~~
+  **CORRECTED 14 Sep 2026, and the correction is bigger than the line.** Both
+  halves were wrong: it is not eight, and the ramp three were not one lead.
+  These drivers depended on WHAT DAY THE RUN HAPPENED — three went green
+  overnight with no code change. The comparison below ("byte-identical on
+  `main`") was therefore worth less than it claimed, because both sides ran on
+  the same day. See the entry above.** A worktree at `9449087` ran the same nine; the set
   of failing check names is byte-identical for `tour`, `swap-request`,
   `coach-week-move`, `single-implement`, `ramp-ticks`, `calibration-search`,
   `program-move` and `six`. So this session's twelve commits did not cause them

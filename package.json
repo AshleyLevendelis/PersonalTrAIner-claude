@@ -171,6 +171,7 @@
     "test:session-edit": "tsx scripts/test-session-edit.ts",
     "test:exercise-add": "tsx scripts/test-exercise-add.ts",
     "test:setup-answers": "tsx scripts/test-setup-answers.ts",
+    "test:harness-clock": "tsx scripts/test-harness-clock.ts",
     "test:edit-keeps-the-bar": "tsx scripts/test-edit-keeps-the-bar.ts",
     "test:today-only": "tsx scripts/test-today-only.ts",
     "test:day-coverage": "tsx scripts/test-day-coverage.ts",

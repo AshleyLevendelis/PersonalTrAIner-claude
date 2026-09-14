@@ -40,9 +40,16 @@ import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } f
 import { ProfileScreen } from '@/components/ProfileScreen'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 import type { UserProfile, MesocycleWeek } from '@/lib/types'
+import { setDevClockOverride } from '@/lib/dev-clock'
+import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import '@/index.css'
 
 const PROFILE_ID = 'harness-profile'
+
+// PINNED BEFORE FIRST RENDER — see .tour-harness/anchor.mjs. One fixed
+// "today" for every run, so a driver's day-name assertions stop depending on
+// what day it is where the machine is.
+setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 const FULL_GYM = new URLSearchParams(location.search).get('fullgym') === '1'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
@@ -67,7 +74,7 @@ const baseProfile: UserProfile = {
   max_dumbbell_kg: 30,
   max_single_implement_kg: 32,
   max_improvised_kg: 20,
-  created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
+  created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
 } as UserProfile
 
 setRandomSource(seededRngFromKey('profile-harness'))
