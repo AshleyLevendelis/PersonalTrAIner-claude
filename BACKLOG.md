@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [ ] **REPORT ONLY — what every plan edit does going forward, and what a coach
+  would do instead.** Ashley, 14 Sep 2026: think as a certified trainer and
+  nutritionist about how swapping, removing, adding and moving affect a plan
+  going forward, and report back. `docs/what-an-edit-does-to-the-plan.md`.
+  Twenty operations traced through the code — every exercise edit through
+  this week, the rest of the block and the next block; every meal edit
+  through the meal, the rest of the day and tomorrow — each with what the app
+  does now, what a coach would say, and what to change. Twelve gaps ranked by
+  risk to someone's goals. The three that decide the order: coming back from a
+  gap at last weight or a step above (nothing knows how long ago the last
+  session on a lift was — the safety item); every edit expiring silently at
+  the block boundary (a leg press swapped out for lack of a machine comes back
+  in week 5 unasked); and swap/remove never asking why, so a permanent problem
+  gets a one-day fix. Three of the twelve touch load prescription or the diet
+  path and get a plan before any build.
+  NOTHING BUILT. Nothing driven on a phone: two claims are marked as leads to
+  re-measure — whether swapping one meal visibly re-picks another, and whether
+  the per-meal protein floor applies on the move path. Open until Ashley picks
+  from the ranked list.
+
 - [x] **THE COACH WAS STILL BEING TOLD IT COULD NOT BAN AN EXERCISE — three
   days after it was wired. Found by re-measuring her question, not by a check,
   and the check that should have caught it was looking the other way.**
