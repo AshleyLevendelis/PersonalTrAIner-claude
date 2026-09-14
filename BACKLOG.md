@@ -65,6 +65,22 @@ Newest first. One line each.
   first is now executed over every question the parser can ask.
   Plan: `docs/plans/one-lift-one-number-today.md`. New: `test:log-needs-your-words`,
   `verify:one-number`, `verify:finisher`.
+  **THE FULL SWEEP FOUND THREE MORE, all in the checks rather than the app.**
+  Two were mine. `test:log-needs-your-words` pinned the exact text of a ternary
+  in the chat client, and I moved that decision into a shared function later
+  the same day so a different gate could EXECUTE it over every question — then
+  re-ran that gate and not this one, so my own breakage reached a sweep. It now
+  runs the function too. `test:harness-clock` asked every browser driver to
+  read its day off `__rampTarget` BY NAME, so a new driver that reads its day
+  off a different page-published target went red for doing exactly the right
+  thing; it now derives the list of targets from the page's own source.
+  The third is older and worse. **`test:session-edit` generated an UNSEEDED
+  plan, so it failed on roughly one run in three** — measured as one FAIL and
+  two PASSes on identical code, with the set counts differing between runs. It
+  is the harness-clock lesson one level over: a check that does not give the
+  same answer twice means green is not evidence, and looking at it does not
+  tell you which you have. Seeded, 5/5 deterministic, and mutation-tested to
+  confirm the seeded fixture still catches the thing it guards.
 
 - [x] **BUILT — a change that works against your goal is now ASKED about, not
   just allowed.** Ashley, 14 Sep 2026: "Build it."

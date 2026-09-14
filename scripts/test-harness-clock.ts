@@ -136,6 +136,13 @@ check('chat.tsx publishes a swap target off today\u2019s session',
 check('swap-request.mjs asks for the lift the page named, not one typed in',
   /__swapTarget/.test(bare(readFileSync(join(DIR, 'swap-request.mjs'), 'utf-8'))))
 
+// What real.tsx actually hands the drivers: every `.__name =` it publishes on
+// window. Read off the page's own source so the list cannot drift.
+const published = [...bare(readFileSync(join(DIR, 'real.tsx'), 'utf-8')).matchAll(/\.(__\w+)\s*=/g)]
+  .map(m => m[1])
+  .filter((v, i, a) => a.indexOf(v) === i)
+check('real.tsx publishes at least one target for the drivers to stand on', published.length > 0, published)
+
 for (const f of drivers) {
   const src = bare(readFileSync(join(DIR, f), 'utf-8'))
   // 5a. THE PAGE OWNS THE CLOCK. A driver that writes the key itself is
@@ -149,7 +156,20 @@ for (const f of drivers) {
       pin.startsWith('today=$'), pin)
   }
   if (pins.length > 0) {
-    check(`${f}: ...and it reads that day off the page`, /__rampTarget/.test(src))
+    // THE DAY CAME FROM THE PAGE — whichever target the page publishes, not
+    // one named here. This asked for `__rampTarget` by name, so a driver that
+    // pinned its day off a DIFFERENT page-published target went red for
+    // reading the right thing from the right place (verify:finisher and its
+    // __finisherTarget, 14 Sep 2026). The property is "the pinned day traces
+    // to something real.tsx computed"; the particular target was the
+    // mechanism — the same mistake this file exists to correct one level up,
+    // where two drivers hard-coded a weekday and a lift name.
+    //
+    // DERIVED FROM real.tsx, never a written list, so a new target needs no
+    // edit here and a driver cannot satisfy this by inventing a name.
+    const anyTarget = published.some(name => new RegExp(`\\b${name}\\b`).test(src))
+    check(`${f}: ...and it reads that day off the page`, anyTarget,
+      { published, pins })
   }
 }
 

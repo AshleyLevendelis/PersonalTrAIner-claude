@@ -26,6 +26,7 @@
 // ---------------------------------------------------------------------------
 
 import { parseWorkoutEntries, isNamedByTheUser, resolveExerciseName, type WorkoutEntryInput } from '../src/lib/set-parse'
+import { answerPlaceholderFor } from '../src/components/chat/ClarificationCard'
 
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -141,8 +142,17 @@ console.log('\n6. The wiring: the chat client passes the user\'s own message, fr
   // 'ambiguous' resolution, so "Which exercise was that?" had no buttons.
   check('candidates become taps whenever they exist, not only when resolution is ambiguous',
     /const options = group\.ambiguousCandidates/.test(ui))
+  // EXECUTED, not grepped. This asked for the exact text of an inline ternary
+  // in ChatAssistant — and I moved that decision into answerPlaceholderFor
+  // later the same day (so test:correction-loop could run it over every
+  // question rather than read it), which turned this red over a rule that had
+  // not changed. Worse, I ran correction-loop after that refactor and not this
+  // one, so the breakage reached a sweep. The property is that an exercise
+  // question is answerable by typing even when it offers taps.
   check('...and an exercise question keeps a box for work that was not on the plan',
-    /ambiguity\?\.field === 'exercise_name'\s*\n?\s*\? 'or type the exercise'/.test(ui))
+    !!answerPlaceholderFor('exercise_name', true))
+  check('...while the client asks that one function rather than deciding again',
+    /answerPlaceholderFor\(group\.ambiguity\?\.field/.test(ui))
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

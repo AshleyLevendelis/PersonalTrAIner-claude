@@ -24,7 +24,8 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { generateMesocycle, enforceSetHierarchy, enforceLoadCoherence } from '../src/lib/exercise-plan'
+import { enforceLoadCoherence, enforceSetHierarchy, generateMesocycle, resetRandomSource, setRandomSource } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
 import {
   removeExerciseFromSession,
   moveExerciseInSession,
@@ -60,9 +61,23 @@ const profile = {
   recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
 } as unknown as UserProfile
 
+// SEEDED, and that is a correctness fix rather than tidiness. Unseeded, this
+// file generated a different plan on every run — and §5's "a single removal
+// inside the band says nothing" failed on roughly one run in three, because
+// the fixture week sometimes landed outside the chest:back band before any
+// removal happened. Measured 14 Sep 2026 during a sweep: one FAIL and two
+// PASSes on identical code, with the set counts differing between runs
+// (19 back, then 17).
+//
+// CLAUDE.md's rule about the harness clock is the same rule one level over —
+// a check that does not give the same answer twice means green is not
+// evidence, and nothing about looking at it tells you which you have. The
+// clock fix pinned "today"; this pins the plan.
 const quiet = console.log
 console.log = () => {}
+setRandomSource(seededRngFromKey('session-edit-fixture'))
 const MESO = generateMesocycle(profile)
+resetRandomSource()
 console.log = quiet
 
 const WEEK = MESO[0].week_number
