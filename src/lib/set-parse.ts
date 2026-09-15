@@ -76,6 +76,17 @@ export interface ParseWorkoutInput {
    * this stops being optional.
    */
   userSaid?: string
+  /**
+   * The model's claim that this turn FIXES what was just logged rather than
+   * adding to it — the same flag that drives `replaceExisting`.
+   */
+  correctsPrevious?: boolean
+  /**
+   * What the APP ITSELF has on today's log. Not the model's copy: these names
+   * were written by this app, from rows it holds. See the correction branch in
+   * parseWorkoutEntries for the one thing they are used for.
+   */
+  loggedExerciseNames?: string[]
 }
 
 export interface ParseWorkoutResult {
@@ -362,26 +373,55 @@ export function parseWorkoutEntries(input: ParseWorkoutInput): ParseWorkoutResul
     // — that is precisely what made it invisible. Today's session is offered as
     // taps, and the card keeps its type-it box for work that was not on the
     // plan at all.
-    if (input.userSaid !== undefined && !isNamedByTheUser(entry.exercisePhrase, input.userSaid)) {
-      return {
-        matchedRawPhrase: entry.rawText,
-        resolution: 'unknown',
-        sets: [],
-        ambiguousCandidates: input.todaysPlanExerciseNames
-          .map(n => getExerciseEntry(n))
-          .filter((e): e is ExerciseEntry => !!e),
-        ambiguity: { field: 'exercise_name', message: 'Which exercise was that?' },
+    //
+    // A CORRECTION IS THE ONE CASE WHERE NAMING NOTHING IS NORMAL. "actually it
+    // was 60kg" names no lift, and it does not have to: it points at the thing
+    // the app itself has just written down. So a correction resolves its target
+    // from THIS APP'S OWN LOG, never from the model's phrase — which keeps the
+    // 14 Sep rule exactly as it was, because the model's name is still not
+    // trusted for anything.
+    //
+    // AND IT CANNOT PUT A LIFT IN HISTORY THAT NOBODY DID, which is the harm
+    // the rule exists to prevent: the only name this branch can produce is one
+    // already on today's log, so the worst it can do is change a number on a
+    // set that is already there — under a "Corrected" receipt naming the lift,
+    // with Undo one tap away. Adding is still blocked; only altering is
+    // allowed, and only when there is exactly one thing it could mean.
+    //
+    // MEASURED, 15 Sep 2026: without this, the 14 Sep guard silently closed the
+    // correction loop the 8 Sep work opened. "actually it was 60kg" asked
+    // "Which exercise was that?" and offered seven exercises off today's plan —
+    // none of them the one just logged, because it was off-plan work.
+    let tracedPhrase = entry.exercisePhrase
+    if (input.userSaid !== undefined && !isNamedByTheUser(tracedPhrase, input.userSaid)) {
+      const logged = input.loggedExerciseNames ?? []
+      const correcting = input.correctsPrevious === true && logged.length > 0
+      if (correcting && logged.length === 1) {
+        tracedPhrase = logged[0]
+      } else {
+        return {
+          matchedRawPhrase: entry.rawText,
+          resolution: 'unknown',
+          sets: [],
+          // A CORRECTION CAN ONLY MEAN SOMETHING ALREADY LOGGED. Offering
+          // today's plan instead is how the card came to list seven exercises
+          // that were not candidates and omit the one that was.
+          ambiguousCandidates: (correcting ? logged : input.todaysPlanExerciseNames)
+            .map(n => getExerciseEntry(n))
+            .filter((e): e is ExerciseEntry => !!e),
+          ambiguity: { field: 'exercise_name', message: 'Which exercise was that?' },
+        }
       }
     }
 
-    const nameRes = resolveExerciseName(entry.exercisePhrase, input.todaysPlanExerciseNames)
+    const nameRes = resolveExerciseName(tracedPhrase, input.todaysPlanExerciseNames)
     if (nameRes.resolution === 'ambiguous') {
       return {
-        matchedRawPhrase: entry.exercisePhrase,
+        matchedRawPhrase: tracedPhrase,
         resolution: 'ambiguous',
         ambiguousCandidates: nameRes.candidates,
         sets: [],
-        ambiguity: { field: 'exercise_name', message: `Which "${entry.exercisePhrase}" did you mean?` },
+        ambiguity: { field: 'exercise_name', message: `Which "${tracedPhrase}" did you mean?` },
       }
     }
 

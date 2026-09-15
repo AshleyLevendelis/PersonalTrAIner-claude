@@ -155,5 +155,131 @@ console.log('\n6. The wiring: the chat client passes the user\'s own message, fr
     /answerPlaceholderFor\(group\.ambiguity\?\.field/.test(ui))
 }
 
+console.log('\n7. A CORRECTION names its target by existing — and still cannot invent one')
+{
+  // Ashley, 8 Sep 2026: correcting a mislogged set "repeats questions endlessly
+  // without performing the update." That was fixed. The 14 Sep rule above then
+  // closed it again, silently, because "actually it was 60kg" names no lift and
+  // never can — MEASURED 15 Sep 2026 in the browser, where the app asked "Which
+  // exercise was that?" and offered seven exercises off today's plan, none of
+  // them the one just logged.
+  //
+  // The resolution is not a loosening: the target comes from the APP'S OWN LOG.
+  // The model's phrase is still never used, and the branch cannot put a lift in
+  // history — only change a number on one already there.
+  const LOGGED = ['Barbell Bench Press']
+
+  const one = parseWorkoutEntries({
+    entries: [entry('actually it was 60kg', 'barbell bench press', '3x8 60kg')],
+    todaysPlanExerciseNames: PLAN,
+    userSaid: 'actually it was 60kg',
+    correctsPrevious: true,
+    loggedExerciseNames: LOGGED,
+  })
+  check('a correction with one thing on the log does not ask which exercise',
+    one.needsClarification === false, one.groups[0])
+  check('...it is the lift the APP logged', one.groups[0].exerciseName === 'Barbell Bench Press', one.groups[0].exerciseName)
+  check('...and the new numbers are parsed', one.groups[0].sets.length === 3 && one.groups[0].sets[0].weightKg === 60, one.groups[0].sets)
+
+  // THE MODEL'S NAME IS STILL WORTH NOTHING. Same message, same log, but the
+  // model hands back the 14 Sep fabrication. The lift that comes out is the one
+  // on the log — so this branch cannot reach a name nobody did.
+  const fabricated = parseWorkoutEntries({
+    entries: [entry('Trap Bar Deadlift 3x8 60kg', 'Trap Bar Deadlift', '3x8 60kg')],
+    todaysPlanExerciseNames: PLAN,
+    userSaid: 'actually it was 60kg',
+    correctsPrevious: true,
+    loggedExerciseNames: LOGGED,
+  })
+  check('a fabricated name is discarded, not followed',
+    fabricated.groups[0].exerciseName === 'Barbell Bench Press', fabricated.groups[0].exerciseName)
+  check('...so the only name a correction can produce is one already on the log',
+    LOGGED.includes(fabricated.groups[0].exerciseName ?? ''), fabricated.groups[0].exerciseName)
+
+  // A missing NUMBER is a different question from a missing NAME, and it names
+  // the lift — which is what makes the answer box mean something.
+  const weightOnly = parseWorkoutEntries({
+    entries: [entry('actually it was 60kg', 'barbell bench press', '60kg')],
+    todaysPlanExerciseNames: PLAN,
+    userSaid: 'actually it was 60kg',
+    correctsPrevious: true,
+    loggedExerciseNames: LOGGED,
+  })
+  check('a correction missing the sets asks for the sets, naming the lift',
+    weightOnly.groups[0].ambiguity?.field === 'sets_x_reps'
+    && /Barbell Bench Press/.test(weightOnly.groups[0].ambiguity?.message ?? ''),
+    weightOnly.groups[0].ambiguity)
+
+  // TWO THINGS LOGGED IS GENUINELY AMBIGUOUS. It asks — and it offers what was
+  // LOGGED, because those are the only things a correction can mean. Offering
+  // today's plan is how the card came to list seven non-candidates.
+  const TWO = ['Barbell Bench Press', 'Lat Pulldown']
+  const many = parseWorkoutEntries({
+    entries: [entry('actually it was 60kg', 'barbell bench press', '3x8 60kg')],
+    todaysPlanExerciseNames: PLAN,
+    userSaid: 'actually it was 60kg',
+    correctsPrevious: true,
+    loggedExerciseNames: TWO,
+  })
+  check('two lifts on the log and no name: it asks', many.needsClarification === true, many.groups[0])
+  check('...offering what was logged, not what was planned',
+    JSON.stringify((many.groups[0].ambiguousCandidates ?? []).map(c => c.name)) === JSON.stringify(TWO),
+    many.groups[0].ambiguousCandidates?.map(c => c.name))
+
+  // NOTHING LOGGED MEANS THERE IS NOTHING TO CORRECT, so the 14 Sep rule stands
+  // unchanged — a "correction" against an empty log is just a nameless write.
+  const empty = parseWorkoutEntries({
+    entries: [entry('Trap Bar Deadlift 3x8 60kg', 'Trap Bar Deadlift', '3x8 60kg')],
+    todaysPlanExerciseNames: PLAN,
+    userSaid: 'actually it was 60kg',
+    correctsPrevious: true,
+    loggedExerciseNames: [],
+  })
+  check('an empty log still asks', empty.needsClarification === true, empty.groups[0])
+  check('...and writes nothing', empty.groups[0].sets.length === 0, empty.groups[0])
+  // ...and the question is still answerable: with nothing logged there is no
+  // correction to offer, so it falls back to today's session as taps.
+  check('...offering today\'s session, since there is no log to offer',
+    (empty.groups[0].ambiguousCandidates?.length ?? 0) === PLAN.length,
+    empty.groups[0].ambiguousCandidates?.map(c => c.name))
+
+  // AND IT IS THE CORRECTION FLAG THAT OPENS IT, not merely having logged
+  // something. An ordinary nameless entry on the same log is still refused.
+  const notACorrection = parseWorkoutEntries({
+    entries: [entry('Trap Bar Deadlift 3x8 60kg', 'Trap Bar Deadlift', '3x8 60kg')],
+    todaysPlanExerciseNames: PLAN,
+    userSaid: 'I did 1x10 @60kg',
+    correctsPrevious: false,
+    loggedExerciseNames: LOGGED,
+  })
+  check('the reported case is still refused when it is not a correction',
+    notACorrection.needsClarification === true && notACorrection.groups[0].sets.length === 0, notACorrection.groups[0])
+}
+
+console.log('\n8. The wiring: the correction target comes from the app, not the model')
+{
+  const { readFileSync } = await import('fs')
+  const { join, dirname } = await import('path')
+  const { fileURLToPath } = await import('url')
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const ui = strip(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))
+
+  // EVERY parse the client runs, not just the first. The resume re-parses to
+  // find which group the answer belongs to; giving it different inputs files
+  // the answer against a different field.
+  const parses = ui.match(/parseWorkoutEntries\(\{[\s\S]*?\}\)/g) ?? []
+  check('the client parses in more than one place', parses.length >= 2, parses.length)
+  check('...and every one of them is told whether this is a correction',
+    parses.every(p => /correctsPrevious/.test(p)), parses.map(p => p.slice(0, 60)))
+  check('...and which exercises the app itself has logged',
+    parses.every(p => /loggedExerciseNames/.test(p)), parses.map(p => p.slice(0, 60)))
+  // THE SOURCE OF THAT LIST IS THE APP'S OWN READ MODEL. If it ever came off
+  // the model's payload the whole argument above collapses.
+  const helper = ui.match(/const loggedExerciseNamesToday[\s\S]*?\n\n/)?.[0] ?? ''
+  check('the list is read off the session log', /activeSession\.logs/.test(helper), helper.slice(0, 200))
+  check('...and not off anything the model sent', !/entries|logWorkout|exercise_phrase/.test(helper), helper.slice(0, 200))
+}
+
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nThe coach asks before logging a lift nobody named.')

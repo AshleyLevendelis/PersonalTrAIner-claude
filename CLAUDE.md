@@ -665,6 +665,15 @@ than one not started, because it looks finished in the log.
 ## Safety-adjacent work
 
 - Dietary enforcement, injury filtering, and load prescription always get a plan before a build, even when the fix looks obvious.
+- **A rule that distrusts the model will sometimes block something legitimate.
+  The answer is a better SOURCE, not a weaker rule.** 15 Sep 2026: the 14 Sep
+  rule "never write an exercise the user did not name" also blocked every
+  correction, because "actually it was 60kg" names no lift and never can. The
+  fix was not to relax the rule for corrections — it was to take the name from
+  the app's OWN log instead of the model's word, which keeps the rule intact
+  and makes the branch unable to cause the harm it guards against. When a
+  safety rule closes a path it was not aimed at, look for the fact the app
+  already holds.
 - **Pain is triaged before it is acted on, everywhere it is reported.** Ashley's
   ruling, 15 Sep 2026, from three options: ask which kind, then act. A niggle
   eases that area off for a few days and reverts on its own; something that has
@@ -687,6 +696,12 @@ than one not started, because it looks finished in the log.
 
 - Report the verified state, not that a command exited 0. Say what was proven live versus proven by construction or by test.
 - Browser-harness clicks: verified working 11 Aug 2026 (field focus, typing, and two state-changing clicks all registered correctly). History: this harness failed to register synthetic clicks for an extended prior period, the cause was never root-caused, and the recovery is unexplained. Treat "working" as the current observed state, not a permanent fix — if clicks stop registering again, re-test before concluding anything, rather than assuming either "still broken" or "still fixed."
+- **A FAILING CHECK'S NAME IS NOT ITS FINDING.** It says a property does not
+  hold; it does not say which way it broke. 15 Sep 2026 I reported "a
+  correction adds sets instead of replacing them" off a check called "the wrong
+  sets are REPLACED, not added to" — nothing was being written at all, and the
+  observed values printed on the same line said so. Read the values, not the
+  label.
 - **A WRITTEN FINDING IS A LEAD, NOT A FACT. Re-measure before fixing from it.** BACKLOG said `verify:tap-targets` failed on Home with "2 of 87 controls under 44px". Re-run 9 Sep 2026: 5 of 87, across three tabs, only one of them on Home — the "28px numeric input" was on Exercise. Fixing from the note would have fixed the wrong screen and left three real ones. When a note turns out wrong, correct it where it sits AND say so in the new entry; a stale line that nobody contradicts gets believed twice.
 - If a metric's scale, denominator, or threshold changes, say so — prior numbers stop being comparable.
 - If you retract or correct an earlier claim, say how you reached the wrong one — which file you read, what you skimmed, what you assumed. The correction is worth more than the retraction: it tells us whether the same error shape is sitting in other conclusions.

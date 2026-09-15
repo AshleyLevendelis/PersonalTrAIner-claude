@@ -2,6 +2,54 @@
 
 Newest first. One line each.
 
+- [x] **FIXED — correcting a logged set has been impossible since 14 Sep, and
+  a safety rule was what broke it.** `verify:correction-loop` was red;
+  re-measured from scratch rather than acted on from the note (the note was
+  wrong — see below).
+  **WHAT WAS HAPPENING ON HER PHONE.** Log "bench 3x8 6kg". Say "actually it
+  was 60kg". The coach replies **"Which exercise was that?"** and offers seven
+  exercises off today's plan — Prone Y-T Raises, Chin-Ups, Seated Cable Row and
+  four more — not one of which is the bench she just logged, because that lift
+  was off-plan work. The correction cannot be completed by tapping. Tap
+  nothing, type "3x8" into the box, and the app takes that as the exercise
+  NAME and asks "How many sets and reps for 3x8?". The loop the 8 Sep work
+  closed had quietly reopened.
+  **THE CAUSE, MEASURED, not reasoned.** On 14 Sep we added the rule that an
+  exercise name must be traceable to the user's own message before anything is
+  written — the fix for Ashley's "I did 1x10 @60kg" being filed under Trap Bar
+  Deadlift, a lift she never named. That rule is right and stays. But "actually
+  it was 60kg" names no exercise AND NEVER CAN, so every correction tripped it.
+  Isolated by disabling the traceability predicate alone and re-running the
+  driver: 5 failures → 0. That single change is the whole of it.
+  **THE FIX KEEPS BOTH PROMISES.** A correction now takes its target from THE
+  APP'S OWN LOG, never from the model's phrase. One thing logged today: that is
+  what is being corrected, no question asked. Two or more: it asks, offering
+  WHAT WAS LOGGED rather than what was planned — the second defect here, and
+  the reason that card listed seven non-candidates. Nothing logged: unchanged,
+  it asks, because there is nothing to correct.
+  **WHY THIS IS NOT A LOOSENING OF THE 14 SEP RULE.** The only name this branch
+  can produce is one already on today's log, so it cannot put a lift in history
+  that nobody did — which is the harm that rule exists to prevent. The worst it
+  can do is change a number on a set that is already there, under a "Corrected"
+  receipt that names the lift, with Undo one tap away. The model's name is
+  still worth nothing: hand it the 14 Sep fabrication on a correction turn and
+  it is discarded, which the gate checks by name.
+  **DECIDED WITHOUT ASKING, and flagged because it touches the logging path.**
+  Standing convention: bugs are proceed-without-asking, and the intended
+  behaviour was already written down in the gate that was failing. Restoring a
+  gated behaviour a later change broke is mechanical. Ashley: if you would
+  rather the app ALWAYS asked which lift before changing a logged set, even
+  when there is only one it could be, say so and I will make it ask.
+  **Mutations: 9 attempted, 9 caught** — the branch removed; the model's phrase
+  followed instead of the log; the first logged one picked when several are
+  logged; the plan offered instead of the log; the correction flag ignored so
+  any nameless entry gets in; the have-something-logged condition dropped; and
+  three on the wiring (the resume not told it is a correction, the logged list
+  sourced from the model's payload, the main parse not given the log).
+  `test:log-needs-your-words` §7-8 (executed, not grepped) and
+  `verify:correction-loop`, which is the reach proof a `test:` gate cannot be.
+  **Frontend only — no function deploy.**
+
 - [x] **FIXED — the coach was sending empty bubbles; and the persona rule she
   asked for.** Ashley, from the live app on her phone, 15 Sep 2026, with a
   screenshot: three turns in a row — one of them just "Hello" — came back as a
@@ -44,12 +92,15 @@ Newest first. One line each.
   never been run; it is not evidence the coach is unchanged.
 
 - [ ] **FOUND, NOT FIXED, and it is not from this session's work:
-  `verify:correction-loop` is red — a logged-set CORRECTION adds sets instead
-  of replacing them.** Five checks fail: the clarification question does not
-  name the lift ("Which exercise was that?" rather than a whole sentence), and
-  correcting "3×10" to "3×8" leaves the day with the wrong total rather than
-  the corrected one. That is the double-counting shape this file has recorded
-  before.
+  `verify:correction-loop` is red.**
+  **CORRECTED 15 Sep 2026 — this line said "a logged-set CORRECTION adds sets
+  instead of replacing them", and that is wrong.** Nothing is written at all:
+  the correction never reaches the log. I reached the wrong claim by reading the
+  CHECK NAMES — one of them is "the wrong sets are REPLACED, not added to" —
+  and inferring from its failure that the app must be adding. The observed
+  values were printed beside it on the same line and say otherwise. A failing
+  check tells you a property does not hold; it does not tell you which way it
+  broke. See the fix entry above for what was actually happening.
   **PROVEN PRE-EXISTING rather than assumed.** Run against the chat component
   as it stood before today's changes: identical five failures, same names. Then
   run again in a clean worktree at `0e4741f`, before any of today's work:

@@ -3730,6 +3730,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   /**
+   * The exercises the APP has on today's log, deduplicated in the order they
+   * were written. The only place a correction is allowed to get a name from
+   * when the user named none — see set-parse's correction branch for why that
+   * is the app's own record and not the model's word.
+   */
+  const loggedExerciseNamesToday = (): string[] =>
+    [...new Set(activeSession.logs.map(l => l.exercise_name).filter(Boolean))]
+
+  /**
    * @param correctsPrevious  The user is FIXING what was just logged, not
    *   adding to it. Replaces the named exercises' sets for the day instead of
    *   appending. See the executor's comment: "No 3x10 deadlifts" previously
@@ -3743,7 +3752,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // supplied from context — never typed — is asked about, not logged. See
     // isNamedByTheUser's note for the incident behind it (Ashley, 14 Sep 2026:
     // "I did 1x10 @60kg" written into history as a Trap Bar Deadlift).
-    const parsed = parseWorkoutEntries({ entries, todaysPlanExerciseNames, userSaid })
+    const parsed = parseWorkoutEntries({ entries, todaysPlanExerciseNames, userSaid, correctsPrevious, loggedExerciseNames: loggedExerciseNamesToday() })
 
     if (parsed.needsClarification) {
       const idx = parsed.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
@@ -3844,7 +3853,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // alone would block the entry a second time on the very name they just
     // chose, which is the traceability rule eating its own clarification.
     const said = `${session.userSaid} ${value}`.trim()
-    const priorParse = parseWorkoutEntries({ entries: session.entries, todaysPlanExerciseNames: session.todaysPlanExerciseNames, userSaid: session.userSaid })
+    const priorParse = parseWorkoutEntries({
+      entries: session.entries,
+      todaysPlanExerciseNames: session.todaysPlanExerciseNames,
+      userSaid: session.userSaid,
+      // THE SAME INPUTS THE ASK WAS BUILT FROM, or the resume finds a different
+      // group and files the answer against the wrong field. Nothing has been
+      // written between the question and this answer, so today's log is the
+      // same list it was.
+      correctsPrevious: session.correctsPrevious,
+      loggedExerciseNames: loggedExerciseNamesToday(),
+    })
     const idx = priorParse.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
     if (idx === -1) return
     // WHERE THE ANSWER GOES DEPENDS ON WHAT WAS ASKED. A name replaces the
