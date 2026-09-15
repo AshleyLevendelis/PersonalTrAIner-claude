@@ -255,7 +255,30 @@ console.log('\n3. Nothing has crept back up')
   // that genuinely cost something — an added exercise that breaks the set
   // hierarchy, a removed primer, a week that stops building on the last. That
   // is not a rounding error, so the budget moves and the reason is here.
-  const TOTAL_BUDGET_KB = 1870
+  // 1,870 -> 1,895, 15 Sep 2026, for two features, MEASURED ON A CLEAN
+  // CHECKOUT of the commit before either of them (458d713) rather than
+  // inferred from the diff:
+  //
+  //   before both          app 910   total 1867   first paint 408 kB gz
+  //   + the activity swap  app 911   total 1872
+  //   + tightness          app 915   total 1879   first paint 410 kB gz
+  //
+  // THE FIRST FIVE WERE ALREADY OVER AND NOBODY SAW IT. The activity-swap
+  // change — the coach asking before it marks a day, plus the detector that
+  // stops it claiming a change it did not make — took the total to 1,872
+  // against a 1,870 budget, and I did not catch it because I stopped that
+  // sweep before it reached this check. That is the cost of killing a sweep:
+  // the number it would have told you is the number you then have to go and
+  // find. Recorded so the next person reads it as a habit and not a one-off.
+  //
+  // THE SEVEN FOR TIGHTNESS BOUGHT SOMETHING ON THE OTHER SIDE. The sheet is
+  // deferred, so the app chunk took 4 of it rather than 8 and first paint
+  // moved 2 kB — the same trade the two nutrition sheets took on 14 Sep: one
+  // more chunk header in the total, the sheet's whole weight off first paint.
+  //
+  // 1,895 restores the ~16 kB of headroom this line is supposed to carry.
+  // Prior totals are not comparable to later ones across this line.
+  const TOTAL_BUDGET_KB = 1895
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
 

@@ -28,7 +28,12 @@ import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
-import { TightnessSheet, type TightnessAnswer } from './TightnessSheet'
+// DEFERRED, the same trade the two nutrition sheets took on 14 Sep: a sheet
+// nobody has opened yet has no business in the chunk that has to arrive before
+// the first pixel. It costs one extra chunk header in the total and takes its
+// whole weight off first paint.
+const TightnessSheet = lazy(() => import('./TightnessSheet').then(m => ({ default: m.TightnessSheet })))
+import type { TightnessAnswer } from './TightnessSheet'
 import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
@@ -1041,12 +1046,16 @@ export function TodayPanel({
               ? `Tight: ${tightness.items.length > 0 ? 'warm-up updated' : 'noted'} — change it`
               : 'Anything feeling tight?'}
           </Button>
-          <TightnessSheet
-            open={tightOpen}
-            onOpenChange={setTightOpen}
-            selected={tightAreas}
-            onAnswer={handleTightness}
-          />
+          {tightOpen && (
+            <Suspense fallback={null}>
+              <TightnessSheet
+                open={tightOpen}
+                onOpenChange={setTightOpen}
+                selected={tightAreas}
+                onAnswer={handleTightness}
+              />
+            </Suspense>
+          )}
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
           <ExerciseList
             workout={workout!}

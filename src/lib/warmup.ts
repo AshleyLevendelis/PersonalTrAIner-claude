@@ -104,27 +104,26 @@ const GENERAL_WARMUPS: Record<EquipmentAccess, WarmupItem> = {
 }
 
 // ---------------------------------------------------------------------------
-// Targeted mobility
 // ---------------------------------------------------------------------------
-// Each drill declares which joints it prepares and which injuries it is
-// inappropriate for. Selection is driven by the movement patterns actually
-// scheduled that day — this is what makes the warm-up specific rather than
-// decorative.
-
-interface MobilityDrill extends WarmupItem {
-  prepares_joints: string[]
-  contraindicated_for: string[]
-  needs_equipment: string[]
-}
-
-const MOBILITY_DRILLS: MobilityDrill[] = [
-  // NECK AND ELBOW ADDED 15 Sep 2026, and only because the tightness check
-  // needs them. The app lets somebody name eight areas; before this, two of
-  // those eight had no drill in the list at all, so answering "my neck feels
-  // tight" would have changed nothing while looking exactly like an answer
-  // that worked. Both are unloaded, need no kit, and are contraindicated for
-  // an INJURY in the same place — tight is not hurt, and the hurt path is a
-  // different question with a different answer.
+// DRILLS THAT EXIST ONLY FOR A TIGHTNESS ANSWER.
+//
+// SEPARATE FROM MOBILITY_DRILLS ON PURPOSE, and the separation was bought the
+// hard way. These two were added to the shared catalogue first, because the
+// tightness question offers eight areas and nothing in the app prepared the
+// neck or the elbow — tapping either would have looked exactly like tapping
+// hips and produced nothing.
+//
+// Putting them in the shared list also let the PLAN pick them, which it did:
+// test:audit came back with six sessions estimated at 43 minutes against a
+// 37-minute budget, because a generated warm-up now had another drill to
+// choose and the session had to pay for it. That is a change to everybody's
+// plan, made as a side effect of answering a different question.
+//
+// So they live here. `drillsPreparing` sees both lists; buildWarmup sees only
+// the catalogue. A tightness answer can reach these; a generated session
+// cannot, and its duration budget is untouched.
+// ---------------------------------------------------------------------------
+const TIGHTNESS_ONLY_DRILLS: MobilityDrill[] = [
   {
     name: 'Chin Tucks and Neck Rotations',
     prescription: '8 tucks, then 5 slow rotations each way',
@@ -143,6 +142,22 @@ const MOBILITY_DRILLS: MobilityDrill[] = [
     contraindicated_for: ['elbows'],
     needs_equipment: [],
   },
+]
+
+// Targeted mobility
+// ---------------------------------------------------------------------------
+// Each drill declares which joints it prepares and which injuries it is
+// inappropriate for. Selection is driven by the movement patterns actually
+// scheduled that day — this is what makes the warm-up specific rather than
+// decorative.
+
+interface MobilityDrill extends WarmupItem {
+  prepares_joints: string[]
+  contraindicated_for: string[]
+  needs_equipment: string[]
+}
+
+const MOBILITY_DRILLS: MobilityDrill[] = [
   {
     name: 'Cat-Cow',
     prescription: '10 slow reps',
@@ -589,7 +604,9 @@ export function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay
 export function drillsPreparing(joints: string[], injuries: string[] = []): WarmupItem[] {
   const want = new Set(joints)
   if (want.size === 0) return []
-  return MOBILITY_DRILLS
+  // BOTH LISTS — the catalogue the plan uses, plus the two that exist only for
+  // this question. See TIGHTNESS_ONLY_DRILLS for why the second list exists.
+  return [...MOBILITY_DRILLS, ...TIGHTNESS_ONLY_DRILLS]
     .filter(d => d.needs_equipment.length === 0)
     // AN INJURY STILL VETOES A DRILL. Tight and hurt are different answers to
     // different questions, and the hurt one is triaged elsewhere — but if the

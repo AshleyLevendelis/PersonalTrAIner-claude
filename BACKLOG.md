@@ -2,6 +2,35 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP CAUGHT TWO REGRESSIONS, BOTH MINE, AND ONE HAD ALREADY
+  SHIPPED.** 234 gates, 5 failed. Three are the usual unreachable-database
+  three. The other two were real.
+  **1. `test:audit`: six sessions estimated at 43 minutes against a 37-minute
+  budget.** The two mobility drills I added for the tightness question went
+  into the SHARED catalogue, so generated warm-ups started choosing them and
+  the session had to pay for the extra time. A change to everybody's plan, made
+  as a side effect of answering a different question.
+  **FIXED AT THE CAUSE, not the budget.** The two drills now live in their own
+  list that only the tightness selector can see; the plan's warm-up builder
+  cannot reach them. `test:audit` back to 0 failures out of 17,423.
+  **2. `test:bundle`: 1,879 kB against a 1,870 budget — AND THE FIRST FIVE OF
+  THOSE WERE ALREADY OVER BEFORE TODAY'S SECOND FEATURE.** Measured on a clean
+  checkout of the commit before both (458d713): 1,867 before, 1,872 after the
+  activity-swap work, 1,879 after tightness. So the activity-swap change I
+  pushed hours ago was already 2 kB over, and I did not know, **because I
+  killed that sweep before it reached this check.** That is the real lesson:
+  stopping a sweep does not remove the number, it just means you find it later
+  and with less idea which change put it there.
+  **HANDLED THE WAY THIS FILE HAS HANDLED IT BEFORE.** The sheet is deferred
+  first — so the app chunk took 4 kB rather than 8 and first paint moved 2 kB
+  (408 → 410 gzipped) — and only then is the total budget raised, 1,870 →
+  1,895, with all three measurements written into the check beside the raise.
+  Prior totals are not comparable across that line.
+  **Both re-verified after the fix**: `test:audit`, `test:bundle`,
+  `test:tightness`, `test:no-dead-code` and `verify:tightness` all pass, and
+  the browser driver was re-run against the split so the feature is proven on
+  the code that actually ships.
+
 - [x] **BUILT — "Anything feeling tight?" before a session, feeding the
   warm-up.** Ashley asked what I thought of a list of coach improvements
   Gemini suggested and then said "build all that you think is good". This was
