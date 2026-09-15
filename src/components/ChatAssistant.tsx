@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload} from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -30,6 +30,7 @@ import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
 import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
 import { executeMealMove } from '@/lib/pending-action-executor'
+import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
@@ -1613,21 +1614,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     if (action.type === 'swap_session_for_activity') {
-      // The edge function already wrote workout_sessions.swapped_for_activity
-      // — it only emits this action when its own write succeeded. So this is
-      // a refresh, not a write, and the week strip picks up the ⇄ from the
-      // session row on the next read.
+      // DELIBERATELY STILL HERE, AND DATED. 15 Sep 2026 this tool moved onto
+      // the propose->confirm rail, so the new edge function never emits this
+      // action again. The OLD one, which is what production runs until
+      // `npm run deploy:functions:prod -- chat-gemini` is run by hand, still
+      // does — and the frontend merges on a push while that deploy is a
+      // separate manual step, so there is a window where the two disagree.
       //
-      // THE SAME BUG AS THE BRANCH BELOW, one action type later: this type was
-      // missing from the PlanAction union, so applyPlanAction fell through to
-      // `return false` and the user was told "Action failed — the change was
-      // not applied" about a change that HAD been applied. Reported live, from
-      // a phone, minutes after the migration that made the write possible.
+      // Deleting this branch during that window re-creates a defect this file
+      // has already shipped once: applyPlanAction falls through to
+      // `return false` and the user is told "Action failed — the change was
+      // not applied" about a write that HAD landed. It is in BACKLOG under
+      // that exact sentence.
       //
-      // The lesson was already written down here and it still happened again,
-      // so it is now a gate rather than a comment: test:chat-actions parses
-      // every `action: { type: … }` the edge function can emit and fails if
-      // any of them is unhandled here.
+      // REMOVE IT in a follow-up commit once the function is deployed, not
+      // before. It is a refresh and nothing else, so leaving it costs nothing.
       onLogsUpdated?.()
       return true
     }
@@ -1858,6 +1859,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
+    if (pendingAction.kind === 'propose_session_activity_swap') return 'Want me to swap that day over?'
     if (pendingAction.kind === 'propose_session_move') return 'Want me to move that session?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -2807,6 +2809,76 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           { severity: 'info', text: 'The session itself stays on the plan — this marks the day, it does not delete the work.' },
         ],
         rationale: reason,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_session_activity_swap's card — "I'm doing Muay Thai instead".
+   *
+   * Same window, same session lookup and same refusal as the rest-day builder
+   * above, because it answers the same question about the same day: is there a
+   * session here to change at all. The difference is only what replaces it.
+   *
+   * ASHLEY'S RULING, 15 Sep 2026, from three options: ASK FIRST, LIKE THE
+   * OTHERS. This verb has existed since 25 Aug and wrote immediately; the
+   * "record it, but confirm first" ruling landed on 31 Aug and never reached
+   * it. On 15 Sep the coach told her it had swapped her day, with nothing to
+   * tap, and she reported the chat as lying to her.
+   */
+  const buildSwapForActivityProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: SwapForActivityPayload
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const activityName = typeof rawArgs.activity_name === 'string' ? rawArgs.activity_name.trim() : ''
+    if (!activityName) return null
+
+    const raw = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date)
+      ? rawArgs.date
+      : activeSession.date
+    const dayMs = 86_400_000
+    const delta = (new Date(`${raw}T00:00:00`).getTime() - new Date(`${activeSession.date}T00:00:00`).getTime()) / dayMs
+    if (!Number.isFinite(delta) || delta < -7 || delta > 7) return null
+
+    const dayName = new Date(`${raw}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+    const resolved = sessionForDate({ date: raw, plan: exercisePlan, moves: trainingWeek.moves })
+    const session = resolved.day
+    if (!session || session.exercises.length === 0) return null
+
+    // ONLY A FIGURE SHE ACTUALLY SAID. The server already refused the model's
+    // invented numbers; this keeps the card honest about what it will log.
+    const minutes = typeof rawArgs.duration_minutes === 'number' && Number.isFinite(rawArgs.duration_minutes)
+      ? rawArgs.duration_minutes
+      : null
+    const rpe = typeof rawArgs.intensity_rpe === 'number' && Number.isFinite(rawArgs.intensity_rpe)
+      ? rawArgs.intensity_rpe
+      : null
+    const planned = rawArgs.activity_planned === true
+
+    const implications: import('@/lib/pending-actions-store').ProposalDiff['implications'] = [
+      { severity: 'info', text: "It won't count as a missed session, and it won't count against your week." },
+    ]
+    // THE CARD PROMISES ONLY WHAT CONFIRM WILL DO. A class still to come has
+    // no duration to log yet, and a duration she never stated is a number the
+    // app invented — both were live defects on the old write path.
+    if (!planned && minutes != null && minutes > 0) {
+      implications.push({ severity: 'info', text: `I'll log the ${Math.round(minutes)} minutes towards your week too.` })
+    } else if (planned) {
+      implications.push({ severity: 'info', text: "Tell me how long it went afterwards and I'll log it." })
+    }
+    implications.push({ severity: 'info', text: 'The session itself stays on the plan — this marks the day, it does not delete the work.' })
+
+    return {
+      scopeKey: `${profile.id}:propose_session_activity_swap:${raw}`,
+      preconditions: { date: raw, dayName },
+      payload: { date: raw, dayName, activityName, sessionFocus: session.focus, durationMinutes: minutes, intensityRpe: rpe, activityPlanned: planned },
+      diff: {
+        lead: `I'll mark ${dayName} as ${activityName} instead of your lift, so it won't show as missed. Shall I?`,
+        rows: [{ field: dayName, before: session.focus, after: activityName }],
+        implications,
         reversible: true,
       },
     }
@@ -4195,6 +4267,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
         else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
+      } else if (result.proposal.kind === 'propose_session_activity_swap' && result.proposal.rawArgs) {
+        const sw = buildSwapForActivityProposal(result.proposal.rawArgs)
+        if (sw) built = { scopeKey: sw.scopeKey, preconditions: sw.preconditions, payload: sw.payload as unknown as Record<string, unknown>, diff: sw.diff }
+        else refusal = "There's no session on that day to swap — it's already a rest day on your plan."
       } else if (result.proposal.kind === 'propose_exercise_add' && result.proposal.rawArgs) {
         const ad = buildExerciseAddProposal(result.proposal.rawArgs)
         if (ad.ok) { built = { scopeKey: ad.scopeKey, preconditions: ad.preconditions, payload: ad.payload as unknown as Record<string, unknown>, preImage: ad.preImage, diff: ad.diff }; advice = ad.advice }
@@ -4350,8 +4426,32 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     // No proposal, no receipt, no offer: the existing immediate-action path
     // (log_weight, log_workout_session, etc. — writes the server already
-    // made) is unchanged, and rendering the model's own reply is still safe
-    // here because this turn made no plan-mutation claim.
+    // made) is unchanged.
+    //
+    // D1'S MISSING HALF, closed 15 Sep 2026. The comment that stood here said
+    // rendering the model's own reply was "still safe because this turn made
+    // no plan-mutation claim". All the code can actually see is that no tool
+    // call arrived, and it inferred no claim from that. Those are different
+    // propositions: "I've swapped out today's lifting session for Muay Thai on
+    // your schedule" arrived on exactly such a turn, with no tool, no row and
+    // nothing to tap, and went straight to her screen.
+    //
+    // `action` is the discriminator, not the absence of one. log_weight,
+    // ban_exercise and the two logging actions DO reach here with a write
+    // already made, and their past tense is earned; a turn with no action
+    // wrote nothing and may not say it did.
+    //
+    // THE SERVER REFUSES THIS FIRST. Two copies is deliberate: the frontend
+    // merges on a push and the edge function is deployed by hand afterwards,
+    // so for that window this one is the only guard running.
+    if (!result.action) {
+      const claim = detectPlanClaim(result.reply ?? '')
+      if (claim) {
+        console.error('chat: model claimed a change on a turn that called no tool —', claim)
+        return { text: planClaimFloorText() }
+      }
+    }
+
     let responseText = result.reply
     let action = result.action
     if (action) {
@@ -5046,6 +5146,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // touch the plan, so there is nothing to restore beyond clearing the
       // flag — which is exactly what undoRestDay does.
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_session_activity_swap') {
+      const payload = row.payload as unknown as SwapForActivityPayload
+      const result = await executeSwapForActivity(profile, payload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? 'Swapped' : "Couldn't swap that day"
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
+      // Marks a DAY, like the rest-day arm beside it — no mesocycle write and
+      // no pre_image, because the plan itself is untouched.
+      onLogsUpdated?.()
     } else if (row.kind === 'propose_exercise_add') {
       const result = await executeExerciseAdd(profile, mesocycle, row.payload as unknown as ExerciseAddPayload, exerciseExclusions)
       receipt = result.receipt
@@ -5333,6 +5444,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
+        onLogsUpdated?.()
+      } else if (row.kind === 'propose_session_activity_swap') {
+        await undoSwapForActivity(profile.id, row.payload as unknown as SwapForActivityPayload)
         onLogsUpdated?.()
       } else if (row.kind === 'propose_exercise_add' || row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
         const payload = row.payload as unknown as { weekNumber: number; scope: SwapScope }

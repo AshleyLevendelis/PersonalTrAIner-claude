@@ -62,33 +62,74 @@ console.log('\n1. Every tool the coach is offered can actually be executed')
   check('...and there are tools to check, so this has teeth', declared.length > 10, declared.length)
 }
 
-console.log('\n2. Skipping a day for something else is a tool, not a sentence')
+console.log('\n2. Skipping a day for something else is a CARD, not a sentence and not a silent write')
 {
-  check('swap_session_for_activity is declared', /name:\s*"swap_session_for_activity"/.test(chat))
-  check('...and executed', /name === "swap_session_for_activity"/.test(chat))
+  // REWRITTEN 15 Sep 2026. This section used to pin the opposite: that the
+  // handler wrote workout_sessions and cardio_logs itself. It did, and that
+  // was the 25 Aug fix for the coach SAYING a day was marked when nothing
+  // could mark it. What it left standing is the thing Ashley reported on the
+  // 15th — her record changed with no card and no tap. Her ruling, from three
+  // options: ask first, like the others. So the property inverts: this handler
+  // must now write NOTHING.
+  check('propose_session_activity_swap is declared', /name:\s*"propose_session_activity_swap"/.test(chat))
+  check('...and executed', /name === "propose_session_activity_swap"/.test(chat))
+  // IT SITS WITH ITS SIBLINGS. The name and the neighbourhood are both signals
+  // to the model, and this tool being declared among the log_* writers is how
+  // it came to be treated as one.
+  const decls = [...chat.matchAll(/name:\s*"(propose_[a-z_]+|log_[a-z_]+)"/g)].map(m => m[1])
+  const i = decls.indexOf('propose_session_activity_swap')
+  check('...declared among the propose_* tools, not the log_* ones',
+    i > 0 && decls[i - 1].startsWith('propose_'), { before: decls[i - 1], after: decls[i + 1] })
 
-  // The update_workout_schedule trap: write only where the app reads. The
-  // Exercise tab's week strip reads workout_sessions (via getWeeklyDashboard);
-  // the streak reads cardio_logs. Anything else is a write nobody renders.
-  const body = chat.slice(chat.indexOf('name === "swap_session_for_activity"'))
-    .slice(0, chat.slice(chat.indexOf('name === "swap_session_for_activity"')).indexOf('if (name === "log_meal")'))
-  check('it writes to workout_sessions — what the week strip reads', body.includes('workout_sessions'))
-  check('it writes to cardio_logs — what the streak reads', body.includes('cardio_logs'))
-  check('it does NOT write to fitness_profiles, the field update_workout_schedule died on',
-    !body.includes('fitness_profiles'))
+  const start = chat.indexOf('name === "propose_session_activity_swap"')
+  // TERMINATED ON THE NEXT HANDLER IN THE FILE, not on a name picked from the
+  // DECLARATION order — those two orders are different, and slicing to a
+  // handler that sits earlier gives a negative length and an empty body that
+  // passes every "does NOT contain" check vacuously.
+  const body = chat.slice(start, start + chat.slice(start).indexOf('if (name === "log_meal")'))
+  check('...and the slice really holds the handler', body.length > 500 && body.includes('activityName'), body.length)
+  // COMMENTS STRIPPED BEFORE ANY ABSENCE CLAIM. The handler's own header now
+  // explains where those writes WENT — a note about a removal must not satisfy
+  // the check that it was removed. Caught here on the first run.
+  const bodyCode = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  check('the handler writes NOTHING to workout_sessions', !bodyCode.includes('workout_sessions'), bodyCode.length)
+  check('...and nothing to cardio_logs', !bodyCode.includes('cardio_logs'))
+  check('...and nothing to fitness_profiles, the field update_workout_schedule died on',
+    !bodyCode.includes('fitness_profiles'))
+  check('it returns a proposal for the user to confirm', /kind: "propose_session_activity_swap"/.test(body))
+  // D1: a turn carrying a proposal returns NO prose, so there is no sentence
+  // left on this path for the model to get wrong.
+  check('...and no prose of its own', /reply: ""/.test(body))
 
-  // A failed write must never produce a success sentence. This is the exact
-  // shape of the original defect, one layer down.
-  check('a failed write reports failure rather than claiming success',
-    /!dbSuccess[\s\S]{0,120}couldn't/.test(body))
+  // THE 8 SEP RULE SURVIVES THE MOVE. The model invented 60 minutes for a
+  // class still hours away; a duration counts only when it echoes one in her
+  // own message. That rule now guards a card instead of a row.
+  check('a duration is only forwarded when she actually said it',
+    /statedDurationsMinutes\(message\)/.test(body) && /saidMinutes\.some/.test(body))
+  check('...and whether the activity has happened yet is read, not assumed',
+    /eventTiming\(message, activityName\)/.test(body))
 }
 
 console.log('\n3. The prompt forbids claiming an untaken action')
 {
   check('the honesty rule is present', chat.includes('NEVER CLAIM AN ACTION YOU DID NOT TAKE'))
-  check('...it names the tool to use instead', /swap_session_for_activity/.test(chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 1600)))
+  // THE WHOLE SECTION, not a fixed number of characters from its heading.
+  // 15 Sep 2026: rule 2 gained three sentences (the measured live example, and
+  // the carve-out saying a plain statement is enough to call the tool) and
+  // pushed rules 5 and 6 past the 1600-char window three checks used — so the
+  // checks went red over a rule that had not changed, and the only way to make
+  // them green would have been to say LESS about honesty. A window is a
+  // mechanism; the property is "it is in this section".
+  const honestyStart = chat.indexOf('NEVER CLAIM AN ACTION')
+  const honestyEnd = (() => {
+    const rest = chat.slice(honestyStart)
+    const next = rest.indexOf('\n=== ', 40)
+    return next > 0 ? honestyStart + next : chat.length
+  })()
+  const honesty = chat.slice(honestyStart, honestyEnd)
+  check('...it names the tool to use instead', /propose_session_activity_swap/.test(honesty))
   check('...and tells it to say so plainly when it has no tool',
-    /cannot do it from chat|can't do that from here/i.test(chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 1600)))
+    /cannot do it from chat|can't do that from here/i.test(honesty))
 }
 
 console.log('\n3b. Resting a day is a tool too, and an intention is not an appointment')
@@ -109,7 +150,14 @@ console.log('\n3b. Resting a day is a tool too, and an intention is not an appoi
   check('...and the server writes nothing itself',
     !body.includes('workout_sessions') && !body.includes('PATCH'), body.slice(0, 200))
 
-  const rule = chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 2600)
+  // Same re-anchor as §3: the section, not a character count.
+  const ruleStart = chat.indexOf('NEVER CLAIM AN ACTION')
+  const ruleEnd = (() => {
+    const rest = chat.slice(ruleStart)
+    const next = rest.indexOf('\n=== ', 40)
+    return next > 0 ? ruleStart + next : chat.length
+  })()
+  const rule = chat.slice(ruleStart, ruleEnd)
   check('the honesty rule names propose_rest_day as the thing to call',
     /propose_rest_day/.test(rule), rule.slice(0, 200))
   check('...and says nothing has happened until the user confirms',
@@ -628,7 +676,7 @@ console.log('\n6b. A second sport is a tool, not a memory note — and not the o
   const g = chat.slice(chat.indexOf('=== 3g.'), chat.indexOf('=== 4. TAG HYGIENE'))
   check('§3g exists', g.length > 200, g.length)
   check('...and names all three look-alike sentences with their tools',
-    /swap_session_for_activity/.test(g) && /propose_schedule_change/.test(g) && /propose_concurrent_activity/.test(g))
+    /propose_session_activity_swap/.test(g) && /propose_schedule_change/.test(g) && /propose_concurrent_activity/.test(g))
   check('...says it never guesses the days', /Never guess days/.test(g))
   check('...and that one class day may still carry a heavy session', /still carries a heavy session/.test(g))
   check('the memory-note precedence rule names it too',
@@ -837,19 +885,26 @@ console.log('\nThe coach speaks after a tool runs, and the server reads the mess
   check('the prompt names the judgement question', /is a COACHING question about food they named/.test(code))
   check('...and tells the model what a tool result is for', /=== 1f\. AFTER A TOOL RUNS ===/.test(code))
 
-  // The swap tool is honest about what it wrote.
-  const swap = code.slice(code.indexOf('name === "swap_session_for_activity"'), code.indexOf('if (name === "log_meal")'))
+  // THE SWAP TOOL IS A COURIER NOW, so what it must be honest about changed.
+  // REWRITTEN 15 Sep 2026 with the rail. Four of these checks used to pin the
+  // write path — the read-before-insert, the no-double-insert, the "may not
+  // say logged" forbid — and every one of them was correct about code that has
+  // moved to the client's confirm arm. What SURVIVES the move is the pair of
+  // rules the 8 Sep incident bought: a duration only when she said it, and
+  // nothing logged for a class that has not happened. Those now guard a card.
+  const swap = code.slice(code.indexOf('name === "propose_session_activity_swap"'), code.indexOf('if (name === "log_meal")'))
+  check('the swap handler slice is real', swap.length > 500, swap.length)
   check('a combined sentence — session later, activity today — becomes a move card, not a swap', /if \(sessionStillHappening\) \{[\s\S]{0,700}kind: "propose_session_move"/.test(swap))
-  check('the activity is logged only if it has happened', /if \(dbSuccess && !activityPlanned\)/.test(swap))
-  check('...only at a duration SHE stated', /const durationStated = [\s\S]{0,200}statedDurations\.some/.test(swap) && /else if \(durationStated\)/.test(swap))
-  // MUTATION-HARDENED: a first version only saw the GET's URL, and survived
-  // a swap that fetched the rows and ignored them. What must hold is that the
-  // rows the GET returned are what decides whether the insert runs.
-  check('...and never twice: it looks before it inserts, and what it finds decides',
-    /const existingRows = already\.ok \? await already\.json\(\) : \[\];[\s\S]{0,120}if \(Array\.isArray\(existingRows\) && existingRows\.length > 0\) \{[\s\S]{0,80}activityLogged = true;[\s\S]{0,40}\} else if \(durationStated\)/.test(swap))
-  const futureFloor = /activityPlanned\s*\?\s*`([^`]*)`/.exec(swap)?.[1] ?? ''
-  check('a class still to come: the day is marked, nothing is called logged', futureFloor.length > 0 && !/\blogged\b/i.test(futureFloor) && /how long/.test(futureFloor), futureFloor)
-  check('...and the model may not say "logged" either unless a row exists', /forbid: activityLogged \? \[\] : \[\/\\blogged\\b\/i/.test(swap))
+  // ORDER, NOT TEXT: the move re-route has to be tested BEFORE the swap
+  // proposal returns, or a sentence that says both writes the day off.
+  check('...and that test comes first', swap.indexOf('sessionStillHappening') < swap.indexOf('kind: "propose_session_activity_swap"'))
+  check('whether the activity has happened yet is read, not assumed', /activity_planned: eventTiming\(message, activityName\) === "future"/.test(swap))
+  check('a duration is forwarded only at a figure SHE stated',
+    /saidMinutes = statedDurationsMinutes\(message\)/.test(swap) && /saidMinutes\.some\(\(d\) => Math\.abs\(d - modelMinutes\) <= 1\)/.test(swap))
+  check('...and never a guess: no stated figure means null, not a number', /: null,/.test(swap))
+  // D1: a proposal turn returns no prose, so there is no sentence on this path
+  // for the model to get wrong. That is what replaces the old forbid-list.
+  check('the turn carries no prose of its own', /reply: "",/.test(swap))
 
   // The two other handlers that author English go through the same pass.
   check('a weigh-in reply must quote her number', /mustContain: \[`\$\{weightKg\}`\]/.test(code))

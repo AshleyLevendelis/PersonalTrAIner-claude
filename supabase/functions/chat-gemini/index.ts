@@ -4,6 +4,7 @@ import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.t
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
+import { detectPlanClaim, planClaimFloorText } from "../_shared/plan-claim.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
 import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming } from "../_shared/message-evidence.ts";
 
@@ -879,7 +880,7 @@ const toolDeclarations = [
   {
     name: "propose_concurrent_activity",
     description:
-      "PROPOSES recording a second sport or class the user does OUTSIDE this plan on a STANDING weekly schedule ('I also do Muay Thai on Tuesday and Thursday evenings', 'I play five-a-side every Wednesday night', 'I run with a club on Saturday mornings'), then rebuilding the plan from the live week forward so the LIGHTER gym sessions land on those days and no extra cardio is prescribed on them. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Total lifting work is unchanged UNLESS the sport counts as training load (two or more sessions a week, or one hard/combat session) — then the plan ALSO comes down one recovery notch and the card shows the working-set count before and after, with a one-tap Revert to full volume on the workout card. If the same sentence ALSO states which days they train in the gym ('I train Mon/Tue/Thu/Fri and I also do Muay Thai…') pass the COMPLETE gym-day list in training_days so it is one card, not two; and if they state when their gym sessions are ('in the mornings'), pass gym_time_of_day. NOT for a one-off ('I'm doing Muay Thai instead of legs tonight' is swap_session_for_activity) and NOT for a day they simply can't train (that is propose_schedule_change). Never guess a time of day, an intensity, or the days — if they didn't say which days, ask before calling.",
+      "PROPOSES recording a second sport or class the user does OUTSIDE this plan on a STANDING weekly schedule ('I also do Muay Thai on Tuesday and Thursday evenings', 'I play five-a-side every Wednesday night', 'I run with a club on Saturday mornings'), then rebuilding the plan from the live week forward so the LIGHTER gym sessions land on those days and no extra cardio is prescribed on them. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Total lifting work is unchanged UNLESS the sport counts as training load (two or more sessions a week, or one hard/combat session) — then the plan ALSO comes down one recovery notch and the card shows the working-set count before and after, with a one-tap Revert to full volume on the workout card. If the same sentence ALSO states which days they train in the gym ('I train Mon/Tue/Thu/Fri and I also do Muay Thai…') pass the COMPLETE gym-day list in training_days so it is one card, not two; and if they state when their gym sessions are ('in the mornings'), pass gym_time_of_day. NOT for a one-off ('I'm doing Muay Thai instead of legs tonight' is propose_session_activity_swap) and NOT for a day they simply can't train (that is propose_schedule_change). Never guess a time of day, an intensity, or the days — if they didn't say which days, ask before calling.",
     parameters: {
       type: "object",
       properties: {
@@ -935,7 +936,7 @@ const toolDeclarations = [
   {
     name: "propose_session_move",
     description:
-      "PROPOSES running ONE prescribed session on a different day this week — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say a session is not happening when the plan says but IS still happening: 'I'll do it tomorrow', 'can I move today's session to Thursday', 'I'll make Tuesday's up later in the week'. THE DIFFERENCE FROM THE OTHER TWO DAY TOOLS IS WHETHER THE WORK STILL HAPPENS: propose_rest_day is for a day they are writing off ('taking today off'), swap_session_for_activity is for a day they replaced with something else ('Muay Thai instead'), and this one is for a day they are simply doing later. Do NOT call it for a lasting change to which weekdays they train — that is propose_schedule_change — and do not call it for a session they already logged. YOU DO NOT PICK THE DAY: pass the day they named and the app resolves where it can actually go, because a day that already has a session on it cannot take a second one. If they name no day at all, omit to_date and the app takes the soonest free day. Never say the session has been moved: they tap Confirm, and until they do nothing has happened.",
+      "PROPOSES running ONE prescribed session on a different day this week — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say a session is not happening when the plan says but IS still happening: 'I'll do it tomorrow', 'can I move today's session to Thursday', 'I'll make Tuesday's up later in the week'. THE DIFFERENCE FROM THE OTHER TWO DAY TOOLS IS WHETHER THE WORK STILL HAPPENS: propose_rest_day is for a day they are writing off ('taking today off'), propose_session_activity_swap is for a day they replaced with something else ('Muay Thai instead'), and this one is for a day they are simply doing later. Do NOT call it for a lasting change to which weekdays they train — that is propose_schedule_change — and do not call it for a session they already logged. YOU DO NOT PICK THE DAY: pass the day they named and the app resolves where it can actually go, because a day that already has a session on it cannot take a second one. If they name no day at all, omit to_date and the app takes the soonest free day. Never say the session has been moved: they tap Confirm, and until they do nothing has happened.",
     parameters: {
       type: "object",
       properties: {
@@ -970,7 +971,7 @@ const toolDeclarations = [
   {
     name: "propose_rest_day",
     description:
-      "PROPOSES recording a prescribed training day as a rest the user chose, so it stops counting as a missed session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say they are not training a day and name NOTHING they are doing instead ('rest day today', 'taking today off', 'not training tomorrow, just resting'). If they name a replacement activity, that is swap_session_for_activity instead, not this — this tool records rest, and would throw away the activity. Do not call it for a day with no session prescribed (there is nothing to rest from), for a session they already logged, or when they are thinking out loud rather than telling you ('should I take today off?' is a question — answer it).",
+      "PROPOSES recording a prescribed training day as a rest the user chose, so it stops counting as a missed session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say they are not training a day and name NOTHING they are doing instead ('rest day today', 'taking today off', 'not training tomorrow, just resting'). If they name a replacement activity, that is propose_session_activity_swap instead, not this — this tool records rest, and would throw away the activity. Do not call it for a day with no session prescribed (there is nothing to rest from), for a session they already logged, or when they are thinking out loud rather than telling you ('should I take today off?' is a question — answer it).",
     parameters: {
       type: "object",
       properties: {
@@ -993,7 +994,7 @@ const toolDeclarations = [
   {
     name: "propose_missed_session",
     description:
-      "PROPOSES recording a prescribed training day as MISSED — the session did not happen and nothing replaced it — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they tell you they skipped or missed a session and are not calling it a rest ('I missed yesterday', 'didn't train Monday', 'skipped it', 'mark it missed'). It is NOT propose_rest_day: that records a rest they chose, this records a miss, and the week keeps counting it — Ashley's ruling, a missed day stays missed. It is NOT swap_session_for_activity: if they name something they did instead, use that. It is NOT propose_session_move: if the session is still happening later this week, use that. Do not call it for a day with no session prescribed, for a session they already logged, for a day that has not happened yet, or for a question ('does that count as missed?' — answer it).",
+      "PROPOSES recording a prescribed training day as MISSED — the session did not happen and nothing replaced it — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they tell you they skipped or missed a session and are not calling it a rest ('I missed yesterday', 'didn't train Monday', 'skipped it', 'mark it missed'). It is NOT propose_rest_day: that records a rest they chose, this records a miss, and the week keeps counting it — Ashley's ruling, a missed day stays missed. It is NOT propose_session_activity_swap: if they name something they did instead, use that. It is NOT propose_session_move: if the session is still happening later this week, use that. Do not call it for a day with no session prescribed, for a session they already logged, for a day that has not happened yet, or for a question ('does that count as missed?' — answer it).",
     parameters: {
       type: "object",
       properties: {
@@ -1011,6 +1012,37 @@ const toolDeclarations = [
         },
       },
       required: ["origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_session_activity_swap",
+    description:
+      "PROPOSES marking a day's prescribed lifting as swapped for something they are doing instead — this does NOT apply anything, the app shows a card and the user taps Confirm. Call when the user says they are NOT doing their prescribed lifting session on a given day and names what they are doing instead ('skipping weights today but I'm doing Muay Thai in the evening', 'no gym tonight, playing football', 'swapping legs for a long run'). The card marks that day as a deliberate swap rather than a missed session, and logs the activity towards their streak. NOT propose_missed_session (nothing replaced it), NOT propose_session_move (the session is still happening later this week), NOT log_workout (a workout they already did ALONGSIDE their lifting), and not for a hypothetical ('what if I skipped'). If they say they are skipping but name no activity, ask what they are doing instead before calling. A STATEMENT IS ENOUGH: 'I'm not going to hit that session, I'm doing Muay Thai instead' is exactly this tool. It needs no command verb and takes no origin_verbatim_quote — telling you what they are doing IS the request. Never say the day has been swapped in your own words: the card asks, and they answer it.",
+    parameters: {
+      type: "object",
+      properties: {
+        activity_name: {
+          type: "string",
+          description: "What they are doing instead, in their own words, e.g. 'Muay Thai', 'five-a-side football', 'long run'",
+        },
+        duration_minutes: {
+          type: "number",
+          description: "How long the activity is, if they said. Omit if they didn't — do not guess.",
+        },
+        intensity_rpe: {
+          type: "number",
+          description: "Perceived effort 1-10, if they said or it is obvious from how they described it. Omit if unclear.",
+        },
+        date: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD) of the day being swapped. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message saying the session is not happening and naming what is instead. Copy it verbatim, do not paraphrase. It does NOT have to be a command — 'not going to hit that session in going to do muay thai instead' is a perfectly good quote.",
+        },
+      },
+      required: ["activity_name", "origin_verbatim_quote"],
     },
   },
   {
@@ -1112,33 +1144,6 @@ const toolDeclarations = [
         },
       },
       required: ["weight_kg"],
-    },
-  },
-  {
-    name: "swap_session_for_activity",
-    description:
-      "Call when the user says they are NOT doing their prescribed lifting session on a given day and names what they are doing instead (e.g. 'skipping weights today but I'm doing Muay Thai in the evening', 'no gym tonight, playing football', 'swapping legs for a long run'). Marks that day's lifting as a deliberate swap rather than a missed session, and records the activity so it counts toward their streak. Do NOT call this when they simply missed a session with no replacement, when they are asking hypothetically ('what if I skipped'), or when they describe a workout they ALREADY completed alongside their lifting — that is log_workout. If they say they are skipping but name no activity, ask what they are doing instead before calling.",
-    parameters: {
-      type: "object",
-      properties: {
-        activity_name: {
-          type: "string",
-          description: "What they are doing instead, in their own words, e.g. 'Muay Thai', 'five-a-side football', 'long run'",
-        },
-        duration_minutes: {
-          type: "number",
-          description: "How long the activity is, if they said. Omit if they didn't — do not guess.",
-        },
-        intensity_rpe: {
-          type: "number",
-          description: "Perceived effort 1-10, if they said or it is obvious from how they described it. Omit if unclear.",
-        },
-        date: {
-          type: "string",
-          description: "ISO date (YYYY-MM-DD) of the day being swapped. Omit for today.",
-        },
-      },
-      required: ["activity_name"],
     },
   },
   {
@@ -1848,7 +1853,7 @@ When the user tells you about something they do OUTSIDE this plan on a regular w
 - Call propose_concurrent_activity with the name, the days they stated, and the time of day ONLY if they said it. If the same message also says which days they train in the gym, pass the complete gym-day list as training_days so it is ONE card, not a schedule card and then an activity card — two cards for one sentence reads as not listening. If it also says when their gym sessions are ("in the mornings"), pass gym_time_of_day.
 - What the card does, and say so in a sentence: the plan is rebuilt from this week forward so the LIGHTER gym sessions fall on the class days and no extra cardio is prescribed on those nights — the classes are the cardio. If the sport is TWO OR MORE sessions a week, or ONE hard/combat session (Muay Thai, sparring, a hard club run), the lifting ALSO comes down one recovery notch — the card shows the working-set count before and after, and the workout card carries a one-tap Revert to full volume. A single gentle class (yoga, mobility) only changes which weekday carries which session. Weeks already logged are untouched.
 - A four-day week has a fixed shape. If the card says one class day still carries a heavy session, that is honest — do not promise every class day got a light one.
-- THREE SENTENCES THAT LOOK ALIKE AND ARE NOT: "I do Muay Thai every Tuesday" is THIS tool (a standing commitment, the plan bends around it). "I'm doing Muay Thai instead of legs tonight" is swap_session_for_activity (one day, marked as a deliberate swap). "I can't train on Tuesdays" is propose_schedule_change (a gym day removed). Pick by what they said, and if it is genuinely unclear whether a session is one-off or every week, ask.
+- THREE SENTENCES THAT LOOK ALIKE AND ARE NOT: "I do Muay Thai every Tuesday" is THIS tool (a standing commitment, the plan bends around it). "I'm doing Muay Thai instead of legs tonight" is propose_session_activity_swap (one day, marked as a deliberate swap). "I can't train on Tuesdays" is propose_schedule_change (a gym day removed). Pick by what they said, and if it is genuinely unclear whether a session is one-off or every week, ask.
 - Never guess days, time of day or intensity. If they say "twice a week" without naming the days, ask which days before calling — a plan reorganised around the wrong evenings is worse than one that did not move.
 
 === 4. TAG HYGIENE & QUICK REPLIES ===
@@ -2067,7 +2072,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_concurrent_activity per §3d/§3e/§3f/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all four show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
 - Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — ANSWER IT IN TEXT; this tool is for what they are actually having. (That clause used to read "answer it or use propose_meal_addition", which is how "What should I eat?" produced a card offering to replace a real user's lunch on 8 Sep 2026. A question is never a trigger for either tool.)
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
-- Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is swap_session_for_activity; if the session is happening later this week, propose_session_move.
+- Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is propose_session_activity_swap; if the session is happening later this week, propose_session_move.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
@@ -2235,7 +2240,7 @@ SESSION PLANNING RULES:
 
 NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
-2. When the user says they are skipping their lifting for something else and names it, call swap_session_for_activity. That is the tool for exactly this, and it is the only thing that changes what the Exercise tab shows.
+2. When the user says they are skipping their lifting for something else and names it, call propose_session_activity_swap. That is the tool for exactly this, and its card is the only thing that changes what the Exercise tab shows. A PLAIN STATEMENT IS ENOUGH TO CALL IT — "I'm not going to hit that session, I'm doing Muay Thai instead" needs no command verb and no please. The rule further down about not calling a tool for a sentence with no imperative verb is about propose_meal_swap and propose_exercise_swap, where the user is ordering a change to the plan's content; it does NOT apply to the four day tools, where telling you what is happening to their day IS the request. Answering that sentence in prose is the failure this rule exists to stop: measured live twice, 25 Aug and 15 Sep 2026, both times about Muay Thai, both times with the coach saying the day was sorted when nothing had been written.
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
 3b. When they say a session did NOT happen and name nothing in its place and do not call it a rest — "I missed yesterday", "didn't train Monday", "mark it missed" — call propose_missed_session. A miss is not a rest: never answer a miss with propose_rest_day unless they say it was a rest. It shows a card; until they confirm, nothing has happened, so do not say it has.
 4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food, the Exercise tab for banning a movement. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
@@ -2244,9 +2249,9 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 
 6b. THE FOUR EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order; propose_exercise_add puts a new slot in and takes nothing out, which makes the session longer. None of them bans — ban_exercise is every week of every block, and its card says how many sessions that reaches before you confirm. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
 
-7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
+7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, propose_session_activity_swap replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
-8. WHEN ONE SENTENCE SAYS BOTH — the session is happening LATER and they are doing something else TODAY ("I didn't train this morning but I'm going to Muay Thai tonight and will do this morning's session tomorrow") — it is a MOVE. Call propose_session_move, and pass what they are doing today as also_doing_activity (and also_doing_duration_minutes ONLY if they said how long). Do not call swap_session_for_activity for it: a swap writes the session off, and they have just told you it is still happening.
+8. WHEN ONE SENTENCE SAYS BOTH — the session is happening LATER and they are doing something else TODAY ("I didn't train this morning but I'm going to Muay Thai tonight and will do this morning's session tomorrow") — it is a MOVE. Call propose_session_move, and pass what they are doing today as also_doing_activity (and also_doing_duration_minutes ONLY if they said how long). Do not call propose_session_activity_swap for it: a swap writes the session off, and they have just told you it is still happening.
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
@@ -2902,20 +2907,29 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
-      if (name === "swap_session_for_activity") {
-        // Ashley told the coach she was doing Muay Thai instead of weights.
-        // It replied "I'll make sure today is marked as a rest day for
-        // lifting" and did nothing, because until this tool existed nothing
-        // could: no tool touched a day's status at all. Worse than a no-op —
-        // classifyDay ends `dateStr < todayStr ? 'missed' : 'due'`, so the day
-        // she announced IN ADVANCE showed as missed the next morning.
+      if (name === "propose_session_activity_swap") {
+        // WHY THIS TOOL EXISTS, 25 Aug 2026. Ashley told the coach she was
+        // doing Muay Thai instead of weights. It replied "I'll make sure today
+        // is marked as a rest day for lifting" and did nothing, because until
+        // this tool existed nothing could: no tool touched a day's status at
+        // all. Worse than a no-op — classifyDay ends
+        // `dateStr < todayStr ? 'missed' : 'due'`, so the day she announced IN
+        // ADVANCE showed as missed the next morning.
         //
-        // The trap here is documented on update_workout_schedule, which is
-        // disabled because it "used to write to a profile field the app
-        // doesn't actually render from, so schedule 'changes' looked applied
-        // in chat but never showed up on the Exercise tab." So this writes
-        // only to workout_sessions and cardio_logs — the two tables the
-        // Exercise tab and the streak actually read.
+        // AND WHY IT PROPOSES RATHER THAN WRITES, 15 Sep 2026. The same
+        // sentence came back — "I've swapped out today's lifting session for
+        // Muay Thai on your schedule", no card, nothing to tap. Giving the
+        // model a tool that writes fixed the 25 Aug lie and left a second
+        // problem standing: her record changed without her agreeing to it.
+        // Ashley's ruling, from three options — ask first, like the others.
+        //
+        // The trap this tool was written around still holds and still applies
+        // to the CONFIRM path: update_workout_schedule is disabled because it
+        // "used to write to a profile field the app doesn't actually render
+        // from, so schedule 'changes' looked applied in chat but never showed
+        // up on the Exercise tab." So the client's executor touches
+        // workout_sessions and cardio_logs, the two tables the Exercise tab
+        // and the streak actually read, and nothing else.
         const profileId = context.profile_id;
         const activityName = typeof args.activity_name === "string" ? args.activity_name.trim() : "";
         if (!profileId || !activityName) {
@@ -2966,140 +2980,47 @@ Keep this context in mind to ensure your greetings and questions naturally align
           );
         }
 
-        let dbSuccess = true;
-        try {
-          const restHeaders = {
-            Authorization: `Bearer ${serviceKey}`,
-            Apikey: serviceKey,
-            "Content-Type": "application/json",
-          };
-          // Read before write, rather than an upsert. workout_sessions.
-          // split_type is NOT NULL with no default, so an upsert payload would
-          // have to carry it — and would then overwrite a real session's split
-          // with a placeholder whenever the row already existed.
-          const existing = await fetch(
-            `${supabaseUrl}/rest/v1/workout_sessions?profile_id=eq.${profileId}&date=eq.${swapDate}&select=id`,
-            { headers: restHeaders }
-          );
-          const rows = existing.ok ? await existing.json() : [];
-          const sessionId = Array.isArray(rows) && rows.length > 0 ? rows[0].id : null;
-
-          const resp = sessionId
-            ? await fetch(`${supabaseUrl}/rest/v1/workout_sessions?id=eq.${sessionId}`, {
-                method: "PATCH",
-                headers: { ...restHeaders, Prefer: "return=minimal" },
-                body: JSON.stringify({ swapped_for_activity: activityName, updated_at: new Date().toISOString() }),
-              })
-            : await fetch(`${supabaseUrl}/rest/v1/workout_sessions`, {
-                method: "POST",
-                headers: { ...restHeaders, Prefer: "return=minimal" },
-                // 'swapped' names what this row is rather than borrowing a
-                // training split it never had; 0 is the honest LIFTING
-                // duration. What they actually did, and for how long, is the
-                // cardio_logs row below.
-                body: JSON.stringify({
-                  profile_id: profileId,
-                  date: swapDate,
-                  split_type: "swapped",
-                  duration_minutes: 0,
-                  is_completed: false,
-                  swapped_for_activity: activityName,
-                }),
-              });
-          if (!resp.ok) {
-            console.error(`workout_sessions swap write failed: ${resp.status}`, await resp.text());
-            dbSuccess = false;
-          }
-        } catch (err) {
-          console.error("swap_session_for_activity error:", err);
-          dbSuccess = false;
-        }
-
-        // The activity itself — only when THEY said how long, and only when
-        // it has happened. 8 Sep 2026, production rows: the model guessed 60
-        // minutes (its own schema says not to) for a class still hours away,
-        // and two turns about the same evening produced two rows. So the
-        // duration has to echo a figure in their own message; an activity
-        // that is still to come marks the day but logs nothing (the coach
-        // asks how long afterwards); and a row already there for this
-        // activity on this date is reused, never doubled.
-        const durationMinutes = Number(args.duration_minutes);
-        const statedDurations = statedDurationsMinutes(message);
-        const durationStated = Number.isFinite(durationMinutes) && durationMinutes > 0 && durationMinutes <= 600
-          && statedDurations.some((d) => Math.abs(d - durationMinutes) <= 1);
-        const activityTiming = eventTiming(message, activityName);
-        const activityPlanned = activityTiming === "future";
-        let activityLogged = false;
-        if (dbSuccess && !activityPlanned) {
-          const rpe = Number(args.intensity_rpe);
-          const cardioHeaders = {
-            Authorization: `Bearer ${serviceKey}`,
-            Apikey: serviceKey,
-            "Content-Type": "application/json",
-          };
-          try {
-            const already = await fetch(
-              `${supabaseUrl}/rest/v1/cardio_logs?user_id=eq.${profileId}&date=eq.${swapDate}&activity_name=ilike.${encodeURIComponent(activityName)}&select=id`,
-              { headers: cardioHeaders }
-            );
-            const existingRows = already.ok ? await already.json() : [];
-            if (Array.isArray(existingRows) && existingRows.length > 0) {
-              activityLogged = true;
-            } else if (durationStated) {
-              const resp = await fetch(`${supabaseUrl}/rest/v1/cardio_logs`, {
-                method: "POST",
-                headers: { ...cardioHeaders, Prefer: "return=minimal" },
-                body: JSON.stringify({
-                  user_id: profileId,
-                  date: swapDate,
-                  activity_name: activityName,
-                  duration_minutes: Math.round(durationMinutes),
-                  intensity_rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : 6,
-                  notes: "Swapped in place of the prescribed lifting session",
-                }),
-              });
-              activityLogged = resp.ok;
-              if (!resp.ok) console.error(`cardio_logs insert failed: ${resp.status}`, await resp.text());
-            }
-          } catch (err) {
-            console.error("swap activity log error:", err);
-          }
-        }
-
-        // Never claims more than happened — the whole reason this tool exists
-        // is a reply that claimed more than happened. The floor says exactly
-        // what was written; the model may say it in its own words, and may
-        // not say "logged" unless a row exists.
-        const dayWord = swapDate === context.current_local_date ? "today" : "that day";
-        const swapFloor = !dbSuccess
-          ? "I couldn't update that day just now — give it another go in a moment."
-          : activityLogged
-            ? `Done — ${dayWord} is marked as ${activityName} instead of lifting, and the session is logged.`
-            : activityPlanned
-              ? `${activityName} is down for ${dayWord} instead of the lift. Tell me how long it went afterwards and I'll log it.`
-              : `Done — ${dayWord} is marked as ${activityName} instead of lifting. Tell me how long it was and I'll log it properly.`;
-        const confirmText = !dbSuccess
-          ? swapFloor
-          : (await toolReply({
-              outcome: {
-                name, args,
-                response: {
-                  status: "swapped", date: swapDate, activity: activityName,
-                  activity_logged: activityLogged, activity_planned: activityPlanned,
-                  duration_minutes: activityLogged && durationStated ? Math.round(durationMinutes) : null,
-                },
-              },
-              floor: swapFloor,
-              preferFirstLegText: true,
-              forbid: activityLogged ? [] : [/\blogged\b/i, /\brecorded\b/i],
-            })).reply;
-
+        // ASHLEY'S RULING, 15 Sep 2026, from three options: ASK FIRST, LIKE
+        // THE OTHERS. This tool predates the "record it, but confirm first"
+        // ruling of 31 Aug by six days — it was built on 25 Aug to stop the
+        // coach SAYING it had marked a day when nothing in the app could — and
+        // it is the only day-verb that never came back onto the rail
+        // afterwards. Its three siblings (rest, missed, move) all propose. So
+        // NOTHING IS WRITTEN HERE: the card asks, and on Confirm the client
+        // executes through the same daily-tracking writer the Exercise screen
+        // uses — which is also what keeps swapped_for_activity to one writer.
+        //
+        // D1: a turn carrying a proposal returns NO prose. Every word on the
+        // card is the client's, so there is no sentence left here for the
+        // model to get wrong, which is the complaint this answers.
+        const modelMinutes = Number(args.duration_minutes);
+        const saidMinutes = statedDurationsMinutes(message);
+        const rpe = Number(args.intensity_rpe);
         return new Response(
           JSON.stringify({
-            reply: confirmText,
-            action: dbSuccess
-              ? { type: "swap_session_for_activity", activity_name: activityName, date: swapDate, activity_logged: activityLogged, activity_planned: activityPlanned }
-              : undefined,
+            reply: "",
+            proposal: {
+              kind: "propose_session_activity_swap",
+              rawArgs: {
+                date: swapDate,
+                activity_name: activityName,
+                // ONLY A FIGURE SHE ACTUALLY SAID — the rule the write path
+                // enforced before this card existed, and the reason it did:
+                // 8 Sep 2026, in production, the model invented 60 minutes for
+                // a class still hours away. Its own schema says not to guess;
+                // it guessed. So a duration counts only when it echoes one in
+                // her own message.
+                duration_minutes: Number.isFinite(modelMinutes) && modelMinutes > 0 && modelMinutes <= 600
+                  && saidMinutes.some((d) => Math.abs(d - modelMinutes) <= 1)
+                  ? Math.round(modelMinutes)
+                  : null,
+                intensity_rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : null,
+                // Still to come, so there is nothing to log yet: the card says
+                // it marks the day, and the coach asks how long afterwards.
+                // Carried from the write path rather than re-derived.
+                activity_planned: eventTiming(message, activityName) === "future",
+              },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -3913,11 +3834,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
     // clear; it is the model skipping a turn. That is precisely the shape that
     // made the previous tone rewrite (fa683fc) silently stop answering 4 of 7
     // turns, so the persona work goes in behind this, not in front of it.
+    // A TURN THAT CALLED NO TOOL WROTE NOTHING, so it may not say it wrote
+    // something. 15 Sep 2026: "I've swapped out today's lifting session for
+    // Muay Thai on your schedule" — no tool, no row, straight to her screen,
+    // and she reported the chat as lying to her. The prompt forbids that
+    // sentence in four places; the model said it anyway.
+    //
+    // THE FLOOR IS AN OFFER, NOT AN APOLOGY. A dead end here would be its own
+    // defect — she asked for something the app can plainly do. So the refusal
+    // owns the mistake in one clause and then offers the thing, with chips
+    // whose words route to a real tool on the next turn.
+    const claimFloor = planClaimFloorText();
     const plain = await resolvePlainReply({
       contents,
       firstParts: parts,
       callGemini: callLeg,
       floor: "I'm not sure I followed that one — tell me a bit more and I'll pick it up.",
+      refuse: detectPlanClaim,
+      refusedFloor: claimFloor,
       log: console.error,
     });
     console.log(`plain-reply source=${plain.source} legs=${plain.legs}`);

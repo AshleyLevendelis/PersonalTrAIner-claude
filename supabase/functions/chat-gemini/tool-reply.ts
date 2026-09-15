@@ -190,19 +190,67 @@ export interface PlainReplyOptions {
   callGemini: GeminiLegCaller;
   /** Today's server-authored last resort. Always non-empty. */
   floor: string;
+  /**
+   * None of these may match the reply or it is refused — the SAME guard
+   * ToolReplyOptions has carried since it existed.
+   *
+   * THE ASYMMETRY THIS CLOSES, 15 Sep 2026. A tool turn had mustContain and
+   * forbid; a plain turn had nothing, and shipped whatever the model said. But
+   * the plain turn is the one where the model is UNSUPERVISED: no tool ran, so
+   * no server-authored floor constrains what it may claim. The unguarded path
+   * was the unwatched one. Ashley's screenshot: "I've swapped out today's
+   * lifting session for Muay Thai on your schedule", no tool call, nothing
+   * written, straight to her screen.
+   */
+  forbid?: RegExp[];
+  /**
+   * A refusal that a regex cannot express. The plan-claim rule is decided
+   * sentence by sentence with a hedge veto, so it is a function, not a
+   * pattern — returns the offending sentence, or null.
+   */
+  refuse?: (text: string) => string | null;
+  /** The floor to use when `refuse` fired, rather than the generic one. */
+  refusedFloor?: string;
+  /** Replaces PLAIN_TURN_NUDGE when the retry needs to say what was wrong. */
+  nudge?: string;
   log?: (...args: unknown[]) => void;
 }
 
+/**
+ * The retry when the model claimed a change it did not make. PLAIN_TURN_NUDGE
+ * is for a turn that said NOTHING; this is for one that said too much, and the
+ * difference has to be in the words or the retry repeats the offence.
+ */
+export const PLAIN_CLAIM_NUDGE =
+  "(System: your last turn told them their plan or their day had already been changed. It has not been. You called no tool this turn, so nothing was written anywhere and nothing on their screen has moved. Answer them again now, in your own voice, WITHOUT claiming any change has happened. If they want something changed, say what you can do and offer to do it — never report it as done.)";
+
 export async function resolvePlainReply(opts: PlainReplyOptions): Promise<ToolReplyResult> {
   const log = opts.log ?? (() => {});
+  const forbid = opts.forbid ?? [];
+  const refuseReason = (t: string): string | null =>
+    guardReason(t, [], forbid) ?? (opts.refuse ? opts.refuse(t) : null);
+
+  let refused = false;
   const own = sanitizeReply(textOf(opts.firstParts));
-  if (own) return { reply: own, source: "first_leg", legs: 0 };
+  if (own) {
+    // THE ONE CHECK THAT WAS MISSING. guardReason already existed, already
+    // exported, already ran on every tool turn — it had simply never been
+    // pointed at this path, the one where the model is unsupervised.
+    const why = refuseReason(own);
+    if (!why) return { reply: own, source: "first_leg", legs: 0 };
+    refused = true;
+    log("plain-reply: first-leg text refused", { why, text: own.slice(0, 160) });
+  }
+  // A SILENT TURN AND A REFUSED ONE NEED DIFFERENT WORDS. Retrying a false
+  // claim with "you produced no message at all" tells the model something
+  // untrue about itself and invites the same sentence straight back.
+  const nudge = refused ? (opts.nudge ?? PLAIN_CLAIM_NUDGE) : PLAIN_TURN_NUDGE;
 
   let legs = 0;
   for (let attempt = 0; attempt < 2; attempt++) {
     legs++;
     const leg = await opts.callGemini(
-      [...opts.contents, { role: "user", parts: [{ text: PLAIN_TURN_NUDGE }] }],
+      [...opts.contents, { role: "user", parts: [{ text: nudge }] }],
       false,
     );
     if (!leg.ok) {
@@ -214,9 +262,21 @@ export async function resolvePlainReply(opts: PlainReplyOptions): Promise<ToolRe
     const dropped = callsOf(leg.parts);
     if (dropped.length > 0) log("plain-reply: retry returned calls with tools off — dropped", dropped.map((c) => c.name));
     const text = sanitizeReply(textOf(leg.parts));
-    if (text) return { reply: text, source: "round_trip", legs };
+    if (text) {
+      const why = refuseReason(text);
+      if (!why) return { reply: text, source: "round_trip", legs };
+      // Twice is enough. The floor is server-authored and cannot claim
+      // anything, which is the whole point of having one.
+      refused = true;
+      log("plain-reply: retry refused by guard", { why, text: text.slice(0, 160) });
+      break;
+    }
     log("plain-reply: retry said nothing either");
     break;
   }
-  return { reply: opts.floor, source: "floor", legs };
+  // A REFUSED TURN GETS A DIFFERENT LAST RESORT. "I'm not sure I followed
+  // that one" is right for a model that said nothing and wrong for one that
+  // said too much — she was perfectly clear, and blaming her for it would be
+  // the app's second mistake in the same turn.
+  return { reply: refused && opts.refusedFloor ? opts.refusedFloor : opts.floor, source: "floor", legs };
 }

@@ -2,6 +2,77 @@
 
 Newest first. One line each.
 
+- [x] **FIXED — the coach told her it had changed her plan, and nothing made it
+  prove that.** Ashley, 15 Sep 2026, from the live app with a screenshot. She
+  typed *"Im not going to hit that session in going to do muay thai instead"*
+  and got *"I've swapped out today's lifting session for Muay Thai on your
+  schedule. Have a killer class tonight…"* — no card, no Confirm, no receipt.
+  Her verdict: **"The chat is still lying to me."** Two defects under one
+  sentence, and only one of them is about lying.
+  **1. THE ACTIVITY SWAP WAS THE ONLY DAY-VERB THAT NEVER ASKED — and the
+  history says why.** Measured, not inferred: the tool landed **25 Aug 2026**
+  (commit *"Let the coach actually mark a day swapped, instead of saying it
+  did"* — the original fix for this exact lie, same user, same Muay Thai, told
+  in the handler's own header). Ashley's **"record it, but confirm first"**
+  ruling came **31 Aug**, and `propose_rest_day` shipped on the rail that day.
+  Every day-verb built after it asks. This one was six days older and never
+  came back for it.
+  **HER RULING, 15 Sep, from three options: ASK FIRST, LIKE THE OTHERS.** She
+  rejected *do it, say what it cost, offer Undo* and *do it silently but
+  honestly*. So the coach now shows: *"I'll mark Wednesday as Muay Thai instead
+  of your lift, so it won't show as missed. Shall I?"* with the session it
+  replaces struck through, and **nothing is written until she taps Apply**. The
+  confirm goes through the same writer the day menu uses, so the coach and the
+  screen leave identical rows.
+  **2. A TURN WHERE THE MODEL CALLS NO TOOL WAS COMPLETELY UNPOLICED.** Every
+  defence the app has is entered through the tool call — the architecture doc
+  said so in as many words, *"Model free text is permitted only on turns that
+  produced no proposal and no execution"*. Skip the call, skip all five. Now a
+  shared detector refuses a completed-change claim on both sides of the wire,
+  and the floor is an **offer with chips**, not an apology: *"I haven't
+  actually changed anything — I got ahead of myself there."*
+  **THE THIRD TIME THIS CLASS HAS BEEN PAID FOR.** 31 Aug, *"I will mark today
+  as a rest day for you"* → fixed by adding a tool. 31 Aug, same conversation,
+  *"Got tomorrow morning locked in"* → fixed by **banning the phrase in the
+  prompt**. Today the tool existed and was not called, so neither answer was
+  available. The note written then holds: *a rule with no tool behind it is one
+  the model routes around.* The prompt forbids this sentence in four places.
+  **A HOLE IN THE HARNESS, found because this is the first driver that ever
+  tapped Apply on a coach proposal.** The fake database returned `data: null`
+  from every `update`, and `claimPendingAction` reads exactly that to decide
+  who won the claim — so every confirm in the harness wrote `status='claimed'`
+  and then returned `already_resolved` to its caller, which returns early. No
+  error anywhere. **So no browser driver before this one could have confirmed a
+  proposal**; the chat drivers all stop at the card. That is not a fact about
+  this change — it is a cap on what the harness could prove at all.
+  **Mutations: 23 attempted, 23 caught** — one only after strengthening. The
+  hedge veto in the detector survived being deleted, because nothing in the
+  corpus needed it; two sentences that describe what Confirm WILL do (*"Once
+  you tap Confirm, your schedule is updated"*) now make it load-bearing.
+  New: `test:no-false-claim`, `verify:no-tool-claim`, `verify:activity-swap`.
+  Re-anchored: `coach-promises` §2 and Phase 2 (they pinned the write path,
+  correctly, about code that has moved), `chat-actions` §4-5, `coach-parity`.
+  **TWO CHECKS OF MINE WERE WRONG IN WAYS WORTH KEEPING.** One asserted the
+  handler contains no `workout_sessions` and read the file WITH comments — the
+  header explaining where those writes went satisfied the check that they were
+  gone. The other three sliced a fixed 1,600 characters from the honesty rule's
+  heading; my longer rule 2 pushed rules 5 and 6 past the window, so the only
+  way to make them green would have been to say LESS about honesty. Both
+  re-anchored on the property.
+  **CORRECTED, a claim in my own plan:** I wrote that `test:coach-exam-fresh`
+  would go red because the prompt, model and tools all changed. It does not —
+  it short-circuits on `baselinePending: true` and exits green before it ever
+  compares the fingerprint. The exam has still never been run, and this change
+  makes the coach it would examine newer again. Green there is not evidence.
+  **NEEDS A DEPLOY:** `npm run deploy:functions:prod -- chat-gemini`. Both
+  halves are server-side. Frontend on merge.
+  **DELIBERATELY LEFT IN:** the client's old `swap_session_for_activity` action
+  branch, with a dated comment. The frontend merges on a push and the function
+  is deployed by hand afterwards; between the two, production still emits that
+  action, and deleting the branch early re-creates the *"Action failed — the
+  change was not applied"* defect this file already records. Remove it in a
+  follow-up commit **after** the deploy.
+
 - [x] **The full sweep, 15 Sep 2026 (second run): 229 gates, 3 failed, all
   three the same unreachable database.** `test:meal-quality` ("Host not in
   allowlist" on every one of its five profiles), `test:schema-parity` (could

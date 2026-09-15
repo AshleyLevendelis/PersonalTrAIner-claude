@@ -25,7 +25,7 @@ import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-pe
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
-import { setSessionMove, setDeliberateRest, setMarkedMissed } from './daily-tracking'
+import { setSessionMove, setDeliberateRest, setMarkedMissed, setSwappedForActivity } from './daily-tracking'
 import { saveCardioLog } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
@@ -1201,6 +1201,81 @@ export async function executeRestDay(
 /** Clears the flag. The day goes back to whatever it was — due, or missed. */
 export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
   await setDeliberateRest(profileId, payload.date, false)
+}
+
+// ---------------------------------------------------------------------------
+// "I'M DOING MUAY THAI INSTEAD" — now on the same rail as the other three.
+//
+// This was the FIRST of the four day-verbs to exist (25 Aug 2026) and the last
+// to ask. It was built to stop the coach SAYING a day was marked when nothing
+// could mark it, and it fixed that by writing immediately, server-side. Six
+// days later Ashley ruled on the rest-day version — "record it, but confirm
+// first" — and every day-verb built afterwards proposed. This one never came
+// back for it, so on 15 Sep 2026 the coach changed her record with no card and
+// no tap, and she reported it as the chat lying to her.
+//
+// THE WRITES ARE THE SCREEN'S, NOT A SECOND COPY. setSwappedForActivity and
+// saveCardioLog are exactly what WhatHappenedSheet's "I did something else
+// instead" calls, so the coach and the day menu leave identical rows — and
+// swapped_for_activity keeps the single client writer test:what-happened §3
+// pins.
+// ---------------------------------------------------------------------------
+
+export interface SwapForActivityPayload {
+  /** ISO date of the day being swapped. */
+  date: string
+  /** The day's name, for the receipt — resolved by the caller, not re-derived here. */
+  dayName: string
+  /** What they are doing instead, in their own words. */
+  activityName: string
+  /** What the session would have been, for the receipt. */
+  sessionFocus?: string
+  /** Only ever a figure they actually said; null when they did not. */
+  durationMinutes?: number | null
+  intensityRpe?: number | null
+  /** Still to come, so there is nothing to log yet — the day is marked either way. */
+  activityPlanned?: boolean
+}
+
+export interface SwapForActivityResult {
+  receipt: PendingActionReceipt
+}
+
+export async function executeSwapForActivity(
+  profile: UserProfile,
+  payload: SwapForActivityPayload,
+): Promise<SwapForActivityResult> {
+  if (!profile.id) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  const ok = await setSwappedForActivity(profile.id, payload.date, payload.activityName)
+  if (!ok) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: "Couldn't swap that day — try again in a moment" }] } }
+  }
+  const landed = [`${payload.dayName}: ${payload.activityName}${payload.sessionFocus ? ` instead of ${payload.sessionFocus}` : ''}`]
+  // THE DAY IS MARKED EITHER WAY; THE ACTIVITY IS LOGGED ONLY WHEN THERE IS
+  // SOMETHING TRUE TO LOG. A class that has not happened yet has no duration
+  // to record, and a duration nobody stated is a number the app invented —
+  // both were live defects on the write path (8 Sep 2026, two rows for one
+  // evening and a guessed 60 minutes for a class still hours away).
+  const minutes = payload.durationMinutes
+  if (!payload.activityPlanned && typeof minutes === 'number' && minutes > 0) {
+    saveCardioLog({
+      userId: profile.id,
+      date: payload.date,
+      activityName: payload.activityName,
+      durationMinutes: Math.round(minutes),
+      intensityRpe: payload.intensityRpe ?? 6,
+      notes: 'Swapped in place of the prescribed lifting session',
+    })
+    landed.push(`${payload.activityName}: ${Math.round(minutes)} min logged`)
+  }
+  return { receipt: { landed, failed: [] } }
+}
+
+/** Clears the swap. The day goes back to whatever it was — due, or missed. */
+export async function undoSwapForActivity(profileId: string, payload: SwapForActivityPayload): Promise<void> {
+  await setSwappedForActivity(profileId, payload.date, null)
 }
 
 export interface MissedSessionPayload {

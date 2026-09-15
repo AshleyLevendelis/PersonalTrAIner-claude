@@ -110,8 +110,18 @@ menu" stays true when a copy is also left outside it.
   `verify:what-happened`; coach `log_history`
 - Make today a rest day — both; `what-happened`, `verify:rest-day-race`,
   `verify:what-happened`
-- Swap the session for an activity — both; `what-happened`,
-  `verify:swapped-day`, `verify:what-happened`
+- Swap the session for an activity — both, and **it asks first from 15 Sep
+  2026**. Her ruling that day, from three options: **ask, like the others** —
+  the coach shows a confirm card and nothing is written until she taps it. She
+  rejected "do it and offer Undo" and "do it silently but honestly". This was
+  the only day-verb that wrote immediately: it was built 25 Aug, six days
+  before her "record it, but confirm first" ruling, and never came back for it.
+  CORRECTED: this line listed `what-happened`, `verify:swapped-day` and
+  `verify:what-happened` as if they covered both surfaces. All three drive the
+  DAY MENU only — none opens a coach conversation. SCREEN: those three. COACH:
+  `coach-promises` §2, `chat-actions` §5 and `verify:activity-swap`, which
+  drives the real chat to the card, taps it, and checks nothing was written
+  before the tap
 - Shorten or lighten TODAY only — both surfaces since 13 Sep 2026. Her ruling
   that day, from three options: **protect the main lift and drop accessories**
   — you still squat and squat properly, and the accessory work at the end goes,

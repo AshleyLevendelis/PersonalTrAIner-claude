@@ -81,8 +81,28 @@ export function makeFakeSupabase(db: Db) {
         return { data: single ? (out[0] ?? null) : out, error: null }
       }
       if (op === 'update') {
-        for (const r of rows0) if (filters.every(f => f(r))) Object.assign(r, updateObj)
-        return { data: null, error: null }
+        // RETURN THE UPDATED ROWS — the same lesson the insert branch above
+        // learned, one operation later, and it cost more.
+        //
+        // FOUND 15 Sep 2026 while writing the first driver that ever tapped
+        // Apply on a coach proposal. `data: null` made
+        // `.update().select().maybeSingle()` answer null, and
+        // claimPendingAction reads exactly that to decide who won the claim:
+        //   if (error || !data) return { outcome: 'already_resolved' }
+        // So every confirm in this harness wrote status='claimed' to the row
+        // and then returned 'already_resolved' to its caller, which returns
+        // early. The card stayed on screen, nothing executed, and no error was
+        // raised anywhere.
+        //
+        // WHAT THAT MEANS FOR EVERY DRIVER BEFORE THIS ONE: not one of them
+        // could have confirmed a proposal, so "the coach's confirm path works"
+        // was never proven on a real screen — the chat drivers all stop at the
+        // card. That is not a fact about this change; it is a hole in what the
+        // harness was able to prove at all.
+        const hit: Row[] = []
+        for (const r of rows0) if (filters.every(f => f(r))) { Object.assign(r, updateObj); hit.push(r) }
+        const out = hit.map(r => ({ ...r }))
+        return { data: single ? (out[0] ?? null) : out, error: null }
       }
       if (op === 'delete') {
         db[name] = rows0.filter(r => !filters.every(f => f(r)))

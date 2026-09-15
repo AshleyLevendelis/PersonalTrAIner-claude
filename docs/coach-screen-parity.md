@@ -62,7 +62,7 @@ it is wrong.
 | `record_goal` | SCREEN | Profile → Goals. |
 | `record_session_feel` | EXCEPTION | Coach-only by Ashley's ruling, 8 Sep 2026: how a session felt is asked in chat, not collected by a button. |
 | `set_display_name` | SCREEN | Profile → Name. |
-| `swap_session_for_activity` | SCREEN | The day menu → "What happened?". |
+| `propose_session_activity_swap` | SCREEN | The day menu → "What happened?" → "I did something else instead". Both surfaces now ask before writing (Ashley, 15 Sep 2026); the coach's card and the sheet call the same writer. |
 
 ## Things the screen can do that the coach cannot
 
