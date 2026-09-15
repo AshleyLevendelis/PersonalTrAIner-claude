@@ -69,7 +69,7 @@ is a different thing and must not be dressed up as this one.
 
 ## The build, in the order that keeps each step honest
 
-### 1. Render a prescribed activity day (fixes the live defect)
+### 1. Render a prescribed activity day (fixes the live defect) — **BUILT 15 Sep 2026**
 
 The only step that is purely a bug fix, and the one everything else depends on:
 **a card that cannot be rendered must not be offered.**
@@ -87,6 +87,24 @@ The only step that is purely a bug fix, and the one everything else depends on:
   `exercises.length > 0`).
 - **This alone fixes the starting-out walking plan**, which is shipping the
   empty card now.
+
+**AS BUILT**, with the differences from the sketch above, because they matter:
+
+- The shared decisions live in `src/lib/activity-day.ts` (a leaf module) rather
+  than being repeated in each component: `isScheduledDay`, `prescriptionLine`,
+  `dayDetail`. That also collapsed two phrasings of one fact — the card said
+  "20m · RPE 4" and the week list said "20 min @ RPE 4".
+- The logging form is NOT pre-filled. The prescription got its own one-tap
+  "Log" (the shape `RecoveryFinisher` already used), so the form below is for
+  something else you did, and says so: "Log something else you did".
+- The card also stops calling a prescribed session "active recovery". It leads
+  with the activity and the day, and says "This is today's session."
+- **"Train anyway" was deliberately NOT switched to the flag.** It borrows
+  another day's PRESCRIPTION to do today, and an activity day has no exercises
+  to borrow — switching it would open a session with nothing in it, which is
+  the defect this step exists to remove. Same for ProgramBrowse's expand tests.
+- Held by `test:planned-activity` (28 checks, 12 mutations, 12 caught) and
+  `verify:planned-activity` (screenshot read, not the tick trusted).
 
 ### 2. A tool that adds one, on the existing rail
 

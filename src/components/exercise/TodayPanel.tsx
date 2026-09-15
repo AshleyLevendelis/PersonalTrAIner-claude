@@ -38,6 +38,7 @@ import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
 import { FinisherRow } from './FinisherRow'
+import { isScheduledDay, dayDetail } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
@@ -591,10 +592,20 @@ export function TodayPanel({
   const tomorrowWorkout = tomorrowCell?.movedTo
     ? undefined
     : (tomorrowCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === tomorrowName)
-  const tomorrowPreview = tomorrowWorkout && tomorrowWorkout.exercises.length > 0
-    ? { dayName: tomorrowName, focus: tomorrowWorkout.focus, exerciseCount: tomorrowWorkout.exercises.length }
+  // A DAY IS SCHEDULED IF IT SAYS IT IS. `is_scheduled` exists precisely
+  // because "scheduled" was being inferred from the exercise count, which
+  // makes an activity-shaped day — a walk, a swim, no exercises array —
+  // invisible: the beginner's whole plan never appeared in tomorrow's preview.
+  // Same expression dashboard-data.ts's streak input already uses, and the
+  // fallback is for plans stored before the field existed.
+  const tomorrowPreview = isScheduledDay(tomorrowWorkout)
+    ? { dayName: tomorrowName, focus: tomorrowWorkout!.focus, detail: dayDetail(tomorrowWorkout!) }
     : undefined
 
+  // DELIBERATELY STILL THE EXERCISE COUNT. "Train anyway" borrows another
+  // day's PRESCRIPTION to do today, and an activity day has no exercises to
+  // borrow — offering one here would open a session with nothing in it, which
+  // is the defect this whole change exists to remove.
   const trainAnywayOptions = liveWeekPlan
     .filter(d => d.exercises.length > 0 && d.day !== todayName)
     .map(d => d.day)
@@ -841,7 +852,12 @@ export function TodayPanel({
           </div>
         ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
           <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground">
-            {peekDay} is a rest or recovery day.
+            {/* A peeked day with a prescribed activity is NOT a rest day, and
+                saying so was the same defect as the empty card — it just said
+                it in one sentence instead of a blank form. */}
+            {peekWorkout?.plannedActivity
+              ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
+              : `${peekDay} is a rest or recovery day.`}
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
           </div>
         ) : (

@@ -130,6 +130,18 @@ const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
 // finisher after a session, rather than hand-seeding a row, which would have
 // proved only that a string written here renders. Same reasoning as ?legcurl.
 const FINISHER = new URLSearchParams(location.search).get('finisher') === '1'
+// ?walker=1 — THE BEGINNER'S WALKING PLAN, the only plan the app generates
+// whose days hold a prescribed ACTIVITY instead of exercises.
+//
+// This is the fixture the empty-card defect needed and never had: for weeks
+// the generator filled in a walk — twenty minutes, an effort target, a reason
+// — and every screen decided "is this a session?" by counting exercises, so
+// the card fell through to a blank "log a walk or other activity" form. No
+// driver could see it, because no harness profile produced a walking plan.
+//
+// The six fields below are exactly what isStartingOut reads (starting-out.ts)
+// — a real profile the app would route this way, not a hand-seeded day.
+const WALKER = new URLSearchParams(location.search).get('walker') === '1'
 
 // ?planDelay=N — App.tsx holds exercisePlan/mesocycle at [] until its read
 // resolves (App.tsx:111,138). Every other run of this harness hands them over
@@ -140,8 +152,10 @@ export const STATED_DUMBBELL_KG = 24
 
 const profile: UserProfile = {
   id: PROFILE_ID,
-  age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
-  fitness_goal: FINISHER ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
+  age: 30, gender: 'male', height_cm: 178, weight_kg: 80,
+  activity_level: WALKER ? 'sedentary' : 'moderate',
+  fitness_goal: FINISHER || WALKER ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
+  ...(WALKER ? { start_preference: 'move_more' as const } : {}),
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
   //
   // Dumbbell Leg Curl is not reachable at full_gym on an upper/lower split:
@@ -150,8 +164,9 @@ const profile: UserProfile = {
   // three splits and three seeds before picking this one, rather than
   // hand-seeding a plan row, which would have proved only that a string I
   // wrote myself renders.
-  equipment_access: LEG_CURL ? 'home_gym' : 'full_gym', injuries: [], training_style: 'hybrid',
-  training_experience: 'intermediate', session_duration_preference: '45-60',
+  equipment_access: WALKER ? 'bodyweight' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: [],
+  training_style: WALKER ? 'functional' : 'hybrid',
+  training_experience: WALKER ? 'beginner' : 'intermediate', session_duration_preference: '45-60',
   workout_split_preference: LEG_CURL ? 'push_pull_legs' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
@@ -337,6 +352,31 @@ const loggedTarget = (() => {
     .map(d => ({ day: d.day, date: nearestAnchorDate(d.day), activity: d.recommendedCardio!.activity, duration: d.recommendedCardio!.duration, rpe: d.recommendedCardio!.targetRpe }))
   if (withFinisher.length === 0) return null
   return withFinisher.reduce((best, d) => (d.activity.length > best.activity.length ? d : best))
+})()
+
+// THE LIVE WEEK'S PRESCRIBED ACTIVITY — published for verify:planned-activity.
+//
+// Same rule as the two targets above: the driver asks the page what the plan
+// says rather than naming a weekday and a number, both of which move. FROM THE
+// LIVE WEEK for the reason recorded above — the fixture's plan is nine days old
+// so week 2 is on screen, and the walk's minutes step per BLOCK, so a driver
+// reading week 1 would argue with the app about a figure both had right.
+// Null for every profile but ?walker=1, which is what makes the driver's own
+// "the fixture really is a walking plan" check able to fail.
+;(window as unknown as { __walkTarget: unknown }).__walkTarget = (() => {
+  const liveWeekForWalk = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeekForWalk)?.days ?? exercisePlan
+  const today = liveDays.find(d => d.day === DAYS[anchorDate().getDay()])
+  const anyDay = liveDays.find(d => d.plannedActivity)
+  const pick = today?.plannedActivity ? today : anyDay
+  if (!pick?.plannedActivity) return null
+  return {
+    day: pick.day,
+    date: nearestAnchorDate(pick.day),
+    isToday: pick.day === DAYS[anchorDate().getDay()],
+    exercises: pick.exercises.length,
+    ...pick.plannedActivity,
+  }
 })()
 
 // TODAY'S FOCUS, from THIS page's plan — for verify:rest-day-race, 14 Sep 2026.
