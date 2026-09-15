@@ -79,6 +79,10 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     if (String(url).includes('chat-gemini')) {
       window.__chatCalls++
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
+      // THE BUG ASHLEY PHOTOGRAPHED: a 200 with an empty reply and nothing
+      // else in it. Several server paths return "" on purpose, so this is a
+      // real response shape, not an invented one.
+      if (/saynothing/i.test(said)) return new Response(JSON.stringify({ reply: '' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (!/drop|remove/i.test(said)) return new Response(JSON.stringify({ reply: 'Sure.' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       return new Response(JSON.stringify({
         reply: '',
@@ -244,8 +248,36 @@ if (cheap2) {
   await ev(`window.__removeReason = undefined`)
 }
 
+// --- 7. A TURN THAT COMES BACK EMPTY STILL SAYS SOMETHING -------------------
+//
+// Reported live 15 Sep 2026 with a screenshot: three turns in a row, one of
+// them just "Hello", rendered as a green avatar and nothing else. The edge
+// function has a floor for its plain path; the CLIENT had none, and several
+// server paths return `reply: ""` deliberately. test:never-blank holds the
+// rule; this is the half it cannot reach — that the floor is actually run
+// before a bubble is painted.
+await ask('saynothing please')
+const blank = await ev(`(() => {
+  // The last coach bubble on screen, and everything it carries.
+  const rows = [...document.querySelectorAll('[data-role="assistant"], .prose')]
+  const text = document.body.innerText
+  return {
+    tail: text.replace(/\\s+/g, ' ').slice(-260),
+    rows: rows.length,
+    hasRetry: [...document.querySelectorAll('button')].some(b => /retry/i.test(b.textContent || '')),
+  }
+})()`)
+await shoot('tradeoff-empty-reply')
+check('7a. the empty turn does not leave a bubble with nothing in it',
+  /came back empty/i.test(blank.tail), blank)
+check('7b. ...and the failed state offers a way to try again', blank.hasRetry === true, blank)
+// ONCE, NOT THREE TIMES. The first cut said "tap Retry" in the sentence too,
+// on top of the inline line and the button the failed state already renders.
+check('7c. ...told once, not three times over',
+  (blank.tail.match(/retry/gi) || []).length <= 2, blank.tail)
+
 const err = await ev('window.__err ?? null')
-check('7. no uncaught error on the page', err === null, err)
+check('8. no uncaught error on the page', err === null, err)
 
 console.log(failures === 0 ? '\nA goal-damaging change is asked about, then allowed.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

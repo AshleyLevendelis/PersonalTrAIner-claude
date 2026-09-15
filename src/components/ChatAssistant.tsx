@@ -115,6 +115,44 @@ const OPENER_MAX_WAIT_MS = 2500
 // see the round-2 report for the remaining piece.
 const BREAK_TAG_RE = /^[ \t]*\[BREAK\][ \t]*$/gim
 
+/**
+ * A COACH BUBBLE IS NEVER BOTH EMPTY AND FEATURELESS.
+ *
+ * Reported live 15 Sep 2026 with a screenshot: three turns in a row — one of
+ * them just "Hello" — rendered as a green avatar and nothing else. No
+ * sentence, no card, no chips, no Retry.
+ *
+ * WHY THE FLOOR THAT ALREADY EXISTED DID NOT CATCH IT. There is one and it is
+ * right for the case it was built for: the edge function's plain turn runs
+ * `resolvePlainReply`, so a model that skips a turn still produces a sentence.
+ * But the CLIENT had none, and several server paths return `reply: ""` on
+ * purpose — log_workout and the memory intents hand back an empty string
+ * because the client is supposed to author the copy itself. Any turn that
+ * comes back empty and then fails to author anything renders as silence.
+ *
+ * EMPTY IS ONLY A DEFECT WHEN THERE IS NOTHING ELSE. A card, a receipt, a
+ * clarification or a row of chips IS the response for some turns; printing a
+ * sentence above one would be noise. Hence the second argument.
+ *
+ * IT REPORTS RATHER THAN INVENTS. Guessing a coaching reply here would be the
+ * silent-success path the send path's error branch was written to remove —
+ * worse than silence, because it looks real.
+ *
+ * ONE HOME, TWO CALLERS. The send path and the Retry path both build a
+ * message, and the Retry path was the worse of the two: it blanked AND cleared
+ * `lastFailedInput`, so a retried blank lost the button that produced it.
+ */
+export function floorReply(strippedText: string, hasSomethingElse: boolean): { text: string; blank: boolean } {
+  if (strippedText.trim()) return { text: strippedText, blank: false }
+  if (hasSomethingElse) return { text: strippedText, blank: false }
+  // NO "TAP RETRY" HERE. Marking the message failed already renders the
+  // affordance twice — an inline line and a button — so instructing them a
+  // third time read as nagging on a real screen. Read off the driver's
+  // screenshot, not reasoned about: this sentence says WHAT HAPPENED and the
+  // existing failed-state UI says what to do about it.
+  return { text: 'That came back empty — nothing came through from your coach.', blank: true }
+}
+
 function applyMessageBreaks(text: string): string {
   return text.replace(BREAK_TAG_RE, '\n')
 }
@@ -4340,13 +4378,20 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = await callGemini(userMsg.content)
       const processed = await processResponse(result, userMsg.content)
       const quickReplies = extractQuickReplies(processed.text)
-      const cleanedText = stripTags(processed.text)
+      // THE SAME FLOOR AS THE SEND PATH. Without it a retried blank came back
+      // blank AND cleared lastFailedInput below, so the button that produced
+      // it disappeared — a failure that looked like a success.
+      const retryFloor = floorReply(stripTags(processed.text), !!(
+        processed.action || processed.pendingAction || processed.receipt
+        || processed.clarification || quickReplies.length > 0
+      ))
+      const cleanedText = retryFloor.text
 
       setMessages(prev => prev.map((m, i) =>
         i === failedIndex ? {
           ...m,
           content: cleanedText,
-          status: 'complete' as const,
+          status: retryFloor.blank ? 'failed' as const : 'complete' as const,
           action: processed.action,
           pendingAction: processed.pendingAction,
           receipt: processed.receipt,
@@ -4355,8 +4400,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         } : m
       ))
       setQuickRepliesDismissed(false)
-      setLastFailedInput(null)
-      finalizePlaceholder(failedMsg.id, cleanedText, 'complete', processed.action)
+      // Keep Retry armed when the retry itself came back empty.
+      if (!retryFloor.blank) setLastFailedInput(null)
+      finalizePlaceholder(failedMsg.id, cleanedText, retryFloor.blank ? 'failed' : 'complete', processed.action)
     } catch {
       setMessages(prev => prev.map((m, i) =>
         i === failedIndex ? {
@@ -4479,8 +4525,43 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     const quickReplies = extractQuickReplies(responseText!)
-    const cleanedText = stripTags(responseText!)
-    const finalStatus = failed ? 'failed' as const : 'complete' as const
+    const strippedText = stripTags(responseText!)
+
+    // NEVER A BARE AVATAR. Reported live 15 Sep 2026 with a screenshot: three
+    // messages in a row — including "Hello" — came back as a coach bubble with
+    // no text in it at all. Nothing to read, nothing to tap, nothing to retry.
+    //
+    // WHY THE EXISTING FLOOR DID NOT CATCH IT. There is one, and it is in the
+    // right place for the case it was written for: the edge function's plain
+    // turn runs `resolvePlainReply` with a fallback sentence, so a model that
+    // skips a turn still says something. But the CLIENT had no floor at all,
+    // and several server paths return `reply: ""` on purpose — log_workout and
+    // the memory intents hand back an empty string because the client is meant
+    // to author the copy itself. So any turn that returns "" and then fails to
+    // produce its own copy renders as silence, and no check anywhere noticed.
+    //
+    // EMPTY IS ONLY A DEFECT WHEN THERE IS NOTHING ELSE. A card, a receipt, a
+    // clarification or a row of chips IS the response for some turns, and
+    // forcing a sentence above one would be noise. So this fires only when the
+    // bubble would otherwise be completely blank.
+    //
+    // IT SAYS WHAT HAPPENED RATHER THAN INVENTING AN ANSWER. Guessing at a
+    // coaching reply here would be the silent-success path the error branch
+    // above was written to remove — worse than silence, because it looks real.
+    const hasSomethingElse = !!(action || pendingAction || receipt || clarification || quickReplies.length > 0)
+    const floored = floorReply(strippedText, hasSomethingElse)
+    const cleanedText = floored.text
+    const blank = floored.blank
+    if (blank) {
+      console.error('chat: empty reply with nothing to render — the coach said nothing at all')
+      // ARM RETRY, or the sentence above tells her to tap a button that is not
+      // there. `lastFailedInput` is what the Retry affordance reads, and until
+      // now only the catch block set it — a turn that came back 200-and-empty
+      // was never treated as a failure at all.
+      setLastFailedInput(userText)
+    }
+
+    const finalStatus = failed || blank ? 'failed' as const : 'complete' as const
     const assistantMessage: ChatMessage = {
       id: placeholderId,
       role: 'assistant',
