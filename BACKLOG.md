@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP AFTER ALL OF IT: 235 RAN, 3 FAILED, ALL THREE THE UNREACHABLE
+  DATABASE.** Clean, and the count is the point as much as the failures: 235 is
+  the same 235 that ran on the previous sweep, so nothing crashed out of it —
+  the rule about comparing checks that RAN, not just checks that failed.
+  Read off their OUTPUT rather than their names, because a failing check's name
+  is not its finding: `schema-parity` prints "Failed to link to TEST";
+  `verify:rls` prints its own paused-project advice; and all five of
+  `meal-quality`'s "hard failures" print `pools={}` — an empty food table, not
+  a verdict about meals.
+  The four failures that were mine last run — two wording-pinned checks, a DOM
+  climb anchored on an old sentence, and the bundle ceiling — are all closed and
+  stayed closed. So the voice work, the gate, the ceiling and the corrections
+  are green on exactly what is on the branch.
+
 - [x] **THE SWEEP AFTER THE VOICE WORK: 235 RAN, 7 FAILED, AND THE ONE THAT
   MATTERED WAS A KILOBYTE.** 235 is 234 plus the new gate — the count went UP
   by exactly one, so nothing crashed out of it. Three failures are the usual
