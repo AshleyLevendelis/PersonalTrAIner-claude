@@ -118,6 +118,31 @@ interface MobilityDrill extends WarmupItem {
 }
 
 const MOBILITY_DRILLS: MobilityDrill[] = [
+  // NECK AND ELBOW ADDED 15 Sep 2026, and only because the tightness check
+  // needs them. The app lets somebody name eight areas; before this, two of
+  // those eight had no drill in the list at all, so answering "my neck feels
+  // tight" would have changed nothing while looking exactly like an answer
+  // that worked. Both are unloaded, need no kit, and are contraindicated for
+  // an INJURY in the same place — tight is not hurt, and the hurt path is a
+  // different question with a different answer.
+  {
+    name: 'Chin Tucks and Neck Rotations',
+    prescription: '8 tucks, then 5 slow rotations each way',
+    purpose: 'Eases a stiff neck before anything overhead or braced',
+    duration_seconds: 45,
+    prepares_joints: ['neck'],
+    contraindicated_for: ['neck'],
+    needs_equipment: [],
+  },
+  {
+    name: 'Elbow Circles and Wrist Rolls',
+    prescription: '10 circles each way, then 10 wrist rolls',
+    purpose: 'Warms the elbow and wrist before pressing or gripping heavy',
+    duration_seconds: 40,
+    prepares_joints: ['elbow', 'wrist'],
+    contraindicated_for: ['elbows'],
+    needs_equipment: [],
+  },
   {
     name: 'Cat-Cow',
     prescription: '10 slow reps',
@@ -546,3 +571,34 @@ export function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay
   }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// DRILLS FOR A JOINT SOMEBODY SAID IS TIGHT.
+//
+// Separate from buildWarmup on purpose. What the plan holds is the warm-up the
+// SESSION needs, scored and budgeted with the rest of the week; "my hips feel
+// tight this morning" is a fact about today and nothing else. Making it an
+// addition computed at render time means it cannot leak into tomorrow, cannot
+// touch the stored plan, and disappears the moment she clears it.
+//
+// KIT-FREE ONLY. A drill offered for tightness must never be the one she
+// hasn't got the band for — an answer that produces nothing is worse than not
+// asking.
+// ---------------------------------------------------------------------------
+export function drillsPreparing(joints: string[], injuries: string[] = []): WarmupItem[] {
+  const want = new Set(joints)
+  if (want.size === 0) return []
+  return MOBILITY_DRILLS
+    .filter(d => d.needs_equipment.length === 0)
+    // AN INJURY STILL VETOES A DRILL. Tight and hurt are different answers to
+    // different questions, and the hurt one is triaged elsewhere — but if the
+    // profile already carries an injury there, the drill is off regardless of
+    // which question put it on screen.
+    .filter(d => !d.contraindicated_for.some(c => injuries.includes(c)))
+    .filter(d => d.prepares_joints.some(j => want.has(j)))
+    .sort((a, b) =>
+      b.prepares_joints.filter(j => want.has(j)).length -
+      a.prepares_joints.filter(j => want.has(j)).length)
+    .map(d => ({ name: d.name, prescription: d.prescription, purpose: d.purpose, duration_seconds: d.duration_seconds }))
+}

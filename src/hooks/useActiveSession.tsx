@@ -125,6 +125,9 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   /** Which ramp-up steps are ticked for this exercise today. A place-keeper, never a log. */
   rampTicksFor: (exerciseId: string) => number[]
   toggleRampTick: (exerciseId: string, setNumber: number) => void
+  /** Areas she said felt tight before today's session — drives the extra warm-up drills. */
+  tightAreas: string[]
+  setTightAreas: (areas: string[]) => void
   saveSetDraft: (exerciseId: string, setNumber: number, draft: SetDraft) => void
   clearSetDrafts: (exerciseId: string) => void
   extraSetsFor: (exerciseId: string) => number[]
@@ -293,6 +296,7 @@ export function ActiveSessionProvider({
    * is worse than no tick, because you tap it again.
    */
   const [rampTicks, setRampTicks] = useState<Record<string, number[]>>({})
+  const [tightAreas, setTightAreasState] = useState<string[]>([])
 
   // Hydrate status/startedAtIso from the persisted record on identity
   // change — same pattern restEndsAt already uses below.
@@ -306,6 +310,7 @@ export function ActiveSessionProvider({
     setStatus(record?.status ?? 'idle')
     setStartedAtIso(record?.startedAtIso ?? null)
     setRampTicks(record?.rampTicks ?? {})
+    setTightAreasState(record?.tightAreas ?? [])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 
@@ -627,6 +632,14 @@ export function ActiveSessionProvider({
     })
   }, [patchRecord])
 
+  // Written through in the same tick, like the ramp ticks beside it: somebody
+  // answering this is standing in a changing room, and an answer that did not
+  // survive a glance at another tab would be worse than not asking.
+  const setTightAreas = useCallback((areas: string[]) => {
+    setTightAreasState(areas)
+    patchRecord({ tightAreas: areas })
+  }, [patchRecord])
+
   const setExtraSets = useCallback((exerciseId: string, setNumbers: number[]) => {
     const existing = currentRecord()?.extraSets ?? {}
     patchRecord({ extraSets: { ...existing, [exerciseId]: setNumbers } })
@@ -792,6 +805,8 @@ export function ActiveSessionProvider({
     clearSetDrafts,
     rampTicksFor,
     toggleRampTick,
+    tightAreas,
+    setTightAreas,
     extraSetsFor,
     setExtraSets,
     declareOffPlan,

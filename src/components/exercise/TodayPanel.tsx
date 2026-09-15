@@ -28,6 +28,8 @@ import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
+import { TightnessSheet, type TightnessAnswer } from './TightnessSheet'
+import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
 import { FinisherRow } from './FinisherRow'
@@ -137,7 +139,7 @@ export function TodayPanel({
    */
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
 }) {
-  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
+  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas } = useActiveSession()
 
   // Audit §6.4 — hold the screen awake for as long as the session is
   // actually running, and no longer. Before this the phone dimmed and locked
@@ -169,6 +171,26 @@ export function TodayPanel({
   const [removeTarget, setRemoveTarget] = useState<RemoveTarget | null>(null)
   const [borrowedDayName, setBorrowedDayName] = useState<string | null>(null)
   const [expandedWarmup, setExpandedWarmup] = useState(false)
+  const [tightOpen, setTightOpen] = useState(false)
+
+  // COMPUTED HERE, NEVER STORED. The plan's warm-up is untouched; these exist
+  // for as long as today's answer does and no longer. Injuries still veto a
+  // drill, which is why the profile's list is handed in.
+  const tightness = useMemo(
+    () => tightnessWarmup(tightAreas, profile?.injuries ?? []),
+    [tightAreas, profile?.injuries],
+  )
+
+  const handleTightness = async (a: TightnessAnswer) => {
+    // THE TWO THAT ARE NOT ABOUT TIGHTNESS go straight to the triage that owns
+    // them — the same handler the exercise row uses, so there is one pain path
+    // in the app and not two. Ashley's ruling, 15 Sep 2026.
+    if (a.type === 'red_flag') return                     // advice only; nothing moves
+    if (a.type === 'injury') { if (onInjury) await onInjury(a); return }
+    setTightAreas(a.type === 'tight' ? a.areas : [])
+    // Open it, so the answer is visibly an answer rather than a sheet closing.
+    if (a.type === 'tight') setExpandedWarmup(true)
+  }
   const [banBusy, setBanBusy] = useState<string | null>(null)
   // Turn 5: "Add unplanned work" moved from an always-visible bottom button
   // to the day-level "⋮" menu (WeekContextRow) — this is that controlled
@@ -996,7 +1018,35 @@ export function TodayPanel({
               <p className="text-xs text-muted-foreground">{workout!.block_size_note}</p>
             </div>
           )}
-          <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
+          <WarmupSection
+            warmup={workout!.warmup}
+            open={expandedWarmup}
+            onToggle={() => setExpandedWarmup(v => !v)}
+            extra={tightness.items}
+            extraNote={tightness.note}
+            extraCaveat={uncoveredNote(tightness)}
+          />
+          {/* BEFORE THE SESSION, BESIDE THE WARM-UP IT CHANGES. Not on the
+              session dock: this is a question you answer while you are still
+              deciding what the next hour looks like, and it has nothing to say
+              once you are three sets in. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start min-h-[44px] text-xs"
+            data-testid="tightness-open"
+            onClick={() => setTightOpen(true)}
+          >
+            {tightAreas.length > 0
+              ? `Tight: ${tightness.items.length > 0 ? 'warm-up updated' : 'noted'} — change it`
+              : 'Anything feeling tight?'}
+          </Button>
+          <TightnessSheet
+            open={tightOpen}
+            onOpenChange={setTightOpen}
+            selected={tightAreas}
+            onAnswer={handleTightness}
+          />
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
           <ExerciseList
             workout={workout!}

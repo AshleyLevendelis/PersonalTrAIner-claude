@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **BUILT — "Anything feeling tight?" before a session, feeding the
+  warm-up.** Ashley asked what I thought of a list of coach improvements
+  Gemini suggested and then said "build all that you think is good". This was
+  the one on that list worth taking as written, and the only one whose
+  machinery already existed.
+  **WHY THIS ONE.** The warm-up here is not a generic five minutes of cardio —
+  it has a mobility block whose stated job is preparing the joints the session
+  is about to load. Tightness is the one input the plan cannot derive: the
+  session knows which joints it will load, she knows which ones feel stiff this
+  morning. Everything else on Gemini's list was either already built, blocked
+  on data the app does not collect (sleep, stress, what time she trains), or a
+  PROMPT RULE — and we measured twice the same day that the coach ignores
+  prompt rules.
+  **WHAT SHE GETS.** A row under the warm-up on the Exercise screen. Tap any of
+  the eight areas, and up to three mobility drills go in at the FRONT of
+  today's warm-up under their own heading, with a line saying why: *"Added for
+  the hips you said felt tight — do these first."* The move count and the
+  minutes on the collapsed card both go up to match. Clearing it removes them.
+  **IT TOUCHES NOTHING ELSE, AND THAT IS CHECKED ON A REAL SCREEN.** Not a set,
+  not a weight, not an exercise, not the plan. The drills are computed where
+  they are rendered from a list held against today's date, so tomorrow's
+  warm-up is untouched because nothing was written to it. `verify:tightness`
+  reads every weight and set count before and after and compares them.
+  **TIGHT IS NOT HURT — the line that took the most care.** Ashley's pain
+  ruling of 15 Sep is a rule about the APP: any surface where somebody says
+  something hurts asks the same three questions, and sharp, one-sided or
+  worsening names a professional and changes NOTHING. A tightness question one
+  tap away is exactly where a second, softer pain path would grow. So the
+  escape is not among the area chips, it hands to the SAME triage with the
+  same constants, and the driver proves the red-flag branch leaves the screen
+  byte-identical.
+  **TWO DRILLS ADDED because two of the eight areas had none.** Nothing in the
+  catalogue prepared the neck or the elbow, so tapping those would have looked
+  exactly like tapping hips and produced nothing. Both are unloaded, need no
+  kit, and are vetoed by an injury in the same place. Side effect worth
+  knowing: they are in the shared catalogue, so generated warm-ups can now pick
+  them too — an Upper Pull day did in testing, which is correct but is a change
+  to plans, hence the full sweep.
+  **A DEFECT OF MINE THE DRIVER CAUGHT AND READING DID NOT.** Reopening the
+  sheet showed no selection: the chips are initialised from a prop and the
+  component stays mounted, so the second open came back blank — a tap that
+  looked forgotten. Invisible on first open, which is the only state a
+  screenshot catches.
+  **THREE OF MY OWN CHECKS WERE WRONG, all found by mutation.** One said "I
+  haven't got a warm-up movement for shoulders" when there are three and they
+  did not fit — saying the app cannot do something it can is the same defect
+  class as saying it did something it did not; the two reasons are now separate
+  lists with separate sentences. One sliced a region that never contained the
+  thing it asserted was absent. One found the FIRST of two `TIGHT_AREAS.map`
+  blocks in the file — the injury picker — and reported on the tightness chips
+  while reading it; caught because the baseline went red, not the mutation.
+  **Mutations: 16 attempted, 16 caught** (13 source, 3 driver), two only after
+  re-anchoring. New: `test:tightness`, `verify:tightness`.
+  **NOT DONE, and named rather than omitted: there is no coach path.** She can
+  say this on the screen and not in chat, which is a one-sided capability by
+  the standing parity rule. A coach path needs the answer to reach a store the
+  edge function cannot see, so it is real work rather than a tool declaration.
+  **Frontend only — no function deploy.**
+
 - [x] **FIXED — the coach told her it had changed her plan, and nothing made it
   prove that.** Ashley, 15 Sep 2026, from the live app with a screenshot. She
   typed *"Im not going to hit that session in going to do muay thai instead"*

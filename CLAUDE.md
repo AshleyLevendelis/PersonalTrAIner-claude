@@ -38,6 +38,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — screen exists; ranking-over-shuffling itself `UNGUARDED`
+- **Say what feels tight before a session and the warm-up prepares it** — added
+  15 Sep 2026 from a suggestion list Ashley asked me to assess, on her "build
+  all that you think is good". Eight areas as taps; up to three mobility drills
+  go in at the front of TODAY's warm-up, with a line saying why and an honest
+  account of anything it could not cover. It adds warm-up and nothing else — no
+  set, weight, exercise or plan is touched, checked on a real screen before and
+  after. **`screen only`**: there is no coach path, because the answer lives in
+  a store the edge function cannot reach. `tightness`, `verify:tightness`
 - No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
 - Activity-shaped plans: only the starting-out walking plan exists, and only
   it is offered — `starting-out`
