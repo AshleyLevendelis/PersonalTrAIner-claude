@@ -33,7 +33,8 @@ import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE } from '@/lib/coach-voice'
+import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
@@ -1911,7 +1912,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const oldItem = String(rawArgs.old_item ?? '')
     const newItem = String(rawArgs.new_item ?? '')
     if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
-    if (!oldItem) return { ok: false, reason: 'Which exercise did you want to change?' }
+    if (!oldItem) return { ok: false, reason: whichOne('exercise', 'change') }
     if (!newItem) return { ok: false, reason: `What would you like instead of ${oldItem}?` }
 
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
@@ -2002,6 +2003,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload,
       preImage: mesocycle,
       diff: {
+        lead: ask(`swap **${oldEx.name}** for **${newEntry.name}**`),
         rows: [{ field: 'Exercise', before: oldEx.name, after: newEntry.name }],
         unchanged: [`${day.day}'s other ${day.exercises.length - 1} exercise${day.exercises.length - 1 === 1 ? '' : 's'}`, `Sets × reps: ${oldEx.sets}×${oldEx.reps}`],
         implications: [
@@ -2048,7 +2050,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '')
     if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
-    if (!item) return { ok: false, reason: 'Which exercise did you want to add?' }
+    if (!item) return { ok: false, reason: whichOne('exercise', 'add') }
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
@@ -2136,7 +2138,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     diff: import('@/lib/pending-actions-store').ProposalDiff
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '').trim()
-    if (!item) return { ok: false, reason: 'Which exercise did you want me to stop giving you?' }
+    if (!item) return { ok: false, reason: whichOne('exercise', 'stop getting') }
     if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
 
     // Resolved against the CATALOGUE, so the ban is recorded under the name the
@@ -2254,7 +2256,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '')
     if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
-    if (!item) return { ok: false, reason: 'Which exercise did you want to take out?' }
+    if (!item) return { ok: false, reason: whichOne('exercise', 'take out') }
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
@@ -2326,7 +2328,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const beforeItem = String(rawArgs.before_item ?? '')
     const afterItem = String(rawArgs.after_item ?? '')
     if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
-    if (!item) return { ok: false, reason: 'Which exercise did you want to move?' }
+    if (!item) return { ok: false, reason: whichOne('exercise', 'move') }
     if (!beforeItem && !afterItem) return { ok: false, reason: `Where should ${item} go — before or after which exercise?` }
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
@@ -2428,6 +2430,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { injuryCode, durationDays, weekNumbers, exclusions: exerciseExclusions, mode, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
+        lead: ask(`work around your ${injuryCode.replace('_', ' ')} for the next ${durationDays} days`),
         rows,
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
@@ -2502,6 +2505,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { injuryCode, weekNumbers, exclusions: exerciseExclusions, mode, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
+        lead: ask(`keep your plans clear of your ${injuryCode.replace('_', ' ')} from here on`),
         rows,
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
@@ -2531,6 +2535,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preconditions: { injuryCode },
       payload: { injuryCode },
       diff: {
+        lead: ask(`take your ${injuryCode.replace('_', ' ')} off your injuries list`),
         rows: [{ field: 'Injuries', before: injuryCode.replace('_', ' '), after: 'removed' }],
         implications: [
           { severity: 'info', text: `Future plans stop avoiding this area.` },
@@ -2583,6 +2588,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { equipmentTier, durationDays, weekNumbers, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
+        lead: ask(`rebuild around ${(EQUIPMENT_OPTIONS.find(o => o.value === equipmentTier)?.label ?? equipmentTier).toLowerCase()} for the next ${durationDays} days`),
         rows,
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
@@ -2651,7 +2657,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       {
         severity: 'info',
         text: todayOnly
-          ? `Just this week — ${day.day} is back to normal next week.`
+          ? SCOPE.thisWeek(day.day)
           : `Applies from week ${startWeek} on. Weeks you've already trained don't change.`,
       },
     ]
@@ -2685,6 +2691,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { dayName: day.day, direction, weekNumbers, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
+        lead: ask(`make ${dayName} ${direction}${todayOnly ? ' just for today' : ''}`),
         rows,
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
@@ -2729,7 +2736,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const impact = describeEditImpact(week, settled.week, day.day)
 
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Just today — ${day.day} is back to the full session next week.` },
+      { severity: 'info', text: SCOPE.today(day.day) },
     ]
     // SAY IT WHEN IT COULD NOT GET THERE, rather than showing a card headed
     // "25 min" for a session that takes 32.
@@ -3133,7 +3140,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (weeksAhead === 0) return null
 
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. Anything you've already logged stays exactly as it is.` },
+      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. ${SCOPE.historyKept}` },
     ]
     if (wanted.length !== before.length) {
       implications.push({
@@ -3148,6 +3155,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { trainingDays: wanted, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
+        lead: ask(`move you to training ${wanted.join(', ')}`),
         rows: [{ field: 'Training days', before: before.join(', ') || 'none', after: wanted.join(', ') }],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
@@ -3181,9 +3189,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { trainingStyle: wantedOpt.value, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
+        lead: ask(`switch you to ${wantedOpt.label}`),
         rows: [{ field: 'Training style', before: beforeOpt?.label ?? beforeValue, after: wantedOpt.label }],
         implications: [
-          { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. Anything you've already logged stays exactly as it is.` },
+          { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. ${SCOPE.historyKept}` },
           { severity: 'warn', text: 'The exercises and rep ranges change, not just the name — this is a different programme from here on.' },
         ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
@@ -3284,7 +3293,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       return `The lifting also comes down one recovery notch while ${name} is on — two hard sessions a week are training too: about ${withoutNotch} → ${withNotch} working sets a week. Revert to full volume any time from the workout card.`
     })()
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on so the lighter gym sessions land on ${days.join(' and ')} and no extra cardio is prescribed there. ${volumeSentence} Anything you've already logged stays exactly as it is.` },
+      { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on so the lighter gym sessions land on ${days.join(' and ')} and no extra cardio is prescribed there. ${volumeSentence} ${SCOPE.historyKept}` },
     ]
     if (unavoidable.length > 0) {
       implications.push({
@@ -3313,7 +3322,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
       },
       preImage: mesocycle,
-      diff: { rows, implications, rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined, reversible: true },
+      diff: { lead: ask(`build your plan around ${name} on ${days.join(' and ')}`), rows, implications, rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined, reversible: true },
     }
   }
 
@@ -4880,7 +4889,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Swapped' : "Couldn't apply the swap"
+      title = ok ? RECEIPTS['propose_exercise_swap'].done : RECEIPTS['propose_exercise_swap'].failed
       rows = ok ? [{ label: payload.oldExerciseName, detail: `→ ${payload.newExerciseName}` }] : []
       undoToken = ok ? row.id : undefined // undo (C17) re-fetches row.pre_image by this id — no need to re-capture it here
     } else if (row.kind === 'propose_meal_swap') {
@@ -4900,7 +4909,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ok = false
         }
       }
-      title = ok ? 'Swapped' : "Couldn't apply the swap"
+      title = ok ? RECEIPTS['propose_meal_swap'].done : RECEIPTS['propose_meal_swap'].failed
       rows = ok ? [{ label: payload.slot, detail: `→ ${result.appliedName}` }] : []
       if (ok && result.appliedMacros) {
         await upsertFavorite({
@@ -5022,7 +5031,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Adjusted' : "Couldn't apply the adaptation"
+      title = ok ? RECEIPTS['propose_injury_adaptation'].done : RECEIPTS['propose_injury_adaptation'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       if (ok && profile.id) {
         // No standard 10-minute Undo here — ending early is a separate,
@@ -5050,7 +5059,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onProfileChanged({ injuries: profile.injuries.includes(payload.injuryCode) ? profile.injuries : [...profile.injuries, payload.injuryCode] })
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Injury saved' : "Couldn't save this"
+      title = ok ? RECEIPTS['propose_injury_as_lasting'].done : RECEIPTS['propose_injury_as_lasting'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       // No plan_adaptations row — nothing time-bounded here to expire.
     } else if (row.kind === 'propose_injury_recovered') {
@@ -5059,7 +5068,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onProfileChanged({ injuries: profile.injuries.filter(i => i !== payload.injuryCode) })
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Injury removed' : "Couldn't save this"
+      title = ok ? RECEIPTS['propose_injury_recovered'].done : RECEIPTS['propose_injury_recovered'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
     } else if (row.kind === 'propose_equipment_adaptation') {
       const payload = row.payload as unknown as EquipmentAdaptationPayload
@@ -5067,7 +5076,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Adjusted' : "Couldn't apply the adaptation"
+      title = ok ? RECEIPTS['propose_equipment_adaptation'].done : RECEIPTS['propose_equipment_adaptation'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       if (ok && profile.id) {
         await createPlanAdaptation({
@@ -5087,7 +5096,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Session shortened for today' : "Couldn't shorten it"
+      title = ok ? RECEIPTS['propose_session_shorten'].done : RECEIPTS['propose_session_shorten'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_volume_change') {
@@ -5096,7 +5105,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Volume adjusted' : "Couldn't adjust the volume"
+      title = ok ? RECEIPTS['propose_volume_change'].done : RECEIPTS['propose_volume_change'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
       // No plan_adaptations row: this is a change to the plan itself, not a
@@ -5114,7 +5123,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Schedule updated' : "Couldn't change the schedule"
+      title = ok ? RECEIPTS['propose_schedule_change'].done : RECEIPTS['propose_schedule_change'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_style_change') {
@@ -5126,7 +5135,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       if (result.receipt.failed.length === 0) onProfileChanged({ training_style: payload.trainingStyle })
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Style updated' : "Couldn't change the style"
+      title = ok ? RECEIPTS['propose_style_change'].done : RECEIPTS['propose_style_change'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_concurrent_activity') {
@@ -5144,7 +5153,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Plan built around it' : "Couldn't add that"
+      title = ok ? RECEIPTS['propose_concurrent_activity'].done : RECEIPTS['propose_concurrent_activity'].failed
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_rest_day') {
@@ -5152,7 +5161,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = await executeRestDay(profile, payload)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Rest day marked' : "Couldn't mark that rest day"
+      title = ok ? RECEIPTS['propose_rest_day'].done : RECEIPTS['propose_rest_day'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
       // No mesocycle write and no pre_image: this marks a DAY, it does not
@@ -5164,7 +5173,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = await executeSwapForActivity(profile, payload)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Swapped' : "Couldn't swap that day"
+      title = ok ? RECEIPTS['propose_session_activity_swap'].done : RECEIPTS['propose_session_activity_swap'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
       // Marks a DAY, like the rest-day arm beside it — no mesocycle write and
@@ -5174,7 +5183,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = await executeExerciseAdd(profile, mesocycle, row.payload as unknown as ExerciseAddPayload, exerciseExclusions)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Added' : "Couldn't add that"
+      title = ok ? RECEIPTS['propose_exercise_add'].done : RECEIPTS['propose_exercise_add'].failed
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
       if (ok) onMesocycleUpdated(result.mesocycle)
@@ -5184,7 +5193,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = await executeExerciseBan(profile, mesocycle, row.payload as unknown as ExerciseBanPayload, exerciseExclusions, planCreatedAt)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Never again' : "Couldn't do that"
+      title = ok ? RECEIPTS['propose_exercise_ban'].done : RECEIPTS['propose_exercise_ban'].failed
       rows = receipt.landed.map(line => ({ label: line, detail: '' }))
       undoToken = undefined // A ban is a preference, not a session edit — taken back in Profile, not here.
       if (ok) {
@@ -5201,7 +5210,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         : await executeExerciseReorder(profile, mesocycle, row.payload as unknown as ExerciseReorderPayload)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? (isRemove ? 'Taken out' : 'Reordered') : (isRemove ? "Couldn't take that out" : "Couldn't move that")
+      title = ok
+        ? (isRemove ? RECEIPTS['propose_exercise_remove'].done : RECEIPTS['propose_exercise_reorder'].done)
+        : (isRemove ? RECEIPTS['propose_exercise_remove'].failed : RECEIPTS['propose_exercise_reorder'].failed)
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
       if (ok) onMesocycleUpdated(result.mesocycle)
@@ -5210,7 +5221,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = await executeMissedSession(profile, payload)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Marked as missed' : "Couldn't mark that day"
+      title = ok ? RECEIPTS['propose_missed_session'].done : RECEIPTS['propose_missed_session'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
       // Marks a DAY, touches no plan — same shape as the rest day above, so
@@ -5221,7 +5232,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = await executeSessionMove(profile, payload)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
-      title = ok ? 'Session moved' : "Couldn't move that session"
+      title = ok ? RECEIPTS['propose_session_move'].done : RECEIPTS['propose_session_move'].failed
       // The first line is the move (labelled by where it went); any further
       // line is the passenger activity, which belongs to the day it LEFT.
       rows = ok ? receipt.landed.map((line, i) => ({ label: i === 0 ? payload.toDayName : payload.fromDayName, detail: line })) : []
