@@ -215,7 +215,32 @@ console.log('\n3. Nothing has crept back up')
   // is to raise the budget instead of doing the deferring. 920 restores real
   // room while still sitting well under the 921 this batch would have cost
   // unsplit.
-  const APP_CHUNK_BUDGET_KB = 920
+  // 15 Sep 2026: 920 -> 940, on Ashley's ruling from three options — raise it
+  // with room to grow, over keeping it and trimming every time (which is what
+  // she chose on 14 Sep, above) and over deferring the plan-BUILDING engine.
+  //
+  // THE NUMBERS, MEASURED ON CLEAN WORKTREES RATHER THAN INFERRED — the note
+  // above is exactly why:
+  //     ad1dd46, before the cardio work   917 kB
+  //     b43edde, the cardio work inline   921 kB   (over the 920 ceiling)
+  //     b43edde with the form deferred    920 kB   (green, zero headroom)
+  // The deferral happened anyway and is not part of this raise: every other
+  // sheet in this app is its own chunk and AddCardioSessionSheet was the odd
+  // one out. But 920-under-920 is the same trap the 14 Sep note names, one
+  // more turn of the screw, so the ceiling moves on top of the deferral rather
+  // than instead of it.
+  //
+  // 940 IS 20 kB ABOVE TODAY'S MEASURED 920, and 20 is what "room to grow"
+  // means here — the 13 Sep entry above used ~14, the one below ~8, and both
+  // were spent within two days. RECORD THE MEASURED VALUE, NOT THE NOTE'S: the
+  // BACKLOG said 918 and a clean build said 917.
+  //
+  // What this does NOT relax, and the reason it is safe to move: the number
+  // that decides how fast the app opens is the FIRST-PAINT figure in §2b, not
+  // this one. That is 411 kB gzipped against 483 before the coach was deferred,
+  // and it has its own check. This budget is a proxy for it and a brake on
+  // drift, not the user-facing measurement.
+  const APP_CHUNK_BUDGET_KB = 940
   const app = find('index-')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
     !!app && app.raw < APP_CHUNK_BUDGET_KB * 1024, app ? kb(app.raw) : null)

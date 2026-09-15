@@ -110,14 +110,34 @@ export async function saveScopedEdit(
   weekNumber: number,
   scope: 'today' | 'permanent',
 ): Promise<void> {
+  const touched = weeksTouchedByScope(mesocycle, weekNumber, scope)
+  await Promise.all(touched.map(w => saveMesocycleWeek(profileId, w)))
+}
+
+/**
+ * WHICH WEEKS A SCOPED EDIT REACHES — 'today' is one week, 'permanent' is the
+ * rest of that week's block.
+ *
+ * SPLIT OUT OF saveScopedEdit ON 15 Sep 2026, and the reason is that the gate
+ * caught it: a caller that CHANGES a run of weeks has to know the same answer
+ * the saver uses, and executeCardioSession worked it out for itself. Two
+ * computations of one question is how the swap path ended up with three copies
+ * of this branch (test:silent-writes §6, the same day).
+ *
+ * So a caller that needs the weeks asks for them, rather than re-deriving them
+ * and hoping the saver agrees.
+ */
+export function weeksTouchedByScope(
+  mesocycle: MesocycleWeek[],
+  weekNumber: number,
+  scope: 'today' | 'permanent',
+): MesocycleWeek[] {
   if (scope === 'today') {
     const week = mesocycle.find(w => w.week_number === weekNumber)
-    if (week) await saveMesocycleWeek(profileId, week)
-    return
+    return week ? [week] : []
   }
   const block = mesocycle.find(w => w.week_number === weekNumber)?.block_number
-  const touched = mesocycle.filter(w => w.block_number === block && w.week_number >= weekNumber)
-  await Promise.all(touched.map(w => saveMesocycleWeek(profileId, w)))
+  return mesocycle.filter(w => w.block_number === block && w.week_number >= weekNumber)
 }
 
 export async function saveMesocycleWeek(profileId: string, week: MesocycleWeek): Promise<void> {

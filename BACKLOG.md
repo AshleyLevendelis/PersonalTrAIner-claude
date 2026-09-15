@@ -2,6 +2,48 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP AFTER THE CARDIO WORK: 239 RAN, 5 FAILED, AND TWO OF THEM
+  WERE REAL — BOTH CAUGHT BY GATES WRITTEN EARLIER THE SAME DAY.**
+  239 is the previous 237 plus exactly the two new checks, so nothing crashed
+  out. Three failures are the unreachable database as always.
+  **(1) `test:silent-writes` §6 — MY OWN CHECK, CAUGHT MY OWN DUPLICATION.**
+  Written this morning after finding THREE copies of the scope branch on the
+  swap path; it went red on `pending-action-executor.ts` hours later because
+  `executeCardioSession` worked out which weeks to CHANGE for itself while
+  `saveScopedEdit` worked out which to SAVE. Two computations of one question,
+  which is exactly how the swap path got to three copies. Fixed properly rather
+  than by exempting the file: `weeksTouchedByScope` is now exported and both
+  use it. **This is the best evidence yet for pinning the PROPERTY rather than
+  the mechanism** — a check that had named the swap executor would have said
+  nothing here.
+  **(2) `test:bundle` — the app-chunk budget, which I flagged YESTERDAY as
+  eroding silently (918 of 920) and left, because raising it is Ashley's.**
+  It tipped on schedule. MEASURED ON CLEAN WORKTREES, not inferred:
+  `ad1dd46` before the cardio work **917 kB**; with the work inline **921**;
+  with the new form deferred **920**. (The BACKLOG note said 918; a clean build
+  says 917 — record the measured value, not the inherited one.)
+  I tested the obvious cause first and it was WRONG: I expected the new
+  `pending-action-executor` import in TodayPanel to have dragged that module
+  into the app chunk, and TodayPanel had already imported it for
+  `executeSecondSportVolume`. Third time this number's obvious explanation has
+  not held.
+  **THE DEFERRAL HAPPENED ANYWAY AND IS NOT PART OF THE RAISE.** Every other
+  sheet in this app is its own chunk — SwapDialog, TightnessSheet,
+  RemoveExerciseSheet, AddExerciseSheet, three meal sheets — and
+  `AddCardioSessionSheet` was the odd one out. Splitting it is right regardless
+  of any budget, and it recovered the kilobyte.
+  **ASHLEY'S RULING, from three options: raise it with room to grow.** Over
+  keeping it and trimming every time (her own 14 Sep choice) and over deferring
+  the plan-BUILDING engine, which would buy real room but is surgery on the
+  thing that generates her plans. **920 -> 940**, which is 20 above today's
+  measured 920; the two previous raises used ~14 and ~8 and both were spent
+  within two days. Recorded in the file with all three measurements.
+  What this does NOT relax, and why it is safe: the number that actually
+  decides how fast the app opens is the FIRST-PAINT figure, 411 kB gzipped
+  against 483 before the coach was deferred, and it has its own check. The
+  app-chunk budget is a proxy and a brake on drift, not the user-facing
+  measurement.
+
 - [x] **THE COACH OFFERS TO ADD A CARDIO SESSION, AND THE CARD IS A REAL ONE.**
   Ashley: *"I want the app chat to be smart. It should be able to have proper
   conversation and know when to suggest adding a session and when something is

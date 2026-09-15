@@ -22,7 +22,7 @@ import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
 import { settleWeek } from './settle-week'
 import { shortenDayTo } from './exercise-plan'
-import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
@@ -1101,11 +1101,13 @@ export async function executeCardioSession(
     }),
   })
 
-  const block = week.block_number
-  const touched = payload.scope === 'today'
-    ? [payload.weekNumber]
-    : mesocycle.filter(w => w.block_number === block && w.week_number >= payload.weekNumber).map(w => w.week_number)
-  const next = mesocycle.map(w => (touched.includes(w.week_number) ? withActivity(w) : w))
+  // THE SAME ANSWER THE SAVER USES, asked rather than re-derived. This had its
+  // own copy of the scope branch until test:silent-writes §6 — written earlier
+  // the same day, after the swap path was found with THREE copies of it — went
+  // red on this file. A caller that changes a run of weeks and a saver that
+  // writes a run of weeks must not disagree about which run.
+  const touched = new Set(weeksTouchedByScope(mesocycle, payload.weekNumber, payload.scope).map(w => w.week_number))
+  const next = mesocycle.map(w => (touched.has(w.week_number) ? withActivity(w) : w))
 
   landed.push(`${payload.dayName}: ${payload.activity}, ${payload.minutes} min at RPE ${payload.targetRpe}`)
 
