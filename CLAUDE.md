@@ -44,8 +44,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   go in at the front of TODAY's warm-up, with a line saying why and an honest
   account of anything it could not cover. It adds warm-up and nothing else — no
   set, weight, exercise or plan is touched, checked on a real screen before and
-  after. **`screen only`**: there is no coach path, because the answer lives in
-  a store the edge function cannot reach. `tightness`, `verify:tightness`
+  after. **`screen only`**, and now recorded as such in
+  `docs/coach-screen-parity.md` — it was not, for a day, which is the rule-4
+  gap the parity doc's own instruction exists to prevent.
+  CORRECTED 15 Sep 2026, measured: the reason written here — "the answer lives
+  in a store the edge function cannot reach" — is FALSE on both halves. The
+  edge function reaches no store on this rail; every `propose_*` tool returns
+  an intent and the BROWSER writes (`chat-gemini:2677-2693` says so outright),
+  and the coach is already inside that very store via `declareOffPlan`. The
+  real obstacles are smaller and worth having written down before anyone
+  builds it: the answer can only ever be TODAY, a coach-set answer would
+  silently open a session, and the pain boundary is enforced on the screen
+  only. `tightness`, `verify:tightness`
 - No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
 - Activity-shaped plans: only the starting-out walking plan exists, and only
   it is offered — `starting-out`
@@ -66,12 +76,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   equipment; a loaded lift never replaced by an unloaded one by default —
   both surfaces; `swap-target`, `slot-replacement`,
   `single-implement`, `verify:swap-request`
-- Ban it from every future plan — `screen only`; `audit-fixes`,
-  `silent-writes`. CORRECTED 11 Sep 2026: this said "both". The coach's
-  `ban_exercise` is a deliberate decline — "NOT WIRED UP YET… point the user at
-  the ban button" (chat-gemini `:598`, handler `:3087`) — because a ban is the
-  highest-blast-radius mutation in the app. I wrote "both" from the tool list
-  without reading the handler
+- Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
+  `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
+  and quoted the decline "NOT WIRED UP YET… point the user at the ban button"
+  at `chat-gemini:598` / `:3087`. Both line numbers are from the stale note and
+  neither is a decline today — the tool proposes (`:3400-3432`, returning
+  `kind: "propose_exercise_ban"`), wired 14 Sep on Ashley's instruction as the
+  last thing a screen could do that chat could not. The 11 Sep correction that
+  stood here was right when written and was never revisited after the fix
 - Add one to a session AS PART OF THE PLAN — both surfaces since 13 Sep 2026.
   Her ruling that day, from three options: **add it and say the session is now
   longer** — you asked for the exercise, so you get it, and the app never
@@ -297,10 +309,17 @@ menu" stays true when a copy is also left outside it.
   ruling the same day: the score stays behind the scenes as a guarantee we
   check, never a number on screen — what a person reads is the specific thing
   that changed, in plain words.
-  MEASURED 14 Sep 2026, and worth knowing: that is a GATE. `scorePlan` has
-  zero call sites in the app itself, so it is never run on a real person's
-  real edit. The cards price every change against the plan's STRUCTURE
-  (balance, length, −protein) and never against the person's GOAL
+  CORRECTED 15 Sep 2026, measured. This said `scorePlan` has ZERO call sites
+  in the app and that the cards never price a change against the GOAL. It has
+  two — `edit-tradeoff.ts:227-228`, both with `skipComparisons`, reached live
+  from `ChatAssistant.tsx:684` via `assessEdit` → `scoreDrop`. The 14 Sep
+  measurement was true when taken and the build THAT SAME DAY falsified it;
+  the two facts sat in this file three paragraphs apart, only one updated.
+  What remains true is narrower and still worth keeping: a `skipComparisons`
+  score is NOT comparable to the 7.2 floor (the denominator inside
+  goalAlignment changes), so the app can know a change made the plan worse and
+  can never know it fell below the bar. That residue is Ashley's, ruled on
+  twice, and should not be reopened without her
 - When a change works AGAINST the goal, the app asks first, then allows — it
   never refuses anything that is not unsafe. DECIDED 14 Sep 2026 by the
   session on Ashley's explicit delegation (*"You decide what you think is best
@@ -368,10 +387,18 @@ menu" stays true when a copy is also left outside it.
   skipped exactly the case it existed to fail on, the other counted
   ChatAssistant as a screen and so proved the COACH had a builder. **Adding an exercise (13 Sep) changes neither count**: it
   existed on no surface, and arrived on both at once. Recorded because the
-  obvious assumption is that a new capability moves one of these numbers. **No GENERAL gate distinguishes a declared coach tool from
-  a declining stub**, which is the hole the ban error fell through;
-  `meal-food-edit` §8 does it for its own three tools and is the shape the
-  general one should take
+  obvious assumption is that a new capability moves one of these numbers. **The GENERAL declining-stub gate EXISTS** — CORRECTED 15 Sep
+  2026, measured. This line said there was none and named `meal-food-edit` §8
+  as the shape one should take. `coach-parity` §3 has been that gate since 14
+  Sep: it loops EVERY declared tool, slices each handler to its own name so a
+  decliner cannot taint its neighbour, and proves its detector on a synthetic
+  handler first so it cannot go vacuous now that nothing declines. It is
+  weaker than §8 in one way worth knowing — a negative check on three known
+  refusal phrases, so a stub declining in NEW words would pass — and §8's
+  positive courier-shape proof does not generalise, because the 40 tools have
+  three incompatible shapes (23 couriers with a literal matching kind, 3 with
+  a variable or differing kind, 14 pure server-side writers with no kind at
+  all)
 - A written exceptions list, each with a reason, Ashley's to change — EXISTS
   since 14 Sep 2026, `docs/coach-screen-parity.md`, held by `coach-parity`.
   CORRECTED: this line still said `MISSING` after the list was written and the
@@ -404,7 +431,16 @@ menu" stays true when a copy is also left outside it.
   `activity-streak`; a missed WEEK gets a chat prefill, not a follow-up
 - It holds its scope — doctor, physio, dietitian at the right moment —
   `starting-out` for the first-timer note; otherwise `UNGUARDED`
-- One voice, every time — tone probes only; `UNGUARDED`
+- One voice, every time — **half guarded since 15 Sep 2026, and the split is
+  the point.** The sentences the APP writes — every card lead, receipt,
+  refusal and floor — are held by `coach-voice` (33 checks, 10 mutations) and
+  `verify:activity-swap` / `verify:swap-request` read on a real screen. The
+  MODEL's own voice is still `UNGUARDED` and still unmeasurable here: every
+  tone probe posts to the deployed function and needs credentials a cloud
+  session does not have, and the coach exam grades ADVICE, not voice, by
+  design (`docs/coach-exam-rubric.md:7`). Measured first in
+  `docs/audits/the-coachs-own-words-2026-09-15.md`: three grammars for one
+  job, eight wordings of one failure, three narrators in one file
 - Never claims a capability, screen or guarantee it lacks; proposes,
   confirms, can be undone — `coach-promises`, `chat-app-reality`,
   `pending-actions`, `log-correction`, `replace-without-losing`,
@@ -615,6 +651,28 @@ old — the commands were right and the context was missing.
   pass — that happened once during this very fix.
 - Strip comments before asserting a string is ABSENT, or a note explaining why
   something was removed will satisfy the check that it was removed.
+- **A MUTATION THAT DID NOT APPLY, OR THAT CRASHED, READS EXACTLY LIKE A CHECK
+  THAT MISSED.** 15 Sep 2026, four times in one day. Two mutations reported
+  MISSED because shell escaping silently failed and the file was never
+  modified. One reported MISSED with zero failures because it named an export
+  that does not exist, so the module threw at import and NONE of the 33 checks
+  ran — the "compare checks that RAN" rule, one level down. One was a real
+  edit that did not create the defect (it reverted 1 of 5 call sites, so the
+  symbol was still used).
+  So a mutation harness must, before believing a green: assert the file
+  actually changed, and assert the run executed as many checks as the baseline.
+  Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
+  meaningless" print identically.
+- **ASKING A QUESTION OF EVIDENCE YOU JUST CREATED.** The same shape, twice in
+  one day: grepping a file for an identifier to see whether it was imported,
+  AFTER inserting a line that used it — the only hit was the new code, and the
+  check confirmed itself; and a `/record/i` over a function that matched
+  `Record<string, unknown>` in its own signature. Before trusting a search,
+  ask what ELSE could satisfy it: your own edit, a type, a comment, an import.
+- **A QUOTE CLASS MUST RESPECT WHICH QUOTE OPENED THE STRING.** `[^'"`]` stops
+  at the apostrophe in "That's", truncating the match. It cost two separate
+  false results on 15 Sep 2026 — a reddened baseline and a safety string
+  reported missing. Use `(['"`])((?:(?!\1).)*)\1`.
 - New check → register it in `package.json` → mutation-test it → say in the
   report how many mutations were tried and how many were caught.
 

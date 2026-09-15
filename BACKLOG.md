@@ -2,6 +2,104 @@
 
 Newest first. One line each.
 
+- [x] **ONE VOICE, IN THE WORDS THE APP WRITES ITSELF.** Ashley chose this from
+  four options as the thing to work on while the `chat-gemini` deploy, the
+  `marked_missed` migration and the coach exam wait on her.
+  **WHY THIS HALF.** Every probe that observes the coach's voice posts to the
+  deployed function and needs credentials a cloud session does not have, and
+  the coach exam grades ADVICE not voice, by design. So voice was assigned to
+  the probes and the probes only ever looked at the model — while the several
+  hundred sentences the APP puts in the coach's mouth were measured by nothing.
+  **MEASURED FIRST** (`docs/audits/the-coachs-own-words-2026-09-15.md`), before
+  a word changed. 18 proposal builders, 9 leads — half the cards rendered a
+  bare before/after table with NO spoken line, the exercise swap among them.
+  The nine that spoke used three grammars for one job: "I can X:", "I'll X.
+  Shall I?", and "Want me to X?" on the quick-reply chips for the very same
+  actions, 945 lines away in one file. One save-failure sentence existed in
+  EIGHT wordings across 13 sites. `App.tsx` reported failures as "I", "We",
+  bare "Couldn't" and the passive. And the per-goal vocabulary CLAUDE.md lists
+  as STILL TO BUILD was half built and DEAD — `GOAL_NOUN`, four goals, one call
+  site, inside a string every reader re-wraps and none renders.
+  **HER RULING, from three options with the card mocked up for each: "Want me
+  to X?"** — over "I'll X. Shall I?" and "I can X:". The warmest of the three,
+  and it had a second effect she did not have to choose: the chips already
+  spoke that way, so the chip and the card agree for the first time.
+  **BUILT.** `coach-voice.ts` holds the SHAPE, not 18 finished sentences — each
+  builder passes the phrase describing its own change, because a table of whole
+  sentences would drag every builder's facts into a file that knows none of
+  them, and the first slot that did not fit would be written inline again.
+  All 18 cards now ask. 13 save-failure sites, 9 duplicate refusals, 3
+  narrators and 19 receipt title pairs all come from one place. `GOAL_NOUN` is
+  alive.
+  **READ ON A PHONE, not trusted as a tick** — "Want me to mark Wednesday as
+  Muay Thai instead of your lift?" and "Want me to swap Seated Cable Row for
+  Leg Press?", both at 390x844.
+  **GATED**: `test:coach-voice`, 33 checks, 10 mutations attempted and 10
+  caught. Four re-anchorings of existing gates that pinned wording rather than
+  property, each of which would have gone red on a reword while staying green
+  on a card that lied.
+
+- [ ] **FIVE OF MY OWN DEFECTS IN ONE DAY, AND THEY ARE ALL THE SAME SHAPE:
+  BELIEVING A MEASUREMENT I DID NOT INTERROGATE.** Kept open because the shape
+  is worth re-reading, not because anything is unfixed.
+  **1. A near-miss that would have shipped a fresh lie.** `didNotSave` first
+  read "nothing has changed" — reassuring, and true at most of its 13 call
+  sites. False at `pending-action-executor.ts:1025`, where the shorten path
+  pushes to `landed` and returns the new mesocycle BEFORE saving: the session
+  on screen really is shorter and only persistence failed. It would have
+  contradicted the line printed directly beside it. The exact defect class the
+  claim guard shipped THAT MORNING exists to prevent, reintroduced by me while
+  tidying.
+  **2. Three dead exports, in the commit that fixed dead exports.** `whichOne`
+  and `RECEIPTS` imported and never called; `SCOPE` imported nowhere — the
+  same defect as `GOAL_NOUN` above. `test:no-dead-code` PASSED throughout: it
+  catches an unreferenced export but not an unused IMPORT, and `tsc` does not
+  either (`noUnusedLocals` off). Found by grepping, not by the tick.
+  **3. Two mutations that reported MISSED and proved nothing.** One had not
+  applied (shell escaping failed silently, file untouched). One CRASHED — it
+  named an export that does not exist, the module threw at import, and ZERO of
+  33 checks ran; counting FAIL lines alone reads that as a pass. A third was a
+  real edit that did not create the defect: it reverted 1 of 5 call sites.
+  **4. Two self-confirming searches.** Grepping a file for an identifier to
+  see whether it was imported, AFTER inserting a line that used it. And a
+  `/record/i` satisfied by `Record<string, unknown>` in the function's own
+  signature.
+  **5. A screenshot that lied in the OTHER direction.** The swap card
+  photographed as "…for **Leg" — broken markdown, no question mark — and read
+  as a real rendering bug. It was the camera: the driver polls until the CARD
+  exists, but the bubble types character by character. Inverted from the
+  morning's error, where a dead sweep read as a running one. Both are measuring
+  at the wrong moment.
+  All five are now standing rules in CLAUDE.md.
+
+- [x] **FOUR STALE LINES IN CLAUDE.md AND ONE IN THE PARITY DOC, EACH
+  RE-MEASURED AND CORRECTED.** All four were true when written and falsified by
+  work done days or hours later, with both facts sitting in the same file.
+  **1. "No GENERAL gate distinguishes a declared coach tool from a declining
+  stub."** It exists — `coach-parity` §3, since 14 Sep, looping every declared
+  tool and proving its detector on a synthetic handler first. Weaker than the
+  §8 shape the line asked for (a phrase blacklist, so a stub declining in NEW
+  words passes), and §8's positive proof does not generalise: the 40 tools have
+  three incompatible shapes.
+  **2. `ban_exercise` is "a deliberate decline — NOT WIRED UP YET".** It
+  proposes, since 14 Sep. Both line numbers in the note were from the stale
+  note itself.
+  **3. "`scorePlan` has zero call sites in the app."** Two, reached live from
+  the chat client. The 14 Sep measurement was falsified by the build THAT SAME
+  DAY, three paragraphs away in this file.
+  **4. The parity doc's "Things the screen can do that the coach cannot:
+  None."** False the day after it was written — the tightness feature shipped
+  screen-only and I did not add it, though the doc's own closing line says to.
+  `test:coach-parity` structurally cannot catch this: §1 derives its universe
+  from DECLARED TOOLS, so a screen feature with no tool is invisible, and §4
+  only checks the section is non-empty — `**None,` satisfies it forever. Hole
+  named, not fixed.
+  **5. The REASON recorded for tightness having no coach path was wrong on both
+  halves** — "the answer lives in a store the edge function cannot reach". The
+  edge function reaches no store on this rail (every propose_* tool returns an
+  intent and the browser writes), and the coach is already inside that store
+  via `declareOffPlan`. The real obstacles are smaller and now written down.
+
 - [x] **THE SWEEP THAT WAS NOT RUNNING, AND THE CLEAN ONE THAT FOLLOWED IT.**
   Merged to `main` on Ashley's explicit word — a fast-forward from `cfaea11`
   to `7d6c7e6`, 29 commits, re-fetched and SHA-verified against origin rather
