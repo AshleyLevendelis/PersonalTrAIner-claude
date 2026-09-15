@@ -1,5 +1,6 @@
 import type { MesocycleWeek, UserProfile, WorkoutDay, FitnessGoal } from './types'
 import type { Tradeoff, TradeoffAlternative, EditScope } from './tradeoff-shape'
+import { reasonChipsFor } from './edit-reason'
 import { EXERCISE_DATABASE, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
 import { scorePlan, ONE_RULE, DIMENSION_KEYS, type DimensionKey } from './quality-score'
 
@@ -348,11 +349,16 @@ export function assessEdit(ctx: EditContext): Tradeoff {
       return {
         tier: 2,
         cost: `${exerciseName} is the lift this block is built around — the rest of ${dayName} is arranged to support it.`,
-        alternatives: [
-          { label: 'Swap it instead', note: 'keeps the slot and the progression', prompt: `swap ${exerciseName} for something similar` },
-          { label: 'Just today', note: 'back next week', prompt: `drop ${exerciseName} today only` },
-        ],
-        question: `${exerciseName} is what this block is built around. What's going on with it — is it the exercise itself, or something else?`,
+        // THE CHIPS ANSWER THE QUESTION. Corrected 15 Sep 2026: this asked
+        // "what's going on with it?" and offered "Swap it instead / Just today
+        // / Do it anyway", none of which is an answer. A question whose
+        // buttons do not answer it teaches people to ignore the buttons.
+        //
+        // The reason chips ARE the answer set, which is also why a reason ask
+        // and a tier-2 ask never stack into two questions: where both apply,
+        // they are one question. See edit-reason.ts.
+        alternatives: reasonChipsFor('remove'),
+        question: `${exerciseName} is what this block is built around. What's going on with it?`,
         reason: 'removing or banning a main lift during a strength phase',
       }
     }

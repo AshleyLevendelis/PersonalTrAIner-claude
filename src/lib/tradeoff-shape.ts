@@ -123,8 +123,20 @@ export function applyTradeoff<T extends TradeoffCardFields>(diff: T, t: Tradeoff
  */
 export function askText(t: Tradeoff): string {
   if (t.tier !== 2 || !t.question) return ''
-  const chips = [...t.alternatives.map(a => a.label), DO_IT_ANYWAY]
-    .slice(0, 4)
+  // THE SLICE COMES BEFORE THE ESCAPE CHIP, NOT AFTER IT. Corrected 15 Sep
+  // 2026, found while giving the main-lift question its reason chips.
+  //
+  // This used to append DO_IT_ANYWAY and then slice the whole list to four —
+  // so a verdict with four alternatives silently lost the one chip the
+  // decision guarantees, and the question became a block instead of a
+  // one-tap-further-away ask. Nothing had four alternatives yet, so it had
+  // never fired; it would have fired the moment anything did.
+  //
+  // Four ALTERNATIVES plus the escape, so at most five chips. The cap exists
+  // to stop a long list, and a curated five is not a long list — the four-chip
+  // convention in the coach's prompt governs what the MODEL should write, not
+  // what the app may render.
+  const chips = [...t.alternatives.slice(0, 4).map(a => a.label), DO_IT_ANYWAY]
     .map(c => `"${c}"`)
     .join(' | ')
   return `${t.question}\n[QUICK_REPLIES: ${chips}]`

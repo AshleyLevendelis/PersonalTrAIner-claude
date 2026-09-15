@@ -176,6 +176,7 @@
     "test:setup-answers": "tsx scripts/test-setup-answers.ts",
     "test:harness-clock": "tsx scripts/test-harness-clock.ts",
     "test:edit-tradeoff": "tsx scripts/test-edit-tradeoff.ts",
+    "test:edit-reason": "tsx scripts/test-edit-reason.ts",
     "test:edit-keeps-the-bar": "tsx scripts/test-edit-keeps-the-bar.ts",
     "test:today-only": "tsx scripts/test-today-only.ts",
     "test:day-coverage": "tsx scripts/test-day-coverage.ts",
