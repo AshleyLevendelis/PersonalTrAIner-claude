@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **The full sweep, 15 Sep 2026 (second run): 229 gates, 3 failed, all
+  three the same unreachable database.** `test:meal-quality` ("Host not in
+  allowlist" on every one of its five profiles), `test:schema-parity` (could
+  not link to TEST at all) and `verify:rls` (which says so itself). No code
+  failure anywhere in the suite.
+  **COMPARED PROPERLY, both numbers.** The run before it was 228 gates / 5
+  failed. The extra gate is `test:never-blank`, registered after that run's
+  list was captured — so 229 is the honest count, not a gate appearing from
+  nowhere. Two failures cleared: `verify:correction-loop`, fixed above, and
+  `verify:tradeoff`, which was never broken — it hung for 46 minutes on my own
+  leaked browsers holding its fixed debug port. It passes on a clean machine
+  and passed here.
+
 - [x] **FIXED — correcting a logged set has been impossible since 14 Sep, and
   a safety rule was what broke it.** `verify:correction-loop` was red;
   re-measured from scratch rather than acted on from the note (the note was
