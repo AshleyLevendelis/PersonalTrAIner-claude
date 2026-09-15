@@ -148,6 +148,24 @@ check('2b. ...and a real proposal came back instead', state.hasProposal === true
 check('2c. ...for the exercise that is actually on the day, spelled the way the plan spells it',
   state.mentionsTarget === true, { asked: swapTarget.loose, expected: TARGET_FULL, tail: state.tail })
 check('2d. ...swapped to the one that was asked for', state.mentionsLegPress === true, state.tail)
+// WAIT FOR THE BUBBLE TO FINISH TYPING BEFORE PHOTOGRAPHING IT. The poll above
+// stops as soon as the CARD exists, but the lead above it types in character by
+// character, so the shot caught "Want me to swap **Seated Cable Row** for **Leg"
+// — broken markdown and no question mark — and read as a rendering bug. It was
+// the camera, not the card. Settle on the lead's own text before shooting.
+{
+  const leadText = () => ev(`(() => {
+    const b = [...document.querySelectorAll('[data-testid="chat-bubble"], .prose')].pop()
+    return b ? (b.textContent || '').trim() : ''
+  })()`)
+  let prev = await leadText()
+  for (let i = 0; i < 20; i++) {
+    await wait(350)
+    const now = await leadText()
+    if (now === prev && now.length > 0) break
+    prev = now
+  }
+}
 await shoot('swap-request-proposal')
 
 // --- 4. THE CARD SAYS WHAT THE SWAP COSTS THE WEEK ------------------------
