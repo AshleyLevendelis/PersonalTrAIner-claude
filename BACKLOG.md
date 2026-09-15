@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP AFTER THE WALK FIX AND THE THREE BUGS: 237 RAN, 3 FAILED, ALL
+  THREE THE UNREACHABLE DATABASE.** The count is evidence as much as the
+  failures: 237 is the previous 235 plus exactly my two new checks
+  (`test:planned-activity`, `verify:planned-activity`), so nothing crashed out
+  of the run. Green on everything that is on the branch.
+  Read off their OUTPUT, not their names. **AND ONE OF THE THREE HAS CHANGED
+  ITS REASON, which is worth recording rather than waving through as "the usual
+  three".** `test:meal-quality` used to fail with `pools={}` — an empty food
+  table. It now fails with **"Host not in allowlist:
+  vswuurrtbzbrgubddefv.supabase.co. Add this host to your network egress
+  settings"** — the container's egress policy blocking the database host
+  outright, which is a different mechanism reaching the same conclusion. Same
+  for the other two: `schema-parity` prints "Failed to link to TEST. Nothing
+  was run against it", and `verify:rls` prints "28 tables … 28 never answered"
+  with its own paused-project advice. All three are environmental; none is a
+  verdict about the app.
+  A note for the next session: the standing line in CLAUDE.md says two checks
+  always fail in a cloud session. It is three — `verify:rls` has been failing
+  alongside them and was named in the previous sweep entry but never added to
+  that line.
+
 - [x] **THE EMPTY CARD ASHLEY REPORTED WAS ALREADY SHIPPING — FROM THE
   BEGINNER'S WALKING PLAN, NOT FROM CARDIO.** Her words, 15 Sep: *"I want when
   it adds a session like a cardio session that it's actually a useful card like
