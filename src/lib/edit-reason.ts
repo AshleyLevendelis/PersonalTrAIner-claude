@@ -262,6 +262,15 @@ export const HURT_KINDS: HurtOption[] = [
 export const NIGGLE_EASE_OFF_DAYS = 7
 
 /**
+ * HOW LONG A KIT CHANGE LASTS. Seven days, for the same reason and with one
+ * more: "I haven't got the kit" is nearly always a trip, and a permanent
+ * answer to a temporary problem is how somebody comes home to a bodyweight
+ * plan. Changing it for good is the Profile screen's Equipment row, which is a
+ * more deliberate act than a chip on a sheet.
+ */
+export const EQUIPMENT_SWITCH_DAYS = 7
+
+/**
  * What the app says when someone picks the red-flag answer.
  *
  * NOTHING IS CHANGED AND NOTHING IS RECORDED, and both halves matter. Not

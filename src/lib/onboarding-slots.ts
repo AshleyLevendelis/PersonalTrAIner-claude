@@ -127,12 +127,8 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
  * this line says so. An "— no x or y" clause is read as an exclusion, not a
  * claim, and must name things the tier genuinely lacks.
  */
-export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: string; description: string }[] = [
-  { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'Everything a commercial gym has' },
-  { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, rack, bench, dumbbells, kettlebells, bands, pull-up bar, weighted bag' },
-  { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Dumbbells, kettlebells, bands, pull-up bar, weighted bag — no barbell or bench' },
-  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'Bodyweight, a pull-up bar and a weighted bag' },
-]
+import { EQUIPMENT_OPTIONS, INJURY_OPTIONS } from './picker-options'
+export { EQUIPMENT_OPTIONS, INJURY_OPTIONS }
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
   { value: 'functional', icon: '🏃', label: 'Functional / athletic', description: 'Explosive & dynamic' },
@@ -165,16 +161,6 @@ export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string;
  * (a scarf for the neck). 🦾 was rejected for Elbows: a prosthetic arm beside
  * an injury checkbox reads as something it does not mean.
  */
-export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
-  { value: 'lower_back', icon: '🧍', label: 'Lower back' },
-  { value: 'knees', icon: '🦵', label: 'Knees' },
-  { value: 'shoulders', icon: '💪', label: 'Shoulders' },
-  { value: 'neck', icon: '🧣', label: 'Neck' },
-  { value: 'wrists', icon: '✋', label: 'Wrists' },
-  { value: 'hips', icon: '🦴', label: 'Hips' },
-  { value: 'ankles', icon: '🦶', label: 'Ankles' },
-  { value: 'elbows', icon: '🤜', label: 'Elbows' },
-]
 
 /**
  * Turns whatever is stored in `profile.injuries` into a code the plan engine

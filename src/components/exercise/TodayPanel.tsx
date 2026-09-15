@@ -12,7 +12,7 @@ import { TrainerNudge } from '@/components/TrainerNudge'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
-import { estimateDaySeconds, getSessionMaximumSeconds } from '@/lib/session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -36,6 +36,7 @@ import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
 import type { WhatHappenedTarget } from './WhatHappenedSheet'
 import type { RemoveTarget } from './RemoveExerciseSheet'
+import type { ReasonAnswer } from './EditReasonStep'
 // NOT LAZY, DELIBERATELY — tried and measured 11 Sep 2026. Loading these two
 // on demand saved nothing: ChatAssistant imports the same module statically
 // for the coach's side of the same two operations, so the bundler keeps it in
@@ -88,6 +89,8 @@ export function TodayPanel({
   onOpenSwap,
   onBanExercise,
   onMesocycleUpdated,
+  onInjury,
+  onEquipment,
   onProfileChanged,
   onOpenPlateCalc,
   onOpenHistory,
@@ -112,6 +115,14 @@ export function TodayPanel({
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
+  /**
+   * "It hurts" — owned a level up, because the swap dialog needs the same
+   * triage and lives beside this panel rather than inside it. See
+   * ExerciseTab.applyInjury.
+   */
+  onInjury?: (answer: Extract<ReasonAnswer, { type: 'injury' }>) => Promise<string | null>
+  /** "I haven't got the kit" — rebuild this week around a different tier. Same owner, same reason. */
+  onEquipment?: (tier: string) => Promise<string | null>
   onProfileChanged?: (patch: Partial<UserProfile>) => void
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
@@ -326,6 +337,26 @@ export function TodayPanel({
       { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
       'today',
     )
+  }
+
+  /**
+   * WHERE EACH ANSWER GOES. docs/how-the-app-talks-about-a-change.md §3's
+   * table, and every destination already existed — this routes, it does not
+   * build. The injury branch is the caller's because the swap dialog needs the
+   * same one and lives a level up; see ExerciseTab.applyInjury.
+   */
+  const handleRemoveReason = async (a: ReasonAnswer): Promise<string | null> => {
+    if (a.type === 'red_flag') return null       // advice only; the plan is untouched, deliberately
+    if (a.type === 'injury') return onInjury ? onInjury(a) : 'I can\'t adjust for that just now.'
+    if (a.type === 'equipment') return onEquipment ? onEquipment(a.tier) : 'I can\'t adjust for that just now.'
+    switch (a.reason) {
+      case 'no_time': return shortenToday(getSessionMinimumSeconds(profile?.session_duration_preference || '45-60') / 60)
+      case 'tired': return lighterToday()
+      // 'dislike' never reaches here — the sheet keeps its own drop/swap step
+      // for it, because "and never again" is a different question from "what
+      // goes in its place", and Ashley ruled on that one separately (11 Sep).
+      default: return null
+    }
   }
 
   /** One step lighter, this week's session only — the same tail, the same scope. */
@@ -763,6 +794,7 @@ export function TodayPanel({
         onDrop={scope => dropExercise(removeTarget!.exIndex, scope)}
         onSwapInstead={() => removeTarget && onOpenSwap(removeTarget.dayName, removeTarget.exIndex, removeTarget.exerciseName)}
         balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : { cost: null, balancing: null })}
+        onReason={handleRemoveReason}
       />
       </Suspense>
 

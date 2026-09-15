@@ -61,7 +61,7 @@ import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { getExerciseId } from '@/lib/exercise-db'
+import { getExerciseId, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 
@@ -264,6 +264,21 @@ const rampTarget = (() => {
   })
 })()
 ;(window as unknown as { __rampTarget: unknown }).__rampTarget = rampTarget
+
+// THE CATALOGUE'S JOINT TAGS, for verify:hurts — so it can ask "does anything
+// left in this day still load the sore shoulder?" against the app's own data
+// rather than a list written in the driver, which would go stale the first
+// time an exercise was retagged. A projection of three fields per entry, not
+// five thousand whole objects.
+;(window as unknown as { __jointTags: unknown }).__jointTags = EXERCISE_DATABASE.map(e => ({
+  name: e.name,
+  unsafeFor: contraindicatedJoints(e),
+  // isIndicatedFor takes a SET of flagged joints, not one joint — passing a
+  // string threw at module scope and took the whole page down silently, which
+  // is the mistake __swapTarget's own comment in chat.tsx already records.
+  indicatedFor: ['shoulder', 'knee', 'hip', 'lower_back_axial', 'neck', 'wrist', 'elbow', 'ankle']
+    .filter(j => isIndicatedFor(e, new Set([j]))),
+}))
 
 // ?logged=1 — A REAL PRIOR SESSION ON TODAY'S LIFT, lighter than the plan.
 //

@@ -133,18 +133,52 @@ const victim = afterTrip[afterTrip.length - 1]
 check('3a. the last exercise’s menu opens', (await openRowMenu(victim)) === 'open')
 check('3b. ...and it cannot move later', (await menuItems()).find(i => i.id === 'move-down')?.disabled === true)
 check('3c. "Take out of this session" opens the sheet', await tap('[data-testid="remove-exercise"]') && (await wait(700), await has('[data-testid="remove-exercise-sheet"]')))
+
+// WHY COMES FIRST NOW (15 Sep 2026). docs/how-the-app-talks-about-a-change.md
+// §3: one tap and the app knows which of six problems it is solving, instead
+// of answering all of them with the same removal.
+check('3c2. it asks WHY before anything else', await has('[data-testid="reason-chips"]'))
+const reasons = await ev(`[...document.querySelectorAll('[data-testid="reason-chips"] [data-reason]')].map(b => b.getAttribute('data-reason'))`)
+check('3c3. ...offering the four a removal can have',
+  JSON.stringify(reasons) === JSON.stringify(['no_time', 'tired', 'hurts', 'dislike']), reasons)
+check('3c4. ...naming the exercise', (await ev(`document.querySelector('[data-testid="reason-chips"]')?.innerText || ''`)).includes(victim), victim)
+// NEVER GATED BEHIND AN ANSWER — "reason required" was the option Ashley did
+// NOT pick on 14 Sep, and a question you cannot walk past is that option in
+// disguise.
+check('3c5. ...and a way past it without answering', await has('[data-testid="reason-skip"]'))
+await shoot('session-edit-reason')
+await clickSel('[data-testid="reason-skip"]'); await wait(500)
+
 const verbs = await ev(`[...document.querySelectorAll('[data-testid="remove-exercise-sheet"] [data-verb]')].map(b => b.getAttribute('data-verb'))`)
 check('3d. it ASKS — drop it, or put something else there (her ruling, 11 Sep)', JSON.stringify(verbs) === JSON.stringify(['drop', 'swap-instead']), verbs)
 check('3e. ...and it names the exercise being taken out', (await ev(`document.querySelector('[data-testid="remove-exercise-sheet"]')?.innerText || ''`)).includes(victim), victim)
 await shoot('session-edit-remove-asks')
 
 // --- the swap route out of it ----------------------------------------------
-check('4a. "Put something else there" reaches the swap list', await clickSel('[data-verb="swap-instead"]') && (await wait(900), (await ev(`document.body.innerText`)).includes('Smart Exercise Swap')))
-check('4b. ...for the same exercise', (await ev(`document.body.innerText`)).includes(victim))
+// POLLED, NOT SLEPT ON. The swap dialog is lazy (15 Sep 2026), so the first
+// open waits on a chunk fetch — a fixed 900ms passed before it was lazy and
+// failed after, which is a driver measuring the network rather than the app.
+const untilSel = async (sel, ms = 6000) => {
+  for (let i = 0; i < ms / 250; i++) { if (await has(sel)) return true; await wait(250) }
+  return false
+}
+// ANCHORED ON THE DIALOG, NOT ITS TITLE. Two things changed under this check
+// on 15 Sep 2026 and each broke it for a different reason: the dialog went
+// lazy, so a fixed 900ms wait became a race with a chunk fetch; and its title
+// is now "Swap X?" while it asks why, because promising "constraint-checked
+// replacements" above that question describes something it may not do. The
+// property is that the swap surface opened for this exercise — which survives
+// both.
+check('4a. "Put something else there" reaches the swap dialog',
+  await clickSel('[data-verb="swap-instead"]') && await untilSel('[data-testid="swap-dialog"]'))
+check('4b. ...for the same exercise', (await ev(`document.querySelector('[data-testid="swap-dialog"]')?.innerText || ''`)).includes(victim), victim)
+check('4c. ...and it asks why here too, the same question as the sheet',
+  await has('[data-testid="swap-dialog"] [data-testid="reason-chips"]'))
 await escape(); await wait(600)
 
 // --- dropping it ------------------------------------------------------------
-check('5a. reopening and choosing "Drop it"', (await openRowMenu(victim)) === 'open' && await tap('[data-testid="remove-exercise"]') && (await wait(700), await clickSel('[data-verb="drop"]')))
+check('5a. reopening and choosing "Drop it"', (await openRowMenu(victim)) === 'open' && await tap('[data-testid="remove-exercise"]')
+  && (await wait(700), await clickSel('[data-testid="reason-skip"]')) && (await wait(400), await clickSel('[data-verb="drop"]')))
 await wait(400)
 check('5b. ...asks how far it should reach', await has('[data-testid="remove-scope"]'))
 const scopes = await ev(`[...document.querySelectorAll('[data-testid="remove-scope"] [data-scope]')].map(b => ({ s: b.getAttribute('data-scope'), t: b.textContent.trim() }))`)
@@ -177,7 +211,8 @@ await wait(4500)
 const tilted = await order()
 check('6a. the tilted week still renders a session', Array.isArray(tilted) && tilted.length >= 4, tilted)
 const tiltVictim = tilted[tilted.length - 1]
-check('6b. the remove sheet opens on it', (await openRowMenu(tiltVictim)) === 'open' && await tap('[data-testid="remove-exercise"]') && (await wait(700), await clickSel('[data-verb="drop"]')))
+check('6b. the remove sheet opens on it', (await openRowMenu(tiltVictim)) === 'open' && await tap('[data-testid="remove-exercise"]')
+  && (await wait(700), await clickSel('[data-testid="reason-skip"]')) && (await wait(400), await clickSel('[data-verb="drop"]')))
 await wait(500)
 check('6c. ...and reaches the scope step', await has('[data-testid="remove-scope"]'))
 const balancing = await ev(`document.querySelector('[data-testid="remove-balancing"]')?.textContent?.trim() || ''`)

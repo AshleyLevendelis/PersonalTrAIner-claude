@@ -228,6 +228,7 @@
     "verify:calibration-search": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/calibration-search.mjs",
     "verify:what-happened": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/what-happened.mjs",
     "verify:session-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-edit.mjs",
+    "verify:hurts": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/hurts.mjs",
     "verify:exercise-add": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/exercise-add.mjs",
     "verify:setup-answers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/setup-answers.mjs",
     "verify:shorten-today": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/shorten-today.mjs",

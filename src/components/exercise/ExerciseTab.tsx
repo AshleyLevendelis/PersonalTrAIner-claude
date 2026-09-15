@@ -7,12 +7,19 @@ import { PlateCalculator } from '@/components/PlateCalculator'
 import { DevTestPanel } from '@/components/DevTestPanel'
 import { isDevAccount } from '@/lib/dev-clock'
 import { TodayPanel } from './TodayPanel'
-import { SwapDialog, type SwapTarget } from './SwapDialog'
+// LAZY, like the remove sheet beside it. A dialog nobody has opened has no
+// business in the bundle that renders the first screen — and with its reason
+// step it had grown enough for test:bundle to say so (915 -> 922 kB). Measured
+// rather than assumed: this is what took it back under.
+import { lazy, Suspense } from 'react'
+import type { SwapTarget } from './SwapDialog'
+const SwapDialog = lazy(() => import('./SwapDialog').then(m => ({ default: m.SwapDialog })))
 import { ExerciseDetailDialog, type ExerciseDetailTab } from './ExerciseDetailDialog'
 import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
+import type { ReasonAnswer } from './EditReasonStep'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -131,6 +138,47 @@ export function ExerciseTab({
     )
   }, [swapTarget, profile, mesocycle, liveWeek])
 
+  // THE TWO APPLIERS LIVE IN A MODULE OF THEIR OWN, loaded on the tap.
+  //
+  // They need plan-adaptations, the adaptation executors and the adaptation
+  // store. ChatAssistant needs the same code and is already its own chunk, so
+  // reaching for it from HERE — a component in the main chunk — made Vite
+  // hoist all of it into the bundle every person downloads before they see
+  // anything: 915 -> 925 kB, and test:bundle caught it. Same shape as the
+  // nutrition sheet a day earlier. Importing the module lazily keeps it in a
+  // chunk of its own, fetched when somebody actually says something hurts.
+  const applyInjury = useCallback(async (
+    answer: Extract<ReasonAnswer, { type: 'injury' }>,
+  ): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const { applyInjuryFromRow } = await import('@/lib/screen-adaptations')
+    const r = await applyInjuryFromRow(profile, mesocycle, liveWeek, answer.hurt, answer.area)
+    if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
+    if (r.addInjuryCode) onProfileChanged?.({ injuries: [...(profile.injuries ?? []), r.addInjuryCode] })
+    return r.message
+  }, [profile, mesocycle, liveWeek, onMesocycleUpdated, onProfileChanged])
+
+  const applyEquipment = useCallback(async (tier: string): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const { applyEquipmentFromRow } = await import('@/lib/screen-adaptations')
+    const r = await applyEquipmentFromRow(profile, mesocycle, liveWeek, tier)
+    if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
+    return r.message
+  }, [profile, mesocycle, liveWeek, onMesocycleUpdated])
+
+  /**
+   * THE SWAP'S FOUR ANSWERS. Two of them are not swaps: "it hurts" is the
+   * injury triage and "I haven't got the kit" rebuilds the week around what
+   * they have. The other two — busy, don't like it — fall through to the
+   * swap list the dialog already shows, because that IS the right answer to
+   * both; what differs is the scope, which the list's own step asks next.
+   */
+  const handleSwapReason = useCallback(async (answer: ReasonAnswer): Promise<string | null> => {
+    if (answer.type === 'injury') return applyInjury(answer)
+    if (answer.type === 'equipment') return applyEquipment(answer.tier)
+    return null
+  }, [applyInjury, applyEquipment])
+
   if (isProgramView) {
     // DevTestPanel mounts here — program surface, dev-gated — never above
     // the today hero (LAYOUT-DESIGN.md §2.4).
@@ -165,7 +213,7 @@ export function ExerciseTab({
           onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
           onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
         />
-        <SwapDialog
+        <Suspense fallback={null}><SwapDialog
           target={swapTarget}
           onClose={() => setSwapTarget(null)}
           profile={profile}
@@ -173,7 +221,8 @@ export function ExerciseTab({
           softExercisePreferences={softExercisePreferences}
           onConfirm={handleConfirmSwap}
           impactFor={swapImpact}
-        />
+            onReason={handleSwapReason}
+        /></Suspense>
         <ExerciseDetailDialog
           open={!!detailTarget}
           onOpenChange={open => { if (!open) setDetailTarget(null) }}
@@ -203,6 +252,8 @@ export function ExerciseTab({
         devOverrideDay={devOverrideDay}
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
         onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}
+          onInjury={applyInjury}
+          onEquipment={applyEquipment}
         onBanExercise={onBanExercise}
         onMesocycleUpdated={onMesocycleUpdated}
         onProfileChanged={onProfileChanged}
@@ -212,7 +263,7 @@ export function ExerciseTab({
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
         onCalibrationSessionFinished={onCalibrationSessionFinished}
       />
-      <SwapDialog
+      <Suspense fallback={null}><SwapDialog
         target={swapTarget}
         onClose={() => setSwapTarget(null)}
         profile={profile}
@@ -220,7 +271,8 @@ export function ExerciseTab({
         softExercisePreferences={softExercisePreferences}
         onConfirm={handleConfirmSwap}
         impactFor={swapImpact}
-      />
+            onReason={handleSwapReason}
+      /></Suspense>
       <PlateCalculator
         open={plateCalcOpen}
         onOpenChange={setPlateCalcOpen}

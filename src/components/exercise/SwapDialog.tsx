@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
+import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
 import { getExerciseEntry, searchExerciseCatalog, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
@@ -41,6 +42,7 @@ export function SwapDialog({
   softExercisePreferences,
   onConfirm,
   impactFor,
+  onReason,
 }: {
   target: SwapTarget | null
   onClose: () => void
@@ -59,7 +61,18 @@ export function SwapDialog({
    * render a list nobody has decided from yet.
    */
   impactFor?: (candidate: ExerciseEntry) => Promise<{ cost: string | null; balancing: string | null }>
+  /**
+   * WHY FIRST. The four answers a swap can have route to four different
+   * things, and two of them are not swaps at all — "it hurts" is the injury
+   * path and "I haven't got the kit" rebuilds the week around what they have.
+   * Returns a refusal string or null. Unwired, the dialog behaves exactly as
+   * it did.
+   */
+  onReason?: (answer: ReasonAnswer) => Promise<string | null>
 }) {
+  const [asked, setAsked] = useState(false)
+  const [reasonBusy, setReasonBusy] = useState(false)
+  const [reasonError, setReasonError] = useState<string | null>(null)
   const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
   const [impact, setImpact] = useState<{ cost: string | null; balancing: string | null } | null>(null)
   const [showAllReplacements, setShowAllReplacements] = useState(false)
@@ -67,6 +80,7 @@ export function SwapDialog({
   const [busy, setBusy] = useState(false)
 
   const reset = () => {
+    setAsked(false); setReasonBusy(false); setReasonError(null)
     setPendingSwap(null)
     setImpact(null)
     setShowAllReplacements(false)
@@ -119,23 +133,54 @@ export function SwapDialog({
     }
   }
 
+  const askingWhy = !!onReason && !asked && !pendingSwap
+
+  const answerReason = async (a: ReasonAnswer) => {
+    // Busy and don't-like-it are still swaps — the answer only says which
+    // scope the person is really after, and the list below is the same list.
+    if (a.type === 'reason') { setAsked(true); return }
+    setReasonBusy(true); setReasonError(null)
+    const refusal = await onReason?.(a) ?? null
+    setReasonBusy(false)
+    if (refusal) { setReasonError(refusal); return }
+    handleClose()
+  }
+
   return (
     <Dialog open={!!target} onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" data-testid="swap-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowRightLeft className="size-4" />
-            {pendingSwap ? 'Apply this swap' : 'Smart Exercise Swap'}
+            {pendingSwap ? 'Apply this swap' : askingWhy ? `Swap ${target?.exerciseName}?` : 'Smart Exercise Swap'}
           </DialogTitle>
           <DialogDescription>
             {pendingSwap ? (
               <>Swap <span className="font-semibold text-foreground">{target?.exerciseName}</span> for <span className="font-semibold text-foreground">{pendingSwap.name}</span></>
+            ) : askingWhy ? (
+              // NOT "constraint-checked replacements" WHILE STILL ASKING WHY.
+              // Two of the four answers never reach a replacement list at all,
+              // so promising one above the question is the app describing
+              // something it may not be about to do.
+              <>{target?.dayName}</>
             ) : (
               <>Constraint-checked replacements for <span className="font-semibold text-foreground">{target?.exerciseName}</span></>
             )}
           </DialogDescription>
         </DialogHeader>
 
+        {askingWhy ? (
+          <>
+            <EditReasonStep
+              kind="swap"
+              exerciseName={target?.exerciseName ?? 'it'}
+              busy={reasonBusy}
+              onAnswer={answerReason}
+              onSkip={() => setAsked(true)}
+            />
+            {reasonError && <p className="text-xs text-destructive" data-testid="swap-reason-error">{reasonError}</p>}
+          </>
+        ) : (<>
         {!pendingSwap && currentEntry && (
           <div className="flex flex-wrap gap-1.5 pb-2">
             <Badge variant="outline" className="text-xs">{currentEntry.movement_pattern.replace(/_/g, ' ')}</Badge>
@@ -310,6 +355,7 @@ export function SwapDialog({
             </Button>
           </div>
         )}
+        </>)}
       </DialogContent>
     </Dialog>
   )
