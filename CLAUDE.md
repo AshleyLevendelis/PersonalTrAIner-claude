@@ -675,6 +675,18 @@ old — the commands were right and the context was missing.
   reported missing. Use `(['"`])((?:(?!\1).)*)\1`.
 - New check → register it in `package.json` → mutation-test it → say in the
   report how many mutations were tried and how many were caught.
+- **A BUDGET WITH HEADROOM SILENTLY SPENDS IT, and the comment goes on
+  claiming the original figure.** A ceiling only speaks when it is CROSSED, so
+  "this keeps ~8 kB of headroom" is a claim about the day it was written and
+  nothing else. 15 Sep 2026: `test:bundle`'s re-download ceiling had been moved
+  twice, each time to 8 kB above a measured value, and its note still said 8 kB
+  — but the real headroom had eroded to 1 kB, so a one-kilobyte change tipped
+  it and looked like the cause. It was the last straw. The app-chunk budget was
+  quietly doing the same thing (918 of 920) and nobody had noticed either.
+  So: when a budget is raised, record the value MEASURED THAT DAY, not the one
+  inherited from the note; and when one fails, measure the baseline on a clean
+  checkout before believing the change in front of you caused it. I guessed
+  twice at the cause here and was wrong both times.
 
 ### What a full sweep costs, so it is neither skipped nor stumbled into
 

@@ -81,7 +81,28 @@ console.log('\n1. The libraries are cached separately from the app')
   // Ashley's ruling, from three options: take the coach off the first-paint
   // path rather than raise the ceiling a second time. Measured 248; 256 keeps
   // the same ~8 kB of headroom this file has always allowed.
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 256, appGzip)
+  //
+  // MOVED 15 Sep 2026: 256 -> 264, on Ashley's ruling from three options —
+  // raise it, with the real number written in. She rejected clawing back the
+  // kilobyte (the cost IS the feature: eighteen coach cards that now speak)
+  // and rejected leaving the check red (a permanently red check teaches people
+  // to scroll past red). It does NOT reverse her 14 Sep ruling: the coach
+  // stays off the first-paint path, which is the check below and still has
+  // room.
+  //
+  // AND THE PART WORTH READING, WHICH IS NOT THE KILOBYTE. Every move of this
+  // number has claimed "~8 kB of headroom over a measured value" — 284 -> 292,
+  // then 248 -> 256. Measured on a clean worktree of 7d6c7e6 on 15 Sep, the
+  // real baseline was 255, not 248: the app had grown 7 kB since 14 Sep and
+  // the headroom had gone from 8 kB to 1 kB WITH NOTHING SAYING SO, because a
+  // ceiling only speaks when it is crossed. The comment went on claiming 8 kB
+  // the whole time. So the voice work's 1 kB was the last straw, not the cause,
+  // and the number below is 8 kB over a value measured TODAY (256) rather than
+  // over one inherited from a note.
+  //
+  // Treat the stated headroom as a lead, not a fact: it decays silently, and
+  // the app-chunk budget below is doing the same thing right now (918 of 920).
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 264, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')

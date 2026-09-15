@@ -2,6 +2,58 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP AFTER THE VOICE WORK: 235 RAN, 7 FAILED, AND THE ONE THAT
+  MATTERED WAS A KILOBYTE.** 235 is 234 plus the new gate — the count went UP
+  by exactly one, so nothing crashed out of it. Three failures are the usual
+  unreachable database. Four were mine.
+  **THREE WERE CHECKS PINNED ON WORDING THE VOICE WORK CHANGED.** Each would
+  have gone red on ANY reword while staying green on a card that lied, which is
+  the whole argument for pinning properties.
+  `test:auth-and-rls` required the literal "We couldn't sign you in" and failed
+  because the app now speaks as one person — it went red on a change that
+  improved exactly what it guards. `verify:moved-session` pinned "Shall I?".
+  `verify:coach-ban` climbed the DOM until a container held the old lead "I can
+  stop giving you"; with the new wording the loop never broke, the node climbed
+  to `<body>`, and three checks read an unrelated scroll fixture — reporting
+  the ban card as missing its blast-radius line while the card was CORRECT.
+  2a-2c passed throughout, which is what made it look like a content bug.
+  (My first re-anchor of that one put a backtick inside a template literal and
+  broke the driver outright. A delimiter inside content — the same family as
+  the quote-class bug that bit twice earlier the same day.)
+  **THE FOURTH WAS REAL, AND I GUESSED TWICE BEFORE MEASURING.** `test:bundle`:
+  the re-download was 256 kB gzipped against a `< 256` ceiling.
+  Guess 1 — the phrasebook's re-export of the safety text was pulling weight.
+  Wrong; removing it changed nothing. It WAS dead, though (nobody imported it
+  from there), so it went, and the gate now states the real rule directly: the
+  phrasebook holds no copy of the safety text at all. The re-export was a
+  mechanism for that rule, not the rule.
+  Guess 2 — the new `EQUIPMENT_OPTIONS` import. Also nothing; `picker-options`
+  was already in the chunk.
+  **MEASURED, on a clean worktree of `7d6c7e6`: baseline 255, now 256.** The
+  voice work costs ONE kilobyte.
+  **ASHLEY'S RULING, from three options: raise it, with the real number written
+  in.** She rejected clawing back the kilobyte — the cost is the feature,
+  eighteen cards that now speak — and rejected leaving the check red, because a
+  permanently red check teaches people to scroll past red. Put to her rather
+  than decided here because she ruled on this exact number on 14 Sep, choosing
+  to take weight off the path rather than raise the ceiling a second time.
+  It does not reverse that: the coach stays off the first-paint path, a
+  different number, still with room (411 kB).
+  **AND THE PART WORTH KEEPING, WHICH IS NOT THE KILOBYTE.** This ceiling has
+  been moved twice, each time to ~8 kB above a measured value, and its comment
+  still claimed 8 kB. The real headroom had eroded to 1 kB between 14 and 15
+  Sep — the app grew 7 kB and NOTHING SAID SO, because a ceiling only speaks
+  when it is crossed. My kilobyte was the last straw, not the cause. Now a
+  standing rule in CLAUDE.md.
+
+- [ ] **THE APP-CHUNK BUDGET IS ERODING THE SAME WAY, SILENTLY: 918 kB of 920.**
+  Two kilobytes left, no comment saying so, and the same mechanism that let the
+  re-download ceiling reach 1 kB of headroom unnoticed. Named here rather than
+  touched: it is a separate decision and not one Ashley was asked about. The
+  next person to add anything to the app chunk will tip it, and should meet
+  this line BEFORE the check goes red rather than after. `test:bundle`, the
+  budget below the re-download check.
+
 - [x] **ONE VOICE, IN THE WORDS THE APP WRITES ITSELF.** Ashley chose this from
   four options as the thing to work on while the `chat-gemini` deploy, the
   `marked_missed` migration and the coach exam wait on her.
