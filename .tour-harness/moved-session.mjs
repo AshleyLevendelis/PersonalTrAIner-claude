@@ -193,8 +193,14 @@ check('9b. ...and so does the row under it, and the promise beside it',
 check('9c. the day that will not count as missed is the day it LEFT',
   new RegExp(`${YESTERDAY_NAME} won't count as a missed session`).test(moved.text)
     && !new RegExp(`${TODAY_NAME} won't count as a missed session`).test(moved.text), moved.sample)
+// RE-ANCHORED 15 Sep 2026, same reason as verify:activity-swap. This pinned the
+// literal "Shall I?" — Ashley's old card grammar — so her change that day
+// ("Want me to X?") turned it red with nothing wrong, and it would have stayed
+// GREEN on a card that tacked "Shall I?" onto an announcement. The property is
+// the pair: it ASKS (a question mark reaches the screen) and does not ANNOUNCE
+// (no completed-action verb). Neither half names a wording we chose.
 check('10. ...and it is still a question until she confirms',
-  /Shall I\?/.test(moved.text) && !/has been moved|is now on/i.test(moved.text), moved.sample)
+  /\?/.test(moved.text) && !/has been moved|is now on/i.test(moved.text), moved.sample)
 await shoot('moved-session-move-card')
 
 // --- the other answer: dropping it -----------------------------------------

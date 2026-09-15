@@ -259,13 +259,23 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
 }
 
 // ---------------------------------------------------------------------------
-// SAFETY TEXT — RE-EXPORTED, NEVER RE-WORDED
+// SAFETY TEXT LIVES IN edit-reason.ts, AND THIS FILE DOES NOT TOUCH IT.
 //
-// Ashley's pain ruling of 15 Sep is a rule about the APP: every surface where
-// somebody says something hurts asks the same three questions, and the third
-// answer names a professional and changes nothing. A second copy of those
-// words here would be a second thing to drift, and the half that drifted would
-// be the half nobody re-read. So this module points at the one copy.
+// Ashley's pain ruling of 15 Sep 2026 is a rule about the APP: every surface
+// where somebody says something hurts asks the same three questions, and the
+// third answer names a professional and changes nothing. A second copy of those
+// words would be a second thing to drift, and the half that drifted would be
+// the half nobody re-read.
+//
+// THIS FILE FIRST RE-EXPORTED HURT_KINDS AND RED_FLAG_ADVICE, and that was
+// wrong twice over. Nobody imported them from here — both screens take them
+// straight from edit-reason, as they always did — so the re-export was dead.
+// And it was not free: it was this module's only runtime edge, and test:bundle
+// caught the app's re-download tipping to exactly its ceiling. Ashley's ruling
+// of 14 Sep on that number was to take weight OFF the first-paint path rather
+// than raise the ceiling a second time, so it came off.
+//
+// The rule it was meant to serve is unchanged and now sits where it belongs:
+// test:coach-voice §5 asserts this file holds no copy of the safety text at
+// all. That was always the real property; the re-export was a mechanism for it.
 // ---------------------------------------------------------------------------
-
-export { HURT_KINDS, RED_FLAG_ADVICE } from './edit-reason'

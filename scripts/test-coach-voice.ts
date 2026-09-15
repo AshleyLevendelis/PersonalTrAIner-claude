@@ -81,8 +81,26 @@ const walk = (file: string, seen = new Set<string>()) => {
 walk(VOICE)
 const heavyHits = graph.filter(g => HEAVY.some(h => g.includes(h)))
 check('nothing heavy is reachable from it at runtime', heavyHits.length === 0, heavyHits)
-check('...and the graph really was walked, so an empty result means light, not broken',
-  graph.length > 0, graph)
+// A POSITIVE CONTROL, because "empty" is now the CORRECT answer. The first
+// version asserted the graph was non-empty, on the reasoning that an empty
+// result probably meant a broken walker — true at the time, since the module
+// re-exported the safety text. Removing that dead re-export made the module a
+// true leaf, and the guard then failed on exactly the state it wanted.
+// So the walker is proved on a file KNOWN to have runtime imports instead, and
+// the phrasebook is then allowed to be empty.
+const controlGraph: string[] = []
+{
+  const keep = graph.slice()
+  graph.length = 0
+  walk('src/lib/edit-tradeoff.ts')
+  controlGraph.push(...graph)
+  graph.length = 0
+  graph.push(...keep)
+}
+check('...and the walker works, proved on a module that really does import things',
+  controlGraph.length > 0, controlGraph.length)
+check('...so the phrasebook importing nothing at runtime is a fact, not a broken read',
+  graph.length === 0, graph)
 
 // ---------------------------------------------------------------------------
 console.log('\n[2] EVERY proposal card asks — none is silent\n')
@@ -170,8 +188,14 @@ console.log('\n[5] The safety text has exactly one copy\n')
 // words would be a second thing to drift, and the half that drifted would be the
 // half nobody re-read. Same shape as test:coach-rules-sync.
 const voiceSrc = read(VOICE)
-check('the phrasebook re-exports the safety text rather than restating it',
-  /export \{[^}]*RED_FLAG_ADVICE[^}]*\} from '\.\/edit-reason'/.test(voiceSrc))
+// THIS CHECK PINNED A MECHANISM AND HAD TO GO. It required the phrasebook to
+// RE-EXPORT the safety text — but nobody imported it from here, so the
+// re-export was dead code, and it was the module's only runtime edge, which
+// tipped test:bundle's re-download to its ceiling. The rule was never "re-export
+// it"; it was "do not keep a second copy", which the check below states directly.
+check('the phrasebook does not own safety text at all',
+  !/RED_FLAG_ADVICE|HURT_KINDS/.test(strip(voiceSrc).replace(/^import[\s\S]*?$/gm, '')),
+  strip(voiceSrc).match(/.{0,60}(RED_FLAG_ADVICE|HURT_KINDS).{0,40}/)?.[0])
 // THE QUOTE CLASS MUST RESPECT WHICH QUOTE OPENED THE STRING. A flat [^'"`]
 // stops at the apostrophe in "That's", so this matched four characters, failed
 // the {20,} and reported the safety text missing. Second time today the same
