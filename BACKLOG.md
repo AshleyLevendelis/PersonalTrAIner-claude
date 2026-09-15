@@ -2,6 +2,74 @@
 
 Newest first. One line each.
 
+- [x] **FIXED — the coach was sending empty bubbles; and the persona rule she
+  asked for.** Ashley, from the live app on her phone, 15 Sep 2026, with a
+  screenshot: three turns in a row — one of them just "Hello" — came back as a
+  green avatar and nothing else. No sentence, no card, no chips, no Retry.
+  **WHAT CHANGES ON HER PHONE.** The app never goes silent again. If a reply
+  comes back empty it says *"That came back empty — nothing came through from
+  your coach"*, marks the turn failed, and leaves Retry there.
+  **WHERE THE HOLE WAS, traced rather than guessed.** A floor already existed
+  and is right for the case it was built for — the edge function's plain turn
+  runs `resolvePlainReply`, so a model that skips a turn still says something.
+  But the CLIENT had none, and several server paths return `reply: ""` on
+  purpose: `log_workout` and the memory intents hand back an empty string
+  because the client is meant to author the copy itself. Any turn that came
+  back empty and then failed to author anything rendered as silence, and no
+  check anywhere noticed.
+  **THE RETRY PATH WAS WORSE THAN THE SEND PATH** and had the identical hole:
+  it blanked AND cleared `lastFailedInput`, so retrying a blank removed the
+  button that produced it — a failure that looked like a success. One
+  `floorReply` now serves both.
+  **WHAT THIS DOES NOT DO, said plainly:** it does not explain why the coach
+  returned nothing on her phone. Production is not reachable from a cloud
+  session. This makes the app honest about it, gives her a Retry, and logs an
+  error; the cause is still to find.
+  **HER PERSONA SPEC, applied** — end every response with exactly ONE targeted
+  follow-up that drives accountability, checks recovery, or clarifies the next
+  step; never two questions in one message. Added as prompt §1b-i. Two
+  conflicts resolved in the rule rather than left implicit: a card's own
+  buttons are not the question and must not be re-asked in words, and a turn
+  that is already a question with chips IS the question.
+  **Mutations: 5 attempted, 5 caught.** The browser one reproduces her
+  screenshot exactly — her message, then nothing. The copy was cut AFTER
+  reading the screenshot: the first version said "tap Retry" on top of an
+  inline line and a button that already say it, three times on one bubble.
+  New: `test:never-blank` (the floor executed, not read — the first cut indexed
+  source strings, mis-fired on the wrong `cleanedText`, and that is how the
+  Retry path's hole was found), `verify:tradeoff` §7.
+  **NEEDS A DEPLOY:** the persona is a prompt change —
+  `npm run deploy:functions:prod -- chat-gemini`. The empty-bubble fix is
+  frontend, on merge. `test:coach-exam-fresh` passes only because the exam has
+  never been run; it is not evidence the coach is unchanged.
+
+- [ ] **FOUND, NOT FIXED, and it is not from this session's work:
+  `verify:correction-loop` is red — a logged-set CORRECTION adds sets instead
+  of replacing them.** Five checks fail: the clarification question does not
+  name the lift ("Which exercise was that?" rather than a whole sentence), and
+  correcting "3×10" to "3×8" leaves the day with the wrong total rather than
+  the corrected one. That is the double-counting shape this file has recorded
+  before.
+  **PROVEN PRE-EXISTING rather than assumed.** Run against the chat component
+  as it stood before today's changes: identical five failures, same names. Then
+  run again in a clean worktree at `0e4741f`, before any of today's work:
+  identical again. Same checks RAN in every case, so this is a comparison and
+  not a crash reading as a pass.
+  Its own fix, its own session. Re-measure before acting on this line.
+
+- [x] **The full sweep, 15 Sep 2026: 228 gates, 5 failed, none of them the
+  app.** `test:meal-quality` and `test:schema-parity` are the two standing
+  cloud-session failures (they need a live database). `verify:rls` is the same
+  shape and says so itself rather than printing a pass it cannot justify.
+  `verify:correction-loop` is the pre-existing defect above.
+  `verify:tradeoff` failed IN THE SWEEP ONLY, and the cause was mine: my own
+  repeated standalone runs had leaked four Chromium instances onto that
+  driver's fixed debug port, so the sweep's run attached to a dead browser and
+  hung for 46 minutes at check 0b. Cleared the strays, re-ran it clean — all
+  checks pass. **Worth keeping: the browser drivers share hardcoded debug
+  ports and do not clean up after a failed run, so a driver can hang rather
+  than fail, and a hang is not a red line — it is an hour of nothing.**
+
 - [x] **BUILT — the app asks WHY before it changes anything, and pain gets
   triaged.** Third of the three Ashley picked. `docs/how-the-app-talks-about-a-change.md`
   §3 called this "the single highest-value change"; §11 listed it as step 1.
