@@ -33,6 +33,7 @@ import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
+import { ask, whichOne, didNotSave, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS } from '@/lib/coach-voice'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
@@ -1909,12 +1910,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const dayArg = String(rawArgs.day ?? '')
     const oldItem = String(rawArgs.old_item ?? '')
     const newItem = String(rawArgs.new_item ?? '')
-    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
     if (!oldItem) return { ok: false, reason: 'Which exercise did you want to change?' }
     if (!newItem) return { ok: false, reason: `What would you like instead of ${oldItem}?` }
 
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
-    if (!week) return { ok: false, reason: "I can't see this week on your plan just now — give it a moment and ask me again." }
+    if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
     // An absent day means TODAY. "Swap this exercise" names no day at all, and
     // demanding one was the commonest way into the dead end.
@@ -2046,10 +2047,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     advice: EditAdvice
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '')
-    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
     if (!item) return { ok: false, reason: 'Which exercise did you want to add?' }
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
-    if (!week) return { ok: false, reason: "I can't see this week on your plan just now — give it a moment and ask me again." }
+    if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
     const dayArg = String(rawArgs.day ?? '') || 'today'
     const dayName = week.days.some(d => d.day.toLowerCase() === dayArg.toLowerCase())
@@ -2089,7 +2090,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { weekNumber: activeSession.liveWeek, dayName, exerciseName: entry.name, scope },
       preImage: mesocycle,
       diff: {
-        lead: `I can add **${entry.name}** to ${dayName}:`,
+        lead: ask(`add **${entry.name}** to ${dayName}`),
         rows: [
           { field: dayName, before: `${day.exercises.length} exercises`, after: `${day.exercises.length + 1} exercises` },
           { field: 'Session length', before: `~${wasMinutes} min`, after: `~${nowMinutes} min` },
@@ -2136,7 +2137,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '').trim()
     if (!item) return { ok: false, reason: 'Which exercise did you want me to stop giving you?' }
-    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
 
     // Resolved against the CATALOGUE, so the ban is recorded under the name the
     // app prescribes by rather than the one they typed — a fact keyed to
@@ -2196,7 +2197,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         payload: { exerciseName: name, sessionsAffected: 0 },
         preImage: mesocycle,
         diff: {
-          lead: `I can stop giving you **${name}** for good:`,
+          lead: ask(`stop giving you **${name}** for good`),
           rows: [{ field: 'On this plan', before: 'not scheduled', after: 'not scheduled' }],
           unchanged: ['Every session you already have'],
           implications: [
@@ -2215,7 +2216,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { exerciseName: name, sessionsAffected: sessions },
       preImage: mesocycle,
       diff: {
-        lead: `I can stop giving you **${name}** for good:`,
+        lead: ask(`stop giving you **${name}** for good`),
         rows: [
           { field: 'Sessions it appears in', before: `${sessions}`, after: '0' },
           { field: 'Weeks affected', before: `${weeksTouched.size} of ${mesocycle.length}`, after: 'all rebuilt' },
@@ -2252,10 +2253,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     advice: EditAdvice
   } | { ok: false; reason: string } => {
     const item = String(rawArgs.item ?? '')
-    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
     if (!item) return { ok: false, reason: 'Which exercise did you want to take out?' }
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
-    if (!week) return { ok: false, reason: "I can't see this week on your plan just now — give it a moment and ask me again." }
+    if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
     const target = resolveSwapTarget({
       dayArg: String(rawArgs.day ?? '') || 'today',
@@ -2287,7 +2288,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { weekNumber: activeSession.liveWeek, dayName: day.day, exIndex: target.exIndex, exerciseName: target.exerciseName, scope },
       preImage: mesocycle,
       diff: {
-        lead: `I can take **${target.exerciseName}** out of ${day.day}:`,
+        lead: ask(`take **${target.exerciseName}** out of ${day.day}`),
         rows: [{ field: day.day, before: `${day.exercises.length} exercises`, after: `${day.exercises.length - 1} exercises` }],
         unchanged: [`Everything else on ${day.day}`],
         implications: [
@@ -2324,11 +2325,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const item = String(rawArgs.item ?? '')
     const beforeItem = String(rawArgs.before_item ?? '')
     const afterItem = String(rawArgs.after_item ?? '')
-    if (mesocycle.length === 0) return { ok: false, reason: "Your plan hasn't loaded yet — give it a moment and ask me again." }
+    if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
     if (!item) return { ok: false, reason: 'Which exercise did you want to move?' }
     if (!beforeItem && !afterItem) return { ok: false, reason: `Where should ${item} go — before or after which exercise?` }
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
-    if (!week) return { ok: false, reason: "I can't see this week on your plan just now — give it a moment and ask me again." }
+    if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
     const dayArg = String(rawArgs.day ?? '') || 'today'
     const moving = resolveSwapTarget({ dayArg, exerciseArg: item, days: week.days, todayName: activeSession.dayName })
@@ -2355,7 +2356,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { weekNumber: activeSession.liveWeek, dayName: day.day, fromIndex: moving.exIndex, toIndex, exerciseName: moving.exerciseName, neighbourName: neighbour.exerciseName, placement: beforeItem ? 'before' : 'after', scope: 'today' },
       preImage: mesocycle,
       diff: {
-        lead: `I can put **${moving.exerciseName}** ${beforeItem ? 'before' : 'after'} **${neighbour.exerciseName}**:`,
+        lead: ask(`put **${moving.exerciseName}** ${beforeItem ? 'before' : 'after'} **${neighbour.exerciseName}**`),
         rows: [{ field: `${day.day}'s order`, before: day.exercises.map(e => e.name).join(' → '), after: order.join(' → ') }],
         unchanged: ['Every weight, set and rep on the day'],
         implications: [{ severity: 'info', text: 'Order only — nothing about the work itself changes.' }],
@@ -2744,7 +2745,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       payload: { weekNumber: activeSession.liveWeek, dayName: day.day, minutes, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
-        lead: `I can cut ${day.day} down to about ${trial.achievedMinutes} minutes:`,
+        lead: ask(`cut ${day.day} down to about ${trial.achievedMinutes} minutes`),
         rows: [
           { field: 'Time', before: `~${Math.round(estimateDaySeconds(day) / 60)} min`, after: `~${trial.achievedMinutes} min` },
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
@@ -2802,7 +2803,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preconditions: { date: raw, dayName },
       payload: { date: raw, dayName, sessionFocus: session.focus, reason },
       diff: {
-        lead: `I'll mark ${dayName} as a rest day you chose, so it won't show as missed. Shall I?`,
+        lead: ask(`mark ${dayName} as a rest day you chose`),
         rows: [{ field: dayName, before: session.focus, after: 'Rest day' }],
         implications: [
           { severity: 'info', text: "It won't count as a missed session, and it won't count against your week." },
@@ -2876,7 +2877,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preconditions: { date: raw, dayName },
       payload: { date: raw, dayName, activityName, sessionFocus: session.focus, durationMinutes: minutes, intensityRpe: rpe, activityPlanned: planned },
       diff: {
-        lead: `I'll mark ${dayName} as ${activityName} instead of your lift, so it won't show as missed. Shall I?`,
+        lead: ask(`mark ${dayName} as ${activityName} instead of your lift`),
         rows: [{ field: dayName, before: session.focus, after: activityName }],
         implications,
         reversible: true,
@@ -2916,7 +2917,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preconditions: { date: raw, dayName },
       payload: { date: raw, dayName, sessionFocus: session.focus, reason },
       diff: {
-        lead: `I'll mark ${dayName}'s ${session.focus} as missed — it stays on your record as a session that didn't happen. Shall I?`,
+        lead: ask(`mark ${dayName}'s ${session.focus} as missed`),
         rows: [{ field: dayName, before: session.focus, after: 'Missed' }],
         implications: [
           { severity: 'info', text: "It counts as a missed session this week. That's the honest record, not a punishment." },
@@ -3044,16 +3045,28 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
     // Said out loud, in the app's words, from the day THIS code resolved.
     // A question until she taps: nothing has moved when this is read.
+    // WHY THAT DAY, THEN THE ASK. Ashley's grammar of 15 Sep 2026 is "Want me
+    // to X?", and this card also has to explain which day it picked and why —
+    // so the reason goes first and the question last.
+    //
+    // THE ORDER IS NOT COSMETIC, and I had it the other way round first: the
+    // ask led, the reason trailed, and `test:session-move` went red on "every
+    // lead ends as a question, after any passenger clause". That check was
+    // pinned on the old wording and had to be re-anchored regardless — but the
+    // property underneath it was right and mine was wrong. A card whose last
+    // sentence is an explanation leaves a person reading prose when they are
+    // looking for the thing to answer; the question belongs against the
+    // buttons.
     const leadBase = target.asWanted || !target.requestedDayName
-      ? `${target.dayName}'s free, so I'll put ${trueFromDayName}'s ${session.focus} there and ${trueFromDayName} won't count as missed.`
-      : `${target.requestedDayName} already has a session, so the next free day is ${target.dayName} — I'll put ${trueFromDayName}'s ${session.focus} there and ${trueFromDayName} won't count as missed.`
+      ? `${target.dayName}'s free, so ${trueFromDayName} won't count as missed.`
+      : `${target.requestedDayName} already has a session, so ${target.dayName} is the next one free — and ${trueFromDayName} won't count as missed.`
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_session_move:${trueFromDate}:${target.date}`,
       preconditions: { fromDate, toDate: target.date },
       payload,
       diff: {
-        lead: `${leadBase}${alsoDoing ? alsoDoingLeadClause(alsoDoing) : ''} Shall I?`,
+        lead: `${leadBase}${alsoDoing ? alsoDoingLeadClause(alsoDoing) : ''} ${ask(`put ${trueFromDayName}'s ${session.focus} on ${target.dayName}`)}`,
         // THE TRUE ORIGIN ON THE CARD TOO, not just in the sentence above it.
         // Caught in the browser, 10 Sep 2026: on a session that had already
         // been moved once, the lead read "I'll put Wednesday's Upper Pull &
@@ -3754,7 +3767,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     } catch (err) {
       console.error('Logging steps from chat failed:', err)
       return {
-        text: "That didn't save — check your connection and I'll try again.",
+        text: didNotSave('That'),
         receipt: {
           kind: 'steps_logged',
           title: 'Steps not logged',
@@ -4883,7 +4896,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // reintroduce the exact bug the pool-level swap fix just closed).
         const persisted = await onMealSwapApplied(payload.slot, result.appliedName)
         if (!persisted) {
-          receipt = { ...receipt, failed: [...receipt.failed, { op: 'save', error: "The swap didn't save — try again" }] }
+          receipt = { ...receipt, failed: [...receipt.failed, { op: 'save', error: didNotSave('The swap') }] }
           ok = false
         }
       }

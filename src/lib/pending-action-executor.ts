@@ -12,6 +12,7 @@
 // guard against double-execution, that's the claim's job.
 // ---------------------------------------------------------------------------
 
+import { didNotSave } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
@@ -101,7 +102,7 @@ export async function executeExerciseSwap(
     return {
       mesocycle: updatedMesocycle,
       preImage,
-      receipt: { landed: [], failed: [{ op: 'save', error: 'The swap could not be saved — try again' }] },
+      receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The swap') }] },
     }
   }
 
@@ -189,7 +190,7 @@ export async function executeExerciseRemove(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseRemove: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return {
     mesocycle: result.mesocycle, preImage,
@@ -258,7 +259,7 @@ export async function executeExerciseAdd(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseAdd: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return {
     mesocycle: result.mesocycle, preImage,
@@ -368,7 +369,7 @@ export async function executeExerciseReorder(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseReorder: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   const where = payload.neighbourName ? ` — now ${payload.placement ?? 'next to'} ${payload.neighbourName}` : ''
   return {
@@ -552,7 +553,7 @@ export async function applyMealOptionToSlot(
   // from the insert, so this removes the row it wrote and never a same-named
   // meal that was already there.
   await undoMealAddition(profileId, payload, result.poolIndex)
-  return { receipt: { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }, poolIndex: null }
+  return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The meal') }] }, poolIndex: null }
 }
 
 /**
@@ -653,7 +654,7 @@ export async function executeMealMove(
           op: 'propose_meal_move',
           error: done.length > 0
             ? "The swap didn't save, so nothing moved — your meals are as they were"
-            : "The move didn't save — try again",
+            : didNotSave('The move'),
         }],
       }
     }
@@ -728,7 +729,7 @@ export async function executeInjuryAdaptation(
     await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeInjuryAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
@@ -816,7 +817,7 @@ export async function executeLastingInjury(
     }
   } catch (err) {
     console.error('executeLastingInjury: persisting failed', err)
-    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
 
   return {
@@ -862,7 +863,7 @@ export async function executeInjuryRecovered(
     await updateProfileField(profile.id, { injuries: profile.injuries.filter(i => i !== payload.injuryCode) })
   } catch (err) {
     console.error('executeInjuryRecovered: persisting failed', err)
-    return { receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+    return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return { receipt: { landed: [`Injuries: removed ${payload.injuryCode.replace('_', ' ')}`], failed: [] } }
 }
@@ -887,7 +888,7 @@ export async function executeEquipmentAdaptation(
     await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeEquipmentAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
@@ -1022,7 +1023,7 @@ export async function executeSessionShorten(
   )
 
   try { if (profile.id) await saveMesocycleWeek(profile.id, settled.week) }
-  catch { failed.push({ op: 'save', error: "That didn't save — try again in a moment." }) }
+  catch { failed.push({ op: 'save', error: didNotSave('That') }) }
 
   return { mesocycle: next, preImage, receipt: { landed, failed } }
 }

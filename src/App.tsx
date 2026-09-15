@@ -1,3 +1,4 @@
+import { couldNot } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -1205,7 +1206,7 @@ function App() {
       // setupError, not authError: this is the onboarding screen's own error
       // surface, which is where the person actually is when it happens.
       setSetupError(
-        "We couldn't start your account, so there was nowhere to save your plan. " +
+        `${couldNot('start your account')} There was nowhere to save your plan. ` +
         `Check your connection and try again — nothing was lost. (${signIn.error ?? 'no session'})`,
       )
       return
@@ -1702,11 +1703,11 @@ function App() {
         setMealRegenerateError(
           result.generatorReached
             ? (hadExistingOptions
-                ? `Couldn't fit a new ${MEAL_SLOT_LABEL[slot]} option — kept your existing one. Try loosening a restriction or widening your calorie range.`
+                ? `${couldNot(`fit a new ${MEAL_SLOT_LABEL[slot]} option`)} I've kept your existing one — try loosening a restriction or widening your calorie range.`
                 : `${MEAL_SLOT_LABEL[slot]} doesn't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off this slot.`)
             : (hadExistingOptions
-                ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
-                : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`)
+                ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
+                : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`)
         )
         return
       }
@@ -1717,8 +1718,8 @@ function App() {
     } catch {
       setMealRegenerateError(
         hadExistingOptions
-          ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
-          : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`
+          ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
+          : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`
       )
     } finally {
       setIsGeneratingMeals(false)
@@ -1767,7 +1768,7 @@ function App() {
         setMealRegenerateError(
           result.generatorReached
             ? "Nothing fits your current targets right now. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot — then regenerate."
-            : "Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment."
+            : `${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`
         )
         return
       }
@@ -1797,12 +1798,12 @@ function App() {
         const keptSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) > 0)
         const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
         const parts: string[] = []
-        if (keptSlots.length > 0) parts.push(`Couldn't fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept what you had.`)
+        if (keptSlots.length > 0) parts.push(`${couldNot(`fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')}`)} I've kept what you had.`)
         if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} don't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off a slot.`)
         setMealRegenerateError(parts.join(' '))
       }
     } catch {
-      setMealRegenerateError("Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment.")
+      setMealRegenerateError(`${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`)
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -1885,7 +1886,7 @@ function App() {
       console.error('Weight-basis rebuild failed:', err)
       setAdaptationMessages(prev => [
         ...prev.filter(m => m.weightBasisOfferId !== id),
-        { text: "Couldn't rebuild your plan just then — nothing was changed. Try again in a moment." },
+        { text: `${couldNot('rebuild your plan just then')} Nothing was changed — try again in a moment.` },
       ])
     } finally {
       setLoadSuggestionBusy(null)
@@ -1987,7 +1988,7 @@ function App() {
       await reloadMemory(profile.id)
     } catch (err) {
       console.error('Recording the ban failed:', err)
-      setWriteError(`Couldn't save that — ${exerciseName} hasn't been removed. Check your connection and try again.`)
+      setWriteError(`${couldNot('save that')} ${exerciseName} hasn't been removed — check your connection and try again.`)
       return
     }
     setWriteError(null)
@@ -2136,7 +2137,7 @@ function App() {
       )
       const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek)
       if (!result.ok || !result.mesocycle) {
-        setWriteError(result.error ?? "Couldn't rebuild your plan just now — nothing has changed.")
+        setWriteError(result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`)
         return
       }
       const previous = mesocycle
@@ -2416,7 +2417,7 @@ function App() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-4 text-center">
-          <h2 className="text-lg font-semibold">We couldn't sign you in</h2>
+          <h2 className="text-lg font-semibold">I couldn't sign you in</h2>
           {/* The message depends on WHAT failed. Blaming the connection for a
               server setting sends someone to check their wifi over something
               only a dashboard toggle can fix — and offers a Try again button
@@ -2479,7 +2480,7 @@ function App() {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <div className="max-w-md w-full space-y-4 text-center">
-            <h2 className="text-lg font-semibold">We couldn't finish setting up your plan</h2>
+            <h2 className="text-lg font-semibold">I couldn't finish setting up your plan</h2>
             <p className="text-sm text-muted-foreground break-words">{setupError}</p>
             <Button className="w-full" onClick={() => setSetupError(null)}>
               Try again
