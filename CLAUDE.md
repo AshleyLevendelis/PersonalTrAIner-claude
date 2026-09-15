@@ -626,6 +626,17 @@ old — the commands were right and the context was missing.
 - So: run the handful of affected checks while working — they are instant —
   and the full sweep once, before a merge. Run it in the background and do
   something else; do not sit and watch it.
+- **A KILLED SWEEP'S LOG IS INDISTINGUISHABLE FROM A RUNNING ONE. Check the
+  PROCESS, not the file.** 15 Sep 2026: I reported a full sweep as "27 of 234
+  done" against freshly merged code while nothing was running — the log
+  belonged to a sweep I had killed hours earlier. A sweep only writes its
+  "SWEEP DONE" line at the end, so a log that stops early looks exactly like
+  one still being written, and the partial PASS lines read as progress. A
+  watcher that waits for the finish line therefore waits forever and reports
+  nothing wrong. One `ps` settles it. Any background wait on a sweep must
+  check the process is alive on every poll and say so when it is not.
+  This is the "a crash reads as a pass" rule one level up: there, zero
+  failures looked like success; here, a dead run looked like a live one.
 - **Two checks ALWAYS fail in a cloud session and are not your problem:**
   `test:meal-quality` and `test:schema-parity`. Both need a live database this
   machine cannot reach. Confirm by stashing your changes and re-running — they

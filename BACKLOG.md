@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP THAT WAS NOT RUNNING, AND THE CLEAN ONE THAT FOLLOWED IT.**
+  Merged to `main` on Ashley's explicit word — a fast-forward from `cfaea11`
+  to `7d6c7e6`, 29 commits, re-fetched and SHA-verified against origin rather
+  than read off "N commits ahead".
+  **THEN I TOLD HER A FULL SWEEP WAS RUNNING AGAINST THE MERGED CODE. IT WAS
+  NOT.** Nothing was running at all. The background watcher was polling
+  `sweep10.txt` — a sweep I killed myself hours earlier, which stopped at 27
+  of 234 checks. A killed sweep's log never gains its "SWEEP DONE" line, so it
+  is byte-for-byte indistinguishable from one still working, and I reported
+  "27 done, 1 failure" as PROGRESS when it was a HEADSTONE.
+  **HOW I REACHED IT:** I checked whether the FILE said it had finished
+  instead of whether the PROCESS writing it was alive. One `ps` would have
+  said so, and did the moment I ran it. This is the same shape as the rule
+  already in CLAUDE.md — "a crash produces zero failures and reads as a pass"
+  — arriving one level up: a DEAD sweep reads as a RUNNING one. The watcher is
+  now written to check the process is alive on every poll and say so when it
+  is not, instead of waiting for a line that can never come.
+  **ALSO FOUND BY THE SAME LOOK:** `sweep11.txt` had completed at 11:46 and I
+  had not read it. It is the 234/5 run — the one whose `test:audit` and
+  `test:bundle` failures were then fixed in `7d6c7e6`. So the record is:
+  the last COMPLETE sweep predated the fixes it prompted, exactly the gap I
+  had named to Ashley and then wrongly reported as being closed.
+  **THE REAL ONE, AGAINST THE MERGED COMMIT: 234 scripts, 3 failed.** Same 234
+  that ran on the previous sweep, so no crash is hiding inside the number.
+  All three are the unreachable database, confirmed from their OUTPUT and not
+  their names: `test:schema-parity` cannot link to TEST; `verify:rls` prints
+  its own paused-project advice; `test:meal-quality` reports `pools={}`, which
+  is an empty food table rather than a quality verdict. `test:audit` and
+  `test:bundle` — the two real failures of the previous run — both pass.
+  **Deploys still outstanding and unaffected by the merge:** `chat-gemini`
+  (the activity-swap ask and the server-side claim guard are both in it), the
+  `20260910160000_add_marked_missed` migration, and the coach exam, which has
+  still never been run.
+
 - [x] **THE SWEEP CAUGHT TWO REGRESSIONS, BOTH MINE, AND ONE HAD ALREADY
   SHIPPED.** 234 gates, 5 failed. Three are the usual unreachable-database
   three. The other two were real.
