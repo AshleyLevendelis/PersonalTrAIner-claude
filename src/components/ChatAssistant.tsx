@@ -17,7 +17,7 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload} from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -34,6 +34,8 @@ import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { ask, whichOne, didNotSave, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE } from '@/lib/coach-voice'
+import { isHedged } from '@/lib/definite-mention'
+import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
@@ -1855,6 +1857,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       return `I can adjust ${count} exercise${count === 1 ? '' : 's'} across your plan:`
     }
     if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
+    if (pendingAction.kind === 'propose_cardio_session') return "Here's that session on your plan:"
     if (pendingAction.kind === 'propose_session_shorten') return "Here's that session cut down to fit:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
@@ -2760,6 +2763,88 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         unchanged: [`Your main lift — every set of it`],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_cardio_session's card — "Wednesday's my cardio day", yes.
+   *
+   * VALIDATES HERE, NOT AT CONFIRM. This is the bug Ashley hit on 15 Sep: a
+   * card read "Want me to remember Wednesday cardio?", she tapped yes, and
+   * only then did the app discover it had nowhere to put it — "Which meal slot
+   * should that apply to? / Nothing was applied". `buildIntentProposal`
+   * formats a label and never checks the args can be written. Every other
+   * builder in this file returns null and shows no card at all. So does this.
+   *
+   * IT REFUSES A DAY THAT ALREADY TRAINS. plannedActivity means "this activity
+   * is the WHOLE day"; putting one on a lifting day would hide the lifting
+   * behind it on all three screens that now lead with the prescription.
+   */
+  const buildCardioSessionProposal = (rawArgs: Record<string, unknown>, userSaid: string): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: CardioSessionPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { refusal: string } | null => {
+    // ASHLEY'S RULING, 15 Sep 2026, ENFORCED IN THE DIRECTION THAT COSTS
+    // SOMETHING. A session goes on the plan only when she sounded definite.
+    // Read against the WHOLE message, not the model's chosen quote — a quote
+    // of "a bike ride Wednesday" out of "I might do a bike ride Wednesday"
+    // would strip the hedge and pass a check that only read the quote.
+    if (isHedged(userSaid)) {
+      return { refusal: "Sounds like a maybe — say the word when you've decided and I'll put it in." }
+    }
+
+    const activity = String(rawArgs.activity ?? '').trim()
+    const minutes = Number(rawArgs.minutes)
+    const targetRpe = Number(rawArgs.target_rpe)
+    if (!activity) return null
+    if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 240) return null
+    if (!Number.isFinite(targetRpe) || targetRpe < 1 || targetRpe > 10) return null
+    if (mesocycle.length === 0) return null
+    const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    if (!week) return null
+
+    const wanted = String(rawArgs.day ?? '').trim() || activeSession.dayName
+    const day = week.days.find(d => d.day.toLowerCase() === wanted.toLowerCase())
+    if (!day) return null
+    if (day.exercises.length > 0) {
+      return { refusal: `${day.day} already has a session on it — do you want this instead of that one, or on a different day?` }
+    }
+
+    const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
+    const wasRest = !day.plannedActivity
+
+    return {
+      scopeKey: `${profile.id}:propose_cardio_session:${day.day}:${activeSession.liveWeek}`,
+      preconditions: { day: day.day, hadActivity: !wasRest },
+      payload: {
+        weekNumber: activeSession.liveWeek,
+        dayName: day.day,
+        activity,
+        minutes,
+        targetRpe,
+        reason,
+        // EVERY WEEK OF THE BLOCK, because "Wednesday is my cardio day" is a
+        // standing statement, not a one-off. A single session is what
+        // propose_session_activity_swap already does to one day.
+        scope: 'permanent',
+      },
+      preImage: mesocycle,
+      diff: {
+        lead: ask(`put ${prescriptionLine({ activity, duration: minutes, targetRpe })} on ${day.day}`),
+        rows: [
+          { field: day.day, before: wasRest ? 'Rest' : day.focus, after: prescriptionLine({ activity, duration: minutes, targetRpe }) },
+        ],
+        unchanged: ['Every other day of your week'],
+        implications: [
+          { severity: 'info', text: SCOPE.restOfBlock },
+          ...(wasRest ? [] : [{ severity: 'warn' as const, text: `This replaces the ${day.focus.toLowerCase()} that was on ${day.day}.` }]),
+        ],
+        rationale: reason,
         reversible: true,
       },
     }
@@ -4247,6 +4332,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (shorten && 'refusal' in shorten) refusal = shorten.refusal
         else if (shorten) built = { scopeKey: shorten.scopeKey, preconditions: shorten.preconditions, payload: shorten.payload as unknown as Record<string, unknown>, preImage: shorten.preImage, diff: shorten.diff }
         else refusal = "I couldn't work out which session you meant — tell me the day and how long you've got."
+      } else if (result.proposal.kind === 'propose_cardio_session' && result.proposal.rawArgs) {
+        // userSaid, not the tool's quote: see buildCardioSessionProposal.
+        const cardio = buildCardioSessionProposal(result.proposal.rawArgs, userSaid)
+        if (cardio && 'refusal' in cardio) refusal = cardio.refusal
+        else if (cardio) built = { scopeKey: cardio.scopeKey, preconditions: cardio.preconditions, payload: cardio.payload as unknown as Record<string, unknown>, preImage: cardio.preImage, diff: cardio.diff }
+        else refusal = "I couldn't work out which day, or how long — tell me the day, roughly how many minutes, and how hard."
       } else if (result.proposal.kind === 'propose_schedule_change' && result.proposal.rawArgs) {
         const schedule = buildScheduleChangeProposal(result.proposal.rawArgs)
         if (schedule) built = { scopeKey: schedule.scopeKey, preconditions: schedule.preconditions, payload: schedule.payload as unknown as Record<string, unknown>, preImage: schedule.preImage, diff: schedule.diff }
@@ -5099,6 +5190,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? RECEIPTS['propose_session_shorten'].done : RECEIPTS['propose_session_shorten'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_cardio_session') {
+      const payload = row.payload as unknown as CardioSessionPayload
+      const result = await executeCardioSession(profile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_cardio_session'].done : RECEIPTS['propose_cardio_session'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_volume_change') {
       const payload = row.payload as unknown as VolumeChangePayload
       const result = await executeVolumeChange(profile, mesocycle, payload)
@@ -5422,6 +5522,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const preImage = row.pre_image as MesocycleWeek[] | null
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, 'today', planCreatedAt)
+        onMesocycleUpdated(preImage)
+      } else if (row.kind === 'propose_cardio_session') {
+        // Wrote the rest of the block, so the undo restores the same scope it
+        // wrote — the payload carries it rather than the live week guessing.
+        const payload = row.payload as unknown as CardioSessionPayload
+        const preImage = row.pre_image as MesocycleWeek[] | null
+        if (!preImage || !planCreatedAt) return
+        await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_concurrent_activity') {
         // Both wrote a RUN of weeks, so undo restores the same run rather

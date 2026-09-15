@@ -1026,6 +1026,102 @@ export async function executeSessionShorten(
   return { mesocycle: next, preImage, receipt: { landed, failed } }
 }
 
+export interface CardioSessionPayload {
+  weekNumber: number
+  dayName: string
+  activity: string
+  minutes: number
+  targetRpe: number
+  reason?: string
+  /** 'today' writes the live week only; 'permanent' carries it to the rest of the block. */
+  scope: 'today' | 'permanent'
+}
+
+/**
+ * PUTS A CARDIO SESSION ON A DAY, as part of the plan.
+ *
+ * Ashley, 15 Sep 2026: *"I want when it adds a session like a cardio session
+ * that it's actually a useful card like other workouts not empty."*
+ *
+ * It writes a `PlannedActivity`, which is the shape three screens learned to
+ * render earlier the same day — the card on Today, the week list, tomorrow's
+ * preview. That ordering was the point: a card that cannot be rendered must
+ * not be offered, and before that fix this would have produced exactly the
+ * blank "log a walk or other activity" box she reported.
+ *
+ * IT REFUSES A DAY THAT ALREADY HAS LIFTING ON IT. `plannedActivity` means
+ * "this activity is the WHOLE day" (types.ts says so), so writing one onto a
+ * day holding exercises would make "is this the session or an extra?"
+ * unanswerable from the data — and the screens, which lead with the
+ * prescription, would hide the lifting behind it. Adding cardio AFTER a lift
+ * is what `recommendedCardio` already means and is a different request.
+ */
+export async function executeCardioSession(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: CardioSessionPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const week = mesocycle.find(w => w.week_number === payload.weekNumber)
+  if (!week) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: "I can't see that week on your plan just now." }] } }
+  }
+  const day = week.days.find(d => d.day === payload.dayName)
+  if (!day) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: `I couldn't find ${payload.dayName} on your plan.` }] } }
+  }
+  if (day.exercises.length > 0) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed, failed: [{ op: 'add', error: `${payload.dayName} already has a session on it.` }] },
+    }
+  }
+
+  const withActivity = (w: MesocycleWeek): MesocycleWeek => ({
+    ...w,
+    days: w.days.map(d => d.day !== payload.dayName ? d : {
+      ...d,
+      focus: payload.activity,
+      is_scheduled: true,
+      // THE SUGGESTION GOES WHEN THE PRESCRIPTION ARRIVES. recommendedCardio
+      // is an add-on the generator offers for an empty day; once the day HAS a
+      // session, leaving it would be two prescriptions on one day and no way
+      // to tell which is which.
+      recommendedCardio: undefined,
+      plannedActivity: {
+        activity: payload.activity,
+        duration: payload.minutes,
+        targetRpe: payload.targetRpe,
+        ...(payload.reason ? { reason: payload.reason } : {}),
+      },
+    }),
+  })
+
+  const block = week.block_number
+  const touched = payload.scope === 'today'
+    ? [payload.weekNumber]
+    : mesocycle.filter(w => w.block_number === block && w.week_number >= payload.weekNumber).map(w => w.week_number)
+  const next = mesocycle.map(w => (touched.includes(w.week_number) ? withActivity(w) : w))
+
+  landed.push(`${payload.dayName}: ${payload.activity}, ${payload.minutes} min at RPE ${payload.targetRpe}`)
+
+  if (!profile.id) {
+    return { mesocycle: next, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await saveScopedEdit(profile.id, next, payload.weekNumber, payload.scope)
+  } catch (err) {
+    console.error('executeCardioSession: persisting failed', err)
+    return { mesocycle: next, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That session') }] } }
+  }
+
+  return { mesocycle: next, preImage, receipt: { landed, failed } }
+}
+
 export interface ScheduleChangePayload {
   /** The days the user will train, replacing whatever was there. */
   trainingDays: string[]

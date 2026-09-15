@@ -835,6 +835,42 @@ const toolDeclarations = [
   },
 
   {
+    name: "propose_cardio_session",
+    description:
+      "PROPOSES putting a CARDIO OR ACTIVITY SESSION on one day of their plan — a run, a ride, a swim, a rower, a walk — as part of the plan, not as a note. This does NOT apply anything: the app shows a card and the user taps Confirm. CALL IT ONLY AFTER THEY HAVE SAID YES. When somebody mentions doing something on a day ('Wednesday is my cardio day', 'I run on Tuesdays'), you ASK first, in plain words, with no tool call at all — see the section on offering to add a session. Only when they answer yes do you call this. YOU MUST CARRY THE DETAIL THE CONVERSATION ALREADY ESTABLISHED: if you have told them 30-40 minutes of zone 2 on a treadmill or bike, this card says 35 minutes at that effort, not 'cardio'. A card that throws away what you just prescribed is worse than no card. It is NOT propose_concurrent_activity, which is for a sport they do OUTSIDE this plan (a Muay Thai class, a football league) and which rebuilds their lifting around it — this one is a session the plan itself prescribes and shows on the day. It is NOT record_fact: remembering that Wednesday is their cardio day changes nothing on any screen.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day of the week the session goes on (Monday ... Sunday). Absent means today.",
+        },
+        activity: {
+          type: "string",
+          description: "Plain name as they would say it — 'Run', 'Cycle', 'Swim', 'Row', 'Walk'. Not a sentence, and never the bare word 'Cardio' if you know what kind.",
+        },
+        minutes: {
+          type: "number",
+          description: "How long the session is. REQUIRED. Take the number from the conversation — if you have already recommended 30-40 minutes, use a number in that range and say which. If nothing has been said and you have no basis for one, ASK how long rather than inventing a number.",
+        },
+        target_rpe: {
+          type: "number",
+          description: "Effort on the 1-10 scale, REQUIRED. Zone 2 / conversational is 3-4; steady is 5-6; hard intervals are 7-8. Use what was discussed.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence, in your own coaching voice, on why this session is what it is — shown on the day itself, so write it for them to read later, not as a label.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message agreeing to this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["activity", "minutes", "target_rpe", "origin_verbatim_quote"],
+    },
+  },
+
+  {
     name: "ban_exercise",
     description:
       "PROPOSES banning ONE exercise from EVERY week of EVERY block — the largest single change in the app. This does NOT apply anything: the app shows a card stating how many sessions the ban reaches, and the user taps Confirm. Call this when the user says 'I hate X', 'never give me X again', 'remove X permanently', or explicitly flags an exercise to never appear again. It is NOT propose_exercise_remove, which takes it out of ONE session and leaves every other week alone — if they mean just today or just this session, that is the tool. It is NOT propose_exercise_swap, which keeps the slot and changes what fills it. Never say it is banned before the card comes back confirmed, and never quote a number of sessions yourself; the card carries the app's own count.",
@@ -1856,6 +1892,22 @@ When the user tells you about something they do OUTSIDE this plan on a regular w
 - THREE SENTENCES THAT LOOK ALIKE AND ARE NOT: "I do Muay Thai every Tuesday" is THIS tool (a standing commitment, the plan bends around it). "I'm doing Muay Thai instead of legs tonight" is propose_session_activity_swap (one day, marked as a deliberate swap). "I can't train on Tuesdays" is propose_schedule_change (a gym day removed). Pick by what they said, and if it is genuinely unclear whether a session is one-off or every week, ask.
 - Never guess days, time of day or intensity. If they say "twice a week" without naming the days, ask which days before calling — a plan reorganised around the wrong evenings is worse than one that did not move.
 
+=== 3g2. THEY MENTIONED DOING SOMETHING ON A DAY (propose_cardio_session) ===
+Ashley's ruling, 15 Sep 2026: offer to put it in the plan ONLY when they sound DEFINITE. Not every time, and never silently.
+
+THE TWO-TURN SHAPE, and the first turn is the whole point:
+- TURN ONE — NO TOOL CALL AT ALL. Reply in plain words, name what you heard, and ask: "Wednesday's your cardio day — want me to put that in your plan?" Then a quick-reply tag, because this is exactly the bounded question §4 describes: [QUICK_REPLIES: "Yes, add it" | "No, just chatting"]. Do NOT call propose_cardio_session on this turn. A card on turn one is the thing she asked us to stop doing.
+- TURN TWO — only if they say yes, call propose_cardio_session.
+
+WHEN TO ASK — say it out loud before you decide, because the app will not correct you:
+- DEFINITE, so ask: a present-tense or committed statement about a specific day. "Wednesday is my cardio day." "I run on Tuesdays." "I'm doing a bike ride Thursday." "I swim Saturday mornings."
+- HEDGED, so say nothing about adding it and just carry on the conversation: might, maybe, perhaps, possibly, probably, thinking about, thinking of, considering, I could, I may, we may, hoping to, hope to, not sure, if I, if I can, depends, we will see, we'll see, at some point, one of these days.
+- If they ask outright ("add a run on Friday"), that is not a mention, it is an instruction — you may go straight to the tool.
+
+CARRY WHAT YOU ALREADY TOLD THEM. If earlier in this conversation you recommended 30-40 minutes of zone 2 on a treadmill or bike, the card says a number in that range at that effort. "Wednesday: cardio" has thrown away your own coaching and is not acceptable. minutes and target_rpe are REQUIRED for that reason. If nothing has been discussed and you have no basis, ASK how long and how hard before calling — one more question is cheaper than a session they did not want.
+
+NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. One day's lift replaced by an activity is propose_session_activity_swap. Remembering a preference that changes no screen is record_fact.
+
 === 4. TAG HYGIENE & QUICK REPLIES ===
 - Strict Placement: Place any system action or quick reply tag on its OWN DEDICATED LINE at the absolute bottom of your response.
 - Message-break tag ([BREAK]): the ONE tag that appears mid-response, on its own line, wherever you want the reply to split into a second sent message (§1). Maximum two [BREAK]s (three messages). Never put one immediately before a [QUICK_REPLIES] or [ACTION] line — those always belong at the very bottom, after the final message's text.
@@ -1866,7 +1918,7 @@ When the user tells you about something they do OUTSIDE this plan on a regular w
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -2064,7 +2116,7 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "propose_cardio_session", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
@@ -3391,6 +3443,34 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_session_shorten",
               rawArgs: { day: args.day, minutes: args.minutes, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_cardio_session") {
+        // Courier shape, same as propose_session_shorten above: no server
+        // write, raw args forwarded, the client builds the card.
+        //
+        // origin_verbatim_quote IS FORWARDED, unlike session_shorten's, and
+        // that is load-bearing rather than tidiness. Ashley's 15 Sep ruling is
+        // that a session is offered only when somebody sounds DEFINITE, and
+        // the client refuses to build a card off a hedged message. It needs
+        // the quote to know which message it is judging.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_cardio_session",
+              rawArgs: {
+                day: args.day,
+                activity: args.activity,
+                minutes: args.minutes,
+                target_rpe: args.target_rpe,
+                reason: args.reason,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

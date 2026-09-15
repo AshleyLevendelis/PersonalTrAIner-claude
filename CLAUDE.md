@@ -162,6 +162,21 @@ menu" stays true when a copy is also left outside it.
   the coach's volume change, which reaches to the end of the plan. True, and
   still true — this adds a second, narrower one beside it rather than changing
   that one.
+- **Put a cardio session on a day, as part of the plan** — both surfaces since
+  15 Sep 2026. Ashley: *"know when to suggest adding a session and when
+  something is mentioned in passing"*. Her ruling that day, from three options:
+  **offer it only when she sounds DEFINITE** — over asking every time (my
+  recommendation) and over never offering.
+  **THE RULING IS ENFORCED IN ONE DIRECTION ONLY, and that is the part to
+  remember.** A hedge ("I might ride Wednesday") cannot produce a card — the
+  client refuses before building one, off a written list of 21 phrases, read
+  against the WHOLE message rather than the model's chosen quote. The coach
+  staying QUIET when it should have offered cannot be enforced at all, because
+  there is no turn to inspect: it simply said something else. So the app blocks
+  the direction that costs something and the coach exam grades the direction
+  that costs nothing. Anything built on a model JUDGEMENT should be split this
+  way and the two halves named separately.
+  `cardio-session`, `verify:cardio-session`, `coach-parity`
 - Rebuild today's session as a whole, for today — `MISSING`, named rather than
   half-built. Nothing regenerates below a whole week; the one function that
   assembles a day is private with fifteen parameters including the cross-day
@@ -690,6 +705,15 @@ old — the commands were right and the context was missing.
   So: for a function, require `name(`; for render order, anchor on the rendered
   block; and prove the detector on something that should FAIL it, in the gate
   itself, so it cannot go vacuous later.
+- **A BROWSER DRIVER FINDS THINGS NO `test:` GATE CAN, AND THEY ARE NOT SMALL.**
+  15 Sep 2026, two in one run, both on a card that every source check passed:
+  a new control was on the wrong component (`RestDayCard` renders only when the
+  plan has NO row for a day; a scheduled-but-empty day gets `ActiveRecoveryCard`
+  — and that is exactly the day the feature was for), and after the write the
+  card showed TWO prescriptions stacked, leaving the reader to guess which was
+  the session. Neither is visible from the data or the source; both are obvious
+  in one screenshot. When something new appears on a screen, the driver is not
+  the last step after the gates pass — it is the step that finds the defect.
 - **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
   beyond "did not apply" and "crashed", and the harness cannot see it: on
   15 Sep a mutation to the walking plan's day builder read MISSED because the

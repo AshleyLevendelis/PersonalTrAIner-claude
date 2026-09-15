@@ -56,6 +56,7 @@ import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
 import { settleWeek } from '@/lib/settle-week'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
+import { executeCardioSession } from '@/lib/pending-action-executor'
 import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
@@ -328,6 +329,32 @@ export function TodayPanel({
       onMesocycleUpdated?.(mesocycle)
       return "That didn't save — try again in a moment."
     }
+    weekTrain.refresh()
+    onLogsUpdated?.()
+    return null
+  }
+
+  /**
+   * "MAKE TODAY A CARDIO DAY" — the screen half of the coach's
+   * propose_cardio_session, 15 Sep 2026.
+   *
+   * THE SAME EXECUTOR THE COACH'S CONFIRM CALLS, not a second implementation
+   * of the same verb. That is what parity means here and it is also what stops
+   * the two surfaces disagreeing about scope: executeCardioSession writes the
+   * rest of the block from this week, both ways round.
+   */
+  const handleAddCardio = async (activity: string, minutes: number, targetRpe: number): Promise<string | null> => {
+    if (!profileId || !profile || !mesocycle || mesocycle.length === 0) return 'No plan to add it to yet.'
+    const result = await executeCardioSession(profile, mesocycle, {
+      weekNumber: liveWeek,
+      dayName: todayName,
+      activity,
+      minutes,
+      targetRpe,
+      scope: 'permanent',
+    })
+    if (result.receipt.failed.length > 0) return result.receipt.failed[0].error
+    onMesocycleUpdated?.(result.mesocycle)
     weekTrain.refresh()
     onLogsUpdated?.()
     return null
@@ -889,6 +916,7 @@ export function TodayPanel({
           onPeek={d => setPeekDay(d)}
           trainAnywayOptions={trainAnywayOptions}
           onTrainAnyway={setBorrowedDayName}
+          onAddCardio={handleAddCardio}
         />
       ) : isActiveRecovery ? (
         <ActiveRecoveryCard
@@ -896,6 +924,7 @@ export function TodayPanel({
           weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned }}
           tomorrow={tomorrowPreview}
           onPeek={d => setPeekDay(d)}
+          onAddCardio={handleAddCardio}
         />
       ) : (
         <div className="space-y-3">

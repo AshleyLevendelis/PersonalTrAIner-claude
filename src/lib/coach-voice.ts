@@ -236,6 +236,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_exercise_reorder: { done: 'Reordered', failed: "I couldn't move that" },
   propose_exercise_ban: { done: 'Banned', failed: "I couldn't ban that" },
   propose_session_shorten: { done: 'Shortened', failed: "I couldn't shorten it" },
+  propose_cardio_session: { done: 'Scheduled', failed: "I couldn't add that session" },
   propose_volume_change: { done: 'Adjusted', failed: "I couldn't adjust it" },
   propose_schedule_change: { done: 'Rescheduled', failed: "I couldn't change the schedule" },
   propose_style_change: { done: 'Restyled', failed: "I couldn't change the style" },

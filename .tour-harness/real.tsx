@@ -379,6 +379,18 @@ const loggedTarget = (() => {
   }
 })()
 
+// A REST DAY IN THE LIVE WEEK — published for verify:cardio-session, 15 Sep
+// 2026. The screen control that makes a day a cardio day lives on the rest-day
+// card, so the driver needs a day that HAS one. Asked of the page rather than
+// named, for the reason the two targets above record: weekday names move.
+;(window as unknown as { __restDayTarget: unknown }).__restDayTarget = (() => {
+  const liveWeekForRest = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeekForRest)?.days ?? exercisePlan
+  const rest = liveDays.find(d => d.exercises.length === 0 && !d.plannedActivity)
+  if (!rest) return null
+  return { day: rest.day, date: nearestAnchorDate(rest.day) }
+})()
+
 // TODAY'S FOCUS, from THIS page's plan — for verify:rest-day-race, 14 Sep 2026.
 // Its last check compared the coach's first bubble with Home's session name,
 // but read the coach off chat.html and Home off real.html: two harness pages,

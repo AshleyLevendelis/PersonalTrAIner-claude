@@ -179,10 +179,23 @@ changes the week. It says so on the card — `session-balance-cost.ts` and
 - The coach's prompt and tools change, so **the coach exam goes staler**. It has
   still never been run.
 
-## The one question this plan does not settle
+## BUILT 15 Sep 2026 — steps 2, 3 and 4
+
+All three on Ashley's approval, plus a screen counterpart the plan named as
+added scope. See BACKLOG for the two defects the browser driver found that the
+gates did not. The open question below is ANSWERED.
+
+## The one question this plan does not settle — ANSWERED 15 Sep 2026
 
 Step 3 says a passing mention gets a question. **What counts as passing?**
 "Wednesday is my cardio day" is a standing fact; "I might do a bike ride
 Wednesday" is not. The safe default is to ASK in both cases — the cost of asking
 is one tap, the cost of guessing wrong is an unwanted session on her plan — and
 that is what this plan assumes unless Ashley says otherwise.
+
+**She said otherwise.** From three options she chose **offer only when she
+sounds definite** — over asking every time (which this plan had assumed and I
+had recommended) and over never offering. Built that way. The consequence,
+recorded because it is the cost of the choice: when the coach misjudges it goes
+QUIET, and a silent miss is invisible. The app enforces only the other
+direction — a hedge cannot produce a card.

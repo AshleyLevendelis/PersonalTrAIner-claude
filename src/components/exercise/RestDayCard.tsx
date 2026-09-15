@@ -150,6 +150,108 @@ function TomorrowPreview({
   )
 }
 
+/**
+ * "MAKE THIS A CARDIO DAY" — the screen half of propose_cardio_session.
+ *
+ * Parity, not decoration (CLAUDE.md rule 4): the coach gained a tool that puts
+ * a cardio session on a day, and a coach tool with no screen path is a gap
+ * unless the exceptions list gives a reason. The only reason available here
+ * would have been "not built yet", which is not one.
+ *
+ * SAME VERB, SAME SCOPE, SAME EXECUTOR. The coach's version writes every week
+ * of the block, because "Wednesday is my cardio day" is a standing statement;
+ * so does this. Both go through executeCardioSession, so the two surfaces
+ * cannot drift about what adding a session means.
+ *
+ * EFFORT IS THREE CHIPS, NOT A 1-10 BOX. The scale is the coach's own
+ * (conversational / steady / hard), and nobody standing in a kitchen wants to
+ * pick a number between one and ten for a walk.
+ */
+const EFFORTS: { label: string; note: string; rpe: number }[] = [
+  { label: 'Easy', note: 'can hold a conversation', rpe: 3 },
+  { label: 'Steady', note: 'working, but not gasping', rpe: 5 },
+  { label: 'Hard', note: 'intervals', rpe: 7 },
+]
+
+function AddCardioSession({ dayName, onAdd }: { dayName: string; onAdd: (a: string, m: number, rpe: number) => Promise<string | null> }) {
+  const [open, setOpen] = useState(false)
+  const [activity, setActivity] = useState('')
+  const [minutes, setMinutes] = useState('')
+  const [rpe, setRpe] = useState(EFFORTS[1].rpe)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+        onClick={() => setOpen(true)}
+      >
+        Make {dayName} a cardio day →
+      </button>
+    )
+  }
+
+  const mins = parseInt(minutes, 10)
+  const ready = !!activity.trim() && Number.isFinite(mins) && mins > 0
+
+  const handleSave = async () => {
+    if (!ready) return
+    // The same bound the logging form uses, for the same reason: `min` on a
+    // number input is a hint the browser does not enforce.
+    if (!isPlausibleCardioDuration(mins)) {
+      setError(`Enter between 1 and ${MAX_PLAUSIBLE_CARDIO_MINUTES} minutes.`)
+      return
+    }
+    setError(null)
+    setSaving(true)
+    const failure = await onAdd(activity.trim(), mins, rpe)
+    setSaving(false)
+    if (failure) { setError(failure); return }
+    setOpen(false)
+    setActivity(''); setMinutes('')
+  }
+
+  return (
+    <div className="space-y-2" data-testid="add-cardio">
+      <p className="text-xs text-muted-foreground">
+        This goes on {dayName} for the rest of this block — not just today.
+      </p>
+      <div className="flex items-center gap-2">
+        <Input placeholder="Run, Cycle, Swim…" value={activity} onChange={e => setActivity(e.target.value)} className="h-8 text-sm" autoFocus />
+        <Input
+          type="number" min="1" max={MAX_PLAUSIBLE_CARDIO_MINUTES} placeholder="Mins"
+          value={minutes} onChange={e => setMinutes(e.target.value)} className="h-8 text-sm w-20"
+        />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {EFFORTS.map(e => (
+          <Button
+            key={e.rpe}
+            variant={rpe === e.rpe ? 'default' : 'outline'}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setRpe(e.rpe)}
+            title={e.note}
+          >
+            {e.label}
+          </Button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" className="h-8" disabled={!ready || saving} onClick={handleSave}>
+          {saving ? <Loader2 className="size-3 animate-spin" /> : 'Add it'}
+        </Button>
+        <button type="button" className="text-xs text-muted-foreground underline" onClick={() => { setOpen(false); setError(null) }}>
+          Cancel
+        </button>
+      </div>
+      {error && <p className="text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">{error}</p>}
+    </div>
+  )
+}
+
 export function RestDayCard({
   dayName,
   weekTally,
@@ -157,6 +259,7 @@ export function RestDayCard({
   onPeek,
   trainAnywayOptions,
   onTrainAnyway,
+  onAddCardio,
 }: {
   dayName: string
   weekTally: { done: number; planned: number }
@@ -164,6 +267,8 @@ export function RestDayCard({
   onPeek?: (dayName: string) => void
   trainAnywayOptions: string[]
   onTrainAnyway: (sourceDayName: string) => void
+  /** Returns null on success, or a sentence to show. Absent means no plan loaded yet. */
+  onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -186,6 +291,7 @@ export function RestDayCard({
         )}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry />
+        {onAddCardio && <AddCardioSession dayName={dayName} onAdd={onAddCardio} />}
         {trainAnywayOptions.length > 0 && !pickerOpen && (
           <button
             type="button"
@@ -300,11 +406,13 @@ export function ActiveRecoveryCard({
   weekTally,
   tomorrow,
   onPeek,
+  onAddCardio,
 }: {
   workout: WorkoutDay
   weekTally: { done: number; planned: number }
   tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
+  onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
 }) {
   const cardio = workout.recommendedCardio
   // A DAY WHOSE WHOLE PLAN IS AN ACTIVITY SHOWS THE ACTIVITY. The beginner's
@@ -348,9 +456,24 @@ export function ActiveRecoveryCard({
             )}
           </div>
         )}
-        {cardio && <PrescribedRow activity={cardio.activity} duration={cardio.duration} targetRpe={cardio.targetRpe} />}
+        {/* NOT BOTH. recommendedCardio is a SUGGESTION for an otherwise-empty
+            day; plannedActivity is what the plan prescribes for it. Showing
+            both put "Cycle · 35m · RPE 3" directly above "Active Recovery Walk
+            or Light Swim" and left the person to guess which was the session —
+            the same unanswerable question the type comment warns about, on
+            screen instead of in the data. Found by the driver, on a real card. */}
+        {!planned && cardio && <PrescribedRow activity={cardio.activity} duration={cardio.duration} targetRpe={cardio.targetRpe} />}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry alsoLabel={!!planned} />
+        {/* AN EMPTY DAY IS THE ONE YOU WANT TO FILL, and this is the card an
+            empty day actually gets. The control was on RestDayCard alone at
+            first — which only renders when the plan has NO row for the day at
+            all. A scheduled day with nothing on it comes here instead, and
+            that is precisely the day somebody means by "Wednesday is my cardio
+            day". Found by the driver, not by reading: it landed on a Tuesday
+            reading "Active recovery" with no control on it.
+            Hidden once the day HAS a prescription — there is nothing to add. */}
+        {onAddCardio && !planned && <AddCardioSession dayName={workout.day} onAdd={onAddCardio} />}
       </CardContent>
     </Card>
   )

@@ -2,6 +2,72 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH OFFERS TO ADD A CARDIO SESSION, AND THE CARD IS A REAL ONE.**
+  Ashley: *"I want the app chat to be smart. It should be able to have proper
+  conversation and know when to suggest adding a session and when something is
+  mentioned in passing"*, and *"when it adds a session like a cardio session
+  that it's actually a useful card like other workouts not empty."* Steps 2-4
+  of `docs/plans/a-cardio-session-you-can-actually-see.md`, on her approval.
+  **HER RULING, 15 Sep 2026, from three options: OFFER IT ONLY WHEN SHE SOUNDS
+  DEFINITE.** She chose the coach judging over asking every time (my
+  recommendation) and over never offering. I said once why I'd recommended
+  otherwise — the judgement is the model's, and the model has been measured
+  ignoring prompt rules it was given four times — and then built her choice.
+  **THE HONEST SHAPE OF THAT, because it is the part that will be forgotten:**
+  the ruling is enforced in ONE direction only, and deliberately.
+  A hedge cannot put a session on her plan — `isHedged` runs on the client
+  before the card is built, 21 phrases, and a hedged message produces a
+  sentence instead of a card. The coach staying QUIET when it should have
+  offered cannot be enforced at all (there is no turn to inspect — it simply
+  said something else), so that half is graded by the coach exam. The app
+  blocks the direction that costs something and grades the direction that
+  costs nothing.
+  **THE HEDGE CHECK READS THE WHOLE MESSAGE, NOT THE TOOL'S QUOTE** — a model
+  that quoted "a bike ride Wednesday" out of "I might do a bike ride Wednesday"
+  would strip the hedge and pass a check that read only the quote. Caught by
+  mutation (M4), which is the second time this week a check was satisfied by
+  something that survives the break.
+  **ONE LIST, NOT TWO COPIES.** The prompt has to teach the model the same
+  words the code refuses on. Rather than a Deno twin that nothing executes,
+  `HEDGE_PHRASES` lives in `src/lib/definite-mention.ts` and the gate DERIVES
+  the check: every phrase must appear in the prompt's §3g2. A DEVIATION from
+  the approved plan, which said "server + client twin" — the server runs no
+  matcher, so a second copy would be a liability, not a safety net. The sync is
+  still enforced, just derived rather than byte-compared.
+  **WHAT ELSE IS IN IT:** `propose_cardio_session` on the same propose →
+  confirm → execute → receipt rail as every other day-verb, validating at BUILD
+  time (five guards, returning null and NO card — the bug she hit was a card
+  that only discovered at confirm that it had nowhere to write); minutes and
+  effort REQUIRED so a card cannot say "Wednesday: cardio" after the coach has
+  already prescribed 30-40 minutes of zone 2; two turns, the first with chips
+  and no tool call; the write lands on every week of the block and stops at the
+  block boundary; a day that already trains is refused, because
+  `plannedActivity` means "this activity is the WHOLE day".
+  **AND THE SCREEN HALF, so parity holds** (rule 4: the exceptions list needs a
+  reason, and "not built yet" is not one). "Make Tuesday a cardio day" on the
+  rest / recovery card, going through the SAME executor the coach's Confirm
+  calls — so the two surfaces cannot drift about what adding a session means.
+  Effort is three chips in words, not a box asking for a number out of ten.
+  **TWO REAL DEFECTS THE BROWSER DRIVER FOUND THAT NOTHING ELSE WOULD HAVE:**
+  1. The control was on `RestDayCard` alone, which only renders when the plan
+     has NO row for the day. A scheduled day with nothing on it gets
+     `ActiveRecoveryCard` instead — and that is exactly the day somebody means
+     by "Wednesday is my cardio day". The driver landed on a Tuesday reading
+     "Active recovery" with no control on it.
+  2. After adding, the card showed TWO prescriptions: "Cycle · 35m · RPE 3"
+     directly above "Active Recovery Walk or Light Swim". `recommendedCardio`
+     is a suggestion for an empty day; once the day has a session, showing both
+     leaves the person to guess which is the session — the unanswerable
+     question `types.ts` warns about, on screen instead of in the data. Fixed
+     in both places: the executor clears the suggestion it replaces, and the
+     card prefers the prescription.
+  **12 mutations, 12 caught.** Screenshot read: *"Cycle · Tuesday / This is
+  today's session. / Cycle · 35m · RPE 3 [Log]"*.
+  **NEEDS `npm run deploy:functions:prod -- chat-gemini`** — a SECOND deploy,
+  after the one already on Ashley's list. The coach's fingerprint moved from
+  `a083355add94ea62` to `601ff13ea9dcc0bc`, so the exam's first run must happen
+  AFTER this deploy or it grades a coach we have replaced.
+
 - [x] **THE SWEEP AFTER THE WALK FIX AND THE THREE BUGS: 237 RAN, 3 FAILED, ALL
   THREE THE UNREACHABLE DATABASE.** The count is evidence as much as the
   failures: 237 is the previous 235 plus exactly my two new checks
@@ -2216,7 +2282,7 @@ Newest first. One line each.
   just green.
   **Deploys:** frontend on merge, and **`chat-gemini`** for the new coach tool.
 
-- [ ] **THE SWAP EXECUTOR STILL DOES NOT USE THE SHARED SAVER.** Surfaced 13 Sep
+- [x] **CLOSED 15 Sep 2026 — and there were THREE copies, not two; the property check found the third in App.tsx.** **THE SWAP EXECUTOR STILL DOES NOT USE THE SHARED SAVER.****THE SWAP EXECUTOR STILL DOES NOT USE THE SHARED SAVER.** Surfaced 13 Sep
   2026 by re-anchoring `test:session-edit`'s "the coach saves through it too"
   from a hardcoded count of two calls onto the property. `executeExerciseAdd`,
   `executeExerciseRemove` and `executeExerciseReorder` all persist through
@@ -5110,7 +5176,7 @@ Newest first. One line each.
   settings surface and a migration. The Tools tile stopped claiming otherwise
   on 7 Sep.
 
-- [ ] **water-store READS EVERY WATER LOG EVER WRITTEN** — `getAllLogs` selects
+- [x] **CLOSED 15 Sep 2026 — now getLogsForDate, bounded at the query and in the pending merge.** **water-store READS EVERY WATER LOG EVER WRITTEN****water-store READS EVERY WATER LOG EVER WRITTEN** — `getAllLogs` selects
   the whole table for a profile and filters by date in JS. Unbounded, and it
   gets slower every week the app is used. Noticed while tracing Home's load
   time on 7 Sep; out of scope for that fix, which was about the sequential
@@ -5645,7 +5711,7 @@ Newest first. One line each.
   (where does that control live, and does the coach offer it?), not a gap to
   fill unilaterally. Found by the whole-app audit, 5 Sep 2026.
 
-- [ ] **DST duplicates a day, and a session frozen at midnight keeps
+- [x] **HALF CLOSED 15 Sep 2026: the day-walks in dashboard-data are fixed (measured fixtures, 3 sites). The midnight-frozen session is UNTOUCHED and still open.** **DST duplicates a day, and a session frozen at midnight keeps**DST duplicates a day, and a session frozen at midnight keeps
   yesterday's date.** Both known, both narrow, both listed here rather than
   quietly fixed inside an audit whose scope was elsewhere.
 
