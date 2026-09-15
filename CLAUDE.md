@@ -316,7 +316,18 @@ menu" stays true when a copy is also left outside it.
   PLAN, not a literature constant the app has nowhere else; and the "strength"
   vocabulary keys off the PHASE, because the four goals are fat loss,
   hypertrophy, functional and conditioning — there is no strength goal.
-  STILL TO BUILD: the reason chips, the screen-side sheets, the block-end review
+  **THE REASON CHIPS AND THE SCREEN-SIDE SHEETS SHIPPED 15 Sep 2026.** Both
+  surfaces ask "what's going on with it?" before a swap or a removal — four
+  answers per verb, each routed to something that already existed, and "just
+  get on with it" always beside them. The pain answer triages, which is its own
+  standing rule (see **Safety-adjacent work**). Two things were found on the
+  way: the question was ALREADY being asked on a main-lift removal, under three
+  chips that did not answer it; and `askText` appended the escape chip and THEN
+  sliced to four, so the first verdict with four alternatives would have lost it
+  and turned a one-tap-away ask into a block. `edit-reason`, `verify:hurts`,
+  `verify:tradeoff` §4-6, `verify:session-edit` §3c2-3c5.
+  STILL TO BUILD: the per-goal phrasebook as one graded file, sets-per-muscle
+  on the cards, the block-end review
 - **A `test:` gate can never prove a branch is REACHED.** Measured 14 Sep 2026:
   disabling the whole trade-off step with `if (false && advice)` left all
   twelve of its source checks green, because they read text and the text was
@@ -654,6 +665,23 @@ than one not started, because it looks finished in the log.
 ## Safety-adjacent work
 
 - Dietary enforcement, injury filtering, and load prescription always get a plan before a build, even when the fix looks obvious.
+- **Pain is triaged before it is acted on, everywhere it is reported.** Ashley's
+  ruling, 15 Sep 2026, from three options: ask which kind, then act. A niggle
+  eases that area off for a few days and reverts on its own; something that has
+  been there a while goes on the injuries list so every future plan avoids it;
+  **sharp, one-sided or worsening names a professional and changes nothing —
+  not the plan, not the record.** She rejected acting today-only and recording
+  nothing ("the app never learns"), and treating every ache as an injury ("one
+  sore session rewrites the block").
+  This is a rule about the APP, not about one screen: any surface that lets
+  somebody say something hurts asks the same three, and the third answer is
+  never a plan change. Held in `src/lib/edit-reason.ts` (`HURT_KINDS`,
+  `RED_FLAG_ADVICE`), driven by `verify:hurts`. The coach already held the same
+  line in its tool descriptions; whether it OBEYS is model behaviour and stays
+  asserted until the coach exam runs.
+- **A branch that must never change anything is checked on both halves.** What
+  it SAYS and what the screen shows afterwards — because a build that printed
+  the right sentence and quietly rebuilt the week passes either check alone.
 
 ## Reporting
 

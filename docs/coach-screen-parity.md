@@ -37,9 +37,9 @@ it is wrong.
 | `propose_custom_meal` | EXCEPTION | Coach-only. NARROWED 14 Sep 2026: the "no free-text entry" half of this reason is gone — the food search built for `propose_meal_food_add` could serve here too. What is left is the real reason: a custom meal is an open-ended list of foods AND a dish name AND a decision about what the rest of the day does around it, which is a screen someone has to design, not a control to bolt onto a row. |
 | `propose_equipment_adaptation` | SCREEN | Profile → Equipment. |
 | `propose_exercise_add` | SCREEN | The session's "Add an exercise" row. Both surfaces since 13 Sep 2026. |
-| `propose_exercise_remove` | SCREEN | The exercise row's menu. |
+| `propose_exercise_remove` | SCREEN | The exercise row's menu. Both surfaces ask why first since 15 Sep 2026, with the same four answers. |
 | `propose_exercise_reorder` | SCREEN | The exercise row's menu. |
-| `propose_exercise_swap` | SCREEN | "Swap exercise" on the row. |
+| `propose_exercise_swap` | SCREEN | "Swap exercise" on the row. Both surfaces ask why first since 15 Sep 2026 — a different four, because a swap and a removal have different reasons. |
 | `propose_injury_adaptation` | SCREEN | Profile → Injuries. |
 | `propose_injury_as_lasting` | SCREEN | Profile → Injuries. |
 | `propose_injury_recovered` | SCREEN | Profile → Injuries. |

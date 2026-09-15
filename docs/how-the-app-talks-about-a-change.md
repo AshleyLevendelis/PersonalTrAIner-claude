@@ -125,19 +125,66 @@ starting-out plan short of stopping.
 The single highest-value change: **when a swap or removal arrives without a
 reason, ask — with chips, not a question.**
 
-| Chip | Tool it routes to | What the card then says |
-|---|---|---|
-| Busy / broken | Swap, today | Nothing extra — Tier 0 |
-| Don't like it | Swap for the block, or ban | The goal cost of losing that movement, if any, and the nearest thing that does the same job |
-| Hurts | The injury path, never a plain swap | The injury triage the coach already runs |
-| No time | Shorten today | Main lift stays, accessories go |
-| Don't have it *(swap only)* | Equipment change | "Tell me what your gym has and I'll rebuild around it" |
-| Too tired *(remove/lighter)* | Lighter, today | "Today only — back to normal next week" |
+**BUILT 15 Sep 2026, both surfaces.** The table below is what shipped.
 
-Same chips on the screen's sheet as in chat, because both surfaces are equal
-paths. One tap, and the app knows which of six problems it is solving.
-Without it, every one of them is answered with the tool the person happened
-to name.
+| Chip | Verb it appears on | Where it goes |
+|---|---|---|
+| It's busy or broken | swap | The ordinary swap, today. Nothing extra — Tier 0 |
+| I don't like it | both | Drop or replace it, and keep it out from now on |
+| It hurts | both | The triage below — never a plain swap |
+| I haven't got the kit | swap | Asks which kit, then rebuilds the week around it |
+| I'm short on time | remove | `shortenDayTo` — the main lift stays, accessories go |
+| I'm wiped today | remove | One step lighter, today only |
+
+**FOUR PER VERB, NOT SIX ON EACH.** Two of the six were already verb-specific
+here; the rest split the same way, on the test "would this make someone reach
+for THIS verb?" Nobody swaps because they are short on time — a swap takes
+just as long. Nobody removes because a machine is taken — they would put
+something else there. Four is also what the chip row can render: the coach's
+prompt caps a row at four and `askText` slices to four, so a six-chip set
+would have been silently truncated by machinery neither surface controls.
+
+**THE QUESTION WAS ALREADY BEING ASKED.** Removing a main lift in a strength
+block had said *"What's going on with it — is it the exercise itself, or
+something else?"* since 14 Sep, under three chips that did not answer it. So
+the reason chips are that question's missing answer set, not a second question
+beside it — which is why a reason ask and a goal ask never stack.
+
+**AND ONE THING THE ESCAPE CHIP TAUGHT US.** `askText` appended "Do it anyway"
+and *then* sliced to four, so the first verdict with four alternatives would
+have lost it and turned the ask into a block. Fixed the day the reason chips
+arrived, before it could fire.
+
+### The hurts triage — Ashley's ruling, 15 Sep 2026
+
+From three options: **ask, then act.** One question, three answers.
+
+| Answer | What happens |
+|---|---|
+| Just a niggle today | That area eases off for seven days, then comes back on its own |
+| It's been there a while | Goes into her injuries, so every future plan avoids it |
+| Sharp, one-sided or getting worse | Names a physio. **The plan is not touched and nothing is recorded** |
+
+Rejected: acting today-only and recording nothing (the app never learns, and
+she says it again next session), and treating every ache as an injury (one sore
+session rewrites the rest of the block).
+
+**And from three more, on where it happens: on the screen, fully** — "you reach
+for this mid-session on a gym floor, and dropping someone into a chat to type
+is the wrong thing to hand them."
+
+Two calls inside that were the session's, and are flagged rather than buried:
+**one question with three answers rather than a safety screen first**, because
+opening with "is it sharp?" is an alarming answer to "it hurts" and costs the
+common case a tap to serve the rare one; and **seven days** for both the niggle
+and the kit change, because a row of buttons cannot ask "how long" without
+becoming a second question, and a permanent answer to a temporary problem is
+how somebody comes home to a bodyweight plan.
+
+The red-flag branch is the one the browser driver exists for: `verify:hurts`
+checks the advice names a professional AND that the session is byte-for-byte
+unchanged, because a build that printed the sentence and rebuilt the week
+anyway would pass on either half alone.
 
 ---
 
@@ -393,12 +440,13 @@ chest from 3 sets a week down to 0 for the rest of the block. Just today, or is
 there something about it you want gone for good?"* — with **Just today**, **Put
 something else there**, **Do it anyway**, and no card until one is tapped.
 
-Still to build: the reason chips (§3), the screen-side sheets, and the
-block-end review (§7).
+Still to build: the per-goal phrasebook as one graded file, sets-per-muscle on
+the add and remove cards, and the block-end review (§7). The reason chips and
+the screen-side sheets shipped 15 Sep 2026 — see §3.
 
 ## 11. If approved, the order
 
-1. The reason chips, both surfaces.
+1. ~~The reason chips, both surfaces.~~ **Done, 15 Sep 2026** — see §3.
 2. Run the score on every trial and translate the dimension that moved.
 3. The per-goal phrasebook — one file, both surfaces, exam-gradable.
 4. Sets per muscle per week, on the add and remove cards.

@@ -2,6 +2,72 @@
 
 Newest first. One line each.
 
+- [x] **BUILT — the app asks WHY before it changes anything, and pain gets
+  triaged.** Third of the three Ashley picked. `docs/how-the-app-talks-about-a-change.md`
+  §3 called this "the single highest-value change"; §11 listed it as step 1.
+  **WHAT CHANGES ON HER PHONE.** Tapping "Take out" or "Swap" now opens with
+  *"What's going on with Side Plank?"* and four answers, and each answer does
+  something different: short on time shortens today and keeps the main lift;
+  wiped makes today lighter; don't like it drops it and keeps it out; it hurts
+  starts the pain triage. On a swap the four are busy or broken, don't like it,
+  it hurts, and haven't got the kit — which asks what she HAS today and
+  rebuilds the week around it. "Just get on with it" is always there. Ask the
+  coach the same thing and it asks the same question with the same chips.
+  **HER TWO RULINGS, 15 Sep 2026, both from three options.**
+  On pain: **ask, then act.** A niggle eases that area off for a week and the
+  exercises come back on their own; something that has been there a while goes
+  into her injuries so every future plan avoids it; sharp, one-sided or getting
+  worse names a physio and changes NOTHING. Rejected: acting today-only and
+  recording nothing (the app never learns, she has to say it again next
+  session), and treating every ache as an injury (one sore session rewrites the
+  rest of the block).
+  On where: **on the screen, fully** — "you reach for this mid-session on a gym
+  floor, and dropping someone into a chat to type is the wrong thing to hand
+  them." Rejected: handing off to the coach, and a screen/coach split.
+  **THE FINDING THAT SHAPED THE BUILD.** The app was ALREADY asking. Removing a
+  main lift in a strength block has said *"What's going on with it — is it the
+  exercise itself, or something else?"* since 14 Sep, under three chips —
+  Swap it instead / Just today / Do it anyway — none of which answers it. So
+  this was never a second question to add beside the trade-off; it is the
+  missing answer set for one already being asked. That is also why a reason ask
+  and a goal ask can never stack into two questions.
+  **A LATENT DEFECT FOUND ON THE WAY.** `askText` appended "Do it anyway" and
+  then sliced the whole list to four, so a verdict with four alternatives lost
+  exactly the chip the whole decision rests on — turning a one-tap-away ask
+  into a block. Nothing had four alternatives yet, so it had never fired.
+  **AND ONE ON THE REMOVE SHEET:** it computed its cost line with a hardcoded
+  `today` scope, so tapping "Rest of block" showed the price of a one-week
+  change. Both scopes are now computed and shown.
+  **MY CALLS, flagged not buried:** one question with three answers rather than
+  a safety screen first (opening with "is it sharp?" is an alarming answer to
+  "it hurts" and costs the common case a tap to serve the rare one); a niggle
+  and a kit change both last seven days (a row of buttons cannot ask "how long"
+  without becoming a second question, and a permanent answer to a temporary
+  problem is how somebody comes home to a bodyweight plan).
+  **Mutations: 20 attempted, 20 caught** — 11 on the module, 3 on the coach
+  wiring, 6 on the screen. Two only after the check that should have caught
+  them was fixed. The chip round-trip loop read the label AND the expected
+  answer from the same table, so renaming a chip renamed both sides and it
+  stayed green. And with the `reasonGiven` test removed the coach asked on
+  EVERY request while every check passed, because the driver never sent a
+  reason — "it asks" is only a decision if there is a case where it does not.
+  **THE BUNDLE, FIXED TWICE RATHER THAN RE-BUDGETED.** 915 → 925 kB, caught by
+  `test:bundle`. The picker's two option lists dragged the whole 1,200-line
+  onboarding module into the chunk every person downloads before they see
+  anything; the injury appliers dragged the adaptation engine and executors in
+  behind them. Split out, and then the swap dialog itself went lazy like the
+  remove sheet beside it. **Net 910 kB — five under where this work started.**
+  **WHAT IS NOT GUARDED.** The coach's own hurts triage is model behaviour: its
+  tool descriptions already require the area and the niggle-vs-lasting answer
+  and already say "never for sharp/one-sided", but whether it OBEYS is only
+  knowable from the coach exam, which has still never been run. Asserted, not
+  known. The SCREEN's triage is in code and is driven.
+  New: `test:edit-reason`, `verify:hurts` (24 checks, screenshots read),
+  `src/lib/edit-reason.ts`, `screen-adaptations.ts`, `picker-options.ts`,
+  `EditReasonStep.tsx`. Extended: `verify:tradeoff` §4-6,
+  `verify:session-edit` §3c2-3c5. **No `chat-gemini` deploy** — no prompt,
+  model or tool change.
+
 - [x] **FIXED — four weight chips above "3 working sets".** Ashley saw it on a
   real card while training. The chips and the count line are two views of one
   number, and they disagreed.
