@@ -2,6 +2,110 @@
 
 Newest first. One line each.
 
+- [x] **THE EMPTY CARD ASHLEY REPORTED WAS ALREADY SHIPPING — FROM THE
+  BEGINNER'S WALKING PLAN, NOT FROM CARDIO.** Her words, 15 Sep: *"I want when
+  it adds a session like a cardio session that it's actually a useful card like
+  other workouts not empty."* Step 1 of
+  `docs/plans/a-cardio-session-you-can-actually-see.md`, which is the only step
+  that is a bug fix rather than a new capability. Steps 2-4 (the tool, the
+  ask-first rule, the cost line) are deliberately NOT started: they prescribe
+  training, they need the `chat-gemini` deploy, and the plan's open question —
+  what counts as "mentioning it in passing" — is hers.
+  **WHAT WAS WRONG.** `PlannedActivity` has existed for weeks. The beginner's
+  walking plan has been filling it in for weeks — twenty minutes, an effort
+  target, and a reason written for a person to read. **No screen component read
+  it. Not one.** Every reader decided "is this a session?" by counting
+  exercises, got zero, and fell through to `ActiveRecoveryCard`, whose entire
+  offer was a dotted link reading "Log a walk or other activity" over two blank
+  boxes. The plan said walk; the screen asked what you did. The week list and
+  tomorrow's preview filtered the day out entirely, so the only plan a true
+  beginner ever gets was invisible to the rest of the app.
+  **HOW IT SURVIVED SO LONG, which is the useful part.** `types.ts` said in its
+  own comment *"nothing generates these yet"* and *"no generator produces these
+  as of slice one"*. Both were false and had been for a while. A type that says
+  nothing produces a field is a standing instruction not to look for the screen
+  that has to show it. Corrected in place rather than deleted.
+  **WHAT CHANGED.** New `src/lib/activity-day.ts` — a leaf module holding the
+  decision that was being guessed in four places: `isScheduledDay` (ask the
+  `is_scheduled` flag, fall back to the count only for plans stored before the
+  field existed), `prescriptionLine` ("Walk · 20m · RPE 4", one phrasing where
+  there were two), `dayDetail` (minutes for an activity day, exercises for a
+  gym day — never "0 exercises"). `ActiveRecoveryCard` now leads with the
+  prescription and a one-tap Log, carries the coach's reason underneath, stops
+  calling a prescribed session "active recovery", and the blank form below it
+  says "Log something else you did" instead of offering to log a walk beside a
+  prescribed walk. `ProgramBrowse` gives the day its own line. The peek stops
+  calling it a rest day.
+  **ONE PLANNED CHANGE DELIBERATELY NOT MADE, and it is worth the line.** The
+  plan listed `TodayPanel:599` — the "Train anyway" options — among the filters
+  to switch to the flag. It must not be: that control borrows another day's
+  PRESCRIPTION to do today, and an activity day has no exercises to borrow, so
+  switching it would open a session with nothing in it. The exact defect this
+  change exists to remove. Left as the exercise count, with a comment saying
+  why. `ProgramBrowse`'s open/expand tests are the same case and also unchanged.
+  **PROVEN LIVE, not by tick.** `verify:planned-activity` drives a real
+  Chromium at 390×844 through a new `?walker=1` fixture (six real profile
+  fields, the ones `isStartingOut` reads — not a hand-seeded day) and the
+  screenshot was opened: **"Walk · Wednesday / This is today's session. / Walk ·
+  20m · RPE 3 [Log]"** over the coach's reason. Mutating the card back to
+  ignoring the field turns the driver red with the original defect printed in
+  the failure: *"Active recovery · Wednesday / Walk / Log a walk or other
+  activity"*.
+  New `test:planned-activity` (28 checks) runs the real decision functions and
+  reads the three screens' source. **12 mutations, 12 caught** — after three
+  corrections that are the point of doing it:
+  M7 exposed a REAL DEFECT IN THE CHECK: replacing the one call to
+  `isScheduledDay` with the hand-rolled count left the IMPORT line in place, so
+  a bare-name check still found it and passed over the defect. The check now
+  requires a call and proves its own detector against a file that only imports.
+  M5's first attempt inserted a comment instead of reordering the JSX —
+  meaningless, and it also revealed the ordering check was anchored on the
+  const declaration rather than the rendered block, so it was true however the
+  JSX was ordered. Re-anchored on the block.
+  M10's first attempt was overwritten downstream: the mesocycle RE-STAMPS every
+  `plannedActivity` from `startingOutActivity(block)`, so mutating the day
+  builder changed nothing the gate could see. A third kind of meaningless
+  mutation — it applied, it just could not create the defect.
+  M11 CRASHED the gate rather than failing it (2 of 28 checks ran, zero
+  failures — which reads exactly like a pass). The gate now reports a missing
+  prescription instead of throwing on a non-null assertion.
+
+- [x] **THREE MECHANICAL BUGS WITH A RIGHT ANSWER, so no decision needed. 8
+  further mutations, 8 caught.**
+  **(a) The water total downloaded every row ever logged.** `getAllLogs` ran
+  `select('*').eq('profile_id', …)` with no date bound, and both callers
+  immediately filtered to one day and threw the rest away. A year of four
+  glasses a day is 1,400 rows re-downloaded to draw one ring. Now
+  `getLogsForDate`, bounded at the query AND in the pending-queue merge — a
+  write still in flight on another day used to leak into the day being read.
+  `test:dashboard` proves it behaviourally (a second day is logged, the first
+  is read, and the check also asserts the other day is genuinely there to have
+  been returned). `test:tab-ownership` re-anchored: it named `getAllLogs`
+  literally; the property is that Nutrition still reads the day's water.
+  **(b) The streak miscounted around a clock change.** Three fixed
+  86,400,000 ms day-walks in `dashboard-data.ts`. A day is 23 or 25 hours when
+  the clocks move. **The three fixtures in the new gate were MEASURED, not
+  reasoned** — under Europe/London the old code gave: 26 Oct 23:30 walking back
+  → 25th, 25th, 24th (a day counted twice); 30 Mar 00:30 walking back → 28th,
+  27th (the 29th never appears); 28 Mar 23:30 one day on → Monday the 30th
+  (Sunday skipped). At 00:30 on the 26th the same code is correct, which is why
+  my first two fixtures passed against the bug and the mutation read MISSED.
+  Now stepped with `addDays` from `session-move.ts`, the repo's existing
+  DST-safe stepper, so "tomorrow" means one thing across the app. The UK clocks
+  go back on 25 Oct 2026.
+  **(c) Three copies of one saver, and the check found the third.**
+  `saveScopedEdit` was extracted so the screen's swap and the coach's could not
+  disagree about which weeks reach the database. Both kept their own copy
+  anyway — the executor's under a comment promising it *"mirrors
+  handleSwapExercise exactly"*, a promise nothing checked. I knew about that
+  one. The new property check in `test:silent-writes` ("exactly one module
+  decides which weeks a scoped edit saves") went red on **two**: the third copy
+  was `handleSwapExercise` itself, in App.tsx — the original the other two
+  claimed to mirror. All three now call the shared saver. No behaviour change:
+  the branches were byte-for-byte identical. The check counts modules rather
+  than asking "does this file call that function", because a check of the
+  second kind is satisfied by an import sitting next to a copy.
+
 - [x] **THE SWEEP AFTER ALL OF IT: 235 RAN, 3 FAILED, ALL THREE THE UNREACHABLE
   DATABASE.** Clean, and the count is the point as much as the failures: 235 is
   the same 235 that ran on the previous sweep, so nothing crashed out of it —

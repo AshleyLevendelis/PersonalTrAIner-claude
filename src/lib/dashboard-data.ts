@@ -25,7 +25,7 @@ import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
 import { estimateDaySeconds } from './session-duration'
-import { sessionForDate, type SessionMove } from './session-move'
+import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
 
 /**
  * 'unknown' IS NOT 'rest', and conflating them is the defect this value
@@ -152,7 +152,7 @@ function findWorkoutDay(days: WorkoutDay[], dayName: string): WorkoutDay | undef
 }
 
 function daysAgo(dateStr: string, todayStr: string): number {
-  return Math.round((new Date(`${todayStr}T00:00:00`).getTime() - new Date(`${dateStr}T00:00:00`).getTime()) / 86_400_000)
+  return daysBetween(dateStr, todayStr)
 }
 
 export interface LoadDashboardDataInput {
@@ -202,14 +202,18 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // cold-load window, not a trainee without a plan.
   const planKnown = mesocycle.length > 0 || exercisePlan.length > 0
 
-  const tomorrowDate = new Date(now.getTime() + 86_400_000)
-  const tomorrowName = tomorrowDate.toLocaleDateString('en-US', { weekday: 'long' })
+  // STEPPED BY THE CALENDAR, NOT BY 86,400,000 MILLISECONDS. A day is 23 or
+  // 25 hours long when the clocks move, so adding a fixed day to a time near
+  // midnight lands back on the same date, or skips one. addDays reads at
+  // midday and steps the date field — the stepper session-move already uses
+  // everywhere, so "tomorrow" means one thing across the app.
+  const tomorrowStr = addDays(todayStr, 1)
+  const tomorrowName = dayNameOf(tomorrowStr)
   // Tomorrow's schedule is read from the SAME week's plan (or next week if
   // tomorrow rolls into a new plan week) — approximated via the flat
   // week-1 pattern for the schedule shape (which days train), same source
   // the streak uses, since day-of-week availability doesn't change week to
   // week within a mesocycle.
-  const tomorrowStr = getLocalDateString(tomorrowDate)
   const tomorrowResolved = sessionForDate({ date: tomorrowStr, plan: exercisePlan, moves })
   const tomorrowWorkoutDay = tomorrowResolved.movedTo ? undefined : tomorrowResolved.day ?? undefined
   // The count rides along because Home's Tomorrow row shows it
@@ -334,7 +338,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   )
   const streakDays: StreakDayInput[] = []
   for (let i = 34; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 86_400_000)
+    // Same reason as tomorrow above: a fixed-millisecond walk back over
+    // five weeks crosses a clock change twice a year, and when it does it
+    // either repeats a date or skips one — silently, in the input to the
+    // streak. Stepped on the calendar date instead.
+    const d = new Date(`${addDays(todayStr, -i)}T12:00:00`)
     // One date convention, and it is the local calendar one every write in
     // this app uses. This was a ternary comparing the UTC date against
     // todayStr and falling back to a hand-rolled local format — which took
@@ -411,10 +419,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const proteinDays: { date: string; hit: boolean }[] = []
   if (proteinTarget > 0) {
     const dates: string[] = []
-    for (let i = 1; i <= 14; i++) {
-      const d = new Date(now.getTime() - i * 86_400_000)
-      dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
-    }
+    // Third and last fixed-millisecond walk in this file. A repeated date here
+    // would ask the database for the same day twice and count it twice toward
+    // the protein streak; a skipped one would break a streak that held.
+    for (let i = 1; i <= 14; i++) dates.push(addDays(todayStr, -i))
     const eatenByDate = await getEatenProteinByDate(profileId, dates).catch(() => null)
     if (eatenByDate) {
       for (const dateStr of dates) {

@@ -58,7 +58,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   only. `tightness`, `verify:tightness`
 - No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
 - Activity-shaped plans: only the starting-out walking plan exists, and only
-  it is offered — `starting-out`
+  it is offered — `starting-out`. **It is now RENDERED, since 15 Sep 2026** —
+  `planned-activity`, `verify:planned-activity`.
+  CORRECTED, measured: this line was true about generation and silent about the
+  screen, and the screen was the whole problem. `PlannedActivity` had been
+  generated for weeks and **no screen component read it** — every reader asked
+  `exercises.length`, so a prescribed twenty-minute walk rendered as a blank
+  "Log a walk or other activity" form and was filtered out of the week list
+  entirely. Ashley reported the empty card on 15 Sep believing it was about
+  cardio; it was already shipping to every beginner. **A capability is not
+  "had" because the data exists** — rule 2, one layer lower than usual: this
+  one had a generator, a type, a coach that could read it, and no pixel.
 
 **The meal plan, as generated — the same bar, in its own terms**
 - Targets from the profile, moved by a seven-day weight average, explained
@@ -669,6 +679,30 @@ old — the commands were right and the context was missing.
   check confirmed itself; and a `/record/i` over a function that matched
   `Record<string, unknown>` in its own signature. Before trusting a search,
   ask what ELSE could satisfy it: your own edit, a type, a comment, an import.
+- **AN IMPORT IS NOT A USE, AND A DECLARATION IS NOT A RENDER.** Two checks
+  written 15 Sep 2026 passed over the exact defect they were written for, both
+  found by mutation, both the same shape — the check matched something that
+  survives the break. Replacing the one CALL to a shared decision function with
+  the hand-rolled expression it replaced left the `import` line untouched, so a
+  bare-name check still found the name. And an ordering check comparing
+  `indexOf('plannedActivity')` — the const declaration near the top of a
+  component — against the form below it was true however the JSX was ordered.
+  So: for a function, require `name(`; for render order, anchor on the rendered
+  block; and prove the detector on something that should FAIL it, in the gate
+  itself, so it cannot go vacuous later.
+- **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
+  beyond "did not apply" and "crashed", and the harness cannot see it: on
+  15 Sep a mutation to the walking plan's day builder read MISSED because the
+  mesocycle RE-STAMPS every `plannedActivity` from `startingOutActivity(block)`
+  further downstream. The file changed, every check ran, the gate was right.
+  Before believing a MISSED, ask whether the value you broke is the one the
+  gate reads, or whether something later writes over it.
+- **A CHECK'S FIXTURE MUST BE MEASURED, NOT PLAUSIBLE.** The DST day-walk gate
+  needed times where a fixed 86,400,000 ms step actually misbehaves, and which
+  side of midnight that is depends on which way the clocks moved AND which way
+  the walk runs. My first two fixtures looked obviously right and the old
+  buggy code passed both. Run the OLD code against the candidate fixture and
+  read what it produces before writing the assertion.
 - **A QUOTE CLASS MUST RESPECT WHICH QUOTE OPENED THE STRING.** `[^'"`]` stops
   at the apostrophe in "That's", truncating the match. It cost two separate
   false results on 15 Sep 2026 — a reddened baseline and a safety string

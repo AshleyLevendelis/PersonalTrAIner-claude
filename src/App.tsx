@@ -31,7 +31,7 @@ import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, cl
 import { GroceryScreen } from '@/components/GroceryScreen'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
-import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
@@ -2045,19 +2045,14 @@ function App() {
 
     if (!profile.id) return
     try {
-      if (scope === 'today') {
-        const week = updatedMesocycle.find(w => w.week_number === weekNumber)
-        if (week) await saveMesocycleWeek(profile.id, week)
-      } else {
-        // 'permanent' touches every remaining week of the current block —
-        // still a handful of rows, cheap enough to upsert individually
-        // rather than resaving the whole mesocycle.
-        const touchedBlock = updatedMesocycle.find(w => w.week_number === weekNumber)?.block_number
-        const touchedWeeks = updatedMesocycle.filter(
-          w => w.block_number === touchedBlock && w.week_number >= weekNumber
-        )
-        await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
-      }
+      // THE THIRD COPY OF THIS BRANCH, removed 15 Sep 2026. saveScopedEdit
+      // was extracted to own it precisely so the screen's swap and the
+      // coach's could not disagree about which weeks reached the database —
+      // and then both kept their own copy anyway, the executor's under a
+      // comment promising it "mirrors handleSwapExercise exactly". This was
+      // the original the other two claimed to mirror. Identical behaviour:
+      // 'today' is one week, 'permanent' is the rest of that week's block.
+      await saveScopedEdit(profile.id, updatedMesocycle, weekNumber, scope)
       // VISION-ARCHITECTURE.md §2.3 — "after any tap mutation, sweep pending
       // proposals on the same target and mark them stale immediately, so
       // the user never taps Confirm on a card invalidated by their own tap

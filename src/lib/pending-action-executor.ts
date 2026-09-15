@@ -89,14 +89,12 @@ export async function executeExerciseSwap(
   }
 
   try {
-    if (payload.scope === 'today') {
-      const week = updatedMesocycle.find(w => w.week_number === payload.weekNumber)
-      if (week) await saveMesocycleWeek(profile.id, week)
-    } else {
-      const touchedBlock = updatedMesocycle.find(w => w.week_number === payload.weekNumber)?.block_number
-      const touchedWeeks = updatedMesocycle.filter(w => w.block_number === touchedBlock && w.week_number >= payload.weekNumber)
-      await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
-    }
+    // ONE SAVER. This inlined the scope branch that saveScopedEdit exists to
+    // own — a byte-for-byte copy of it, under a comment promising it "mirrors
+    // handleSwapExercise exactly", which is a promise nothing checked. The
+    // other three executors in this file already call the shared one. No
+    // behaviour changes here; what goes is the second copy that could drift.
+    await saveScopedEdit(profile.id, updatedMesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseSwap: persisting swap failed', err)
     return {
