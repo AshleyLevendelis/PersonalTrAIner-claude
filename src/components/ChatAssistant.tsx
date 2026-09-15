@@ -49,9 +49,10 @@ import { resolveSwapTarget } from '@/lib/swap-target'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import {
-  assessEdit, applyTradeoff, askText, askKey, shouldAsk, downgradeToCard,
+  assessEdit, applyTradeoff, askText, askKey, shouldAsk, askIsAllowed, downgradeToCard,
   type Tradeoff, type EditContext,
 } from '@/lib/edit-tradeoff'
+import { reasonChipsFor, reasonQuestion, type ReasonedEditKind } from '@/lib/edit-reason'
 import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } from '@/lib/meal-tradeoff'
 import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
@@ -560,7 +561,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * trial the confirm will apply, never from a second guess at what the edit
    * would do.
    */
-  type EditAdvice = { verdict: Tradeoff; key: string; scope: EditContext['scope'] }
+  // `reasoned` carries what the reason question needs to be asked: which verb
+  // it was and which exercise, plus whether the request already SAID why. Only
+  // swap and remove set it — the other kinds have no reason question.
+  type EditAdvice = {
+    verdict: Tradeoff; key: string; scope: EditContext['scope']
+    reasoned?: { kind: ReasonedEditKind; exerciseName: string; reasonGiven: boolean }
+  }
   /**
    * THE SAME QUESTION, ABOUT FOOD. Ashley's 14 Sep ruling built for exercise;
    * this is the meal half. See meal-tradeoff.ts for why protein leads and why
@@ -633,9 +640,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return { verdict: assessMealEdit(ctx), key, scope: 'permanent' }
   }
 
-  const adviseEdit = (ctx: EditContext): EditAdvice => {
+  const adviseEdit = (ctx: EditContext, reasoned?: EditAdvice['reasoned']): EditAdvice => {
     const block = ctx.before.find(w => w.week_number === ctx.weekNumber)?.block_number ?? 1
-    return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope }
+    return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope, reasoned }
   }
   /** Clear-chat's armed state — see handleClearChat for why this is not a window.confirm. */
   const [clearArmed, setClearArmed] = useState(false)
@@ -1937,6 +1944,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial, weekNumber: activeSession.liveWeek,
       dayName: day.day, kind: 'swap', scope, exerciseName: oldEx.name, newExerciseName: newEntry.name,
+    }, {
+      kind: 'swap',
+      exerciseName: oldEx.name,
+      // The tool has always accepted a `reason` and nothing ever asked for
+      // one. A blank string counts as absent — a model that fills the field
+      // with nothing has told us nothing.
+      reasonGiven: typeof rawArgs.reason === 'string' && rawArgs.reason.trim().length > 0,
     })
 
     return {
@@ -2220,6 +2234,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
       dayName: day.day, kind: 'remove', scope, exerciseName: target.exerciseName,
+    }, {
+      kind: 'remove',
+      exerciseName: target.exerciseName,
+      reasonGiven: typeof rawArgs.reason === 'string' && rawArgs.reason.trim().length > 0,
     })
     return {
       ok: true,
@@ -4187,6 +4205,38 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
       if (advice) {
         const guards = { alreadyAsked: readAskedKeys(), sessionRunning: activeSession.status === 'running' }
+
+        // WHY, BEFORE WHAT IT COSTS. docs/how-the-app-talks-about-a-change.md
+        // §3: "the bench is busy", "my shoulder hurts" and "I hate this
+        // exercise" are three different problems, and answering all three with
+        // the same swap gets two of them wrong.
+        //
+        // ONLY WHEN THE VERDICT IS NOT ALREADY A QUESTION. A tier 2 asks its
+        // own, and since 15 Sep its chips ARE these chips — so asking here too
+        // would be the same question twice. That is the whole reason the reason
+        // ask sits before the tier-2 block rather than replacing it.
+        //
+        // The guards are the existing ones, deliberately: once per block per
+        // thing, and never mid-session for a today change. A separate counter
+        // would let someone be asked twice about one exercise in one block by
+        // two different mechanisms, which is exactly the nagging §10's shape
+        // rules exist to prevent. The key is prefixed so it cannot collide
+        // with the trade-off's own.
+        const r = advice.reasoned
+        if (r && !r.reasonGiven && advice.verdict.tier !== 2) {
+          const reasonKey = `reason:${advice.key}`
+          if (askIsAllowed(reasonKey, advice.scope, guards)) {
+            markAsked(reasonKey)
+            return { text: askText({
+              tier: 2,
+              cost: null,
+              alternatives: reasonChipsFor(r.kind),
+              question: reasonQuestion(r.kind, r.exerciseName),
+              reason: 'no reason given with the request',
+            }) }
+          }
+        }
+
         if (shouldAsk(advice.verdict, advice.key, advice.scope, guards)) {
           markAsked(advice.key)
           return { text: askText(advice.verdict) }

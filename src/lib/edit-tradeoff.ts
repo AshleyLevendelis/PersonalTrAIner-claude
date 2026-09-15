@@ -509,7 +509,7 @@ export function askKey(ctx: Pick<EditContext, 'kind' | 'dayName' | 'exerciseName
 // tradeoff-shape.ts's own note for the measurement.
 // ---------------------------------------------------------------------------
 export {
-  DO_IT_ANYWAY, applyTradeoff, askText, shouldAsk, downgradeToCard,
+  DO_IT_ANYWAY, applyTradeoff, askText, shouldAsk, askIsAllowed, downgradeToCard,
 } from './tradeoff-shape'
 export type {
   EditTier, EditScope, TradeoffAlternative, Tradeoff, TradeoffCardFields, AskGuards,

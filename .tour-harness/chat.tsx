@@ -247,6 +247,49 @@ const tradeoffRemoval = (() => {
 })()
 ;(window as unknown as { __tradeoffRemoval: unknown }).__tradeoffRemoval = tradeoffRemoval
 
+// AND ONE THAT IS NOT GOAL-DAMAGING — for the reason ask, which is the whole
+// of the rest of the change surface.
+//
+// Its sibling above finds a tier-2 removal, which asks its OWN question and
+// therefore never reaches the reason ask (one question, not two). So a driver
+// that only had that target could never see the reason chips at all — it would
+// report green on a branch it had not entered, which is the exact failure the
+// tradeoff driver exists to prevent for the tier-2 path.
+//
+// Same search, opposite test: the first removal the engine prices at tier 0 or
+// 1. Published as null rather than falling back to anything, so a plan with no
+// such removal is a finding the driver reports instead of a check it skips.
+const cheapRemovals = (() => {
+  const out: { name: string; day: string; tier: number }[] = []
+  const todayName = DAYS[todayIdx]
+  const week = mesocycle[0]
+  const ordered = [
+    ...week.days.filter(d => d.day === todayName),
+    ...week.days.filter(d => d.day !== todayName),
+  ].filter(d => d.exercises.length > 0)
+  for (const day of ordered) {
+    for (let i = 0; i < day.exercises.length; i++) {
+      const name = day.exercises[i].name
+      const trial = removeExerciseFromSession({
+        mesocycle, profile, weekNumber: 1, dayName: day.day, exIndex: i, scope: 'permanent',
+      })
+      if (!trial.changed) continue
+      const verdict = assessEdit({
+        profile, before: mesocycle, after: trial.mesocycle, weekNumber: 1,
+        dayName: day.day, kind: 'remove', scope: 'permanent', exerciseName: name,
+      })
+      if (verdict.tier !== 2) out.push({ name, day: day.day, tier: verdict.tier })
+      if (out.length >= 2) return out
+    }
+  }
+  return out
+})()
+;(window as unknown as { __cheapRemoval: unknown }).__cheapRemoval = cheapRemovals[0] ?? null
+// TWO OF THEM, because the ask fires once per block per thing: proving that a
+// request WITH a reason goes straight to a card needs a lift the first section
+// has not already spent its one ask on.
+;(window as unknown as { __cheapRemoval2: unknown }).__cheapRemoval2 = cheapRemovals[1] ?? null
+
 // A NAME THAT MEANS ONE THING ACROSS THE WHOLE PLAN — for verify:coach-ban.
 //
 // A swap is scoped to a day, so a loose name unique within that day is enough.

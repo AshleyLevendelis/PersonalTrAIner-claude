@@ -165,6 +165,25 @@ export interface AskGuards {
  */
 export function shouldAsk(t: Tradeoff, key: string, scope: EditScope, guards: AskGuards): boolean {
   if (t.tier !== 2 || !t.question) return false
+  return askIsAllowed(key, scope, guards)
+}
+
+/**
+ * THE TWO GUARDS ON THEIR OWN, for a question that is not a tier-2 verdict.
+ *
+ * Split out 15 Sep 2026 for the reason ask ("why are you dropping this?"),
+ * which needs the same two rules and has no verdict to carry them on. The
+ * first version of that call built a fake `{...verdict, tier: 2, question:
+ * 'x'}` to get in through `shouldAsk` — which is precisely what that
+ * function's own note warns about ("a function that is awkward to call
+ * correctly gets called incorrectly"), so the note won and the guards moved
+ * out here.
+ *
+ * Both asks share ONE store of keys on purpose. Two counters would let
+ * somebody be asked twice about one exercise in one block by two different
+ * mechanisms, which is the nagging the shape rules exist to prevent.
+ */
+export function askIsAllowed(key: string, scope: EditScope, guards: AskGuards): boolean {
   // NEVER BETWEEN SETS. A today-scoped change made during a live session is a
   // person standing in a gym solving a problem now.
   if (guards.sessionRunning && scope === 'today') return false

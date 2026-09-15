@@ -84,7 +84,13 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
         reply: '',
         proposal: {
           kind: 'propose_exercise_remove',
-          rawArgs: { day: window.__removeDay, item: window.__removeName, scope: 'permanent' },
+          rawArgs: {
+            day: window.__removeDay, item: window.__removeName, scope: 'permanent',
+            // The tool has always had this field and nothing ever filled it.
+            // Left undefined by default so the default run is "no reason
+            // given", which is the state every real request was in.
+            ...(window.__removeReason ? { reason: window.__removeReason } : {}),
+          },
         },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -130,6 +136,11 @@ const READ = `(() => {
   const buttons = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
   return {
     hasCard: /Proposed change/i.test(text),
+    // HOW MANY, not whether. The chat keeps every earlier turn on screen, so
+    // a boolean answers "has this conversation ever produced a card" — which
+    // is true from section 1 onwards and says nothing about THIS turn. Cost a
+    // false failure on the reason ask before it was noticed.
+    cards: (text.match(/Proposed change/gi) || []).length,
     hasApply: buttons.some(t => /^Apply/.test(t)),
     chips: buttons.filter(t => t.length < 30),
     tail: text.replace(/\\s+/g, ' ').slice(-420),
@@ -163,8 +174,78 @@ check('2b. ...and the card still states what it costs',
   /\bsets\b/i.test(second.tail), second.tail)
 check('2c. ...so the change was never blocked, only slowed by one tap', second.hasApply === true, second)
 
+// --- 4. THE REASON ASK -----------------------------------------------------
+//
+// Everything above is the tier-2 path: a change that works against the goal.
+// That is the rare case. The ordinary one — drop an accessory, nothing much
+// lost — used to go straight to a card, and the app never learned WHY. §3:
+// "the bench is busy", "my shoulder hurts" and "I hate this exercise" are
+// three different problems answered with the same swap.
+//
+// DIFFERENT TARGET, DELIBERATELY. The lift above asks its own question, so it
+// can never reach this branch. A driver reusing it would report green on code
+// it had not entered.
+const cheap = await ev('window.__cheapRemoval ?? null')
+check('4a. this week holds a removal that is NOT goal-damaging',
+  !!cheap && !!cheap.name && cheap.tier !== 2, cheap)
+
+if (cheap) {
+  console.log(`  asking to drop "${cheap.name}" from ${cheap.day} — the engine prices it tier ${cheap.tier}`)
+  await ev(`window.__removeName = ${JSON.stringify(cheap.name)}; window.__removeDay = ${JSON.stringify(cheap.day)}`)
+  const beforeCards = (await ev(READ)).cards
+  await ask(`drop ${cheap.name} from ${cheap.day} for the rest of the block`)
+  const why = await ev(READ)
+  await shoot('tradeoff-reason-ask')
+
+  check('4b. it asks why instead of putting a card up',
+    why.cards === beforeCards, { was: beforeCards, now: why.cards, tail: why.tail })
+  check('4c. ...naming the exercise', new RegExp(cheap.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(why.tail), why.tail)
+  // The four answers, and the escape beside them. Read off the rendered
+  // buttons, because the slice that used to drop the escape chip lived
+  // between the verdict and the screen.
+  // THE REMOVE SET. Swap and remove offer different answers on purpose —
+  // nobody removes an exercise because the machine is taken, they put
+  // something else there. Using the swap list here was this driver's own
+  // first bug.
+  const wanted = ["short on time", "wiped", "hurts", "don't like"]
+  const got = wanted.filter(w => why.chips.some(c => c.toLowerCase().includes(w)))
+  check('4d. ...offering four reasons to choose from', got.length === 4, { got, chips: why.chips })
+  check('4e. ...and "Do it anyway" beside them, so nothing is blocked',
+    why.chips.some(c => /do it anyway/i.test(c)), why.chips)
+
+  // --- 5. ONCE, THEN TRUSTED ----------------------------------------------
+  // The same guard the goal ask uses. Asking a second time about one exercise
+  // in one block is the nagging the decision's shape rules exist to prevent.
+  await ask(`drop ${cheap.name} from ${cheap.day} for the rest of the block`)
+  const again = await ev(READ)
+  check('5a. asked again, it stops asking and shows the card', again.cards === beforeCards + 1, { was: beforeCards, now: again.cards })
+  check('5b. ...so the change was never blocked, only slowed by one tap', again.hasApply === true, again)
+}
+
+// --- 6. SAY WHY AND IT DOES NOT ASK -----------------------------------------
+//
+// THE NON-VACUITY HALF, and it was missing until a mutation found it: with the
+// `reasonGiven` test removed the app asked on EVERY request, and every check
+// above still passed, because none of them ever sent a reason. "It asks" is
+// only a decision if there is a case where it does not.
+//
+// A different lift, because the ask is spent once per block per thing.
+const cheap2 = await ev('window.__cheapRemoval2 ?? null')
+check('6a. the week holds a second non-goal-damaging removal to try', !!cheap2 && !!cheap2.name, cheap2)
+if (cheap2) {
+  await ev(`window.__removeName = ${JSON.stringify(cheap2.name)}; window.__removeDay = ${JSON.stringify(cheap2.day)}; window.__removeReason = 'my shoulder is sore'`)
+  const before2 = (await ev(READ)).cards
+  await ask(`drop ${cheap2.name} from ${cheap2.day} for the rest of the block because my shoulder is sore`)
+  const told = await ev(READ)
+  check('6b. told why, it goes straight to the card without asking',
+    told.cards === before2 + 1, { was: before2, now: told.cards, tail: told.tail })
+  check('6c. ...and does not ask the reason question anyway',
+    !told.chips.some(c => /wiped today|short on time/i.test(c)), told.chips)
+  await ev(`window.__removeReason = undefined`)
+}
+
 const err = await ev('window.__err ?? null')
-check('3. no uncaught error on the page', err === null, err)
+check('7. no uncaught error on the page', err === null, err)
 
 console.log(failures === 0 ? '\nA goal-damaging change is asked about, then allowed.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
