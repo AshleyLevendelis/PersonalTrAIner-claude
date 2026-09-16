@@ -465,8 +465,10 @@ menu" stays true when a copy is also left outside it.
   `coach-sees-ingredients`, `coach-sees-technique`, `coach-volume-schedule`,
   `coach-phase-brief`, `context-is-read`, `week-load-consistency`
 - Accurate, current, specific advice at the level a qualified trainer and
-  nutritionist would sign — still `UNGUARDED` in practice: the coach exam now
-  exists but has never been run, so the graded check is built and unused
+  nutritionist would sign — still `UNGUARDED` in practice, but no longer for
+  the reason written here for three days. CORRECTED 16 Sep 2026: the exam HAS
+  been run once, on Ashley's machine on 13 Sep, and the scores were never
+  pushed. See the exam bullet below for what that run is and is not worth
 - It asks before prescribing and uses the answer — prompt rule, kept in sync
   by `coach-rules-sync`; whether it HAPPENS is `UNGUARDED`
 - It notices patterns and coaches to them — `block-review`,
@@ -491,7 +493,21 @@ menu" stays true when a copy is also left outside it.
   `question-not-a-card`, `tool-reply`, `message-evidence`
 - **The coach exam** — a fixed set of realistic conversations graded against
   a written rubric, run against the real model whenever the prompt, model or
-  tools change, scores kept — BUILT 13 Sep 2026, **NEVER RUN**. 20 cases and
+  tools change, scores kept — BUILT 13 Sep 2026, and **RUN ONCE, on 13 Sep,
+  ON ASHLEY'S MACHINE — a fact this file denied until 16 Sep 2026.** That run
+  sits as a single unpushed local commit; this session has not seen it and
+  records it as RELAYED, not measured. Its headline was 7 of 20 cases
+  breaching a hard rule. **DO NOT READ THAT 7 AT FACE VALUE**: two of the
+  breaches were the coach replying "with no text at all", and that is the
+  exact false positive fixed on 16 Sep — on 13 Sep the coach returned an
+  empty reply beside a card in 28 places (measured at `29221cf`), the runner
+  recorded no card, and the hard rule named `silence` fired on a coach that
+  had behaved correctly. A third is likely stale rather than real: the
+  exercise-ban tool was still a declining stub on 13 Sep and was wired the
+  next day. So the 13 Sep scores measure a coach and a grader that both no
+  longer exist, and the number to act on is the one from the first run AFTER
+  the deploy. Keep the commit — it is the only record of what the exam said
+  before any of this was fixed, and the comparison is the point. 20 cases and
   37 turns (`coach-exam:run`); NINE hard rules checked in code and five
   judged dimensions marked against `docs/coach-exam-rubric.md`
   (`coach-exam:grade`); and `coach-exam-fresh` in every sweep, which fails
@@ -499,10 +515,17 @@ menu" stays true when a copy is also left outside it.
   makes rule 5 enforceable rather than aspirational. The rules are
   fixture-tested (`coach-exam-grader`) and the RUNNER is now driven end to end
   against a fake coach (`coach-exam-runner`). No conversation has been
-  played against the real model, because that needs credentials a cloud
-  session does not have. So until it is run once, "best-in-class advice" is
-  still asserted, not known — and the floor is deliberately unset, to be
-  proposed from that first run's numbers.
+  played against the real model FROM A CLOUD SESSION, because that needs
+  credentials this machine does not have — which is why the 13 Sep run
+  happened on Ashley's machine and why this file went on saying it had not
+  happened. So until it is run again against the CURRENT coach,
+  "best-in-class advice" is still asserted, not known — and the floor is
+  deliberately unset, to be proposed from that run's numbers.
+  **THE SHAPE OF THIS MISTAKE IS WORTH MORE THAN THE FACT.** Work done on a
+  machine this session cannot see is invisible to every check here, and the
+  absence of evidence read as evidence of absence for three days across two
+  files and five BACKLOG entries. When a capability needs credentials a cloud
+  session lacks, "never run" means "never run HERE" and must say so.
   CORRECTED 16 Sep 2026, measured: this said eight rules and quoted a mutation
   count, and the more useful correction is WHY a ninth was needed. **The exam
   could not see a card.** chat-gemini returns a `proposal` with an empty reply
