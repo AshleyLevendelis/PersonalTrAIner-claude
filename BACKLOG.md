@@ -53,6 +53,18 @@ Newest first. One line each.
   940, deploy re-download 256 → **257** against 264. Put to Ashley as a
   question rather than raised quietly, because she has ruled on this trade
   three times and twice chose to trim rather than raise.
+  **HER RULING, 16 Sep 2026, from three options: move the line and write in
+  the real number** — over trimming to fit (her own 14 Sep choice for the app
+  chunk) and over tightening it further to force a trim now and at every
+  future feature. 1,895 -> 1,915, which is 20 above the figure measured today,
+  with BOTH ends of the measurement written into the file so the next reader
+  is not working from an inherited number. Recorded because the same trade
+  will come again: **the deciding fact was that the number governing how fast
+  the app OPENS still has room, and the line that tripped is the early
+  warning, not the speed.** Worth watching, and flagged to her unprompted:
+  opening is now 413 of 420 and has moved ~2 kB per feature, so that one has
+  roughly three features left before it is the same conversation with a real
+  cost attached.
   **CORRECTED IN PLACE:** CLAUDE.md (three passages) and
   `docs/handoff-2026-09-16.md`, which also dropped its step 1 — the migration
   was already applied, verified by the local session comparing both projects'

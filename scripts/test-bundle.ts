@@ -324,7 +324,33 @@ console.log('\n3. Nothing has crept back up')
   //
   // 1,895 restores the ~16 kB of headroom this line is supposed to carry.
   // Prior totals are not comparable to later ones across this line.
-  const TOTAL_BUDGET_KB = 1895
+  //
+  // 1,895 -> 1,915, 16 Sep 2026, ASHLEY'S RULING from three options: move the
+  // line and write in the real number, over trimming to fit (what she chose on
+  // 14 Sep for the app chunk) and over tightening it further. Her reason for
+  // not trimming this time is the one this comment block already argues: the
+  // numbers that decide how fast the app OPENS all still have room, and this
+  // line is the early warning, not the speed.
+  //
+  // MEASURED 16 Sep, both ends, on real builds rather than inferred:
+  //     ff31d09, before this session's work   total 1888   app 920   paint 411
+  //     9c62e7b, after it                     total 1895   app 924   paint 413
+  // (ff31d09 was measured on a clean detached worktree, not by stashing.)
+  // +7 kB for a session rebuild on both surfaces and a target-change notice
+  // that says what the numbers moved FROM. 1,915 is 20 above the 1,895
+  // measured TODAY.
+  //
+  // AND THE 16 kB CLAIM ABOVE WAS ALREADY FALSE WHEN THIS TRIPPED. It was
+  // written against a measured 1,879 on 15 Sep; by the end of that same night
+  // the cardio work had taken it to 1,888, so 9 of the 16 were gone before
+  // this session opened a file — with nothing saying so, because a ceiling
+  // only speaks when it is crossed. That is the THIRD time a note in this file
+  // has gone on quoting headroom it no longer had, and the second time in two
+  // days. The rule is already written at the top of the app-chunk block and in
+  // CLAUDE.md; what this entry adds is that writing the rule down has not yet
+  // stopped it happening. Anyone raising this line again: measure BOTH ends
+  // first, and assume the last note's figure is stale.
+  const TOTAL_BUDGET_KB = 1915
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
 
