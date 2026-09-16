@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [x] **THE SWEEP THIS BRANCH ACTUALLY NEEDED: 244 ran, 3 failed, all three
+  environmental.** 16 Sep 2026, 16:34-17:24, at `9c62e7b` plus the two commits
+  that landed mid-run.
+  **244 RAN AGAINST 244 DECLARED**, and that equality is half the result — a
+  gate that crashes out of enumeration produces no failure and reads as a pass,
+  so the run count is checked before the failure count. The script records
+  DECLARED and ran= separately for exactly that reason.
+  **The three failures, read by their values rather than their names:**
+  `test:meal-quality`, `test:schema-parity` and `verify:rls` each print
+  `Host not in allowlist: vswuurrtbzbrgubddefv.supabase.co` or "Failed to link
+  to TEST". They are one fact, not three: this machine's network policy cannot
+  reach the test database. Nothing to investigate.
+  **`test:bundle` passed at 1,895 against its new 1,915**, and the change was
+  IN THE FILE BEFORE THE SWEEP REACHED GATE 34 — checked, because a fix made in
+  response to a sweep is not covered by that sweep, and this one had to be.
+  Plan quality re-scored **11.56 / 12, 0 of 9,216 below the 7.2 floor**,
+  unchanged by any of this session's work.
+  **THE DOC EDITS LANDING MID-SWEEP ARE IRRELEVANT, and that was checked rather
+  than assumed**: no gate reads CLAUDE.md or BACKLOG.md as data — the eleven
+  files that match those names only mention them in comments. The distinction
+  matters because a naive `grep -l` says the opposite.
+  Branch verified against origin: `4d28033`, fully pushed, **30 commits** ahead
+  of `main` (`7d6c7e6`). The handoff's numbers were stale by two commits again
+  within the hour and are corrected; step 2 is cleared for Ashley to merge.
+
 - [x] **I REPORTED A SWEEP THAT WAS YESTERDAY'S, AND AN EXAM THAT HAD ALREADY
   BEEN RUN. Two false facts in one session, opposite shapes, same cause.**
   16 Sep 2026. Neither was found by a check; both were found by going back to
