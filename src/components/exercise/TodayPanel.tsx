@@ -53,6 +53,7 @@ import type { ReasonAnswer } from './EditReasonStep'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
+import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { settleWeek } from '@/lib/settle-week'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
@@ -395,6 +396,38 @@ export function TodayPanel({
   }
 
   /**
+   * "GIVE ME A DIFFERENT SESSION TODAY" — 16 Sep 2026.
+   *
+   * Ashley's ruling, from three options: keep the main lift and rebuild around
+   * it. You still do today's main lift at the weight and sets already
+   * prescribed; everything else changes. It matches her 13 Sep ruling for
+   * shortening (protect the main lift, drop accessories), so the two
+   * change-today verbs treat it the same way.
+   *
+   * rebuildDayAroundMainLift runs settleWeek itself — unlike shortenToday
+   * above, which has to. Scope 'today', so the same day next week is the
+   * session that was always planned.
+   */
+  const rebuildToday = async (): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const result = await rebuildDayAroundMainLift({
+      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exclusions,
+    })
+    if (!result.changed) return result.refusal ?? "I couldn't rebuild that one."
+    const saved = await applySessionEdit({ mesocycle: result.mesocycle, changed: true }, 'today')
+    if (saved) return saved
+    // WHAT IT COULD NOT DO IS SAID, NOT SWALLOWED. A rebuild that quietly left
+    // three exercises alone and reported success is the defect this codebase
+    // keeps finding — the app knowing something and the screen saying nothing.
+    const kept = result.kept.length
+    const main = result.mainLift ? ` ${result.mainLift} is untouched, as planned.` : ''
+    setRebuildNote(kept === 0
+      ? `Rebuilt today — ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed.${main} Back to the planned session next week.`
+      : `Rebuilt today — ${result.replaced.length} changed, ${kept} stayed because nothing else fits ${kept === 1 ? 'that slot' : 'those slots'} with your equipment and injuries.${main} Back to the planned session next week.`)
+    return null
+  }
+
+  /**
    * WHERE EACH ANSWER GOES. docs/how-the-app-talks-about-a-change.md §3's
    * table, and every destination already existed — this routes, it does not
    * build. The injury branch is the caller's because the swap dialog needs the
@@ -661,6 +694,17 @@ export function TodayPanel({
   const volumeNames = volume ? volume.names.join(' and ') : ''
   const [volumeBusy, setVolumeBusy] = useState(false)
   const [volumeError, setVolumeError] = useState<string | null>(null)
+  /**
+   * What the rebuild changed and what it could not, after the tap.
+   *
+   * TRANSIENT ON PURPOSE, and the limit is worth stating: unlike the shortened
+   * marker (workout.shortened_to_minutes, which is stored on the day and so
+   * survives a reload), this is component state and goes on refresh. The
+   * session itself visibly changed and stays changed; what is lost on a reload
+   * is only the list of slots that STAYED. Storing that needs a field on the
+   * day, which is a persistence change this build did not take.
+   */
+  const [rebuildNote, setRebuildNote] = useState<string | null>(null)
   const volumeReduction = useMemo(() => {
     if (!profile || !volume || volume.atFloor || !hasMesocycle) return null
     const activities = profile.concurrent_activities ?? []
@@ -840,6 +884,7 @@ export function TodayPanel({
         onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
         onShorten={shortenToday}
         onLighter={lighterToday}
+        onRebuild={rebuildToday}
       />
       </Suspense>
       <Suspense fallback={null}>
@@ -971,6 +1016,7 @@ export function TodayPanel({
             </InsightBanner>
           )}
           {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
+          {rebuildNote && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{rebuildNote}</p>}
           {/* Turn 5 hero block — supersedes IdentityLine's old day/focus text
               (now deleted; its timers entry point moved into WeekContextRow's
               "⋮" menu above). New: a 2px session-progress line under the
