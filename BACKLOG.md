@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **"CHOSEN, NOT SHUFFLED" NOW HAS A CHECK — AND WRITING IT CAUGHT MY OWN
+  CHECK MISSING THE EXACT DEFECT IT WAS NAMED FOR.**
+  Ashley chose this from three options, 16 Sep 2026. VISION's claim is "score
+  eligible candidates on quality, goal fit, experience fit, what's already in
+  the session, and variety across the block — then pick the best, not any valid
+  one", and CLAUDE.md carried it tagged `UNGUARDED`: the "Why this exercise"
+  screen exists, and nothing would have noticed the ranking underneath it
+  becoming a coin flip.
+  **NOT HYPOTHETICAL.** `exercise-plan.ts`'s own comments record it happening:
+  906 of 18,909 main/secondary slots resolved to a resistance band on a day
+  that already held a real load, because two candidates scored IDENTICALLY on
+  every factor and the winner fell out of the tie-break. "A coin flip, 906
+  times."
+  **SO THE TIE-BREAK IS WHAT THE NEW GATE WATCHES HARDEST.** It is deliberate
+  and load-bearing — without it two equal candidates always resolve the same
+  way, which is its own defect — but it is +/-0.3 against factor steps of 1,
+  and NOTHING enforced that relationship. `test:chosen-not-shuffled`, 19 checks
+  in five parts: the ranker discriminates; a one-point difference survives
+  every seed while two identical candidates genuinely do differ; a main lift
+  never loses to an accessory with every other factor stacked against it; each
+  factor moves the score in the direction it claims; and the on-screen reason
+  is the factor that actually decided the pick, silent when none did.
+  **IT CALLS THE RANKER RATHER THAN READING IT**, which needed
+  `scoreCandidate`, `orderCandidates` and `explainWinner` exported — the same
+  reason `getAffinityPrimerPool` already is, in its own words: a check that
+  hand-copies this logic drifts out of sync and then proves nothing about the
+  plan people actually get.
+  **MUTATIONS: 10 TRIED, 10 CAUGHT — after 6 of 10 on the first pass. All four
+  misses were MY FIXTURES, and the first is the one that matters.**
+  **P1 widened the tie-break tenfold, to where it CAN overturn a real
+  difference — the precise defect this gate exists for — and the gate stayed
+  green.** Its fixture compared two different TIERS, a 30-point gap, while the
+  comment directly above it said "a pair separated by ONE factor step, the
+  smallest real difference there is". The prose and the code disagreed and the
+  prose was what I read back. It now compares an exercise against an identical
+  twin that has appeared once this week: a gap of exactly 1, with nothing about
+  the two movements able to explain the order.
+  The other three, same shape: a balance check comparing ranks with `<=`, which
+  nothing moving also satisfies (now asserts the factor); a style check that
+  branched on whether the candidate happened to be on-style and asserted `=== 0`
+  when it was, which zeroing the factor also satisfies (now finds one that is
+  genuinely off-style, across the whole catalogue, because every horizontal
+  push carries the bodybuilding tag); and no fixture at all for the explainer's
+  half-the-gap threshold, so removing it changed nothing visible.
+  **A MEASUREMENT TAKEN AND DELIBERATELY NOT BUILT ON, recorded because the
+  next person will have the same idea.** The obvious end-to-end test is "same
+  profile under different seeds should produce nearly the same plan; a shuffle
+  would not". Measured: same profile across 6 seeds, week-1 exercise overlap
+  **min 0.33, mean 0.41**; two different profiles on the same seed, **mean
+  0.11**. The separation is real (3.8x) but 0.41 is far lower than "ranking"
+  suggests, and the reason is that the seed drives the SPLIT and the rotation
+  as well as the tie-break — so the metric conflates structure with ranking and
+  cannot support the claim. Caught before writing a check on it, which is the
+  fixture rule doing its job one step earlier than usual.
+  **ALSO NOTICED, not chased:** an unrecognised `training_style` makes plan
+  generation throw rather than fall back (`styleConfig` is undefined at
+  `exercise-plan.ts` line ~511). Unreachable from onboarding today, which fixes
+  the style to four known values; it would bite the day one is renamed.
+
 - [x] **A GATE WAS RED AT THE BRANCH HEAD AND I DID NOT KNOW, BECAUSE I FIXED
   YESTERDAY'S SWEEP FAILURES AND NEVER RE-RAN THE SWEEP.**
   Today's sweep: **240 ran, 236 passed, 4 failed.** 240 is yesterday's 239 plus

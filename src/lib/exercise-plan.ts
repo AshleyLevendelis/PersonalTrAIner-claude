@@ -1435,7 +1435,7 @@ const BAND_WITHOUT_WEIGHT_PENALTY = 12
 /** Shared empty set, so the no-injury path doesn't allocate one per candidate scored. */
 const EMPTY_JOINTS: Set<string> = new Set()
 
-interface ScoreContext {
+export interface ScoreContext {
   /** The day's own patterns (track.primary_patterns + secondary_patterns) — what "supports today's session" is measured against. */
   trackPatterns: MovementPattern[]
   selectedSoFar: ExerciseEntry[]
@@ -1485,7 +1485,7 @@ interface ScoreContext {
  * candidates factor-by-factor to find what actually decided a pick, instead
  * of guessing from the final score alone.
  */
-interface ScoreFactors {
+export interface ScoreFactors {
   role_support: number
   goal_fit: number
   experience_fit: number
@@ -1496,7 +1496,7 @@ interface ScoreFactors {
   style_fit: number
 }
 
-interface ScoredCandidate {
+export interface ScoredCandidate {
   e: ExerciseEntry
   score: number
   factors: ScoreFactors
@@ -1517,7 +1517,20 @@ interface ScoredCandidate {
  * used-name tracking. This function only orders ONE day's candidates at the
  * moment of the initial pick.
  */
-function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): { score: number; factors: ScoreFactors } {
+/**
+ * EXPORTED FOR test:chosen-not-shuffled, 16 Sep 2026, and for the same reason
+ * getAffinityPrimerPool is: a check that hand-copies this logic can silently
+ * drift out of sync with it, and then proves nothing about the plan people
+ * actually get.
+ *
+ * VISION's claim is "score eligible candidates... then pick the best, not any
+ * valid one". That was UNGUARDED — nothing here would have noticed the ranking
+ * becoming a shuffle, which is not hypothetical: this file's own comments
+ * record 906 main/secondary slots resolved by a coin flip before the band rule
+ * existed, and a jitter term big enough to overturn a real difference would put
+ * the app straight back there with every gate still green.
+ */
+export function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): { score: number; factors: ScoreFactors } {
   const factors: ScoreFactors = { role_support: 0, goal_fit: 0, experience_fit: 0, session_balance: 0, weekly_variety: 0, equipment_fit: 0, style_fit: 0 }
 
   // 1. Quality for the role: an isolation exercise that directly supports
@@ -1681,7 +1694,7 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   return { score, factors }
 }
 
-function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ScoredCandidate[] {
+export function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ScoredCandidate[] {
   // Answered here, once, from the list actually being ranked — not by any
   // caller and not from the pool at large. "Was a real weight on offer for
   // THIS slot?" is the only form of the question that makes the band rule
@@ -1753,7 +1766,7 @@ const REASON_CLAUSES: { [K in keyof ScoreFactors]: (winner: ExerciseEntry, runne
  * single deciding factor (or one only separated by tier/jitter) stays
  * silent, same as an obvious pick always has.
  */
-function explainWinner(winner: ScoredCandidate, runnerUp: ScoredCandidate | undefined, policy: GoalPolicy): string | undefined {
+export function explainWinner(winner: ScoredCandidate, runnerUp: ScoredCandidate | undefined, policy: GoalPolicy): string | undefined {
   if (!runnerUp) return undefined
   const totalGap = winner.score - runnerUp.score
   if (totalGap <= 0) return undefined

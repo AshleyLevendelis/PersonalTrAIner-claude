@@ -37,7 +37,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
-  — screen exists; ranking-over-shuffling itself `UNGUARDED`
+  — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
+  CALLS the ranker rather than reading it. It holds the tie-break to its job:
+  a one-point difference survives every seed, while two identical candidates
+  genuinely do differ — the +/-0.3 jitter against factor steps of 1 was the
+  relationship nothing enforced, and widening it turns every plan back into the
+  coin flip that put a band in 906 loaded slots.
 - **Say what feels tight before a session and the warm-up prepares it** — added
   15 Sep 2026 from a suggestion list Ashley asked me to assess, on her "build
   all that you think is good". Eight areas as taps; up to three mobility drills
