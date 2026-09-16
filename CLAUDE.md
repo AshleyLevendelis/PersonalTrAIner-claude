@@ -78,7 +78,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 **The meal plan, as generated — the same bar, in its own terms**
 - Targets from the profile, moved by a seven-day weight average, explained
   when they move, with an endpoint to a deficit — `fat-loss-deficit`,
-  `macro-split`; "explained" `UNGUARDED`
+  `macro-split`, and "explained" since 16 Sep 2026: `target-change-notice`
+  (19 checks, 9 mutations). CORRECTED, measured: the notice always EXISTED —
+  I reported it missing off one identifier (`anchorMoved`, genuinely dead and
+  now deleted) while the notice ran off another (`changedFromPrior`, wired at
+  both call sites). What was true is the tag: nothing would have noticed it
+  breaking. It now names what each target moved FROM as well as to, covers
+  protein, carbs and fat rather than calories alone, and comes from the shared
+  phrasebook instead of two hand-written copies.
 - Meals hit targets from real foods, varied, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`

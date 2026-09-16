@@ -1,4 +1,4 @@
-import { couldNot } from '@/lib/coach-voice'
+import { couldNot, targetsMoved } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -1003,8 +1003,13 @@ function App() {
     // one ever) is the one-time "your target changed" notice trigger.
     snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, effectiveTargetWeight.weightKg)
       .then(result => {
-        if (result.changedFromPrior) {
-          setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${liveTargets!.calories} kcal, based on your recent weigh-ins.` }])
+        // ONE SENTENCE, FROM THE PHRASEBOOK. This and its twin below were two
+        // hand-written copies of the same line, naming only calories and only
+        // the new figure. targetsMoved returns null when nothing actually
+        // moved, so the notice cannot fire on a change that did not happen.
+        const moved = result.previous && liveTargets ? targetsMoved(result.previous, liveTargets) : null
+        if (result.changedFromPrior && moved) {
+          setAdaptationMessages(prev => [...prev, { text: moved }])
         }
       })
   }
@@ -2346,8 +2351,9 @@ function App() {
     const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
     setMacros(targets)
     snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
-      if (result.changedFromPrior) {
-        setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${targets!.calories} kcal, based on your recent weigh-ins.` }])
+      const moved = result.previous && targets ? targetsMoved(result.previous, targets) : null
+      if (result.changedFromPrior && moved) {
+        setAdaptationMessages(prev => [...prev, { text: moved }])
       }
     })
 

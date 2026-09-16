@@ -2,6 +2,53 @@
 
 Newest first. One line each.
 
+- [x] **"EXPLAINED WHEN THEY MOVE" IS GUARDED — AND I HAD TO RETRACT "IT IS
+  MISSING" FIRST, WHICH IS THE PART WORTH KEEPING.**
+  Ashley chose this from three options, 16 Sep 2026, on my description of it as
+  a missing feature. **That description was wrong and I corrected it to her
+  before building anything**, then she chose again from the real options
+  ("make it honest and guard it", over guarding it unchanged and over dropping
+  it).
+  **HOW I GOT IT WRONG, because the error shape matters more than the
+  retraction.** `getEffectiveTargetWeightKg` returns `anchorMoved`, whose own
+  doc comment calls it "the signal a caller uses to decide whether a 'your
+  target changed' notice is warranted". I grepped it, found it read by nothing,
+  and reported the NOTICE as missing. The notice runs off a DIFFERENT signal —
+  `snapshotTargetsIfChanged`'s `changedFromPrior` — which is wired at both call
+  sites and fires. **One identifier is not a feature**, and a doc comment
+  claiming a role is not evidence the role is filled that way.
+  **WHAT WAS ACTUALLY THIN**, measured: the notice named CALORIES only, while
+  protein, carbs and fat move in the same instant off the same weight change;
+  it named the NEW figure with nothing to measure it against; the sentence was
+  hand-written in two places, outside `coach-voice.ts`; and nothing would have
+  noticed if it stopped firing. That last one is what `UNGUARDED` meant here
+  all along.
+  **BUILT:** `targetsMoved(before, after)` in the phrasebook, returning null
+  when nothing moved so a caller cannot announce a change that did not happen.
+  Live: *"Your daily targets moved with your recent weigh-ins — calories 2,550
+  to 2,400 and protein 170g to 165g."* `SnapshotResult` now carries `previous`
+  so the sentence can name the old figure — Ashley's implement-ceiling ruling
+  (13 Sep) generalised: if the app quotes a number it says where that number
+  sits. Both call sites use the one sentence. `anchorMoved` is deleted, with a
+  comment recording what it claimed and why nothing should have believed it.
+  **THE NUMBER FORMATTER DOES NOT ASK THE LOCALE.** `toLocaleString` would read
+  the machine's, and a check that answers differently on a different machine is
+  not a check — the harness-clock rule one level down. Grouped by hand, and the
+  gate asserts the formatter never calls `Intl`.
+  **Mutations: 9 tried, 9 caught — 8 on the first pass.** The miss is the
+  familiar one: my check asked whether `changedFromPrior && moved` appeared
+  ANYWHERE, so dropping the guard at ONE of the two call sites left it green —
+  the surviving copy answered for both. It now counts every site and requires
+  all of them. Third time this week a check has tested existence where it meant
+  universality.
+  **The absent-string check strips comments first**, which it has to: the note
+  explaining `anchorMoved`'s removal would otherwise satisfy the check that it
+  was removed. A second check asserts that note is still there, so the
+  explanation cannot be quietly deleted either.
+  No deploy — screen-side only. `coach-voice`, `bundle` and `silent-writes`
+  pass; the phrasebook stayed a cheap import (`MacroTargets` is a type-only
+  import, so §1's import-graph walk is unaffected).
+
 - [x] **"CHOSEN, NOT SHUFFLED" NOW HAS A CHECK — AND WRITING IT CAUGHT MY OWN
   CHECK MISSING THE EXACT DEFECT IT WAS NAMED FOR.**
   Ashley chose this from three options, 16 Sep 2026. VISION's claim is "score

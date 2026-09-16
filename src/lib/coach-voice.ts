@@ -51,7 +51,54 @@
 //   - `coach-tips.ts` — dashboard tiles, a different medium from a chat bubble.
 // ---------------------------------------------------------------------------
 
-import type { FitnessGoal } from './types'
+import type { FitnessGoal, MacroTargets } from './types'
+
+// ---------------------------------------------------------------------------
+// TARGETS THAT MOVED ON THEIR OWN
+// ---------------------------------------------------------------------------
+
+/** Deterministic thousands separator. toLocaleString would read the machine's
+ *  locale, and a gate that gives a different answer on a different machine is
+ *  not a gate — the same rule as the harness clock, one level down. */
+const grouped = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
+/** Every target that can move, in the order a person reads them. */
+const TARGET_FIELDS: ReadonlyArray<{ key: keyof MacroTargets; label: string; unit: string }> = [
+  { key: 'calories', label: 'calories', unit: '' },
+  { key: 'protein', label: 'protein', unit: 'g' },
+  { key: 'carbs', label: 'carbs', unit: 'g' },
+  { key: 'fat', label: 'fat', unit: 'g' },
+]
+
+/**
+ * WHAT CHANGED AND WHAT IT CHANGED FROM, when the app retunes daily targets
+ * off a moved weight trend. Returns null when nothing actually moved, so a
+ * caller cannot announce a change that did not happen.
+ *
+ * WHY IT NAMES THE OLD NUMBER. The two hand-written copies this replaces said
+ * "Your calorie target updated to 2,400 kcal" — a figure with nothing to
+ * measure it against. Ashley's ruling on the implement ceilings (13 Sep 2026)
+ * generalises: if the app quotes a number, it says where that number sits, or
+ * she cannot go and look at it.
+ *
+ * WHY IT NAMES MORE THAN CALORIES. Protein, carbs and fat are derived from the
+ * same weight and move in the same instant. Announcing only the calorie change
+ * tells someone tracking protein that nothing happened to their protein.
+ *
+ * WHY IT IS ONE SENTENCE AND NOT A LIST. This renders as a coach nudge on
+ * Home, in the same strip as every other thing the coach says. A four-row
+ * table there would read as a report, not as a trainer mentioning something.
+ */
+export function targetsMoved(before: MacroTargets, after: MacroTargets): string | null {
+  const moved = TARGET_FIELDS
+    .filter(f => Math.round(before[f.key]) !== Math.round(after[f.key]))
+    .map(f => `${f.label} ${grouped(before[f.key])}${f.unit} to ${grouped(after[f.key])}${f.unit}`)
+  if (moved.length === 0) return null
+  const list = moved.length === 1
+    ? moved[0]
+    : `${moved.slice(0, -1).join(', ')} and ${moved[moved.length - 1]}`
+  return `Your daily targets moved with your recent weigh-ins — ${list}.`
+}
 
 // ---------------------------------------------------------------------------
 // ASKING
