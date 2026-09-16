@@ -809,7 +809,7 @@ const toolDeclarations = [
   {
     name: "propose_session_shorten",
     description:
-      "PROPOSES cutting ONE day's session down to the time the user actually has — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it whenever somebody says how long they have and it is less than their session: 'I've only got half an hour', 'I can do 25 minutes before work', 'I need to be out by 7'. WHAT IT DOES, so you can say it plainly: their MAIN LIFT is protected — every set of it stays — and the accessory work at the end comes out from the bottom until the session fits. It never goes below three exercises. It is for TODAY only; the same day next week is the full session again. If the day cannot reach the number they gave without cutting into the main lift, the card says the closest it can get rather than pretending. This is NOT the tool for 'that session is always too long' — that is a lasting change to how long their sessions are, which they set on the Profile screen.",
+      "PROPOSES cutting ONE day's session down to the time the user actually has — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it whenever somebody says how long they have and it is less than their session: 'I've only got half an hour', 'I can do 25 minutes before work', 'I need to be out by 7'. WHAT IT DOES, so you can say it plainly: their MAIN LIFT is protected — every set of it stays — and the accessory work at the end comes out from the bottom until the session fits. It never goes below three exercises. It is for TODAY only; the same day next week is the full session again. If the day cannot reach the number they gave without cutting into the main lift, the card says the closest it can get rather than pretending. This is NOT the tool for 'that session is always too long' — that is a LASTING change to how long their sessions are, and it is propose_session_length. The difference is the time scope, never the number: both requests carry a figure in minutes, and 'today' versus 'from now on' is the whole distinction.",
     parameters: {
       type: "object",
       properties: {
@@ -828,6 +828,31 @@ const toolDeclarations = [
         origin_verbatim_quote: {
           type: "string",
           description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["minutes", "origin_verbatim_quote"],
+    },
+  },
+
+  {
+    name: "propose_session_length",
+    description:
+      "PROPOSES changing how long their sessions are FROM NOW ON, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it when the time they have has CHANGED for good: 'my sessions need to be 45 minutes from now on', 'I can only do half an hour these days', 'I've got more time now, make them longer'. WHAT IT DOES, so you can say it plainly: the remaining weeks are rebuilt to FIT the new length — fewer or more exercises, sets and rest to match — rather than the same sessions with the end cut off. Weeks already underway or finished are never rewritten and anything logged stays exactly as it is. THE DIFFERENCE FROM propose_session_shorten IS THE TIME SCOPE, NEVER THE NUMBER: both carry a figure in minutes. 'I only have 45 minutes today' is one day and is propose_session_shorten; 'my sessions need to be 45 minutes' is every session from here and is this one. If you cannot tell which they mean, ASK — do not guess, because one of them rebuilds the rest of their block.",
+    parameters: {
+      type: "object",
+      properties: {
+        minutes: {
+          type: "string",
+          enum: ["30-45", "45-60", "60-90", "90+"],
+          description: "The band their sessions should be from now on. Map what they said to the band that CONTAINS it — 45 minutes is '30-45', an hour is '45-60'. If what they said sits on a boundary or between bands, ask rather than choosing for them.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described (e.g. 'new job, less time in the mornings') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the change. Must be copied verbatim, not paraphrased.",
         },
       },
       required: ["minutes", "origin_verbatim_quote"],
@@ -1878,6 +1903,7 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 
 === 3d2. NOT ENOUGH TIME TODAY (propose_session_shorten) ===
 - "I've only got 25 minutes", "I can do half an hour before work", "I need to be out by 7" — call propose_session_shorten with the number of minutes they said. If they say they are short of time but no number, ASK how long they have; do not guess one.
+- "My sessions need to be 45 minutes from now on", "I can only do half an hour these days", "make them shorter permanently", "I've got more time now" — call propose_session_length. THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER: both tools take a figure in minutes, and the same "45 minutes" means one day in the first list and every session from here in this one. Words that decide it: "today", "this morning", "before work" mean ONE day; "from now on", "these days", "permanently", "always", "in future" mean LASTING. If NEITHER kind of word is there — a bare "my sessions should be 45 minutes" — ASK which they mean. Do not guess: one of them rebuilds the rest of their block and the other does not touch tomorrow.
 - Say what it will do, in their terms: the main lift stays exactly as it is, the accessory work at the end comes out until it fits, and the day is back to the full session next week. Never name a specific exercise as the one that will go — the app decides that against the floors and you cannot see the result until the card renders.
 - This is TODAY. "Tuesdays are always too long" is not this tool: session length is a lasting setting they change on the Profile screen, and saying so is the honest answer.
 
@@ -3456,6 +3482,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
               // rest of the plan, and an arg dropped here reads there as
               // "ongoing" — silently the more far-reaching of the two.
               rawArgs: { day: args.day, direction: args.direction, scope: args.scope, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_length") {
+        // Courier, like its neighbours: no server write, raw args forwarded,
+        // the client builds the diff. The rebuild itself lives in src/lib
+        // (rebuildAgainstProfile) and cannot be reached from Deno — and it is
+        // the only thing that knows which week is live, which is the whole
+        // guarantee here, since weeks already underway are never rewritten.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_length",
+              rawArgs: { minutes: args.minutes, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -304,6 +304,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_cardio_session: { done: 'Scheduled', failed: "I couldn't add that session" },
   propose_volume_change: { done: 'Adjusted', failed: "I couldn't adjust it" },
   propose_schedule_change: { done: 'Rescheduled', failed: "I couldn't change the schedule" },
+  propose_session_length: { done: 'Sessions resized', failed: "I couldn't change your session length" },
   propose_style_change: { done: 'Restyled', failed: "I couldn't change the style" },
   propose_rest_day: { done: 'Marked as rest', failed: "I couldn't mark that day" },
   propose_missed_session: { done: 'Marked as missed', failed: "I couldn't mark that day" },

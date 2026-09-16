@@ -19,8 +19,9 @@ import { createPendingAction, claimPendingAction, declinePendingAction, markExec
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
-import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
+import { STYLE_OPTIONS, DURATION_OPTIONS } from '@/lib/onboarding-slots'
+import { getDurationBudgetSeconds } from '@/lib/session-duration'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
@@ -1863,6 +1864,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_session_shorten') return "Here's that session cut down to fit:"
     if (pendingAction.kind === 'propose_session_rebuild') return "Here's a different session, with your main lift kept:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
+    if (pendingAction.kind === 'propose_session_length') return "Here's your plan at the new session length:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
@@ -3311,6 +3313,55 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  // THE LASTING TWIN OF THE SHORTEN CARD. Its whole job is to be the one the
+  // user meant: the two requests are one word apart and both carry minutes,
+  // so this refuses rather than guesses when the length is already set.
+  const buildSessionLengthProposal = (
+    rawArgs: Record<string, unknown>,
+  ): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: SessionLengthPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    // Validated against the real option list, never the model's spelling —
+    // an unrecognised band is dropped and the proposal does not happen. Same
+    // rule as the style card, and for the same reason: the enum is the app's,
+    // not the model's.
+    const wantedOpt = DURATION_OPTIONS.find(o => o.value === String(rawArgs.minutes ?? '').trim())
+    if (!wantedOpt || mesocycle.length === 0) return null
+    const beforeValue = profile.session_duration_preference
+    if (wantedOpt.value === beforeValue) return null
+    const beforeOpt = DURATION_OPTIONS.find(o => o.value === beforeValue)
+
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+
+    const shorter = getDurationBudgetSeconds(wantedOpt.value) < getDurationBudgetSeconds(beforeValue)
+    return {
+      scopeKey: `${profile.id}:propose_session_length:${wantedOpt.value}:${startWeek}`,
+      preconditions: { before: beforeValue, wanted: wantedOpt.value, startWeek },
+      payload: { sessionDuration: wantedOpt.value, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        lead: ask(`move your sessions to ${wantedOpt.label}`),
+        rows: [{ field: 'Session length', before: beforeOpt?.label ?? String(beforeValue), after: wantedOpt.label }],
+        implications: [
+          { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. ${SCOPE.historyKept}` },
+          // THE POINT OF THE RULING, said before the tap. Trimming and
+          // rebuilding are different things and she chose the second.
+          { severity: 'warn', text: shorter
+            ? 'Your sessions get rebuilt to fit — fewer exercises and sets, not the same ones with the end cut off.'
+            : 'Your sessions get rebuilt to use the extra time properly, rather than leaving it over.' },
+        ],
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
   const buildStyleChangeProposal = (rawArgs: Record<string, unknown>): {
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -4422,6 +4473,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             ? `You're already training ${current.join(', ')} — nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead.`
             : "Nothing to change there. If you were asking something else, like what today's session is, say so and I'll answer that instead."
         }
+      } else if (result.proposal.kind === 'propose_session_length' && result.proposal.rawArgs) {
+        const len = buildSessionLengthProposal(result.proposal.rawArgs)
+        if (len) built = { scopeKey: len.scopeKey, preconditions: len.preconditions, payload: len.payload as unknown as Record<string, unknown>, preImage: len.preImage, diff: len.diff }
+        else {
+          // The two ways this can come back null, said apart. Naming the
+          // TODAY tool here matters: the whole failure mode of this pair is
+          // somebody asking for one and getting the other.
+          const current = DURATION_OPTIONS.find(o => o.value === profile.session_duration_preference)?.label ?? 'that length'
+          refusal = `Your sessions are already set to ${current}. If you just mean today, tell me how long you have and I'll cut this one down instead.`
+        }
       } else if (result.proposal.kind === 'propose_style_change' && result.proposal.rawArgs) {
         const style = buildStyleChangeProposal(result.proposal.rawArgs)
         if (style) built = { scopeKey: style.scopeKey, preconditions: style.preconditions, payload: style.payload as unknown as Record<string, unknown>, preImage: style.preImage, diff: style.diff }
@@ -5300,6 +5361,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       receipt = result.receipt
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_schedule_change'].done : RECEIPTS['propose_schedule_change'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_session_length') {
+      const payload = row.payload as unknown as SessionLengthPayload
+      const result = await executeSessionLength(profile, mesocycle, exerciseExclusions, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // executeSessionLength writes the column itself; mirror it into App
+      // state the same way the style branch does, so the Profile screen and
+      // today's card agree without a reload.
+      if (result.receipt.failed.length === 0) onProfileChanged({ session_duration_preference: payload.sessionDuration })
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_session_length'].done : RECEIPTS['propose_session_length'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_style_change') {

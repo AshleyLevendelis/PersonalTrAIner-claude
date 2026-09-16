@@ -16,7 +16,7 @@ import { didNotSave } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
-import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity } from './types'
+import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity, SessionDuration } from './types'
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
@@ -32,7 +32,7 @@ import { saveCardioLog } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
 import type { MealMovePayload } from './meal-move'
-import { STYLE_OPTIONS } from './onboarding-slots'
+import { STYLE_OPTIONS, DURATION_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
 
@@ -1302,6 +1302,74 @@ export async function executeStyleChange(
     receipt: {
       landed: failed.length === 0
         ? [`Training style: ${STYLE_OPTIONS.find(o => o.value === payload.trainingStyle)?.label ?? payload.trainingStyle}`,
+           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+        : [],
+      failed,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HOW LONG SESSIONS ARE, FROM NOW ON — 16 Sep 2026.
+//
+// The lasting twin of executeSessionShorten, which is TODAY only. Deliberately
+// the same shape as executeStyleChange rather than a new one: both are a
+// lasting profile-column change that invalidates the plan, and holding them in
+// one shape is what stops the two answering differently.
+//
+// ASHLEY'S RULING, from three options: rebuild the rest of the block around
+// the new length. Over trimming what is already there — a 60-minute session
+// with its end chopped off is not a session designed for 45 — and over waiting
+// for the next block, which leaves weeks of sessions that do not fit.
+// ---------------------------------------------------------------------------
+
+export interface SessionLengthPayload {
+  /** The band their sessions run to from now on, replacing whatever was set. */
+  sessionDuration: SessionDuration
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeSessionLength(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: SessionLengthPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const updated: UserProfile = { ...profile, session_duration_preference: payload.sessionDuration }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  // REBUILD FIRST, WRITE SECOND — the same order as the style change, for the
+  // same reason: writing the new length and then failing the rebuild would
+  // leave the profile saying 45 minutes while every session on screen still
+  // ran to 60. That divergence is the exact thing this tool exists to close,
+  // so the failure path must not recreate it.
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { session_duration_preference: payload.sessionDuration }) }
+    catch { failed.push({ op: 'save', error: "The new session length didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  return {
+    mesocycle: rebuild.mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Sessions: ${DURATION_OPTIONS.find(o => o.value === payload.sessionDuration)?.label ?? payload.sessionDuration}`,
            `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
         : [],
       failed,

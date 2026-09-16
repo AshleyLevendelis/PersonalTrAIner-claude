@@ -56,6 +56,7 @@ it is wrong.
 | `propose_session_move` | SCREEN | The day menu → "What happened?". |
 | `propose_cardio_session` | SCREEN | "Make this a cardio day" on the rest / recovery card, since 15 Sep 2026. Same executor as the coach confirm, so both write the rest of the block. |
 | `propose_session_shorten` | SCREEN | The day menu, since 13 Sep 2026. |
+| `propose_session_length` | SCREEN | Profile → "Session length". Both surfaces since 16 Sep 2026, and **both rebuild** — Ashley's ruling that day, from three options: rebuild the rest of the block around the new length, over trimming what is already there and over waiting for the next block. The screen half had to change too: `session_duration_preference` was not in `PLAN_INVALIDATING_FIELDS`, so setting it wrote the number and left every session at the old length. Distinct from `propose_session_shorten`, which is TODAY only — the time scope is the whole difference and both carry a figure in minutes. |
 | `propose_session_rebuild` | SCREEN | The day menu, since 16 Sep 2026 — "Give me a different session". Ashley's ruling that day: the main lift is kept, everything else rebuilt around it. |
 | `propose_style_change` | SCREEN | Profile → training style. |
 | `propose_volume_change` | SCREEN | The workout card's volume control. |
@@ -100,9 +101,12 @@ the whole time. Three more, in one file, contradicted by another file, and
 to derive a row from. Two documents, one of them right, and the gate blind to
 the difference.
 
-- **Session length.** `screen only` until 16 Sep 2026 — see the entry for it
-  below once built. Worth knowing separately: changing it has never rebuilt
-  the plan, so "the screen can do this" was itself only half true.
+- ~~**Session length.**~~ **CLOSED 16 Sep 2026** — it has a coach tool now and
+  a row in the table above. It sat here for less than a day, which is the
+  shortest an entry has lasted, and the note it carried is worth keeping: "the
+  screen can do this" was itself only half true, because changing it had never
+  rebuilt the plan. Closing it meant fixing the screen as well as adding the
+  tool.
 - **Macro mode** (Standard / Dynamic CSCS) and **macro split**. `screen only`.
   Both bypass the Profile screen's own writer and are applied from `App.tsx`
   with their own optimistic-apply and revert, so a coach path cannot simply
