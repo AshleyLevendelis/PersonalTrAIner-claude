@@ -255,24 +255,28 @@ menu" stays true when a copy is also left outside it.
   capability can be absent while every piece of machinery for it exists and
   looks, to a reader, like proof it works. Same family as the walking plan
   (generator, type, no pixel) and bodyweight PRs (six filters, no record)
-- Session length — `screen only`, and **changing it changes nothing about the
-  plan you already have.** Measured 16 Sep 2026: `session_duration_preference`
-  is absent from `PLAN_INVALIDATING_FIELDS` (`plan-invalidation.ts:67`) and
-  from `CEILING_FIELDS`, so the screen neither rebuilds nor re-prices. The one
-  live effect is that today's card re-labels the session as running over
-  (`TodayPanel.tsx:809`). So "you can set your session length" has been true
-  about the NUMBER and false about the PLAN.
+- Session length — **both surfaces since 16 Sep 2026**, and until that day it
+  was `screen only` in the emptiest sense: the screen wrote the number and
+  changed nothing about the plan. `session_duration_preference` was absent from
+  `PLAN_INVALIDATING_FIELDS` and from `CEILING_FIELDS`, so the screen neither
+  rebuilt nor re-priced; the one live effect was today's card re-labelling the
+  session as running over. "You can set your session length" was true about the
+  NUMBER and false about the PLAN.
   **Ashley's ruling, 16 Sep 2026, from three options: rebuild the rest of the
   block around the new length** — over trimming what is there (a 60-minute
   session with its end chopped off is not a session designed for 45) and over
-  waiting for the next block. It binds BOTH surfaces: the screen has to start
-  rebuilding too, or the same request answers differently depending on where
-  it was made
+  waiting for the next block. It binds BOTH surfaces, which is why the coach
+  got `propose_session_length` the same day: the same request must not answer
+  differently depending on where it was made.
+  `session-length-change`, `rebuild-offer`, `verify:setup-answers` §6i-6n,
+  `coach-parity`. Needs the `chat-gemini` deploy to work by chat
 - **"I only have 45 minutes today" ALREADY WORKS on both surfaces**, and is a
   different thing from the above — `propose_session_shorten`
   (`chat-gemini:810`, takes `minutes`, TODAY-only, main lift protected) and
   `onShorten(minutes)` on the day menu. Recorded because the two requests are
-  one word apart ("today" / "from now on") and the tools are not
+  one word apart ("today" / "from now on") and the tools are not. Both sides of
+  that pair are now the coach's too, and the prompt rule keys on the TIME SCOPE
+  rather than the number, because both requests carry a minute figure
 - Targets and macro mode — `screen only`, and "targets" is not one thing:
   `calorie_target` has no control anywhere and never did. It is written once
   at onboarding and derived by `computeTargets` thereafter, so changing it
@@ -847,6 +851,24 @@ old — the commands were right and the context was missing.
   the session. Neither is visible from the data or the source; both are obvious
   in one screenshot. When something new appears on a screen, the driver is not
   the last step after the gates pass — it is the step that finds the defect.
+- **A `verify:` DRIVER ONLY SEES WHAT ITS HARNESS PAGE RENDERS, AND THE
+  HARNESS IS NOT THE APP.** 16 Sep 2026: I added two checks asking whether the
+  rebuild offer was visible and whether anything was stacked on top of it. Both
+  went red, which read as every rebuild offer in the app being hidden under a
+  panel — a serious, long-standing defect. It was the harness. The testid the
+  checks queried is rendered by `.tour-harness/profile.tsx`, a bare div under
+  the page's own button; the app's real offer is a Dialog in `App.tsx` raised
+  from the same callback. I had measured test scaffolding and nearly "fixed"
+  the app for it.
+  So, before believing a driver result, ask WHICH FILE renders the node being
+  measured. A harness page can carry the real component and still substitute
+  its own chrome around it, and that substitution is invisible from the driver.
+  The split worth keeping: a harness like this DOES prove the real screen
+  raises the offer and what words it carries; it can prove nothing about
+  whether the app's own dialog appears, because no harness page boots
+  `App.tsx`. Write which half you have next to the checks, and **never make the
+  harness render a copy of the app's chrome to satisfy a check** — that
+  measures the copy.
 - **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
   beyond "did not apply" and "crashed", and the harness cannot see it: on
   15 Sep a mutation to the walking plan's day builder read MISSED because the

@@ -330,6 +330,74 @@ check('6h. ...and NO weights were silently re-priced behind it',
   { was: receiptWas, now: await text('[data-testid="reprice-receipt"]') })
 await shoot('setup-answers-5-rebuild-offer')
 
+// --- SESSION LENGTH, added 16 Sep 2026 ------------------------------------
+// It sat on this screen the whole time and did NOTHING to the plan: the field
+// was absent from PLAN_INVALIDATING_FIELDS, so setting it wrote the number and
+// left every session at the old length. The only visible effect was today's
+// card starting to say the session ran over. "You can set your session length"
+// was true about the NUMBER and false about the PLAN.
+//
+// Ashley's ruling, 16 Sep 2026, from three options: rebuild the rest of the
+// block around the new length. This reads that ruling off the real screen —
+// a source gate can prove the branch exists and cannot prove anyone reaches it.
+{
+  const receiptWas = await text('[data-testid="reprice-receipt"]')
+  await ev(`(() => {
+    const label = [...document.querySelectorAll('span')].find(s => /^Session length$/.test((s.textContent || '').trim()))
+    const c = label && label.parentElement.querySelector('button, [role="combobox"]')
+    if (c) c.click()
+  })()`)
+  await wait(500)
+  // The fixture is 60-90, so 30-45 is a genuine shortening and the copy that
+  // comes back is the "cut off the end" half rather than the other one.
+  const picked = await ev(`(() => {
+    const o = [...document.querySelectorAll('[role="option"]')].find(x => /30-45/.test(x.textContent || ''))
+    if (!o) return [...document.querySelectorAll('[role="option"]')].map(x => (x.textContent||'').trim())
+    o.click(); return true
+  })()`)
+  check('6i. session length can be changed on the screen at all', picked === true, picked)
+  await wait(600)
+
+  const offer = await until(() => text('[data-testid="plan-invalidation"]'), v => v.length > 0)
+  check('6j. changing it OFFERS a rebuild rather than silently writing a number',
+    offer.length > 0, offer)
+  // ASHLEY'S RULING, READ OFF THE SCREEN. Rebuilt to fit is the whole point;
+  // "trimmed" is the option she rejected, and the sentence has to say which.
+  check('6k. ...saying sessions are REBUILT to fit, not trimmed at the end',
+    /rather than the same ones with the end cut off/i.test(offer), offer)
+  check('6l. ...and promising her logged work survives it',
+    /already logged stays/i.test(offer), offer)
+  check('6m. ...in plain words, naming no database field',
+    !/session_duration|preference/i.test(offer), offer)
+  // THE ROAD NOT TAKEN, same shape as 6h: a re-price receipt here would mean
+  // the length had been treated as a number to adjust rather than a plan to
+  // rebuild — the same sessions at slightly different weights, still too long.
+  check('6n. ...and NO weights were silently re-priced behind it',
+    (await text('[data-testid="reprice-receipt"]')) === receiptWas,
+    { was: receiptWas, now: await text('[data-testid="reprice-receipt"]') })
+  // WHAT THIS DRIVER CANNOT ANSWER, written down so the next reader does not
+  // spend an afternoon on it as I did on 16 Sep 2026. I added two checks here —
+  // "it is on the screen" and "nothing is stacked on top of it" — and both went
+  // red, which looked like every rebuild offer in the app being hidden under a
+  // panel. It was the harness. `[data-testid="plan-invalidation"]` is rendered
+  // by THIS page (.tour-harness/profile.tsx), a bare div under the Open Profile
+  // button; the app's real offer is a Dialog in App.tsx raised from the same
+  // callback. So the div was behind ProfileScreen's own dialog, exactly as a
+  // bare div would be, and the measurement was of test scaffolding.
+  //
+  // What the checks above DO prove, and it is the half that can silently break:
+  // a real change on the real ProfileScreen raises an offer, and these are the
+  // words it carries — the same string the app hands to its dialog title and
+  // body. Whether that dialog then appears is a question about App.tsx, and no
+  // harness page boots App.tsx, so no driver in this repo can ask it today.
+  // Do NOT re-add a geometry or elementFromPoint check against this testid, and
+  // do not make the harness render its own copy of the dialog to satisfy one —
+  // that measures the copy.
+  await ev(`document.querySelector('[data-testid="plan-invalidation"]')?.scrollIntoView({ block: 'center' })`)
+  await wait(500)
+  await shoot('setup-answers-6-session-length')
+}
+
 // --- THE THREE KNOWN LIFTS, added 14 Sep 2026 -----------------------------
 // The last setup answers that could never be corrected. §7 of the source gate
 // holds why the RE-PRICE path cannot act on them; this holds that they are on
