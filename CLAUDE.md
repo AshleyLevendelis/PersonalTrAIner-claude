@@ -755,6 +755,19 @@ old — the commands were right and the context was missing.
   reported missing. Use `(['"`])((?:(?!\1).)*)\1`.
 - New check → register it in `package.json` → mutation-test it → say in the
   report how many mutations were tried and how many were caught.
+- **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
+  2026: yesterday's sweep found two real failures, both were fixed, and the
+  sweep was reported clean without being re-run. One of those fixes — pulling a
+  duplicated branch into a shared function, which a gate had ASKED for — broke a
+  different gate that required the two to sit within 200 characters of each
+  other. It was red at the branch head for a day. Re-run at least the gates that
+  touch what the fix touched, and say which.
+- **`npx tsc --noEmit` COVERS `src` ONLY.** `tsconfig.json` is
+  `include: ["src"]`, so nothing type-checks `scripts/`. Measured 16 Sep 2026: a
+  duplicate `const` in a gate passed `tsc` clean and was caught by esbuild when
+  the gate was RUN. So "typecheck clean" has never been a statement about the
+  gates, and must not be reported as one — what proves a gate compiles is
+  running it.
 - **A BUDGET WITH HEADROOM SILENTLY SPENDS IT, and the comment goes on
   claiming the original figure.** A ceiling only speaks when it is CROSSED, so
   "this keeps ~8 kB of headroom" is a claim about the day it was written and

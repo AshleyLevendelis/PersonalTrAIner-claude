@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **A GATE WAS RED AT THE BRANCH HEAD AND I DID NOT KNOW, BECAUSE I FIXED
+  YESTERDAY'S SWEEP FAILURES AND NEVER RE-RAN THE SWEEP.**
+  Today's sweep: **240 ran, 236 passed, 4 failed.** 240 is yesterday's 239 plus
+  exactly the one new check, so nothing crashed out of the enumeration. Three
+  failures are the unreachable database as always (`test:meal-quality`,
+  `test:schema-parity`, `verify:rls`). The fourth was real and was NOT from
+  today's work: `test:session-edit` fails identically at `ff31d09`, measured in
+  a worktree at that commit rather than assumed.
+  **IT WAS CAUSED BY YESTERDAY'S FIX TO YESTERDAY'S SWEEP FAILURE.**
+  `test:silent-writes` §6 found the scope branch computed twice, so
+  `weeksTouchedByScope` was extracted and both callers pointed at it. That
+  extraction moved the branch out of `saveScopedEdit` — and `test:session-edit`
+  required `saveMesocycleWeek` within 200 characters of `if (scope === 'today')`.
+  The code got better and the check went red. **I reported the sweep as clean
+  after fixing its two real failures without re-running it.** The standing rule
+  now has a corollary worth stating: a fix made in response to a sweep is not
+  covered by that sweep.
+  **THE CHECK WAS WRONG, NOT THE CODE** — "when a check blocks a fix, suspect
+  the check", arriving exactly on schedule and on a file whose own header says
+  its checks call the code rather than read it.
+  **AND MY FIRST RE-ANCHOR WAS ALSO A SOURCE READ, CAUGHT BY MUTATION INSIDE
+  THE HOUR.** Gutting the 'today' branch to `return mesocycle` left the new
+  check green, because the pattern it matched — `w.week_number === weekNumber`
+  — also appears on the line BELOW, where the permanent branch finds the block.
+  A check matching something the break does not touch. "Ask what ELSE could
+  satisfy this search", one more time, and reading a source is where it keeps
+  happening. It now CALLS `weeksTouchedByScope` and asserts what comes back.
+  **THEN THE FIXTURE COULD NOT EXPRESS ONE OF THE DEFECTS.** Dropping the
+  `>= weekNumber` guard, so a permanent edit reaches BACK over weeks already
+  trained, was MISSED — because the probe week is the first of its block and
+  has nothing behind it. A second probe from a later week fixes it. Third
+  instance this week of "a fixture must be MEASURED, not plausible".
+  **Mutations: 6 tried, 6 caught** (4 of 5 on the first attempt, 3 of 4 on the
+  one before that — both rounds' misses were the check, not the code).
+  **ALSO MEASURED TODAY, and it corrects something I have been implying:**
+  `npx tsc --noEmit` covers `src` only — `tsconfig.json` has
+  `include: ["src"]`. Nothing type-checks `scripts/`. A duplicate `const` in a
+  gate passed `tsc` clean and was caught by esbuild at run time. So "typecheck
+  clean" has never meant the gates, and the thing that actually proves a gate
+  compiles is running it.
+  **THE THREE TRACKED REPORT ARTIFACTS WERE STALE AND ARE NOW REFRESHED**, in
+  their own commit, which is the standing rule's own exception. `audit-report`
+  still recorded 54 failures of 13,967 — 51 load-cap breaches on cable lateral
+  raises, fixed some time ago — against 0 of 17,423 today. Quality 11.04 ->
+  11.56 / 12; differentiation name-overlap 55.0% -> 39.6%. The pre-commit hook
+  refuses these three and names `--no-verify` for "if you genuinely mean to
+  update a committed snapshot"; that is this case, and the hook stays as it is.
+  The cost of always reverting them is that nobody ever commits them, and a
+  stale record that nothing contradicts gets believed.
+
 - [x] **THE COACH EXAM SCORED A CORRECT OFFER AS THE COACH SAYING NOTHING —
   FOUND BY READING IT, BECAUSE ITS LIVE PATH HAD NEVER RUN ONCE.**
   The exam has 20 conversations and 37 turns, was built 13 Sep and has still
