@@ -313,6 +313,12 @@ const rampTarget = (() => {
 // rampTarget is: naming one pins a weekday and a string, and both have moved
 // before. Ramped by preference — the per-set chips are a third view of the
 // same number and the place a flattened or unscaled ramp would show up.
+// ?bwpr=1 — a bodyweight history and nothing else new. Off by default so
+// every existing run of this harness is unchanged. It exists because the
+// defect it covers is invisible to a source check AND to the data: the rows
+// were always there, and six separate filters meant no pixel ever showed
+// them. A person training at home saw an empty graph and no personal best.
+const BWPR = new URLSearchParams(location.search).get('bwpr') === '1'
 const LOGGED = new URLSearchParams(location.search).get('logged') === '1'
 const loggedTarget = (() => {
   if (!LOGGED) return null
@@ -431,6 +437,38 @@ const db: Db = {
     // and groups by session_id, while the consistency read that row serves
     // uses neither. A row missing them reads as "nothing logged" — which looks
     // exactly like the fixture working and the feature being absent.
+    // PULL-UPS, not some other bodyweight movement, and the choice is the
+    // point: this fixture's today session has Pull-Ups as its MAIN LIFT, so
+    // the exercise detail — and the graph that was permanently empty — is
+    // reachable by tapping a row a person would actually tap. A history
+    // seeded against an exercise not in the plan leaves the graph verifiable
+    // only in theory.
+    // Getting better over three weeks, the newest inside the 7-day window
+    // Home's "Recent PRs" filters on. Rising 8 -> 11 -> 14 so the best is
+    // unambiguous and the graph has a direction to draw.
+    // Plus one belt session on Dips, because "once a belt goes on, added
+    // weight is the record" is a separate rendering (+kg, not reps) and a
+    // check that only ever sees reps would pass with that branch deleted.
+    ...(BWPR
+      ? [
+          ...[20, 13, 2].map((back, i) => ({
+            id: `bw${i}`, user_id: PROFILE_ID, session_id: `bw-sess-${i}`,
+            exercise_id: getExerciseId('Pull-Ups') ?? 'pull-ups', exercise_name: 'Pull-Ups',
+            set_number: 1, weight_kg: 0, reps_completed: [8, 11, 14][i],
+            is_bodyweight: true, is_warmup: false,
+            completed_at: new Date(anchorNowMs() - back * 86400000).toISOString(),
+            date: isoOf(new Date(anchorNowMs() - back * 86400000)),
+          })),
+          {
+            id: 'bwbelt', user_id: PROFILE_ID, session_id: 'bw-sess-belt',
+            exercise_id: getExerciseId('Dips') ?? 'dips', exercise_name: 'Dips',
+            set_number: 1, weight_kg: 0, reps_completed: 5, added_load_kg: 12,
+            is_bodyweight: true, is_warmup: false,
+            completed_at: new Date(anchorNowMs() - 3 * 86400000).toISOString(),
+            date: isoOf(new Date(anchorNowMs() - 3 * 86400000)),
+          },
+        ]
+      : []),
     ...(loggedTarget
       ? Array.from({ length: Math.min(3, loggedTarget.sets) }, (_, i) => ({
           id: `lg${i}`, user_id: PROFILE_ID, session_id: 'sess-logged',

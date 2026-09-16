@@ -2,6 +2,76 @@
 
 Newest first. One line each.
 
+- [x] **BODYWEIGHT TRAINING HAD NO PROGRESS AT ALL — SIX SEPARATE PLACES, AND
+  FIXING ANY ONE WOULD HAVE CHANGED NOTHING.**
+  Ashley chose this from three options, 16 Sep 2026, then ruled on the question
+  it could not be built without.
+  **HER RULING, from three options: MOST REPS IN ONE SET.** Over most reps
+  across the session — an easy high-volume day beats a genuinely hard one, so
+  the app would congratulate someone for going easier — and over converting
+  bodyweight to an estimated load, which gives one tidy line at the price of
+  the app INVENTING conversion factors and showing them as if measured
+  (`load-prescription.ts:12` already forbids exactly that). And the half that
+  makes it coherent: **once a belt goes on, added weight is the record, and
+  the reps best stays as the best-without-weight.** Different lifts, both kept.
+  **THE SIX EXCLUSIONS**, each in different code, each alone invisible:
+  `.gt('weight_kg', 0)` in `refreshPRCacheFromDB`'s QUERY (excluded in the
+  database, before any logic); `if (weight <= 0)` in `checkForPR`;
+  `if (s.weight <= 0) continue` in `getTopPRSet`; `if (log.is_bodyweight)
+  continue` in `computeSessionPRs`; `if (s.isBodyweight) continue` in
+  `groupSetsBySession`; and `.filter(l => l.weight_kg > 0)` in a private
+  one-liner inside `SetGrid`. Net: press-ups from 5 to 15 registered nowhere,
+  for ever. `toSessionSets` moved into the engine so that last one is
+  somewhere a gate can reach.
+  **TWO THINGS THE WRITTEN RECORD HAD WRONG**, both measured before building.
+  The BACKLOG note said the chart presents an estimate as "One Rep Max" — it
+  says "Strength trend" and was already honest, so fixing from the note would
+  have "fixed" correct copy. And a comment at `SetGrid.tsx:437` claimed a
+  weighted pull-up kept "bodyweight, PR by reps" behaviour. There was no PR by
+  reps; it was PR by nothing. **A comment asserting a behaviour the function
+  it calls cannot produce is the evidence trap one level up** — not a check
+  satisfied by a comment, a READER satisfied by one, and it hid this for weeks.
+  **THE GATE CAUGHT THE SAME BUG IN MY OWN CODE ON ITS FIRST RUN.** My ranking
+  comment said a belt set "wins on its own terms rather than by being a bigger
+  number" while the code compared magnitudes — so 20 bodyweight reps beat a
+  15kg belt set. Metric first, magnitude within it. Written while fixing an
+  instance of itself.
+  **A NUMBER NEVER REACHES A SCREEN WITHOUT ITS UNIT.** Three renderers printed
+  `${value}kg` with no branch: a bodyweight best showed "0 kg" and a 12-rep
+  best would have shown "12kg", which is worse than nothing because it looks
+  right. One phrasebook function now, and the renderers have no default branch.
+  **GATES.** `test:bodyweight-progress` — 55 checks, 15 mutations, 15 caught.
+  `verify:bodyweight-progress` — 19 checks on a real phone screen, 6 mutations,
+  6 caught. Read off the screenshots: Home shows *Barbell Squats 60kg ·
+  Pull-Ups 14 reps · Dips +12kg*, and the exercise graph — permanently empty
+  before today — draws a rising line captioned "BEST SET, IN REPS".
+  **FOUR THINGS THE DRIVER FOUND THAT NO SOURCE CHECK COULD**, all in the
+  driver rather than the product, and all worth keeping: a Radix menu ignores
+  `element.click()` and needs a real pointer event; a node cached BEFORE a row
+  expands is detached afterwards and still answers `getBoundingClientRect`
+  with a plausible box, so the tap "succeeded" on nothing; `innerText` returns
+  text as CSS renders it, so a case-sensitive match called the correct
+  uppercase caption missing; and `\d` inside a JS template literal collapses
+  to `d`, so a path regex matched nothing and reported an empty chart.
+  **AND ONE NON-FINDING, recorded because the process matters more than the
+  result:** I read the screenshot and thought the middle graph point was
+  floating off the line. The coordinates said otherwise — (8,108), (150,60),
+  (292,12), exactly linear, which is what 8 → 11 → 14 should draw. A
+  screenshot is the right tool for "is this readable" and a poor one for "is
+  this number right". The check stayed anyway; it is cheap and pins a real
+  property.
+  **TWO GATE DEFECTS FOUND BY MUTATION, both the `tsc` blind spot.** Round one
+  reported a MISSED that was a malformed fixture — it passed `weightKg` where
+  the function reads `weight`, so the restored bug had nothing to bite.
+  `tsconfig.json` is `include: ["src"]`, so **a gate's fixtures get no
+  compiler help**, which makes "the mutation had nothing to bite on" the first
+  thing to suspect when a MISSED makes no sense. Two checks in that round were
+  also tautologies — arithmetic the file performed and compared with itself.
+  They ask the engine now. And `test:exercise-history` CRASHED on the new
+  return shape: zero checks ran, which reads as a pass to anything counting
+  only failures.
+  No deploys — frontend only, ships on merge.
+
 - [x] **THE SWEEP THIS BRANCH ACTUALLY NEEDED: 244 ran, 3 failed, all three
   environmental.** 16 Sep 2026, 16:34-17:24, at `9c62e7b` plus the two commits
   that landed mid-run.
