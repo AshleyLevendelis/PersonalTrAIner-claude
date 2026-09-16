@@ -2,6 +2,98 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH EXAM SCORED A CORRECT OFFER AS THE COACH SAYING NOTHING —
+  FOUND BY READING IT, BECAUSE ITS LIVE PATH HAD NEVER RUN ONCE.**
+  The exam has 20 conversations and 37 turns, was built 13 Sep and has still
+  never been run; the first run will be Ashley's, on her machine, and costs
+  money per call. So what it would have measured was worth checking first.
+  **THE DEFECT, measured 15 Sep and re-measured 16 Sep.** When the coach
+  correctly offers a change it returns an empty reply and a `proposal`,
+  because in the app the CARD does the talking in the app's own words. That is
+  the design and it is right. But the runner recorded `action` and never
+  `proposal` — and `action` appears in 3 of chat-gemini's returns while
+  `proposal` appears in 33. **Every one of those 33 has `reply: ""`** — checked
+  exhaustively, not sampled. So a correct offer was written to the transcript
+  as an empty turn, and the grader then has a hard rule literally named
+  `silence` that fires on exactly that. The coach would have been flagged for a
+  hard-rule breach for behaving correctly, worst of all on the two cases
+  written for that behaviour.
+  **A SECOND DEFECT FOUND WHILE FIXING THE FIRST, and it is the worse one.**
+  The runner only pushed the coach's TEXT into the history it sends the next
+  turn — so after a proposal turn, which has no text, the next turn saw the
+  user's message and nothing from the coach at all. The app does not work that
+  way: it pushes the card's own sentence into its message list and sends that
+  list. So the exam's second turn — *"so they're gone for good?"* — was being
+  asked of a coach with no record that it had offered anything, which is a
+  harder question than the app has ever asked. The exam now pushes a marker
+  naming the card's KIND and saying plainly that it is the app talking. It is
+  not the card's exact copy, which is built from a live plan and cannot be
+  reached from a script, and the runner's header says so rather than leaving a
+  reader to find the difference and assume a bug.
+  **WHAT CHANGED.** The runner records the card. `silence` excludes a turn that
+  produced one — an empty reply BESIDE a card is the app working; beside
+  nothing it is still the failure that rule was written for. A new hard rule
+  `missing-proposal` fires when a case declares `expectsProposal` and no card
+  ever arrives: the inverse of `test:question-not-a-card`, which holds "a
+  question must not produce a card" inside the app. Set on the two certain
+  cases only; the three plausible ones stay undeclared until a real run shows
+  what the model actually does, rather than guessing now. The card is rendered
+  into the transcript the judge marks, so Tier B stops reading the coach's best
+  turns as "(no text at all)" — and the sentence explaining it lives in
+  `docs/coach-exam-rubric.md`, which is sent verbatim, rather than as a second
+  copy inside the grader.
+  **ASHLEY'S CALL, 16 Sep 2026: "build it now".** Put to her because the fix
+  changes what the exam MEASURES, which is on the stop-and-wait list. Nothing
+  prior becomes incomparable — it has never produced a number.
+  **THREE THINGS FOUND BY BUILDING THE GATE THAT NO AMOUNT OF READING FOUND.**
+  (1) The runner read `.env.local` INTO process.env unconditionally, so the
+  file beat an already-set variable — the opposite of every dotenv library. A
+  gate advertised as free would have pointed the real runner at Ashley's real
+  project and charged for it, on her machine only, where nobody would have been
+  watching. Fixed, and the gate proves it: it runs the child in a temp
+  directory holding a decoy `.env.local` pointing at a dead port, and asserts
+  the fake coach was actually reached. Zero requests is the regression's
+  signature.
+  (2) Both the transcript directory and `run.json` were fixed paths, so a free
+  run would have overwritten a paid run's transcripts. Both now honour
+  `COACH_EXAM_OUT_DIR`, and the gate asserts the repo's own copy was untouched.
+  (3) The retry ladder is 4 waits totalling 44 seconds per turn — right against
+  a rate-limited model, and 27 minutes of nothing across 37 turns if the
+  deployed function is simply erroring. The gate now proves it gives up rather
+  than looping, with the ladder overridable for that purpose only.
+  **A STALE CASE FILE CORRECTED WHILE IN THERE.** `honest-ban-an-exercise` said
+  the ban tool "is a deliberate decline… not wired up". It was wired up on
+  14 Sep and proposes like every other change. Corrected in place and dated —
+  a case's stated reason is read by the grader into the report, so a wrong one
+  gets believed.
+  **WHAT THIS CANNOT PROVE: that the real model behaves.** That is the exam's
+  own job and still needs her machine and her credentials. This makes the first
+  run worth what it costs instead of scoring the coach as silent on the turns
+  where it did the right thing.
+  **No deploy.** Exam tooling only — no app code, no edge function, and the
+  coach's fingerprint is unchanged, so `test:coach-exam-fresh` still reports
+  the exam as never run, which is true.
+  **MUTATIONS: 16 TRIED, 15 CAUGHT, AND THE FIRST PASS FOUND TWO REAL FAULTS —
+  BOTH IN MY OWN NEW WORK, BOTH SHAPES THIS FILE ALREADY WARNS ABOUT.**
+  (a) `MISSED (3 of 28 checks ran)` on the output-directory mutation. Not a
+  miss at all: with no transcript to inspect, the gate's own bail-out was a
+  bare `return` from `main()`, which skipped the exit-code decision at the
+  bottom — so a gate that had FAILED a check exited 0. "A crash produces zero
+  failures and reads as a pass", one level in: the bail-out was inside the gate
+  itself. Every exit now goes through one `finish()`, and re-running that
+  mutation catches it.
+  (b) `MISSED` on "a malformed card with no kind buys a turn out of silence".
+  The CODE was right; my FIXTURE was wrong. It built the card with
+  `x.card ? { kind: x.card } : null`, so `card: ''` produced no card at all and
+  the check passed for the wrong reason. A fixture must be MEASURED, not
+  plausible — and mutation is the only thing that reads it.
+  The 16th mutation is deliberately uncatchable and recorded as such: reverting
+  the `finish()` fix breaks a branch a green run never reaches, so nothing can
+  see it. What proves that fix is the output-directory mutation going from
+  MISSED to caught. A mutation that applies, runs, and creates no defect is a
+  third category, and calling it a miss would have sent me looking for a hole
+  that is not there.
+
 - [x] **THE SWEEP AFTER THE CARDIO WORK: 239 RAN, 5 FAILED, AND TWO OF THEM
   WERE REAL — BOTH CAUGHT BY GATES WRITTEN EARLIER THE SAME DAY.**
   239 is the previous 237 plus exactly the two new checks, so nothing crashed

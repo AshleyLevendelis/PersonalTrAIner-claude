@@ -473,16 +473,31 @@ menu" stays true when a copy is also left outside it.
 - **The coach exam** — a fixed set of realistic conversations graded against
   a written rubric, run against the real model whenever the prompt, model or
   tools change, scores kept — BUILT 13 Sep 2026, **NEVER RUN**. 20 cases and
-  37 turns (`coach-exam:run`); eight hard rules checked in code and five
+  37 turns (`coach-exam:run`); NINE hard rules checked in code and five
   judged dimensions marked against `docs/coach-exam-rubric.md`
   (`coach-exam:grade`); and `coach-exam-fresh` in every sweep, which fails
   when the coach changes and the exam has not been re-run — that gate is what
   makes rule 5 enforceable rather than aspirational. The rules are
-  fixture-tested (`coach-exam-grader`, 13 mutations). No conversation has been
+  fixture-tested (`coach-exam-grader`) and the RUNNER is now driven end to end
+  against a fake coach (`coach-exam-runner`). No conversation has been
   played against the real model, because that needs credentials a cloud
   session does not have. So until it is run once, "best-in-class advice" is
   still asserted, not known — and the floor is deliberately unset, to be
   proposed from that first run's numbers.
+  CORRECTED 16 Sep 2026, measured: this said eight rules and quoted a mutation
+  count, and the more useful correction is WHY a ninth was needed. **The exam
+  could not see a card.** chat-gemini returns a `proposal` with an empty reply
+  in 33 places — the card does the talking, in the app's own words — and the
+  runner recorded only `action`, which appears in 3. So a correct offer was
+  written down as an empty turn and the rule named `silence` flagged it: the
+  coach marked down for its best behaviour, on the two cases written for that
+  behaviour. **Nothing caught it because the runner's live path had never
+  executed once** — `--dry` skips the network, the grader is fixture-tested
+  off hand-written transcripts, and `coach-exam-fresh` only checks staleness.
+  **A SCRIPT WHOSE FIRST REAL RUN COSTS MONEY GETS A MOCKED END-TO-END GATE
+  BEFORE IT RUNS, NOT AFTER.** The generalisation is not about this exam: it is
+  that "tested in pieces" and "has ever run" are different claims, and the gap
+  between them is invisible from the code.
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —
@@ -674,6 +689,13 @@ old — the commands were right and the context was missing.
   So: **when comparing two runs, compare the number of checks that RAN as well
   as the number that failed.** A crash produces zero failures and reads as a
   pass — that happened once during this very fix.
+  **AND THE SHORT RUN NEED NOT BE A CRASH — A GATE'S OWN BAIL-OUT DOES IT
+  TOO.** 16 Sep 2026: a new gate hit a failed check, printed FAIL, and then
+  `return`ed out of `main()` — skipping the `if (failures > 0) process.exit(1)`
+  at the bottom. It exited 0 on 3 of its 28 checks, and only the mutation
+  harness's "how many ran?" column showed it. So: **a gate has exactly one
+  exit**, and every early return goes through it. A gate that can print FAIL
+  and exit 0 is worse than no gate, because the tick is now evidence.
 - Strip comments before asserting a string is ABSENT, or a note explaining why
   something was removed will satisfy the check that it was removed.
 - **A MUTATION THAT DID NOT APPLY, OR THAT CRASHED, READS EXACTLY LIKE A CHECK

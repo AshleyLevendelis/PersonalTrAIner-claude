@@ -150,6 +150,7 @@
     "test:training-week": "tsx scripts/test-training-week.ts",
     "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
     "test:coach-exam-grader": "tsx scripts/test-coach-exam-grader.ts",
+    "test:coach-exam-runner": "tsx scripts/test-coach-exam-runner.ts",
     "test:coach-exam-fresh": "tsx scripts/test-coach-exam-fresh.ts",
     "test:coach-parity": "tsx scripts/test-coach-parity.ts",
     "test:coach-promises": "tsx scripts/test-coach-promises.ts",
