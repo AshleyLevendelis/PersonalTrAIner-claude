@@ -24,6 +24,7 @@ import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
 import { ShopDayCard } from '@/components/ShopDayCard'
+import { personalBest } from '@/lib/coach-voice'
 
 interface DashboardProps {
   profile: UserProfile
@@ -815,11 +816,17 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                   style={{ borderBottom: '1px solid var(--hairline)' }}
                 >
                   <span className="min-w-0 truncate text-[0.8125rem]">{pr.exerciseName}</span>
-                  {/* The prototype shows "60 kg × 9". RecentPR carries no rep
-                      count (dashboard-data.ts), and a rep number nobody
-                      recorded would be an invention — the weight alone. */}
+                  {/* The prototype shows "60 kg × 9". RecentPR still carries
+                      no rep count for a LOADED lift, and a rep number nobody
+                      recorded would be an invention — so a loaded record is
+                      still the weight alone.
+                      What changed 16 Sep 2026 is that not every record is a
+                      weight. `{pr.weightKg} kg` printed "0 kg" for a
+                      bodyweight best and would have printed "12 kg" for a
+                      12-rep one. The unit comes from the phrasebook with the
+                      number, and there is no default branch to fall into. */}
                   <span className="shrink-0 tabular-mono text-[0.8125rem] font-semibold text-primary-text">
-                    {pr.weightKg} kg
+                    {personalBest(pr.metric, pr.value)}
                   </span>
                 </div>
               ))}

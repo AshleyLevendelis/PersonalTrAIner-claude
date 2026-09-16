@@ -118,6 +118,23 @@ export function targetsMoved(before: MacroTargets, after: MacroTargets): string 
  * written and dead. A gate can call ask('x') and read the prefix off the result,
  * which is a stronger check anyway because it exercises the function.
  */
+/**
+ * A PERSONAL BEST, WITH ITS UNIT ATTACHED. One function, because the three
+ * places that show a PB — the badge on the set row, the end-of-session
+ * summary and Home's recent list — each used to print `${newWeight}kg` and
+ * would have rendered a 12-rep best as "12kg". A number in the wrong unit
+ * is worse than no number: it looks right.
+ *
+ * Ashley's ruling, 16 Sep 2026: at bodyweight the record is the most reps
+ * in one set; once a belt goes on, the record is the added weight. So the
+ * three readings are three sentences, not one sentence with a variable.
+ */
+export function personalBest(metric: 'load' | 'added_load' | 'reps', value: number): string {
+  if (metric === 'reps') return `${value} reps`
+  if (metric === 'added_load') return `+${value}kg`
+  return `${value}kg`
+}
+
 export function ask(verbPhrase: string): string {
   const trimmed = verbPhrase.trim().replace(/[.?!:]+$/, '')
   return `Want me to ${trimmed}?`

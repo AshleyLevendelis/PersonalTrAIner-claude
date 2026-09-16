@@ -42,10 +42,12 @@ import {
   getExerciseHistory,
   deriveStrengthTrend,
   hasEnoughTrendData,
+  trendLabel,
   derivePRHistory,
   type ExerciseHistorySession,
 } from '@/lib/exercise-history'
 import { ExerciseStrengthChart } from './ExerciseStrengthChart'
+import { personalBest } from '@/lib/coach-voice'
 import { MuscleMap } from './MuscleMap'
 
 export type ExerciseDetailTab = 'summary' | 'history' | 'howto'
@@ -218,9 +220,13 @@ export function ExerciseDetailPanel({
             )}
 
             <div>
-              <p className="ds-label-compact mb-2">Strength trend</p>
+              {/* The caption is DERIVED from what the series holds, not
+                  written here. A bodyweight exercise's line is reps, and
+                  calling that "Strength trend" would be the app naming a
+                  number it is not showing. */}
+              <p className="ds-label-compact mb-2">{trendLabel(trend.metric)}</p>
               {hasEnoughTrendData(trend) ? (
-                <ExerciseStrengthChart points={trend} />
+                <ExerciseStrengthChart series={trend} />
               ) : (
                 <p className="text-sm text-muted-foreground">Log this exercise twice to see a trend.</p>
               )}
@@ -243,7 +249,9 @@ export function ExerciseDetailPanel({
                       {prs.map(pr => (
                         <p key={`${pr.sessionId}-${pr.kind}`} className="flex items-center gap-1.5 text-sm">
                           <Trophy className="size-3.5 text-primary-text glow-mint shrink-0" aria-hidden />
-                          <span className="tabular-mono text-primary-text glow-mint">{pr.weightKg}kg</span>
+                          <span className="tabular-mono text-primary-text glow-mint">
+                            {personalBest(pr.metric, pr.metric === 'reps' ? pr.reps : pr.metric === 'added_load' ? pr.addedLoadKg : pr.weightKg)}
+                          </span>
                           <span className="text-xs text-muted-foreground">· {pr.date}</span>
                         </p>
                       ))}

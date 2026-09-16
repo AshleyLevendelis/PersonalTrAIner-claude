@@ -548,7 +548,36 @@ menu" stays true when a copy is also left outside it.
   saying — the last of the eight was unlocked that day. Every answer can be
   changed now
 - Progress is visible — history, PRs, weight trend, streak —
-  `exercise-history`, `dashboard`, `activity-streak`, `home-week-strip`
+  `exercise-history`, `dashboard`, `activity-streak`, `home-week-strip`,
+  and since 16 Sep 2026 **for bodyweight training too**:
+  `bodyweight-progress` (55 checks, 15 mutations),
+  `verify:bodyweight-progress` (19 checks, 6 mutations).
+  CORRECTED, measured: this line was written as if it held for everyone and
+  it held for nobody training without kit. **SIX independent exclusions** —
+  a `.gt('weight_kg', 0)` in the database query itself, a guard in
+  `checkForPR`, a `continue` in `getTopPRSet`, another in
+  `computeSessionPRs`, another in the history grouping, and a filter in a
+  private one-liner inside `SetGrid` — meant a person doing press-ups had an
+  empty graph and no personal best, for ever. Fixing any ONE would have
+  changed nothing visible, which is the general shape worth remembering: when
+  a capability is absent rather than broken, look for the whole set before
+  believing the first cause found.
+  **Ashley's ruling, 16 Sep 2026, from three options: the record at
+  bodyweight is MOST REPS IN ONE SET** — over session-total reps (an easy
+  high-volume day beats a hard one, so the app would congratulate someone for
+  going easier) and over converting bodyweight to an estimated load (one tidy
+  line, but the factors are numbers the app would INVENT and then show as if
+  measured — `load-prescription.ts:12` already forbids exactly that). Once a
+  belt goes on, ADDED WEIGHT is the record and the reps best stays as the
+  best-without-weight; they are different lifts and both are kept.
+- **A NUMBER NEVER REACHES A SCREEN WITHOUT ITS UNIT**, and this generalises
+  past PRs. Three renderers printed `${value}kg` with no branch, so a
+  bodyweight best showed "0 kg" and a 12-rep best would have shown "12kg" —
+  worse than showing nothing, because it looks right. The fix is that the
+  KIND travels with the value and the renderer has no default branch:
+  `personalBest(metric, value)` in the phrasebook, one place, so the exam and
+  the gates can grade it. Any field that can hold two kinds of quantity needs
+  the same treatment
 - Accountability is active — the coach opens, asks how it went, follows up
   — `coach-opener`, `coach-nudge`, `session-feel`, `verify:coach-speaks-first`
 - History is permanent — `diary-preservation`, `replace-without-losing`

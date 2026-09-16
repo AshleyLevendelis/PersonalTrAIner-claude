@@ -14,7 +14,7 @@ import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-s
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
 import { getRecentWeighIns } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
-import { getPRCache } from './pr-engine'
+import { getPRCache, type PRMetric } from './pr-engine'
 import { getActiveGoals } from './memory-store'
 import { computeStreak, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
@@ -87,7 +87,14 @@ export interface PhaseContext {
 
 export interface RecentPR {
   exerciseName: string
+  /** Kept for callers that only ever meant external load. Legitimately 0 on
+   * a bodyweight or belt record — read `value` with `metric`, not this. */
   weightKg: number
+  /** What this record IS. Home must branch on it: a reps figure rendered
+   * into a kilogram slot reads as a weight, and looks correct. */
+  metric: PRMetric
+  /** The number to show, in the metric's own units. */
+  value: number
   date: string
 }
 
@@ -315,9 +322,22 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
 
   // ---- Recent PRs -----------------------------------------------------------
   const prCache = getPRCache(profileId)
+  // WHICH of an exercise's records to show. A belt outranks bodyweight for
+  // the same reason prMetricFor puts it first — a weighted chin-up is its
+  // own lift — and external load outranks both because an exercise that has
+  // any is not a bodyweight movement. Ashley's ruling, 16 Sep 2026.
+  //
+  // The KIND travels with the number. It used to be `weightKg: pr.maxWeight`
+  // and Home printed it beside a "kg", so a reps record would have rendered
+  // "12 kg" — a number in the wrong unit, which reads as true.
   const recentPRs: RecentPR[] = Object.entries(prCache)
     .filter(([, pr]) => daysAgo(pr.date, todayStr) >= 0 && daysAgo(pr.date, todayStr) <= 7)
-    .map(([exerciseName, pr]) => ({ exerciseName, weightKg: pr.maxWeight, date: pr.date }))
+    .map(([exerciseName, pr]) => {
+      const metric: PRMetric = pr.maxWeight > 0 ? 'load' : pr.maxAddedLoad > 0 ? 'added_load' : 'reps'
+      const value = metric === 'load' ? pr.maxWeight : metric === 'added_load' ? pr.maxAddedLoad : pr.maxReps
+      return { exerciseName, weightKg: pr.maxWeight, metric, value, date: pr.date }
+    })
+    .filter(pr => pr.value > 0)
     .sort((a, b) => b.date.localeCompare(a.date))
 
   // ---- Streak + session-pace + protein-adherence window (shared reads) ---
