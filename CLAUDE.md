@@ -189,14 +189,21 @@ menu" stays true when a copy is also left outside it.
   that costs nothing. Anything built on a model JUDGEMENT should be split this
   way and the two halves named separately.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
-- Rebuild today's session as a whole, for today — `MISSING`, named rather than
-  half-built. Nothing regenerates below a whole week; the one function that
-  assembles a day is private with fifteen parameters including the cross-day
-  dedupe set; and the cheap route — regenerate the week, keep one day — picks
-  that day without knowing what the rest of the week now holds, so it can hand
-  you the same exercise twice. It also carries a question that is Ashley's: a
-  rebuilt day loses the progression thread on the main lift, and whether that
-  is acceptable for a one-off is a coaching call
+- Rebuild today's session as a whole, for today — **both surfaces since 16 Sep
+  2026**. Her ruling that day, from three options: **keep the main lift and
+  rebuild around it** — you still do today's main lift at the weight and sets
+  prescribed, so the progression thread is untouched, and everything else
+  changes. It matches her 13 Sep ruling for shortening, so the app holds ONE
+  position on the main lift rather than two; and if the main lift is the thing
+  you want gone, swapping it alone already works.
+  `session-rebuild`, `verify:session-rebuild`, `coach-parity`.
+  CORRECTED, measured: this line gave three reasons it was impossible and TWO
+  WERE WRONG. "Nothing regenerates below a whole week" is true of
+  `generateMesocycle` and irrelevant — swap, add and remove all change one day
+  of a live mesocycle. The day assembler has fourteen parameters, not fifteen,
+  and the build never calls it; the cross-day dedupe set is readable straight
+  off the week. Only the third held (the cheap route can hand you the same
+  exercise twice), which is why this composes the SWAP path once per slot
 
 **Changing one meal** — mirrored from exercise, because meals are plans too
 - Replace it, regenerate it, ask for more — both; `meal-swap-rotation`

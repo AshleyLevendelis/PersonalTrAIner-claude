@@ -292,6 +292,17 @@ export function WhatHappenedSheet({
 
   const focus = session?.focus ?? plan.find(d => d.day === dayName)?.focus ?? 'session'
   const when = isToday ? 'today' : `${dayName}`
+  /**
+   * The same word, capitalised, for the two places it STARTS a sentence.
+   *
+   * FOUND ON A REAL SCREEN, 16 Sep 2026, by the rebuild driver's screenshot —
+   * "…and I'll tell you which. today is back to the planned session next week."
+   * The shorten copy beside it has read that way since 13 Sep and every source
+   * check passed it, because a lowercase sentence start is not a string any of
+   * them look for. This is what CLAUDE.md means by a browser driver finding
+   * what no `test:` gate can.
+   */
+  const When = isToday ? 'Today' : `${dayName}`
 
   return (
     <Dialog open={!!target} onOpenChange={open => { if (!open) close() }}>
@@ -372,7 +383,7 @@ export function WhatHappenedSheet({
             <p className="text-sm">How long have you got?</p>
             <p className="text-xs text-muted-foreground">
               Your main lift stays exactly as it is, and so do at least two others. The accessory work at the end
-              comes out until it fits — or until only those are left, whichever comes first. {when} is back to the
+              comes out until it fits — or until only those are left, whichever comes first. {When} is back to the
               full session next week.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -396,7 +407,7 @@ export function WhatHappenedSheet({
             <p className="text-xs text-muted-foreground">
               Your main lift stays exactly as it is — same weight, same sets — so this week&rsquo;s progression on it
               is untouched. Everything else gets swapped for something that fits your equipment and injuries.
-              Anything with no real alternative stays put, and I&rsquo;ll tell you which. {when} is back to the
+              Anything with no real alternative stays put, and I&rsquo;ll tell you which. {When} is back to the
               planned session next week.
             </p>
             <div className="flex flex-wrap gap-2">

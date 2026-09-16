@@ -2,6 +2,59 @@
 
 Newest first. One line each.
 
+- [x] **A DIFFERENT SESSION TODAY — BOTH SURFACES, AND THE SCREENSHOT FOUND A
+  TYPO THAT HAD BEEN SHIPPING SINCE 13 SEPTEMBER.**
+  Ashley chose this from three options, 16 Sep 2026, then ruled on the one
+  question it could not be built without: **"keep it, rebuild around it"** —
+  over asking each time, and over rebuilding the whole session. You still do
+  today's main lift at the weight and sets already prescribed; everything else
+  changes. `docs/plans/a-different-session-today.md` has the reasoning.
+  **TWO OF THE THREE REASONS CLAUDE.md GAVE FOR THIS BEING `MISSING` WERE
+  WRONG**, measured before building: "nothing regenerates below a whole week"
+  is true of `generateMesocycle` and irrelevant, since swap, add and remove all
+  change one day of a live mesocycle; and the day assembler has fourteen
+  parameters, not fifteen, and this build never calls it. The third held — the
+  cheap route can hand you the same exercise twice — which is why it composes
+  the SWAP path once per slot instead.
+  **SHIPPED:** `rebuildDayAroundMainLift`, the day menu's "Give me a different
+  session", `propose_session_rebuild` on the coach, and a receipt that names
+  what it could NOT change rather than reporting a clean success.
+  **THE BROWSER DRIVER EARNED ITS PLACE AGAIN, ON THE FIRST RUN.** All 23
+  source and screen checks passed, and the SCREENSHOT read:
+  *"…and I'll tell you which. today is back to the planned session next week."*
+  A sentence starting with a lowercase "today", because `{when}` interpolates
+  mid-paragraph at a sentence start. **The shorten copy beside it has read that
+  way since 13 Sep 2026** and every check has passed it since, because no source
+  check looks for a lowercase letter after a full stop. Both fixed with a
+  capitalised `{When}`, and the driver now asserts no sentence in that sheet
+  starts lowercase — mutation-tested by putting the defect back, which fails it
+  naming the exact word.
+  **Mutations on the engine: 10 tried, 10 caught**, after four rounds in which
+  EVERY miss was the check or its fixture, never the engine. Three shared one
+  shape and are worth keeping together: a starved-slot fixture that excluded a
+  candidate LIST (exclusions are honoured — measured — the list is simply not
+  exhaustive); a set-hierarchy assertion stricter than the rule it was checking
+  (it failed on a warm-up movement the rule deliberately exempts); and an
+  "input not written through" check comparing against a live reference INTO the
+  mesocycle, so a rebuild that corrupted the plan would have mutated the very
+  thing being compared. The scope mutation THREW inside a test helper rather
+  than failing a check — a crash is not a catch, and the helper is null-safe now.
+  **AND ONE FIXTURE THAT COULD NOT EXPRESS ITS DEFECT AT ALL.** Two slots
+  claiming the same NEW exercise never happens with a full gym, so the running
+  dedupe looked dead. Searched for a profile where it does rather than assuming
+  one: a beginner with no equipment, whose pool is thin enough that two slots
+  want the same movement. That is the person the starting-out plan is written
+  for. The check now sweeps every training day of that plan.
+  **One user-visible property found only by mutation:** passing
+  `isMainLiftReset` for an accessory rewrites its guidance to "find your working
+  weight this session" — true of a main lift being reset, a lie on an accessory
+  that has a prescribed weight.
+  **`test:coach-parity` caught the coach half working**: a new tool with no
+  recorded screen path fails it. The path existed; the document did not know.
+  Neither coach-only count moves.
+  **Needs the `chat-gemini` deploy already waiting** — the coach's fingerprint
+  moved, so this rides that one deploy rather than adding a second.
+
 - [x] **"EXPLAINED WHEN THEY MOVE" IS GUARDED — AND I HAD TO RETRACT "IT IS
   MISSING" FIRST, WHICH IS THE PART WORTH KEEPING.**
   Ashley chose this from three options, 16 Sep 2026, on my description of it as
