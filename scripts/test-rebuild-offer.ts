@@ -111,8 +111,24 @@ console.log('\n2. And nothing else does')
   // The three known lifts joined 14 Sep 2026, on Ashley's ruling "rebuild only
   // when it matters" — and they are the first CONDITIONAL entries on this
   // list. §2b below is the condition.
+  // session_duration_preference joined 16 Sep 2026, on Ashley's ruling from
+  // three options: rebuild the rest of the block around the new length, over
+  // trimming what is already there and over waiting for the next block. Its
+  // ABSENCE was the defect, not an oversight — setting session length wrote
+  // the number and touched nothing else, so the plan kept the old length and
+  // today's card simply started saying the session ran over. Generation reads
+  // it everywhere (the duration budget, the session minimum and maximum, sets
+  // and reps per tier, the warm-up budget and the filler), which is exactly
+  // the test this list's name states.
+  //
+  // THIS CHECK BLOCKED THE FIX, AND WAS RIGHT TO. It enumerates rather than
+  // derives, which CLAUDE.md warns about — but here the enumeration IS the
+  // property: the whole point is that a field cannot join silently, because
+  // joining means the app starts rebuilding somebody's plan. A derived check
+  // would have let this through unread. Suspect a blocking check; do not
+  // assume it is wrong.
   check('the invalidating list is exactly the fields that change what the plan contains',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,start_preference,training_days,training_style',
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,session_duration_preference,start_preference,training_days,training_style',
     PLAN_INVALIDATING_FIELDS)
 
   // BOTH DIRECTIONS, because the copy differs and only one of them is the
