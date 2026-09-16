@@ -58,11 +58,19 @@ try {
 
 if (scores.baselinePending) {
   console.log('  ---------------------------------------------------------------')
-  console.log('  THE COACH EXAM HAS NEVER BEEN RUN AGAINST THE REAL MODEL.')
-  console.log('  The exam, its rubric and its hard rules are built and checked;')
-  console.log('  no conversation has been scored yet, so "the coach gives good')
-  console.log('  advice" remains asserted rather than known. Clearing this needs')
-  console.log('  one run from a machine with real credentials:')
+  // WORDED AS A FACT ABOUT THIS REPOSITORY, NOT ABOUT THE WORLD. It used to
+  // say "THE COACH EXAM HAS NEVER BEEN RUN AGAINST THE REAL MODEL", which was
+  // the exact claim corrected across CLAUDE.md and BACKLOG on 16 Sep 2026: the
+  // exam HAS been run once, on Ashley's machine on 13 Sep, and those scores
+  // were never pushed. This gate cannot see that and should not assert it —
+  // all it knows is that no scores are on record HERE.
+  console.log('  NO COACH EXAM SCORES ARE ON RECORD IN THIS REPOSITORY.')
+  console.log('  The exam, its rubric and its hard rules are built and checked.')
+  console.log('  A run may exist on someone\'s machine and never have been')
+  console.log('  pushed — this gate cannot see that, and says only what it')
+  console.log('  knows. Until scores land here, "the coach gives good advice"')
+  console.log('  is asserted rather than known. Clearing this needs one run')
+  console.log('  from a machine with real credentials, then a commit:')
   console.log('    npx tsx scripts/run-coach-exam.mts && npm run coach-exam:grade')
   console.log('  ---------------------------------------------------------------')
   pass('baseline pending — recorded deliberately, not a missing file')

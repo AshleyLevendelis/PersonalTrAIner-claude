@@ -91,6 +91,28 @@ it is wrong.
   no tool is invisible to it, and §4 only checks this section is non-empty —
   `**None,` satisfies it forever. That hole is named, not fixed.
 
+**THE COUNT IN THIS SECTION WAS WRONG, and the hole named above is exactly
+why.** Corrected 16 Sep 2026: it opened "One, as of 15 Sep 2026" and listed
+only the pre-session tightness check, while CLAUDE.md's own must-have list had
+said "Session length — `screen only`; targets and macro mode — `screen only`"
+the whole time. Three more, in one file, contradicted by another file, and
+`test:coach-parity` could not see any of them because none has a declared tool
+to derive a row from. Two documents, one of them right, and the gate blind to
+the difference.
+
+- **Session length.** `screen only` until 16 Sep 2026 — see the entry for it
+  below once built. Worth knowing separately: changing it has never rebuilt
+  the plan, so "the screen can do this" was itself only half true.
+- **Macro mode** (Standard / Dynamic CSCS) and **macro split**. `screen only`.
+  Both bypass the Profile screen's own writer and are applied from `App.tsx`
+  with their own optimistic-apply and revert, so a coach path cannot simply
+  reuse the profile-field executor.
+- **The calorie target itself.** On NEITHER surface, and not a gap that can be
+  closed as written: there is no control because the number is derived by
+  `computeTargets`, not stored as an intention. Changing "targets" means
+  changing an input.
+- **The fitness goal.** On NEITHER surface. See CLAUDE.md for the measurement.
+
 Banning an exercise was the previous entry and closed 14 Sep 2026. This
 section exists so the answer stays written down rather than
 recounted from scratch each time; if a screen control is added without a coach

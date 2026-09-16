@@ -238,13 +238,53 @@ menu" stays true when a copy is also left outside it.
 
 **Changing the whole plan**
 - Start again — `screen only` (New Plan; `reset-clears-draft`)
-- Days, equipment, injuries (add / lasting / recovered), goal, style,
-  volume, other sports — both surfaces, proposed and confirmed —
-  `rebuild-offer`, `profile-restore`, `coach-volume-schedule`,
-  `injury-rebuild`, `enforcement-gaps`, `concurrent-activity`
-- Session length — `screen only`; targets and macro mode — `screen only`
-- Onboarding answers and the Profile screen. **As of 14 Sep 2026 there are no
-  locked answers left** — every one can be corrected. The history is kept
+- Days, equipment, injuries (add / lasting / recovered), style, volume,
+  other sports — both surfaces, proposed and confirmed — `rebuild-offer`,
+  `profile-restore`, `coach-volume-schedule`, `injury-rebuild`,
+  `enforcement-gaps`, `concurrent-activity`
+- **GOAL was in that list and is the worst kind of wrong: it is on NEITHER
+  surface.** CORRECTED 16 Sep 2026, measured. Every assignment to
+  `fitness_goal` in `src/` and `supabase/functions/` is a READ being copied
+  forward (profile load, the coach's context block, the onboarding insert), a
+  test fixture, or `onboarding-slots.ts:1096`. There is no `savePatch`, no
+  executor branch, no `propose_goal_change`. Someone who chose fat loss at
+  setup and now wants to build muscle has one route: start a whole new plan.
+  **The road is built and nobody drives on it** — `fitness_goal` IS in
+  `PLAN_INVALIDATING_FIELDS` and `plan-invalidation.ts:203` handles a goal
+  change in a patch that nothing produces. That shape is worth naming: a
+  capability can be absent while every piece of machinery for it exists and
+  looks, to a reader, like proof it works. Same family as the walking plan
+  (generator, type, no pixel) and bodyweight PRs (six filters, no record)
+- Session length — `screen only`, and **changing it changes nothing about the
+  plan you already have.** Measured 16 Sep 2026: `session_duration_preference`
+  is absent from `PLAN_INVALIDATING_FIELDS` (`plan-invalidation.ts:67`) and
+  from `CEILING_FIELDS`, so the screen neither rebuilds nor re-prices. The one
+  live effect is that today's card re-labels the session as running over
+  (`TodayPanel.tsx:809`). So "you can set your session length" has been true
+  about the NUMBER and false about the PLAN.
+  **Ashley's ruling, 16 Sep 2026, from three options: rebuild the rest of the
+  block around the new length** — over trimming what is there (a 60-minute
+  session with its end chopped off is not a session designed for 45) and over
+  waiting for the next block. It binds BOTH surfaces: the screen has to start
+  rebuilding too, or the same request answers differently depending on where
+  it was made
+- **"I only have 45 minutes today" ALREADY WORKS on both surfaces**, and is a
+  different thing from the above — `propose_session_shorten`
+  (`chat-gemini:810`, takes `minutes`, TODAY-only, main lift protected) and
+  `onShorten(minutes)` on the day menu. Recorded because the two requests are
+  one word apart ("today" / "from now on") and the tools are not
+- Targets and macro mode — `screen only`, and "targets" is not one thing:
+  `calorie_target` has no control anywhere and never did. It is written once
+  at onboarding and derived by `computeTargets` thereafter, so changing it
+  means changing its INPUTS — macro split, activity level, or goal (which is
+  on neither surface, above)
+- Onboarding answers and the Profile screen. **"As of 14 Sep 2026 there are no
+  locked answers left" stood here and is FALSE — corrected 16 Sep 2026.** The
+  GOAL is still locked, and was on the day that line was written; it was
+  missed because the unlocking work went field by field through the ones
+  somebody had complained about, and nobody re-derived the list from the
+  profile columns afterwards. Every OTHER answer can be corrected, and the
+  history below is kept because each unlocking needed a different road. The history is kept
   because each unlocking needed a different road and the reasons are the useful
   part. CORRECTED 13 Sep, again 14 Sep:
   - The three implement ceilings — **now editable**, in "You" beside Equipment,
