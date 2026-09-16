@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Heart, ChevronRight, Loader2, ArrowRight } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES, saveCardioLog, deleteCardioLog } from '@/lib/cardio-log-store'
-import type { WorkoutDay, RecommendedCardio } from '@/lib/types'
+import { prescriptionLine } from '@/lib/activity-day'
+// Its own chunk — see the file for the measurement that put it there.
+const AddCardioSession = lazy(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
+import type { WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // Rest and active-recovery days as first-class calm states (LAYOUT-DESIGN.md
@@ -15,7 +18,7 @@ import type { WorkoutDay, RecommendedCardio } from '@/lib/types'
 // day's prescription.
 // ---------------------------------------------------------------------------
 
-function ActivityLogEntry() {
+function ActivityLogEntry({ alsoLabel = false }: { alsoLabel?: boolean }) {
   const { profileId, date } = useActiveSession()
   const [open, setOpen] = useState(false)
   const [activity, setActivity] = useState('')
@@ -56,7 +59,11 @@ function ActivityLogEntry() {
         className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
         onClick={() => setOpen(true)}
       >
-        Log a walk or other activity
+        {/* When the day already PRESCRIBES an activity, that activity has its
+            own one-tap Log above this. Offering "log a walk" underneath a
+            prescribed walk reads as the same button twice, so this one says
+            what it is actually for. */}
+        {alsoLabel ? 'Log something else you did' : 'Log a walk or other activity'}
       </button>
     )
   }
@@ -123,7 +130,7 @@ function TomorrowPreview({
   tomorrow,
   onPeek,
 }: {
-  tomorrow: { dayName: string; focus: string; exerciseCount: number }
+  tomorrow: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
 }) {
   return (
@@ -134,7 +141,11 @@ function TomorrowPreview({
       disabled={!onPeek}
     >
       <span className="text-xs text-foreground">
-        Tomorrow · {tomorrow.focus} · {tomorrow.exerciseCount} exercises
+        {/* The third clause is a STRING, not an exercise count, because an
+            activity day has none: "Walk · 0 exercises" was the same lie the
+            empty card told, one row smaller. The caller says what the day is
+            measured in — exercises, or minutes. */}
+        Tomorrow · {tomorrow.focus} · {tomorrow.detail}
       </span>
       <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
     </button>
@@ -148,13 +159,16 @@ export function RestDayCard({
   onPeek,
   trainAnywayOptions,
   onTrainAnyway,
+  onAddCardio,
 }: {
   dayName: string
   weekTally: { done: number; planned: number }
-  tomorrow?: { dayName: string; focus: string; exerciseCount: number }
+  tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
   trainAnywayOptions: string[]
   onTrainAnyway: (sourceDayName: string) => void
+  /** Returns null on success, or a sentence to show. Absent means no plan loaded yet. */
+  onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -177,6 +191,7 @@ export function RestDayCard({
         )}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry />
+        {onAddCardio && <Suspense fallback={null}><AddCardioSession dayName={dayName} onAdd={onAddCardio} /></Suspense>}
         {trainAnywayOptions.length > 0 && !pickerOpen && (
           <button
             type="button"
@@ -225,7 +240,7 @@ export function MovedDayCard({
   focus: string | null
   toDayName: string
   weekTally: { done: number; planned: number }
-  tomorrow?: { dayName: string; focus: string; exerciseCount: number }
+  tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
   /** Resolves true when the move was cleared, false when the write failed. */
   onDoItToday: () => Promise<boolean>
@@ -291,13 +306,23 @@ export function ActiveRecoveryCard({
   weekTally,
   tomorrow,
   onPeek,
+  onAddCardio,
 }: {
   workout: WorkoutDay
   weekTally: { done: number; planned: number }
-  tomorrow?: { dayName: string; focus: string; exerciseCount: number }
+  tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
+  onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
 }) {
   const cardio = workout.recommendedCardio
+  // A DAY WHOSE WHOLE PLAN IS AN ACTIVITY SHOWS THE ACTIVITY. The beginner's
+  // walking plan (toStartingOutDay) has always carried a real prescription —
+  // minutes, effort, and a reason written for a person — and no screen read it,
+  // so the one card that could render it fell straight through to the blank
+  // "log a walk" form. The plan said walk 20 minutes; the screen asked what you
+  // did. This is not an add-on like recommendedCardio: it IS the session, which
+  // is why it leads the card and why the card stops calling itself recovery.
+  const planned = workout.plannedActivity
   return (
     <Card className="border-[color:var(--role-warn-border)] bg-gradient-to-br from-[color:var(--role-warn-bg)] to-background">
       <CardContent className="py-4 space-y-3">
@@ -306,8 +331,12 @@ export function ActiveRecoveryCard({
             <Heart className="size-5 text-[color:var(--role-warn)]" />
           </div>
           <div className="space-y-0.5">
-            <p className="text-sm font-medium">Active recovery · {workout.day}</p>
-            <p className="text-xs text-muted-foreground">{workout.focus}</p>
+            <p className="text-sm font-medium" data-testid="activity-day-title">
+              {planned ? `${workout.focus} · ${workout.day}` : `Active recovery · ${workout.day}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {planned ? "This is today's session." : workout.focus}
+            </p>
           </div>
         </div>
         {weekTally.planned > 0 && (
@@ -315,15 +344,60 @@ export function ActiveRecoveryCard({
             This week: {weekTally.done} of {weekTally.planned} sessions done.
           </p>
         )}
-        {cardio && <RecoveryFinisher cardio={cardio} />}
+        {planned && (
+          <div className="space-y-1.5" data-testid="planned-activity">
+            <PrescribedRow
+              activity={planned.activity}
+              duration={planned.duration}
+              targetRpe={planned.targetRpe}
+            />
+            {planned.reason && (
+              <p className="text-xs leading-[1.5] text-muted-foreground">{planned.reason}</p>
+            )}
+          </div>
+        )}
+        {/* NOT BOTH. recommendedCardio is a SUGGESTION for an otherwise-empty
+            day; plannedActivity is what the plan prescribes for it. Showing
+            both put "Cycle · 35m · RPE 3" directly above "Active Recovery Walk
+            or Light Swim" and left the person to guess which was the session —
+            the same unanswerable question the type comment warns about, on
+            screen instead of in the data. Found by the driver, on a real card. */}
+        {!planned && cardio && <PrescribedRow activity={cardio.activity} duration={cardio.duration} targetRpe={cardio.targetRpe} />}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
-        <ActivityLogEntry />
+        <ActivityLogEntry alsoLabel={!!planned} />
+        {/* AN EMPTY DAY IS THE ONE YOU WANT TO FILL, and this is the card an
+            empty day actually gets. The control was on RestDayCard alone at
+            first — which only renders when the plan has NO row for the day at
+            all. A scheduled day with nothing on it comes here instead, and
+            that is precisely the day somebody means by "Wednesday is my cardio
+            day". Found by the driver, not by reading: it landed on a Tuesday
+            reading "Active recovery" with no control on it.
+            Hidden once the day HAS a prescription — there is nothing to add. */}
+        {onAddCardio && !planned && <Suspense fallback={null}><AddCardioSession dayName={workout.day} onAdd={onAddCardio} /></Suspense>}
       </CardContent>
     </Card>
   )
 }
 
-function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
+/**
+ * ONE ROW FOR ANYTHING THE PLAN PRESCRIBES BY TIME AND EFFORT — the cardio
+ * finisher bolted to a day, and the walk that IS the day. They render
+ * identically on purpose: what separates them is where they sit on the card
+ * and what the card says around them, not how they look.
+ *
+ * targetRpe is optional because PlannedActivity's is — a first walking
+ * prescription may deliberately carry no effort target — so the effort clause
+ * disappears rather than printing "RPE undefined".
+ */
+function PrescribedRow({
+  activity,
+  duration,
+  targetRpe,
+}: {
+  activity: string
+  duration: number
+  targetRpe?: number
+}) {
   const { profileId, date } = useActiveSession()
   const [saving, setSaving] = useState(false)
   const [loggedClientId, setLoggedClientId] = useState<string | null>(null)
@@ -335,16 +409,19 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
     const view = saveCardioLog({
       userId: profileId,
       date,
-      activityName: cardio.activity,
-      durationMinutes: cardio.duration,
-      intensityRpe: cardio.targetRpe,
+      activityName: activity,
+      durationMinutes: duration,
+      // Same default the typed form below uses for an unstated effort, so one
+      // convention covers both — an easy prescribed walk and a logged one land
+      // on the same number rather than two.
+      intensityRpe: targetRpe ?? 4,
     })
     setSaving(false)
     // The plan supplies this duration, so a refusal here means the plan holds
     // an impossible one — nothing the user can correct from this row, but it
     // must not leave the button reading "Logged" over a row that never wrote.
     if (!view) {
-      console.error('Refused to log the prescribed recovery cardio:', cardio)
+      console.error('Refused to log a prescribed activity:', { activity, duration })
       return
     }
     setLoggedClientId(view.clientId ?? null)
@@ -364,7 +441,7 @@ function RecoveryFinisher({ cardio }: { cardio: RecommendedCardio }) {
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2">
       <span className="text-xs text-foreground">
-        {cardio.activity} · {cardio.duration}m · RPE {cardio.targetRpe}
+        {prescriptionLine({ activity, duration, targetRpe })}
       </span>
       {loggedClientId ? (
         <div className="flex items-center gap-2 shrink-0">

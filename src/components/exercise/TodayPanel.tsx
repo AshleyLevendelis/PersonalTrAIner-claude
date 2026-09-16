@@ -38,6 +38,7 @@ import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
 import { FinisherRow } from './FinisherRow'
+import { isScheduledDay, dayDetail } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
@@ -52,9 +53,11 @@ import type { ReasonAnswer } from './EditReasonStep'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
+import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { settleWeek } from '@/lib/settle-week'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
+import { executeCardioSession } from '@/lib/pending-action-executor'
 import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
@@ -332,6 +335,32 @@ export function TodayPanel({
     return null
   }
 
+  /**
+   * "MAKE TODAY A CARDIO DAY" — the screen half of the coach's
+   * propose_cardio_session, 15 Sep 2026.
+   *
+   * THE SAME EXECUTOR THE COACH'S CONFIRM CALLS, not a second implementation
+   * of the same verb. That is what parity means here and it is also what stops
+   * the two surfaces disagreeing about scope: executeCardioSession writes the
+   * rest of the block from this week, both ways round.
+   */
+  const handleAddCardio = async (activity: string, minutes: number, targetRpe: number): Promise<string | null> => {
+    if (!profileId || !profile || !mesocycle || mesocycle.length === 0) return 'No plan to add it to yet.'
+    const result = await executeCardioSession(profile, mesocycle, {
+      weekNumber: liveWeek,
+      dayName: todayName,
+      activity,
+      minutes,
+      targetRpe,
+      scope: 'permanent',
+    })
+    if (result.receipt.failed.length > 0) return result.receipt.failed[0].error
+    onMesocycleUpdated?.(result.mesocycle)
+    weekTrain.refresh()
+    onLogsUpdated?.()
+    return null
+  }
+
   const dropExercise = async (exIndex: number, scope: SwapScope): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
     return applySessionEdit(
@@ -364,6 +393,38 @@ export function TodayPanel({
       { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
       'today',
     )
+  }
+
+  /**
+   * "GIVE ME A DIFFERENT SESSION TODAY" — 16 Sep 2026.
+   *
+   * Ashley's ruling, from three options: keep the main lift and rebuild around
+   * it. You still do today's main lift at the weight and sets already
+   * prescribed; everything else changes. It matches her 13 Sep ruling for
+   * shortening (protect the main lift, drop accessories), so the two
+   * change-today verbs treat it the same way.
+   *
+   * rebuildDayAroundMainLift runs settleWeek itself — unlike shortenToday
+   * above, which has to. Scope 'today', so the same day next week is the
+   * session that was always planned.
+   */
+  const rebuildToday = async (): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const result = await rebuildDayAroundMainLift({
+      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exclusions,
+    })
+    if (!result.changed) return result.refusal ?? "I couldn't rebuild that one."
+    const saved = await applySessionEdit({ mesocycle: result.mesocycle, changed: true }, 'today')
+    if (saved) return saved
+    // WHAT IT COULD NOT DO IS SAID, NOT SWALLOWED. A rebuild that quietly left
+    // three exercises alone and reported success is the defect this codebase
+    // keeps finding — the app knowing something and the screen saying nothing.
+    const kept = result.kept.length
+    const main = result.mainLift ? ` ${result.mainLift} is untouched, as planned.` : ''
+    setRebuildNote(kept === 0
+      ? `Rebuilt today — ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed.${main} Back to the planned session next week.`
+      : `Rebuilt today — ${result.replaced.length} changed, ${kept} stayed because nothing else fits ${kept === 1 ? 'that slot' : 'those slots'} with your equipment and injuries.${main} Back to the planned session next week.`)
+    return null
   }
 
   /**
@@ -591,10 +652,20 @@ export function TodayPanel({
   const tomorrowWorkout = tomorrowCell?.movedTo
     ? undefined
     : (tomorrowCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === tomorrowName)
-  const tomorrowPreview = tomorrowWorkout && tomorrowWorkout.exercises.length > 0
-    ? { dayName: tomorrowName, focus: tomorrowWorkout.focus, exerciseCount: tomorrowWorkout.exercises.length }
+  // A DAY IS SCHEDULED IF IT SAYS IT IS. `is_scheduled` exists precisely
+  // because "scheduled" was being inferred from the exercise count, which
+  // makes an activity-shaped day — a walk, a swim, no exercises array —
+  // invisible: the beginner's whole plan never appeared in tomorrow's preview.
+  // Same expression dashboard-data.ts's streak input already uses, and the
+  // fallback is for plans stored before the field existed.
+  const tomorrowPreview = isScheduledDay(tomorrowWorkout)
+    ? { dayName: tomorrowName, focus: tomorrowWorkout!.focus, detail: dayDetail(tomorrowWorkout!) }
     : undefined
 
+  // DELIBERATELY STILL THE EXERCISE COUNT. "Train anyway" borrows another
+  // day's PRESCRIPTION to do today, and an activity day has no exercises to
+  // borrow — offering one here would open a session with nothing in it, which
+  // is the defect this whole change exists to remove.
   const trainAnywayOptions = liveWeekPlan
     .filter(d => d.exercises.length > 0 && d.day !== todayName)
     .map(d => d.day)
@@ -623,6 +694,17 @@ export function TodayPanel({
   const volumeNames = volume ? volume.names.join(' and ') : ''
   const [volumeBusy, setVolumeBusy] = useState(false)
   const [volumeError, setVolumeError] = useState<string | null>(null)
+  /**
+   * What the rebuild changed and what it could not, after the tap.
+   *
+   * TRANSIENT ON PURPOSE, and the limit is worth stating: unlike the shortened
+   * marker (workout.shortened_to_minutes, which is stored on the day and so
+   * survives a reload), this is component state and goes on refresh. The
+   * session itself visibly changed and stays changed; what is lost on a reload
+   * is only the list of slots that STAYED. Storing that needs a field on the
+   * day, which is a persistence change this build did not take.
+   */
+  const [rebuildNote, setRebuildNote] = useState<string | null>(null)
   const volumeReduction = useMemo(() => {
     if (!profile || !volume || volume.atFloor || !hasMesocycle) return null
     const activities = profile.concurrent_activities ?? []
@@ -802,6 +884,7 @@ export function TodayPanel({
         onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
         onShorten={shortenToday}
         onLighter={lighterToday}
+        onRebuild={rebuildToday}
       />
       </Suspense>
       <Suspense fallback={null}>
@@ -841,7 +924,12 @@ export function TodayPanel({
           </div>
         ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
           <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground">
-            {peekDay} is a rest or recovery day.
+            {/* A peeked day with a prescribed activity is NOT a rest day, and
+                saying so was the same defect as the empty card — it just said
+                it in one sentence instead of a blank form. */}
+            {peekWorkout?.plannedActivity
+              ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
+              : `${peekDay} is a rest or recovery day.`}
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
           </div>
         ) : (
@@ -873,6 +961,7 @@ export function TodayPanel({
           onPeek={d => setPeekDay(d)}
           trainAnywayOptions={trainAnywayOptions}
           onTrainAnyway={setBorrowedDayName}
+          onAddCardio={handleAddCardio}
         />
       ) : isActiveRecovery ? (
         <ActiveRecoveryCard
@@ -880,6 +969,7 @@ export function TodayPanel({
           weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned }}
           tomorrow={tomorrowPreview}
           onPeek={d => setPeekDay(d)}
+          onAddCardio={handleAddCardio}
         />
       ) : (
         <div className="space-y-3">
@@ -926,6 +1016,7 @@ export function TodayPanel({
             </InsightBanner>
           )}
           {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
+          {rebuildNote && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{rebuildNote}</p>}
           {/* Turn 5 hero block — supersedes IdentityLine's old day/focus text
               (now deleted; its timers entry point moved into WeekContextRow's
               "⋮" menu above). New: a 2px session-progress line under the

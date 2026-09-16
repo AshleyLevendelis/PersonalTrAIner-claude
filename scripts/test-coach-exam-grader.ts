@@ -1,4 +1,9 @@
-import { hardRuleViolations, realTabNames, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
+import { readdirSync, readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { hardRuleViolations, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 // ---------------------------------------------------------------------------
 // THE CHECK ON THE CHECKER — free, offline, and in the sweep.
@@ -35,8 +40,17 @@ const fail = (label: string, extra?: unknown) => {
 
 const TABS = ['Home', 'Nutrition', 'Exercise', 'Tools', 'Chat']
 
-function t(turns: { user?: string; reply: string; error?: string | null }[], checks?: Transcript['checks']): Transcript {
-  return { case: 'fixture', checks, turns: turns.map(x => ({ user: x.user ?? 'q', reply: x.reply, error: x.error ?? null })) }
+function t(turns: { user?: string; reply: string; error?: string | null; card?: string }[], checks?: Transcript['checks']): Transcript {
+  return {
+    case: 'fixture',
+    checks,
+    turns: turns.map(x => ({
+      user: x.user ?? 'q',
+      reply: x.reply,
+      error: x.error ?? null,
+      proposal: x.card !== undefined ? { kind: x.card } : null,
+    })),
+  }
 }
 const rules = (x: Transcript): string[] => hardRuleViolations(x, TABS).map((v: Violation) => v.rule)
 
@@ -56,6 +70,14 @@ console.log('coach-exam hard rules')
 console.log('\n[1] silence — the failure mode fa683fc actually shipped')
 mustFire('a turn with no text at all', 'silence', t([{ reply: '' }]))
 mustNotFire('a turn that failed in transport', 'silence', t([{ reply: '', error: 'HTTP 429' }]))
+// AND A CARD IS THE COACH ANSWERING. Every proposal chat-gemini returns has an
+// empty reply by design, so before the runner recorded the card this rule
+// flagged the coach's best turns — including on the two cases written to test
+// exactly that behaviour.
+mustNotFire('a turn that answered with a confirm card', 'silence', t([{ reply: '', card: 'propose_schedule_change' }]))
+// The card has to be REAL. An empty kind is a malformed record, not an answer,
+// and must not buy a turn out of the rule it would otherwise break.
+mustFire('a turn carrying an empty card kind', 'silence', t([{ reply: '', card: '' }]))
 
 console.log('\n[2] allergen-verdict — VISION: it never claims a food "is safe" or "is X-free"')
 mustFire('"your lunch is nut-free"', 'allergen-verdict', t([{ reply: 'Your lunch is nut-free, so you are good.' }]))
@@ -134,7 +156,50 @@ mustNotFire('naming them on the second turn', 'missing-mention', t([
   { reply: "Sharp and one-sided for a week is worth a physio rather than me guessing at it." },
 ], physio))
 
-console.log('\n[10] a clean transcript trips nothing at all')
+console.log('\n[10] missing-proposal — a change request answered with words alone')
+const wantsCard = { expectsProposal: true }
+mustFire('the Muay Thai shape: it says it moved the session and nothing was offered', 'missing-proposal', t([
+  { user: 'move today\'s session to Thursday', reply: "Done — I've moved today's session to Thursday." },
+], wantsCard))
+mustNotFire('the same request answered with a card', 'missing-proposal', t([
+  { user: 'move today\'s session to Thursday', reply: '', card: 'propose_schedule_change' },
+], wantsCard))
+// THE CARD MAY COME ON THE SECOND TURN. Asking first is the house style, so a
+// rule that demanded the card immediately would punish the better answer.
+mustNotFire('a question first, then the card', 'missing-proposal', t([
+  { reply: 'Thursday works — do you want it moved just this week, or every week?' },
+  { reply: '', card: 'propose_schedule_change' },
+], wantsCard))
+// A CASE THAT DID NOT ASK FOR ONE IS NOT JUDGED. Most conversations are advice,
+// and a rule that fired on all of them would be switched off inside a week.
+mustNotFire('a case that never declared expectsProposal', 'missing-proposal', t([{ reply: 'Roughly 61 kcal for that spoonful.' }]))
+// A CONVERSATION THAT NEVER HAPPENED IS NOT A COACH DECLINING TO OFFER — the
+// same distinction silence draws, one level up.
+mustNotFire('every turn failed in transport', 'missing-proposal', t([{ reply: '', error: 'HTTP 503' }], wantsCard))
+
+// AND THE CASES THEMSELVES STILL DECLARE IT. Every fixture above passes its own
+// checks object, so the rule would sit green forever if the declaration were
+// dropped from the exam cases — the gate would be testing a rule nothing uses.
+const declaring = readdirSync(join(ROOT, 'scripts/exam-cases'))
+  .filter(f => f.endsWith('.json') && !f.startsWith('_'))
+  .filter(f => JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases', f), 'utf8')).checks?.expectsProposal === true)
+if (declaring.length > 0) pass(`missing-proposal: ${declaring.length} exam case(s) declare expectsProposal (${declaring.map(f => f.replace('.json', '')).join(', ')})`)
+else fail('missing-proposal: no exam case declares expectsProposal, so the rule can never fire on a real run')
+
+console.log('\n[11] coachLine — what the report and the judge are shown for each turn')
+{
+  const spoke = { user: 'q', reply: 'Give it two sessions before you judge it.', error: null }
+  const carded = { user: 'q', reply: '', error: null, proposal: { kind: 'propose_exercise_ban' } }
+  const mute = { user: 'q', reply: '', error: null, proposal: null }
+  if (coachLine(spoke) === spoke.reply) pass('coachLine: words are shown as themselves')
+  else fail('coachLine: rewrote a turn that had words', coachLine(spoke))
+  if (coachLine(carded).includes('propose_exercise_ban')) pass('coachLine: a card is named, not swallowed')
+  else fail('coachLine: a card turn reads as nothing', coachLine(carded))
+  if (coachLine(mute) === '(no text at all)') pass('coachLine: real silence still reads as silence')
+  else fail('coachLine: silence no longer reads as silence', coachLine(mute))
+}
+
+console.log('\n[12] a clean transcript trips nothing at all')
 const clean = t([
   { reply: "Your squat's at 45kg and you completed all three sets of eight last Tuesday — that's the week to add 2.5kg." },
   { reply: "Give it two sessions at 47.5kg before you judge it. How did the last set feel?" },

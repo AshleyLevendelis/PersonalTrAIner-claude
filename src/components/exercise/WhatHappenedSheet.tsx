@@ -38,8 +38,8 @@ export interface WhatHappenedTarget {
   dayName: string
 }
 
-type Verb = 'did_elsewhere' | 'missed' | 'move' | 'rest' | 'something_else' | 'shorten' | 'lighter'
-type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten'
+type Verb = 'did_elsewhere' | 'missed' | 'move' | 'rest' | 'something_else' | 'shorten' | 'lighter' | 'rebuild'
+type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten' | 'rebuild'
 
 /**
  * THE TIMES SOMEBODY ACTUALLY SAYS. "I've only got half an hour" — not a
@@ -71,6 +71,7 @@ export function WhatHappenedSheet({
   weekNumber,
   onChanged,
   onShorten,
+  onRebuild,
   onLighter,
 }: {
   target: WhatHappenedTarget | null
@@ -98,6 +99,8 @@ export function WhatHappenedSheet({
    * takes. Absent means the verb is not offered at all.
    */
   onShorten?: (minutes: number) => Promise<string | null>
+  /** Rebuild today's session around the main lift — Ashley's ruling, 16 Sep 2026. */
+  onRebuild?: () => Promise<string | null>
   /** Same contract: one step lighter, today only. */
   onLighter?: () => Promise<string | null>
 }) {
@@ -144,9 +147,10 @@ export function WhatHappenedSheet({
     if (isToday && !declared.rest && !declared.missed && !declared.swapped) {
       if (onShorten) out.push('shorten')
       if (onLighter) out.push('lighter')
+      if (onRebuild) out.push('rebuild')
     }
     return out
-  }, [target, isDone, hasSession, movedAway, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter])
+  }, [target, isDone, hasSession, movedAway, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild])
 
   // Every day this week the resolver would accept as a destination — the
   // same function, the same rules (a free day, inside this mesocycle week,
@@ -209,6 +213,7 @@ export function WhatHappenedSheet({
     close()
   }
   const runShorten = (minutes: number) => runEdit(() => onShorten!(minutes))
+  const runRebuild = () => runEdit(() => onRebuild!())
   const runLighter = () => runEdit(() => onLighter!())
 
   /**
@@ -287,6 +292,17 @@ export function WhatHappenedSheet({
 
   const focus = session?.focus ?? plan.find(d => d.day === dayName)?.focus ?? 'session'
   const when = isToday ? 'today' : `${dayName}`
+  /**
+   * The same word, capitalised, for the two places it STARTS a sentence.
+   *
+   * FOUND ON A REAL SCREEN, 16 Sep 2026, by the rebuild driver's screenshot —
+   * "…and I'll tell you which. today is back to the planned session next week."
+   * The shorten copy beside it has read that way since 13 Sep and every source
+   * check passed it, because a lowercase sentence start is not a string any of
+   * them look for. This is what CLAUDE.md means by a browser driver finding
+   * what no `test:` gate can.
+   */
+  const When = isToday ? 'Today' : `${dayName}`
 
   return (
     <Dialog open={!!target} onOpenChange={open => { if (!open) close() }}>
@@ -353,6 +369,9 @@ export function WhatHappenedSheet({
             {verbs.includes('shorten') && (
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('shorten')} data-verb="shorten">I&rsquo;m short of time today</Button>
             )}
+            {verbs.includes('rebuild') && (
+              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('rebuild')} data-verb="rebuild">Give me a different session</Button>
+            )}
             {verbs.includes('lighter') && (
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={runLighter} data-verb="lighter">Make it easier today</Button>
             )}
@@ -364,7 +383,7 @@ export function WhatHappenedSheet({
             <p className="text-sm">How long have you got?</p>
             <p className="text-xs text-muted-foreground">
               Your main lift stays exactly as it is, and so do at least two others. The accessory work at the end
-              comes out until it fits — or until only those are left, whichever comes first. {when} is back to the
+              comes out until it fits — or until only those are left, whichever comes first. {When} is back to the
               full session next week.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -376,6 +395,25 @@ export function WhatHappenedSheet({
               <p className="text-sm text-muted-foreground">This session is already about as short as it gets.</p>
             )}
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
+          </div>
+        )}
+
+        {phase === 'rebuild' && (
+          <div className="space-y-2" data-testid="what-happened-rebuild">
+            <p className="text-sm">A different session, same main lift?</p>
+            {/* SAYS WHAT SURVIVES BEFORE THE TAP, not after. Her ruling is
+                about the progression thread, and someone about to change their
+                whole session needs to know the one thing that is not changing. */}
+            <p className="text-xs text-muted-foreground">
+              Your main lift stays exactly as it is — same weight, same sets — so this week&rsquo;s progression on it
+              is untouched. Everything else gets swapped for something that fits your equipment and injuries.
+              Anything with no real alternative stays put, and I&rsquo;ll tell you which. {When} is back to the
+              planned session next week.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={busy} onClick={runRebuild} data-testid="rebuild-confirm">Rebuild it</Button>
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
+            </div>
           </div>
         )}
 

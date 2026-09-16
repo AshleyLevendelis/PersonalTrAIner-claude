@@ -160,10 +160,21 @@ const READ = String.raw`(() => {
       for (let i = 0; i < 12 && p.parentElement; i++) {
         p = p.parentElement
         const btns = [...p.querySelectorAll('button')].map(b => (b.textContent || '').trim())
-        // The LEAD sentence ("I can stop giving you X for good") sits above the
-        // "Proposed change" heading in the same bubble, so stopping at the
-        // controls alone cuts off the one line naming the exercise.
-        if (btns.some(t => /^Apply/.test(t)) && btns.includes('Keep') && /I can stop giving you/i.test(p.textContent || '')) break
+        // RE-ANCHORED 15 Sep 2026. This used to climb until the container held
+        // the literal old lead, "I can stop giving you" — so when Ashley's
+        // grammar changed that day the loop never broke, the node climbed to
+        // <body>, and 2d-2f read an unrelated scroll fixture from elsewhere on
+        // the page. They reported the ban card as missing its blast-radius line
+        // while the card was correct, and 2a-2c passed throughout, which is
+        // what made it look like a content bug rather than a bad read.
+        //
+        // The lead requirement is GONE rather than re-worded: it was there so
+        // the captured text would include the line naming the exercise, and the
+        // only check that needs that (2c) reads mentionsTarget from the whole
+        // page, not from this slice. 2d-2f test the card's IMPLICATIONS, which
+        // are inside the card. So the innermost ancestor holding the controls
+        // is exactly right, and nothing here encodes a sentence we chose.
+        if (btns.some(t => /^Apply/.test(t)) && btns.includes('Keep')) break
       }
       return p.textContent.replace(/\s+/g, ' ').trim().slice(0, 1200)
     })(),

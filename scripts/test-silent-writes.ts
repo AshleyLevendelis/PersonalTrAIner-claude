@@ -318,5 +318,53 @@ console.log('\n8. The five found by the whole-app audit, 5 Sep 2026')
     /await onSave\(\[\.\.\.values, v\]\)[\s\S]{0,80}setInput\(''\)/.test(profile))
 }
 
+// ---------------------------------------------------------------------------
+// 6. ONE SAVER, NOT A SECOND COPY OF IT
+//
+// Not a silent write, but the shape that produces one. saveScopedEdit exists
+// so the screen's swap and the coach's swap cannot disagree about WHICH weeks
+// reached the database — 'today' is one week, 'permanent' is the rest of that
+// week's block. executeExerciseSwap inlined that branch anyway, byte for byte,
+// under a comment promising it "mirrors handleSwapExercise exactly": a promise
+// nothing checked, on a pair of copies that had already been the subject of
+// one bug.
+//
+// THE PROPERTY IS "ONE", not "this file calls that function" — a check of the
+// second kind is satisfied by the import line and by a copy sitting beside it.
+// So: count the modules that decide weeks from a scope, and require exactly
+// the one whose job that is.
+{
+  console.log('\n6. the scope branch lives in one module')
+  const files = [
+    'src/lib/mesocycle-persistence.ts',
+    'src/lib/pending-action-executor.ts',
+    'src/App.tsx',
+    'src/components/exercise/TodayPanel.tsx',
+    'src/components/ChatAssistant.tsx',
+  ]
+  // The branch, as a property rather than as its text: something tests a
+  // scope against 'today', and something near it filters weeks by
+  // block_number. Either alone is innocent; together they are the copy.
+  const owners = files.filter(f => {
+    const src = stripComments(readFileSync(join(ROOT, f), 'utf8'))
+    return /scope\s*===\s*'today'/.test(src) && /block_number\s*===\s*\w*[Bb]lock/.test(src)
+  })
+  check(`exactly one module decides which weeks a scoped edit saves (found ${owners.length}: ${owners.join(', ') || 'none'})`,
+    owners.length === 1 && owners[0] === 'src/lib/mesocycle-persistence.ts')
+
+  // AND THE DETECTOR IS PROVEN, not trusted: the owner must be found by it,
+  // or "exactly one" could be one false positive and the real thing missed.
+  const owner = stripComments(readFileSync(join(ROOT, 'src/lib/mesocycle-persistence.ts'), 'utf8'))
+  check('...and that module is the one that owns saveScopedEdit',
+    /export async function saveScopedEdit/.test(owner))
+
+  // The swap executor reaches it, rather than having simply dropped the save.
+  const executor = stripComments(readFileSync(join(ROOT, 'src/lib/pending-action-executor.ts'), 'utf8'))
+  const swapBody = executor.slice(executor.indexOf('export async function executeExerciseSwap'),
+    executor.indexOf('export async function', executor.indexOf('export async function executeExerciseSwap') + 10))
+  check('the coach\'s swap still persists, through the shared saver',
+    /saveScopedEdit\s*\(/.test(swapBody), swapBody.length)
+}
+
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll silent-write checks passed.')

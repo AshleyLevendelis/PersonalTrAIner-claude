@@ -54,7 +54,9 @@ it is wrong.
 | `propose_rest_day` | SCREEN | The day menu → "What happened?". |
 | `propose_schedule_change` | SCREEN | Profile → training days. |
 | `propose_session_move` | SCREEN | The day menu → "What happened?". |
+| `propose_cardio_session` | SCREEN | "Make this a cardio day" on the rest / recovery card, since 15 Sep 2026. Same executor as the coach confirm, so both write the rest of the block. |
 | `propose_session_shorten` | SCREEN | The day menu, since 13 Sep 2026. |
+| `propose_session_rebuild` | SCREEN | The day menu, since 16 Sep 2026 — "Give me a different session". Ashley's ruling that day: the main lift is kept, everything else rebuilt around it. |
 | `propose_style_change` | SCREEN | Profile → training style. |
 | `propose_volume_change` | SCREEN | The workout card's volume control. |
 | `record_context_fact` | SCREEN | Profile → Memory. |
@@ -66,8 +68,31 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**None, as of 14 Sep 2026.** Banning an exercise was the last one and closed
-that day. This section exists so the answer stays written down rather than
+**One, as of 15 Sep 2026.**
+
+- **Saying something feels tight before a session.** Eight areas as taps on the
+  Exercise screen; up to three mobility drills go into today's warm-up. There
+  is no coach path. CORRECTED 15 Sep 2026: this section said "None, as of 14
+  Sep 2026" and stayed saying it while the tightness feature shipped
+  screen-only THE NEXT DAY — the doc's own closing instruction ("if a screen
+  control is added without a coach path, it belongs here with a reason") was
+  not followed by the person adding it, which was me.
+  **The reason recorded in CLAUDE.md for having no coach path was wrong**, and
+  is corrected there too: it said the answer "lives in a store the edge
+  function cannot reach". The edge function reaches no store on this rail —
+  every `propose_*` tool returns an intent and the BROWSER writes, and the
+  coach is already inside that same store via `declareOffPlan`. The real
+  obstacles are smaller and different: the answer can only ever be TODAY (the
+  record is keyed to one date), a coach-set answer would silently open a
+  session (`patchRecord` defaults `status: 'running'`), and the pain boundary
+  is enforced only on the screen today.
+  **`test:coach-parity` STRUCTURALLY CANNOT catch this class.** §1 derives its
+  universe from tools DECLARED in the edge function, so a screen feature with
+  no tool is invisible to it, and §4 only checks this section is non-empty —
+  `**None,` satisfies it forever. That hole is named, not fixed.
+
+Banning an exercise was the previous entry and closed 14 Sep 2026. This
+section exists so the answer stays written down rather than
 recounted from scratch each time; if a screen control is added without a coach
 path, it belongs here with a reason.
 

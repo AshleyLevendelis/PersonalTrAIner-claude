@@ -123,8 +123,12 @@ check('...nor undoes a water log', !/undoWaterLog|undoLog\(/.test(nutrition))
 // is measured against. Losing this would make the move a deletion.
 check('...but still sets the water target', /setWaterTargetMl/.test(nutrition))
 check('...from a control the user can reach', /setEditingWaterTarget\(true\)/.test(nutrition))
+// RE-ANCHORED 15 Sep 2026: this named getAllLogs, which no longer exists —
+// the read is bounded to one date now, because the old one downloaded every
+// row a person had ever logged. The PROPERTY is that Nutrition still reads
+// the day's water from the water store, whatever the reader is called.
 check('...and still READS the day, or the H2O ring would show nothing',
-  /getAllWaterLogs|getAllLogs as getAllWaterLogs/.test(nutrition))
+  /from '@\/lib\/water-store'/.test(nutrition) && /WaterLogs?ForDate|getLogsForDate/.test(nutrition))
 
 console.log('\n4. Water is one colour everywhere — status never follows the accent\n')
 check('Home draws water in --chart-3, not the mint accent', /--chart-3/.test(home))

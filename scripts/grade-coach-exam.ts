@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { hardRuleViolations, realTabNames, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
+import { hardRuleViolations, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
 import { coachFingerprint } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
@@ -124,8 +124,13 @@ interface Marked {
   judgeError: string | null
 }
 
+// A CARD IS SHOWN, NOT SWALLOWED. Both the judge and the report read this, and
+// before 16 Sep 2026 both were handed "(no text at all)" for the coach's best
+// turns — the judge would have marked an honest offer as a non-answer on every
+// dimension at once. coachLine is shared with the hard rules so there is one
+// answer to "what did the coach do on this turn".
 function renderTranscript(t: Transcript): string {
-  return t.turns.map(x => `USER:  ${x.user}\nCOACH: ${x.reply || '(no text at all)'}`).join('\n\n')
+  return t.turns.map(x => `USER:  ${x.user}\nCOACH: ${coachLine(x)}`).join('\n\n')
 }
 
 async function main() {

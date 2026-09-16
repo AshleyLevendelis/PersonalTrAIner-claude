@@ -12,6 +12,7 @@
 // guard against double-execution, that's the claim's job.
 // ---------------------------------------------------------------------------
 
+import { didNotSave } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
@@ -20,8 +21,9 @@ import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
 import { settleWeek } from './settle-week'
+import { rebuildDayAroundMainLift } from './session-rebuild'
 import { shortenDayTo } from './exercise-plan'
-import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
@@ -88,20 +90,18 @@ export async function executeExerciseSwap(
   }
 
   try {
-    if (payload.scope === 'today') {
-      const week = updatedMesocycle.find(w => w.week_number === payload.weekNumber)
-      if (week) await saveMesocycleWeek(profile.id, week)
-    } else {
-      const touchedBlock = updatedMesocycle.find(w => w.week_number === payload.weekNumber)?.block_number
-      const touchedWeeks = updatedMesocycle.filter(w => w.block_number === touchedBlock && w.week_number >= payload.weekNumber)
-      await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
-    }
+    // ONE SAVER. This inlined the scope branch that saveScopedEdit exists to
+    // own — a byte-for-byte copy of it, under a comment promising it "mirrors
+    // handleSwapExercise exactly", which is a promise nothing checked. The
+    // other three executors in this file already call the shared one. No
+    // behaviour changes here; what goes is the second copy that could drift.
+    await saveScopedEdit(profile.id, updatedMesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseSwap: persisting swap failed', err)
     return {
       mesocycle: updatedMesocycle,
       preImage,
-      receipt: { landed: [], failed: [{ op: 'save', error: 'The swap could not be saved — try again' }] },
+      receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The swap') }] },
     }
   }
 
@@ -189,7 +189,7 @@ export async function executeExerciseRemove(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseRemove: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return {
     mesocycle: result.mesocycle, preImage,
@@ -258,7 +258,7 @@ export async function executeExerciseAdd(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseAdd: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return {
     mesocycle: result.mesocycle, preImage,
@@ -368,7 +368,7 @@ export async function executeExerciseReorder(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseReorder: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   const where = payload.neighbourName ? ` — now ${payload.placement ?? 'next to'} ${payload.neighbourName}` : ''
   return {
@@ -552,7 +552,7 @@ export async function applyMealOptionToSlot(
   // from the insert, so this removes the row it wrote and never a same-named
   // meal that was already there.
   await undoMealAddition(profileId, payload, result.poolIndex)
-  return { receipt: { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }, poolIndex: null }
+  return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The meal') }] }, poolIndex: null }
 }
 
 /**
@@ -653,7 +653,7 @@ export async function executeMealMove(
           op: 'propose_meal_move',
           error: done.length > 0
             ? "The swap didn't save, so nothing moved — your meals are as they were"
-            : "The move didn't save — try again",
+            : didNotSave('The move'),
         }],
       }
     }
@@ -728,7 +728,7 @@ export async function executeInjuryAdaptation(
     await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeInjuryAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
@@ -816,7 +816,7 @@ export async function executeLastingInjury(
     }
   } catch (err) {
     console.error('executeLastingInjury: persisting failed', err)
-    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
 
   return {
@@ -862,7 +862,7 @@ export async function executeInjuryRecovered(
     await updateProfileField(profile.id, { injuries: profile.injuries.filter(i => i !== payload.injuryCode) })
   } catch (err) {
     console.error('executeInjuryRecovered: persisting failed', err)
-    return { receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+    return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return { receipt: { landed: [`Injuries: removed ${payload.injuryCode.replace('_', ' ')}`], failed: [] } }
 }
@@ -887,7 +887,7 @@ export async function executeEquipmentAdaptation(
     await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeEquipmentAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
@@ -1022,7 +1022,162 @@ export async function executeSessionShorten(
   )
 
   try { if (profile.id) await saveMesocycleWeek(profile.id, settled.week) }
-  catch { failed.push({ op: 'save', error: "That didn't save — try again in a moment." }) }
+  catch { failed.push({ op: 'save', error: didNotSave('That') }) }
+
+  return { mesocycle: next, preImage, receipt: { landed, failed } }
+}
+
+export interface SessionRebuildPayload {
+  weekNumber: number
+  dayName: string
+  /** The compiled exclusion list, resolved by the caller that has it. */
+  exclusions: string[]
+  reason?: string
+}
+
+/**
+ * "GIVE ME A DIFFERENT SESSION TODAY", from the coach — 16 Sep 2026.
+ *
+ * The mirror of TodayPanel's rebuildToday, and deliberately the same steps in
+ * the same order. Ashley's ruling: the main lift is kept exactly as it is and
+ * everything else is rebuilt around it.
+ *
+ * UNLIKE executeSessionShorten ABOVE, this does NOT call settleWeek itself —
+ * rebuildDayAroundMainLift runs it internally, because a rebuild has to settle
+ * between the replacements and the result rather than after. Calling it twice
+ * would be harmless and misleading; calling it here and not there would be a
+ * second place to keep in step.
+ *
+ * WHAT IT COULD NOT DO IS IN THE RECEIPT. A rebuild that quietly kept three
+ * slots and reported success is the defect this file's own §6 exists to stop.
+ */
+export async function executeSessionRebuild(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: SessionRebuildPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const result = await rebuildDayAroundMainLift({
+    mesocycle,
+    profile,
+    weekNumber: payload.weekNumber,
+    dayName: payload.dayName,
+    exclusions: payload.exclusions,
+  })
+  if (!result.changed) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'rebuild', error: result.refusal ?? "I couldn't rebuild that one." }] } }
+  }
+
+  landed.push(
+    `${payload.dayName}: ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed` +
+    (result.mainLift ? `, ${result.mainLift} untouched` : '') +
+    (result.kept.length > 0 ? ` — ${result.kept.map(k => k.name).join(', ')} stayed, nothing else fits ${result.kept.length === 1 ? 'that slot' : 'those slots'}` : ''),
+  )
+
+  const settledWeek = result.mesocycle.find(w => w.week_number === payload.weekNumber)
+  try { if (profile.id && settledWeek) await saveMesocycleWeek(profile.id, settledWeek) }
+  catch { failed.push({ op: 'save', error: didNotSave('That') }) }
+
+  return { mesocycle: result.mesocycle, preImage, receipt: { landed, failed } }
+}
+
+export interface CardioSessionPayload {
+  weekNumber: number
+  dayName: string
+  activity: string
+  minutes: number
+  targetRpe: number
+  reason?: string
+  /** 'today' writes the live week only; 'permanent' carries it to the rest of the block. */
+  scope: 'today' | 'permanent'
+}
+
+/**
+ * PUTS A CARDIO SESSION ON A DAY, as part of the plan.
+ *
+ * Ashley, 15 Sep 2026: *"I want when it adds a session like a cardio session
+ * that it's actually a useful card like other workouts not empty."*
+ *
+ * It writes a `PlannedActivity`, which is the shape three screens learned to
+ * render earlier the same day — the card on Today, the week list, tomorrow's
+ * preview. That ordering was the point: a card that cannot be rendered must
+ * not be offered, and before that fix this would have produced exactly the
+ * blank "log a walk or other activity" box she reported.
+ *
+ * IT REFUSES A DAY THAT ALREADY HAS LIFTING ON IT. `plannedActivity` means
+ * "this activity is the WHOLE day" (types.ts says so), so writing one onto a
+ * day holding exercises would make "is this the session or an extra?"
+ * unanswerable from the data — and the screens, which lead with the
+ * prescription, would hide the lifting behind it. Adding cardio AFTER a lift
+ * is what `recommendedCardio` already means and is a different request.
+ */
+export async function executeCardioSession(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: CardioSessionPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const week = mesocycle.find(w => w.week_number === payload.weekNumber)
+  if (!week) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: "I can't see that week on your plan just now." }] } }
+  }
+  const day = week.days.find(d => d.day === payload.dayName)
+  if (!day) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: `I couldn't find ${payload.dayName} on your plan.` }] } }
+  }
+  if (day.exercises.length > 0) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed, failed: [{ op: 'add', error: `${payload.dayName} already has a session on it.` }] },
+    }
+  }
+
+  const withActivity = (w: MesocycleWeek): MesocycleWeek => ({
+    ...w,
+    days: w.days.map(d => d.day !== payload.dayName ? d : {
+      ...d,
+      focus: payload.activity,
+      is_scheduled: true,
+      // THE SUGGESTION GOES WHEN THE PRESCRIPTION ARRIVES. recommendedCardio
+      // is an add-on the generator offers for an empty day; once the day HAS a
+      // session, leaving it would be two prescriptions on one day and no way
+      // to tell which is which.
+      recommendedCardio: undefined,
+      plannedActivity: {
+        activity: payload.activity,
+        duration: payload.minutes,
+        targetRpe: payload.targetRpe,
+        ...(payload.reason ? { reason: payload.reason } : {}),
+      },
+    }),
+  })
+
+  // THE SAME ANSWER THE SAVER USES, asked rather than re-derived. This had its
+  // own copy of the scope branch until test:silent-writes §6 — written earlier
+  // the same day, after the swap path was found with THREE copies of it — went
+  // red on this file. A caller that changes a run of weeks and a saver that
+  // writes a run of weeks must not disagree about which run.
+  const touched = new Set(weeksTouchedByScope(mesocycle, payload.weekNumber, payload.scope).map(w => w.week_number))
+  const next = mesocycle.map(w => (touched.has(w.week_number) ? withActivity(w) : w))
+
+  landed.push(`${payload.dayName}: ${payload.activity}, ${payload.minutes} min at RPE ${payload.targetRpe}`)
+
+  if (!profile.id) {
+    return { mesocycle: next, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await saveScopedEdit(profile.id, next, payload.weekNumber, payload.scope)
+  } catch (err) {
+    console.error('executeCardioSession: persisting failed', err)
+    return { mesocycle: next, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That session') }] } }
+  }
 
   return { mesocycle: next, preImage, receipt: { landed, failed } }
 }

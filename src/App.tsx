@@ -1,3 +1,4 @@
+import { couldNot, targetsMoved } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,7 @@ import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, cl
 import { GroceryScreen } from '@/components/GroceryScreen'
 import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
 import { supabase } from '@/lib/supabase'
-import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
@@ -1002,8 +1003,13 @@ function App() {
     // one ever) is the one-time "your target changed" notice trigger.
     snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, effectiveTargetWeight.weightKg)
       .then(result => {
-        if (result.changedFromPrior) {
-          setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${liveTargets!.calories} kcal, based on your recent weigh-ins.` }])
+        // ONE SENTENCE, FROM THE PHRASEBOOK. This and its twin below were two
+        // hand-written copies of the same line, naming only calories and only
+        // the new figure. targetsMoved returns null when nothing actually
+        // moved, so the notice cannot fire on a change that did not happen.
+        const moved = result.previous && liveTargets ? targetsMoved(result.previous, liveTargets) : null
+        if (result.changedFromPrior && moved) {
+          setAdaptationMessages(prev => [...prev, { text: moved }])
         }
       })
   }
@@ -1205,7 +1211,7 @@ function App() {
       // setupError, not authError: this is the onboarding screen's own error
       // surface, which is where the person actually is when it happens.
       setSetupError(
-        "We couldn't start your account, so there was nowhere to save your plan. " +
+        `${couldNot('start your account')} There was nowhere to save your plan. ` +
         `Check your connection and try again — nothing was lost. (${signIn.error ?? 'no session'})`,
       )
       return
@@ -1702,11 +1708,11 @@ function App() {
         setMealRegenerateError(
           result.generatorReached
             ? (hadExistingOptions
-                ? `Couldn't fit a new ${MEAL_SLOT_LABEL[slot]} option — kept your existing one. Try loosening a restriction or widening your calorie range.`
+                ? `${couldNot(`fit a new ${MEAL_SLOT_LABEL[slot]} option`)} I've kept your existing one — try loosening a restriction or widening your calorie range.`
                 : `${MEAL_SLOT_LABEL[slot]} doesn't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off this slot.`)
             : (hadExistingOptions
-                ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
-                : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`)
+                ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
+                : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`)
         )
         return
       }
@@ -1717,8 +1723,8 @@ function App() {
     } catch {
       setMealRegenerateError(
         hadExistingOptions
-          ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
-          : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`
+          ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
+          : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`
       )
     } finally {
       setIsGeneratingMeals(false)
@@ -1767,7 +1773,7 @@ function App() {
         setMealRegenerateError(
           result.generatorReached
             ? "Nothing fits your current targets right now. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot — then regenerate."
-            : "Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment."
+            : `${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`
         )
         return
       }
@@ -1797,12 +1803,12 @@ function App() {
         const keptSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) > 0)
         const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
         const parts: string[] = []
-        if (keptSlots.length > 0) parts.push(`Couldn't fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept what you had.`)
+        if (keptSlots.length > 0) parts.push(`${couldNot(`fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')}`)} I've kept what you had.`)
         if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} don't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off a slot.`)
         setMealRegenerateError(parts.join(' '))
       }
     } catch {
-      setMealRegenerateError("Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment.")
+      setMealRegenerateError(`${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`)
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -1885,7 +1891,7 @@ function App() {
       console.error('Weight-basis rebuild failed:', err)
       setAdaptationMessages(prev => [
         ...prev.filter(m => m.weightBasisOfferId !== id),
-        { text: "Couldn't rebuild your plan just then — nothing was changed. Try again in a moment." },
+        { text: `${couldNot('rebuild your plan just then')} Nothing was changed — try again in a moment.` },
       ])
     } finally {
       setLoadSuggestionBusy(null)
@@ -1987,7 +1993,7 @@ function App() {
       await reloadMemory(profile.id)
     } catch (err) {
       console.error('Recording the ban failed:', err)
-      setWriteError(`Couldn't save that — ${exerciseName} hasn't been removed. Check your connection and try again.`)
+      setWriteError(`${couldNot('save that')} ${exerciseName} hasn't been removed — check your connection and try again.`)
       return
     }
     setWriteError(null)
@@ -2044,19 +2050,14 @@ function App() {
 
     if (!profile.id) return
     try {
-      if (scope === 'today') {
-        const week = updatedMesocycle.find(w => w.week_number === weekNumber)
-        if (week) await saveMesocycleWeek(profile.id, week)
-      } else {
-        // 'permanent' touches every remaining week of the current block —
-        // still a handful of rows, cheap enough to upsert individually
-        // rather than resaving the whole mesocycle.
-        const touchedBlock = updatedMesocycle.find(w => w.week_number === weekNumber)?.block_number
-        const touchedWeeks = updatedMesocycle.filter(
-          w => w.block_number === touchedBlock && w.week_number >= weekNumber
-        )
-        await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
-      }
+      // THE THIRD COPY OF THIS BRANCH, removed 15 Sep 2026. saveScopedEdit
+      // was extracted to own it precisely so the screen's swap and the
+      // coach's could not disagree about which weeks reached the database —
+      // and then both kept their own copy anyway, the executor's under a
+      // comment promising it "mirrors handleSwapExercise exactly". This was
+      // the original the other two claimed to mirror. Identical behaviour:
+      // 'today' is one week, 'permanent' is the rest of that week's block.
+      await saveScopedEdit(profile.id, updatedMesocycle, weekNumber, scope)
       // VISION-ARCHITECTURE.md §2.3 — "after any tap mutation, sweep pending
       // proposals on the same target and mark them stale immediately, so
       // the user never taps Confirm on a card invalidated by their own tap
@@ -2136,7 +2137,7 @@ function App() {
       )
       const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek)
       if (!result.ok || !result.mesocycle) {
-        setWriteError(result.error ?? "Couldn't rebuild your plan just now — nothing has changed.")
+        setWriteError(result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`)
         return
       }
       const previous = mesocycle
@@ -2350,8 +2351,9 @@ function App() {
     const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
     setMacros(targets)
     snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
-      if (result.changedFromPrior) {
-        setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${targets!.calories} kcal, based on your recent weigh-ins.` }])
+      const moved = result.previous && targets ? targetsMoved(result.previous, targets) : null
+      if (result.changedFromPrior && moved) {
+        setAdaptationMessages(prev => [...prev, { text: moved }])
       }
     })
 
@@ -2416,7 +2418,7 @@ function App() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-4 text-center">
-          <h2 className="text-lg font-semibold">We couldn't sign you in</h2>
+          <h2 className="text-lg font-semibold">I couldn't sign you in</h2>
           {/* The message depends on WHAT failed. Blaming the connection for a
               server setting sends someone to check their wifi over something
               only a dashboard toggle can fix — and offers a Try again button
@@ -2479,7 +2481,7 @@ function App() {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <div className="max-w-md w-full space-y-4 text-center">
-            <h2 className="text-lg font-semibold">We couldn't finish setting up your plan</h2>
+            <h2 className="text-lg font-semibold">I couldn't finish setting up your plan</h2>
             <p className="text-sm text-muted-foreground break-words">{setupError}</p>
             <Button className="w-full" onClick={() => setSetupError(null)}>
               Try again

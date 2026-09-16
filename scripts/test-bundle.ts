@@ -81,7 +81,28 @@ console.log('\n1. The libraries are cached separately from the app')
   // Ashley's ruling, from three options: take the coach off the first-paint
   // path rather than raise the ceiling a second time. Measured 248; 256 keeps
   // the same ~8 kB of headroom this file has always allowed.
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 256, appGzip)
+  //
+  // MOVED 15 Sep 2026: 256 -> 264, on Ashley's ruling from three options —
+  // raise it, with the real number written in. She rejected clawing back the
+  // kilobyte (the cost IS the feature: eighteen coach cards that now speak)
+  // and rejected leaving the check red (a permanently red check teaches people
+  // to scroll past red). It does NOT reverse her 14 Sep ruling: the coach
+  // stays off the first-paint path, which is the check below and still has
+  // room.
+  //
+  // AND THE PART WORTH READING, WHICH IS NOT THE KILOBYTE. Every move of this
+  // number has claimed "~8 kB of headroom over a measured value" — 284 -> 292,
+  // then 248 -> 256. Measured on a clean worktree of 7d6c7e6 on 15 Sep, the
+  // real baseline was 255, not 248: the app had grown 7 kB since 14 Sep and
+  // the headroom had gone from 8 kB to 1 kB WITH NOTHING SAYING SO, because a
+  // ceiling only speaks when it is crossed. The comment went on claiming 8 kB
+  // the whole time. So the voice work's 1 kB was the last straw, not the cause,
+  // and the number below is 8 kB over a value measured TODAY (256) rather than
+  // over one inherited from a note.
+  //
+  // Treat the stated headroom as a lead, not a fact: it decays silently, and
+  // the app-chunk budget below is doing the same thing right now (918 of 920).
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 264, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -194,7 +215,32 @@ console.log('\n3. Nothing has crept back up')
   // is to raise the budget instead of doing the deferring. 920 restores real
   // room while still sitting well under the 921 this batch would have cost
   // unsplit.
-  const APP_CHUNK_BUDGET_KB = 920
+  // 15 Sep 2026: 920 -> 940, on Ashley's ruling from three options — raise it
+  // with room to grow, over keeping it and trimming every time (which is what
+  // she chose on 14 Sep, above) and over deferring the plan-BUILDING engine.
+  //
+  // THE NUMBERS, MEASURED ON CLEAN WORKTREES RATHER THAN INFERRED — the note
+  // above is exactly why:
+  //     ad1dd46, before the cardio work   917 kB
+  //     b43edde, the cardio work inline   921 kB   (over the 920 ceiling)
+  //     b43edde with the form deferred    920 kB   (green, zero headroom)
+  // The deferral happened anyway and is not part of this raise: every other
+  // sheet in this app is its own chunk and AddCardioSessionSheet was the odd
+  // one out. But 920-under-920 is the same trap the 14 Sep note names, one
+  // more turn of the screw, so the ceiling moves on top of the deferral rather
+  // than instead of it.
+  //
+  // 940 IS 20 kB ABOVE TODAY'S MEASURED 920, and 20 is what "room to grow"
+  // means here — the 13 Sep entry above used ~14, the one below ~8, and both
+  // were spent within two days. RECORD THE MEASURED VALUE, NOT THE NOTE'S: the
+  // BACKLOG said 918 and a clean build said 917.
+  //
+  // What this does NOT relax, and the reason it is safe to move: the number
+  // that decides how fast the app opens is the FIRST-PAINT figure in §2b, not
+  // this one. That is 411 kB gzipped against 483 before the coach was deferred,
+  // and it has its own check. This budget is a proxy for it and a brake on
+  // drift, not the user-facing measurement.
+  const APP_CHUNK_BUDGET_KB = 940
   const app = find('index-')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
     !!app && app.raw < APP_CHUNK_BUDGET_KB * 1024, app ? kb(app.raw) : null)
@@ -278,7 +324,33 @@ console.log('\n3. Nothing has crept back up')
   //
   // 1,895 restores the ~16 kB of headroom this line is supposed to carry.
   // Prior totals are not comparable to later ones across this line.
-  const TOTAL_BUDGET_KB = 1895
+  //
+  // 1,895 -> 1,915, 16 Sep 2026, ASHLEY'S RULING from three options: move the
+  // line and write in the real number, over trimming to fit (what she chose on
+  // 14 Sep for the app chunk) and over tightening it further. Her reason for
+  // not trimming this time is the one this comment block already argues: the
+  // numbers that decide how fast the app OPENS all still have room, and this
+  // line is the early warning, not the speed.
+  //
+  // MEASURED 16 Sep, both ends, on real builds rather than inferred:
+  //     ff31d09, before this session's work   total 1888   app 920   paint 411
+  //     9c62e7b, after it                     total 1895   app 924   paint 413
+  // (ff31d09 was measured on a clean detached worktree, not by stashing.)
+  // +7 kB for a session rebuild on both surfaces and a target-change notice
+  // that says what the numbers moved FROM. 1,915 is 20 above the 1,895
+  // measured TODAY.
+  //
+  // AND THE 16 kB CLAIM ABOVE WAS ALREADY FALSE WHEN THIS TRIPPED. It was
+  // written against a measured 1,879 on 15 Sep; by the end of that same night
+  // the cardio work had taken it to 1,888, so 9 of the 16 were gone before
+  // this session opened a file — with nothing saying so, because a ceiling
+  // only speaks when it is crossed. That is the THIRD time a note in this file
+  // has gone on quoting headroom it no longer had, and the second time in two
+  // days. The rule is already written at the top of the app-chunk block and in
+  // CLAUDE.md; what this entry adds is that writing the rule down has not yet
+  // stopped it happening. Anyone raising this line again: measure BOTH ends
+  // first, and assume the last note's figure is stale.
+  const TOTAL_BUDGET_KB = 1915
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
 

@@ -9,6 +9,7 @@ import { getLoggedPlanDays } from '@/lib/exercise-history'
 import { weekNoteText } from '@/lib/week-note'
 import { weekDelta } from '@/lib/week-delta'
 import { weekRole } from '@/lib/week-role'
+import { prescriptionLine } from '@/lib/activity-day'
 import { shortPhaseLabel } from '@/lib/periodization'
 import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { WarmupSection } from './WarmupSection'
@@ -408,8 +409,16 @@ export function ProgramBrowse({
             : isRest
             ? 'Sleep, hydration, and your baseline nutrition targets.'
             : isActiveRecovery
-              ? (workout?.recommendedCardio
-                  ? `${workout.recommendedCardio.activity} · ${workout.recommendedCardio.duration} min @ RPE ${workout.recommendedCardio.targetRpe}`
+              // A PRESCRIBED ACTIVITY OUTRANKS A FINISHER HERE. When the day's
+              // whole plan is a walk, plannedActivity IS the session and
+              // recommendedCardio is at most an extra bolted on — reading the
+              // add-on first (or, with neither, calling a prescribed 20-minute
+              // walk "light movement and mobility") is the browse-list version
+              // of the empty card on Today.
+              ? (workout?.plannedActivity
+                  ? prescriptionLine(workout.plannedActivity)
+                  : workout?.recommendedCardio
+                  ? prescriptionLine(workout.recommendedCardio)
                   : 'Light movement and mobility.')
               : null
 
@@ -538,7 +547,7 @@ export function ProgramBrowse({
                   {/* Day-level notes the old cards carried — kept, quietly. */}
                   {workout.recommendedCardio && (
                     <p className="text-xs text-muted-foreground">
-                      {workout.recommendedCardio.activity} · {workout.recommendedCardio.duration} min @ RPE {workout.recommendedCardio.targetRpe}
+                      {prescriptionLine(workout.recommendedCardio)}
                       {workout.recommendedCardio.timing === 'post_session' ? ' — after the lifting' : ''}
                     </p>
                   )}

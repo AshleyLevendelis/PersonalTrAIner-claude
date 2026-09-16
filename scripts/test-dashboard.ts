@@ -44,6 +44,8 @@ function cmp(a: unknown, b: unknown): number {
 
 /** Per-table read counter — the round trips this file's §6 exists to count. */
 const queryCounts: Record<string, number> = {}
+/** Per-table record of the last `.in('date', …)` list — see the DST section. */
+const lastDateIn: Record<string, string[]> = {}
 
 function fakeFrom(table: string) {
   queryCounts[table] = (queryCounts[table] ?? 0) + 1
@@ -103,7 +105,13 @@ function fakeFrom(table: string) {
     update: (obj: Row) => { op = 'update'; updateObj = obj; return api },
     delete: () => { op = 'delete'; return api },
     eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return api },
-    in: (c: string, vs: unknown[]) => { filters.push(r => vs.includes(r[c])); return api },
+    in: (c: string, vs: unknown[]) => {
+      // RECORDED, so a check can ask what date range the caller actually asked
+      // for. The DST section below is about the DATES a day-walk produces, and
+      // the only place they become observable is the query they are passed to.
+      if (c === 'date') lastDateIn[table] = vs.map(String)
+      filters.push(r => vs.includes(r[c])); return api
+    },
     is: (c: string, v: unknown) => { filters.push(r => (v === null ? r[c] == null : r[c] === v)); return api },
     gte: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) >= 0); return api },
     lte: (c: string, v: unknown) => { filters.push(r => cmp(r[c], v) <= 0); return api },
@@ -133,7 +141,7 @@ async function main() {
   const { computeStreak } = await import('../src/lib/streak')
   const { selectCoachTip } = await import('../src/lib/coach-tips')
   const { computeWeightTrend } = await import('../src/lib/weight-trend')
-  const { setWaterTargetMl, logWater, getAllLogs, getTotalForDate, flushPending } = await import('../src/lib/water-store')
+  const { setWaterTargetMl, logWater, getLogsForDate, getTotalForDate, flushPending } = await import('../src/lib/water-store')
   const { loadDashboardData } = await import('../src/lib/dashboard-data')
 
   // ---- 1. Streak: rest days counted correctly -------------------------------
@@ -237,8 +245,41 @@ async function main() {
   await flushPending()
   const total = await getTotalForDate(profileId, '2026-01-15')
   check('water total is a plain sum over logged entries (300 + 200 = 500)', total === 500, total)
-  const logs = await getAllLogs(profileId)
+  const logs = await getLogsForDate(profileId, '2026-01-15')
   check('both log rows synced to the fake DB via the local-first flush', db.water_logs.filter(r => r.profile_id === profileId).length === 2, logs)
+
+  // THE READ IS BOUNDED TO THE DAY, 15 Sep 2026. It used to be
+  // `select('*').eq('profile_id', …)` with no date bound: both callers pulled
+  // every row a person had ever logged and then filtered to one day. A year of
+  // four glasses a day is 1,400 rows re-downloaded to draw one ring.
+  //
+  // BEHAVIOURAL, not a source grep: a second day is logged and the reader is
+  // asked for the first. A reader that still fetched everything would come
+  // back with three rows.
+  logWater({ profileId, date: '2026-01-16', amountMl: 750, source: 'manual' })
+  await flushPending()
+  const dayOne = await getLogsForDate(profileId, '2026-01-15')
+  check('reading one day returns only that day, not the whole history',
+    dayOne.length === 2 && dayOne.every(l => l.date === '2026-01-15'), dayOne.map(l => l.date))
+  check('...and the other day is genuinely there to have been returned',
+    db.water_logs.filter(r => r.profile_id === profileId).length === 3,
+    db.water_logs.filter(r => r.profile_id === profileId).map(r => r.date))
+  check('...so the total for that day is unaffected by the next one',
+    (await getTotalForDate(profileId, '2026-01-15')) === 500)
+  check('...and the next day reads on its own', (await getTotalForDate(profileId, '2026-01-16')) === 750)
+
+  // AND THE PENDING QUEUE IS BOUNDED THE SAME WAY. The local-first write lands
+  // in the queue before it reaches the server, and the merge used to fold in
+  // EVERY pending op for the profile — so a day read while another day's write
+  // was still in flight came back with a row it never asked for. Not flushed
+  // here on purpose: unflushed is the only state in which this can be seen.
+  logWater({ profileId, date: '2026-01-17', amountMl: 999, source: 'manual' })
+  const stillDayOne = await getLogsForDate(profileId, '2026-01-15')
+  check('a pending write on another day does not leak into this one',
+    stillDayOne.length === 2 && stillDayOne.every(l => l.date === '2026-01-15'), stillDayOne.map(l => l.date))
+  check('...and that pending write is genuinely there, on its own day',
+    (await getLogsForDate(profileId, '2026-01-17')).some(l => l.amount_ml === 999))
+  await flushPending()
 
   // ---- 4. Calories-in matches the ledger (direct passthrough) -----------------
   console.log('\n[3b] the home screen asks for ONE weight, not two')
@@ -450,6 +491,82 @@ async function main() {
     const proteinComponent = result.consistency?.components.find(c => c.label === 'protein days')
     check('the protein component counts the plan week\'s prior days', proteinComponent?.outOf === 3, result.consistency)
     check('...and only the ones that actually hit the target', proteinComponent?.done === 2, proteinComponent)
+  }
+
+  // ---- 7. A DAY IS NOT ALWAYS 86,400,000 MILLISECONDS -----------------------
+  //
+  // dashboard-data walked days by adding or subtracting a fixed day in three
+  // places: tomorrow, the 35-day streak input and the 14-day protein window.
+  // A day is 23 or 25 hours long when the clocks move, so a fixed step taken
+  // near midnight either repeats a date or skips one — silently, in the input
+  // to a streak. The UK clocks go back on 25 Oct 2026 and forward on 29 March
+  // 2026, both inside the life of this app.
+  //
+  // THE THREE FIXTURES BELOW WERE MEASURED, NOT REASONED. The drift only bites
+  // when the wall clock is within an hour of midnight, and which side depends
+  // on which way the clocks moved and which way the walk runs. The old code's
+  // actual output at each of these, under Europe/London:
+  //
+  //   26 Oct 23:30, walking back : 25th, 25th, 24th   (a day counted twice)
+  //   30 Mar 00:30, walking back : 28th, 27th, 26th   (the 29th never appears)
+  //   28 Mar 23:30, one day on   : Monday the 30th    (Sunday skipped entirely)
+  //
+  // At 00:30 on the 26th, or 23:30 on the 30th, the same code is correct —
+  // which is why this needed measuring rather than a plausible-looking date.
+  //
+  // BEHAVIOURAL, not a source grep: the protein window's dates are observable
+  // because they are passed to the query, and tomorrow is observable through
+  // the label Home renders.
+  console.log('\n[7] day walks survive a clock change')
+  {
+    const tzBefore = process.env.TZ
+    process.env.TZ = 'Europe/London'
+    const DST_PROFILE = 'dst-profile'
+    const dstTargets = { calories: 2000, protein: 100, carbs: 200, fat: 60 }
+    const dstProfile = { id: DST_PROFILE, created_at: '2026-01-01T00:00:00Z' } as never
+    const planWith = (trainingDay: string) =>
+      ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => ({
+        day, focus: day === trainingDay ? 'Upper Body' : 'Rest',
+        exercises: day === trainingDay
+          ? [{ name: 'Bench Press', sets: 3, reps: '8-10', rest_seconds: 120, intensity: 'RPE 7' }]
+          : [],
+      })) as never
+    const loadAt = (todayStr: string, dayName: string, nowLocal: string, trainingDay: string) =>
+      loadDashboardData({
+        profile: dstProfile, macros: dstTargets, exercisePlan: planWith(trainingDay), mesocycle: [],
+        planCreatedAt: '2026-01-01T00:00:00Z', todayLogs: [], liveWeek: 1,
+        dayName, todayStr, now: new Date(nowLocal),
+      })
+
+    // (a) CLOCKS BACK, walking backwards — the day is counted twice.
+    await loadAt('2026-10-26', 'Monday', '2026-10-26T23:30:00', 'Tuesday')
+    const autumn = lastDateIn.meal_events ?? []
+    check('the 14-day protein window really is fourteen days', autumn.length === 14, autumn)
+    check('...every one of them a different date', new Set(autumn).size === 14, autumn)
+    check('...the day the clocks went back appears exactly once',
+      autumn.filter(d => d === '2026-10-25').length === 1, autumn)
+    check('...and they run back from yesterday without a gap',
+      autumn[0] === '2026-10-25' && autumn[13] === '2026-10-12', { first: autumn[0], last: autumn[13] })
+
+    // (b) CLOCKS FORWARD, walking backwards — the day vanishes.
+    await loadAt('2026-03-30', 'Monday', '2026-03-30T00:30:00', 'Tuesday')
+    const spring = lastDateIn.meal_events ?? []
+    check('the same holds when the clocks go forward', new Set(spring).size === 14, spring)
+    check('...and the day they changed is not missing from the window',
+      spring.includes('2026-03-29'), spring)
+    check('...the window still starts at yesterday', spring[0] === '2026-03-29', spring[0])
+
+    // (c) ONE DAY FORWARD, across the spring change — tomorrow skipped a day.
+    const eve = await loadAt('2026-03-28', 'Saturday', '2026-03-28T23:30:00', 'Sunday')
+    check('tomorrow is the next calendar day, not the next 24 hours',
+      eve.tomorrowLabel === 'Tomorrow: Upper Body · 1 exercise', eve.tomorrowLabel)
+    // The contrast, so the check above cannot pass by naming the only label
+    // this fixture can produce: Monday is NOT tomorrow here.
+    const eveWrong = await loadAt('2026-03-28', 'Saturday', '2026-03-28T23:30:00', 'Monday')
+    check('...and it is not the day after that', eveWrong.tomorrowLabel === 'Tomorrow: Rest', eveWrong.tomorrowLabel)
+
+    if (tzBefore === undefined) delete process.env.TZ
+    else process.env.TZ = tzBefore
   }
 
   if (failures > 0) {

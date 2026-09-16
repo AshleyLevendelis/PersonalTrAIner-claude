@@ -7,7 +7,7 @@ import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
-import { getAllLogs as getAllWaterLogs, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
+import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
@@ -204,7 +204,7 @@ export function NutritionDisplay({
 
   useEffect(() => {
     if (!profileId) return
-    void getAllWaterLogs(profileId).then(setWaterLogs)
+    void getWaterLogsForDate(profileId, date).then(setWaterLogs)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, date])
 
@@ -215,7 +215,9 @@ export function NutritionDisplay({
   // (design_handoff_app_polish, "Home becomes the day"); water is the H2O
   // ring and its legend entry here, and the TARGET is still set here, inside
   // "How it's set". What is left is the total the ring is drawn from.
-  const todayWaterMl = waterLogs.filter(l => l.date === date).reduce((s, l) => s + l.amount_ml, 0)
+  // Already bounded to `date` by the query above — the filter that used to
+  // stand here existed because the read returned every row ever logged.
+  const todayWaterMl = waterLogs.reduce((s, l) => s + l.amount_ml, 0)
   const handleSaveWaterTarget = async () => {
     const n = Number(waterTargetInput)
     if (!profileId || !Number.isFinite(n) || n <= 0) { setEditingWaterTarget(false); return }

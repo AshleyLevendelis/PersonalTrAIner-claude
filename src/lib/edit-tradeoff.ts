@@ -1,3 +1,4 @@
+import { GOAL_TERMS } from './coach-voice'
 import type { MesocycleWeek, UserProfile, WorkoutDay, FitnessGoal } from './types'
 import type { Tradeoff, TradeoffAlternative, EditScope } from './tradeoff-shape'
 import { reasonChipsFor } from './edit-reason'
@@ -170,24 +171,20 @@ export const isStartingOut = (profile: UserProfile): boolean =>
 // THE GOAL'S OWN TERMS
 // ---------------------------------------------------------------------------
 
-/** What this person is training for, said the way they would say it. */
-const GOAL_NOUN: Record<FitnessGoal, string> = {
-  hypertrophy: 'building muscle',
-  fat_loss: 'losing fat while keeping muscle',
-  functional: 'getting stronger and moving well',
-  conditioning: 'your conditioning',
-}
-
-/** Why a muscle losing work matters, per goal. One clause, never a paragraph. */
-function whyVolumeMatters(goal: FitnessGoal, group: MuscleGroup): string {
-  const g = GROUP_LABEL[group]
-  switch (goal) {
-    case 'hypertrophy': return `${g} grows from the work you do for it`
-    case 'fat_loss': return `that work is what keeps ${g} on you while you're eating less`
-    case 'functional': return `${g} carries a lot of what you're training for`
-    case 'conditioning': return `it's work your week is built around`
-  }
-}
+// MOVED TO `coach-voice.ts`, 15 Sep 2026, and the reason is the measurement.
+//
+// `GOAL_NOUN` used to be declared here with FOUR goals and exactly ONE call
+// site, inside a `free(...)` reason string — and every reader of a
+// `Tradeoff.reason` only re-wraps it into another reason, so nothing rendered
+// it. The app had a per-goal vocabulary written down that no person had ever
+// read. `whyVolumeMatters` sat beside it and WAS live, so the two halves of one
+// table had opposite fates purely by where they happened to be called.
+//
+// Both now live in the shared phrasebook, where `meal-tradeoff.ts` — which
+// inlines its own `goal === 'fat_loss' ? … : …` ternaries today — can reach
+// them without importing this module's weight.
+const whyVolumeMatters = (goal: FitnessGoal, group: MuscleGroup): string =>
+  GOAL_TERMS[goal].whyVolume(GROUP_LABEL[group])
 
 // ---------------------------------------------------------------------------
 // THE SCORE, AS WORDS
@@ -479,7 +476,7 @@ export function assessEdit(ctx: EditContext): Tradeoff {
     }
   }
 
-  return free(`no material change to weekly volume or plan quality (${GOAL_NOUN[goal]})`)
+  return free(`no material change to weekly volume or plan quality (${GOAL_TERMS[goal].noun})`)
 }
 
 // ---------------------------------------------------------------------------

@@ -474,10 +474,13 @@ export interface RecommendedCardio {
  * extra?" unanswerable from the data. A WorkoutDay carrying this field has
  * exercises: [] and is the complete plan for that day.
  *
- * Type and shape only as of slice one — nothing generates these yet. The
- * generator (and its progression/ramp model) is deliberately NOT built here:
- * duration and frequency numbers for a true beginner are a coaching
- * decision, not something to guess at in a type definition.
+ * CORRECTED 15 Sep 2026: this said "nothing generates these yet". One does —
+ * toStartingOutDay in starting-out.ts, the beginner's walking plan — and had
+ * for some time. The stale note is worth recording rather than just deleting,
+ * because it is exactly what let the field go unrendered: the type said
+ * nothing produced these, so nobody looked for a screen that had to show one.
+ * Rendered by ActiveRecoveryCard (the day itself), ProgramBrowse (the week
+ * list) and TodayPanel (tomorrow's preview and the peek).
  */
 export interface PlannedActivity {
   /** Plain activity name as the user would say it — "Walk", "Swim". */
@@ -504,8 +507,10 @@ export interface WorkoutDay {
   /**
    * Set when this day's whole prescription is an activity rather than a gym
    * session — see PlannedActivity. Mutually exclusive with a populated
-   * exercises array in practice, though nothing enforces that structurally
-   * yet (no generator produces these as of slice one).
+   * exercises array in practice, though nothing enforces that structurally.
+   * A day carrying this ALSO carries is_scheduled: it is a session, not a
+   * rest day, and every reader deciding "is this a session?" must ask the
+   * flag rather than counting exercises.
    */
   plannedActivity?: PlannedActivity
   /**

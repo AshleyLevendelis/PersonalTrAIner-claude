@@ -124,7 +124,13 @@ const READ = String.raw`(() => {
     hasCard: /Proposed change/i.test(text)
       && btns.some(b => /^Apply/.test(b))
       && btns.includes('Keep'),
-    asks: /Shall I\?/.test(text),
+    // RE-ANCHORED 15 Sep 2026. This pinned the literal "Shall I?", so Ashley's
+    // change of card grammar that day ("Want me to X?") turned it red without
+    // anything being wrong — and it would have stayed GREEN on a card that
+    // tacked "Shall I?" onto an announcement. The property is the pair below:
+    // the card ASKS (a question mark reaches the screen) and does not ANNOUNCE
+    // (no completed-action verb). Neither half is about any wording we chose.
+    asks: /\?/.test(text),
     announces: /I've swapped|I have swapped|is now down as|Done —/.test(text),
     namesActivity: /Muay Thai/.test(text),
     saysNotMissed: /won't (show as|count as) missed|won't count as a missed session/i.test(text),

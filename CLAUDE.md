@@ -37,23 +37,55 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
-  — screen exists; ranking-over-shuffling itself `UNGUARDED`
+  — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
+  CALLS the ranker rather than reading it. It holds the tie-break to its job:
+  a one-point difference survives every seed, while two identical candidates
+  genuinely do differ — the +/-0.3 jitter against factor steps of 1 was the
+  relationship nothing enforced, and widening it turns every plan back into the
+  coin flip that put a band in 906 loaded slots.
 - **Say what feels tight before a session and the warm-up prepares it** — added
   15 Sep 2026 from a suggestion list Ashley asked me to assess, on her "build
   all that you think is good". Eight areas as taps; up to three mobility drills
   go in at the front of TODAY's warm-up, with a line saying why and an honest
   account of anything it could not cover. It adds warm-up and nothing else — no
   set, weight, exercise or plan is touched, checked on a real screen before and
-  after. **`screen only`**: there is no coach path, because the answer lives in
-  a store the edge function cannot reach. `tightness`, `verify:tightness`
+  after. **`screen only`**, and now recorded as such in
+  `docs/coach-screen-parity.md` — it was not, for a day, which is the rule-4
+  gap the parity doc's own instruction exists to prevent.
+  CORRECTED 15 Sep 2026, measured: the reason written here — "the answer lives
+  in a store the edge function cannot reach" — is FALSE on both halves. The
+  edge function reaches no store on this rail; every `propose_*` tool returns
+  an intent and the BROWSER writes (`chat-gemini:2677-2693` says so outright),
+  and the coach is already inside that very store via `declareOffPlan`. The
+  real obstacles are smaller and worth having written down before anyone
+  builds it: the answer can only ever be TODAY, a coach-set answer would
+  silently open a session, and the pain boundary is enforced on the screen
+  only. `tightness`, `verify:tightness`
 - No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
 - Activity-shaped plans: only the starting-out walking plan exists, and only
-  it is offered — `starting-out`
+  it is offered — `starting-out`. **It is now RENDERED, since 15 Sep 2026** —
+  `planned-activity`, `verify:planned-activity`.
+  CORRECTED, measured: this line was true about generation and silent about the
+  screen, and the screen was the whole problem. `PlannedActivity` had been
+  generated for weeks and **no screen component read it** — every reader asked
+  `exercises.length`, so a prescribed twenty-minute walk rendered as a blank
+  "Log a walk or other activity" form and was filtered out of the week list
+  entirely. Ashley reported the empty card on 15 Sep believing it was about
+  cardio; it was already shipping to every beginner. **A capability is not
+  "had" because the data exists** — rule 2, one layer lower than usual: this
+  one had a generator, a type, a coach that could read it, and no pixel.
 
 **The meal plan, as generated — the same bar, in its own terms**
 - Targets from the profile, moved by a seven-day weight average, explained
   when they move, with an endpoint to a deficit — `fat-loss-deficit`,
-  `macro-split`; "explained" `UNGUARDED`
+  `macro-split`, and "explained" since 16 Sep 2026: `target-change-notice`
+  (19 checks, 9 mutations). CORRECTED, measured: the notice always EXISTED —
+  I reported it missing off one identifier (`anchorMoved`, genuinely dead and
+  now deleted) while the notice ran off another (`changedFromPrior`, wired at
+  both call sites). What was true is the tag: nothing would have noticed it
+  breaking. It now names what each target moved FROM as well as to, covers
+  protein, carbs and fat rather than calories alone, and comes from the shared
+  phrasebook instead of two hand-written copies.
 - Meals hit targets from real foods, varied, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`
@@ -66,12 +98,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   equipment; a loaded lift never replaced by an unloaded one by default —
   both surfaces; `swap-target`, `slot-replacement`,
   `single-implement`, `verify:swap-request`
-- Ban it from every future plan — `screen only`; `audit-fixes`,
-  `silent-writes`. CORRECTED 11 Sep 2026: this said "both". The coach's
-  `ban_exercise` is a deliberate decline — "NOT WIRED UP YET… point the user at
-  the ban button" (chat-gemini `:598`, handler `:3087`) — because a ban is the
-  highest-blast-radius mutation in the app. I wrote "both" from the tool list
-  without reading the handler
+- Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
+  `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
+  and quoted the decline "NOT WIRED UP YET… point the user at the ban button"
+  at `chat-gemini:598` / `:3087`. Both line numbers are from the stale note and
+  neither is a decline today — the tool proposes (`:3400-3432`, returning
+  `kind: "propose_exercise_ban"`), wired 14 Sep on Ashley's instruction as the
+  last thing a screen could do that chat could not. The 11 Sep correction that
+  stood here was right when written and was never revisited after the fix
 - Add one to a session AS PART OF THE PLAN — both surfaces since 13 Sep 2026.
   Her ruling that day, from three options: **add it and say the session is now
   longer** — you asked for the exercise, so you get it, and the app never
@@ -140,14 +174,36 @@ menu" stays true when a copy is also left outside it.
   the coach's volume change, which reaches to the end of the plan. True, and
   still true — this adds a second, narrower one beside it rather than changing
   that one.
-- Rebuild today's session as a whole, for today — `MISSING`, named rather than
-  half-built. Nothing regenerates below a whole week; the one function that
-  assembles a day is private with fifteen parameters including the cross-day
-  dedupe set; and the cheap route — regenerate the week, keep one day — picks
-  that day without knowing what the rest of the week now holds, so it can hand
-  you the same exercise twice. It also carries a question that is Ashley's: a
-  rebuilt day loses the progression thread on the main lift, and whether that
-  is acceptable for a one-off is a coaching call
+- **Put a cardio session on a day, as part of the plan** — both surfaces since
+  15 Sep 2026. Ashley: *"know when to suggest adding a session and when
+  something is mentioned in passing"*. Her ruling that day, from three options:
+  **offer it only when she sounds DEFINITE** — over asking every time (my
+  recommendation) and over never offering.
+  **THE RULING IS ENFORCED IN ONE DIRECTION ONLY, and that is the part to
+  remember.** A hedge ("I might ride Wednesday") cannot produce a card — the
+  client refuses before building one, off a written list of 21 phrases, read
+  against the WHOLE message rather than the model's chosen quote. The coach
+  staying QUIET when it should have offered cannot be enforced at all, because
+  there is no turn to inspect: it simply said something else. So the app blocks
+  the direction that costs something and the coach exam grades the direction
+  that costs nothing. Anything built on a model JUDGEMENT should be split this
+  way and the two halves named separately.
+  `cardio-session`, `verify:cardio-session`, `coach-parity`
+- Rebuild today's session as a whole, for today — **both surfaces since 16 Sep
+  2026**. Her ruling that day, from three options: **keep the main lift and
+  rebuild around it** — you still do today's main lift at the weight and sets
+  prescribed, so the progression thread is untouched, and everything else
+  changes. It matches her 13 Sep ruling for shortening, so the app holds ONE
+  position on the main lift rather than two; and if the main lift is the thing
+  you want gone, swapping it alone already works.
+  `session-rebuild`, `verify:session-rebuild`, `coach-parity`.
+  CORRECTED, measured: this line gave three reasons it was impossible and TWO
+  WERE WRONG. "Nothing regenerates below a whole week" is true of
+  `generateMesocycle` and irrelevant — swap, add and remove all change one day
+  of a live mesocycle. The day assembler has fourteen parameters, not fifteen,
+  and the build never calls it; the cross-day dedupe set is readable straight
+  off the week. Only the third held (the cheap route can hand you the same
+  exercise twice), which is why this composes the SWAP path once per slot
 
 **Changing one meal** — mirrored from exercise, because meals are plans too
 - Replace it, regenerate it, ask for more — both; `meal-swap-rotation`
@@ -297,10 +353,17 @@ menu" stays true when a copy is also left outside it.
   ruling the same day: the score stays behind the scenes as a guarantee we
   check, never a number on screen — what a person reads is the specific thing
   that changed, in plain words.
-  MEASURED 14 Sep 2026, and worth knowing: that is a GATE. `scorePlan` has
-  zero call sites in the app itself, so it is never run on a real person's
-  real edit. The cards price every change against the plan's STRUCTURE
-  (balance, length, −protein) and never against the person's GOAL
+  CORRECTED 15 Sep 2026, measured. This said `scorePlan` has ZERO call sites
+  in the app and that the cards never price a change against the GOAL. It has
+  two — `edit-tradeoff.ts:227-228`, both with `skipComparisons`, reached live
+  from `ChatAssistant.tsx:684` via `assessEdit` → `scoreDrop`. The 14 Sep
+  measurement was true when taken and the build THAT SAME DAY falsified it;
+  the two facts sat in this file three paragraphs apart, only one updated.
+  What remains true is narrower and still worth keeping: a `skipComparisons`
+  score is NOT comparable to the 7.2 floor (the denominator inside
+  goalAlignment changes), so the app can know a change made the plan worse and
+  can never know it fell below the bar. That residue is Ashley's, ruled on
+  twice, and should not be reopened without her
 - When a change works AGAINST the goal, the app asks first, then allows — it
   never refuses anything that is not unsafe. DECIDED 14 Sep 2026 by the
   session on Ashley's explicit delegation (*"You decide what you think is best
@@ -368,10 +431,18 @@ menu" stays true when a copy is also left outside it.
   skipped exactly the case it existed to fail on, the other counted
   ChatAssistant as a screen and so proved the COACH had a builder. **Adding an exercise (13 Sep) changes neither count**: it
   existed on no surface, and arrived on both at once. Recorded because the
-  obvious assumption is that a new capability moves one of these numbers. **No GENERAL gate distinguishes a declared coach tool from
-  a declining stub**, which is the hole the ban error fell through;
-  `meal-food-edit` §8 does it for its own three tools and is the shape the
-  general one should take
+  obvious assumption is that a new capability moves one of these numbers. **The GENERAL declining-stub gate EXISTS** — CORRECTED 15 Sep
+  2026, measured. This line said there was none and named `meal-food-edit` §8
+  as the shape one should take. `coach-parity` §3 has been that gate since 14
+  Sep: it loops EVERY declared tool, slices each handler to its own name so a
+  decliner cannot taint its neighbour, and proves its detector on a synthetic
+  handler first so it cannot go vacuous now that nothing declines. It is
+  weaker than §8 in one way worth knowing — a negative check on three known
+  refusal phrases, so a stub declining in NEW words would pass — and §8's
+  positive courier-shape proof does not generalise, because the 40 tools have
+  three incompatible shapes (23 couriers with a literal matching kind, 3 with
+  a variable or differing kind, 14 pure server-side writers with no kind at
+  all)
 - A written exceptions list, each with a reason, Ashley's to change — EXISTS
   since 14 Sep 2026, `docs/coach-screen-parity.md`, held by `coach-parity`.
   CORRECTED: this line still said `MISSING` after the list was written and the
@@ -394,8 +465,10 @@ menu" stays true when a copy is also left outside it.
   `coach-sees-ingredients`, `coach-sees-technique`, `coach-volume-schedule`,
   `coach-phase-brief`, `context-is-read`, `week-load-consistency`
 - Accurate, current, specific advice at the level a qualified trainer and
-  nutritionist would sign — still `UNGUARDED` in practice: the coach exam now
-  exists but has never been run, so the graded check is built and unused
+  nutritionist would sign — still `UNGUARDED` in practice, but no longer for
+  the reason written here for three days. CORRECTED 16 Sep 2026: the exam HAS
+  been run once, on Ashley's machine on 13 Sep, and the scores were never
+  pushed. See the exam bullet below for what that run is and is not worth
 - It asks before prescribing and uses the answer — prompt rule, kept in sync
   by `coach-rules-sync`; whether it HAPPENS is `UNGUARDED`
 - It notices patterns and coaches to them — `block-review`,
@@ -404,24 +477,69 @@ menu" stays true when a copy is also left outside it.
   `activity-streak`; a missed WEEK gets a chat prefill, not a follow-up
 - It holds its scope — doctor, physio, dietitian at the right moment —
   `starting-out` for the first-timer note; otherwise `UNGUARDED`
-- One voice, every time — tone probes only; `UNGUARDED`
+- One voice, every time — **half guarded since 15 Sep 2026, and the split is
+  the point.** The sentences the APP writes — every card lead, receipt,
+  refusal and floor — are held by `coach-voice` (33 checks, 10 mutations) and
+  `verify:activity-swap` / `verify:swap-request` read on a real screen. The
+  MODEL's own voice is still `UNGUARDED` and still unmeasurable here: every
+  tone probe posts to the deployed function and needs credentials a cloud
+  session does not have, and the coach exam grades ADVICE, not voice, by
+  design (`docs/coach-exam-rubric.md:7`). Measured first in
+  `docs/audits/the-coachs-own-words-2026-09-15.md`: three grammars for one
+  job, eight wordings of one failure, three narrators in one file
 - Never claims a capability, screen or guarantee it lacks; proposes,
   confirms, can be undone — `coach-promises`, `chat-app-reality`,
   `pending-actions`, `log-correction`, `replace-without-losing`,
   `question-not-a-card`, `tool-reply`, `message-evidence`
 - **The coach exam** — a fixed set of realistic conversations graded against
   a written rubric, run against the real model whenever the prompt, model or
-  tools change, scores kept — BUILT 13 Sep 2026, **NEVER RUN**. 20 cases and
-  37 turns (`coach-exam:run`); eight hard rules checked in code and five
+  tools change, scores kept — BUILT 13 Sep 2026, and **RUN ONCE, on 13 Sep,
+  ON ASHLEY'S MACHINE — a fact this file denied until 16 Sep 2026.** That run
+  sits as a single unpushed local commit; this session has not seen it and
+  records it as RELAYED, not measured. Its headline was 7 of 20 cases
+  breaching a hard rule. **DO NOT READ THAT 7 AT FACE VALUE**: two of the
+  breaches were the coach replying "with no text at all", and that is the
+  exact false positive fixed on 16 Sep — on 13 Sep the coach returned an
+  empty reply beside a card in 28 places (measured at `29221cf`), the runner
+  recorded no card, and the hard rule named `silence` fired on a coach that
+  had behaved correctly. A third is likely stale rather than real: the
+  exercise-ban tool was still a declining stub on 13 Sep and was wired the
+  next day. So the 13 Sep scores measure a coach and a grader that both no
+  longer exist, and the number to act on is the one from the first run AFTER
+  the deploy. Keep the commit — it is the only record of what the exam said
+  before any of this was fixed, and the comparison is the point. 20 cases and
+  37 turns (`coach-exam:run`); NINE hard rules checked in code and five
   judged dimensions marked against `docs/coach-exam-rubric.md`
   (`coach-exam:grade`); and `coach-exam-fresh` in every sweep, which fails
   when the coach changes and the exam has not been re-run — that gate is what
   makes rule 5 enforceable rather than aspirational. The rules are
-  fixture-tested (`coach-exam-grader`, 13 mutations). No conversation has been
-  played against the real model, because that needs credentials a cloud
-  session does not have. So until it is run once, "best-in-class advice" is
-  still asserted, not known — and the floor is deliberately unset, to be
-  proposed from that first run's numbers.
+  fixture-tested (`coach-exam-grader`) and the RUNNER is now driven end to end
+  against a fake coach (`coach-exam-runner`). No conversation has been
+  played against the real model FROM A CLOUD SESSION, because that needs
+  credentials this machine does not have — which is why the 13 Sep run
+  happened on Ashley's machine and why this file went on saying it had not
+  happened. So until it is run again against the CURRENT coach,
+  "best-in-class advice" is still asserted, not known — and the floor is
+  deliberately unset, to be proposed from that run's numbers.
+  **THE SHAPE OF THIS MISTAKE IS WORTH MORE THAN THE FACT.** Work done on a
+  machine this session cannot see is invisible to every check here, and the
+  absence of evidence read as evidence of absence for three days across two
+  files and five BACKLOG entries. When a capability needs credentials a cloud
+  session lacks, "never run" means "never run HERE" and must say so.
+  CORRECTED 16 Sep 2026, measured: this said eight rules and quoted a mutation
+  count, and the more useful correction is WHY a ninth was needed. **The exam
+  could not see a card.** chat-gemini returns a `proposal` with an empty reply
+  in 33 places — the card does the talking, in the app's own words — and the
+  runner recorded only `action`, which appears in 3. So a correct offer was
+  written down as an empty turn and the rule named `silence` flagged it: the
+  coach marked down for its best behaviour, on the two cases written for that
+  behaviour. **Nothing caught it because the runner's live path had never
+  executed once** — `--dry` skips the network, the grader is fixture-tested
+  off hand-written transcripts, and `coach-exam-fresh` only checks staleness.
+  **A SCRIPT WHOSE FIRST REAL RUN COSTS MONEY GETS A MOCKED END-TO-END GATE
+  BEFORE IT RUNS, NOT AFTER.** The generalisation is not about this exam: it is
+  that "tested in pieces" and "has ever run" are different claims, and the gap
+  between them is invisible from the code.
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —
@@ -613,10 +731,97 @@ old — the commands were right and the context was missing.
   So: **when comparing two runs, compare the number of checks that RAN as well
   as the number that failed.** A crash produces zero failures and reads as a
   pass — that happened once during this very fix.
+  **AND THE SHORT RUN NEED NOT BE A CRASH — A GATE'S OWN BAIL-OUT DOES IT
+  TOO.** 16 Sep 2026: a new gate hit a failed check, printed FAIL, and then
+  `return`ed out of `main()` — skipping the `if (failures > 0) process.exit(1)`
+  at the bottom. It exited 0 on 3 of its 28 checks, and only the mutation
+  harness's "how many ran?" column showed it. So: **a gate has exactly one
+  exit**, and every early return goes through it. A gate that can print FAIL
+  and exit 0 is worse than no gate, because the tick is now evidence.
 - Strip comments before asserting a string is ABSENT, or a note explaining why
   something was removed will satisfy the check that it was removed.
+- **A MUTATION THAT DID NOT APPLY, OR THAT CRASHED, READS EXACTLY LIKE A CHECK
+  THAT MISSED.** 15 Sep 2026, four times in one day. Two mutations reported
+  MISSED because shell escaping silently failed and the file was never
+  modified. One reported MISSED with zero failures because it named an export
+  that does not exist, so the module threw at import and NONE of the 33 checks
+  ran — the "compare checks that RAN" rule, one level down. One was a real
+  edit that did not create the defect (it reverted 1 of 5 call sites, so the
+  symbol was still used).
+  So a mutation harness must, before believing a green: assert the file
+  actually changed, and assert the run executed as many checks as the baseline.
+  Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
+  meaningless" print identically.
+- **ASKING A QUESTION OF EVIDENCE YOU JUST CREATED.** The same shape, twice in
+  one day: grepping a file for an identifier to see whether it was imported,
+  AFTER inserting a line that used it — the only hit was the new code, and the
+  check confirmed itself; and a `/record/i` over a function that matched
+  `Record<string, unknown>` in its own signature. Before trusting a search,
+  ask what ELSE could satisfy it: your own edit, a type, a comment, an import.
+- **AN IMPORT IS NOT A USE, AND A DECLARATION IS NOT A RENDER.** Two checks
+  written 15 Sep 2026 passed over the exact defect they were written for, both
+  found by mutation, both the same shape — the check matched something that
+  survives the break. Replacing the one CALL to a shared decision function with
+  the hand-rolled expression it replaced left the `import` line untouched, so a
+  bare-name check still found the name. And an ordering check comparing
+  `indexOf('plannedActivity')` — the const declaration near the top of a
+  component — against the form below it was true however the JSX was ordered.
+  So: for a function, require `name(`; for render order, anchor on the rendered
+  block; and prove the detector on something that should FAIL it, in the gate
+  itself, so it cannot go vacuous later.
+- **A BROWSER DRIVER FINDS THINGS NO `test:` GATE CAN, AND THEY ARE NOT SMALL.**
+  15 Sep 2026, two in one run, both on a card that every source check passed:
+  a new control was on the wrong component (`RestDayCard` renders only when the
+  plan has NO row for a day; a scheduled-but-empty day gets `ActiveRecoveryCard`
+  — and that is exactly the day the feature was for), and after the write the
+  card showed TWO prescriptions stacked, leaving the reader to guess which was
+  the session. Neither is visible from the data or the source; both are obvious
+  in one screenshot. When something new appears on a screen, the driver is not
+  the last step after the gates pass — it is the step that finds the defect.
+- **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
+  beyond "did not apply" and "crashed", and the harness cannot see it: on
+  15 Sep a mutation to the walking plan's day builder read MISSED because the
+  mesocycle RE-STAMPS every `plannedActivity` from `startingOutActivity(block)`
+  further downstream. The file changed, every check ran, the gate was right.
+  Before believing a MISSED, ask whether the value you broke is the one the
+  gate reads, or whether something later writes over it.
+- **A CHECK'S FIXTURE MUST BE MEASURED, NOT PLAUSIBLE.** The DST day-walk gate
+  needed times where a fixed 86,400,000 ms step actually misbehaves, and which
+  side of midnight that is depends on which way the clocks moved AND which way
+  the walk runs. My first two fixtures looked obviously right and the old
+  buggy code passed both. Run the OLD code against the candidate fixture and
+  read what it produces before writing the assertion.
+- **A QUOTE CLASS MUST RESPECT WHICH QUOTE OPENED THE STRING.** `[^'"`]` stops
+  at the apostrophe in "That's", truncating the match. It cost two separate
+  false results on 15 Sep 2026 — a reddened baseline and a safety string
+  reported missing. Use `(['"`])((?:(?!\1).)*)\1`.
 - New check → register it in `package.json` → mutation-test it → say in the
   report how many mutations were tried and how many were caught.
+- **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
+  2026: yesterday's sweep found two real failures, both were fixed, and the
+  sweep was reported clean without being re-run. One of those fixes — pulling a
+  duplicated branch into a shared function, which a gate had ASKED for — broke a
+  different gate that required the two to sit within 200 characters of each
+  other. It was red at the branch head for a day. Re-run at least the gates that
+  touch what the fix touched, and say which.
+- **`npx tsc --noEmit` COVERS `src` ONLY.** `tsconfig.json` is
+  `include: ["src"]`, so nothing type-checks `scripts/`. Measured 16 Sep 2026: a
+  duplicate `const` in a gate passed `tsc` clean and was caught by esbuild when
+  the gate was RUN. So "typecheck clean" has never been a statement about the
+  gates, and must not be reported as one — what proves a gate compiles is
+  running it.
+- **A BUDGET WITH HEADROOM SILENTLY SPENDS IT, and the comment goes on
+  claiming the original figure.** A ceiling only speaks when it is CROSSED, so
+  "this keeps ~8 kB of headroom" is a claim about the day it was written and
+  nothing else. 15 Sep 2026: `test:bundle`'s re-download ceiling had been moved
+  twice, each time to 8 kB above a measured value, and its note still said 8 kB
+  — but the real headroom had eroded to 1 kB, so a one-kilobyte change tipped
+  it and looked like the cause. It was the last straw. The app-chunk budget was
+  quietly doing the same thing (918 of 920) and nobody had noticed either.
+  So: when a budget is raised, record the value MEASURED THAT DAY, not the one
+  inherited from the note; and when one fails, measure the baseline on a clean
+  checkout before believing the change in front of you caused it. I guessed
+  twice at the cause here and was wrong both times.
 
 ### What a full sweep costs, so it is neither skipped nor stumbled into
 
@@ -626,6 +831,17 @@ old — the commands were right and the context was missing.
 - So: run the handful of affected checks while working — they are instant —
   and the full sweep once, before a merge. Run it in the background and do
   something else; do not sit and watch it.
+- **A KILLED SWEEP'S LOG IS INDISTINGUISHABLE FROM A RUNNING ONE. Check the
+  PROCESS, not the file.** 15 Sep 2026: I reported a full sweep as "27 of 234
+  done" against freshly merged code while nothing was running — the log
+  belonged to a sweep I had killed hours earlier. A sweep only writes its
+  "SWEEP DONE" line at the end, so a log that stops early looks exactly like
+  one still being written, and the partial PASS lines read as progress. A
+  watcher that waits for the finish line therefore waits forever and reports
+  nothing wrong. One `ps` settles it. Any background wait on a sweep must
+  check the process is alive on every poll and say so when it is not.
+  This is the "a crash reads as a pass" rule one level up: there, zero
+  failures looked like success; here, a dead run looked like a live one.
 - **Two checks ALWAYS fail in a cloud session and are not your problem:**
   `test:meal-quality` and `test:schema-parity`. Both need a live database this
   machine cannot reach. Confirm by stashing your changes and re-running — they
