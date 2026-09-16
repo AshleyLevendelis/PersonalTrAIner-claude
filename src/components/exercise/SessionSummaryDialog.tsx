@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Trophy } from 'lucide-react'
 import type { SessionSummary } from '@/lib/session-derive'
 import type { SessionPRHit } from '@/lib/pr-engine'
+import { personalBest } from '@/lib/coach-voice'
 import type { DoubleProgressionRecommendation } from '@/lib/progression-engine'
 
 export interface SessionSummaryData {
@@ -88,7 +89,16 @@ export function SessionSummaryDialog({
                   <p key={pr.exerciseName} className="flex items-center gap-1.5 text-sm">
                     <Trophy className="size-3.5 text-primary-text glow-mint shrink-0" />
                     <span className="font-medium">{pr.exerciseName}</span>
-                    <span className="tabular-mono text-primary-text glow-mint">{pr.result.newWeight}kg</span>
+                    {/* `{pr.result.newWeight}kg` stood here, which printed
+                        "0kg" for a bodyweight best and would have printed
+                        "12kg" the moment reps records existed. The unit comes
+                        from the phrasebook with the number now. */}
+                    <span className="tabular-mono text-primary-text glow-mint">
+                      {personalBest(pr.result.metric,
+                        pr.result.metric === 'reps' ? pr.result.newReps
+                          : pr.result.metric === 'added_load' ? pr.result.newAddedLoadKg
+                          : pr.result.newWeight)}
+                    </span>
                   </p>
                 ))}
               </div>

@@ -44,23 +44,30 @@ function main() {
   check('a 0kg non-bodyweight set (not pre-filtered) still groups but contributes 0 to top-set (caller filters malformed rows before calling)', groupedMalformed[0].topSetWeightKg === 0, groupedMalformed)
 
   console.log('\n[2] deriveStrengthTrend / hasEnoughTrendData')
-  const oneSessionOnly: ExerciseHistorySession[] = [{ sessionId: 's1', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 60 }]
+  const oneSessionOnly: ExerciseHistorySession[] = [{ sessionId: 's1', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 60, topSetReps: 0, topSetAddedLoadKg: 0 }]
   check('0 sessions -> not enough data', !hasEnoughTrendData(deriveStrengthTrend([])))
   check('1 session -> not enough data', !hasEnoughTrendData(deriveStrengthTrend(oneSessionOnly)))
   const twoPlusSessions: ExerciseHistorySession[] = [
-    { sessionId: 's2', date: '2026-01-08', sets: [], topSetWeightKg: 55, topSetE1RM: 65 },
-    { sessionId: 's1', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 60 },
+    { sessionId: 's2', date: '2026-01-08', sets: [], topSetWeightKg: 55, topSetE1RM: 65, topSetReps: 0, topSetAddedLoadKg: 0 },
+    { sessionId: 's1', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 60, topSetReps: 0, topSetAddedLoadKg: 0 },
   ]
   const trend = deriveStrengthTrend(twoPlusSessions)
   check('2+ sessions -> enough data', hasEnoughTrendData(trend))
-  check('trend output is oldest-first regardless of input order', trend[0].date === '2026-01-01' && trend[1].date === '2026-01-08', trend)
+  // deriveStrengthTrend returns a SERIES now, not a bare array: the points
+  // plus what they ARE, so a chart cannot render reps as kilograms. Updated
+  // here rather than shimmed, because the shim would hide exactly the
+  // distinction the change exists to make.
+  check('trend output is oldest-first regardless of input order',
+    trend.points[0].date === '2026-01-01' && trend.points[1].date === '2026-01-08', trend)
+  check('a loaded history is still a load series, plotting the estimate',
+    trend.metric === 'load' && trend.points[0].value === trend.points[0].topSetE1RM, trend)
 
   console.log('\n[3] derivePRHistory: a chronological weight sequence produces PR moments only where a new max is set')
   const prSessions: ExerciseHistorySession[] = [
-    { sessionId: 'a', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 50 },
-    { sessionId: 'b', date: '2026-01-08', sets: [], topSetWeightKg: 55, topSetE1RM: 55 },
-    { sessionId: 'c', date: '2026-01-15', sets: [], topSetWeightKg: 52, topSetE1RM: 52 }, // regression, no PR
-    { sessionId: 'd', date: '2026-01-22', sets: [], topSetWeightKg: 60, topSetE1RM: 60 },
+    { sessionId: 'a', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 50, topSetReps: 0, topSetAddedLoadKg: 0 },
+    { sessionId: 'b', date: '2026-01-08', sets: [], topSetWeightKg: 55, topSetE1RM: 55, topSetReps: 0, topSetAddedLoadKg: 0 },
+    { sessionId: 'c', date: '2026-01-15', sets: [], topSetWeightKg: 52, topSetE1RM: 52, topSetReps: 0, topSetAddedLoadKg: 0 }, // regression, no PR
+    { sessionId: 'd', date: '2026-01-22', sets: [], topSetWeightKg: 60, topSetE1RM: 60, topSetReps: 0, topSetAddedLoadKg: 0 },
   ]
   const prMoments = derivePRHistory(prSessions)
   check('exactly 3 PR moments (50, 55, 60) — the 52 regression is not one', prMoments.length === 3, prMoments)
@@ -68,16 +75,16 @@ function main() {
   check('newest-first for display', prMoments[0].sessionId === 'd', prMoments)
 
   const bothKindSessions: ExerciseHistorySession[] = [
-    { sessionId: 'x', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 50 },
-    { sessionId: 'y', date: '2026-01-08', sets: [], topSetWeightKg: 60, topSetE1RM: 70 }, // beats both weight and e1rm
+    { sessionId: 'x', date: '2026-01-01', sets: [], topSetWeightKg: 50, topSetE1RM: 50, topSetReps: 0, topSetAddedLoadKg: 0 },
+    { sessionId: 'y', date: '2026-01-08', sets: [], topSetWeightKg: 60, topSetE1RM: 70, topSetReps: 0, topSetAddedLoadKg: 0 }, // beats both weight and e1rm
   ]
   const bothMoments = derivePRHistory(bothKindSessions)
   const yMoment = bothMoments.find(m => m.sessionId === 'y')
   check('a session beating both weight and e1rm classifies as "both"', yMoment?.kind === 'both', yMoment)
 
   const e1rmOnlySessions: ExerciseHistorySession[] = [
-    { sessionId: 'p', date: '2026-01-01', sets: [], topSetWeightKg: 60, topSetE1RM: 60 },
-    { sessionId: 'q', date: '2026-01-08', sets: [], topSetWeightKg: 55, topSetE1RM: 70 }, // lower weight, higher e1rm (more reps)
+    { sessionId: 'p', date: '2026-01-01', sets: [], topSetWeightKg: 60, topSetE1RM: 60, topSetReps: 0, topSetAddedLoadKg: 0 },
+    { sessionId: 'q', date: '2026-01-08', sets: [], topSetWeightKg: 55, topSetE1RM: 70, topSetReps: 0, topSetAddedLoadKg: 0 }, // lower weight, higher e1rm (more reps)
   ]
   const e1rmMoments = derivePRHistory(e1rmOnlySessions)
   const qMoment = e1rmMoments.find(m => m.sessionId === 'q')
