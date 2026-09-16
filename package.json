@@ -153,6 +153,7 @@
     "test:coach-exam-runner": "tsx scripts/test-coach-exam-runner.ts",
     "test:chosen-not-shuffled": "tsx scripts/test-chosen-not-shuffled.ts",
     "test:target-change-notice": "tsx scripts/test-target-change-notice.ts",
+    "test:session-rebuild": "tsx scripts/test-session-rebuild.ts",
     "test:coach-exam-fresh": "tsx scripts/test-coach-exam-fresh.ts",
     "test:coach-parity": "tsx scripts/test-coach-parity.ts",
     "test:coach-promises": "tsx scripts/test-coach-promises.ts",
