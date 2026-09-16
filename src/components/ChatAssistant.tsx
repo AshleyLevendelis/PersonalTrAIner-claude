@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { buildCoachMealSummary, mealsContaining } from '@/lib/meal-ingredients'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,7 +18,8 @@ import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
-import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
+import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS } from '@/lib/onboarding-slots'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -1859,6 +1861,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_volume_change') return "Here's the change to that session:"
     if (pendingAction.kind === 'propose_cardio_session') return "Here's that session on your plan:"
     if (pendingAction.kind === 'propose_session_shorten') return "Here's that session cut down to fit:"
+    if (pendingAction.kind === 'propose_session_rebuild') return "Here's a different session, with your main lift kept:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
@@ -2761,6 +2764,65 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
         ],
         unchanged: [`Your main lift — every set of it`],
+        implications,
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_session_rebuild's card — "give me something different today".
+   *
+   * ASYNC, unlike its shorten sibling above, because the rebuild prices each
+   * new slot off logged history. The one place that dispatches proposals is
+   * already async and already awaits two sibling builders, so this costs
+   * nothing — the same finding that let the swap card state its cost.
+   *
+   * TRIALLED THROUGH THE REAL REBUILD, never modelled: it is the only thing
+   * that knows which lift is the main one, what is already elsewhere in the
+   * week and which slots have no alternative. The card says what will actually
+   * happen, including what will NOT change.
+   */
+  const buildSessionRebuildProposal = async (rawArgs: Record<string, unknown>): Promise<{
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: SessionRebuildPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { refusal: string } | null> => {
+    if (mesocycle.length === 0) return null
+    const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    if (!week) return null
+    const wanted = String(rawArgs.day ?? '').trim() || activeSession.dayName
+    const day = week.days.find(d => d.day.toLowerCase() === wanted.toLowerCase())
+    if (!day) return null
+
+    const trial = await rebuildDayAroundMainLift({
+      mesocycle, profile, weekNumber: activeSession.liveWeek, dayName: day.day, exclusions: exerciseExclusions,
+    })
+    if (!trial.changed) return { refusal: trial.refusal ?? "I couldn't rebuild that one." }
+
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      { severity: 'info', text: SCOPE.today(day.day) },
+    ]
+    // WHAT IT COULD NOT CHANGE, BEFORE THE TAP. Not after, and not silently.
+    if (trial.kept.length > 0) {
+      implications.push({
+        severity: 'warn',
+        text: `${trial.kept.map((k: { name: string }) => k.name).join(' and ')} ${trial.kept.length === 1 ? 'stays' : 'stay'} — nothing else fits ${trial.kept.length === 1 ? 'that slot' : 'those slots'} with your equipment and injuries.`,
+      })
+    }
+
+    return {
+      scopeKey: `${profile.id}:propose_session_rebuild:${day.day}:${activeSession.liveWeek}`,
+      preconditions: { day: day.day, exerciseCount: day.exercises.length },
+      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        lead: ask(`rebuild ${day.day} around ${trial.mainLift ?? 'your main lift'}`),
+        rows: trial.replaced.map((r: { from: string; to: string }) => ({ field: r.from, before: r.from, after: r.to })),
+        unchanged: trial.mainLift ? [`${trial.mainLift} — same weight, same sets`] : [],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
@@ -4332,6 +4394,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (shorten && 'refusal' in shorten) refusal = shorten.refusal
         else if (shorten) built = { scopeKey: shorten.scopeKey, preconditions: shorten.preconditions, payload: shorten.payload as unknown as Record<string, unknown>, preImage: shorten.preImage, diff: shorten.diff }
         else refusal = "I couldn't work out which session you meant — tell me the day and how long you've got."
+      } else if (result.proposal.kind === 'propose_session_rebuild' && result.proposal.rawArgs) {
+        const rebuilt = await buildSessionRebuildProposal(result.proposal.rawArgs)
+        if (rebuilt && 'refusal' in rebuilt) refusal = rebuilt.refusal
+        else if (rebuilt) built = { scopeKey: rebuilt.scopeKey, preconditions: rebuilt.preconditions, payload: rebuilt.payload as unknown as Record<string, unknown>, preImage: rebuilt.preImage, diff: rebuilt.diff }
+        else refusal = "I couldn't work out which session you meant — tell me the day."
       } else if (result.proposal.kind === 'propose_cardio_session' && result.proposal.rawArgs) {
         // userSaid, not the tool's quote: see buildCardioSessionProposal.
         const cardio = buildCardioSessionProposal(result.proposal.rawArgs, userSaid)
@@ -5190,6 +5257,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? RECEIPTS['propose_session_shorten'].done : RECEIPTS['propose_session_shorten'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_session_rebuild') {
+      const payload = row.payload as unknown as SessionRebuildPayload
+      const result = await executeSessionRebuild(profile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_session_rebuild'].done : RECEIPTS['propose_session_rebuild'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_cardio_session') {
       const payload = row.payload as unknown as CardioSessionPayload
       const result = await executeCardioSession(profile, mesocycle, payload)
@@ -5513,6 +5589,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         const preImage = row.pre_image as MesocycleWeek[] | null
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
+        onMesocycleUpdated(preImage)
+      } else if (row.kind === 'propose_session_rebuild') {
+        // ONE WEEK, same as shortening: a rebuild is today-only by definition.
+        const payload = row.payload as unknown as SessionRebuildPayload
+        const preImage = row.pre_image as MesocycleWeek[] | null
+        if (!preImage || !planCreatedAt) return
+        await undoExerciseSwap(profile.id, preImage, payload.weekNumber, 'today', planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_session_shorten') {
         // ONE WEEK, not a run. Shortening is today-only by definition, so the

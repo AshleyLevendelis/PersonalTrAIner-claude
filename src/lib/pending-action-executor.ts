@@ -21,6 +21,7 @@ import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
 import { settleWeek } from './settle-week'
+import { rebuildDayAroundMainLift } from './session-rebuild'
 import { shortenDayTo } from './exercise-plan'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
@@ -1024,6 +1025,63 @@ export async function executeSessionShorten(
   catch { failed.push({ op: 'save', error: didNotSave('That') }) }
 
   return { mesocycle: next, preImage, receipt: { landed, failed } }
+}
+
+export interface SessionRebuildPayload {
+  weekNumber: number
+  dayName: string
+  /** The compiled exclusion list, resolved by the caller that has it. */
+  exclusions: string[]
+  reason?: string
+}
+
+/**
+ * "GIVE ME A DIFFERENT SESSION TODAY", from the coach — 16 Sep 2026.
+ *
+ * The mirror of TodayPanel's rebuildToday, and deliberately the same steps in
+ * the same order. Ashley's ruling: the main lift is kept exactly as it is and
+ * everything else is rebuilt around it.
+ *
+ * UNLIKE executeSessionShorten ABOVE, this does NOT call settleWeek itself —
+ * rebuildDayAroundMainLift runs it internally, because a rebuild has to settle
+ * between the replacements and the result rather than after. Calling it twice
+ * would be harmless and misleading; calling it here and not there would be a
+ * second place to keep in step.
+ *
+ * WHAT IT COULD NOT DO IS IN THE RECEIPT. A rebuild that quietly kept three
+ * slots and reported success is the defect this file's own §6 exists to stop.
+ */
+export async function executeSessionRebuild(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: SessionRebuildPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const result = await rebuildDayAroundMainLift({
+    mesocycle,
+    profile,
+    weekNumber: payload.weekNumber,
+    dayName: payload.dayName,
+    exclusions: payload.exclusions,
+  })
+  if (!result.changed) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'rebuild', error: result.refusal ?? "I couldn't rebuild that one." }] } }
+  }
+
+  landed.push(
+    `${payload.dayName}: ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed` +
+    (result.mainLift ? `, ${result.mainLift} untouched` : '') +
+    (result.kept.length > 0 ? ` — ${result.kept.map(k => k.name).join(', ')} stayed, nothing else fits ${result.kept.length === 1 ? 'that slot' : 'those slots'}` : ''),
+  )
+
+  const settledWeek = result.mesocycle.find(w => w.week_number === payload.weekNumber)
+  try { if (profile.id && settledWeek) await saveMesocycleWeek(profile.id, settledWeek) }
+  catch { failed.push({ op: 'save', error: didNotSave('That') }) }
+
+  return { mesocycle: result.mesocycle, preImage, receipt: { landed, failed } }
 }
 
 export interface CardioSessionPayload {

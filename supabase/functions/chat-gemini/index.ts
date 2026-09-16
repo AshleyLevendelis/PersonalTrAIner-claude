@@ -835,6 +835,30 @@ const toolDeclarations = [
   },
 
   {
+    name: "propose_session_rebuild",
+    description:
+      "PROPOSES rebuilding ONE day's session around the lift that carries their progression — this does NOT apply anything, the app shows a card and the user taps Confirm. Use it when somebody wants a DIFFERENT session rather than a specific change: 'give me something different today', 'I'm bored of this one', 'can I do a different session', 'the gym's too busy for this'. WHAT IT DOES, so you can say it plainly: their MAIN LIFT is kept exactly as it is — same exercise, same weight, same sets, so this week's progression on it is untouched — and every OTHER exercise is swapped for something that fits their equipment and injuries. Anything with no real alternative stays put, and the card names it rather than pretending. It is TODAY only; the same day next week is the session that was always planned. IF THE MAIN LIFT IS THE PROBLEM — 'I don't fancy squatting today' — this is the WRONG tool: use propose_exercise_swap on that one exercise, which can change it. It is NOT propose_session_shorten (that is about TIME) and NOT propose_volume_change (that is about how hard, and it lasts).",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day of the week whose session should be rebuilt (Monday ... Sunday). Absent means today.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what they described (e.g. 'bored of this session', 'gym too busy for the rack') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+
+  {
     name: "propose_cardio_session",
     description:
       "PROPOSES putting a CARDIO OR ACTIVITY SESSION on one day of their plan — a run, a ride, a swim, a rower, a walk — as part of the plan, not as a note. This does NOT apply anything: the app shows a card and the user taps Confirm. CALL IT ONLY AFTER THEY HAVE SAID YES. When somebody mentions doing something on a day ('Wednesday is my cardio day', 'I run on Tuesdays'), you ASK first, in plain words, with no tool call at all — see the section on offering to add a session. Only when they answer yes do you call this. YOU MUST CARRY THE DETAIL THE CONVERSATION ALREADY ESTABLISHED: if you have told them 30-40 minutes of zone 2 on a treadmill or bike, this card says 35 minutes at that effort, not 'cardio'. A card that throws away what you just prescribed is worse than no card. It is NOT propose_concurrent_activity, which is for a sport they do OUTSIDE this plan (a Muay Thai class, a football league) and which rebuilds their lifting around it — this one is a session the plan itself prescribes and shows on the day. It is NOT record_fact: remembering that Wednesday is their cardio day changes nothing on any screen.",
@@ -1856,6 +1880,12 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 - "I've only got 25 minutes", "I can do half an hour before work", "I need to be out by 7" — call propose_session_shorten with the number of minutes they said. If they say they are short of time but no number, ASK how long they have; do not guess one.
 - Say what it will do, in their terms: the main lift stays exactly as it is, the accessory work at the end comes out until it fits, and the day is back to the full session next week. Never name a specific exercise as the one that will go — the app decides that against the floors and you cannot see the result until the card renders.
 - This is TODAY. "Tuesdays are always too long" is not this tool: session length is a lasting setting they change on the Profile screen, and saying so is the honest answer.
+
+=== 3d3. A DIFFERENT SESSION TODAY (propose_session_rebuild) ===
+- "Give me something different today", "I'm bored of this one", "can I do a different session", "the gym is too busy for this" — call propose_session_rebuild. They want a different session, not a specific change.
+- Say what it will do, in their terms: their main lift stays exactly as it is, same weight and same sets, so this week's progression on it is untouched; everything else changes to something that fits their kit and their injuries; and the day is back to the planned session next week. NEVER name the exercises that will replace them — the app chooses those against their equipment, their injuries and what is already elsewhere in their week, and you cannot see the result until the card renders.
+- IF THE MAIN LIFT IS THE THING THEY DO NOT WANT — "I can't face squatting today", "anything but bench" — this is the WRONG tool, because it is the one exercise this one will not touch. Use propose_exercise_swap on that lift instead. Saying so plainly is better than handing them a card that keeps exactly what they asked to avoid.
+- It is not propose_session_shorten (that is about TIME) and not propose_volume_change (that is about how HARD, and it lasts beyond today).
 - Do not reach for propose_volume_change for a TIME problem. Fewer sets across the board is a different thing from a shorter session, and time is what they told you about.
 
 === 3d. SESSION VOLUME (propose_volume_change) ===
@@ -1918,7 +1948,7 @@ NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -2116,7 +2146,7 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "propose_cardio_session", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_session_rebuild", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "propose_cardio_session", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
@@ -3443,6 +3473,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_session_shorten",
               rawArgs: { day: args.day, minutes: args.minutes, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_rebuild") {
+        // Courier shape, same as propose_session_shorten above: no server
+        // write, raw args forwarded, the client builds the diff.
+        // rebuildDayAroundMainLift lives in src/lib and cannot be reached from
+        // Deno — it needs the exercise catalogue, the replacement ranker and
+        // the settling tail, none of which exist on this side.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_rebuild",
+              rawArgs: { day: args.day, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

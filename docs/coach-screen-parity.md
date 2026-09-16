@@ -56,6 +56,7 @@ it is wrong.
 | `propose_session_move` | SCREEN | The day menu → "What happened?". |
 | `propose_cardio_session` | SCREEN | "Make this a cardio day" on the rest / recovery card, since 15 Sep 2026. Same executor as the coach confirm, so both write the rest of the block. |
 | `propose_session_shorten` | SCREEN | The day menu, since 13 Sep 2026. |
+| `propose_session_rebuild` | SCREEN | The day menu, since 16 Sep 2026 — "Give me a different session". Ashley's ruling that day: the main lift is kept, everything else rebuilt around it. |
 | `propose_style_change` | SCREEN | Profile → training style. |
 | `propose_volume_change` | SCREEN | The workout card's volume control. |
 | `record_context_fact` | SCREEN | Profile → Memory. |
