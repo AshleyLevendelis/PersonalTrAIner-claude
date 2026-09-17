@@ -89,7 +89,45 @@ const TARGET_FIELDS: ReadonlyArray<{ key: keyof MacroTargets; label: string; uni
  * Home, in the same strip as every other thing the coach says. A four-row
  * table there would read as a report, not as a trainer mentioning something.
  */
-export function targetsMoved(before: MacroTargets, after: MacroTargets): string | null {
+/**
+ * WHY THE CAUSE IS AN ARGUMENT, added 17 Sep 2026 after shipping this broken.
+ *
+ * The sentence used to end with a hardcoded "moved with your recent weigh-ins",
+ * and on 16 Sep this function gained a fourth caller: the effect that recomputes
+ * targets when the GOAL, age, height, activity level or macro mode changes.
+ * So switching from fat loss to muscle growth told somebody their weigh-ins had
+ * done it. Nobody had weighed in.
+ *
+ * A single sentence with one cause baked into it is safe exactly until it gets
+ * a second caller, and nothing about adding that caller makes the problem
+ * visible — the sentence still reads perfectly. Any phrasebook line that
+ * ASSERTS WHY should take the why from the caller that knows it.
+ */
+export type TargetMoveCause = 'weigh_in' | 'goal' | 'settings' | 'unknown'
+
+const CAUSE_CLAUSE: Record<TargetMoveCause, string> = {
+  // Named in the person's own terms, never the field that changed. "Recent"
+  // rather than "your weigh-in" because the anchor moves on a seven-day
+  // average, so no single reading is the one responsible.
+  weigh_in: 'with your recent weigh-ins',
+  goal: 'with your new goal',
+  // The honest catch-all: age, height, activity level and macro mode all land
+  // here, and naming them individually would be a list nobody reads. It still
+  // says a CHANGE caused it rather than implying the app moved on its own.
+  settings: "now you've changed your details",
+  // A COLD START KNOWS NOTHING, and must not guess. restoreSession compares
+  // today's targets against the last stored snapshot, which could have moved
+  // for any reason, on any day, possibly on another device. Every other clause
+  // here asserts a cause; this one asserts only elapsed time, which is the one
+  // thing that path can actually stand behind.
+  unknown: 'since you were last here',
+}
+
+export function targetsMoved(
+  before: MacroTargets,
+  after: MacroTargets,
+  cause: TargetMoveCause,
+): string | null {
   const moved = TARGET_FIELDS
     .filter(f => Math.round(before[f.key]) !== Math.round(after[f.key]))
     .map(f => `${f.label} ${grouped(before[f.key])}${f.unit} to ${grouped(after[f.key])}${f.unit}`)
@@ -97,7 +135,34 @@ export function targetsMoved(before: MacroTargets, after: MacroTargets): string 
   const list = moved.length === 1
     ? moved[0]
     : `${moved.slice(0, -1).join(', ')} and ${moved[moved.length - 1]}`
-  return `Your daily targets moved with your recent weigh-ins — ${list}.`
+  // FALLBACK, NOT DECORATION. src/ is typechecked so every real caller passes
+  // a cause — but scripts/ is not (tsconfig is include: ["src"]), and a gate
+  // calling the old two-argument signature produced the user-facing sentence
+  // "Your daily targets moved undefined — calories 2,200 to 2,400." while
+  // still passing, because its assertions read the list and not the clause.
+  // Measured 17 Sep 2026. A sentence that reaches a screen can never be
+  // allowed to contain the word undefined; the gate below pins the clause so
+  // this fallback cannot quietly become the normal path.
+  return `Your daily targets moved ${CAUSE_CLAUSE[cause] ?? CAUSE_CLAUSE.unknown} — ${list}.`
+}
+
+/**
+ * THE MEALS NO LONGER ADD UP TO THE TARGET, said once, with both numbers.
+ *
+ * Ashley's ruling, 17 Sep 2026: tell her and offer to refit — not silently,
+ * not automatically. This is the telling half, and it deliberately asserts NO
+ * CAUSE. targetsMoved above names why the target moved because its caller
+ * knows; this one is reached from a drift that accumulated over weeks out of
+ * every input at once, so "your meals no longer match" is the whole of what
+ * the app can stand behind.
+ *
+ * Calories only, and that is a choice rather than an omission. The protein,
+ * carb and fat bands are part of the same verdict, but four numbers against
+ * four other numbers is a table, and the card's rows already carry the detail
+ * for anyone who wants it.
+ */
+export function mealsDrifted(mealCalories: number, targetCalories: number): string {
+  return `Your meals add up to ${grouped(mealCalories)} calories against a ${grouped(targetCalories)} target. I can resize them — same meals, different amounts.`
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +394,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_meal_food_replace: { done: 'Replaced', failed: "I couldn't replace that" },
   propose_meal_food_resize: { done: 'Resized', failed: "I couldn't change the amount" },
   propose_custom_meal: { done: 'Saved', failed: "I couldn't save that meal" },
+  propose_meal_refit: { done: 'Resized', failed: "I couldn't resize your meals" },
 }
 
 // ---------------------------------------------------------------------------

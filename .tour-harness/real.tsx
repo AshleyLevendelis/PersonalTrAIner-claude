@@ -37,7 +37,9 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exe
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { getPools, setMealPick } from '@/lib/meal-store'
-import type { PoolOption } from '@/lib/meal-generation'
+import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
+import { checkMealRefit } from '@/lib/meal-refit'
+import { computeMealMacros } from '@/lib/food-db'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
 import { saveActiveSessionRecord } from '@/lib/active-session-store'
 import type { UserProfile, MacroTargets } from '@/lib/types'
@@ -154,6 +156,12 @@ const profile: UserProfile = {
   id: PROFILE_ID,
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80,
   activity_level: WALKER ? 'sedentary' : 'moderate',
+  // A COHERENT MEAL SPLIT, added 17 Sep 2026 because its absence was visible.
+  // Both were undefined, so computeSlotBudgets gave the snack slot no share of
+  // the day — and the refit card listed three meals while the fourth kept its
+  // old size. The app now SAYS so (meal-refit's residue line), and the harness
+  // stops describing a profile that eats a snack it does not budget for.
+  meals_per_day: 3, include_snacks: true,
   fitness_goal: FINISHER || WALKER ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   ...(WALKER ? { start_preference: 'move_more' as const } : {}),
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
@@ -408,6 +416,60 @@ const loggedTarget = (() => {
   exercisePlan.find(d => d.day === DAYS[anchorDate().getDay()])?.focus ?? null
 const macros: MacroTargets | null = computeTargets(profile)
 
+// ?refit=1&drift=N — A DAY WHOSE TARGET HAS MOVED AWAY FROM ITS MEALS.
+//
+// ITS OWN MEALS AND ITS OWN TARGET, and both halves of that are measured
+// rather than chosen to look right.
+//
+// The three meals this harness has always carried cannot serve here, and
+// finding out why is the useful part: their macros are hand-written
+// (480/720/780 kcal) while their INGREDIENT LIST is the same 180g chicken and
+// 120g rice, which food-db prices at 442 kcal. checkMealRefit scales the
+// ingredients and then recomputes from the food database — deliberately, so a
+// card never states a number the food will not deliver — so on that fixture
+// the "after" bears no relation to the "before" and the day cannot be made to
+// fit at ANY factor. Measured: at drift 1.0, 1.15, 1.35 and 0.8, needed=false
+// every time. A driver written against it would have proved nothing and passed
+// its no-offer checks vacuously.
+//
+// So the refit run gets four meals whose stated macros ARE their ingredients'
+// macros, and a target derived from the day itself, so drift=1 fits exactly by
+// construction. Measured across seven factors before these two were picked:
+// 1.0 fits and offers nothing; 1.5 and above no longer fits and the resize
+// lands it back inside tolerance. Everything between 1.0 and 1.35 is absorbed
+// silently by assembleDay, which is Ashley's anti-nag ruling working and is
+// the reason the drifted run uses 1.6.
+const REFIT = new URLSearchParams(location.search).get('refit') === '1'
+const DRIFT = Number(new URLSearchParams(location.search).get('drift') ?? '1')
+const priced = (slot: string, name: string, ingredients: { name: string; quantity: number; unit: string }[]) => {
+  const m = computeMealMacros(ingredients)
+  return {
+    slot, name, ingredients, tags: [] as string[],
+    macros: { calories: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) },
+  }
+}
+const refitChosen = {
+  breakfast: priced('breakfast', 'Porridge with milk', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 250, unit: 'ml' }]),
+  lunch: priced('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 150, unit: 'g' }]),
+  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' }]),
+  snack: priced('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
+}
+const refitBase = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
+  (a, sl) => ({
+    calories: a.calories + refitChosen[sl].macros.calories, protein: a.protein + refitChosen[sl].macros.protein,
+    carbs: a.carbs + refitChosen[sl].macros.carbs, fat: a.fat + refitChosen[sl].macros.fat,
+  }),
+  { calories: 0, protein: 0, carbs: 0, fat: 0 },
+)
+const driftedMacros: MacroTargets | null = REFIT
+  ? {
+    calories: Math.round(refitBase.calories * DRIFT),
+    protein: Math.round(refitBase.protein * DRIFT),
+    carbs: Math.round(refitBase.carbs * DRIFT),
+    fat: Math.round(refitBase.fat * DRIFT),
+  }
+  : macros
+
 const today = isoOf(anchorDate())
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
@@ -565,14 +627,14 @@ const nuttyBreakfast = {
   macros: { calories: 480, protein: 18, carbs: 60, fat: 18 },
   tags: [],
 }
-const chosen = {
+const chosen = (REFIT ? refitChosen : {
   breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480),
   lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720),
   dinner: meal('dinner', 'Salmon, new potatoes and green beans', 780),
-} as never
-const pools = {
-  breakfast: [chosen.breakfast], lunch: [chosen.lunch], dinner: [chosen.dinner],
-} as never
+}) as never
+const pools = (REFIT
+  ? { breakfast: [refitChosen.breakfast], lunch: [refitChosen.lunch], dinner: [refitChosen.dinner], snack: [refitChosen.snack] }
+  : { breakfast: [(chosen as never as Record<string, unknown>).breakfast], lunch: [(chosen as never as Record<string, unknown>).lunch], dinner: [(chosen as never as Record<string, unknown>).dinner] }) as never
 
 /**
  * SEED THE FAKE POOL TABLE TOO, not just the props.
@@ -609,6 +671,37 @@ function Harness() {
     setLiveChosen(prev => ({ ...prev, [slot]: option }))
     return true
   }
+  // THE DRIFT OFFER, computed by the APP'S OWN ENGINE and not by this file.
+  // The harness supplies the inputs App supplies (pools, targets, pins) and
+  // renders the real NutritionDisplay with the real verdict; the confirm runs
+  // the real persistResizedPools against the fake database and re-reads, in
+  // App's own order. WHAT THIS CANNOT PROVE, written next to it so no reader
+  // mistakes it: whether App.tsx's own gating decides to show the offer. No
+  // harness page boots App.tsx. test:meal-refit §9 holds that half.
+  const refit = driftedMacros
+    ? checkMealRefit(livePools as never, driftedMacros, {
+      mealsPerDay: profile.meals_per_day, includeSnacks: profile.include_snacks,
+    })
+    : null
+  const [refitError, setRefitError] = useState<string | null>(null)
+  const [refitDeclined, setRefitDeclined] = useState(false)
+  const handleRefitConfirm = async () => {
+    if (!refit) return null
+    const result = await persistResizedPools(PROFILE_ID, refit.pools as never)
+    const fresh = await getPools(PROFILE_ID)
+    setLivePools(prev => ({ ...prev, ...(fresh as Record<string, PoolOption[]>) }))
+    setLiveChosen(prev => {
+      const next = { ...prev }
+      for (const [slot, options] of Object.entries(fresh as Record<string, PoolOption[]>)) {
+        const same = options.find(o => o.name === prev[slot]?.name)
+        if (same) next[slot] = same
+      }
+      return next
+    })
+    if (result.updated === 0) setRefitError("I couldn't resize your meals. They're exactly as they were — try again in a moment.")
+    return result
+  }
+
   const liveTotals = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
     (acc, sl) => {
       const m = liveChosen[sl]?.macros
@@ -688,11 +781,15 @@ function Harness() {
 />
         )}
         {activeTab === 'nutrition' && (
-          <NutritionDisplay profile={profile} macros={macros} exercisePlan={exercisePlan}
+          <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
             latestWeightKg={80} profileId={PROFILE_ID} date={today}
             pools={livePools as never} chosen={liveChosen as never} mealTotals={liveTotals}
             isGeneratingMeals={false} mealRegenerateError={null}
             onMealPickApplied={handleMealPickApplied as never}
+            mealRefit={refit?.needed && !refitDeclined ? refit : null}
+            mealRefitError={refitError}
+            onMealRefitConfirm={() => { void handleRefitConfirm() }}
+            onMealRefitDecline={() => setRefitDeclined(true)}
             onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop} />
         )}
         {activeTab === 'exercise' && (

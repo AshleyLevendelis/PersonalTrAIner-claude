@@ -49,6 +49,7 @@ it is wrong.
 | `propose_meal_food_replace` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_food_resize` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_move` | SCREEN | The meal row's Move control, since 14 Sep 2026. Same day only on BOTH surfaces alike: no screen renders another day's meals, so a cross-day move would change something nobody can see. |
+| `propose_meal_refit` | SCREEN | Nutrition → the "Resize them" offer above the meal list, since 17 Sep 2026. Ashley's two rulings that day: tell her and offer to refit, and stay quiet until the drift is real. **The strongest parity row in this table, and by construction rather than by inspection**: App computes the verdict ONCE and hands the same object to the Nutrition tab and to the coach, and both confirm through one function. The coach cannot offer a resize the screen would not offer, cannot state a number the screen would not state, and cannot write by a different path — there is one answer and one write, read twice. |
 | `propose_meal_swap` | SCREEN | The meal row's swap control. |
 | `propose_missed_session` | SCREEN | The day menu → "What happened?". |
 | `propose_rest_day` | SCREEN | The day menu → "What happened?". |
@@ -70,7 +71,15 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**One, as of 15 Sep 2026.**
+**Three screen-only, as of 17 Sep 2026** — the pre-session tightness check,
+macro mode, and macro split. The calorie target below is a fourth entry but a
+different kind: it is on NEITHER surface and cannot be, because it is derived
+rather than set.
+
+**THE COUNT IS RE-DERIVED FROM THE BULLETS, NEVER CARRIED FORWARD.** It has
+been wrong twice — "None" while tightness shipped, then "One" while three more
+sat listed underneath it. Both times somebody edited a bullet and left the
+header alone. Count what is below before trusting what is here.
 
 - **Saying something feels tight before a session.** Eight areas as taps on the
   Exercise screen; up to three mobility drills go into today's warm-up. There
@@ -116,7 +125,18 @@ the difference.
   closed as written: there is no control because the number is derived by
   `computeTargets`, not stored as an intention. Changing "targets" means
   changing an input.
-- **The fitness goal.** On NEITHER surface. See CLAUDE.md for the measurement.
+- ~~**The fitness goal.**~~ **CLOSED 17 Sep 2026** — a Goal row on Profile and
+  `propose_goal_change` in chat, with a row in the table above. It had been on
+  NEITHER surface while every piece of machinery for it existed, which is why
+  it sat in this section rather than being caught by the gate.
+  **AND THIS BULLET WAS LEFT STALE FOR A DAY BY THE PERSON WHO CLOSED IT** —
+  me. I noticed it, said in the same message that I would fix it, and shipped
+  without doing so; it went to `main` still claiming the goal was unreachable.
+  That is the second time this file's own closing instruction has been ignored
+  by whoever added the capability (the tightness entry, 15 Sep, was the first),
+  and it is the same root cause both times: **nothing in the sweep reads this
+  section**, so only the author's memory keeps it true. Noticing the rule is
+  not following it.
 
 Banning an exercise was the previous entry and closed 14 Sep 2026. This
 section exists so the answer stays written down rather than

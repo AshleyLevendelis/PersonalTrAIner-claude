@@ -86,6 +86,28 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   breaking. It now names what each target moved FROM as well as to, covers
   protein, carbs and fat rather than calories alone, and comes from the shared
   phrasebook instead of two hand-written copies.
+- **And the meals FOLLOW the targets when those move — both surfaces since
+  17 Sep 2026.** Her two rulings that day: **tell her and offer to refit**
+  (from four options — not silently, not automatically, not by swapping the
+  meals out), and **stay quiet until the drift is real, then resize** (from
+  three) — same meals, adjusted amounts, so the shopping list stays valid and
+  saying yes costs nothing.
+  CORRECTED, measured, and the correction is the useful part: "meals never
+  follow a moving target" is FALSE. `assembleDay` is pure, runs on every
+  render, re-searches the pool against current targets and repair-scales its
+  largest unpinned slot — absorbing roughly 0.8x to 1.4x of a day's own size
+  without a word, which is the anti-nag ruling working. A 5kg weight drift is
+  3.5% and lands there; what it cannot absorb is accumulation.
+  **THE ENGINE SHIPPED WITH NO CALLER**, correct and measured and unreachable,
+  and 50 green checks said nothing about it. Same family as the walking plan
+  and the goal, one layer earlier — so the gate now has a section whose only
+  job is to fail when a module has no screen.
+  A GOAL change is deliberately refused here: it moves calories x1.36 while
+  protein stays x1.00, so a proportional resize reaching the calories drags
+  protein from 157g to 239g against a 160g target. **A resize only ever works
+  when the SHAPE held and the SIZE moved**; a goal change regenerates instead.
+  `meal-refit` (91 checks, 16 mutations), `verify:meal-refit` (25 checks, 5
+  mutations), `coach-parity`. Needs the `chat-gemini` deploy for chat
 - Meals hit targets from real foods, varied, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`
@@ -235,6 +257,14 @@ menu" stays true when a copy is also left outside it.
   Meals per day and snacks — `screen only` (Profile)
 - Scale a portion — both surfaces since 12 Sep 2026, the same row menu;
   `meal-food-edit`, `verify:meal-food-edit`
+- Resize the WHOLE DAY back onto the targets — both surfaces since 17 Sep
+  2026; the offer on Nutrition and `propose_meal_refit` in chat. **Parity here
+  is by construction rather than by inspection**: App computes the verdict
+  ONCE and hands the same object to both, and both confirm through one
+  function, so the coach cannot offer what the screen would not, state a
+  number the screen would not, or write by a different path. Worth copying for
+  anything that must not drift between surfaces. `meal-refit`,
+  `verify:meal-refit`, `coach-parity`
 
 **Changing the whole plan**
 - Start again — `screen only` (New Plan; `reset-clears-draft`)
@@ -949,11 +979,23 @@ old — the commands were right and the context was missing.
   check the process is alive on every poll and say so when it is not.
   This is the "a crash reads as a pass" rule one level up: there, zero
   failures looked like success; here, a dead run looked like a live one.
-- **Two checks ALWAYS fail in a cloud session and are not your problem:**
-  `test:meal-quality` and `test:schema-parity`. Both need a live database this
-  machine cannot reach. Confirm by stashing your changes and re-running — they
-  fail identically on untouched code. Report them as environmental rather than
-  investigating them from scratch every session.
+- **THREE checks ALWAYS fail in a cloud session and are not your problem:**
+  `test:meal-quality`, `test:schema-parity` and `verify:rls`. All three need a
+  live database this machine cannot reach; each prints the same cause verbatim
+  — *"Host not in allowlist: …supabase.co"*. Report them as environmental
+  rather than investigating them from scratch every session.
+  CORRECTED 17 Sep 2026, measured: this line said TWO for weeks and named only
+  the first pair. `verify:rls` has the same cause and was simply never in a
+  reported sweep here. **The shape is the one this file keeps relearning: a
+  count written once goes stale silently, because nothing re-derives it.** The
+  honest way to confirm the set is to read each failure's own output for the
+  allowlist sentence, not to tick names off this list — a real failure could
+  hide behind a name that happens to be on it.
+  `verify:rls` is worth knowing about for a second reason: it refuses to pass
+  on an unreachable database and says so — *"INCONCLUSIVE… this run proves
+  nothing. Nothing here says your data is safe, and nothing here says it is
+  exposed."* It used to print PASSED over 28 failed connections. That is the
+  model for every check that can lose its subject.
 - The sweep REWRITES `audit-report.txt`, `quality-report.txt` and
   `differentiation-audit-report.txt`. Revert those three before committing
   unless the change is genuinely about them.

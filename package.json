@@ -250,6 +250,7 @@
     "verify:cardio-session": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-session.mjs",
     "verify:program-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/program-move.mjs",
     "verify:meal-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-move.mjs",
+    "verify:meal-refit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-refit.mjs",
     "verify:meal-food-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-food-edit.mjs",
     "verify:tools-timer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tools-timer.mjs",
     "verify:round-presets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/round-presets.mjs",
@@ -285,7 +286,8 @@
     "test:bodyweight-progress": "tsx scripts/test-bodyweight-progress.ts",
     "verify:bodyweight-progress": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/bodyweight-progress.mjs",
     "test:session-length-change": "tsx scripts/test-session-length-change.ts",
-    "test:goal-change": "tsx scripts/test-goal-change.ts"
+    "test:goal-change": "tsx scripts/test-goal-change.ts",
+    "test:meal-refit": "tsx scripts/test-meal-refit.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

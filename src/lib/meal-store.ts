@@ -837,6 +837,3 @@ export async function clearMealPick(profileId: string, date: string, slot: MealS
   await supabase.from('meal_plan_picks').delete().eq('profile_id', profileId).eq('date', date).eq('slot', slot)
 }
 
-export async function clearAllMealPicksForDate(profileId: string, date: string): Promise<void> {
-  await supabase.from('meal_plan_picks').delete().eq('profile_id', profileId).eq('date', date)
-}

@@ -156,11 +156,24 @@ console.log('\n4. The FOOD half is derived from the goal, so a write moves it')
   // nothing recomputes when the field changes, which is exactly the shape
   // that made this whole feature unreachable. App's macro effect keys on a
   // string of inputs — fitness_goal must be in it.
+  // RE-ANCHORED 17 Sep 2026. This read the inline array inside `const
+  // macroInputs` and broke when that array became a named constant — the
+  // refactor made the code better and the check worse, which is the
+  // mechanism-pinned failure CLAUDE.md warns about. The property is "the goal
+  // is one of the inputs that retrigger the target recompute", so read the
+  // list by name and then prove the recompute is built FROM that list.
   const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
-  const inputsAt = app.indexOf('const macroInputs')
-  const inputs = inputsAt < 0 ? '' : app.slice(inputsAt, app.indexOf(']', inputsAt))
+  const keysAt = app.indexOf('MACRO_INPUT_KEYS = [')
+  const keys = keysAt < 0 ? '' : app.slice(keysAt, app.indexOf(']', keysAt))
+  check('the target-recompute inputs are declared as a named list', keysAt > 0, { keysAt })
   check('the app recomputes targets when the goal changes',
-    /fitness_goal/.test(inputs), { inputsAt, inputs: inputs.slice(0, 200) })
+    /fitness_goal/.test(keys), { keys })
+  // AND THE LIST IS ACTUALLY WHAT DRIVES IT. A list nothing reads would
+  // satisfy the check above while the recompute keyed on something else.
+  const inputsAt = app.indexOf('const macroInputs')
+  const inputs = inputsAt < 0 ? '' : app.slice(inputsAt, inputsAt + 200)
+  check('...and the change-detector is built from that list, not a second copy',
+    /MACRO_INPUT_KEYS/.test(inputs), { inputs: inputs.slice(0, 160) })
 
   // AND SAY SO. The numbers moving silently is worse than not moving: the
   // Nutrition tab would show different figures with no account of why.
