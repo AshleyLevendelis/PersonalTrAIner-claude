@@ -86,6 +86,28 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   breaking. It now names what each target moved FROM as well as to, covers
   protein, carbs and fat rather than calories alone, and comes from the shared
   phrasebook instead of two hand-written copies.
+- **And the meals FOLLOW the targets when those move — both surfaces since
+  17 Sep 2026.** Her two rulings that day: **tell her and offer to refit**
+  (from four options — not silently, not automatically, not by swapping the
+  meals out), and **stay quiet until the drift is real, then resize** (from
+  three) — same meals, adjusted amounts, so the shopping list stays valid and
+  saying yes costs nothing.
+  CORRECTED, measured, and the correction is the useful part: "meals never
+  follow a moving target" is FALSE. `assembleDay` is pure, runs on every
+  render, re-searches the pool against current targets and repair-scales its
+  largest unpinned slot — absorbing roughly 0.8x to 1.4x of a day's own size
+  without a word, which is the anti-nag ruling working. A 5kg weight drift is
+  3.5% and lands there; what it cannot absorb is accumulation.
+  **THE ENGINE SHIPPED WITH NO CALLER**, correct and measured and unreachable,
+  and 50 green checks said nothing about it. Same family as the walking plan
+  and the goal, one layer earlier — so the gate now has a section whose only
+  job is to fail when a module has no screen.
+  A GOAL change is deliberately refused here: it moves calories x1.36 while
+  protein stays x1.00, so a proportional resize reaching the calories drags
+  protein from 157g to 239g against a 160g target. **A resize only ever works
+  when the SHAPE held and the SIZE moved**; a goal change regenerates instead.
+  `meal-refit` (91 checks, 16 mutations), `verify:meal-refit` (25 checks, 5
+  mutations), `coach-parity`. Needs the `chat-gemini` deploy for chat
 - Meals hit targets from real foods, varied, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`
@@ -235,6 +257,14 @@ menu" stays true when a copy is also left outside it.
   Meals per day and snacks — `screen only` (Profile)
 - Scale a portion — both surfaces since 12 Sep 2026, the same row menu;
   `meal-food-edit`, `verify:meal-food-edit`
+- Resize the WHOLE DAY back onto the targets — both surfaces since 17 Sep
+  2026; the offer on Nutrition and `propose_meal_refit` in chat. **Parity here
+  is by construction rather than by inspection**: App computes the verdict
+  ONCE and hands the same object to both, and both confirm through one
+  function, so the coach cannot offer what the screen would not, state a
+  number the screen would not, or write by a different path. Worth copying for
+  anything that must not drift between surfaces. `meal-refit`,
+  `verify:meal-refit`, `coach-parity`
 
 **Changing the whole plan**
 - Start again — `screen only` (New Plan; `reset-clears-draft`)

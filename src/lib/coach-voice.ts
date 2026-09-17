@@ -146,6 +146,25 @@ export function targetsMoved(
   return `Your daily targets moved ${CAUSE_CLAUSE[cause] ?? CAUSE_CLAUSE.unknown} — ${list}.`
 }
 
+/**
+ * THE MEALS NO LONGER ADD UP TO THE TARGET, said once, with both numbers.
+ *
+ * Ashley's ruling, 17 Sep 2026: tell her and offer to refit — not silently,
+ * not automatically. This is the telling half, and it deliberately asserts NO
+ * CAUSE. targetsMoved above names why the target moved because its caller
+ * knows; this one is reached from a drift that accumulated over weeks out of
+ * every input at once, so "your meals no longer match" is the whole of what
+ * the app can stand behind.
+ *
+ * Calories only, and that is a choice rather than an omission. The protein,
+ * carb and fat bands are part of the same verdict, but four numbers against
+ * four other numbers is a table, and the card's rows already carry the detail
+ * for anyone who wants it.
+ */
+export function mealsDrifted(mealCalories: number, targetCalories: number): string {
+  return `Your meals add up to ${grouped(mealCalories)} calories against a ${grouped(targetCalories)} target. I can resize them — same meals, different amounts.`
+}
+
 // ---------------------------------------------------------------------------
 // ASKING
 // ---------------------------------------------------------------------------
@@ -375,6 +394,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_meal_food_replace: { done: 'Replaced', failed: "I couldn't replace that" },
   propose_meal_food_resize: { done: 'Resized', failed: "I couldn't change the amount" },
   propose_custom_meal: { done: 'Saved', failed: "I couldn't save that meal" },
+  propose_meal_refit: { done: 'Resized', failed: "I couldn't resize your meals" },
 }
 
 // ---------------------------------------------------------------------------

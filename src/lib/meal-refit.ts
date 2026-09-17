@@ -133,6 +133,8 @@ export function checkMealRefit(
 
   const budgets = computeSlotBudgets(targets, mealsPerDay, includeSnacks)
   const rejected: string[] = []
+  /** Slots the profile's own meal split gives no share of the day to. */
+  const unbudgeted: MealSlotName[] = []
   const next: MealPools = {}
 
   for (const slot of Object.keys(pools) as MealSlotName[]) {
@@ -144,7 +146,14 @@ export function checkMealRefit(
     if (pinned[slot]) { next[slot] = options; continue }
 
     const budget = budgets[slot]
-    if (!budget) { next[slot] = options; continue }
+    // NO BUDGET IS NOT NOTHING TO SAY. computeSlotBudgets gives a slot a share
+    // only if the profile's meal split includes it, so a snack sitting in the
+    // pool of a profile that does not include snacks gets no budget — and used
+    // to be skipped in silence while still counting towards the day's totals.
+    // Found by reading a real screen: the card listed three meals and the
+    // fourth quietly kept its old size. A resize that leaves a meal alone says
+    // which one.
+    if (!budget) { next[slot] = options; unbudgeted.push(slot); continue }
 
     next[slot] = options.map(option => {
       const scaled = scaleToTarget(
@@ -175,6 +184,12 @@ export function checkMealRefit(
     // calling that a resize would be describing the wrong change.
     if (now.name !== was.name) continue
     if (now.macros.calories === was.macros.calories) continue
+    // NO RESIZED OPTION CARRIED HERE, and that was a real dead end rather than
+    // an omission: I added one on the way to a confirm that would write the
+    // chosen meals slot by slot, then measured that only writing the WHOLE
+    // resized pool reproduces `after` — assembly is free to pick a different
+    // option, so a half-resized pool does not land where the card promised.
+    // The confirm writes `pools`; this list is for the card to read.
     resized.push({ slot, name: now.name, before: was.macros, after: now.macros })
   }
 
@@ -199,7 +214,7 @@ export function checkMealRefit(
     pools: next,
     resized,
     pinnedUntouched: Object.keys(pinned) as MealSlotName[],
-    couldNotFix: describeResidue(after, rejected, Object.keys(pinned) as MealSlotName[]),
+    couldNotFix: describeResidue(after, rejected, Object.keys(pinned) as MealSlotName[], unbudgeted),
   }
 }
 
@@ -212,8 +227,9 @@ function describeResidue(
   after: AssembledDay,
   rejected: string[],
   pinnedSlots: MealSlotName[],
+  unbudgeted: MealSlotName[],
 ): string | null {
-  if (after.withinTolerance && rejected.length === 0) return null
+  if (after.withinTolerance && rejected.length === 0 && unbudgeted.length === 0) return null
 
   // A PIN IS THE MOST LIKELY REASON AND THE ONE WORTH NAMING FIRST, because
   // it is the only one the reader can act on: unpin it, or accept the miss.
@@ -222,6 +238,13 @@ function describeResidue(
   }
   if (!after.withinTolerance) {
     return `Resizing gets close but not all the way. Some of these meals are the wrong shape for your new numbers rather than the wrong size, so portions alone cannot finish the job.`
+  }
+  // A SLOT YOUR MEAL SPLIT DOES NOT COVER, named first among the tolerance-
+  // reached cases because it is the one with an obvious fix: it is a setting,
+  // not a limit of portioning.
+  if (unbudgeted.length > 0) {
+    const names = unbudgeted.join(' and ')
+    return `Everything fits now except your ${names} — your meal split doesn't give ${unbudgeted.length === 1 ? 'it' : 'them'} a share of the day, so ${unbudgeted.length === 1 ? 'it stays' : 'they stay'} exactly as before.`
   }
   // Tolerance reached, but something could not be scaled honestly. Still worth
   // saying: the day fits and one meal is not the size it should be.
@@ -246,4 +269,44 @@ export function refitNeeded(
     includeSnacks: profile.include_snacks,
     pinned,
   }).needed
+}
+
+// ---------------------------------------------------------------------------
+// SAYING NO, AND HAVING THAT REMEMBERED
+// ---------------------------------------------------------------------------
+// Ashley's first ruling has a quiet half: an offer that reappears on every
+// load after she declined it is not an offer, it is a nag. The other two
+// standing offers (weight basis, beat-target) persist their answer in a table
+// — the right shape for a decision that changes a PLAN. This one gates a
+// nudge, so it follows goal-proximity.ts instead and stays device-local.
+//
+// KEYED ON THE TARGETS, NOT ON A DATE OR AN ID, and that is the whole design.
+// "I don't want my meals resized" is only ever true of the numbers that were
+// on screen when she said it. When the target moves again the key changes, the
+// decline no longer matches, and the app is free to ask about the NEW gap —
+// which is exactly right, and is the behaviour a per-profile flag would have
+// silently prevented for ever.
+const DECLINED_KEY_PREFIX = 'fitplan_meal_refit_declined_v1'
+
+/** The identity of a decline: whose day, and against which numbers. */
+const declineKey = (profileId: string, targets: MacroTargets): string =>
+  `${DECLINED_KEY_PREFIX}:${profileId}:${Math.round(targets.calories)}-${Math.round(targets.protein)}-${Math.round(targets.carbs)}-${Math.round(targets.fat)}`
+
+export function isRefitDeclined(profileId: string, targets: MacroTargets | null): boolean {
+  if (!targets) return false
+  try {
+    return localStorage.getItem(declineKey(profileId, targets)) === '1'
+  } catch {
+    // Best-effort, same as every other dismissal in the app: a storage that
+    // refuses to read means the offer can appear again, never that it is
+    // suppressed by accident.
+    return false
+  }
+}
+
+export function declineRefit(profileId: string, targets: MacroTargets | null): void {
+  if (!targets) return
+  try {
+    localStorage.setItem(declineKey(profileId, targets), '1')
+  } catch { /* best-effort — a failed decline just means the offer can return */ }
 }

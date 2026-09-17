@@ -25,7 +25,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { checkMealRefit, refitNeeded } from '../src/lib/meal-refit'
+import { checkMealRefit, refitNeeded, isRefitDeclined, declineRefit } from '../src/lib/meal-refit'
 import { assembleDay, type PoolOption } from '../src/lib/meal-generation'
 import { computeMealMacros } from '../src/lib/food-db'
 import { computeTargets } from '../src/lib/nutrition-targets'
@@ -34,6 +34,9 @@ import type { MacroTargets, UserProfile } from '../src/lib/types'
 import type { MealSlotName } from '../src/lib/meal-store'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
+/** Comments blanked before any ABSENCE check: a note explaining why something was removed would otherwise satisfy the check that it was removed. */
+const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
   if (ok) console.log(`  ok: ${name}`)
@@ -259,6 +262,176 @@ console.log('\n8. The thin wrapper both surfaces call agrees with the full check
   check('no targets means no offer', refitNeeded(pools, null, profile) === false)
   check('a fitting day means no offer', refitNeeded(pools, { ...asBuilt }, profile) === false)
   check('a drifted day means an offer', refitNeeded(pools, scaleTargets(asBuilt, 1.6), profile) === true)
+}
+
+console.log('\n8b. A meal the split gives no share to is NAMED, not silently left')
+{
+  // FOUND ON A REAL SCREEN, not from the source. The harness profile had no
+  // meals_per_day and no include_snacks, so computeSlotBudgets gave the snack
+  // slot no budget — and the card listed three meals while the fourth kept its
+  // old size and went on counting towards the day's total. Nothing said so.
+  const target = scaleTargets(asBuilt, 1.6)
+  const noSnackSplit = checkMealRefit(pools, target, { mealsPerDay: 3, includeSnacks: false })
+  const snackResized = noSnackSplit.resized.some(r => r.slot === 'snack')
+  check('a slot with no budget is not resized', snackResized === false, noSnackSplit.resized.map(r => r.slot))
+  check('...and the card says which one, in plain words',
+    !!noSnackSplit.couldNotFix && /snack/i.test(noSnackSplit.couldNotFix), noSnackSplit.couldNotFix)
+  check('...naming the meal split as the reason, not a limit of portioning',
+    /meal split/i.test(noSnackSplit.couldNotFix ?? ''), noSnackSplit.couldNotFix)
+  // The contrast, so the check above cannot pass vacuously on a day where
+  // nothing was resizable at all.
+  const withSplit = checkMealRefit(pools, target, OPTS)
+  check('...while a split that DOES include it resizes it', withSplit.resized.some(r => r.slot === 'snack'),
+    withSplit.resized.map(r => r.slot))
+}
+
+console.log('\n9. The offer actually reaches a screen, and is gated on the verdict')
+{
+  // WRITTEN BECAUSE THE ENGINE SHIPPED WITH NO CALLER. The 50 checks above all
+  // passed while nothing in the app imported this module at all — a feature
+  // that was correct, measured and completely unreachable. These checks are
+  // the difference between "it works" and "it is had", and they are source
+  // checks for the honest reason: a `test:` gate cannot prove a branch RENDERS.
+  // verify:meal-refit is what proves that, on a real screen.
+  const app = strip(read('src/App.tsx'))
+  const nut = strip(read('src/components/NutritionDisplay.tsx'))
+
+  check('App asks whether the meals have drifted', /checkMealRefit\(/.test(app))
+  // The gate, not the call: asking unconditionally would repeat the assembly
+  // search on every render to learn what assembledMeals already knows.
+  check('...only on a day the assembler already failed',
+    /assembledMeals\s*&&\s*!assembledMeals\.withinTolerance/.test(app))
+  check('...and only offers what the engine calls needed',
+    /mealRefit\?\.needed\s*&&\s*!mealRefitDeclined/.test(app))
+  check('...and hands it to the Nutrition tab', /mealRefit=\{mealRefitOffer\}/.test(app))
+
+  check('the Nutrition tab renders the offer', /data-testid="meal-refit-offer"/.test(nut))
+  check('...with both a resize and a leave-it action',
+    /'Resize them'/.test(nut) && /'Leave them'/.test(nut))
+  check('...naming every meal it would change, before and after',
+    /mealRefit\.resized\.map\(/.test(nut) && /r\.before\.calories/.test(nut) && /r\.after\.calories/.test(nut))
+  // THE HONEST HALF, pinned separately: a card that reports only successes is
+  // the exact failure this whole module's describeResidue exists to prevent.
+  check('...and showing what it could not fix when there is something',
+    /mealRefit\.couldNotFix\s*&&/.test(nut))
+  check('the lead comes from the phrasebook, not written here',
+    /mealsDrifted\(/.test(nut) && !/Your meals add up to/.test(nut))
+}
+
+console.log('\n10. ONE verdict, read by both surfaces — parity by construction')
+{
+  // The strongest form of the parity promise available: the coach does not
+  // recompute anything, so it cannot reach a different answer from the screen.
+  // Pinned on the DIRECTION of the data as well as the fact of it — a chat
+  // that called checkMealRefit itself would satisfy a bare-name check while
+  // being exactly the second opinion this forbids.
+  const app = strip(read('src/App.tsx'))
+  const chat = strip(read('src/components/ChatAssistant.tsx'))
+  check('the coach is handed the same verdict App gives the screen',
+    (app.match(/mealRefit=\{mealRefitOffer\}/g) ?? []).length === 2,
+    (app.match(/mealRefit=\{mealRefitOffer\}/g) ?? []).length)
+  check('...and never computes its own', !/checkMealRefit\(/.test(chat))
+  check('...and confirms through the screen\'s write path, not a second one',
+    /onMealRefitConfirm\(\)/.test(chat) && !/persistResizedPools\(/.test(chat))
+  check('App has exactly one place that writes a resize',
+    (app.match(/persistResizedPools\(/g) ?? []).length === 1)
+
+  check('the coach declares the tool', /"propose_meal_refit"/.test(strip(read('supabase/functions/chat-gemini/index.ts'))))
+  check('...as a courier that decides nothing', (() => {
+    const fn = strip(read('supabase/functions/chat-gemini/index.ts'))
+    const i = fn.indexOf('if (name === "propose_meal_refit")')
+    if (i < 0) return false
+    const body = fn.slice(i, i + 900)
+    // No macro arithmetic, no slot names, no portions: the whole point is that
+    // the model is told nothing it could get wrong.
+    return /kind: "propose_meal_refit"/.test(body) && !/kcal|calories|breakfast/.test(body)
+  })())
+  check('the client refuses to build a card when a resize would not help',
+    /if \(!mealRefit \|\| !mealRefit\.needed/.test(chat))
+  check('...and says why instead of going quiet',
+    /wrong shape for your numbers/.test(chat) && /already add up to your targets/.test(chat))
+}
+
+console.log('\n11. The write re-portions what is stored, and removes nothing')
+{
+  const gen = strip(read('src/lib/meal-generation.ts'))
+  const i = gen.indexOf('export async function persistResizedPools')
+  const body = i < 0 ? '' : gen.slice(i, gen.indexOf('\n}', gen.indexOf('return { updated, failed }', i)))
+  check('there is a resize writer at all', i >= 0)
+  // THE PROPERTY, not the mechanism: "same meals, adjusted amounts" means the
+  // write cannot be capable of removing or adding a meal, however it is
+  // implemented. persistPools' delete-then-insert is the thing being avoided.
+  check('it never deletes', !/\.delete\(/.test(body))
+  check('...and never inserts', !/\.insert\(/.test(body))
+  check('...it updates', /\.update\(/.test(body))
+  // THE UPDATE PAYLOAD ITSELF, sliced out rather than searched for across the
+  // whole function. My first version of this check asked whether the word
+  // "name" appeared anywhere in the body and failed on the perfectly correct
+  // line that MATCHES a stored row by name. The property is about what is
+  // written, so the check has to read what is written.
+  const update = body.slice(body.indexOf('.update({'), body.indexOf('})', body.indexOf('.update({')))
+  check('it can find the update payload (sanity check on this check)', update.length > 20, update.length)
+  check('...which moves amounts and their macros', /ingredients:/.test(update) && /macros:/.test(update))
+  check('...and nothing else — not the name, not the tags, not the slot',
+    !/\bname:/.test(update) && !/\btags:/.test(update) && !/\bslot:/.test(update), update)
+}
+
+console.log('\n12. Saying no is remembered against THESE numbers, and no others')
+{
+  // localStorage does not exist in node; the module is written to survive its
+  // absence, so the stub proves the real behaviour rather than papering over it.
+  const store = new Map<string, string>()
+  ;(globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => { store.set(k, v) },
+  }
+  const a: MacroTargets = { calories: 2200, protein: 160, carbs: 220, fat: 70 }
+  const b: MacroTargets = { calories: 2400, protein: 160, carbs: 220, fat: 70 }
+  check('nothing is declined to begin with', isRefitDeclined('p1', a) === false)
+  declineRefit('p1', a)
+  check('a decline is remembered', isRefitDeclined('p1', a) === true)
+  // THE WHOLE DESIGN, and the reason it is not a per-profile flag: "leave my
+  // meals alone" was only ever true of the numbers she was looking at.
+  check('...and covers only the targets it was given', isRefitDeclined('p1', b) === false)
+  check('...and only that profile', isRefitDeclined('p2', a) === false)
+  check('no targets means nothing to decline', isRefitDeclined('p1', null) === false)
+
+  // FAILS OPEN, NEVER CLOSED. A storage that throws must let the offer appear
+  // again — the opposite mistake would suppress it for ever, invisibly.
+  ;(globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: () => { throw new Error('blocked') },
+    setItem: () => { throw new Error('blocked') },
+  }
+  check('unreadable storage means ask again, not go silent', isRefitDeclined('p1', a) === false)
+  declineRefit('p1', a)
+  check('...and an unwritable decline throws nothing at the caller', true)
+}
+
+console.log('\n13. Regenerating some meals no longer destroys picks for the others')
+{
+  // NOT PART OF THE RESIZE, found while reading the path it sits beside, and
+  // fixed here because it is the same promise: a meal the app kept on purpose
+  // should not quietly stop being hers. The old code kept the prior pool for a
+  // slot whose regeneration failed and then cleared EVERY pick anyway.
+  const app = strip(read('src/App.tsx'))
+  const i = app.indexOf('const handleRegenerateAllMeals')
+  const body = app.slice(i, i + 4000)
+  check('the regenerate path clears picks per slot', /clearMealPick\(/.test(body))
+  check('...and not all of them at once', !/clearAllMealPicksForDate/.test(body))
+  // DRIVEN BY THE DERIVED LIST, not merely accompanied by it. Found by
+  // mutation: pointing the loop at an empty array left "regeneratedSlots" in
+  // the file and every earlier version of this check green, while no pick was
+  // cleared at all. The property is which collection the loop walks.
+  check('...for exactly the slots that actually got new meals',
+    /for \(const slot of regeneratedSlots\) await clearMealPick\(/.test(body))
+  check('...and the on-screen picks are dropped from the same list',
+    /for \(const slot of regeneratedSlots\) delete next\[slot\]/.test(body))
+  check('...where that list is the slots whose pool came back non-empty',
+    /regeneratedSlots =[\s\S]{0,220}options\.length > 0/.test(body))
+  // The blanket helper is gone rather than left exported — an unreferenced
+  // "delete every pick for this day" is a loaded gun for the next reader.
+  check('the blanket helper no longer exists anywhere',
+    !/clearAllMealPicksForDate/.test(strip(read('src/lib/meal-store.ts'))))
 }
 
 console.log(failures === 0 ? '\nAll meal-refit checks passed.\n' : `\n${failures} check(s) FAILED.\n`)

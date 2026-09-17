@@ -769,6 +769,87 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
   }
 }
 
+/**
+ * RE-PORTIONS WHAT IS ALREADY STORED, AND CHANGES NOTHING ELSE.
+ *
+ * The write half of meal-refit.ts. Ashley's ruling of 17 Sep 2026 is "same
+ * meals, adjusted amounts", and the shape of this function is that sentence:
+ * it UPDATES the ingredients and macros of rows that already exist, matched by
+ * name within the slot. It never inserts, never deletes, and never touches a
+ * row whose name is not in the resized set.
+ *
+ * DELIBERATELY NOT persistPools. That function is a delete-then-insert, and
+ * its own doc comment lists the three failure modes it has to defend against
+ * because of it — a slot with no meals in it for a moment, a failed insert
+ * leaving it that way, a restore path for when it does. None of those exist
+ * here, because nothing is ever removed. It also preserves `user-requested`
+ * rows at their ORIGINAL macros on purpose, which would be exactly wrong for a
+ * resize: the whole point is that every option is re-sized to the new budget.
+ *
+ * Matched on NAME rather than position. readPools orders by pool_index and
+ * then discards it, so the caller's array index is only a proxy for the stored
+ * index and would silently mis-assign the moment a pool had a gap in its
+ * indices. The name is what every other meal path already treats as the
+ * option's identity — picks are stored by name, nextPoolOption finds by name.
+ *
+ * Returns what actually happened rather than throwing: a partial write is a
+ * real outcome here and the caller has to be able to tell the person about it.
+ */
+export async function persistResizedPools(
+  profileId: string,
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+): Promise<{ updated: number; failed: number }> {
+  let updated = 0
+  let failed = 0
+  for (const [slot, options] of Object.entries(pools) as [MealSlotName, PoolOption[]][]) {
+    if (!options || options.length === 0) continue
+
+    const { data, error } = await supabase
+      .from('meal_plan_slots')
+      .select('pool_index, name')
+      .eq('profile_id', profileId)
+      .eq('slot', slot)
+    if (error || !data) {
+      // Nothing was written for this slot, and nothing was destroyed either.
+      console.error(`Couldn't read the stored pool for slot ${slot} — leaving its portions as they are:`, error)
+      failed += options.length
+      continue
+    }
+
+    const indexByName = new Map<string, number>()
+    for (const row of data as { pool_index: number; name: string }[]) {
+      // FIRST WINS. A duplicate name inside one slot should not happen and is
+      // not worth failing over; updating the first is the same choice
+      // nextPoolOption makes when it resolves a name to an option.
+      if (!indexByName.has(row.name)) indexByName.set(row.name, row.pool_index)
+    }
+
+    for (const option of options) {
+      const poolIndex = indexByName.get(option.name)
+      // An option that is not in the database is one assembly invented or one
+      // added since the read. Skipped rather than inserted: this function
+      // re-portions, and quietly growing the pool would be a different verb.
+      if (poolIndex === undefined) continue
+      const { error: updateError } = await supabase
+        .from('meal_plan_slots')
+        .update({
+          ingredients: option.ingredients,
+          macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
+        })
+        .eq('profile_id', profileId)
+        .eq('slot', slot)
+        .eq('pool_index', poolIndex)
+      if (updateError) {
+        console.error(`Couldn't resize ${option.name} in slot ${slot}:`, updateError)
+        failed += 1
+      } else {
+        updated += 1
+      }
+    }
+  }
+  return { updated, failed }
+}
+
 // ---------------------------------------------------------------------------
 // DAY ASSEMBLY (M1 Part 4) — pick one option per slot that hits the day's
 // totals, not just each slot's own budget in isolation. Slot budgets are

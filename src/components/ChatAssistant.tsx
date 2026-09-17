@@ -32,6 +32,7 @@ import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from 
 import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
 import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
+import type { MealRefit } from '@/lib/meal-refit'
 import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
@@ -239,6 +240,19 @@ interface ChatAssistantProps {
    * harness) is not forced to invent one.
    */
   onGoalMealsNeedRebuild?: () => Promise<void>
+  /**
+   * WHETHER TODAY'S MEALS HAVE DRIFTED, and by how much — computed once in
+   * App.tsx and handed to BOTH surfaces, rather than recomputed here.
+   *
+   * That is the whole parity guarantee for this capability rather than an
+   * optimisation: the coach literally cannot offer a resize the Nutrition tab
+   * would not offer, and cannot state a number the screen would not state,
+   * because there is one answer and both read it. Null when the day fits or
+   * the offer was already turned down.
+   */
+  mealRefit?: MealRefit | null
+  /** The one write path, shared with the screen's own Resize button. Reports what actually landed so the receipt can say so. */
+  onMealRefitConfirm?: () => Promise<{ updated: number; failed: number } | null>
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
@@ -318,7 +332,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -3434,6 +3448,69 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * is that it never shows a number it would have to invent; naming the
    * direction is honest and naming a calorie count would not be.
    */
+  /**
+   * "MY MEALS DON'T ADD UP TO MY CALORIES ANY MORE" — the coach's half of
+   * Ashley's 17 Sep ruling, built from the SAME verdict the Nutrition tab
+   * renders rather than a second opinion about the same day.
+   *
+   * Returns null in the one case that matters: the app says a resize would
+   * not help. The engine refuses when the day already fits, when nothing can
+   * be resized, and — the case worth naming — when the day is the wrong SHAPE
+   * rather than the wrong size, where a proportional resize reaches the
+   * calorie target by dragging protein further out than it started. A card
+   * there would be an offer of harm with a Confirm button on it, so there is
+   * no card and the coach says so in words instead.
+   *
+   * The payload is deliberately tiny and carries no portions. The write runs
+   * through App's own handler against the plan as it stands at confirm time,
+   * which is the same deferral the swap card already makes — the numbers on
+   * the card are real, and the write re-reads rather than replaying them.
+   */
+  /**
+   * The four slot names, capitalised. A local copy of MealPlan's SLOT_LABEL
+   * rather than an import of it: importing a meal-screen component into the
+   * chat bundle for four words would drag the whole meal UI into this chunk,
+   * and test:bundle's re-download ceiling is the thing that would notice —
+   * after the fact, as a number nobody could explain. Four words is the
+   * cheaper duplicate.
+   */
+  const REFIT_SLOT_LABEL: Record<MealSlotName, string> = {
+    breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack',
+  }
+
+  const buildMealRefitProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: Record<string, unknown>
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    if (!mealRefit || !mealRefit.needed || mealRefit.resized.length === 0) return null
+    const before = Math.round(mealRefit.before.totals.calories)
+    const after = Math.round(mealRefit.after.totals.calories)
+    return {
+      // Keyed on the day's BEFORE state, so two asks about the same drifted
+      // day collapse onto one proposal instead of stacking two cards.
+      scopeKey: `${profile.id}:propose_meal_refit:${before}`,
+      preconditions: { beforeCalories: before },
+      payload: { beforeCalories: before, afterCalories: after, slots: mealRefit.resized.map(r => r.slot) },
+      diff: {
+        lead: ask('resize today\'s meals so they add up to your targets'),
+        rows: mealRefit.resized.map(r => ({
+          field: REFIT_SLOT_LABEL[r.slot],
+          before: `${Math.round(r.before.calories)} kcal`,
+          after: `${Math.round(r.after.calories)} kcal`,
+          note: r.name,
+        })),
+        unchanged: ['The meals themselves, their names and their foods — only the amounts move.'],
+        implications: mealRefit.couldNotFix
+          ? [{ severity: 'warn', text: mealRefit.couldNotFix }]
+          : undefined,
+        rationale: typeof rawArgs.origin_verbatim_quote === 'string' ? rawArgs.origin_verbatim_quote : undefined,
+        reversible: false,
+      },
+    }
+  }
+
   const buildGoalChangeProposal = (rawArgs: Record<string, unknown>): {
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -4433,7 +4510,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         result.proposal.kind === 'propose_meal_food_remove'
         || result.proposal.kind === 'propose_meal_food_replace'
         || result.proposal.kind === 'propose_meal_food_resize'
-        || result.proposal.kind === 'propose_meal_move'
+        // DEAD ALTERNATIVE REMOVED, 17 Sep 2026: propose_meal_move was listed
+        // here as a fourth and is handled by its own branch thirty lines
+        // above, so this test could never be true for it. Harmless to run and
+        // actively misleading to read — it implied a meal move shared the
+        // food-edit builders, which it does not.
       ) {
         // CHANGING ONE FOOD ALREADY IN THE MEAL — the same door as the add
         // above, opening the other way. One branch for all three because the
@@ -4573,6 +4654,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           // Name the goal they already have and leave the door open.
           const current = GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label ?? 'that'
           refusal = `You're already training for ${current.toLowerCase()} — nothing to change there. If you're weighing up a switch, tell me what you're after and I'll talk it through with you.`
+        }
+      } else if (result.proposal.kind === 'propose_meal_refit') {
+        const refit = buildMealRefitProposal(result.proposal.rawArgs ?? {})
+        if (refit) built = { scopeKey: refit.scopeKey, preconditions: refit.preconditions, payload: refit.payload, diff: refit.diff }
+        else if (!macros) {
+          refusal = "I need your height, weight, age and sex before I can work out whether your meals fit — you can add them in Profile."
+        } else {
+          // NO CARD, AND A REASON RATHER THAN A SHRUG. Two different days land
+          // here and they deserve different sentences: one where the meals
+          // already fit, and one where they do not fit and resizing would not
+          // fix it. The second is the goal-change shape — calories move and
+          // protein does not, so scaling everything to reach the calories
+          // drags protein further out than it started. Saying "no" and saying
+          // WHY is what stops the next message being the same request again.
+          refusal = mealRefit
+            ? "Resizing wouldn't fix these — they're the wrong shape for your numbers rather than the wrong size, so the portions can't get there. Want me to build you a new set of meals around your current targets instead?"
+            : "Your meals already add up to your targets, near enough — nothing to resize. If a particular meal feels off, tell me which and I'll look at that one."
         }
       } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs) {
         const activity = buildConcurrentActivityProposal(result.proposal.rawArgs)
@@ -5325,6 +5423,32 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // receipt carries one opaque token. Wiring that is real work and belongs
       // in its own change rather than bolted on half-done — the same call the
       // meal LOG made for the same reason. Moving it back is one more move.
+      undoToken = undefined
+    } else if (row.kind === 'propose_meal_refit') {
+      // ONE WRITE PATH FOR BOTH SURFACES. The Nutrition tab's own Resize
+      // button calls exactly this function; the coach does not have a second
+      // copy of the write, so the two cannot drift and a fix to one is a fix
+      // to both. It also means the resize runs against the plan as it stands
+      // NOW rather than replaying portions computed when the card was built —
+      // the same deferral the swap card makes, for the same reason.
+      const result = onMealRefitConfirm ? await onMealRefitConfirm() : null
+      const ok = !!result && result.updated > 0
+      receipt = ok
+        ? {
+          landed: [`${result.updated} meal${result.updated === 1 ? '' : 's'} resized`],
+          // A PARTIAL WRITE IS REPORTED AS PARTIAL. Reporting only the
+          // successes would put a plain "Resized" on a day where some meals
+          // are still their old size, which is the receipt lying by omission.
+          failed: result.failed > 0 ? [{ op: 'propose_meal_refit', error: `${result.failed} didn't save and are still their old size` }] : [],
+        }
+        : { landed: [], failed: [{ op: 'propose_meal_refit', error: didNotSave('The resize') }] }
+      title = ok ? RECEIPTS['propose_meal_refit'].done : RECEIPTS['propose_meal_refit'].failed
+      rows = ok ? (row.payload as { slots?: string[] }).slots?.map(slot => ({ label: slot, detail: 'resized' })) ?? [] : []
+      // NO UNDO, and named rather than quietly absent. Undoing means putting
+      // every option in every slot back to the portion it had, which is a
+      // stored pre-image this proposal deliberately does not carry — the
+      // payload is three numbers precisely so the write reads live state.
+      // Asking again after a target move re-offers, which is the way back.
       undoToken = undefined
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload

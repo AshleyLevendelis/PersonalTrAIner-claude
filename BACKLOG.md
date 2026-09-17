@@ -2,6 +2,72 @@
 
 Newest first. One line each.
 
+- [x] **YOUR MEALS NOW FOLLOW YOUR CALORIES — AND THE ENGINE FOR IT HAD BEEN
+  SHIPPED WITH NO CALLER.** 17 Sep 2026.
+  A calorie target is DERIVED — from bodyweight, activity, goal and macro mode
+  — so it moves on its own while the meals sit still. A few weeks into a cut
+  the Nutrition tab printed "260 over" with no account of why and no control
+  but a full regenerate, which costs a paid call, replaces the pool, clears
+  every manual pick and leaves the grocery list naming ingredients for meals
+  that no longer exist.
+  **ASHLEY'S TWO RULINGS.** From four options: **tell her and offer to refit**
+  — not silently, not automatically, not by swapping the meals out. From
+  three: **stay quiet until the drift is real, and refit by resizing** — same
+  meals, adjusted amounts, so the shopping list stays valid and saying yes
+  costs nothing.
+  **THE SHAPE TO REMEMBER: the resize engine and its 50 checks were correct,
+  measured, committed and pushed — and NOTHING IN THE APP IMPORTED THE
+  MODULE.** Every one of those checks passed against a feature no person could
+  reach. It is the same family as the walking plan (generator, type, no pixel)
+  and the goal (every piece of machinery, nothing writing the field), one step
+  earlier: here even the machinery had no caller. The gate now has a §9 whose
+  whole job is to fail when the engine has no screen, and §10 for when it has
+  one surface and not the other.
+  **BUILT.** The offer sits above the meal list on Nutrition (`mealsDrifted`
+  in the phrasebook, "Resize them" / "Leave them", every meal it would change
+  named with before and after, and `couldNotFix` when portions cannot finish
+  the job). The coach gets `propose_meal_refit`, a courier carrying no
+  numbers. **PARITY BY CONSTRUCTION RATHER THAN BY INSPECTION**: App computes
+  the verdict ONCE and hands the same object to both surfaces, and both
+  confirm through one function — so the coach cannot offer a resize the screen
+  would not, cannot state a number the screen would not, and cannot write by a
+  different path. Declining is remembered against THE TARGETS, not the
+  profile, so a later move asks again about the new gap.
+  The write is a new `persistResizedPools`: UPDATEs in place, never deletes,
+  never inserts, and touches only amounts and their macros — deliberately not
+  `persistPools`, whose delete-then-insert carries three failure modes that
+  simply do not exist when nothing is removed.
+  **TWO THINGS THE BROWSER FOUND THAT NO SOURCE CHECK COULD.** The card listed
+  three meals while a fourth silently kept its old size: a slot the profile's
+  meal split gives no share to gets no budget and was skipped in silence. It
+  is now named in the app's own words, and the harness profile stopped
+  describing someone who eats a snack they do not budget for. And the harness
+  fixture could not have worked at all — its meals' macros are hand-written
+  (480/720/780 kcal) while their ingredients price at 442, and the engine
+  recomputes from the food database on purpose, so at drift 1.0, 1.15, 1.35
+  and 0.8 the day could never be made to fit. A driver written against it
+  would have passed its no-offer checks vacuously. Measured across seven
+  factors before the fixture was chosen.
+  **A REAL DATA-LOSS BUG FIXED ON THE WAY**, in the path this sits beside:
+  when "regenerate all meals" partly failed, the code carefully kept the old
+  meals for any slot that failed — and then wiped EVERY manual pick anyway,
+  including for those kept slots. The meal survived and stopped being hers,
+  for no reason anyone could see. Picks are now cleared only for slots that
+  actually got new meals, and the blanket helper is deleted rather than left
+  exported.
+  **VERIFIED.** `test:meal-refit` 91 checks, 16 mutations tried, 16 caught.
+  `verify:meal-refit` 25 checks on a real Chromium at 390x844 through the real
+  Nutrition screen, 5 mutations tried, 5 caught; screenshots read, not just
+  exit codes. Its strongest check is that the figure the card promised for
+  each meal is the figure that meal ends up showing. `test:coach-parity`,
+  `test:coach-voice`, `test:chat-actions`, `test:coach-promises`,
+  `test:chat-app-reality`, `test:pending-actions` all green; `npx tsc
+  --noEmit` clean. **WHAT THE DRIVER CANNOT PROVE, written beside the checks:
+  whether App.tsx's own gating decides to show the offer — no harness page
+  boots App.tsx.** `test:meal-refit` §9 holds that half.
+  **NEEDS `npm run deploy:functions:prod -- chat-gemini`** for the coach half;
+  the screen half ships on merge.
+
 - [x] **YOU COULD NOT CHANGE WHAT YOU WERE TRAINING FOR — ON EITHER SURFACE —
   AND EVERY PIECE OF MACHINERY FOR IT ALREADY EXISTED.**
   Ashley chose this from four options, 17 Sep 2026. Someone who set up for fat
