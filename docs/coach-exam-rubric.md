@@ -60,6 +60,13 @@ Mark each 0–3 for the conversation as a whole. Judge the coach's replies only;
 the user's messages are the exam paper, not the answer. If a dimension genuinely
 does not arise in a conversation, mark it `null` rather than inventing a 3.
 
+A turn rendered as `(no words — the app showed a confirm card: <kind>, waiting
+to be tapped)` is the coach **answering**, in the way this app is built to
+answer. A change is never applied by the coach describing it: the app draws a
+card in its own words and waits for a tap. Mark such a turn on what offering it
+says about the coaching — was it the right change, at the right moment, for
+this person — and never as a failure to reply.
+
 ### DIMENSION: correct — Is the advice right?
 
 Would a qualified strength coach and a registered dietitian both sign this

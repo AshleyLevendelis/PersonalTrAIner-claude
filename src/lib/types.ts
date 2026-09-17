@@ -474,10 +474,13 @@ export interface RecommendedCardio {
  * extra?" unanswerable from the data. A WorkoutDay carrying this field has
  * exercises: [] and is the complete plan for that day.
  *
- * Type and shape only as of slice one — nothing generates these yet. The
- * generator (and its progression/ramp model) is deliberately NOT built here:
- * duration and frequency numbers for a true beginner are a coaching
- * decision, not something to guess at in a type definition.
+ * CORRECTED 15 Sep 2026: this said "nothing generates these yet". One does —
+ * toStartingOutDay in starting-out.ts, the beginner's walking plan — and had
+ * for some time. The stale note is worth recording rather than just deleting,
+ * because it is exactly what let the field go unrendered: the type said
+ * nothing produced these, so nobody looked for a screen that had to show one.
+ * Rendered by ActiveRecoveryCard (the day itself), ProgramBrowse (the week
+ * list) and TodayPanel (tomorrow's preview and the peek).
  */
 export interface PlannedActivity {
   /** Plain activity name as the user would say it — "Walk", "Swim". */
@@ -504,8 +507,10 @@ export interface WorkoutDay {
   /**
    * Set when this day's whole prescription is an activity rather than a gym
    * session — see PlannedActivity. Mutually exclusive with a populated
-   * exercises array in practice, though nothing enforces that structurally
-   * yet (no generator produces these as of slice one).
+   * exercises array in practice, though nothing enforces that structurally.
+   * A day carrying this ALSO carries is_scheduled: it is a session, not a
+   * rest day, and every reader deciding "is this a session?" must ask the
+   * flag rather than counting exercises.
    */
   plannedActivity?: PlannedActivity
   /**
@@ -536,6 +541,24 @@ export interface WorkoutDay {
    * just explains why this block looks lighter than an earlier one.
    */
   block_size_note?: string
+  /**
+   * Set when this ONE day was deliberately cut down to fit the time somebody
+   * actually had — "I've only got 25 minutes today", 13 Sep 2026. Holds the
+   * number of minutes that was asked for.
+   *
+   * Rides in the week row's existing `days` jsonb, so it costs no migration.
+   *
+   * It earns its place twice. The screen says the session was shortened on
+   * purpose rather than showing a thin day with no explanation; and
+   * describeSessionShortfall reads it and stays QUIET, because warning that a
+   * deliberately shortened session is short is the app arguing with a decision
+   * the person just made.
+   *
+   * Scoped by which week row gets written, not by anything here: a shortening
+   * saved with scope 'today' touches only this week, so the same day next week
+   * is the full session again.
+   */
+  shortened_to_minutes?: number
 }
 
 export interface ConstraintTraceEntry {
@@ -619,7 +642,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_schedule_change' | 'propose_style_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_add' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_session_shorten' | 'propose_session_length' | 'propose_schedule_change' | 'propose_style_change' | 'propose_goal_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'propose_session_activity_swap' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string

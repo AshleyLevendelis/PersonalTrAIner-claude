@@ -116,9 +116,27 @@ export const TOUR_STEPS: TourStep[] = [
     copy: "Logged — that easy. Leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own.",
   },
   {
-    key: 'tools', tab: 'tools', target: 'toolsall',
+    // CORRECTED 13 Sep 2026, TWICE OVER.
+    //
+    // The copy named the grocery list, and grocery LEFT this tab on 12 Sep —
+    // it has its own screen and a card on Home now. So the tour had been
+    // pointing at a tab and describing something that is not on it, which is
+    // the exact class of claim `chat-app-reality` polices for the coach and
+    // nothing was policing for the tour.
+    //
+    // The target moved from the whole tab to the timer section, because 4a
+    // made the tab taller than a phone screen and the spotlight hole fell off
+    // the bottom of it. Under 4b (14 Sep 2026) it points at the Timers ROW,
+    // because the card it used to point at is no longer on the tab at rest.
+    //
+    // AND THE COPY MOVED WITH IT. It said the protocols were "right here",
+    // which stopped being true the moment they went behind this row. The tour
+    // has no gate holding it to what the app contains — CLAUDE.md names that
+    // as unguarded and already wrong once, over this same grocery/Tools move —
+    // so it is corrected by hand and by reading the screen, not by a check.
+    key: 'tools', tab: 'tools', target: 'toolstimer',
     nav: 'navTools', tapHint: 'Tap Tools', teaser: 'Two doors left.',
-    copy: 'Timers and your grocery list. The list builds itself from your meal plan — nothing to type.',
+    copy: 'All three timers live behind here — a round timer with every protocol (Tabata, EMOM, or your own), a stopwatch, and a lap timer. Start one and it keeps going while you use the rest of the app.',
   },
   {
     key: 'settings', tab: 'tools', target: 'settings',

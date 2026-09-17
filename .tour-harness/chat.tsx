@@ -21,7 +21,7 @@
 // If App.tsx's wrapper changes, this diverges silently. `test:chat-shell`
 // is what holds the two together.
 // ---------------------------------------------------------------------------
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useState, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { setSupabaseClient } from '@/lib/supabase'
@@ -29,21 +29,42 @@ import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
-import type { UserProfile, MacroTargets } from '@/lib/types'
+import { removeExerciseFromSession } from '@/lib/session-edit'
+import { assessEdit } from '@/lib/edit-tradeoff'
+import type { MacroTargets, Meal, MealPlanDay, UserProfile } from '@/lib/types'
 
-import { ChatAssistant } from '@/components/ChatAssistant'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
+import { setDevClockOverride } from '@/lib/dev-clock'
+import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import '@/index.css'
 
 window.addEventListener('error', e => { (window as never as Record<string, unknown>).__err = String(e.message) })
 
+// LAZY, EXACTLY AS App.tsx LOADS IT — 14 Sep 2026. This file's whole premise
+// is "the real ChatAssistant, in the real container App.tsx puts it in", and
+// App.tsx now loads the coach as a separate chunk behind a Suspense boundary so
+// it is off the first-paint path (Ashley's ruling; the first download was at
+// its ceiling and the coach was the largest separable piece).
+//
+// Mirroring it here is not decoration: no harness page mounts App.tsx, so
+// without this the lazy boundary would ship with NO browser coverage at all.
+// With it, every chat driver — the opener, the shell, the swap, the race —
+// exercises the coach arriving late, which is the only thing that could break.
+const ChatAssistant = lazy(() =>
+  import('@/components/ChatAssistant').then(m => ({ default: m.ChatAssistant })))
+
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001'
+
+// PINNED BEFORE FIRST RENDER — see .tour-harness/anchor.mjs. One fixed
+// "today" for every run, so a driver's day-name assertions stop depending on
+// what day it is where the machine is.
+setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const todayIdx = new Date().getDay()
+const todayIdx = anchorDate().getDay()
 
 // ?movedin=1 — HER SITUATION, 9 Sep 2026: yesterday's session was moved onto
 // today, and today is not a training day of its own. That second half is why
@@ -62,7 +83,7 @@ const availableIdx = new Set(MOVED_IN
   ? [(todayIdx + 6) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
   : [todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 const iso = (offsetDays: number) => {
-  const d = new Date(); d.setDate(d.getDate() + offsetDays)
+  const d = anchorDate(); d.setDate(d.getDate() + offsetDays)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -77,13 +98,233 @@ const profile: UserProfile = {
   weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
-  created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
+  created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
 } as UserProfile
 
 setRandomSource(seededRngFromKey('chat-shell'))
 const mesocycle = generateMesocycle(profile)
 resetRandomSource()
 const macros: MacroTargets | null = computeTargets(profile)
+
+// A REAL DAY OF MEALS, for verify:meal-tradeoff (14 Sep 2026).
+//
+// The chat harness passed `mealPlan={[]}` since it was written, because no
+// driver had ever needed one. With meals joining the trade-off step that stops
+// being harmless: an empty day has zero protein, so EVERY meal change would
+// look like it left somebody on nothing. The app guards that case (no day, no
+// judgement) — which is exactly why the driver needs a real day to see
+// anything at all.
+//
+// Built to land ON the profile's own targets, so a change AWAY from it is the
+// only thing that moves the verdict, and the numbers are the app's own rather
+// than three figures chosen to make a threshold fire.
+const mealPlan: MealPlanDay[] = (() => {
+  if (!macros) return []
+  const share = [0.25, 0.35, 0.4]
+  const names = ['Greek yoghurt and oats', 'Chicken and rice bowl', 'Salmon, potatoes and greens']
+  // REAL INGREDIENT LINES, from the app's own food table. The food-edit
+  // builders match a named food against these and then re-verify the whole
+  // meal, so a meal with no ingredients can only ever produce "I can't find
+  // that in your dinner" — a refusal, which is not the path under test.
+  const lines = [
+    ['greek yoghurt 0% 250g', 'oats 60g', 'blueberries 80g'],
+    ['chicken breast 180g', 'white rice cooked 220g', 'broccoli 100g'],
+    ['salmon 200g', 'potato boiled 250g', 'broccoli 120g'],
+  ]
+  return ['breakfast', 'lunch', 'dinner'].map((meal, i) => ({
+    meal,
+    items: [{
+      name: names[i],
+      calories: Math.round(macros.calories * share[i]),
+      protein: Math.round(macros.protein * share[i]),
+      carbs: Math.round(macros.carbs * share[i]),
+      fat: Math.round(macros.fat * share[i]),
+      ingredients: lines[i],
+    } as unknown as Meal],
+  }))
+})()
+;(window as unknown as { __mealDay: unknown }).__mealDay = { targets: macros, plan: mealPlan }
+
+// WHICH LIFT A LOOSE REQUEST SHOULD RESOLVE TO — read off today's session,
+// published for verify:swap-request, 14 Sep 2026.
+//
+// WHY. That driver stubbed the model saying `old_item: 'squats'` and then
+// asserted the card named Squats. Its own comment claimed the plan was "read
+// from the page so the assertions are about THIS run's plan" — via
+// `window.__todayExercises`, which no page has ever published, so the read
+// always came back null and the hard-coded name was the only thing in play.
+// Once "today" stopped moving with the calendar, today's session was Upper
+// Pull & Core and there were no squats on it, so the resolver correctly failed
+// and the check called that a defect.
+//
+// THE PROPERTY IS FUZZY MATCHING, NOT SQUATS: a lift named the way a person
+// says it, with no day given, resolves to the catalogue entry on today's plan.
+// So pick a lift that IS on today, and degrade its name the way a person would
+// — last word, lowercased — choosing one whose last word belongs to only one
+// exercise in the day, so the resolver has a single right answer and the check
+// is not really testing tie-breaking.
+const swapTarget = (() => {
+  const todayName = DAYS[todayIdx]
+  const names = (mesocycle[0].days.find(d => d.day === todayName)?.exercises ?? []).map(e => e.name)
+  // Whitespace only, never hyphens: "Chin-Ups" is how a person says it, and
+  // splitting it further gives "ups", which nobody types.
+  const loosely = (n: string) => n.trim().split(/\s+/).pop()!.toLowerCase()
+  const unique = names.filter(n => loosely(n) !== n.toLowerCase()
+    && names.filter(m => loosely(m) === loosely(n)).length === 1)
+  const full = unique[0] ?? null
+  return full ? { full, loose: loosely(full) } : null
+})()
+;(window as unknown as { __swapTarget: unknown }).__swapTarget = swapTarget
+
+// A REPLACEMENT FROM A DIFFERENT DAY'S FOCUS — for verify:swap-request's cost
+// section, added 14 Sep 2026 when the coach's swap card started stating what a
+// swap costs the week.
+//
+// WHY IT HAS TO COME FROM ELSEWHERE: the card's cost sentence is the week's
+// push:pull and chest:back balance moving. Swapping a lift for another on the
+// SAME day is usually like-for-like and costs nothing, which is the correct
+// answer and proves nothing about whether the card can report a cost at all. A
+// lift off a differently-focused day is the one that moves the balance — so the
+// driver can propose both and show the card DIFFERS, which is the only way to
+// tell a real trial from a printed constant.
+const crossPatternSwap = (() => {
+  const todayName = DAYS[todayIdx]
+  const week = mesocycle[0]
+  const today = week.days.find(d => d.day === todayName)
+  if (!today || today.exercises.length === 0) return null
+  const otherDay = week.days.find(d => d.day !== todayName && d.focus !== today.focus && d.exercises.length > 0)
+  if (!otherDay) return null
+  return {
+    from: today.exercises[0].name,
+    to: otherDay.exercises[0].name,
+    fromFocus: today.focus,
+    toFocus: otherDay.focus,
+  }
+})()
+;(window as unknown as { __crossPatternSwap: unknown }).__crossPatternSwap = crossPatternSwap
+
+// A REMOVAL THAT COSTS A MUSCLE REAL WORK — for verify:tradeoff, 14 Sep 2026,
+// when a change that works against the goal started being ASKED about rather
+// than warned on.
+//
+// WHY IT IS COMPUTED HERE AND NOT NAMED IN THE DRIVER: the tier-2 rule is a
+// lasting drop of 40% or more in one muscle group's weekly sets, and whether a
+// given lift crosses that depends entirely on what else the generated week
+// holds. A driver naming "Barbell Bench Press" would be asserting against a
+// plan that may not contain it — the exact mistake __swapTarget's own comment
+// records. So the page runs the real engine over the real week and publishes
+// the lift that genuinely trips it, or null if none does, which is a finding
+// the driver reports rather than a check it skips.
+//
+// TODAY FIRST, THEN ANY TRAINING DAY — and the second half is not a
+// convenience. The first version searched today only and came back null every
+// time, because the harness's fixed today (2026-09-16) is a WEDNESDAY and this
+// profile trains Mon/Tue/Thu/Fri: it was looping over a rest day's empty
+// exercise list. That is the same mistake __swapTarget's comment above
+// records, made again three lines further down the same file.
+const tradeoffRemoval = (() => {
+  const todayName = DAYS[todayIdx]
+  const week = mesocycle[0]
+  const ordered = [
+    ...week.days.filter(d => d.day === todayName),
+    ...week.days.filter(d => d.day !== todayName),
+  ].filter(d => d.exercises.length > 0)
+  for (const day of ordered) {
+    for (let i = 0; i < day.exercises.length; i++) {
+      const name = day.exercises[i].name
+      const trial = removeExerciseFromSession({
+        mesocycle, profile, weekNumber: 1, dayName: day.day, exIndex: i, scope: 'permanent',
+      })
+      if (!trial.changed) continue
+      const verdict = assessEdit({
+        profile, before: mesocycle, after: trial.mesocycle, weekNumber: 1,
+        dayName: day.day, kind: 'remove', scope: 'permanent', exerciseName: name,
+      })
+      if (verdict.tier === 2) return { name, day: day.day, reason: verdict.reason }
+    }
+  }
+  return null
+})()
+;(window as unknown as { __tradeoffRemoval: unknown }).__tradeoffRemoval = tradeoffRemoval
+
+// AND ONE THAT IS NOT GOAL-DAMAGING — for the reason ask, which is the whole
+// of the rest of the change surface.
+//
+// Its sibling above finds a tier-2 removal, which asks its OWN question and
+// therefore never reaches the reason ask (one question, not two). So a driver
+// that only had that target could never see the reason chips at all — it would
+// report green on a branch it had not entered, which is the exact failure the
+// tradeoff driver exists to prevent for the tier-2 path.
+//
+// Same search, opposite test: the first removal the engine prices at tier 0 or
+// 1. Published as null rather than falling back to anything, so a plan with no
+// such removal is a finding the driver reports instead of a check it skips.
+const cheapRemovals = (() => {
+  const out: { name: string; day: string; tier: number }[] = []
+  const todayName = DAYS[todayIdx]
+  const week = mesocycle[0]
+  const ordered = [
+    ...week.days.filter(d => d.day === todayName),
+    ...week.days.filter(d => d.day !== todayName),
+  ].filter(d => d.exercises.length > 0)
+  for (const day of ordered) {
+    for (let i = 0; i < day.exercises.length; i++) {
+      const name = day.exercises[i].name
+      const trial = removeExerciseFromSession({
+        mesocycle, profile, weekNumber: 1, dayName: day.day, exIndex: i, scope: 'permanent',
+      })
+      if (!trial.changed) continue
+      const verdict = assessEdit({
+        profile, before: mesocycle, after: trial.mesocycle, weekNumber: 1,
+        dayName: day.day, kind: 'remove', scope: 'permanent', exerciseName: name,
+      })
+      if (verdict.tier !== 2) out.push({ name, day: day.day, tier: verdict.tier })
+      if (out.length >= 2) return out
+    }
+  }
+  return out
+})()
+;(window as unknown as { __cheapRemoval: unknown }).__cheapRemoval = cheapRemovals[0] ?? null
+// TWO OF THEM, because the ask fires once per block per thing: proving that a
+// request WITH a reason goes straight to a card needs a lift the first section
+// has not already spent its one ask on.
+;(window as unknown as { __cheapRemoval2: unknown }).__cheapRemoval2 = cheapRemovals[1] ?? null
+
+// A NAME THAT MEANS ONE THING ACROSS THE WHOLE PLAN — for verify:coach-ban.
+//
+// A swap is scoped to a day, so a loose name unique within that day is enough.
+// A BAN IS THE WHOLE PLAN, and "row" is three different lifts across sixteen
+// weeks — the app correctly asks "did you mean...?" rather than banning one of
+// them. So the ban driver needs its own target: a lift whose loose name matches
+// nothing else anywhere. Publishing both also lets that driver prove the
+// ambiguous case asks rather than guesses, using the swap target as the
+// deliberately ambiguous one.
+const banTarget = (() => {
+  const all = [...new Set(mesocycle.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))]
+  const loosely = (n: string) => n.trim().split(/\s+/).pop()!.toLowerCase()
+  // WORD SETS, NOT A REGEXP BUILT FROM A NAME. The first version compiled
+  // `new RegExp('\\b' + lastWord + '\\b')` per exercise, which throws the moment
+  // a catalogue name contains a regex metacharacter — and a throw here is at
+  // module scope, so it took the whole page down silently and the driver saw
+  // only a null target.
+  const words = (n: string) => new Set(n.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+  const unique = all.filter(n => {
+    const l = loosely(n)
+    return l !== n.toLowerCase() && all.filter(m => words(m).has(l)).length === 1
+  })
+  // A UNIQUE LAST WORD IF THE PLAN HAS ONE, otherwise the full name — which is
+  // unique by construction. A plan can legitimately hold three Rows and two
+  // Presses and no lift with a one-word handle of its own, and the ban path
+  // still has to be drivable on such a plan.
+  const full = unique[0] ?? all[0] ?? null
+  if (!full) return null
+  return { full, loose: unique.includes(full) ? loosely(full) : full }
+})()
+;(window as unknown as { __banTarget: unknown }).__banTarget = banTarget
+
+// ...and the same on this page, for the other half of that comparison.
+;(window as unknown as { __todayFocus: unknown }).__todayFocus =
+  mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.focus ?? null
 
 // A conversation long enough to overflow the card, seeded through the SAME
 // cache the real chat restores from — an empty thread cannot show whether the
@@ -129,7 +370,7 @@ else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 //     somewhere else in the app and the coach has something to say.
 // ---------------------------------------------------------------------------
 const SEED_NUDGE = new URLSearchParams(location.search).get('seed') === 'nudge'
-const todayStr = new Date().toISOString().slice(0, 10)
+const todayStr = isoOf(anchorDate())
 const OPENER_ROWS = Number(new URLSearchParams(location.search).get('rows') ?? '0')
 const seededRows = (SEED_NUDGE || (OPENER && OPENER_ROWS > 0))
   ? (SEED_NUDGE ? seeded : seeded.slice(0, OPENER_ROWS)).map((m, i) => ({
@@ -138,7 +379,7 @@ const seededRows = (SEED_NUDGE || (OPENER && OPENER_ROWS > 0))
       role: m.role,
       content: m.content,
       status: 'complete',
-      created_at: new Date(Date.now() - (seeded.length - i) * 60_000).toISOString(),
+      created_at: new Date(anchorNowMs() - (seeded.length - i) * 60_000).toISOString(),
     }))
   : []
 // The one row that makes today a day a session ARRIVED on. Same shape as
@@ -210,13 +451,14 @@ function Harness() {
       <div className="min-h-screen bg-background">
         <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
           <div className="space-y-6">
+            <Suspense fallback={<div>Loading the coach…</div>}>
             <ChatAssistant
               profile={profile}
               macros={macros}
               exercisePlan={livePlan}
               mesocycle={liveMeso}
               planCreatedAt={profile.created_at}
-              mealPlan={[]}
+              mealPlan={mealPlan}
               exerciseExclusions={[]}
               latestWeightKg={80}
               onPlanUpdate={noop}
@@ -234,6 +476,7 @@ function Harness() {
               onAttentionChange={setChatAttention}
               chatVisible={!SEED_NUDGE}
             />
+            </Suspense>
           </div>
         </main>
         <BottomTabBar activeTab={SEED_NUDGE ? 'dashboard' : 'chat'} onTabChange={noop} chatAttention={chatAttention && SEED_NUDGE} />

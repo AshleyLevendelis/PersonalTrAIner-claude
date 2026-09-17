@@ -22,6 +22,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { ANCHOR_ISO, anchorDate, DAY_NAMES, iso as anchorIso } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -62,7 +63,8 @@ const check = (name, ok, detail) => {
   else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 600)}` : ''}`) }
 }
 
-const iso = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+// OFFSETS FROM THE ANCHOR, not from now — see .tour-harness/anchor.mjs.
+const iso = n => { const d = anchorDate(); d.setDate(d.getDate() + n); return anchorIso(d) }
 const nameOf = n => new Date(`${iso(n)}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
 const TODAY_NAME = nameOf(0), TOMORROW_NAME = nameOf(1)
 

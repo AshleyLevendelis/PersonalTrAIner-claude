@@ -14,7 +14,7 @@
 
 import { supabase } from './supabase'
 import { isMalformedZeroWeight, getSetsForSession } from './set-log-store'
-import { calculateE1RM } from './pr-engine'
+import { prMetricFor, calculateE1RM, type PRMetric } from './pr-engine'
 
 export interface ExerciseHistorySetRow {
   setNumber: number
@@ -22,14 +22,27 @@ export interface ExerciseHistorySetRow {
   repsCompleted: number
   rpe: number | null
   isBodyweight: boolean
+  /** Belt or vest weight on a bodyweight lift, kg. Its own field since
+   * migration 20260825120000 — writing it into weightKg produced a row
+   * saying "this pull-up weighed 15kg", indistinguishable from a 15kg lift. */
+  addedLoadKg?: number | null
 }
 
 export interface ExerciseHistorySession {
   sessionId: string
   date: string // YYYY-MM-DD
   sets: ExerciseHistorySetRow[]
+  /** EXTERNAL LOAD ONLY, and deliberately still so. block-review.ts reads
+   * this and its own comment depends on the meaning ("groupSetsBySession
+   * skips bodyweight sets when computing topSetWeightKg"), so bodyweight
+   * work arrives in its own fields BESIDE these rather than by widening
+   * what these two mean underneath a reader that is right today. */
   topSetWeightKg: number
   topSetE1RM: number
+  /** Most reps in one UNWEIGHTED bodyweight set this session. */
+  topSetReps: number
+  /** Most weight hung from a belt this session, in kg. */
+  topSetAddedLoadKg: number
 }
 
 interface RawHistoryRow {
@@ -40,6 +53,7 @@ interface RawHistoryRow {
   reps_completed: number
   rpe: number | null
   is_bodyweight: boolean
+  added_load_kg?: number | null
 }
 
 /**
@@ -64,17 +78,39 @@ export function groupSetsBySession(rows: RawHistoryRow[]): ExerciseHistorySessio
         repsCompleted: r.reps_completed,
         rpe: r.rpe,
         isBodyweight: r.is_bodyweight,
+        addedLoadKg: r.added_load_kg ?? null,
       }))
       .sort((a, b) => a.setNumber - b.setNumber)
     let topSetWeightKg = 0
     let topSetE1RM = 0
+    let topSetReps = 0
+    let topSetAddedLoadKg = 0
     for (const s of sets) {
-      if (s.isBodyweight) continue
-      const e1rm = calculateE1RM(s.weightKg, s.repsCompleted)
-      if (s.weightKg > topSetWeightKg) topSetWeightKg = s.weightKg
-      if (e1rm > topSetE1RM) topSetE1RM = e1rm
+      // `if (s.isBodyweight) continue` stood here and was the reason the
+      // strength graph was permanently empty for anyone training without
+      // kit — the session's tops both stayed 0, and derivePRHistory below
+      // then skipped the whole session on `<= 0 && <= 0`. The continue is
+      // gone; what replaces it is a BRANCH, because the three kinds of set
+      // hold three different records and always did.
+      const metric = prMetricFor({
+        weightKg: s.weightKg,
+        reps: s.repsCompleted,
+        isBodyweight: s.isBodyweight,
+        addedLoadKg: s.addedLoadKg,
+      })
+      if (!metric) continue
+      if (metric === 'load') {
+        const e1rm = calculateE1RM(s.weightKg, s.repsCompleted)
+        if (s.weightKg > topSetWeightKg) topSetWeightKg = s.weightKg
+        if (e1rm > topSetE1RM) topSetE1RM = e1rm
+      } else if (metric === 'added_load') {
+        const added = Number(s.addedLoadKg ?? 0)
+        if (added > topSetAddedLoadKg) topSetAddedLoadKg = added
+      } else if (s.repsCompleted > topSetReps) {
+        topSetReps = s.repsCompleted
+      }
     }
-    sessions.push({ sessionId, date: sessionRows[0].date, sets, topSetWeightKg, topSetE1RM })
+    sessions.push({ sessionId, date: sessionRows[0].date, sets, topSetWeightKg, topSetE1RM, topSetReps, topSetAddedLoadKg })
   }
 
   return sessions.sort((a, b) => b.date.localeCompare(a.date))
@@ -88,7 +124,7 @@ export function groupSetsBySession(rows: RawHistoryRow[]): ExerciseHistorySessio
 export async function getExerciseHistory(userId: string, exerciseId: string, limit = 300): Promise<ExerciseHistorySession[]> {
   const { data, error } = await supabase
     .from('exercise_set_logs')
-    .select('session_id, completed_at, set_number, weight_kg, reps_completed, rpe, is_bodyweight')
+    .select('session_id, completed_at, set_number, weight_kg, reps_completed, rpe, is_bodyweight, added_load_kg')
     .eq('user_id', userId)
     .eq('exercise_id', exerciseId)
     .eq('is_warmup', false)
@@ -115,18 +151,66 @@ export interface TrendPoint {
   date: string
   topSetWeightKg: number
   topSetE1RM: number
+  /** The number the chart actually plots, in the series' own metric. */
+  value: number
 }
 
-/** Oldest-first, for charting. Pure. */
-export function deriveStrengthTrend(sessions: ExerciseHistorySession[]): TrendPoint[] {
-  return [...sessions]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map(s => ({ date: s.date, topSetWeightKg: s.topSetWeightKg, topSetE1RM: s.topSetE1RM }))
+export interface TrendSeries {
+  /** What the points ARE. A chart that does not know this can only guess,
+   * and guessing wrong renders reps as kilograms — a number in the wrong
+   * unit is worse than no number, because it looks right. Null when there
+   * is nothing plottable at all. */
+  metric: PRMetric | null
+  points: TrendPoint[]
+}
+
+/**
+ * Oldest-first, for charting. Pure.
+ *
+ * ONE SERIES, ONE UNIT. An exercise can change metric over a lifetime —
+ * unweighted chin-ups for months, then a belt — and those are not the same
+ * line: 12 and 12 mean different things. So the metric is taken from the
+ * MOST RECENT session that has one (what you are doing now is what the
+ * graph is about), and only the sessions sharing it are plotted. The others
+ * are not lost; they are in the history list and in their own record, which
+ * is what Ashley's ruling means by the reps best "staying as the
+ * best-without-weight".
+ */
+export function deriveStrengthTrend(sessions: ExerciseHistorySession[]): TrendSeries {
+  const oldestFirst = [...sessions].sort((a, b) => a.date.localeCompare(b.date))
+  const metricOf = (s: ExerciseHistorySession): PRMetric | null =>
+    s.topSetAddedLoadKg > 0 ? 'added_load'
+      : s.topSetWeightKg > 0 ? 'load'
+      : s.topSetReps > 0 ? 'reps'
+      : null
+
+  let metric: PRMetric | null = null
+  for (let i = oldestFirst.length - 1; i >= 0; i--) {
+    const m = metricOf(oldestFirst[i])
+    if (m) { metric = m; break }
+  }
+  if (!metric) return { metric: null, points: [] }
+
+  const valueOf = (s: ExerciseHistorySession): number =>
+    metric === 'added_load' ? s.topSetAddedLoadKg : metric === 'reps' ? s.topSetReps : s.topSetE1RM
+
+  const points = oldestFirst
+    .filter(s => metricOf(s) === metric)
+    .map(s => ({ date: s.date, topSetWeightKg: s.topSetWeightKg, topSetE1RM: s.topSetE1RM, value: valueOf(s) }))
+  return { metric, points }
 }
 
 /** The chart's own empty-state gate — honest until there are 2+ points. */
-export function hasEnoughTrendData(points: TrendPoint[]): boolean {
-  return points.length >= 2
+export function hasEnoughTrendData(series: TrendSeries): boolean {
+  return series.points.length >= 2
+}
+
+/** What the trend is a trend OF, in Ashley's words rather than the code's.
+ * One place, so the chart's caption and any future reader agree. */
+export function trendLabel(metric: PRMetric | null): string {
+  if (metric === 'reps') return 'Best set, in reps'
+  if (metric === 'added_load') return 'Added weight'
+  return 'Strength trend'
 }
 
 export interface PRMoment {
@@ -134,7 +218,14 @@ export interface PRMoment {
   sessionId: string
   weightKg: number
   e1rm: number
-  kind: 'weight' | 'e1rm' | 'both'
+  /** Reps in the best set, when the record is a reps record. */
+  reps: number
+  /** Belt weight, when the record is an added-load record. */
+  addedLoadKg: number
+  kind: 'weight' | 'e1rm' | 'both' | 'reps' | 'added_load'
+  /** Which record moved — readers branch on this, never on the kg fields
+   * being nonzero, because a reps PR legitimately has 0 in both. */
+  metric: PRMetric
 }
 
 /**
@@ -150,21 +241,38 @@ export function derivePRHistory(sessions: ExerciseHistorySession[]): PRMoment[] 
   const moments: PRMoment[] = []
   let runningMaxWeight = 0
   let runningMaxE1RM = 0
+  let runningMaxReps = 0
+  let runningMaxAdded = 0
+  const blank = { weightKg: 0, e1rm: 0, reps: 0, addedLoadKg: 0 }
   for (const session of oldestFirst) {
-    if (session.topSetWeightKg <= 0 && session.topSetE1RM <= 0) continue
+    // THE GUARD THAT STOOD HERE — `topSetWeightKg <= 0 && topSetE1RM <= 0`
+    // — skipped every bodyweight session outright, because both of those
+    // are legitimately 0 when nothing external was lifted. Three running
+    // maxima now, and a session can push any of them.
+    const where = { date: session.date, sessionId: session.sessionId }
+
+    if (session.topSetAddedLoadKg > runningMaxAdded) {
+      moments.push({ ...blank, ...where, addedLoadKg: session.topSetAddedLoadKg, kind: 'added_load', metric: 'added_load' })
+    }
+    if (session.topSetReps > runningMaxReps) {
+      moments.push({ ...blank, ...where, reps: session.topSetReps, kind: 'reps', metric: 'reps' })
+    }
     const isWeightPR = session.topSetWeightKg > runningMaxWeight
     const isE1RMPR = session.topSetE1RM > runningMaxE1RM
     if (isWeightPR || isE1RMPR) {
       moments.push({
-        date: session.date,
-        sessionId: session.sessionId,
+        ...blank,
+        ...where,
         weightKg: session.topSetWeightKg,
         e1rm: session.topSetE1RM,
         kind: isWeightPR && isE1RMPR ? 'both' : isWeightPR ? 'weight' : 'e1rm',
+        metric: 'load',
       })
     }
     runningMaxWeight = Math.max(runningMaxWeight, session.topSetWeightKg)
     runningMaxE1RM = Math.max(runningMaxE1RM, session.topSetE1RM)
+    runningMaxReps = Math.max(runningMaxReps, session.topSetReps)
+    runningMaxAdded = Math.max(runningMaxAdded, session.topSetAddedLoadKg)
   }
   return moments.reverse()
 }

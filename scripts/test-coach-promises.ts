@@ -62,33 +62,74 @@ console.log('\n1. Every tool the coach is offered can actually be executed')
   check('...and there are tools to check, so this has teeth', declared.length > 10, declared.length)
 }
 
-console.log('\n2. Skipping a day for something else is a tool, not a sentence')
+console.log('\n2. Skipping a day for something else is a CARD, not a sentence and not a silent write')
 {
-  check('swap_session_for_activity is declared', /name:\s*"swap_session_for_activity"/.test(chat))
-  check('...and executed', /name === "swap_session_for_activity"/.test(chat))
+  // REWRITTEN 15 Sep 2026. This section used to pin the opposite: that the
+  // handler wrote workout_sessions and cardio_logs itself. It did, and that
+  // was the 25 Aug fix for the coach SAYING a day was marked when nothing
+  // could mark it. What it left standing is the thing Ashley reported on the
+  // 15th — her record changed with no card and no tap. Her ruling, from three
+  // options: ask first, like the others. So the property inverts: this handler
+  // must now write NOTHING.
+  check('propose_session_activity_swap is declared', /name:\s*"propose_session_activity_swap"/.test(chat))
+  check('...and executed', /name === "propose_session_activity_swap"/.test(chat))
+  // IT SITS WITH ITS SIBLINGS. The name and the neighbourhood are both signals
+  // to the model, and this tool being declared among the log_* writers is how
+  // it came to be treated as one.
+  const decls = [...chat.matchAll(/name:\s*"(propose_[a-z_]+|log_[a-z_]+)"/g)].map(m => m[1])
+  const i = decls.indexOf('propose_session_activity_swap')
+  check('...declared among the propose_* tools, not the log_* ones',
+    i > 0 && decls[i - 1].startsWith('propose_'), { before: decls[i - 1], after: decls[i + 1] })
 
-  // The update_workout_schedule trap: write only where the app reads. The
-  // Exercise tab's week strip reads workout_sessions (via getWeeklyDashboard);
-  // the streak reads cardio_logs. Anything else is a write nobody renders.
-  const body = chat.slice(chat.indexOf('name === "swap_session_for_activity"'))
-    .slice(0, chat.slice(chat.indexOf('name === "swap_session_for_activity"')).indexOf('if (name === "log_meal")'))
-  check('it writes to workout_sessions — what the week strip reads', body.includes('workout_sessions'))
-  check('it writes to cardio_logs — what the streak reads', body.includes('cardio_logs'))
-  check('it does NOT write to fitness_profiles, the field update_workout_schedule died on',
-    !body.includes('fitness_profiles'))
+  const start = chat.indexOf('name === "propose_session_activity_swap"')
+  // TERMINATED ON THE NEXT HANDLER IN THE FILE, not on a name picked from the
+  // DECLARATION order — those two orders are different, and slicing to a
+  // handler that sits earlier gives a negative length and an empty body that
+  // passes every "does NOT contain" check vacuously.
+  const body = chat.slice(start, start + chat.slice(start).indexOf('if (name === "log_meal")'))
+  check('...and the slice really holds the handler', body.length > 500 && body.includes('activityName'), body.length)
+  // COMMENTS STRIPPED BEFORE ANY ABSENCE CLAIM. The handler's own header now
+  // explains where those writes WENT — a note about a removal must not satisfy
+  // the check that it was removed. Caught here on the first run.
+  const bodyCode = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  check('the handler writes NOTHING to workout_sessions', !bodyCode.includes('workout_sessions'), bodyCode.length)
+  check('...and nothing to cardio_logs', !bodyCode.includes('cardio_logs'))
+  check('...and nothing to fitness_profiles, the field update_workout_schedule died on',
+    !bodyCode.includes('fitness_profiles'))
+  check('it returns a proposal for the user to confirm', /kind: "propose_session_activity_swap"/.test(body))
+  // D1: a turn carrying a proposal returns NO prose, so there is no sentence
+  // left on this path for the model to get wrong.
+  check('...and no prose of its own', /reply: ""/.test(body))
 
-  // A failed write must never produce a success sentence. This is the exact
-  // shape of the original defect, one layer down.
-  check('a failed write reports failure rather than claiming success',
-    /!dbSuccess[\s\S]{0,120}couldn't/.test(body))
+  // THE 8 SEP RULE SURVIVES THE MOVE. The model invented 60 minutes for a
+  // class still hours away; a duration counts only when it echoes one in her
+  // own message. That rule now guards a card instead of a row.
+  check('a duration is only forwarded when she actually said it',
+    /statedDurationsMinutes\(message\)/.test(body) && /saidMinutes\.some/.test(body))
+  check('...and whether the activity has happened yet is read, not assumed',
+    /eventTiming\(message, activityName\)/.test(body))
 }
 
 console.log('\n3. The prompt forbids claiming an untaken action')
 {
   check('the honesty rule is present', chat.includes('NEVER CLAIM AN ACTION YOU DID NOT TAKE'))
-  check('...it names the tool to use instead', /swap_session_for_activity/.test(chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 1600)))
+  // THE WHOLE SECTION, not a fixed number of characters from its heading.
+  // 15 Sep 2026: rule 2 gained three sentences (the measured live example, and
+  // the carve-out saying a plain statement is enough to call the tool) and
+  // pushed rules 5 and 6 past the 1600-char window three checks used — so the
+  // checks went red over a rule that had not changed, and the only way to make
+  // them green would have been to say LESS about honesty. A window is a
+  // mechanism; the property is "it is in this section".
+  const honestyStart = chat.indexOf('NEVER CLAIM AN ACTION')
+  const honestyEnd = (() => {
+    const rest = chat.slice(honestyStart)
+    const next = rest.indexOf('\n=== ', 40)
+    return next > 0 ? honestyStart + next : chat.length
+  })()
+  const honesty = chat.slice(honestyStart, honestyEnd)
+  check('...it names the tool to use instead', /propose_session_activity_swap/.test(honesty))
   check('...and tells it to say so plainly when it has no tool',
-    /cannot do it from chat|can't do that from here/i.test(chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 1600)))
+    /cannot do it from chat|can't do that from here/i.test(honesty))
 }
 
 console.log('\n3b. Resting a day is a tool too, and an intention is not an appointment')
@@ -109,7 +150,14 @@ console.log('\n3b. Resting a day is a tool too, and an intention is not an appoi
   check('...and the server writes nothing itself',
     !body.includes('workout_sessions') && !body.includes('PATCH'), body.slice(0, 200))
 
-  const rule = chat.slice(chat.indexOf('NEVER CLAIM AN ACTION'), chat.indexOf('NEVER CLAIM AN ACTION') + 2600)
+  // Same re-anchor as §3: the section, not a character count.
+  const ruleStart = chat.indexOf('NEVER CLAIM AN ACTION')
+  const ruleEnd = (() => {
+    const rest = chat.slice(ruleStart)
+    const next = rest.indexOf('\n=== ', 40)
+    return next > 0 ? ruleStart + next : chat.length
+  })()
+  const rule = chat.slice(ruleStart, ruleEnd)
   check('the honesty rule names propose_rest_day as the thing to call',
     /propose_rest_day/.test(rule), rule.slice(0, 200))
   check('...and says nothing has happened until the user confirms',
@@ -258,12 +306,27 @@ console.log('\n6. The first-run starter chips only offer things that work')
   // the check guarding it went red for being right. A handler that declines
   // says so in its own reply string; read that instead. The window is cut at
   // the NEXT handler so one decliner cannot make its neighbour look like one.
-  const handlerAt = [...chat.matchAll(/if \(name === "([a-z_]+)"\)/g)]
-  const decliningStubs = handlerAt.filter((m, i) => {
-    const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
-    return /coming in an update soon/.test(body)
-  }).map(m => m[1])
-  check('something still declines, so this check has teeth', decliningStubs.length > 0, decliningStubs)
+  const findDecliners = (src: string): string[] => {
+    const at = [...src.matchAll(/if \(name === "([a-z_]+)"\)/g)]
+    return at.filter((m, i) => {
+      const body = src.slice(m.index!, at[i + 1]?.index ?? m.index! + 2000)
+      return /coming in an update soon/.test(body)
+    }).map(m => m[1])
+  }
+  const decliningStubs = findDecliners(chat)
+  // THE TEETH USED TO BE "at least one tool still declines", which is a check
+  // that depends on a defect existing. On 14 Sep ban_exercise was wired —
+  // Ashley's instruction, and the last screen-only capability — so nothing
+  // declines any more and that guard went red for being right.
+  //
+  // The detector is proved on a synthetic handler instead, so it cannot go
+  // vacuous, and the real count being ZERO is now the property rather than the
+  // failure. If a declining stub is ever added back, the second check catches
+  // it and names it.
+  const SYNTHETIC = 'if (name === "synthetic_decliner") { return json({ reply: "coming in an update soon" }) }\nif (name === "other") { return json({ reply: "" }) }'
+  check('the decline detector actually detects (proved on a synthetic stub)',
+    findDecliners(SYNTHETIC).includes('synthetic_decliner'), findDecliners(SYNTHETIC))
+  check('...and no declared tool declines any more', decliningStubs.length === 0, decliningStubs)
   const declared = new Set([...chat.matchAll(/^\s*name:\s*"([a-z_]+)",\s*$/gm)].map(m => m[1]))
   const executed = new Set([...chat.matchAll(/name\s*===\s*"([a-z_]+)"/g)].map(m => m[1]))
 
@@ -613,7 +676,7 @@ console.log('\n6b. A second sport is a tool, not a memory note — and not the o
   const g = chat.slice(chat.indexOf('=== 3g.'), chat.indexOf('=== 4. TAG HYGIENE'))
   check('§3g exists', g.length > 200, g.length)
   check('...and names all three look-alike sentences with their tools',
-    /swap_session_for_activity/.test(g) && /propose_schedule_change/.test(g) && /propose_concurrent_activity/.test(g))
+    /propose_session_activity_swap/.test(g) && /propose_schedule_change/.test(g) && /propose_concurrent_activity/.test(g))
   check('...says it never guesses the days', /Never guess days/.test(g))
   check('...and that one class day may still carry a heavy session', /still carries a heavy session/.test(g))
   check('the memory-note precedence rule names it too',
@@ -666,11 +729,18 @@ console.log('\n7. A tool that declines says so in its own description')
   // Sanity check on this check: if the phrase list stops matching anything,
   // the loop below is vacuous and passes on a prompt full of false promises.
   //
-  // Was ">= 2" until 7 Sep 2026, when log_meal stopped declining — it now
-  // proposes a confirmation card and the app records the meal on the tap. The
-  // floor is 1 rather than 0 so the loop cannot go vacuous, and the list is
-  // printed so a change in WHICH tools decline is visible rather than silent.
-  check('the decline detector still finds the tools that decline', decliners.length >= 1, decliners)
+  // Was ">= 2" until 7 Sep 2026 when log_meal stopped declining, then ">= 1".
+  // On 14 Sep ban_exercise was wired too — Ashley's instruction — and the last
+  // decliner went with it, so a floor of 1 would demand that a defect exist in
+  // order for the check to pass.
+  //
+  // The phrase list is proved against a synthetic handler instead. The loop
+  // below then runs over however many real decliners there are, which is now
+  // none — and the count is asserted, so adding one back is visible rather
+  // than silent.
+  check('the decline phrases still match a decline (proved on a synthetic handler)',
+    DECLINE_PHRASES.test('I can\'t do that through chat yet — that\'s coming in an update soon.'))
+  check('...and no declared tool declines any more', decliners.length === 0, decliners)
   for (const tool of decliners) {
     check(`${tool} declines, and its description says so up front`,
       MARKS_ITSELF.test(descriptionOf(tool)), descriptionOf(tool).slice(0, 160))
@@ -679,7 +749,22 @@ console.log('\n7. A tool that declines says so in its own description')
   // And the reverse: a tool that DOES write must not describe itself as
   // unavailable, which is how log_meal came to talk a user out of a button
   // that was right there.
-  const liars = declared.filter(t => !decliners.includes(t) && /coming in an update|in the next update/i.test(descriptionOf(t)))
+  //
+  // THE TWO HALVES OF THIS RULE USED DIFFERENT WORD LISTS, and that is exactly
+  // how the next one got through. A decliner had to say "NOT WIRED UP YET"
+  // (MARKS_ITSELF above) while a worker was only forbidden from saying "coming
+  // in an update" — so the sentence a decliner was REQUIRED to carry was not
+  // one a worker was forbidden to keep. `ban_exercise` was wired on 14 Sep
+  // 2026 and its description kept "NOT WIRED UP YET — calling this returns a
+  // decline... never tell the user you have banned anything", about a tool
+  // that by then proposed a real card. The whole section went green, because
+  // the only list that contained that phrase pointed the other way.
+  // ONE VOCABULARY, BOTH DIRECTIONS. Found by reading the tool list against
+  // the handlers, not by a check — which is what made it worth fixing here.
+  const CLAIMS_UNBUILT = (desc: string) =>
+    MARKS_ITSELF.test(desc) ||
+    /coming in an update|in the next update|arrives in the next|not (?:yet )?wired up/i.test(desc)
+  const liars = declared.filter(t => !decliners.includes(t) && CLAIMS_UNBUILT(descriptionOf(t)))
   check('no working tool describes itself as unbuilt', liars.length === 0, liars)
 
   // The prompt must not contradict a decline either — this is the sentence
@@ -800,19 +885,26 @@ console.log('\nThe coach speaks after a tool runs, and the server reads the mess
   check('the prompt names the judgement question', /is a COACHING question about food they named/.test(code))
   check('...and tells the model what a tool result is for', /=== 1f\. AFTER A TOOL RUNS ===/.test(code))
 
-  // The swap tool is honest about what it wrote.
-  const swap = code.slice(code.indexOf('name === "swap_session_for_activity"'), code.indexOf('if (name === "log_meal")'))
+  // THE SWAP TOOL IS A COURIER NOW, so what it must be honest about changed.
+  // REWRITTEN 15 Sep 2026 with the rail. Four of these checks used to pin the
+  // write path — the read-before-insert, the no-double-insert, the "may not
+  // say logged" forbid — and every one of them was correct about code that has
+  // moved to the client's confirm arm. What SURVIVES the move is the pair of
+  // rules the 8 Sep incident bought: a duration only when she said it, and
+  // nothing logged for a class that has not happened. Those now guard a card.
+  const swap = code.slice(code.indexOf('name === "propose_session_activity_swap"'), code.indexOf('if (name === "log_meal")'))
+  check('the swap handler slice is real', swap.length > 500, swap.length)
   check('a combined sentence — session later, activity today — becomes a move card, not a swap', /if \(sessionStillHappening\) \{[\s\S]{0,700}kind: "propose_session_move"/.test(swap))
-  check('the activity is logged only if it has happened', /if \(dbSuccess && !activityPlanned\)/.test(swap))
-  check('...only at a duration SHE stated', /const durationStated = [\s\S]{0,200}statedDurations\.some/.test(swap) && /else if \(durationStated\)/.test(swap))
-  // MUTATION-HARDENED: a first version only saw the GET's URL, and survived
-  // a swap that fetched the rows and ignored them. What must hold is that the
-  // rows the GET returned are what decides whether the insert runs.
-  check('...and never twice: it looks before it inserts, and what it finds decides',
-    /const existingRows = already\.ok \? await already\.json\(\) : \[\];[\s\S]{0,120}if \(Array\.isArray\(existingRows\) && existingRows\.length > 0\) \{[\s\S]{0,80}activityLogged = true;[\s\S]{0,40}\} else if \(durationStated\)/.test(swap))
-  const futureFloor = /activityPlanned\s*\?\s*`([^`]*)`/.exec(swap)?.[1] ?? ''
-  check('a class still to come: the day is marked, nothing is called logged', futureFloor.length > 0 && !/\blogged\b/i.test(futureFloor) && /how long/.test(futureFloor), futureFloor)
-  check('...and the model may not say "logged" either unless a row exists', /forbid: activityLogged \? \[\] : \[\/\\blogged\\b\/i/.test(swap))
+  // ORDER, NOT TEXT: the move re-route has to be tested BEFORE the swap
+  // proposal returns, or a sentence that says both writes the day off.
+  check('...and that test comes first', swap.indexOf('sessionStillHappening') < swap.indexOf('kind: "propose_session_activity_swap"'))
+  check('whether the activity has happened yet is read, not assumed', /activity_planned: eventTiming\(message, activityName\) === "future"/.test(swap))
+  check('a duration is forwarded only at a figure SHE stated',
+    /saidMinutes = statedDurationsMinutes\(message\)/.test(swap) && /saidMinutes\.some\(\(d\) => Math\.abs\(d - modelMinutes\) <= 1\)/.test(swap))
+  check('...and never a guess: no stated figure means null, not a number', /: null,/.test(swap))
+  // D1: a proposal turn returns no prose, so there is no sentence on this path
+  // for the model to get wrong. That is what replaces the old forbid-list.
+  check('the turn carries no prose of its own', /reply: "",/.test(swap))
 
   // The two other handlers that author English go through the same pass.
   check('a weigh-in reply must quote her number', /mustContain: \[`\$\{weightKg\}`\]/.test(code))
@@ -860,8 +952,12 @@ if (failures > 0) {
     /functionCall for an undeclared tool/.test(src), null)
   check('the dead ban_exercise branch that would claim a removal is gone',
     !/I've permanently removed/.test(src), null)
-  check('...while the real ban_exercise decline still stands',
-    /can't ban exercises through chat yet/.test(src), null)
+  // FLIPPED 14 Sep 2026. This used to assert the decline still stood — "I
+  // can't ban exercises through chat yet" — which was correct while the ban
+  // was deliberately unavailable from chat. Ashley asked for it wired, so the
+  // decline is now the regression and the courier is the property.
+  check('...and ban_exercise is a courier now, not a decline',
+    /kind: "propose_exercise_ban"/.test(src) && !/can't ban exercises through chat yet/.test(src), null)
 
   // A plain question turn had no second chance at all.
   check('a plain turn gets the reply guarantee',
@@ -892,6 +988,144 @@ if (failures > 0) {
     /acknowledge it before you fix it/.test(src), null)
   check('the follow-up-question rule is untouched',
     /End most turns with a SPECIFIC question/.test(src), null)
+}
+
+console.log('\nEVERY EDIT CARD SAYS WHAT IT COSTS THE WEEK — including the swap (14 Sep 2026)\n')
+{
+  // THE LAST SILENT SURFACE. CLAUDE.md named it: every other edit path states
+  // its cost before the tap — removing an exercise, changing volume, adding
+  // one, moving a meal — and the coach's SWAP said nothing. The reason was real
+  // but narrow: its builder was synchronous and a faithful trial needs the
+  // async load recompute, so it stayed quiet rather than guess. What did not
+  // follow is that it had to stay quiet; the one dispatch site is already async
+  // and already awaits two sibling builders.
+  //
+  // MEASURED BEFORE BUILDING: no check anywhere referenced describeEditImpact,
+  // and nothing asserted the swap was silent. So this adds the guarantee rather
+  // than flipping one.
+  // Comments stripped before any absence is asserted — the note explaining a
+  // removal must not satisfy the check that it was removed.
+  const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const at = chat.indexOf('const buildExerciseSwapProposal')
+  const body = at === -1 ? '' : chat.slice(at, chat.indexOf('const buildExerciseAddProposal', at + 10))
+  check('the swap builder was found and bounded (sanity check on this check)', body.length > 400, body.length)
+
+  check('the swap card reads its cost from a real trial, not a second guess',
+    /await swapExerciseInMesocycle\(/.test(body), body.slice(0, 200))
+  check('...turned into words by the one shared describer',
+    /describeEditImpact\(/.test(body))
+  check('...and both halves reach the card — what was fixed, and what it cost',
+    /impact\.balancing/.test(body) && /impact\.cost/.test(body), body.slice(-400))
+  // SEVERITY IS THE DIFFERENCE BETWEEN A NOTE AND A WARNING, and the cost is
+  // the half she needs to actually see.
+  check('...with the cost carried as a warning, not a footnote',
+    /impact\.cost \?[^\n]*severity: 'warn'/.test(body), body.slice(-400))
+
+  // THE TRIAL IS READ, NEVER SAVED. It produces a whole mesocycle; two
+  // sentences come off it. A builder that persisted it would be doing the edit
+  // at propose time, which is the one thing a proposal must not do.
+  check('...and the trial is never persisted from the builder',
+    !/saveMesocycle|onMesocycleUpdated|saveMesocycleWeek/.test(body), body)
+
+  // THE WEIGHT STAYS DEFERRED. The original refusal was right about this half:
+  // the trial's weights are real, but confirm re-runs against the live plan,
+  // and a number here that confirm supersedes is worse than no number.
+  check('...while the weight is still left to confirm rather than quoted',
+    /Load recomputed for the new movement once you confirm/.test(body), body.slice(-400))
+
+  // AND THE CALL SITE ACTUALLY AWAITS IT. Without this the card renders from a
+  // Promise and every field reads undefined — the failure that would look like
+  // "the coach stopped proposing swaps" rather than like a missing await.
+  check('the one dispatch site awaits the builder',
+    /const swap = await buildExerciseSwapProposal\(/.test(chat))
+}
+
+console.log('\nA change that works against the goal is ASKED about, not just warned')
+{
+  // THE CLIENT, not the edge function. `chat` in this file is
+  // chat-gemini/index.ts; every rule below is about ChatAssistant.tsx, and
+  // the first version of this section read `chat` and failed twelve checks
+  // against a file that could never contain any of them.
+  const ui = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  // The decision recorded in CLAUDE.md, 14 Sep 2026, taken on Ashley's
+  // explicit delegation. The rules themselves live in edit-tradeoff.ts and
+  // test:edit-tradeoff runs them; this section guards the WIRING — that the
+  // client actually consults the verdict, and that a tier-2 ask does not
+  // quietly write a card anyway.
+
+  // EVERY BUILDER THAT RUNS A TRIAL READS IT. A builder that computed its own
+  // opinion of the cost instead would be the two-implementations defect this
+  // codebase keeps finding.
+  for (const [label, kind] of [['swap', 'swap'], ['remove', 'remove'], ['add', 'add']] as const) {
+    check(`the ${label} builder asks the engine what it costs the goal`,
+      new RegExp(`adviseEdit\\(\\{[\\s\\S]{0,400}?kind: '${kind}'`).test(ui))
+  }
+  check('...from the SAME trial the confirm will apply, never a second guess',
+    /adviseEdit\(\{[\s\S]{0,200}?after: trial/.test(ui))
+
+  // THE ORDER IS THE BEHAVIOUR. The verdict must be consulted AFTER the
+  // builders have run (so a trial exists) and BEFORE createPendingAction (so
+  // a tier-2 can decline to make a card at all). Pinned as an ORDER rather
+  // than on the text of either, per CLAUDE.md's property-not-mechanism rule.
+  const askAt = ui.indexOf('if (shouldAsk(advice.verdict')
+  const rowAt = ui.indexOf('const row = await createPendingAction(')
+  const builtAt = ui.indexOf('if (!built) {')
+  check('the verdict is consulted after the builders have run', askAt > builtAt && builtAt > 0, { builtAt, askAt })
+  check('...and BEFORE any pending action is written', askAt < rowAt && rowAt > 0, { askAt, rowAt })
+
+  // AND THE STEP IS REACHABLE — the one thing every check around it cannot
+  // see. Measured 14 Sep 2026: changing the guard to `if (false && advice)`
+  // disabled the whole trade-off step and all twelve checks in this section
+  // still passed, because the source text they read was all still there. That
+  // is CLAUDE.md's dead-branch trap, and a source gate cannot escape it.
+  //
+  // So this pins the guard's exact shape, which catches the realistic drift,
+  // and `verify:tradeoff` drives a REAL tier-2 in a browser, which is the only
+  // thing that actually proves the branch runs. Neither alone is enough; the
+  // comment says so rather than letting the next reader assume this is proof.
+  check('...and the step is not disabled by a constant',
+    /\n      if \(advice\) \{\n/.test(ui), ui.slice(askAt - 200, askAt).slice(-120))
+
+  // A TIER-2 ASK RETURNS A QUESTION AND NO ROW. An ask that still wrote a
+  // pending action would be a warning with a Confirm button under it — the
+  // thing "ask first" was chosen over.
+  const askBlock = ui.slice(askAt, rowAt)
+  check('the ask returns text only — no pendingAction in that branch',
+    /return \{ text: askText\(advice\.verdict\) \}/.test(askBlock) && !/pendingAction/.test(askBlock), askBlock.slice(0, 200))
+  check('...and records that it asked, so it asks once per block',
+    /markAsked\(advice\.key\)/.test(askBlock))
+
+  // A GUARDED-OUT TIER 2 STILL SAYS WHAT IT COST. Silence here would be the
+  // regression: the ask suppressed AND the cost dropped.
+  check('an ask that is guarded out falls through to a card that still states the cost',
+    /applyTradeoff\(built\.diff, downgradeToCard\(advice\.verdict\)\)/.test(ui))
+
+  // THE TWO GUARDS THAT KEEP IT FROM NAGGING, read off the real signals
+  // rather than trusted to the engine, which cannot see either.
+  check('mid-session is read from the live session, not guessed',
+    /sessionRunning: activeSession\.status === 'running'/.test(ui))
+  check('...and "asked already" survives a reload',
+    /localStorage\.setItem\(ASKED_STORE/.test(ui) && /localStorage\.getItem\(ASKED_STORE/.test(ui))
+  check('...failing safe — a storage error means ask again, never go quiet',
+    /catch \{ seed = \[\] \}/.test(ui))
+}
+
+// THE AUTHORITATIVE EXIT, and it was missing.
+//
+// There is an earlier `if (failures > 0) process.exit(1)` part-way up this
+// file — a fail-fast after the first phases. Everything added BELOW it
+// accumulated into `failures` and was never read again, and the last line of
+// the file said "All coach-promise checks passed" unconditionally. So every
+// check in the last third of this gate printed FAIL and exited 0.
+//
+// FOUND 14 Sep 2026 by writing a section that failed twelve checks and
+// watching the gate report success. It had been true of the swap-card section
+// added the day before, which means those checks have never been able to fail
+// a sweep. Both are live from here.
+if (failures > 0) {
+  console.error(`\n${failures} check(s) failed`)
+  process.exit(1)
 }
 
 console.log('\nAll coach-promise checks passed.\n')

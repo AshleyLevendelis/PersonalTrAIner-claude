@@ -1,20 +1,26 @@
 // ---------------------------------------------------------------------------
-// A simple top-set e1RM trend line for one exercise. Hand-rolled raw <svg>
+// A simple top-set trend line for one exercise. Hand-rolled raw <svg>
 // following Dashboard.tsx's ring-meter precedent (CSS-var strokes, glow
 // classes, no charting library — none is a dependency and none should be
 // added for one chart). Caller gates the honest empty state via
 // hasEnoughTrendData; this component assumes 2+ points.
 // ---------------------------------------------------------------------------
 
-import type { TrendPoint } from '@/lib/exercise-history'
+import type { TrendSeries } from '@/lib/exercise-history'
 
 const WIDTH = 300
 const HEIGHT = 120
 const PAD_X = 8
 const PAD_Y = 12
 
-export function ExerciseStrengthChart({ points }: { points: TrendPoint[] }) {
-  const values = points.map(p => p.topSetE1RM)
+// PLOTS `value`, NOT `topSetE1RM`. It read the e1RM directly, which is 0
+// for every bodyweight session — so a home trainee's line was a flat row of
+// zeroes on the rare occasion it drew at all. The series now says what its
+// numbers ARE (reps, added kg, or an estimate off external load) and the
+// caller captions it accordingly; this component just draws them.
+export function ExerciseStrengthChart({ series }: { series: TrendSeries }) {
+  const points = series.points
+  const values = points.map(p => p.value)
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = max - min || 1
@@ -22,7 +28,7 @@ export function ExerciseStrengthChart({ points }: { points: TrendPoint[] }) {
 
   const coords = points.map((p, i) => {
     const x = PAD_X + i * stepX
-    const y = HEIGHT - PAD_Y - ((p.topSetE1RM - min) / range) * (HEIGHT - PAD_Y * 2)
+    const y = HEIGHT - PAD_Y - ((p.value - min) / range) * (HEIGHT - PAD_Y * 2)
     return { x, y }
   })
 

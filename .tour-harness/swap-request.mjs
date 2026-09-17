@@ -61,10 +61,30 @@ await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 
+console.log('\nA LOOSELY-NAMED SWAP FINDS THE EXERCISE\n')
+
+// WHICH LIFT TO ASK FOR — read off the page, not typed here. This used to name
+// "squats" and assert the card said Squats. Its own comment claimed the plan
+// was read from the page, through `window.__todayExercises`, which no page has
+// ever published: the read came back null every time and the hard-coded name
+// was the whole test. Once "today" stopped drifting with the calendar, today's
+// session had no squats on it and the resolver correctly said so — which the
+// check reported as the dead end coming back.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/` })
+await wait(3000)
+const swapTarget = await ev(`window.__swapTarget`)
+check('0a. today’s session holds a lift with a loose name to ask for',
+  !!swapTarget && !!swapTarget.full && !!swapTarget.loose, swapTarget)
+if (!swapTarget) { console.error('\nNo usable lift on today’s session.\n'); ws.close(); chrome.kill(); server.close(); process.exit(1) }
+console.log(`asking for "${swapTarget.loose}" — the plan spells it "${swapTarget.full}"`)
+const TARGET_FULL = swapTarget.full
+
 // THE SLOPPY ARGUMENTS ARE THE TEST. No day at all, and the old exercise named
 // the way a person says it rather than the way the catalogue spells it. Both
 // were dead ends before; either alone was enough.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  window.__swapOld = ${JSON.stringify(swapTarget.loose)}
+  window.__swapNew = 'leg press'
   window.__chatCalls = 0
   const realFetch = window.fetch
   window.fetch = async (url, init) => {
@@ -76,25 +96,19 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
         reply: '',
         proposal: {
           kind: 'propose_exercise_swap',
-          rawArgs: { day: '', old_item: 'squats', new_item: 'leg press', scope: 'today', reason: 'Rack is busy.' },
+          rawArgs: { day: '', old_item: window.__swapOld, new_item: window.__swapNew, scope: 'today', reason: 'Rack is busy.' },
         },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     return realFetch(url, init)
   }
 ` })
-
-console.log('\nA LOOSELY-NAMED SWAP FINDS THE EXERCISE\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/` })
 await wait(4000)
 
-// The plan the harness generated — read from the page so the assertions are
-// about THIS run's plan rather than a name hard-coded here.
-const planToday = await ev(`(() => (window.__todayExercises || null))()`)
-
 let ready = await ev(`!!document.querySelector('textarea')`)
 for (let i = 0; i < 20 && !ready; i++) { await wait(500); ready = await ev(`!!document.querySelector('textarea')`) }
-check('0. the chat is up', ready === true)
+check('0b. the chat is up', ready === true)
 
 const setValue = `(el, v) => {
   const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype
@@ -120,7 +134,7 @@ const READ = String.raw`(() => {
     hasProposal: /Proposed change/i.test(text)
       && [...document.querySelectorAll('button')].some(b => /^Apply/.test((b.textContent || '').trim()))
       && [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Keep'),
-    mentionsSquats: /Squats/i.test(text),
+    mentionsTarget: text.indexOf(${JSON.stringify(TARGET_FULL)}) !== -1,
     mentionsLegPress: /Leg Press/i.test(text),
     buttons: [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean),
     tail: text.replace(/\s+/g, ' ').slice(-320),
@@ -131,9 +145,128 @@ for (let i = 0; i < 24 && !state.hasProposal && !state.deadEnd; i++) { await wai
 
 check('2a. THE DEAD END IS GONE', state.deadEnd === false, state.tail)
 check('2b. ...and a real proposal came back instead', state.hasProposal === true, state.buttons)
-check('2c. ...for the exercise that is actually on the day', state.mentionsSquats === true, state.tail)
+check('2c. ...for the exercise that is actually on the day, spelled the way the plan spells it',
+  state.mentionsTarget === true, { asked: swapTarget.loose, expected: TARGET_FULL, tail: state.tail })
 check('2d. ...swapped to the one that was asked for', state.mentionsLegPress === true, state.tail)
+// WAIT FOR THE BUBBLE TO FINISH TYPING BEFORE PHOTOGRAPHING IT. The poll above
+// stops as soon as the CARD exists, but the lead above it types in character by
+// character, so the shot caught "Want me to swap **Seated Cable Row** for **Leg"
+// — broken markdown and no question mark — and read as a rendering bug. It was
+// the camera, not the card. Settle on the lead's own text before shooting.
+{
+  const leadText = () => ev(`(() => {
+    const b = [...document.querySelectorAll('[data-testid="chat-bubble"], .prose')].pop()
+    return b ? (b.textContent || '').trim() : ''
+  })()`)
+  let prev = await leadText()
+  for (let i = 0; i < 20; i++) {
+    await wait(350)
+    const now = await leadText()
+    if (now === prev && now.length > 0) break
+    prev = now
+  }
+}
 await shoot('swap-request-proposal')
+
+// --- 4. THE CARD SAYS WHAT THE SWAP COSTS THE WEEK ------------------------
+// Added 14 Sep 2026. CLAUDE.md named this card as the one surface still silent
+// about cost while every other edit path stated it before the tap.
+//
+// TWO SWAPS, NOT ONE, and that is the whole design. A like-for-like swap
+// costing nothing is the CORRECT answer and proves nothing — a card printing a
+// constant would pass it. So this proposes a cross-pattern swap as well, off a
+// differently-focused day, and asserts the card DIFFERS between them. That is
+// the only way from out here to tell a real trial from a fixed string.
+//
+// READ THE CARD'S OWN CLASSIFICATION, NOT ITS WORDS. Each implication line
+// carries data-severity, which is the app saying which line is a COST and
+// which is a note. Matching the whole card's text for numbers is what the
+// first version of these checks did, and it was worthless: "Sets × reps: 2×8"
+// in the Unchanged row satisfied "the cost names real set counts" even after
+// the words "pushing sets to" were deliberately deleted from the sentence.
+const READ_CARD = String.raw`(() => {
+  const all = [...document.querySelectorAll('*')].filter(e => /Proposed change/i.test(e.textContent || ''))
+  const heading = all[all.length - 1]
+  if (!heading) return null
+  let p = heading
+  for (let i = 0; i < 12 && p.parentElement; i++) {
+    p = p.parentElement
+    const btns = [...p.querySelectorAll('button')].map(b => (b.textContent || '').trim())
+    if (btns.some(t => /^Apply/.test(t)) && btns.includes('Keep')) break
+  }
+  const lines = [...p.querySelectorAll('[data-severity]')]
+  return {
+    text: p.textContent.replace(/\s+/g, ' ').trim(),
+    warns: lines.filter(e => e.getAttribute('data-severity') === 'warn').map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+    infos: lines.filter(e => e.getAttribute('data-severity') === 'info').map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+  }
+})()`
+
+const likeForLike = await ev(READ_CARD)
+check('4a. the first card can be read', !!likeForLike && typeof likeForLike.text === 'string' && likeForLike.text.length > 40, likeForLike)
+// THE WEIGHT STAYS DEFERRED — the half the original silence was right about.
+check('4b. it still leaves the weight to confirm rather than quoting one',
+  /Load recomputed for the new movement once you confirm/i.test(likeForLike?.text || ''), likeForLike?.text)
+// The severity hook itself, checked separately so that losing it fails under
+// its own name instead of looking like a card that went quiet about cost.
+check('4b2. the card labels its lines by severity, so a cost can be told from a note',
+  (likeForLike?.infos?.length ?? 0) > 0, likeForLike)
+
+const cross = await ev('window.__crossPatternSwap ?? null')
+check('4c. the plan offers a cross-pattern swap to test with', !!cross && !!cross.from && !!cross.to, cross)
+if (cross) {
+  console.log(`  second swap: ${cross.from} (${cross.fromFocus}) -> ${cross.to} (${cross.toFocus})`)
+  await ev(`window.__swapOld = ${JSON.stringify(cross.from)}; window.__swapNew = ${JSON.stringify(cross.to)}`)
+  await ev(`(() => { const t = document.querySelector('textarea'); if (t) {
+    const proto = window.HTMLTextAreaElement.prototype
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(t, 'swap this exercise, the rack is busy')
+    t.dispatchEvent(new Event('input', { bubbles: true }))
+  } })()`)
+  await wait(400)
+  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (b && !b.disabled) b.click() })()`)
+  await wait(3500)
+  const crossCard = await ev(READ_CARD)
+  check('4d. the second card can be read', !!crossCard && typeof crossCard.text === 'string' && crossCard.text.length > 40, crossCard)
+
+  // WHAT COUNTS AS A COST: a line the card ITSELF marks as a warning. Two
+  // earlier versions of this check were worthless and both were found by
+  // breaking the code rather than by reading them:
+  //   1st — asserted only that the two cards DIFFER. They always do: the
+  //         exercise names differ. It passed on a card with no cost at all.
+  //   2nd — matched the whole card text for a sentence with a number in it.
+  //         Deleting "pushing sets to" from the real sentence left it GREEN,
+  //         because "Unchanged: … Sets × reps: 2×8" sits in the same card.
+  // Reading the warn-severity lines fixes both: nothing else on the card is
+  // one, so neither a silent card nor a neighbouring row can satisfy it.
+  const costs = [likeForLike, crossCard].flatMap(c => c?.warns ?? [])
+  check('4e. at least one of the two swaps reports a balance cost, in its own warning line',
+    costs.length > 0, { first: likeForLike?.warns, second: crossCard?.warns })
+  // AND THE NUMBERS ARE IN THE SENTENCE SHE READS, not merely somewhere on the
+  // card: a warning that says "your week is unbalanced" and nothing else is
+  // the thing this was built to avoid.
+  // THE PROPERTY IS "IT NAMES REAL NUMBERS", NOT ONE SENTENCE'S WORDING.
+  //
+  // This pinned `N pushing sets to M pulling` — the balance pass's exact
+  // shape — and went red on 14 Sep 2026 when the card started carrying the
+  // cost in the GOAL's terms instead ("Your back goes from 14 sets this week
+  // to 9"). That sentence names both counts perfectly well; the check was
+  // describing the mechanism it happened to be written against, which is
+  // precisely what CLAUDE.md says a check must not do.
+  //
+  // Re-anchored on what a person needs from the line: two numbers and the
+  // unit, so it cannot degrade into "your week is unbalanced". The
+  // empty-side sentences are the one honest exception — "that leaves nothing
+  // pulling this week" has no second number to give.
+  const COUNTED = /\d+[^.]*\bsets?\b[^.]*\d+|\d+\s+sets?\b[\s\S]{0,40}?\bto\b\s*\d+/i
+  const EMPTY_SIDE = /leaves nothing (?:pulling|pushing) this week|leaves nothing for your (?:back|chest) this week/i
+  check('4f. ...naming real set counts, not a vague warning',
+    costs.every(c => COUNTED.test(c) || EMPTY_SIDE.test(c)), costs)
+  // AND NOT ON EVERY SWAP. A card that warned every time would be wallpaper —
+  // session-balance-cost's own header says a week no worse after gets silence.
+  check('4g. ...and a swap that costs nothing stays quiet about balance',
+    costs.length < 2, { first: likeForLike?.warns, second: crossCard?.warns })
+  await shoot('swap-request-cost')
+}
 
 const err = await ev('window.__err ?? null')
 check('3. no uncaught error on the page', err === null, err)

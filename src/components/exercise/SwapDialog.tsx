@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
+import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
 import { getExerciseEntry, searchExerciseCatalog, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
@@ -40,6 +41,8 @@ export function SwapDialog({
   exclusions,
   softExercisePreferences,
   onConfirm,
+  impactFor,
+  onReason,
 }: {
   target: SwapTarget | null
   onClose: () => void
@@ -48,14 +51,38 @@ export function SwapDialog({
   /** Soft likes/dislikes — floats liked swaps up, sinks disliked ones. Removes nothing. */
   softExercisePreferences?: { liked: string[]; disliked: string[] }
   onConfirm: (exIndex: number, dayName: string, newExercise: ExerciseEntry, scope: SwapScope) => Promise<void>
+  /**
+   * What this swap would cost the week, and what the app will even out on
+   * other days. Async because a swap recomputes the incoming lift's load
+   * before anything can be said about the week it lands in.
+   *
+   * Asked only once the candidate is chosen, never per row: running a real
+   * trial for every replacement in the list would be a dozen plan edits to
+   * render a list nobody has decided from yet.
+   */
+  impactFor?: (candidate: ExerciseEntry) => Promise<{ cost: string | null; balancing: string | null }>
+  /**
+   * WHY FIRST. The four answers a swap can have route to four different
+   * things, and two of them are not swaps at all — "it hurts" is the injury
+   * path and "I haven't got the kit" rebuilds the week around what they have.
+   * Returns a refusal string or null. Unwired, the dialog behaves exactly as
+   * it did.
+   */
+  onReason?: (answer: ReasonAnswer) => Promise<string | null>
 }) {
+  const [asked, setAsked] = useState(false)
+  const [reasonBusy, setReasonBusy] = useState(false)
+  const [reasonError, setReasonError] = useState<string | null>(null)
   const [pendingSwap, setPendingSwap] = useState<ExerciseEntry | null>(null)
+  const [impact, setImpact] = useState<{ cost: string | null; balancing: string | null } | null>(null)
   const [showAllReplacements, setShowAllReplacements] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [busy, setBusy] = useState(false)
 
   const reset = () => {
+    setAsked(false); setReasonBusy(false); setReasonError(null)
     setPendingSwap(null)
+    setImpact(null)
     setShowAllReplacements(false)
     setSearchQuery('')
   }
@@ -79,6 +106,21 @@ export function SwapDialog({
       )
     : []
 
+  // THE TRIAL, ONCE A CANDIDATE IS CHOSEN. Cancelled on unmount and on a
+  // change of candidate, so a slow trial for a swap the person backed out of
+  // can never land its sentence on a different one.
+  useEffect(() => {
+    if (!pendingSwap || !impactFor) { setImpact(null); return }
+    let cancelled = false
+    setImpact(null)
+    void impactFor(pendingSwap)
+      .then(r => { if (!cancelled) setImpact(r) })
+      // A trial that throws says nothing rather than guessing. The swap
+      // itself is unaffected — this is a sentence, not a gate.
+      .catch(() => { if (!cancelled) setImpact(null) })
+    return () => { cancelled = true }
+  }, [pendingSwap, impactFor])
+
   const applyScope = async (scope: SwapScope) => {
     if (!target || !pendingSwap) return
     setBusy(true)
@@ -91,23 +133,54 @@ export function SwapDialog({
     }
   }
 
+  const askingWhy = !!onReason && !asked && !pendingSwap
+
+  const answerReason = async (a: ReasonAnswer) => {
+    // Busy and don't-like-it are still swaps — the answer only says which
+    // scope the person is really after, and the list below is the same list.
+    if (a.type === 'reason') { setAsked(true); return }
+    setReasonBusy(true); setReasonError(null)
+    const refusal = await onReason?.(a) ?? null
+    setReasonBusy(false)
+    if (refusal) { setReasonError(refusal); return }
+    handleClose()
+  }
+
   return (
     <Dialog open={!!target} onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" data-testid="swap-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowRightLeft className="size-4" />
-            {pendingSwap ? 'Apply this swap' : 'Smart Exercise Swap'}
+            {pendingSwap ? 'Apply this swap' : askingWhy ? `Swap ${target?.exerciseName}?` : 'Smart Exercise Swap'}
           </DialogTitle>
           <DialogDescription>
             {pendingSwap ? (
               <>Swap <span className="font-semibold text-foreground">{target?.exerciseName}</span> for <span className="font-semibold text-foreground">{pendingSwap.name}</span></>
+            ) : askingWhy ? (
+              // NOT "constraint-checked replacements" WHILE STILL ASKING WHY.
+              // Two of the four answers never reach a replacement list at all,
+              // so promising one above the question is the app describing
+              // something it may not be about to do.
+              <>{target?.dayName}</>
             ) : (
               <>Constraint-checked replacements for <span className="font-semibold text-foreground">{target?.exerciseName}</span></>
             )}
           </DialogDescription>
         </DialogHeader>
 
+        {askingWhy ? (
+          <>
+            <EditReasonStep
+              kind="swap"
+              exerciseName={target?.exerciseName ?? 'it'}
+              busy={reasonBusy}
+              onAnswer={answerReason}
+              onSkip={() => setAsked(true)}
+            />
+            {reasonError && <p className="text-xs text-destructive" data-testid="swap-reason-error">{reasonError}</p>}
+          </>
+        ) : (<>
         {!pendingSwap && currentEntry && (
           <div className="flex flex-wrap gap-1.5 pb-2">
             <Badge variant="outline" className="text-xs">{currentEntry.movement_pattern.replace(/_/g, ' ')}</Badge>
@@ -242,6 +315,13 @@ export function SwapDialog({
                 <span>{w}</span>
               </p>
             ))}
+            {/* WHAT IT COSTS, AND WHAT THE APP WILL DO ABOUT IT — the same two
+                sentences the removal sheet shows, from the same helper, so the
+                two paths cannot describe one week differently. Added 13 Sep
+                2026: until then a swap said nothing at all about the week it
+                landed in, and re-ran none of the passes that keep it sane. */}
+            {impact?.cost && <p className="text-xs text-[color:var(--role-warn-text)]" data-testid="swap-balance-cost">{impact.cost}</p>}
+            {impact?.balancing && <p className="text-xs text-muted-foreground" data-testid="swap-balancing">{impact.balancing}</p>}
             <button
               className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors disabled:opacity-50"
               disabled={busy}
@@ -275,6 +355,7 @@ export function SwapDialog({
             </Button>
           </div>
         )}
+        </>)}
       </DialogContent>
     </Dialog>
   )

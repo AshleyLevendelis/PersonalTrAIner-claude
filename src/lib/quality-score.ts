@@ -1106,12 +1106,13 @@ function generateComparisonMesocycle(profile: UserProfile, seedKey: string): Mes
   return meso
 }
 
-function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], comboKey: string): DimensionResult {
+function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], comboKey: string, opts?: ScoreOptions): DimensionResult {
   const goal = profile.fitness_goal
   const policy = getGoalPolicy(goal)
   const deductions: Deduction[] = []
   type Check = { pass: boolean; detail?: Deduction }
   const checks: Check[] = []
+  const skipComparisons = opts?.skipComparisons === true
 
   // Conditioning frequency vs conditioning_preference — always applicable.
   // Excludes duration-filler notes (applyDurationFiller in exercise-plan.ts,
@@ -1150,7 +1151,7 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
   }
 
   // fat_loss: same main-compound structure and >=85% of hypertrophy's load.
-  if (goal === 'fat_loss') {
+  if (goal === 'fat_loss' && !skipComparisons) {
     const hypertrophyProfile: UserProfile = { ...profile, fitness_goal: 'hypertrophy' }
     const hypertrophyMeso = generateComparisonMesocycle(hypertrophyProfile, `${comboKey}::hypertrophy-compare`)
     const hyWeek1 = hypertrophyMeso.find(w => w.week_number === 1)
@@ -1195,7 +1196,7 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
 
   // low recovery_capacity: >=15% fewer weekly sets than an otherwise
   // identical high-recovery profile.
-  if (profile.recovery_capacity === 'low') {
+  if (profile.recovery_capacity === 'low' && !skipComparisons) {
     const highProfile: UserProfile = { ...profile, recovery_capacity: 'high' }
     const highMeso = generateComparisonMesocycle(highProfile, `${comboKey}::high-recovery-compare`)
     const lowSets = sumWeeklySets(week1)
@@ -1228,18 +1229,60 @@ function scoreGoalAlignment(profile: UserProfile, mesocycle: MesocycleWeek[], co
 // Entry point
 // ---------------------------------------------------------------------------
 
-export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comboKey: string): PlanScoreResult {
+/**
+ * THE ONE OPTION, AND IT EXISTS FOR ONE MEASURED REASON.
+ *
+ * `scoreGoalAlignment` has two checks that regenerate a WHOLE comparison
+ * mesocycle for a DIFFERENT profile — a hypertrophy version of this person
+ * (fat_loss) and a high-recovery version (low recovery) — to prove the
+ * generator differentiated them. Measured 14 Sep 2026 on this machine:
+ *
+ *   hypertrophy / moderate recovery    12 ms     (no comparison runs)
+ *   conditioning / high recovery       12 ms     (no comparison runs)
+ *   functional / low recovery         314 ms     (one comparison)
+ *   fat_loss / low recovery           475 ms     (two comparisons)
+ *
+ * The trade-off engine scores an edit BEFORE and AFTER, so a fat-loss trainee
+ * with low recovery would pay ~950 ms on a dev box — call it two to three
+ * seconds on a phone — every time a confirm card is built. That is not a card
+ * anyone waits for.
+ *
+ * So `skipComparisons` drops exactly those two checks and nothing else. It is
+ * an OPTION on the one scorer rather than a second cheaper copy, because a
+ * rule with two implementations has two behaviours — the defect this codebase
+ * keeps finding.
+ *
+ * WHAT IT COSTS, STATED PLAINLY: a score computed with this option is NOT
+ * comparable to the 7.2 floor `test:quality` holds generated plans to, because
+ * the denominator inside goalAlignment changes. Callers must use it for
+ * BEFORE/AFTER DELTAS ONLY, never as an absolute. `test:edit-tradeoff` pins
+ * both halves of that: the cheap path agrees with the full path on every
+ * dimension it keeps, and the engine never compares an absolute against a
+ * floor.
+ */
+export interface ScoreOptions {
+  /**
+   * Skip the two checks that regenerate a comparison plan for a different
+   * profile. Deltas only — see the note above.
+   */
+  skipComparisons?: boolean
+}
+
+export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comboKey: string, opts?: ScoreOptions): PlanScoreResult {
   const dimensions: Record<DimensionKey, DimensionResult> = {
     timeFit: scoreTimeFit(profile, mesocycle),
     structure: scoreStructure(mesocycle, profile),
     progression: scoreProgression(profile, mesocycle),
     selection: scoreSelection(profile, mesocycle),
-    goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey),
+    goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey, opts),
     primerFit: scorePrimerFit(profile, mesocycle),
   }
   const overall = DIMENSION_KEYS.reduce((sum, key) => sum + dimensions[key].points, 0)
   return { overall: Math.round(overall * 10) / 10, dimensions }
 }
+
+/** The scorer's own unit: one distinct rule newly violated. Exported so the trade-off engine's "materially worse" threshold is the scorer's number, not a second opinion about it. */
+export const ONE_RULE = RULE_PENALTY
 
 // ---------------------------------------------------------------------------
 // A DAY THAT LOSES A MUSCLE ITS OWN PLAN ASKED FOR — MEASURED, NOT SCORED.

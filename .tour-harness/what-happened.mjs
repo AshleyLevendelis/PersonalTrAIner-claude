@@ -22,6 +22,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { ANCHOR_ISO, anchorDate, DAY_NAMES, iso as anchorIso } from './anchor.mjs'
 const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => { const p = q.url.split('?')[0]; const f = join(DIST, p === '/' ? '/.tour-harness/real.html' : p); if (!existsSync(f)) { r.writeHead(404); r.end('nf'); return } r.writeHead(200, { 'Content-Type': T[extname(f)] ?? 'application/octet-stream' }); r.end(readFileSync(f)) })
@@ -43,13 +44,22 @@ const check = (name, ok, detail) => {
   if (ok) console.log(`    ✓ ${name}`)
   else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 400)}` : ''}`) }
 }
-const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const real = new Date()
-const pinned = (() => { const d = new Date(real); if (d.getDay() === 1 || d.getDay() === 2) d.setDate(d.getDate() + 2); return d })()
-const TODAY = iso(pinned); const TODAY_NAME = NAMES[pinned.getDay()]
+// THE ANCHOR, not a nudged version of the real clock. This file already pinned
+// a date — it was the only driver that did — but it derived the pin from
+// `new Date()` and only stepped forward off a Monday or Tuesday, so "today"
+// still moved with the calendar and so did every TODAY_NAME assertion below.
+// One anchor for the pages and the drivers alike: .tour-harness/anchor.mjs.
+const iso = anchorIso
+const NAMES = DAY_NAMES
+const pinned = anchorDate()
+const TODAY = ANCHOR_ISO; const TODAY_NAME = NAMES[pinned.getDay()]
 console.log('pinning today to', TODAY, `(${TODAY_NAME})`)
-const pin = async date => (await send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('fitplan_dev_clock_00000000-0000-4000-8000-000000000001', JSON.stringify({date:'${date}',enabled:true})) } catch {}` })).result.identifier
+// NO PIN HERE ANY MORE, 14 Sep 2026. This wrote the dev-clock key itself before
+// navigation — and real.tsx writes the same key at module scope, so the page's
+// value always won. It happened to be the SAME value (the anchor), so nothing
+// broke; three other drivers pinned a DIFFERENT day and lost silently. One
+// owner for the clock now: the page. A driver that needs a different day passes
+// `?today=`, from a date the page published. test:harness-clock §5 pins that.
 
 // Real pointer events at the element's centre — Radix menus open on pointerdown, not on .click().
 const rectOf = sel => ev(`(() => { const n = document.querySelector(${JSON.stringify(sel)}); if (!n) return null; n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 } })()`)
@@ -71,7 +81,6 @@ const untilClosed = async () => { for (let i = 0; i < 16 && await has('[data-tes
 const untilCell = async (day, re) => { let c = await cell(day); for (let i = 0; i < 16 && !re.test(c || ''); i++) { await wait(300); c = await cell(day) } return c }
 
 console.log('\nWHAT HAPPENED TO TODAY’S SESSION — on the screen\n')
-await pin(TODAY)
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
 await wait(4000)
 check(`0. today (${TODAY_NAME}) is a due training day`, new RegExp(`^${TODAY_NAME}: due$`).test(await cell(TODAY_NAME) || ''), await cell(TODAY_NAME))
@@ -79,7 +88,17 @@ check(`0. today (${TODAY_NAME}) is a due training day`, new RegExp(`^${TODAY_NAM
 // --- open ---------------------------------------------------------------
 check('1. the day menu opens the sheet', (await openSheet()) === 'open')
 const v0 = await verbs()
-check('2. today offers exactly: missed, move, rest, something else — and NOT "did it elsewhere"', JSON.stringify(v0) === JSON.stringify(['missed', 'move', 'rest', 'something_else']), v0)
+// THE PROPERTY, NOT THE EXACT LIST. This asserted set equality against four
+// verbs and went red on 13 Sep 2026 the moment "shorten" and "lighter" were
+// added to the day menu — a deliberate feature built on Ashley's ruling that
+// day, not a regression. A check that forbids ever adding an option is
+// pinned to the mechanism; what it actually exists to protect is at both ends
+// of its own sentence: the four ways out of today are all offered, and "I did
+// it elsewhere" is NOT, because for TODAY the logging grid is the path and
+// offering both would be two doors to one thing.
+const REQUIRED_TODAY_VERBS = ['missed', 'move', 'rest', 'something_else']
+check('2. today offers missed, move, rest and something else — and NOT "did it elsewhere"',
+  REQUIRED_TODAY_VERBS.every(verb => (v0 ?? []).includes(verb)) && !(v0 ?? []).includes('did_elsewhere'), v0)
 check('3. ...and points at the grid for a session done today', (await ev(`document.querySelector('[data-testid="what-happened-sheet"]').innerText`)).includes('Tick the sets below'))
 await shoot('what-happened-menu')
 

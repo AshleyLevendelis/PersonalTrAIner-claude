@@ -155,7 +155,7 @@ export function WeekContextRow({
           too, or somebody reads the number and concludes the app ignored what
           they asked for. Audit §6.5. */}
       {shortfallNote && (
-        <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">{shortfallNote}</p>
+        <p className="mt-2 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{shortfallNote}</p>
       )}
 
       {/* THE NOTES ARE ON SCREEN, NOT ONLY BEHIND THE CHEVRON. The tour

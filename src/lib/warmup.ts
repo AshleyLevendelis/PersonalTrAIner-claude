@@ -1,6 +1,9 @@
 import type { EquipmentAccess, TrainingExperience } from './types'
 import type { ExerciseEntry, MovementPattern } from './exercise-db'
 import { isExternallyLoaded, type PrescribedLoadSource } from './load-prescription'
+import { getExerciseEntry } from './exercise-db'
+import { getDurationBudgetSeconds } from './session-duration'
+import type { UserProfile, WorkoutDay } from './types'
 
 // ---------------------------------------------------------------------------
 // WARM-UPS
@@ -101,6 +104,46 @@ const GENERAL_WARMUPS: Record<EquipmentAccess, WarmupItem> = {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// DRILLS THAT EXIST ONLY FOR A TIGHTNESS ANSWER.
+//
+// SEPARATE FROM MOBILITY_DRILLS ON PURPOSE, and the separation was bought the
+// hard way. These two were added to the shared catalogue first, because the
+// tightness question offers eight areas and nothing in the app prepared the
+// neck or the elbow — tapping either would have looked exactly like tapping
+// hips and produced nothing.
+//
+// Putting them in the shared list also let the PLAN pick them, which it did:
+// test:audit came back with six sessions estimated at 43 minutes against a
+// 37-minute budget, because a generated warm-up now had another drill to
+// choose and the session had to pay for it. That is a change to everybody's
+// plan, made as a side effect of answering a different question.
+//
+// So they live here. `drillsPreparing` sees both lists; buildWarmup sees only
+// the catalogue. A tightness answer can reach these; a generated session
+// cannot, and its duration budget is untouched.
+// ---------------------------------------------------------------------------
+const TIGHTNESS_ONLY_DRILLS: MobilityDrill[] = [
+  {
+    name: 'Chin Tucks and Neck Rotations',
+    prescription: '8 tucks, then 5 slow rotations each way',
+    purpose: 'Eases a stiff neck before anything overhead or braced',
+    duration_seconds: 45,
+    prepares_joints: ['neck'],
+    contraindicated_for: ['neck'],
+    needs_equipment: [],
+  },
+  {
+    name: 'Elbow Circles and Wrist Rolls',
+    prescription: '10 circles each way, then 10 wrist rolls',
+    purpose: 'Warms the elbow and wrist before pressing or gripping heavy',
+    duration_seconds: 40,
+    prepares_joints: ['elbow', 'wrist'],
+    contraindicated_for: ['elbows'],
+    needs_equipment: [],
+  },
+]
+
 // Targeted mobility
 // ---------------------------------------------------------------------------
 // Each drill declares which joints it prepares and which injuries it is
@@ -487,4 +530,92 @@ export function getWarmupReserveSeconds(budgetSeconds: number): number {
   // 30-minute session cannot afford a 12-minute warm-up, and a 100-minute
   // session does not need proportionally more.
   return Math.max(390, Math.min(840, Math.round(budgetSeconds * 0.20)))
+}
+
+// ---------------------------------------------------------------------------
+// RE-DERIVING A DAY'S WARM-UP FROM THE DAY IT ACTUALLY IS
+//
+// Lives here, next to buildWarmup, rather than in the edit tail, because both
+// generation and every edit path need it and neither can import the other.
+//
+// MEASURED 13 Sep 2026, and this is why generation calls it too: across 64
+// generated plans and 4,096 training days, **7.0% of days shipped a warm-up
+// that ramps an exercise the session no longer contains**. The warm-up is
+// built once, and the weekly accessory rotation swaps exercises afterwards
+// with nothing re-deriving it — so a Tuesday whose Deadlifts had rotated to a
+// Trap Bar Deadlift still told the trainee to ramp up on Deadlifts. Nothing
+// caught it because no check ever compared the warm-up against the exercise
+// list it was supposed to describe.
+// ---------------------------------------------------------------------------
+
+/** The day's warm-up, re-derived from the exercises it now actually contains. */
+export function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay {
+  const entries = day.exercises
+    .map(ex => ({ ex, entry: getExerciseEntry(ex.name) }))
+    .filter((p): p is { ex: typeof day.exercises[number]; entry: NonNullable<ReturnType<typeof getExerciseEntry>> } => !!p.entry)
+  // An unresolvable exercise list means the warm-up would be derived from
+  // less than the session really holds. Leaving the old one is the honest
+  // failure: it is stale, but it was built from a real session.
+  if (entries.length === 0 || entries.length !== day.exercises.length) return day
+
+  const budgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference)
+  try {
+    const warmup = buildWarmup({
+      patterns: entries.map(p => p.entry.movement_pattern),
+      compounds: entries.map(p => ({
+        entry: p.entry,
+        suggestedLoadKg: p.ex.suggested_load_kg ?? null,
+        loadSource: p.ex.load_source,
+      })),
+      equipment: profile.equipment_access || 'full_gym',
+      injuries: profile.injuries || [],
+      experience: profile.training_experience || 'novice',
+      budgetSeconds: getWarmupReserveSeconds(budgetSeconds),
+    })
+    const rampByName = new Map(warmup.ramp_ups.map(r => [r.exercise, r]))
+    return {
+      ...day,
+      warmup,
+      exercises: day.exercises.map(ex =>
+        rampByName.has(ex.name) ? { ...ex, ramp_up: rampByName.get(ex.name) } : { ...ex, ramp_up: undefined },
+      ),
+    }
+  } catch (err) {
+    console.error('[settle-week] warm-up rebuild failed; keeping the previous one', err)
+    return day
+  }
+}
+
+
+
+// ---------------------------------------------------------------------------
+// DRILLS FOR A JOINT SOMEBODY SAID IS TIGHT.
+//
+// Separate from buildWarmup on purpose. What the plan holds is the warm-up the
+// SESSION needs, scored and budgeted with the rest of the week; "my hips feel
+// tight this morning" is a fact about today and nothing else. Making it an
+// addition computed at render time means it cannot leak into tomorrow, cannot
+// touch the stored plan, and disappears the moment she clears it.
+//
+// KIT-FREE ONLY. A drill offered for tightness must never be the one she
+// hasn't got the band for — an answer that produces nothing is worse than not
+// asking.
+// ---------------------------------------------------------------------------
+export function drillsPreparing(joints: string[], injuries: string[] = []): WarmupItem[] {
+  const want = new Set(joints)
+  if (want.size === 0) return []
+  // BOTH LISTS — the catalogue the plan uses, plus the two that exist only for
+  // this question. See TIGHTNESS_ONLY_DRILLS for why the second list exists.
+  return [...MOBILITY_DRILLS, ...TIGHTNESS_ONLY_DRILLS]
+    .filter(d => d.needs_equipment.length === 0)
+    // AN INJURY STILL VETOES A DRILL. Tight and hurt are different answers to
+    // different questions, and the hurt one is triaged elsewhere — but if the
+    // profile already carries an injury there, the drill is off regardless of
+    // which question put it on screen.
+    .filter(d => !d.contraindicated_for.some(c => injuries.includes(c)))
+    .filter(d => d.prepares_joints.some(j => want.has(j)))
+    .sort((a, b) =>
+      b.prepares_joints.filter(j => want.has(j)).length -
+      a.prepares_joints.filter(j => want.has(j)).length)
+    .map(d => ({ name: d.name, prescription: d.prescription, purpose: d.purpose, duration_seconds: d.duration_seconds }))
 }

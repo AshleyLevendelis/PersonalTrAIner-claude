@@ -348,7 +348,7 @@ const screens: Screen[] = [
       <RestDayCard
         dayName="Saturday"
         weekTally={{ done: 2, planned: 4 }}
-        tomorrow={{ dayName: 'Sunday', focus: 'Upper Body Strength', exerciseCount: 6 }}
+        tomorrow={{ dayName: 'Sunday', focus: 'Upper Body Strength', detail: '6 exercises' }}
         trainAnywayOptions={['Monday', 'Tuesday']}
         onTrainAnyway={noop}
       />

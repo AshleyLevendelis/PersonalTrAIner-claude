@@ -21,7 +21,7 @@ import { Check, Dumbbell, Plus, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber } from '@/lib/session-derive'
-import { checkForPR, getTopPRSet, type PRResult } from '@/lib/pr-engine'
+import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
@@ -110,12 +110,6 @@ export interface SetGridProps {
   // described has never happened once. Deleting the chain rather than
   // inventing the celebration: what that moment should actually show a
   // trainee is a product decision, not a wiring gap to paper over.
-}
-
-function toSessionSets(logs: ExerciseSetLog[]): { setNumber: number; weight: number; reps: number }[] {
-  return logs
-    .filter(l => l.weight_kg > 0 && l.reps_completed > 0)
-    .map(l => ({ setNumber: l.set_number, weight: l.weight_kg, reps: l.reps_completed }))
 }
 
 export function SetGrid({
@@ -434,14 +428,24 @@ export function SetGrid({
     // draft on a later set number would reappear as if freshly typed.
     clearSetDrafts(exerciseId)
 
-    // Both PR paths read the STORED weight, deliberately, so a weighted
-    // pull-up keeps exactly today's behaviour (bodyweight, PR by reps) rather
-    // than half-adopting added weight as the PR metric. checkForPR here and
-    // getTopPRSet below must agree; passing the raw typed figure to one and
-    // the stored 0 to the other would make the badge and the check disagree
-    // inside one function. PRs on added weight are a real thing and are
-    // flagged in BACKLOG as their own pass.
-    const pr = checkForPR(profileId, exerciseName, storedWeightKg, reps)
+    // Both PR paths read the STORED row, deliberately: checkForPR here and
+    // getTopPRSet below must agree, and passing the raw typed figure to one
+    // and the stored 0 to the other would make the badge and the check
+    // disagree inside one function.
+    //
+    // THE COMMENT THAT STOOD HERE CLAIMED a weighted pull-up kept "exactly
+    // today's behaviour (bodyweight, PR by reps)". There was no PR by reps —
+    // checkForPR opened with `if (weight <= 0) return null`, so a bodyweight
+    // set produced nothing at all. The comment described a design choice and
+    // the code did nothing, and reading the comment was enough to stop
+    // anyone checking. Both are real now, and which one applies is decided
+    // by prMetricFor rather than restated here.
+    const pr = checkForPR(profileId, exerciseName, {
+      weightKg: storedWeightKg,
+      reps,
+      isBodyweight: storedIsBodyweight,
+      addedLoadKg,
+    })
     if (pr) {
       setAnimatingPr(true)
       setTimeout(() => setAnimatingPr(false), 2000)

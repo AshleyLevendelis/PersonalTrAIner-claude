@@ -1,3 +1,4 @@
+import { couldNot, targetsMoved, mealsDrifted, type TargetMoveCause } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,6 @@ import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { Dashboard } from '@/components/Dashboard'
 import { ToolsTab } from '@/components/ToolsTab'
-import { ChatAssistant } from '@/components/ChatAssistant'
 import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
@@ -27,11 +27,13 @@ import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshot
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
-import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, clearAllMealPicksForDate, type MealSlotName } from '@/lib/meal-store'
+import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
 import { GroceryScreen } from '@/components/GroceryScreen'
-import { generateMealPools, assembleDay, chosenToMealPlanDays, type PoolOption } from '@/lib/meal-generation'
+import { generateMealPools, assembleDay, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
+import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
-import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
@@ -70,6 +72,26 @@ const ConversationalOnboarding = lazy(() =>
   import('@/components/onboarding/ConversationalOnboarding').then(m => ({ default: m.ConversationalOnboarding })))
 const DevTestPage = lazy(() =>
   import('@/components/DevTestPage').then(m => ({ default: m.DevTestPage })))
+
+// THE COACH, OFF THE CRITICAL PATH — Ashley's ruling, 14 Sep 2026, from three
+// options. The app's first download was 292 kB gzipped against a 292 kB budget:
+// grown into its ceiling, so the next feature tipped it over. Measured by
+// splitting each large module into its own chunk and reading the real build,
+// the coach chat was 85 kB of that 292 — nearly a third, and the only large
+// piece that comes out cleanly.
+//
+// IT IS STILL FORCE-MOUNTED, which is the whole point of it being here: the
+// coach speaks first, and the dot on the chat button comes from state this
+// component owns. So this changes WHEN the code arrives, not whether the coach
+// is live. React renders the chat tab immediately, the import starts
+// immediately, and it mounts a beat later — off the bundle the browser has to
+// parse before it can paint anything.
+//
+// HER RULING NAMED THE COST and it is stated rather than buried: the opener and
+// the dot land a fraction of a second later than they used to, and a tap on the
+// chat inside that first instant sees the app's own loading spinner briefly.
+const ChatAssistant = lazy(() =>
+  import('@/components/ChatAssistant').then(m => ({ default: m.ChatAssistant })))
 
 /** The one loading state this app has, reused so a lazy chunk never introduces a second. */
 function ScreenLoading() {
@@ -186,6 +208,17 @@ function App() {
   // valid for its slot any day, per the M0 architecture decision).
   const [mealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
   const [isGeneratingMeals, setIsGeneratingMeals] = useState(false)
+  /** True while the resize is being written. The card's button says so rather than looking dead. */
+  const [mealRefitBusy, setMealRefitBusy] = useState(false)
+  /** Set only when a resize did not fully land — never when it did. See handleMealRefitConfirm. */
+  const [mealRefitError, setMealRefitError] = useState<string | null>(null)
+  /**
+   * Bumped when the offer is declined, purely to re-read the decline.
+   * isRefitDeclined reads localStorage, which React cannot subscribe to, so
+   * without this the offer would sit on screen until the next reload — a
+   * decline that visibly does nothing, which is worse than not offering.
+   */
+  const [mealRefitDeclineTick, setMealRefitDeclineTick] = useState(0)
   /**
    * The FIRST pool build, running in the background after onboarding handed
    * over — a separate fact from isGeneratingMeals, deliberately.
@@ -306,6 +339,40 @@ function App() {
   // Chat context + its offline canned-response fallback still consume the
   // legacy MealPlanDay[] shape — adapted fresh from today's picks so the
   // chat and the Meals tab can never disagree.
+  // ---------------------------------------------------------------------
+  // HAVE THE MEALS DRIFTED AWAY FROM THE TARGET?
+  // ---------------------------------------------------------------------
+  // Ashley's two rulings, 17 Sep 2026: tell her and offer to refit, and stay
+  // quiet until the drift is real. The engine holds both; this only decides
+  // WHEN TO ASK IT, and the answer is "only on a day that already failed".
+  //
+  // GATED ON THE ASSEMBLY ABOVE, which is the whole reason this is affordable
+  // on every render. checkMealRefit's first act is to assemble the day and
+  // return early when it fits — so calling it unconditionally would repeat
+  // the search that just ran, on every keystroke anywhere in the app, to
+  // learn something assembledMeals already knows. On a day that fits, this
+  // costs one boolean. On a day that does not, it costs the resize trial,
+  // which is exactly the day worth paying for.
+  const mealRefit: MealRefit | null =
+    macros && assembledMeals && !assembledMeals.withinTolerance
+      ? checkMealRefit(mealPools, macros, {
+        mealsPerDay: profile?.meals_per_day,
+        includeSnacks: profile?.include_snacks,
+        pinned: pinnedMeals,
+        softLikedFoods: compiledSoftFoodPreferences,
+      })
+      : null
+  // Keyed on the TARGETS, so a decline covers the numbers she saw and nothing
+  // else: when the target moves again the key changes and the app is free to
+  // ask about the new gap. See meal-refit.ts for why that beats a flag.
+  const mealRefitDeclined = useMemo(
+    () => (profile?.id ? isRefitDeclined(profile.id, macros) : false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profile?.id, macros, mealRefitDeclineTick],
+  )
+  /** What the Nutrition tab actually shows: a needed refit she has not already turned down. */
+  const mealRefitOffer = mealRefit?.needed && !mealRefitDeclined ? mealRefit : null
+
   const mealPlan = chosenToMealPlanDays(chosenMeals)
   const [isRestoring, setIsRestoring] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -476,9 +543,15 @@ function App() {
   // targetWeightAnchorKg is state, not a fresh lookup: the anchor only moves
   // on a real trend, and re-querying it on every field edit would let a noisy
   // weigh-in retune calories through the back door.
+  // ONE LIST, NAMED, so the change-detector and the cause-detector cannot
+  // disagree. The first version of the cause read `split('|')[5]` for the goal
+  // — correct on the day and silently wrong the moment anybody reorders this
+  // array, with no test able to see it. Naming the keys makes the position
+  // derived rather than remembered.
+  const MACRO_INPUT_KEYS = ['weight_kg', 'age', 'height_cm', 'gender',
+    'activity_level', 'fitness_goal', 'macro_calculation_mode'] as const
   const macroInputs = profile
-    ? [profile.weight_kg, profile.age, profile.height_cm, profile.gender,
-       profile.activity_level, profile.fitness_goal, profile.macro_calculation_mode].join('|')
+    ? MACRO_INPUT_KEYS.map(k => String(profile[k] ?? '')).join('|')
     : null
   const lastMacroInputsRef = useRef<string | null>(null)
   useEffect(() => {
@@ -487,11 +560,55 @@ function App() {
     // recomputing immediately would just be the same numbers again.
     if (lastMacroInputsRef.current === null) { lastMacroInputsRef.current = macroInputs; return }
     if (lastMacroInputsRef.current === macroInputs) return
+    const previousMacroInputs = lastMacroInputsRef.current
     lastMacroInputsRef.current = macroInputs
-    setMacros(computeTargets(profile, {
+    const targets = computeTargets(profile, {
       latestWeightKg: targetWeightAnchorKg ?? profile.weight_kg,
       exercisePlan,
-    }))
+    })
+    setMacros(targets)
+    // AND SAY SO. Added 17 Sep 2026 with the goal change, because that is
+    // what exposed it: `fitness_goal` is one of the inputs above, and
+    // macro-calculator reads the goal for the deficit, the carb prescription
+    // and the label — so switching from fat loss to muscle growth moves every
+    // number on the Nutrition tab. Before this it moved them SILENTLY.
+    //
+    // The three lines are the ones handleWeightLogged has always had; this
+    // path never got them, so a weigh-in explained itself and every other
+    // input change did not. Ashley's standing rule is that the app says what
+    // changed in plain words, and it was being kept on one path out of four.
+    //
+    // SAFE TO RUN AFTER A CALLER THAT ALREADY SNAPSHOTTED — handleMacroModeChange
+    // does, and its own write changes macro_calculation_mode, which is in the
+    // input string, so this effect fires straight after it. snapshotTargetsIfChanged
+    // compares against the last stored row and returns changedFromPrior: false
+    // when the numbers match, so the notice is written once, not twice.
+    // THE CAUSE IS DERIVED FROM WHICH INPUT MOVED, not assumed. This effect
+    // fires for seven different fields, and until 17 Sep 2026 the sentence
+    // said "with your recent weigh-ins" for all of them — so changing your
+    // goal blamed weigh-ins that had not happened. The previous input string
+    // is already held for the skip-if-unchanged test, so the answer is
+    // readable rather than guessable.
+    const priorInputs = (previousMacroInputs ?? '').split('|')
+    const nowInputs = macroInputs.split('|')
+    const changed = (key: typeof MACRO_INPUT_KEYS[number]) => {
+      const i = MACRO_INPUT_KEYS.indexOf(key)
+      return priorInputs[i] !== undefined && priorInputs[i] !== nowInputs[i]
+    }
+    // The goal wins when both moved: a goal change is what a person would say
+    // happened, and its rebuild covers the rest anyway. Same precedence
+    // detectPlanInvalidation uses for the same reason.
+    const cause: TargetMoveCause =
+      changed('fitness_goal') ? 'goal' : changed('weight_kg') ? 'weigh_in' : 'settings'
+    if (profile.id) {
+      const profileId = profile.id
+      snapshotTargetsIfChanged(profileId, profile, targets, targetWeightAnchorKg).then(result => {
+        const moved = result.previous && targets ? targetsMoved(result.previous, targets, cause) : null
+        if (result.changedFromPrior && moved) {
+          setAdaptationMessages(prev => [...prev, { text: moved }])
+        }
+      })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [macroInputs, isRestoring])
 
@@ -982,8 +1099,13 @@ function App() {
     // one ever) is the one-time "your target changed" notice trigger.
     snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, effectiveTargetWeight.weightKg)
       .then(result => {
-        if (result.changedFromPrior) {
-          setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${liveTargets!.calories} kcal, based on your recent weigh-ins.` }])
+        // ONE SENTENCE, FROM THE PHRASEBOOK. This and its twin below were two
+        // hand-written copies of the same line, naming only calories and only
+        // the new figure. targetsMoved returns null when nothing actually
+        // moved, so the notice cannot fire on a change that did not happen.
+        const moved = result.previous && liveTargets ? targetsMoved(result.previous, liveTargets, 'unknown') : null
+        if (result.changedFromPrior && moved) {
+          setAdaptationMessages(prev => [...prev, { text: moved }])
         }
       })
   }
@@ -1185,7 +1307,7 @@ function App() {
       // setupError, not authError: this is the onboarding screen's own error
       // surface, which is where the person actually is when it happens.
       setSetupError(
-        "We couldn't start your account, so there was nowhere to save your plan. " +
+        `${couldNot('start your account')} There was nowhere to save your plan. ` +
         `Check your connection and try again — nothing was lost. (${signIn.error ?? 'no session'})`,
       )
       return
@@ -1682,11 +1804,11 @@ function App() {
         setMealRegenerateError(
           result.generatorReached
             ? (hadExistingOptions
-                ? `Couldn't fit a new ${MEAL_SLOT_LABEL[slot]} option — kept your existing one. Try loosening a restriction or widening your calorie range.`
+                ? `${couldNot(`fit a new ${MEAL_SLOT_LABEL[slot]} option`)} I've kept your existing one — try loosening a restriction or widening your calorie range.`
                 : `${MEAL_SLOT_LABEL[slot]} doesn't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off this slot.`)
             : (hadExistingOptions
-                ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
-                : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`)
+                ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
+                : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`)
         )
         return
       }
@@ -1697,12 +1819,69 @@ function App() {
     } catch {
       setMealRegenerateError(
         hadExistingOptions
-          ? `Couldn't refresh ${MEAL_SLOT_LABEL[slot]} — kept your existing options.`
-          : `Couldn't generate ${MEAL_SLOT_LABEL[slot]} — try again in a moment.`
+          ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
+          : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`
       )
     } finally {
       setIsGeneratingMeals(false)
     }
+  }
+
+  /**
+   * SAME MEALS, NEW AMOUNTS — the confirm half of Ashley's 17 Sep ruling.
+   *
+   * Deliberately NOT handleRegenerateAllMeals, which is the thing this exists
+   * to avoid: that costs a paid call, replaces the whole pool, clears every
+   * manual pick and leaves the grocery list naming ingredients for meals that
+   * no longer exist. This writes portions and nothing else, so the names, the
+   * picks and the shopping list all stay exactly as they were.
+   *
+   * THE SCREEN IS RE-READ FROM STORAGE RATHER THAN SET FROM THE TRIAL. The
+   * resized pools in hand are what SHOULD be stored; what IS stored is what
+   * the writes actually achieved, and on a partial failure those are two
+   * different things. Showing the trial would be the app printing a portion
+   * nobody's database holds — the same class of lie as a receipt for a write
+   * that did not land.
+   */
+  const handleMealRefitConfirm = async (): Promise<{ updated: number; failed: number } | null> => {
+    if (!profile?.id || !mealRefit) return null
+    const refitProfileId = profile.id
+    setMealRefitBusy(true)
+    setMealRefitError(null)
+    // RETURNED, not just rendered. The coach confirms through this same
+    // function, and its receipt has to say what actually landed — so the one
+    // write path reports back rather than the chat re-running the write.
+    let refitResult: { updated: number; failed: number } | null = null
+    try {
+      const result = await persistResizedPools(refitProfileId, mealRefit.pools)
+      setMealPools(await getPools(refitProfileId))
+      refitResult = result
+      if (result.updated === 0) {
+        setMealRefitError(`${couldNot('resize your meals')} They're exactly as they were — try again in a moment.`)
+      } else if (result.failed > 0) {
+        // Named, not rounded off. A partial write is the one outcome where
+        // the day on screen is neither the old day nor the promised one, and
+        // saying "some" would leave her unable to tell which.
+        setMealRefitError(`I resized ${result.updated} of your meals, but ${result.failed} didn't save — those are still their old size.`)
+      }
+      // A clean write needs no message and no dismissal. The re-read above
+      // puts the resized meals on screen, the day now fits, and the offer
+      // stops being needed on the next render because the assembly says so —
+      // the same mechanism that decided to show it in the first place.
+    } catch (error) {
+      console.error('Resizing the meals failed:', error)
+      setMealRefitError(`${couldNot('resize your meals')} They're exactly as they were — try again in a moment.`)
+    } finally {
+      setMealRefitBusy(false)
+    }
+    return refitResult
+  }
+
+  /** "Leave them" — remembered against these targets only, so a later move asks again. */
+  const handleMealRefitDecline = () => {
+    if (!profile?.id) return
+    declineRefit(profile.id, macros)
+    setMealRefitDeclineTick(t => t + 1)
   }
 
   const handleRegenerateAllMeals = async () => {
@@ -1747,7 +1926,7 @@ function App() {
         setMealRegenerateError(
           result.generatorReached
             ? "Nothing fits your current targets right now. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot — then regenerate."
-            : "Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment."
+            : `${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`
         )
         return
       }
@@ -1762,9 +1941,22 @@ function App() {
         }
         return next
       })
-      setManualMealPicks({})
+      // PICKS ARE CLEARED ONLY WHERE THE MEALS ACTUALLY CHANGED, which is the
+      // half the block above already got right and this line did not. It used
+      // to clear every pick unconditionally, so a slot whose regeneration
+      // FAILED kept its old meals — carefully, deliberately — and then lost
+      // the pick that made one of them hers anyway. The meal survived and
+      // stopped being her choice, for no reason anyone could see.
+      const regeneratedSlots = (Object.entries(result.accepted) as [MealSlotName, PoolOption[]][])
+        .filter(([, options]) => options.length > 0)
+        .map(([slot]) => slot)
+      setManualMealPicks(prev => {
+        const next = { ...prev }
+        for (const slot of regeneratedSlots) delete next[slot]
+        return next
+      })
       const todayDate = getSessionDateContext(profile.id).date
-      await clearAllMealPicksForDate(profile.id, todayDate)
+      for (const slot of regeneratedSlots) await clearMealPick(profile.id, todayDate, slot)
 
       if (failedSlots.length > 0) {
         // Split by whether each failed slot actually had prior options to
@@ -1777,12 +1969,12 @@ function App() {
         const keptSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) > 0)
         const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
         const parts: string[] = []
-        if (keptSlots.length > 0) parts.push(`Couldn't fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} — kept what you had.`)
+        if (keptSlots.length > 0) parts.push(`${couldNot(`fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')}`)} I've kept what you had.`)
         if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} don't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off a slot.`)
         setMealRegenerateError(parts.join(' '))
       }
     } catch {
-      setMealRegenerateError("Couldn't reach the meal generator — your existing plan is unchanged. Try again in a moment.")
+      setMealRegenerateError(`${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`)
     } finally {
       setIsGeneratingMeals(false)
     }
@@ -1865,7 +2057,7 @@ function App() {
       console.error('Weight-basis rebuild failed:', err)
       setAdaptationMessages(prev => [
         ...prev.filter(m => m.weightBasisOfferId !== id),
-        { text: "Couldn't rebuild your plan just then — nothing was changed. Try again in a moment." },
+        { text: `${couldNot('rebuild your plan just then')} Nothing was changed — try again in a moment.` },
       ])
     } finally {
       setLoadSuggestionBusy(null)
@@ -1967,7 +2159,7 @@ function App() {
       await reloadMemory(profile.id)
     } catch (err) {
       console.error('Recording the ban failed:', err)
-      setWriteError(`Couldn't save that — ${exerciseName} hasn't been removed. Check your connection and try again.`)
+      setWriteError(`${couldNot('save that')} ${exerciseName} hasn't been removed — check your connection and try again.`)
       return
     }
     setWriteError(null)
@@ -2024,19 +2216,14 @@ function App() {
 
     if (!profile.id) return
     try {
-      if (scope === 'today') {
-        const week = updatedMesocycle.find(w => w.week_number === weekNumber)
-        if (week) await saveMesocycleWeek(profile.id, week)
-      } else {
-        // 'permanent' touches every remaining week of the current block —
-        // still a handful of rows, cheap enough to upsert individually
-        // rather than resaving the whole mesocycle.
-        const touchedBlock = updatedMesocycle.find(w => w.week_number === weekNumber)?.block_number
-        const touchedWeeks = updatedMesocycle.filter(
-          w => w.block_number === touchedBlock && w.week_number >= weekNumber
-        )
-        await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
-      }
+      // THE THIRD COPY OF THIS BRANCH, removed 15 Sep 2026. saveScopedEdit
+      // was extracted to own it precisely so the screen's swap and the
+      // coach's could not disagree about which weeks reached the database —
+      // and then both kept their own copy anyway, the executor's under a
+      // comment promising it "mirrors handleSwapExercise exactly". This was
+      // the original the other two claimed to mirror. Identical behaviour:
+      // 'today' is one week, 'permanent' is the rest of that week's block.
+      await saveScopedEdit(profile.id, updatedMesocycle, weekNumber, scope)
       // VISION-ARCHITECTURE.md §2.3 — "after any tap mutation, sweep pending
       // proposals on the same target and mark them stale immediately, so
       // the user never taps Confirm on a card invalidated by their own tap
@@ -2063,6 +2250,50 @@ function App() {
    * remember doing. rebuildFromCurrentWeek enforces that; this just supplies
    * the week to start from.
    */
+  /**
+   * A corrected implement ceiling, applied to the plan she is already in.
+   *
+   * ASHLEY'S RULING, 13 Sep 2026: update this plan's weights now, from this
+   * week onward, exercises unchanged, and say what moved. So this APPLIES
+   * rather than offering — there is no confirm dialog — but it is never
+   * silent: the receipt names the largest move and its two numbers.
+   *
+   * It is not `handleConfirmRebuild`'s sibling by accident of placement. That
+   * one regenerates weeks and can change which exercises the plan holds; this
+   * one may not, which is why it goes through `repriceForCorrectedProfile`
+   * rather than `rebuildFromCurrentWeek`.
+   */
+  const handleCeilingsCorrected = async (patch: Partial<UserProfile>) => {
+    if (!profile?.id || mesocycle.length === 0) return
+    const corrected = { ...profile, ...patch } as UserProfile
+    const liveWeek = getActiveMesocycleWeek(
+      mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4,
+    )
+    const { mesocycle: repriced, changes } = repriceForCorrectedProfile(
+      mesocycle, profile, corrected, repriceableWeekNumbers(mesocycle, liveWeek),
+    )
+    if (changes.length === 0) return
+
+    const previous = mesocycle
+    setMesocycle(repriced)
+    try {
+      // ONLY THE WEEKS THAT MOVED. Re-saving untouched weeks is how a resave
+      // rewinds live-week detection (weight-basis-offer.ts:386) — and there is
+      // no reason to write a week whose numbers are the same.
+      const touched = new Set(changes.map(c => c.weekNumber))
+      await Promise.all(
+        repriced.filter(w => touched.has(w.week_number)).map(w => saveMesocycleWeek(profile.id!, w)),
+      )
+    } catch (err) {
+      console.error('Re-pricing after a corrected ceiling failed to save — reverting', err)
+      setMesocycle(previous)
+      setWriteError("Your weights couldn't be updated just now — the plan is unchanged.")
+      return
+    }
+    const text = describeReprice(changes)
+    if (text) setAdaptationMessages(prev => [...prev, { text }])
+  }
+
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
     setRebuilding(true)
@@ -2072,7 +2303,7 @@ function App() {
       )
       const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek)
       if (!result.ok || !result.mesocycle) {
-        setWriteError(result.error ?? "Couldn't rebuild your plan just now — nothing has changed.")
+        setWriteError(result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`)
         return
       }
       const previous = mesocycle
@@ -2092,6 +2323,25 @@ function App() {
         return
       }
       setLogsVersion(v => v + 1)
+      // THE FOOD HALF OF A GOAL CHANGE — Ashley's ruling, 17 Sep 2026, from
+      // three options: training AND food, from this week. She rejected asking
+      // about food as a second question, because somebody training for muscle
+      // while still eating a fat-loss deficit is the worst of both.
+      //
+      // ONLY for the goal. Every other invalidating field (equipment, days,
+      // injuries, style, session length, the known lifts) changes what you
+      // DO, not what you need to eat — none of them is an input to
+      // computeTargets, so regenerating meals for them would be a slow paid
+      // call that changed nothing.
+      //
+      // The targets themselves already moved, at save time, through the macro
+      // effect keyed on fitness_goal — this is the MEALS following them.
+      // Deliberately here on the confirm rather than at save: it costs an edge
+      // call and real time, and the dialog says it is coming, so it must not
+      // start before the tap. What that leaves is stated in BACKLOG rather
+      // than hidden: declining means new targets with the old meals still
+      // fitted to the old ones, the same shape declining has always had.
+      if (planInvalidation?.field === 'fitness_goal') await handleRegenerateAllMeals()
     } finally {
       setRebuilding(false)
       setPlanInvalidation(null)
@@ -2286,8 +2536,9 @@ function App() {
     const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
     setMacros(targets)
     snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
-      if (result.changedFromPrior) {
-        setAdaptationMessages(prev => [...prev, { text: `Your calorie target updated to ${targets!.calories} kcal, based on your recent weigh-ins.` }])
+      const moved = result.previous && targets ? targetsMoved(result.previous, targets, 'weigh_in') : null
+      if (result.changedFromPrior && moved) {
+        setAdaptationMessages(prev => [...prev, { text: moved }])
       }
     })
 
@@ -2352,7 +2603,7 @@ function App() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-4 text-center">
-          <h2 className="text-lg font-semibold">We couldn't sign you in</h2>
+          <h2 className="text-lg font-semibold">I couldn't sign you in</h2>
           {/* The message depends on WHAT failed. Blaming the connection for a
               server setting sends someone to check their wifi over something
               only a dashboard toggle can fix — and offers a Try again button
@@ -2415,7 +2666,7 @@ function App() {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <div className="max-w-md w-full space-y-4 text-center">
-            <h2 className="text-lg font-semibold">We couldn't finish setting up your plan</h2>
+            <h2 className="text-lg font-semibold">I couldn't finish setting up your plan</h2>
             <p className="text-sm text-muted-foreground break-words">{setupError}</p>
             <Button className="w-full" onClick={() => setSetupError(null)}>
               Try again
@@ -2599,6 +2850,11 @@ function App() {
               onRegenerateMealSlot={handleRegenerateMealSlot}
               onFindMoreOptions={handleFindMoreMealOptions}
               onRegenerateAllMeals={handleRegenerateAllMeals}
+              mealRefit={mealRefitOffer}
+              mealRefitBusy={mealRefitBusy}
+              mealRefitError={mealRefitError}
+              onMealRefitConfirm={handleMealRefitConfirm}
+              onMealRefitDecline={handleMealRefitDecline}
             />
             )}
           </TabsContent>
@@ -2634,6 +2890,10 @@ function App() {
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
+            {/* The fallback is the app's one loading state, and on an inactive
+                tab it is hidden anyway — so the only person who ever sees it is
+                someone who opens the chat in the first instant after launch. */}
+            <Suspense fallback={<ScreenLoading />}>
             <ChatAssistant
               profile={profile}
               macros={macros}
@@ -2648,6 +2908,9 @@ function App() {
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
               onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+              onGoalMealsNeedRebuild={handleRegenerateAllMeals}
+              mealRefit={mealRefitOffer}
+              onMealRefitConfirm={handleMealRefitConfirm}
               onMealSwapApplied={handleMealPickApplied}
               onFindMoreMealOptions={handleFindMoreMealOptions}
               memoryFacts={memoryFacts}
@@ -2674,6 +2937,7 @@ function App() {
               onAttentionChange={setChatAttention}
               chatVisible={activeTab === 'chat'}
             />
+            </Suspense>
           </TabsContent>
         </Tabs>
       </main>
@@ -2700,6 +2964,7 @@ function App() {
         latestWeightKg={latestWeightKg}
         onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
         onPlanInvalidated={setPlanInvalidation}
+        onCeilingsCorrected={handleCeilingsCorrected}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}

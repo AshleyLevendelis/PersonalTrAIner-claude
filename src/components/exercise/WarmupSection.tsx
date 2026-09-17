@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { ChevronDown, Thermometer } from 'lucide-react'
 import { normalizeWarmup } from '@/lib/session-derive'
 import type { WorkoutDay } from '@/lib/types'
+import type { WarmupItem } from '@/lib/warmup'
 
 // ---------------------------------------------------------------------------
 // Rebuilt per LAYOUT-DESIGN.md §1.5: General + Mobility + coach_note only.
@@ -18,10 +19,24 @@ export function WarmupSection({
   warmup,
   open,
   onToggle,
+  extra = [],
+  extraNote,
+  extraCaveat,
 }: {
   warmup: WorkoutDay['warmup']
   open: boolean
   onToggle: () => void
+  /**
+   * Drills added for what she said felt tight THIS MORNING — computed here,
+   * never stored on the plan. Separate from `warmup.mobility` on purpose: the
+   * plan's mobility is what the session needs and is the same every time that
+   * session comes round; these are about today and vanish when she clears them.
+   */
+  extra?: WarmupItem[]
+  /** "Added for the hips you said felt tight" — why these are here. */
+  extraNote?: string | null
+  /** What it could NOT do, said out loud rather than swallowed. */
+  extraCaveat?: string | null
 }) {
   // Defensive against legacy/partial warmup shapes (a mesocycle_weeks row
   // written before a WarmupBlock field existed, or hand-edited data) — see
@@ -34,7 +49,11 @@ export function WarmupSection({
   // focused exercise row is the sole surface for ramp data) but its set
   // time is already folded into totalMinutes, so it must count here too —
   // otherwise "1 move" next to "~10 min" reads as a bug, not a ramp.
-  const moveCount = general.length + mobility.length + rampCount
+  // THE COUNT ON THE CLOSED SECTION HAS TO INCLUDE THEM. She adds three drills
+  // and the badge still says 4 moves would read as the answer not landing —
+  // which is the shape of defect this repo keeps paying for.
+  const moveCount = general.length + mobility.length + rampCount + extra.length
+  const extraMinutes = Math.round(extra.reduce((n, e) => n + e.duration_seconds, 0) / 60)
 
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="rounded-[10px] border bg-card">
@@ -42,7 +61,7 @@ export function WarmupSection({
         <span className="flex items-center gap-2 text-xs font-medium text-foreground">
           <Thermometer className="size-3.5 text-primary-text" />
           Warm-up
-          <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4">{moveCount} {moveCount === 1 ? 'move' : 'moves'} · ~{totalMinutes} min</Badge>
+          <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4">{moveCount} {moveCount === 1 ? 'move' : 'moves'} · ~{totalMinutes + extraMinutes} min</Badge>
         </span>
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
@@ -68,6 +87,21 @@ export function WarmupSection({
               </div>
             ))}
           </div>
+        )}
+        {extra.length > 0 && (
+          <div className="space-y-1" data-testid="warmup-tightness">
+            <p className="text-[0.625rem] uppercase tracking-wider text-primary-text font-medium">For what feels tight</p>
+            {extra.map((item, i) => (
+              <div key={`tight-${i}`} className="text-xs">
+                <span className="font-medium">{item.name}</span>
+                <span className="text-muted-foreground"> — {item.prescription}</span>
+              </div>
+            ))}
+            {extraNote && <p className="text-[0.6875rem] text-muted-foreground">{extraNote}</p>}
+          </div>
+        )}
+        {extraCaveat && (
+          <p className="text-[0.6875rem] text-muted-foreground" data-testid="warmup-tightness-caveat">{extraCaveat}</p>
         )}
         {coachNote && (
           <p className="text-[0.6875rem] text-muted-foreground/80 italic">{coachNote}</p>

@@ -4,6 +4,7 @@ import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.t
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
+import { detectPlanClaim, planClaimFloorText } from "../_shared/plan-claim.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
 import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming } from "../_shared/message-evidence.ts";
 
@@ -518,6 +519,44 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_meal_move",
+    description:
+      "PROPOSES moving a whole meal into a different slot TODAY — this does NOT apply the change, they tap Confirm. Call this for 'I'll have dinner as my snack instead', 'move lunch to breakfast', 'can I have my snack for dinner'. The meal is RESIZED to fit the slot it lands in, and if that slot already has a meal the two SWAP places, both resized. The card carries both new sizes; never state them yourself. This is SAME DAY ONLY — the app cannot move a meal to another day, because no screen shows another day's meals, so if they ask for tomorrow say plainly that you can't move meals between days yet rather than moving it somewhere else. Not for swapping a meal for a different dish (propose_meal_swap) and not for changing one food inside a meal (propose_meal_food_*).",
+    parameters: {
+      type: "object",
+      properties: {
+        from_slot: {
+          type: "string",
+          description: "The meal being moved: breakfast, lunch, dinner or snack.",
+        },
+        to_slot: {
+          type: "string",
+          description: "Where it is going: breakfast, lunch, dinner or snack. Must be a different slot from from_slot.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the move. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["from_slot", "to_slot", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_meal_refit",
+    description:
+      "PROPOSES resizing TODAY'S MEALS so they add up to the user's current calorie and macro targets — this does NOT apply the change, they tap Confirm. The meals, their names and their foods all stay exactly as they are; only the AMOUNTS move. Call this when the user says their meals no longer match their numbers, asks why the day is over or under, or asks you to make their meals fit their targets ('my meals are 300 over', 'these don't add up to my calories any more', 'can you make my food match my targets'). The app decides whether a resize would actually help and refuses to show a card when it would not, so never promise a result: offer, and let the card answer. NOT for swapping a meal for a different dish (propose_meal_swap), NOT for changing one food inside a meal (propose_meal_food_resize), and NOT a regeneration — do not offer to rebuild their meals instead.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_exercise_swap",
     description:
       "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
@@ -556,7 +595,7 @@ const toolDeclarations = [
   {
     name: "propose_exercise_remove",
     description:
-      "PROPOSES taking ONE exercise out of ONE session, leaving the rest of it alone — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they ask to drop, skip, cut or take out a specific exercise ('drop the leg press today', 'take the calf raises out', 'I'm not doing the lunges'). It is NOT ban_exercise: a ban removes it from every week of every block and is not available from chat. It is NOT propose_exercise_swap: if they name something to do INSTEAD, swap is the tool. If removing it would leave the session with fewer than three exercises the app refuses and says so, so do not promise it first. When they clearly want the whole day off rather than one exercise, that is propose_rest_day.",
+      "PROPOSES taking ONE exercise out of ONE session, leaving the rest of it alone — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they ask to drop, skip, cut or take out a specific exercise ('drop the leg press today', 'take the calf raises out', 'I'm not doing the lunges'). It is NOT ban_exercise: a ban removes it from every week of every block, which is a different and much larger request. It is NOT propose_exercise_swap: if they name something to do INSTEAD, swap is the tool. If removing it would leave the session with fewer than three exercises the app refuses and says so, so do not promise it first. When they clearly want the whole day off rather than one exercise, that is propose_rest_day.",
     parameters: {
       type: "object",
       properties: {
@@ -580,6 +619,38 @@ const toolDeclarations = [
         origin_verbatim_quote: {
           type: "string",
           description: "The exact substring of the user's CURRENT message asking for the removal. Copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["item", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_exercise_add",
+    description:
+      "PROPOSES putting ONE exercise INTO one session, as part of the plan — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they want to DO something that isn't in the session ('add some face pulls', 'can I put curls in on Thursday', 'I want more calf work today'). ADDING IS NOT LOGGING: log_history and the app's 'add unplanned work' record something already done, which never joins the plan or counts towards the week's volume; this puts it in the session so it is prescribed, sized and progressed like everything else. It is NOT propose_exercise_swap — swap takes something out to put something in, this takes nothing out. The session gets LONGER and the app says the new length on the card; never offer to shorten something else to make room. A rest day is refused (make it a training day first), and so is an exercise already on that day, so do not promise either as done before the card comes back.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day the session is on — a weekday name, or 'today'/'tomorrow'. Defaults to today when they don't say.",
+        },
+        item: {
+          type: "string",
+          description: "The exercise to add, in their words. The app resolves it against what it would actually plan for them; a movement it cannot place is refused rather than invented.",
+        },
+        scope: {
+          type: "string",
+          enum: ["today", "permanent"],
+          description: "'today' (default) adds it to this one session. 'permanent' adds it to that day for the rest of this block. Only send 'permanent' when they say something lasting ('every week', 'for the rest of the block').",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their words, if they gave one — shown on the card. Omit rather than invent one.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the addition. Copied verbatim, not paraphrased.",
         },
       },
       required: ["item", "origin_verbatim_quote"],
@@ -719,7 +790,7 @@ const toolDeclarations = [
   {
     name: "propose_volume_change",
     description:
-      "PROPOSES moving a day's set count up or down, from this week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. DIRECTION ONLY: you say lighter or heavier, the app decides by how much. It will not go below the floor that keeps an exercise worth doing, will not let an accessory outgrow the main lift it supports, will not push the session past the length the user asked for, and never touches a deload week. If a bound stops it, the card says so rather than silently doing less than it claimed.",
+      "PROPOSES moving a day's set count up or down — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. DIRECTION ONLY: you say lighter or heavier, the app decides by how much. It will not go below the floor that keeps an exercise worth doing, will not let an accessory outgrow the main lift it supports, will not push the session past the length the user asked for, and never touches a deload week. If a bound stops it, the card says so rather than silently doing less than it claimed. SCOPE MATTERS AND IS OFTEN THE WHOLE POINT: 'today' changes only this week's session and it is back to normal next week — that is what someone means by 'I'm knackered today', 'go easy on me this morning', 'I slept badly'. 'ongoing' changes it from this week to the end of the plan, which is what 'Tuesdays are always too much' or 'this is more than I can keep up with' means. When it is genuinely ambiguous, ask which they meant rather than guessing — an ongoing change made from one bad night is the wrong answer in a way that is easy to make and hard to notice.",
     parameters: {
       type: "object",
       properties: {
@@ -731,6 +802,11 @@ const toolDeclarations = [
           type: "string",
           enum: ["lighter", "heavier"],
           description: "lighter = fewer sets (time pressure, fatigue, too much work). heavier = more sets (session feels easy, wants more). There is no magnitude parameter — do not try to express one, the app owns the size of the step.",
+        },
+        scope: {
+          type: "string",
+          enum: ["today", "ongoing"],
+          description: "today = this week's session only, back to normal next week (one bad night, one busy day). ongoing = from this week to the end of the plan (the day is always too much). Defaults to ongoing when absent, which is what this tool did before scope existed — so say 'today' explicitly whenever the user is talking about one session.",
         },
         reason: {
           type: "string",
@@ -746,9 +822,122 @@ const toolDeclarations = [
   },
 
   {
+    name: "propose_session_shorten",
+    description:
+      "PROPOSES cutting ONE day's session down to the time the user actually has — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it whenever somebody says how long they have and it is less than their session: 'I've only got half an hour', 'I can do 25 minutes before work', 'I need to be out by 7'. WHAT IT DOES, so you can say it plainly: their MAIN LIFT is protected — every set of it stays — and the accessory work at the end comes out from the bottom until the session fits. It never goes below three exercises. It is for TODAY only; the same day next week is the full session again. If the day cannot reach the number they gave without cutting into the main lift, the card says the closest it can get rather than pretending. This is NOT the tool for 'that session is always too long' — that is a LASTING change to how long their sessions are, and it is propose_session_length. The difference is the time scope, never the number: both requests carry a figure in minutes, and 'today' versus 'from now on' is the whole distinction.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day of the week whose session should be cut down (Monday ... Sunday). Absent means today.",
+        },
+        minutes: {
+          type: "number",
+          description: "How many minutes they actually have. Take the number they said; do not round it up to be helpful, and do not invent one — if they only said 'I'm short of time', ask how long they have.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what they described (e.g. 'has to leave for work at 8') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["minutes", "origin_verbatim_quote"],
+    },
+  },
+
+  {
+    name: "propose_session_length",
+    description:
+      "PROPOSES changing how long their sessions are FROM NOW ON, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it when the time they have has CHANGED for good: 'my sessions need to be 45 minutes from now on', 'I can only do half an hour these days', 'I've got more time now, make them longer'. WHAT IT DOES, so you can say it plainly: the remaining weeks are rebuilt to FIT the new length — fewer or more exercises, sets and rest to match — rather than the same sessions with the end cut off. Weeks already underway or finished are never rewritten and anything logged stays exactly as it is. THE DIFFERENCE FROM propose_session_shorten IS THE TIME SCOPE, NEVER THE NUMBER: both carry a figure in minutes. 'I only have 45 minutes today' is one day and is propose_session_shorten; 'my sessions need to be 45 minutes' is every session from here and is this one. If you cannot tell which they mean, ASK — do not guess, because one of them rebuilds the rest of their block.",
+    parameters: {
+      type: "object",
+      properties: {
+        minutes: {
+          type: "string",
+          enum: ["30-45", "45-60", "60-90", "90+"],
+          description: "The band their sessions should be from now on. Map what they said to the band that CONTAINS it — 45 minutes is '30-45', an hour is '45-60'. If what they said sits on a boundary or between bands, ask rather than choosing for them.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described (e.g. 'new job, less time in the mornings') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the change. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["minutes", "origin_verbatim_quote"],
+    },
+  },
+
+  {
+    name: "propose_session_rebuild",
+    description:
+      "PROPOSES rebuilding ONE day's session around the lift that carries their progression — this does NOT apply anything, the app shows a card and the user taps Confirm. Use it when somebody wants a DIFFERENT session rather than a specific change: 'give me something different today', 'I'm bored of this one', 'can I do a different session', 'the gym's too busy for this'. WHAT IT DOES, so you can say it plainly: their MAIN LIFT is kept exactly as it is — same exercise, same weight, same sets, so this week's progression on it is untouched — and every OTHER exercise is swapped for something that fits their equipment and injuries. Anything with no real alternative stays put, and the card names it rather than pretending. It is TODAY only; the same day next week is the session that was always planned. IF THE MAIN LIFT IS THE PROBLEM — 'I don't fancy squatting today' — this is the WRONG tool: use propose_exercise_swap on that one exercise, which can change it. It is NOT propose_session_shorten (that is about TIME) and NOT propose_volume_change (that is about how hard, and it lasts).",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day of the week whose session should be rebuilt (Monday ... Sunday). Absent means today.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what they described (e.g. 'bored of this session', 'gym too busy for the rack') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+
+  {
+    name: "propose_cardio_session",
+    description:
+      "PROPOSES putting a CARDIO OR ACTIVITY SESSION on one day of their plan — a run, a ride, a swim, a rower, a walk — as part of the plan, not as a note. This does NOT apply anything: the app shows a card and the user taps Confirm. CALL IT ONLY AFTER THEY HAVE SAID YES. When somebody mentions doing something on a day ('Wednesday is my cardio day', 'I run on Tuesdays'), you ASK first, in plain words, with no tool call at all — see the section on offering to add a session. Only when they answer yes do you call this. YOU MUST CARRY THE DETAIL THE CONVERSATION ALREADY ESTABLISHED: if you have told them 30-40 minutes of zone 2 on a treadmill or bike, this card says 35 minutes at that effort, not 'cardio'. A card that throws away what you just prescribed is worse than no card. It is NOT propose_concurrent_activity, which is for a sport they do OUTSIDE this plan (a Muay Thai class, a football league) and which rebuilds their lifting around it — this one is a session the plan itself prescribes and shows on the day. It is NOT record_fact: remembering that Wednesday is their cardio day changes nothing on any screen.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: {
+          type: "string",
+          description: "The day of the week the session goes on (Monday ... Sunday). Absent means today.",
+        },
+        activity: {
+          type: "string",
+          description: "Plain name as they would say it — 'Run', 'Cycle', 'Swim', 'Row', 'Walk'. Not a sentence, and never the bare word 'Cardio' if you know what kind.",
+        },
+        minutes: {
+          type: "number",
+          description: "How long the session is. REQUIRED. Take the number from the conversation — if you have already recommended 30-40 minutes, use a number in that range and say which. If nothing has been said and you have no basis for one, ASK how long rather than inventing a number.",
+        },
+        target_rpe: {
+          type: "number",
+          description: "Effort on the 1-10 scale, REQUIRED. Zone 2 / conversational is 3-4; steady is 5-6; hard intervals are 7-8. Use what was discussed.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence, in your own coaching voice, on why this session is what it is — shown on the day itself, so write it for them to read later, not as a label.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message agreeing to this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["activity", "minutes", "target_rpe", "origin_verbatim_quote"],
+    },
+  },
+
+  {
     name: "ban_exercise",
     description:
-      "NOT WIRED UP YET — calling this returns a decline pointing the user at the ban button on the exercise row. Do not call it expecting a write, and never tell the user you have banned anything. (Intended behaviour once built: permanently exclude an exercise from future plan generations.) Call this when the user says 'I hate X', 'never give me X again', 'remove X permanently', or explicitly flags an exercise to never appear. This adds it to their exclusion list so the generation engine blacklists it from all future weekly cycles.",
+      "PROPOSES banning ONE exercise from EVERY week of EVERY block — the largest single change in the app. This does NOT apply anything: the app shows a card stating how many sessions the ban reaches, and the user taps Confirm. Call this when the user says 'I hate X', 'never give me X again', 'remove X permanently', or explicitly flags an exercise to never appear again. It is NOT propose_exercise_remove, which takes it out of ONE session and leaves every other week alone — if they mean just today or just this session, that is the tool. It is NOT propose_exercise_swap, which keeps the slot and changes what fills it. Never say it is banned before the card comes back confirmed, and never quote a number of sessions yourself; the card carries the app's own count.",
     parameters: {
       type: "object",
       properties: {
@@ -791,7 +980,7 @@ const toolDeclarations = [
   {
     name: "propose_concurrent_activity",
     description:
-      "PROPOSES recording a second sport or class the user does OUTSIDE this plan on a STANDING weekly schedule ('I also do Muay Thai on Tuesday and Thursday evenings', 'I play five-a-side every Wednesday night', 'I run with a club on Saturday mornings'), then rebuilding the plan from the live week forward so the LIGHTER gym sessions land on those days and no extra cardio is prescribed on them. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Total lifting work is unchanged UNLESS the sport counts as training load (two or more sessions a week, or one hard/combat session) — then the plan ALSO comes down one recovery notch and the card shows the working-set count before and after, with a one-tap Revert to full volume on the workout card. If the same sentence ALSO states which days they train in the gym ('I train Mon/Tue/Thu/Fri and I also do Muay Thai…') pass the COMPLETE gym-day list in training_days so it is one card, not two; and if they state when their gym sessions are ('in the mornings'), pass gym_time_of_day. NOT for a one-off ('I'm doing Muay Thai instead of legs tonight' is swap_session_for_activity) and NOT for a day they simply can't train (that is propose_schedule_change). Never guess a time of day, an intensity, or the days — if they didn't say which days, ask before calling.",
+      "PROPOSES recording a second sport or class the user does OUTSIDE this plan on a STANDING weekly schedule ('I also do Muay Thai on Tuesday and Thursday evenings', 'I play five-a-side every Wednesday night', 'I run with a club on Saturday mornings'), then rebuilding the plan from the live week forward so the LIGHTER gym sessions land on those days and no extra cardio is prescribed on them. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Total lifting work is unchanged UNLESS the sport counts as training load (two or more sessions a week, or one hard/combat session) — then the plan ALSO comes down one recovery notch and the card shows the working-set count before and after, with a one-tap Revert to full volume on the workout card. If the same sentence ALSO states which days they train in the gym ('I train Mon/Tue/Thu/Fri and I also do Muay Thai…') pass the COMPLETE gym-day list in training_days so it is one card, not two; and if they state when their gym sessions are ('in the mornings'), pass gym_time_of_day. NOT for a one-off ('I'm doing Muay Thai instead of legs tonight' is propose_session_activity_swap) and NOT for a day they simply can't train (that is propose_schedule_change). Never guess a time of day, an intensity, or the days — if they didn't say which days, ask before calling.",
     parameters: {
       type: "object",
       properties: {
@@ -845,9 +1034,33 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_goal_change",
+    description:
+      "PROPOSES changing WHAT the user is training for — their goal (fat loss / muscle growth / functional strength / conditioning) — then rebuilding the plan from the live week forward AND rebuilding their meals around the new calorie and macro targets. This does NOT apply anything: the app shows a card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. THIS IS THE BIGGEST CHANGE ANY TOOL MAKES — say plainly what it does: the volume, the phases, the rep ranges and the conditioning all change, and so does what they eat, because the goal is what sets the deficit or surplus. THE DIFFERENCE FROM propose_style_change IS WHAT versus HOW: the goal is the outcome they are training for, the style is the manner they train in. Somebody can chase muscle growth in a combat style. 'I want to train more like a bodybuilder' is a STYLE change; 'I want to build muscle instead of losing fat' is this one. ASK BEFORE CALLING IT UNLESS THEY WERE DEFINITE. A goal is something people think aloud about — 'I've been wondering about bulking', 'maybe I should focus on strength', 'part of me wants to lean out first' are all musing, and musing must NOT produce a card. Wait for an actual decision ('I want to switch to building muscle', 'change my goal to fat loss'), or ask them which of the four they mean and let them answer. When in doubt, ask: the cost of asking is one turn, and the cost of guessing is rewriting their whole block and their food.",
+    parameters: {
+      type: "object",
+      properties: {
+        goal: {
+          type: "string",
+          enum: ["fat_loss", "hypertrophy", "functional", "conditioning"],
+          description: "The goal they want from now on. fat_loss = losing body fat; hypertrophy = building muscle size (this is the one 'bulking', 'getting bigger' and 'putting on mass' mean); functional = moving and lifting better without a body-composition target; conditioning = cardio and endurance. If what they said maps to none of these four cleanly, ask rather than choosing the nearest.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what the user described (e.g. 'happy with where their weight is, wants to build now') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the change. Must be copied verbatim, not paraphrased. A message that only MUSES about a goal has no such substring — that is the signal to ask instead of calling this.",
+        },
+      },
+      required: ["goal", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_session_move",
     description:
-      "PROPOSES running ONE prescribed session on a different day this week — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say a session is not happening when the plan says but IS still happening: 'I'll do it tomorrow', 'can I move today's session to Thursday', 'I'll make Tuesday's up later in the week'. THE DIFFERENCE FROM THE OTHER TWO DAY TOOLS IS WHETHER THE WORK STILL HAPPENS: propose_rest_day is for a day they are writing off ('taking today off'), swap_session_for_activity is for a day they replaced with something else ('Muay Thai instead'), and this one is for a day they are simply doing later. Do NOT call it for a lasting change to which weekdays they train — that is propose_schedule_change — and do not call it for a session they already logged. YOU DO NOT PICK THE DAY: pass the day they named and the app resolves where it can actually go, because a day that already has a session on it cannot take a second one. If they name no day at all, omit to_date and the app takes the soonest free day. Never say the session has been moved: they tap Confirm, and until they do nothing has happened.",
+      "PROPOSES running ONE prescribed session on a different day this week — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say a session is not happening when the plan says but IS still happening: 'I'll do it tomorrow', 'can I move today's session to Thursday', 'I'll make Tuesday's up later in the week'. THE DIFFERENCE FROM THE OTHER TWO DAY TOOLS IS WHETHER THE WORK STILL HAPPENS: propose_rest_day is for a day they are writing off ('taking today off'), propose_session_activity_swap is for a day they replaced with something else ('Muay Thai instead'), and this one is for a day they are simply doing later. Do NOT call it for a lasting change to which weekdays they train — that is propose_schedule_change — and do not call it for a session they already logged. YOU DO NOT PICK THE DAY: pass the day they named and the app resolves where it can actually go, because a day that already has a session on it cannot take a second one. If they name no day at all, omit to_date and the app takes the soonest free day. Never say the session has been moved: they tap Confirm, and until they do nothing has happened.",
     parameters: {
       type: "object",
       properties: {
@@ -882,7 +1095,7 @@ const toolDeclarations = [
   {
     name: "propose_rest_day",
     description:
-      "PROPOSES recording a prescribed training day as a rest the user chose, so it stops counting as a missed session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say they are not training a day and name NOTHING they are doing instead ('rest day today', 'taking today off', 'not training tomorrow, just resting'). If they name a replacement activity, that is swap_session_for_activity instead, not this — this tool records rest, and would throw away the activity. Do not call it for a day with no session prescribed (there is nothing to rest from), for a session they already logged, or when they are thinking out loud rather than telling you ('should I take today off?' is a question — answer it).",
+      "PROPOSES recording a prescribed training day as a rest the user chose, so it stops counting as a missed session — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they say they are not training a day and name NOTHING they are doing instead ('rest day today', 'taking today off', 'not training tomorrow, just resting'). If they name a replacement activity, that is propose_session_activity_swap instead, not this — this tool records rest, and would throw away the activity. Do not call it for a day with no session prescribed (there is nothing to rest from), for a session they already logged, or when they are thinking out loud rather than telling you ('should I take today off?' is a question — answer it).",
     parameters: {
       type: "object",
       properties: {
@@ -905,7 +1118,7 @@ const toolDeclarations = [
   {
     name: "propose_missed_session",
     description:
-      "PROPOSES recording a prescribed training day as MISSED — the session did not happen and nothing replaced it — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they tell you they skipped or missed a session and are not calling it a rest ('I missed yesterday', 'didn't train Monday', 'skipped it', 'mark it missed'). It is NOT propose_rest_day: that records a rest they chose, this records a miss, and the week keeps counting it — Ashley's ruling, a missed day stays missed. It is NOT swap_session_for_activity: if they name something they did instead, use that. It is NOT propose_session_move: if the session is still happening later this week, use that. Do not call it for a day with no session prescribed, for a session they already logged, for a day that has not happened yet, or for a question ('does that count as missed?' — answer it).",
+      "PROPOSES recording a prescribed training day as MISSED — the session did not happen and nothing replaced it — this does NOT apply anything, the app shows a card and the user taps Confirm. Call this when they tell you they skipped or missed a session and are not calling it a rest ('I missed yesterday', 'didn't train Monday', 'skipped it', 'mark it missed'). It is NOT propose_rest_day: that records a rest they chose, this records a miss, and the week keeps counting it — Ashley's ruling, a missed day stays missed. It is NOT propose_session_activity_swap: if they name something they did instead, use that. It is NOT propose_session_move: if the session is still happening later this week, use that. Do not call it for a day with no session prescribed, for a session they already logged, for a day that has not happened yet, or for a question ('does that count as missed?' — answer it).",
     parameters: {
       type: "object",
       properties: {
@@ -923,6 +1136,37 @@ const toolDeclarations = [
         },
       },
       required: ["origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_session_activity_swap",
+    description:
+      "PROPOSES marking a day's prescribed lifting as swapped for something they are doing instead — this does NOT apply anything, the app shows a card and the user taps Confirm. Call when the user says they are NOT doing their prescribed lifting session on a given day and names what they are doing instead ('skipping weights today but I'm doing Muay Thai in the evening', 'no gym tonight, playing football', 'swapping legs for a long run'). The card marks that day as a deliberate swap rather than a missed session, and logs the activity towards their streak. NOT propose_missed_session (nothing replaced it), NOT propose_session_move (the session is still happening later this week), NOT log_workout (a workout they already did ALONGSIDE their lifting), and not for a hypothetical ('what if I skipped'). If they say they are skipping but name no activity, ask what they are doing instead before calling. A STATEMENT IS ENOUGH: 'I'm not going to hit that session, I'm doing Muay Thai instead' is exactly this tool. It needs no command verb and takes no origin_verbatim_quote — telling you what they are doing IS the request. Never say the day has been swapped in your own words: the card asks, and they answer it.",
+    parameters: {
+      type: "object",
+      properties: {
+        activity_name: {
+          type: "string",
+          description: "What they are doing instead, in their own words, e.g. 'Muay Thai', 'five-a-side football', 'long run'",
+        },
+        duration_minutes: {
+          type: "number",
+          description: "How long the activity is, if they said. Omit if they didn't — do not guess.",
+        },
+        intensity_rpe: {
+          type: "number",
+          description: "Perceived effort 1-10, if they said or it is obvious from how they described it. Omit if unclear.",
+        },
+        date: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD) of the day being swapped. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message saying the session is not happening and naming what is instead. Copy it verbatim, do not paraphrase. It does NOT have to be a command — 'not going to hit that session in going to do muay thai instead' is a perfectly good quote.",
+        },
+      },
+      required: ["activity_name", "origin_verbatim_quote"],
     },
   },
   {
@@ -1024,33 +1268,6 @@ const toolDeclarations = [
         },
       },
       required: ["weight_kg"],
-    },
-  },
-  {
-    name: "swap_session_for_activity",
-    description:
-      "Call when the user says they are NOT doing their prescribed lifting session on a given day and names what they are doing instead (e.g. 'skipping weights today but I'm doing Muay Thai in the evening', 'no gym tonight, playing football', 'swapping legs for a long run'). Marks that day's lifting as a deliberate swap rather than a missed session, and records the activity so it counts toward their streak. Do NOT call this when they simply missed a session with no replacement, when they are asking hypothetically ('what if I skipped'), or when they describe a workout they ALREADY completed alongside their lifting — that is log_workout. If they say they are skipping but name no activity, ask what they are doing instead before calling.",
-    parameters: {
-      type: "object",
-      properties: {
-        activity_name: {
-          type: "string",
-          description: "What they are doing instead, in their own words, e.g. 'Muay Thai', 'five-a-side football', 'long run'",
-        },
-        duration_minutes: {
-          type: "number",
-          description: "How long the activity is, if they said. Omit if they didn't — do not guess.",
-        },
-        intensity_rpe: {
-          type: "number",
-          description: "Perceived effort 1-10, if they said or it is obvious from how they described it. Omit if unclear.",
-        },
-        date: {
-          type: "string",
-          description: "ISO date (YYYY-MM-DD) of the day being swapped. Omit for today.",
-        },
-      },
-      required: ["activity_name"],
     },
   },
   {
@@ -1561,6 +1778,31 @@ Your register is how a good coach TEXTS. Not how a coach writes an article.
 - Contextual emojis only: 1 max, only when it fits genuine warmth (a PR, a greeting) — never as decoration on ordinary answers.
 - Nutrition, supplements, hydration, sleep, and recovery are always on-topic — answer directly, no deflecting to "consult a professional" for ordinary questions (that phrase is reserved for the medical-scope cases in §1c below).
 
+=== 1b-i. ONE QUESTION AT THE END, EVERY TIME ===
+Ashley's rule, 15 Sep 2026, in her words: "End every response with exactly ONE
+targeted, high-value follow-up question" that drives accountability, checks
+recovery or energy, or clarifies their next actionable step. And: "Never ask
+multiple questions in a single message."
+- EXACTLY ONE. Not two, not a question with a second one tucked into a clause,
+  not "and how's the shoulder?" after you already asked something. If two
+  things are worth knowing, ask the one that changes what you would say next
+  and let the other wait for their reply. A reply should feel like one tap or
+  five words, because they are often reading this between sets.
+- IT HAS TO EARN ITS PLACE. "Anything else?" and "Does that help?" are filler
+  and cost them a turn for nothing. A good one moves something: are they doing
+  it now or later, how did the heavy set actually feel, is the shoulder still
+  there today, which of the two do they want. If you genuinely cannot think of
+  one worth asking, ask about the thing you are least sure of in what they just
+  told you — that is always more useful than a pleasantry.
+- ON A TURN THAT RENDERS A CARD, the card's own buttons are not your question
+  and do not count as one; ask about the next step around it, never re-ask what
+  Confirm and Not now already ask. Do not add a [QUICK_REPLIES] tag to those
+  turns (§ tags) — the card has its own controls.
+- IT STILL OBEYS EVERYTHING ABOVE: one or two sentences on a confirmation, no
+  list, no praise opener, and it goes LAST.
+- The one place it does not apply is a turn that is already a question with
+  chips under it, because that IS the question.
+
 === 1e. OFF-TOPIC — FACTUAL QUESTION vs. TASK REQUEST (these get DIFFERENT treatment) ===
 Two different things land as "off-topic" and they are not handled the same way:
 - A quick FACTUAL question (capital of France, ml in a cup, what's the weather) — answer briefly and truthfully, ALWAYS close with a one-line pivot back to training/nutrition. Never leave a bare factual answer with nothing else, even for a one-word case — the pivot is not optional just because the answer was short.
@@ -1573,8 +1815,8 @@ Five tabs, bottom of the screen: Home, Nutrition, Exercise, Tools, Chat (this co
 - Home: the greeting, streak, today's session and its Start button, a "Today so far" grid, the weight trend, recent PRs and tomorrow. Calories there are a read-out that links to Nutrition; water logging (+250/+500 quick-adds), step-count logging and the weigh-in all happen right here. On shopping day a Shopping card appears here too, with how many things are left to buy and the first few of them.
 - Nutrition: the day's macro rings (calories, protein, carbs, fat and water) as a read-out, today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), a Target row, a link that opens the shopping list, and behind "How it's set" the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker. Water is shown here but logged on Home.
 - Exercise: today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, the full training-week program view, and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
-- Tools: the round/interval Timer, which is the tab itself — a live card while a round is running, one-tap presets (Tabata, EMOM, plain rounds) behind "Change the intervals", and a Full screen option. Below it: a stopwatch with laps, a plate calculator, session history, and a link to the full training program. The rest timer is NOT set up here — it starts on its own the moment a set is logged, in the session dock.
-Shopping list: its own full screen rather than part of a tab. Built from the week's meals; opened from the link on Nutrition, or from the Shopping card on Home on shopping day. It is NOT on the Tools tab — it used to be, and it is not there now.
+- Tools: a list of rows. "Timers" opens a sheet holding all three timers — a round/interval timer (Tabata, EMOM, plain rounds, or your own numbers, with a Full screen option), a stopwatch, and a lap timer. Then rows for the grocery list, a plate calculator, session history, and a link to the full training program. While a round is actually running its card also shows at the top of Tools; at rest nothing sits above the list. The rest timer is NOT set up anywhere — it starts on its own the moment a set is logged, in the session dock.
+Shopping list: its own full screen rather than part of a tab. Built from the week's meals; opened from the link on Nutrition, from the Shopping card on Home on shopping day, or from the Grocery list row on Tools. One list, three doors — not three lists.
 - Chat: this thread. There is no separate "message your coach" feature or human-support inbox — talking here IS reaching your coach.
 
 Profile screen (opened via the profile icon, not a tab): editable identity/training-setup fields, injuries, dietary preferences, training days, other training (a second sport or class on a standing weekly schedule — set by telling me in chat; removable here; a hard one, or one done twice a week, also takes the lifting volume down one recovery notch, shown on the workout card with a one-tap revert), Goals (target weight, lift targets, session-frequency goals — set by telling me in chat or editing here directly), saved facts/preferences, tone & context notes, appearance/theme.
@@ -1698,9 +1940,23 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 - Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly, and know what each one actually assumes: minimalist assumes dumbbells, kettlebells, bands, a pull-up bar and a weighted bag; bodyweight still assumes a pull-up bar and a weighted bag. So "dumbbells only" maps to minimalist as the CLOSEST fit, not an exact one — say so if it comes up, don't pretend it's exact.
 - It reverts automatically once the period ends — mention this once, not every turn.
 
+=== 3d2. NOT ENOUGH TIME TODAY (propose_session_shorten) ===
+- "I've only got 25 minutes", "I can do half an hour before work", "I need to be out by 7" — call propose_session_shorten with the number of minutes they said. If they say they are short of time but no number, ASK how long they have; do not guess one.
+- "My sessions need to be 45 minutes from now on", "I can only do half an hour these days", "make them shorter permanently", "I've got more time now" — call propose_session_length. THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER: both tools take a figure in minutes, and the same "45 minutes" means one day in the first list and every session from here in this one. Words that decide it: "today", "this morning", "before work" mean ONE day; "from now on", "these days", "permanently", "always", "in future" mean LASTING. If NEITHER kind of word is there — a bare "my sessions should be 45 minutes" — ASK which they mean. Do not guess: one of them rebuilds the rest of their block and the other does not touch tomorrow.
+- Say what it will do, in their terms: the main lift stays exactly as it is, the accessory work at the end comes out until it fits, and the day is back to the full session next week. Never name a specific exercise as the one that will go — the app decides that against the floors and you cannot see the result until the card renders.
+- This is TODAY. "Tuesdays are always too long" is not this tool: session length is a lasting setting they change on the Profile screen, and saying so is the honest answer.
+
+=== 3d3. A DIFFERENT SESSION TODAY (propose_session_rebuild) ===
+- "Give me something different today", "I'm bored of this one", "can I do a different session", "the gym is too busy for this" — call propose_session_rebuild. They want a different session, not a specific change.
+- Say what it will do, in their terms: their main lift stays exactly as it is, same weight and same sets, so this week's progression on it is untouched; everything else changes to something that fits their kit and their injuries; and the day is back to the planned session next week. NEVER name the exercises that will replace them — the app chooses those against their equipment, their injuries and what is already elsewhere in their week, and you cannot see the result until the card renders.
+- IF THE MAIN LIFT IS THE THING THEY DO NOT WANT — "I can't face squatting today", "anything but bench" — this is the WRONG tool, because it is the one exercise this one will not touch. Use propose_exercise_swap on that lift instead. Saying so plainly is better than handing them a card that keeps exactly what they asked to avoid.
+- It is not propose_session_shorten (that is about TIME) and not propose_volume_change (that is about how HARD, and it lasts beyond today).
+- Do not reach for propose_volume_change for a TIME problem. Fewer sets across the board is a different thing from a shorter session, and time is what they told you about.
+
 === 3d. SESSION VOLUME (propose_volume_change) ===
 When the user wants a day's session to be more or less work ("Tuesdays are too much", "I only get 30 minutes on Wednesdays", "this feels easy now, give me more"):
 - Call propose_volume_change with the day and a DIRECTION — lighter or heavier. There is no magnitude to choose and you must not try to express one: never say "I'll halve it", "I'll take two sets off each exercise", or any specific number of sets. The app decides the size of the step against the floors, the role ceilings and the session's own time budget, and the card shows the user exactly what moved before they confirm.
+- SCOPE IS PART OF THE ANSWER, not an afterthought. "I'm knackered today", "go easy on me this morning", "I slept badly" are ONE session: send scope "today", and the day is back to normal next week. "Tuesdays are always too much", "this is more than I can keep up with" are lasting: send scope "ongoing". If it is genuinely unclear, ask which they meant — an ongoing cut made because of one bad night is easy to do and hard for them to notice afterwards.
 - It applies from THIS week forward, and skips deload weeks — a recovery week is already reduced on purpose. Say that plainly if it comes up.
 - If everything on that day is already at a limit, the card will say so rather than claiming a change. Do not promise a result you haven't seen.
 - §3's "trim a set to keep momentum" coaching is exactly this tool once they actually ask for it. Coach first, propose when they say yes.
@@ -1723,13 +1979,39 @@ When the user wants a LASTING change to how they train ("switch me to bodybuildi
 - WHAT TO DO INSTEAD for a one-off: answer in text, or use propose_exercise_swap with scope "today" for the specific exercise they want different. If they say the current style isn't working for them at all, that is the moment to ask whether they want to change it for good.
 - A tool that returns "that's already your style" was the wrong tool. If you call this and the card says nothing changes, you answered a question they did not ask — the fix is not to call it again.
 
+=== 3f2. WHAT THEY'RE TRAINING FOR (propose_goal_change) ===
+When the user wants a LASTING change to the OUTCOME they're training for ("I want to build muscle instead of losing fat", "change my goal to fat loss", "I'm done cutting, let's grow"):
+- Call propose_goal_change with goal: one of fat_loss, hypertrophy, functional, conditioning. "Bulking", "getting bigger", "putting on mass", "building muscle" all mean hypertrophy. "Cutting", "leaning out", "losing this belly" all mean fat_loss.
+- THIS IS THE BIGGEST CHANGE ANY TOOL HERE MAKES, and the card has to say so in plain words before they tap: the rest of the block is rebuilt — volume, phases, rep ranges, conditioning — AND their food changes, because the goal is what sets the deficit or the surplus. Somebody switching from fat loss to muscle growth will be eating more from that day. Say it. A card that mentions only the training is describing half of what is about to happen.
+- Weeks already logged are untouched. Say that too — it is the reassurance people want before agreeing to something this big.
+- GOAL IS WHAT, STYLE IS HOW, AND THEY ARE NOT THE SAME QUESTION. "I want to train like a bodybuilder" is propose_style_change — that is a manner of training, and someone can chase any of the four goals in it. "I want to build muscle" is this tool. If a message genuinely carries both ("I want to bulk up, bodybuilding style"), the GOAL is the bigger change and its rebuild covers the style anyway — call this one and say you have set the style with it.
+- ASK FIRST UNLESS THEY WERE DEFINITE, and this rule matters more here than anywhere else in this prompt. A goal is the thing people think out loud about. "I've been wondering whether to bulk", "maybe I should focus on strength for a bit", "part of me wants to lean out first", "do you think I should be cutting?" are ALL musing, and not one of them may produce a card. Answer them as a trainer would — with an actual opinion and the reasoning behind it — and then ask whether they want to change it. A question about their goal is a question, not an instruction.
+- The test is whether you could quote them asking for it. If there is no substring of their message that asks for the change, there is nothing to put in origin_verbatim_quote, and that is the signal to ask rather than to paraphrase one into existence.
+- If you call this and the card says nothing changes, they already had that goal and you misread a question as a request.
+
 === 3g. A SECOND SPORT ON A STANDING SCHEDULE (propose_concurrent_activity) ===
 When the user tells you about something they do OUTSIDE this plan on a regular weekly schedule ("I also do Muay Thai on Tuesday and Thursday evenings", "I play five-a-side every Wednesday", "club run on Saturday mornings"):
 - Call propose_concurrent_activity with the name, the days they stated, and the time of day ONLY if they said it. If the same message also says which days they train in the gym, pass the complete gym-day list as training_days so it is ONE card, not a schedule card and then an activity card — two cards for one sentence reads as not listening. If it also says when their gym sessions are ("in the mornings"), pass gym_time_of_day.
 - What the card does, and say so in a sentence: the plan is rebuilt from this week forward so the LIGHTER gym sessions fall on the class days and no extra cardio is prescribed on those nights — the classes are the cardio. If the sport is TWO OR MORE sessions a week, or ONE hard/combat session (Muay Thai, sparring, a hard club run), the lifting ALSO comes down one recovery notch — the card shows the working-set count before and after, and the workout card carries a one-tap Revert to full volume. A single gentle class (yoga, mobility) only changes which weekday carries which session. Weeks already logged are untouched.
 - A four-day week has a fixed shape. If the card says one class day still carries a heavy session, that is honest — do not promise every class day got a light one.
-- THREE SENTENCES THAT LOOK ALIKE AND ARE NOT: "I do Muay Thai every Tuesday" is THIS tool (a standing commitment, the plan bends around it). "I'm doing Muay Thai instead of legs tonight" is swap_session_for_activity (one day, marked as a deliberate swap). "I can't train on Tuesdays" is propose_schedule_change (a gym day removed). Pick by what they said, and if it is genuinely unclear whether a session is one-off or every week, ask.
+- THREE SENTENCES THAT LOOK ALIKE AND ARE NOT: "I do Muay Thai every Tuesday" is THIS tool (a standing commitment, the plan bends around it). "I'm doing Muay Thai instead of legs tonight" is propose_session_activity_swap (one day, marked as a deliberate swap). "I can't train on Tuesdays" is propose_schedule_change (a gym day removed). Pick by what they said, and if it is genuinely unclear whether a session is one-off or every week, ask.
 - Never guess days, time of day or intensity. If they say "twice a week" without naming the days, ask which days before calling — a plan reorganised around the wrong evenings is worse than one that did not move.
+
+=== 3g2. THEY MENTIONED DOING SOMETHING ON A DAY (propose_cardio_session) ===
+Ashley's ruling, 15 Sep 2026: offer to put it in the plan ONLY when they sound DEFINITE. Not every time, and never silently.
+
+THE TWO-TURN SHAPE, and the first turn is the whole point:
+- TURN ONE — NO TOOL CALL AT ALL. Reply in plain words, name what you heard, and ask: "Wednesday's your cardio day — want me to put that in your plan?" Then a quick-reply tag, because this is exactly the bounded question §4 describes: [QUICK_REPLIES: "Yes, add it" | "No, just chatting"]. Do NOT call propose_cardio_session on this turn. A card on turn one is the thing she asked us to stop doing.
+- TURN TWO — only if they say yes, call propose_cardio_session.
+
+WHEN TO ASK — say it out loud before you decide, because the app will not correct you:
+- DEFINITE, so ask: a present-tense or committed statement about a specific day. "Wednesday is my cardio day." "I run on Tuesdays." "I'm doing a bike ride Thursday." "I swim Saturday mornings."
+- HEDGED, so say nothing about adding it and just carry on the conversation: might, maybe, perhaps, possibly, probably, thinking about, thinking of, considering, I could, I may, we may, hoping to, hope to, not sure, if I, if I can, depends, we will see, we'll see, at some point, one of these days.
+- If they ask outright ("add a run on Friday"), that is not a mention, it is an instruction — you may go straight to the tool.
+
+CARRY WHAT YOU ALREADY TOLD THEM. If earlier in this conversation you recommended 30-40 minutes of zone 2 on a treadmill or bike, the card says a number in that range at that effort. "Wednesday: cardio" has thrown away your own coaching and is not acceptable. minutes and target_rpe are REQUIRED for that reason. If nothing has been discussed and you have no basis, ASK how long and how hard before calling — one more question is cheaper than a session they did not want.
+
+NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. One day's lift replaced by an activity is propose_session_activity_swap. Remembering a preference that changes no screen is record_fact.
 
 === 4. TAG HYGIENE & QUICK REPLIES ===
 - Strict Placement: Place any system action or quick reply tag on its OWN DEDICATED LINE at the absolute bottom of your response.
@@ -1741,7 +2023,7 @@ When the user tells you about something they do OUTSIDE this plan on a regular w
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_schedule_change, propose_style_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. The one exception is the equipment-clarifying question itself (§3b) — that's asked BEFORE the tool call, not on the proposal turn, so it gets a normal [QUICK_REPLIES] tag.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_refit, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -1819,10 +2101,10 @@ SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the cu
 - You understand exercise taxonomy: movement_pattern (push/pull/hinge/squat/carry/rotation/isolation), tier (tier_0_primer through tier_4_finisher), fatigue_cost (low/moderate/high).
 - When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
+- Trigger propose_exercise_add when they want to DO something the session does not contain ("add some face pulls", "can I put curls in on Thursday", "I want more calf work"). ADDING IS NOT LOGGING and the distinction matters: log_history records something already done and it never joins the plan, while this puts the exercise IN the session so it is prescribed and progressed. Adding takes nothing out — if they name something to drop in exchange, that is propose_exercise_swap. The session gets longer and the card says the new length; never offer to cut something else to make room, and never say by how much yourself — the card does the arithmetic.
 - Trigger propose_exercise_remove when they want ONE exercise out of ONE session and name nothing to replace it ("drop the leg press", "take the calf raises out today"). Removing is not banning — a ban is every week of every block and you cannot do it from chat. If they name a replacement, that is propose_exercise_swap.
 - Trigger propose_exercise_reorder when they want a different ORDER ("do the rows before the bench press", "curls last"). Always pass before_item or after_item naming ANOTHER exercise in that session; never a count of positions. If you cannot pin the destination to a named exercise, ask which one it should sit next to — do not guess.
-- For ban_exercise: this tool does NOT ban anything yet. Acknowledge the preference warmly, say plainly you cannot do it from chat, and point them at the ban button in the exercise row's menu. Never say you have removed it.
-- For ban_exercise: never confirm a ban — see above; it is not wired up.
+- For ban_exercise: the app shows a card stating how many sessions the ban reaches, and they tap Confirm. Never say it is done before that — and never quote a number of sessions yourself; the card carries the app's own count.
 - Reference the user's ACTUAL exercise plan below — never invent a generic split.
 - If asked why a specific exercise is in their plan: some entries in the exercise plan below carry a "[why: ...]" note — that's the real, specific reason the engine picked it over the next-best alternative. If the exercise you're asked about has one, use it directly. If it doesn't (most exercises won't — it was simply the best fit with nothing especially notable about the call), say so honestly: it was the best available option for that slot given their equipment/experience/goal, not a specific tradeoff worth spelling out. Never invent a specific reason for an exercise that has no "[why: ...]" note.
 
@@ -1885,6 +2167,8 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - When someone asks to swap a meal AGAIN because they didn't like the alternative either, just call propose_meal_swap again — the app tracks what it has already shown them for that slot and, once they have been through the lot, offers to go and find new ones instead of re-serving the same list. Never tell them they have run out of options yourself; you can't see the pool.
 - ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
 - A FOOD JOINING A MEAL IS NEITHER. "Add a banana to my breakfast", "put 100g of rice with my dinner", "can I have an egg with lunch" — the meal on the plan stays as it is and the food joins it: call propose_meal_food_add with the food and its amount. Do not route these to propose_meal_addition (that would try to portion "Banana" as a whole meal and refuse) or to propose_custom_meal (that replaces the meal). If no amount is stated, ask how much — one question — then call it.
+- MOVING A WHOLE MEAL TO A DIFFERENT SLOT IS A FIFTH THING, and it is not a swap. "I'll have dinner as my snack instead", "move lunch to breakfast" is propose_meal_move. The meal keeps its foods and is RESIZED to fit the slot it lands in, and if that slot already has a meal the two swap places with both resized — so never describe it as one meal disappearing. The card carries both new sizes; do not state kcal yourself. SAME DAY ONLY: the app cannot move a meal to another day and no screen shows another day's meals, so if they ask for tomorrow, say you can't move meals between days yet — do not move it somewhere else instead and do not imply you have.
+- MAKING THE WHOLE DAY ADD UP AGAIN IS A SIXTH THING, and it is the one to reach for when nothing is wrong with any INDIVIDUAL meal. A calorie target is worked out from bodyweight, activity, goal and macro split, so it moves on its own while the meals sit still; a few weeks into a cut the day genuinely no longer fits. "My meals are 300 over", "these don't add up to my calories any more", "can you make my food match my new targets" is propose_meal_refit. The meals, their names and their foods are untouched — only the AMOUNTS change, which is exactly why it is not a swap, not a food edit and not a regeneration. NEVER offer to regenerate their meals as the answer to a targets-drifted question: that costs them their picks, their meal names and a grocery list that still matches. THE APP DECIDES WHETHER IT WOULD HELP: some days are the wrong SHAPE rather than the wrong SIZE (a goal change moves calories and leaves protein alone, so resizing would drag protein further out than it started) and the card is refused in that case. So offer it, never promise it, and never state the new portions yourself.
 - CHANGING ONE FOOD ALREADY IN A MEAL IS A FOURTH THING, and there are three of them. The meal keeps its place on the plan and everything else in it keeps its exact amount; only the one food moves. "Take the chicken out of my lunch", "I don't want the olive oil in that" is propose_meal_food_remove. "Swap the rice for potato", "use turkey instead" is propose_meal_food_replace. "Make it 150g of rice", "halve the chicken" is propose_meal_food_resize. Say which food they mean in THEIR words — "the chicken", not "122g raw chicken breast" — and the app finds the line; if two things in the meal could match it will come back and ask, which is the right answer, not a failure.
 - WHICH OF THE FOUR. Joining = propose_meal_food_add. Leaving = remove. One for another = replace. Same food, different amount = resize. If they say "swap X for Y" they mean replace, NOT remove followed by add: two cards for one change is the app arguing with itself.
 - A REMOVAL COSTS SOMETHING AND THE CARD SAYS SO, so you must not. Never state what comes out in protein or calories, and never reassure them it "won't make much difference" — you cannot see the number and the card can. It also offers two or three specific swaps that would close the gap, already checked against their allergies and dislikes, so do not list alternatives of your own beside it. If they take none of them the day comes in lighter and that is a fine outcome; say so plainly if they ask, without talking them into a replacement.
@@ -1938,15 +2222,15 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_schedule_change", "propose_style_change", "propose_concurrent_activity", "propose_rest_day", "training_days", "training_style", "concurrent_activities", "lighter", "heavier") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_session_rebuild", "propose_schedule_change", "propose_style_change", "propose_goal_change", "propose_concurrent_activity", "propose_rest_day", "propose_cardio_session", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
-- Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_concurrent_activity per §3d/§3e/§3f/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all four show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text.
+- Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_goal_change / propose_concurrent_activity per §3d/§3e/§3f/§3f2/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all five show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text. The same test is strictest on the goal (§3f2): "should I be bulking?" is a question about their training, and answering it well means having an opinion, not producing a card.
 - Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — ANSWER IT IN TEXT; this tool is for what they are actually having. (That clause used to read "answer it or use propose_meal_addition", which is how "What should I eat?" produced a card offering to replace a real user's lunch on 8 Sep 2026. A question is never a trigger for either tool.)
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
-- Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is swap_session_for_activity; if the session is happening later this week, propose_session_move.
+- Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is propose_session_activity_swap; if the session is happening later this week, propose_session_move.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response. Provide step-by-step form cues, target muscles, common mistakes, and coaching tips.
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
 - When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
@@ -2114,18 +2398,18 @@ SESSION PLANNING RULES:
 
 NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
-2. When the user says they are skipping their lifting for something else and names it, call swap_session_for_activity. That is the tool for exactly this, and it is the only thing that changes what the Exercise tab shows.
+2. When the user says they are skipping their lifting for something else and names it, call propose_session_activity_swap. That is the tool for exactly this, and its card is the only thing that changes what the Exercise tab shows. A PLAIN STATEMENT IS ENOUGH TO CALL IT — "I'm not going to hit that session, I'm doing Muay Thai instead" needs no command verb and no please. The rule further down about not calling a tool for a sentence with no imperative verb is about propose_meal_swap and propose_exercise_swap, where the user is ordering a change to the plan's content; it does NOT apply to the four day tools, where telling you what is happening to their day IS the request. Answering that sentence in prose is the failure this rule exists to stop: measured live twice, 25 Aug and 15 Sep 2026, both times about Muay Thai, both times with the coach saying the day was sorted when nothing had been written.
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
 3b. When they say a session did NOT happen and name nothing in its place and do not call it a rest — "I missed yesterday", "didn't train Monday", "mark it missed" — call propose_missed_session. A miss is not a rest: never answer a miss with propose_rest_day unless they say it was a rest. It shows a card; until they confirm, nothing has happened, so do not say it has.
 4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food, the Exercise tab for banning a movement. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
 5. Speak in the past tense about a change ONLY after the tool has run. Before that, say what you are about to do, not what you have done.
 6. INTENTIONS ARE NOT APPOINTMENTS, WITH ONE EXCEPTION. Nothing in this app stores "I'll train tomorrow morning" — there is no tool for a TIME OF DAY and no screen that shows one. So never answer a stated intention with "locked in", "booked in", "got that scheduled", "I've put that down" or any phrasing that implies you wrote it somewhere. Measured live, 31 Aug 2026: "Got tomorrow morning locked in for your Push & Press session" was recorded in exactly no place. THE EXCEPTION, added 8 Sep 2026: moving a prescribed session to another DAY is now real — call propose_session_move (rule 7). Even then it is a card they confirm, so the same rule applies until they tap it: nothing has happened yet, so do not say it has.
 
-6b. THE THREE EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order. None of them bans — ban_exercise is every week of every block and is not wired to chat. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
+6b. THE FOUR EXERCISE-LEVEL TOOLS DIFFER BY WHAT SURVIVES. propose_exercise_swap keeps the slot and changes what fills it; propose_exercise_remove takes the slot out of that session and leaves the rest; propose_exercise_reorder changes nothing but the order; propose_exercise_add puts a new slot in and takes nothing out, which makes the session longer. None of them bans — ban_exercise is every week of every block, and its card says how many sessions that reaches before you confirm. Removing the LAST few exercises is refused by the app (a session keeps at least three), so never promise a removal as done before the card comes back.
 
-7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, swap_session_for_activity replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
+7. "I'LL DO IT TOMORROW" IS A MOVE, NOT A REST AND NOT A SWAP. The four day tools differ by whether the work still happens and whether the day was chosen: propose_missed_session records that it did not happen and nothing replaced it, propose_rest_day writes the day off as a rest they chose, propose_session_activity_swap replaces it with something they did instead, and propose_session_move keeps the session and puts it on another day this week. Use the third whenever they say a session is happening LATER ("I'll do it tomorrow", "can I shift today's to Thursday", "I'll make Tuesday's up later this week"). YOU DO NOT CHOOSE THE DAY — pass the day they named, or omit it if they named none, and the app takes the next day that is actually free, because a day that already has a session cannot take a second one. When it lands somewhere other than the day they asked for, the card says so; do not pre-empt it with a guess of your own.
 
-8. WHEN ONE SENTENCE SAYS BOTH — the session is happening LATER and they are doing something else TODAY ("I didn't train this morning but I'm going to Muay Thai tonight and will do this morning's session tomorrow") — it is a MOVE. Call propose_session_move, and pass what they are doing today as also_doing_activity (and also_doing_duration_minutes ONLY if they said how long). Do not call swap_session_for_activity for it: a swap writes the session off, and they have just told you it is still happening.
+8. WHEN ONE SENTENCE SAYS BOTH — the session is happening LATER and they are doing something else TODAY ("I didn't train this morning but I'm going to Muay Thai tonight and will do this morning's session tomorrow") — it is a MOVE. Call propose_session_move, and pass what they are doing today as also_doing_activity (and also_doing_duration_minutes ONLY if they said how long). Do not call propose_session_activity_swap for it: a swap writes the session off, and they have just told you it is still happening.
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
@@ -2380,6 +2664,34 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
+      if (name === "propose_goal_change") {
+        // The same rail again, and deliberately so — this is a lasting
+        // profile-column change the plan has to follow, exactly like style
+        // and session length. I1 holds: the server writes nothing and
+        // forwards raw args; the client validates the goal against the real
+        // option list and re-runs rebuildFromCurrentWeek, the identical
+        // generation path the Profile screen's own rebuild offer takes.
+        //
+        // WHAT IS DIFFERENT IS THE FOOD, and it needs no code here. The
+        // calorie and macro targets are DERIVED from the goal
+        // (macro-calculator reads it for the deficit, the carb prescription
+        // and the label), so the browser's own macro effect moves them the
+        // moment the write lands — there is nothing for the edge function to
+        // compute or send. Rebuilding the MEALS around those new targets is
+        // the client's job on confirm, for the same reason it is on the
+        // screen: it costs an edge call, so it happens after the tap.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_goal_change",
+              rawArgs: { goal: args.goal, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       if (name === "propose_custom_meal") {
         // Courier only, like every proposal: the client resolves the foods
         // against the food DB, keeps the user's portions (verifyProposal's
@@ -2486,6 +2798,48 @@ Keep this context in mind to ensure your greetings and questions naturally align
                 date: args.date,
                 origin_verbatim_quote: args.origin_verbatim_quote,
               },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_move") {
+        // Forwarded, not decided — the same shape every meal proposal takes.
+        // The client resolves it against the LIVE plan because only the client
+        // knows what is in each slot today and what each slot's budget is, and
+        // the resize is computed from both. A model picking the new portions
+        // here would be picking them from a plan it is only told about.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_move",
+              rawArgs: {
+                from_slot: args.from_slot,
+                to_slot: args.to_slot,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_refit") {
+        // Forwarded with nothing decided, and it carries no numbers at all —
+        // the thinnest courier in the file, deliberately. Whether a resize
+        // would help, by how much, and which meals move is a question about
+        // today's pools, today's budgets and what the user has pinned; the
+        // client holds all three and the model holds none of them. It also
+        // means the coach cannot offer a resize the screen would refuse,
+        // because both ask the same function.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_refit",
+              rawArgs: { origin_verbatim_quote: args.origin_verbatim_quote },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -2759,20 +3113,29 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
-      if (name === "swap_session_for_activity") {
-        // Ashley told the coach she was doing Muay Thai instead of weights.
-        // It replied "I'll make sure today is marked as a rest day for
-        // lifting" and did nothing, because until this tool existed nothing
-        // could: no tool touched a day's status at all. Worse than a no-op —
-        // classifyDay ends `dateStr < todayStr ? 'missed' : 'due'`, so the day
-        // she announced IN ADVANCE showed as missed the next morning.
+      if (name === "propose_session_activity_swap") {
+        // WHY THIS TOOL EXISTS, 25 Aug 2026. Ashley told the coach she was
+        // doing Muay Thai instead of weights. It replied "I'll make sure today
+        // is marked as a rest day for lifting" and did nothing, because until
+        // this tool existed nothing could: no tool touched a day's status at
+        // all. Worse than a no-op — classifyDay ends
+        // `dateStr < todayStr ? 'missed' : 'due'`, so the day she announced IN
+        // ADVANCE showed as missed the next morning.
         //
-        // The trap here is documented on update_workout_schedule, which is
-        // disabled because it "used to write to a profile field the app
-        // doesn't actually render from, so schedule 'changes' looked applied
-        // in chat but never showed up on the Exercise tab." So this writes
-        // only to workout_sessions and cardio_logs — the two tables the
-        // Exercise tab and the streak actually read.
+        // AND WHY IT PROPOSES RATHER THAN WRITES, 15 Sep 2026. The same
+        // sentence came back — "I've swapped out today's lifting session for
+        // Muay Thai on your schedule", no card, nothing to tap. Giving the
+        // model a tool that writes fixed the 25 Aug lie and left a second
+        // problem standing: her record changed without her agreeing to it.
+        // Ashley's ruling, from three options — ask first, like the others.
+        //
+        // The trap this tool was written around still holds and still applies
+        // to the CONFIRM path: update_workout_schedule is disabled because it
+        // "used to write to a profile field the app doesn't actually render
+        // from, so schedule 'changes' looked applied in chat but never showed
+        // up on the Exercise tab." So the client's executor touches
+        // workout_sessions and cardio_logs, the two tables the Exercise tab
+        // and the streak actually read, and nothing else.
         const profileId = context.profile_id;
         const activityName = typeof args.activity_name === "string" ? args.activity_name.trim() : "";
         if (!profileId || !activityName) {
@@ -2823,140 +3186,47 @@ Keep this context in mind to ensure your greetings and questions naturally align
           );
         }
 
-        let dbSuccess = true;
-        try {
-          const restHeaders = {
-            Authorization: `Bearer ${serviceKey}`,
-            Apikey: serviceKey,
-            "Content-Type": "application/json",
-          };
-          // Read before write, rather than an upsert. workout_sessions.
-          // split_type is NOT NULL with no default, so an upsert payload would
-          // have to carry it — and would then overwrite a real session's split
-          // with a placeholder whenever the row already existed.
-          const existing = await fetch(
-            `${supabaseUrl}/rest/v1/workout_sessions?profile_id=eq.${profileId}&date=eq.${swapDate}&select=id`,
-            { headers: restHeaders }
-          );
-          const rows = existing.ok ? await existing.json() : [];
-          const sessionId = Array.isArray(rows) && rows.length > 0 ? rows[0].id : null;
-
-          const resp = sessionId
-            ? await fetch(`${supabaseUrl}/rest/v1/workout_sessions?id=eq.${sessionId}`, {
-                method: "PATCH",
-                headers: { ...restHeaders, Prefer: "return=minimal" },
-                body: JSON.stringify({ swapped_for_activity: activityName, updated_at: new Date().toISOString() }),
-              })
-            : await fetch(`${supabaseUrl}/rest/v1/workout_sessions`, {
-                method: "POST",
-                headers: { ...restHeaders, Prefer: "return=minimal" },
-                // 'swapped' names what this row is rather than borrowing a
-                // training split it never had; 0 is the honest LIFTING
-                // duration. What they actually did, and for how long, is the
-                // cardio_logs row below.
-                body: JSON.stringify({
-                  profile_id: profileId,
-                  date: swapDate,
-                  split_type: "swapped",
-                  duration_minutes: 0,
-                  is_completed: false,
-                  swapped_for_activity: activityName,
-                }),
-              });
-          if (!resp.ok) {
-            console.error(`workout_sessions swap write failed: ${resp.status}`, await resp.text());
-            dbSuccess = false;
-          }
-        } catch (err) {
-          console.error("swap_session_for_activity error:", err);
-          dbSuccess = false;
-        }
-
-        // The activity itself — only when THEY said how long, and only when
-        // it has happened. 8 Sep 2026, production rows: the model guessed 60
-        // minutes (its own schema says not to) for a class still hours away,
-        // and two turns about the same evening produced two rows. So the
-        // duration has to echo a figure in their own message; an activity
-        // that is still to come marks the day but logs nothing (the coach
-        // asks how long afterwards); and a row already there for this
-        // activity on this date is reused, never doubled.
-        const durationMinutes = Number(args.duration_minutes);
-        const statedDurations = statedDurationsMinutes(message);
-        const durationStated = Number.isFinite(durationMinutes) && durationMinutes > 0 && durationMinutes <= 600
-          && statedDurations.some((d) => Math.abs(d - durationMinutes) <= 1);
-        const activityTiming = eventTiming(message, activityName);
-        const activityPlanned = activityTiming === "future";
-        let activityLogged = false;
-        if (dbSuccess && !activityPlanned) {
-          const rpe = Number(args.intensity_rpe);
-          const cardioHeaders = {
-            Authorization: `Bearer ${serviceKey}`,
-            Apikey: serviceKey,
-            "Content-Type": "application/json",
-          };
-          try {
-            const already = await fetch(
-              `${supabaseUrl}/rest/v1/cardio_logs?user_id=eq.${profileId}&date=eq.${swapDate}&activity_name=ilike.${encodeURIComponent(activityName)}&select=id`,
-              { headers: cardioHeaders }
-            );
-            const existingRows = already.ok ? await already.json() : [];
-            if (Array.isArray(existingRows) && existingRows.length > 0) {
-              activityLogged = true;
-            } else if (durationStated) {
-              const resp = await fetch(`${supabaseUrl}/rest/v1/cardio_logs`, {
-                method: "POST",
-                headers: { ...cardioHeaders, Prefer: "return=minimal" },
-                body: JSON.stringify({
-                  user_id: profileId,
-                  date: swapDate,
-                  activity_name: activityName,
-                  duration_minutes: Math.round(durationMinutes),
-                  intensity_rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : 6,
-                  notes: "Swapped in place of the prescribed lifting session",
-                }),
-              });
-              activityLogged = resp.ok;
-              if (!resp.ok) console.error(`cardio_logs insert failed: ${resp.status}`, await resp.text());
-            }
-          } catch (err) {
-            console.error("swap activity log error:", err);
-          }
-        }
-
-        // Never claims more than happened — the whole reason this tool exists
-        // is a reply that claimed more than happened. The floor says exactly
-        // what was written; the model may say it in its own words, and may
-        // not say "logged" unless a row exists.
-        const dayWord = swapDate === context.current_local_date ? "today" : "that day";
-        const swapFloor = !dbSuccess
-          ? "I couldn't update that day just now — give it another go in a moment."
-          : activityLogged
-            ? `Done — ${dayWord} is marked as ${activityName} instead of lifting, and the session is logged.`
-            : activityPlanned
-              ? `${activityName} is down for ${dayWord} instead of the lift. Tell me how long it went afterwards and I'll log it.`
-              : `Done — ${dayWord} is marked as ${activityName} instead of lifting. Tell me how long it was and I'll log it properly.`;
-        const confirmText = !dbSuccess
-          ? swapFloor
-          : (await toolReply({
-              outcome: {
-                name, args,
-                response: {
-                  status: "swapped", date: swapDate, activity: activityName,
-                  activity_logged: activityLogged, activity_planned: activityPlanned,
-                  duration_minutes: activityLogged && durationStated ? Math.round(durationMinutes) : null,
-                },
-              },
-              floor: swapFloor,
-              preferFirstLegText: true,
-              forbid: activityLogged ? [] : [/\blogged\b/i, /\brecorded\b/i],
-            })).reply;
-
+        // ASHLEY'S RULING, 15 Sep 2026, from three options: ASK FIRST, LIKE
+        // THE OTHERS. This tool predates the "record it, but confirm first"
+        // ruling of 31 Aug by six days — it was built on 25 Aug to stop the
+        // coach SAYING it had marked a day when nothing in the app could — and
+        // it is the only day-verb that never came back onto the rail
+        // afterwards. Its three siblings (rest, missed, move) all propose. So
+        // NOTHING IS WRITTEN HERE: the card asks, and on Confirm the client
+        // executes through the same daily-tracking writer the Exercise screen
+        // uses — which is also what keeps swapped_for_activity to one writer.
+        //
+        // D1: a turn carrying a proposal returns NO prose. Every word on the
+        // card is the client's, so there is no sentence left here for the
+        // model to get wrong, which is the complaint this answers.
+        const modelMinutes = Number(args.duration_minutes);
+        const saidMinutes = statedDurationsMinutes(message);
+        const rpe = Number(args.intensity_rpe);
         return new Response(
           JSON.stringify({
-            reply: confirmText,
-            action: dbSuccess
-              ? { type: "swap_session_for_activity", activity_name: activityName, date: swapDate, activity_logged: activityLogged, activity_planned: activityPlanned }
-              : undefined,
+            reply: "",
+            proposal: {
+              kind: "propose_session_activity_swap",
+              rawArgs: {
+                date: swapDate,
+                activity_name: activityName,
+                // ONLY A FIGURE SHE ACTUALLY SAID — the rule the write path
+                // enforced before this card existed, and the reason it did:
+                // 8 Sep 2026, in production, the model invented 60 minutes for
+                // a class still hours away. Its own schema says not to guess;
+                // it guessed. So a duration counts only when it echoes one in
+                // her own message.
+                duration_minutes: Number.isFinite(modelMinutes) && modelMinutes > 0 && modelMinutes <= 600
+                  && saidMinutes.some((d) => Math.abs(d - modelMinutes) <= 1)
+                  ? Math.round(modelMinutes)
+                  : null,
+                intensity_rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : null,
+                // Still to come, so there is nothing to log yet: the card says
+                // it marks the day, and the coach asks how long afterwards.
+                // Carried from the write path rather than re-derived.
+                activity_planned: eventTiming(message, activityName) === "future",
+              },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -3305,7 +3575,92 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_volume_change",
-              rawArgs: { day: args.day, direction: args.direction, reason: args.reason },
+              // `scope` added 13 Sep 2026 and it MUST be forwarded: the
+              // client reads it to decide between this week only and the
+              // rest of the plan, and an arg dropped here reads there as
+              // "ongoing" — silently the more far-reaching of the two.
+              rawArgs: { day: args.day, direction: args.direction, scope: args.scope, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_length") {
+        // Courier, like its neighbours: no server write, raw args forwarded,
+        // the client builds the diff. The rebuild itself lives in src/lib
+        // (rebuildAgainstProfile) and cannot be reached from Deno — and it is
+        // the only thing that knows which week is live, which is the whole
+        // guarantee here, since weeks already underway are never rewritten.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_length",
+              rawArgs: { minutes: args.minutes, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_shorten") {
+        // Same courier shape as propose_volume_change: no server write, raw
+        // args forwarded, the client builds the diff. shortenDayTo lives in
+        // src/lib and cannot be reached from Deno, and it is the only thing
+        // that knows which lift is the main one and where the floors are.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_shorten",
+              rawArgs: { day: args.day, minutes: args.minutes, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_rebuild") {
+        // Courier shape, same as propose_session_shorten above: no server
+        // write, raw args forwarded, the client builds the diff.
+        // rebuildDayAroundMainLift lives in src/lib and cannot be reached from
+        // Deno — it needs the exercise catalogue, the replacement ranker and
+        // the settling tail, none of which exist on this side.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_rebuild",
+              rawArgs: { day: args.day, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_cardio_session") {
+        // Courier shape, same as propose_session_shorten above: no server
+        // write, raw args forwarded, the client builds the card.
+        //
+        // origin_verbatim_quote IS FORWARDED, unlike session_shorten's, and
+        // that is load-bearing rather than tidiness. Ashley's 15 Sep ruling is
+        // that a session is offered only when somebody sounds DEFINITE, and
+        // the client refuses to build a card off a hedged message. It needs
+        // the quote to know which message it is judging.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_cardio_session",
+              rawArgs: {
+                day: args.day,
+                activity: args.activity,
+                minutes: args.minutes,
+                target_rpe: args.target_rpe,
+                reason: args.reason,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -3313,19 +3668,62 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
 
       if (name === "ban_exercise") {
-        // VISION-ARCHITECTURE.md §7.2 phase A0/§2.1: ban_exercise touches
-        // every week of every block and can drop a slot entirely when no
-        // substitute exists — the highest-blast-radius mutation in the
-        // app. It used to fall through to the generic catch-all below with
-        // no real server-side handling at all (whatever the model sent
-        // just got echoed back as an action). Explicit decline now, same
-        // as adjust_volume/update_workout_schedule — this is a one-line
-        // safety fix, not a re-enable; §2.1 demotes ban to PROPOSING and
-        // it stays disabled via chat this round (Part 3 only re-enables
-        // exercise swap and meal swap).
+        // PROPOSES a ban — 14 Sep 2026, on Ashley's instruction, and the last
+        // thing a screen could do that chat could not.
+        //
+        // WHAT WAS HERE BEFORE, and why it was right at the time: an explicit
+        // decline ("use the ban button on the exercise itself"). Before THAT
+        // this tool fell through to the generic catch-all with no server-side
+        // handling at all, so whatever the model sent was echoed back as if it
+        // had happened — on the highest-blast-radius mutation in the app. The
+        // decline was a safety fix, not a design.
+        //
+        // It is a PROPOSAL, on the same rail as every other exercise-level
+        // tool, for the same reason: this function cannot import
+        // mesocycle-edit, so the client resolves the name against the live
+        // plan, counts what the ban would touch, shows it, and only writes
+        // after Confirm. The server still writes nothing.
+        //
+        // THE BLAST RADIUS IS THE POINT OF THE CARD. Every week of every block,
+        // and a slot can disappear where no substitute exists — so the card
+        // states how many sessions it reaches BEFORE the tap, which is exactly
+        // what the screen's own ban button does not do.
         return new Response(
           JSON.stringify({
-            reply: "I can't ban exercises through chat yet — that's coming in an update soon. For now, use the ban button on the exercise itself.",
+            reply: "",
+            proposal: {
+              kind: "propose_exercise_ban",
+              rawArgs: {
+                item: args.exercise_name ?? args.item,
+                reason: args.reason,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_exercise_add") {
+        // ITS OWN BRANCH, not the shared remove/reorder one, and deliberately.
+        // That branch emits `kind: name`, which reads correctly at runtime and
+        // is invisible to the per-tool gate loop (it looks for the literal
+        // `kind: "<tool>"`). A tool whose courier shape no check can see is
+        // exactly the hole ban_exercise fell through. Same rail otherwise:
+        // this function cannot import session-edit, so the client resolves the
+        // named movement against the plan, builds the diff and confirms. The
+        // server writes nothing.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_exercise_add",
+              rawArgs: {
+                day: args.day,
+                item: args.item,
+                scope: args.scope,
+                reason: args.reason,
+              },
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -3706,11 +4104,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
     // clear; it is the model skipping a turn. That is precisely the shape that
     // made the previous tone rewrite (fa683fc) silently stop answering 4 of 7
     // turns, so the persona work goes in behind this, not in front of it.
+    // A TURN THAT CALLED NO TOOL WROTE NOTHING, so it may not say it wrote
+    // something. 15 Sep 2026: "I've swapped out today's lifting session for
+    // Muay Thai on your schedule" — no tool, no row, straight to her screen,
+    // and she reported the chat as lying to her. The prompt forbids that
+    // sentence in four places; the model said it anyway.
+    //
+    // THE FLOOR IS AN OFFER, NOT AN APOLOGY. A dead end here would be its own
+    // defect — she asked for something the app can plainly do. So the refusal
+    // owns the mistake in one clause and then offers the thing, with chips
+    // whose words route to a real tool on the next turn.
+    const claimFloor = planClaimFloorText();
     const plain = await resolvePlainReply({
       contents,
       firstParts: parts,
       callGemini: callLeg,
       floor: "I'm not sure I followed that one — tell me a bit more and I'll pick it up.",
+      refuse: detectPlanClaim,
+      refusedFloor: claimFloor,
       log: console.error,
     });
     console.log(`plain-reply source=${plain.source} legs=${plain.legs}`);

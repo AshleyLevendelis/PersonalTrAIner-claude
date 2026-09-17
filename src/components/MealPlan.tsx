@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   UtensilsCrossed,
@@ -10,12 +10,20 @@ import {
   Plus,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
-import type { MacroTargets } from '@/lib/types'
+import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import type { PoolOption } from '@/lib/meal-generation'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
+// DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
+// Add food, so paying for them on first paint is paying for a screen most
+// opens never reach. Caught by test:bundle going 11 kB over its ceiling the
+// day they were added — the honest fix is to defer them, not to raise the
+// budget, which is the one thing that check exists to stop.
+import type { MealMoveContext } from './nutrition/MealMoveSheet'
+const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
+const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
 /** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
 export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -37,6 +45,12 @@ interface MealPlanProps {
   /** Sum of the chosen options' macros. */
   totals: MacroTargets
   targets: MacroTargets | null
+  /**
+   * The goal a change is judged against — JUST the goal, because that is all
+   * the trade-off decides anything from. See MealEditContext for why this is
+   * not the whole profile.
+   */
+  fitnessGoal?: FitnessGoal
   isGenerating: boolean
   /**
    * Set when a (re)generate call failed or came back empty for one or more
@@ -91,6 +105,7 @@ interface MealPlanProps {
  * mirroring ExerciseRow's collapsed/expanded contract.
  */
 export function MealPlan({
+  fitnessGoal,
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
@@ -341,7 +356,7 @@ export function MealPlan({
             onMealPickApplied={onMealPickApplied}
             editContextFor={o => (profileId && targets && onMealPickApplied)
               ? {
-                  profileId, date, slot, targets,
+                  profileId, date, slot, targets, fitnessGoal,
                   mealsPerDay, includeSnacks,
                   dietaryPreferences: dietaryPreferences ?? [],
                   dislikedFoods: avoidFoods ?? [],
@@ -349,6 +364,30 @@ export function MealPlan({
                   // WHAT SHE IS ALREADY BEING SERVED, across every slot, so a
                   // removal's swaps lead with foods from her own plan.
                   pantryFoods: SLOT_ORDER.flatMap(sl => (chosen[sl]?.ingredients ?? []).map(formatIngredient)),
+                  // THE DAY AS IT STANDS. `totals` is already the sum of the
+                  // chosen options' macros — the number this screen renders at
+                  // the top — so the sheet judges against exactly what she is
+                  // looking at. Recomputing it here would be a second view of
+                  // one number, free to drift.
+                  dayTotals: totals,
+                }
+              : null}
+            moveContext={(profileId && targets && onMealPickApplied)
+              ? {
+                  profileId, date, fromSlot: slot, targets,
+                  mealsPerDay, includeSnacks,
+                  dietaryPreferences: dietaryPreferences ?? [],
+                  dislikedFoods: avoidFoods ?? [],
+                  // EVERY SLOT'S MEAL, because the destination's is what comes
+                  // back the other way — Ashley's ruling that they swap places
+                  // rather than one of them vanishing.
+                  mealsBySlot: Object.fromEntries(SLOT_ORDER
+                    .filter(sl => chosen[sl])
+                    .map(sl => [sl, {
+                      name: chosen[sl]!.name,
+                      ingredients: chosen[sl]!.ingredients.map(formatIngredient),
+                      macros: chosen[sl]!.macros,
+                    }])),
                 }
               : null}
             onRegenerate={onRegenerateSlot}
@@ -478,6 +517,7 @@ function MealSlotRow({
   onLog,
   onUnlog,
   editContextFor,
+  moveContext,
   onMealPickApplied,
 }: {
   slot: MealSlotName
@@ -507,10 +547,16 @@ function MealSlotRow({
   onUnlog: (clientIds: string[]) => Promise<void>
   /** Null when the screen cannot finish an edit (no profile, no targets, no pick path) — the row menu then doesn't render at all. */
   editContextFor: (option: PoolOption) => MealFoodEditContext | null
+  /** Null for the same reasons editContextFor is — the Move control then doesn't render either. */
+  moveContext: MealMoveContext | null
   onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
 }) {
   const [busy, setBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addNote, setAddNote] = useState<string | null>(null)
+  const [moveNote, setMoveNote] = useState<string | null>(null)
   /** Which ingredient line has its edit open, by index. One at a time. */
   const [editingLine, setEditingLine] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string | null>(null)
@@ -615,7 +661,17 @@ function MealSlotRow({
                   name in the pool while keeping the row compact. `min-w-0`
                   stays either way — without it the flex row refuses to shrink
                   and the macros beside it get pushed off. */}
-              <span className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}>
+              {/* data-meal-name: the one stable way to read which meal is in
+                  which slot. verify:meal-move used to scrape the rendered text
+                  under each slot heading, which broke the moment the Move
+                  sheet put the words "Lunch" and "Dinner" inside an expanded
+                  row — the driver then read a destination BUTTON as the slot's
+                  meal. A test hook beats a text scrape that any layout change
+                  can quietly redefine. */}
+              <span
+                data-meal-name={slot}
+                className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}
+              >
                 {displayName}
               </span>
               {!expanded && (
@@ -802,6 +858,38 @@ function MealSlotRow({
             <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             </Button>
+            {/* MOVE — beside Swap because they are the same kind of change to
+                the same meal, and because this is where she is already
+                looking when she decides she wants dinner as a snack. Hidden
+                when the screen cannot finish the job (no profile, no targets,
+                no pick path), on the same rule the food edits follow: a
+                control that cannot finish is worse than no control. */}
+            {moveContext && onMealPickApplied && (
+              <button
+                type="button"
+                onClick={() => { setMoveOpen(prev => !prev); setMoveNote(null) }}
+                className="text-xs text-muted-foreground"
+                data-testid="meal-move-open"
+              >
+                Move
+              </button>
+            )}
+            {/* ADD A FOOD — the last thing on this row the coach could do and
+                the screen could not. Same builder, same verifier, same
+                executor as the coach's path; the only difference is that the
+                screen picks from the food list rather than taking free text,
+                which is strictly more honest — a food the app cannot cost is
+                never offered rather than typed and then refused. */}
+            {editContextFor(option) && onMealPickApplied && (
+              <button
+                type="button"
+                onClick={() => { setAddOpen(prev => !prev); setAddNote(null) }}
+                className="text-xs text-muted-foreground"
+                data-testid="meal-food-add-open"
+              >
+                Add food
+              </button>
+            )}
             {(otherOptions.length > 0 || onFindMore) && (
               <button
                 type="button"
@@ -814,6 +902,37 @@ function MealSlotRow({
               </button>
             )}
           </div>
+
+          {addOpen && onMealPickApplied && (() => {
+            const ctx = editContextFor(option)
+            if (!ctx) return null
+            return (
+              <Suspense fallback={null}><MealFoodAddSheet
+                ctx={{
+                  profileId: ctx.profileId, date: ctx.date, slot: ctx.slot, targets: ctx.targets,
+                  mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
+                  dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods,
+                  meal: ctx.meal,
+                }}
+                onPick={onMealPickApplied}
+                onDone={summary => { setAddOpen(false); setAddNote(summary) }}
+                onCancel={() => setAddOpen(false)}
+              /></Suspense>
+            )
+          })()}
+          {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
+
+          {moveOpen && moveContext && onMealPickApplied && (
+            <Suspense fallback={null}>
+              <MealMoveSheet
+                ctx={moveContext}
+                onPick={onMealPickApplied}
+                onDone={summary => { setMoveOpen(false); setMoveNote(summary) }}
+                onCancel={() => setMoveOpen(false)}
+              />
+            </Suspense>
+          )}
+          {moveNote && <p className="text-[0.71875rem] text-muted-foreground">{moveNote}. Both were resized to fit where they landed.</p>}
 
           {swapOpen && (
             <div className="flex flex-col gap-1">

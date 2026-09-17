@@ -111,9 +111,21 @@ export const TARGET_WEIGHT_ANCHOR_THRESHOLD_KG = 1
 export interface EffectiveTargetWeight {
   /** The weight to feed into computeTargets — either a fresh 7-day average (the anchor moved) or last time's anchor held flat (the move was inside the noise band). Undefined when the user never gave a weight and has no weigh-ins: there is no anchor, and callers must not invent one. */
   weightKg: number | undefined
-  /** True only when a PRIOR anchor existed and this call moved away from it — the signal a caller uses to decide whether a "your target changed" notice is warranted. False for a first-ever anchor (nothing to compare against) or a within-band move (nothing changed). */
-  anchorMoved: boolean
 }
+
+/*
+ * `anchorMoved` WAS HERE AND IS GONE, 16 Sep 2026. It claimed in its own doc
+ * comment to be "the signal a caller uses to decide whether a 'your target
+ * changed' notice is warranted" — and it was read by nothing, ever, because
+ * that job belongs to snapshotTargetsIfChanged's changedFromPrior and always
+ * did. A moved ANCHOR does not always move a TARGET (rounding, a macro mode
+ * that ignores the change), so acting on it would have announced changes that
+ * did not happen.
+ *
+ * Recorded rather than silently deleted because it cost a wrong conclusion:
+ * grepping for this name and finding no readers, I reported the whole notice
+ * as missing. It exists. One identifier is not a feature.
+ */
 
 /**
  * The weight figure that should drive calorie/macro TARGETS — distinct from
@@ -141,18 +153,18 @@ export async function getEffectiveTargetWeightKg(
     todayStr,
     null,
   )
-  if (!trend) return { weightKg: fallbackWeightKg, anchorMoved: false }
+  if (!trend) return { weightKg: fallbackWeightKg }
 
   const recentTargets = await getNutritionTargets(profileId, '1970-01-01', todayStr).catch(() => [])
   const lastAnchorKg = recentTargets.length > 0
     ? recentTargets[recentTargets.length - 1].calculated_weight_kg ?? null
     : null
 
-  if (lastAnchorKg == null) return { weightKg: trend.rollingAvgKg, anchorMoved: false }
+  if (lastAnchorKg == null) return { weightKg: trend.rollingAvgKg }
   if (Math.abs(trend.rollingAvgKg - lastAnchorKg) >= TARGET_WEIGHT_ANCHOR_THRESHOLD_KG) {
-    return { weightKg: trend.rollingAvgKg, anchorMoved: true }
+    return { weightKg: trend.rollingAvgKg }
   }
-  return { weightKg: lastAnchorKg, anchorMoved: false }
+  return { weightKg: lastAnchorKg }
 }
 
 export interface SnapshotResult {
@@ -160,6 +172,16 @@ export interface SnapshotResult {
   snapshotted: boolean
   /** True only when a new row was written AND a prior snapshot existed with genuinely different numbers — the one signal a caller should use to show a "your target changed" notice. */
   changedFromPrior: boolean
+  /**
+   * The targets this replaced — present exactly when changedFromPrior is true.
+   *
+   * ADDED 16 Sep 2026 because the notice could not say what it changed FROM.
+   * "Your calorie target updated to 2,400 kcal" is a number with nothing to
+   * measure it against, and CLAUDE.md's standing rule from the implement
+   * ceilings is that when the app quotes a number it says where that number
+   * sits, or the person cannot go and check it.
+   */
+  previous: MacroTargets | null
 }
 
 /**
@@ -184,7 +206,7 @@ export async function snapshotTargetsIfChanged(
   targets: MacroTargets | null,
   anchorWeightKg?: number | null,
 ): Promise<SnapshotResult> {
-  if (!targets) return { snapshotted: false, changedFromPrior: false }
+  if (!targets) return { snapshotted: false, changedFromPrior: false, previous: null }
   try {
     const today = new Date().toISOString().split('T')[0]
     const recent = await getNutritionTargets(profileId, '1970-01-01', today)
@@ -197,13 +219,13 @@ export async function snapshotTargetsIfChanged(
       last.target_carbs_g === targets.carbs &&
       last.target_fats_g === targets.fat
 
-    if (unchanged) return { snapshotted: false, changedFromPrior: false }
+    if (unchanged) return { snapshotted: false, changedFromPrior: false, previous: null }
 
     const eff = effectiveProfile(profile, anchorWeightKg)
     // No body metrics means no target to snapshot — persisting a computed
     // row here would recreate the fabricated number this change removes.
     const metrics = resolveBodyMetrics(eff)
-    if (!metrics) return { snapshotted: false, changedFromPrior: false }
+    if (!metrics) return { snapshotted: false, changedFromPrior: false, previous: null }
     const bmr = computeBMR(metrics)
     await upsertNutritionTarget({
       profile_id: profileId,
@@ -217,9 +239,18 @@ export async function snapshotTargetsIfChanged(
       calculated_tdee: computeStaticTDEE(bmr, eff.activity_level),
       calculated_weight_kg: anchorWeightKg ?? eff.weight_kg,
     })
-    return { snapshotted: true, changedFromPrior: last != null }
+    return {
+      snapshotted: true,
+      changedFromPrior: last != null,
+      previous: last == null ? null : {
+        calories: last.target_calories,
+        protein: last.target_protein_g,
+        carbs: last.target_carbs_g,
+        fat: last.target_fats_g,
+      },
+    }
   } catch (err) {
     console.error('Target snapshot failed (non-blocking):', err)
-    return { snapshotted: false, changedFromPrior: false }
+    return { snapshotted: false, changedFromPrior: false, previous: null }
   }
 }

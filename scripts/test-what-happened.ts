@@ -120,6 +120,21 @@ check('"did it, not in the app" is a PAST-day verb only', /if \(isPast\) out\.pu
 check('"I missed it" needs a day that has happened, and not already declared', /\(isPast \|\| isToday\) && !declared\.missed\) out\.push\('missed'\)/.test(verbs))
 check('"something else instead" likewise', /\(isPast \|\| isToday\) && !declared\.swapped\) out\.push\('something_else'\)/.test(verbs))
 check('move and rest apply to any day with a session', /out\.push\('move'\)/.test(verbs) && /if \(!declared\.rest\) out\.push\('rest'\)/.test(verbs))
+// "I'VE ONLY GOT 25 MINUTES TODAY", 13 Sep 2026. Two verbs unlike the other
+// five: the rest declare what already happened to a day, these two CHANGE THE
+// PLAN. So they are gated twice — on the day still being a session you are
+// about to do, and on the surface having handed the sheet something to call.
+// The second gate is what keeps the sheet's no-database contract (:87) true:
+// a plan edit here would have to reach the database, so it does not happen
+// here at all.
+check('shortening and lightening are TODAY only, and only while the day is still ahead of you',
+  /if \(isToday && !declared\.rest && !declared\.missed && !declared\.swapped\)/.test(verbs))
+check('...and neither is offered on a surface that cannot edit the plan',
+  /if \(onShorten\) out\.push\('shorten'\)/.test(verbs) && /if \(onLighter\) out\.push\('lighter'\)/.test(verbs))
+check('...so the sheet itself still writes no plan edit — both hand back to the caller',
+  /onShorten!\(minutes\)/.test(sheet) && /onLighter!\(\)/.test(sheet) && !/saveScopedEdit|saveMesocycle/.test(sheet))
+check('a refusal from either is shown in its own words, not flattened to "couldn\'t save that"',
+  /refusal = await fn\(\)/.test(sheet) && /if \(refusal\) \{ setError\(refusal\); return \}/.test(sheet))
 check('today points at the grid rather than a shortcut', /Tick the sets below/.test(sheet) && !/is_completed: true/.test(sheet))
 const cands = sheet.slice(sheet.indexOf('const moveCandidates'), sheet.indexOf('const nextFree'))
 check('move destinations come from the coach\'s own resolver, one candidate per requested day',
@@ -150,7 +165,27 @@ check('the day tools are four, not three', /The four day tools differ/.test(chat
 check('the trigger rule exists', /Trigger propose_missed_session when they tell you a session did NOT happen/.test(chat))
 const ui = strip(read('src/components/ChatAssistant.tsx'))
 check('the client builds its card', /buildMissedSessionProposal/.test(ui) && /kind === 'propose_missed_session'[\s\S]{0,200}buildMissedSessionProposal/.test(ui))
-check('...whose card says the day stays on the record', /stays on your record as a session that didn't happen/.test(ui))
+// RE-ANCHORED 15 Sep 2026, when the voice work moved this sentence out of the
+// lead and into the implication below it. The old check pinned one exact
+// wording — "stays on your record as a session that didn't happen" — so it went
+// red on a reword that lost nothing, and, worse, it would have stayed GREEN if
+// that sentence had been left on a card whose rows no longer marked the day
+// missed. It proved a string was present, not that the card told the truth.
+// The property is: the missed card marks the day Missed AND says somewhere that
+// the miss is kept on the record. Read off the builder, so it cannot be
+// satisfied by any other card's copy.
+const missedBuilder = ui.slice(ui.indexOf('buildMissedSessionProposal ='), ui.indexOf('buildSessionMoveProposal ='))
+check('...whose card marks the day missed', /after: 'Missed'/.test(missedBuilder))
+// THE FIRST VERSION OF THIS LINE WAS /record/i OVER THE WHOLE BUILDER, AND IT
+// WAS VACUOUS: the builder's own signature is `(rawArgs: Record<string,
+// unknown>)`, so the TypeScript type satisfied a check meant to be about what a
+// person reads. Found by mutation — deleting the real sentence left it green.
+// Now it reads ONLY the strings the card shows.
+// The character class must respect WHICH quote opened the string: a class of
+// [^'"`] stops at the apostrophe in "That's", which truncated this to "It
+// counts as a missed session this week. That" and turned the baseline red.
+const missedSays = (missedBuilder.match(/text: (['"`])(?:(?!\1).)*\1/g) ?? []).join(' ')
+check('...and says the miss is kept on the record', /\brecord\b/i.test(missedSays), missedSays.slice(0, 160))
 check('...refuses a day that has not happened yet', /delta > 0\) return null/.test(ui.slice(ui.indexOf('const buildMissedSessionProposal'), ui.indexOf('const buildMissedSessionProposal') + 1600)))
 check('...executes it on confirm and can undo it', /row\.kind === 'propose_missed_session'[\s\S]{0,200}executeMissedSession/.test(ui) && /undoMissedSession/.test(ui))
 const exec = strip(read('src/lib/pending-action-executor.ts'))

@@ -82,8 +82,26 @@ console.log('\n3. Pause moves the anchor — it does not erase the round')
   const field = stripComments(readFileSync(join(ROOT, 'src/components/timers/RoundField.tsx'), 'utf8'))
   check('the field pauses with pauseRound, never with stop()',
     /timers\.pauseRound\(\)/.test(field) && !/timers\.stop\(\)/.test(field))
+  // THE PROPERTY IS THE SUBTRACTION, NOT WHICH CLOCK FUNCTION IS CALLED.
+  //
+  // This pinned `getAppNow(profileId).getTime() - record.accumulatedMs`. On
+  // 14 Sep 2026 the timers moved off the app clock onto the wall clock — a real
+  // fix, because what DAY it is and how long you have been resting are
+  // different questions and only one of them may be pinned to a harness anchor.
+  // The behaviour this check is named for never changed; the check went red
+  // anyway and, left alone, would have forced the timer back onto the frozen
+  // clock. That is CLAUDE.md's mechanism-pinning warning in its second form: a
+  // check that does not merely miss a drift but ENFORCES one.
   check('resume re-anchors to now minus what was banked',
-    /getAppNow\(profileId\)\.getTime\(\) - record\.accumulatedMs/.test(hook))
+    /nowMs\(\) - record\.accumulatedMs/.test(hook))
+
+  // AND THE RULE THAT FIX ESTABLISHED, which nothing guarded until now.
+  // Measured 14 Sep 2026: no gate anywhere asserted it, so the wall-clock fix
+  // was one edit away from being silently undone.
+  check('...using the WALL clock, so a pinned "today" cannot freeze a timer',
+    /const nowMs = \(\) => Date\.now\(\)/.test(hook))
+  check('...and no elapsed-time maths reads the app clock',
+    !/getAppNow/.test(hook), (hook.match(/.{0,60}getAppNow.{0,60}/g) ?? []).slice(0, 2))
 }
 
 console.log('\n4. The field is coloured from tokens, never from hexes')
@@ -171,7 +189,13 @@ console.log('\n6. The dock is never covered, and a live round owns the tab')
   // everything else on Tools unreachable mid-session. What holds now: the
   // round is always visible while it runs, as a card, and the flooded field
   // is what she opts into. The dock rule above is untouched.
-  check('a running round is always visible', /\{roundLive && <RoundCard/.test(tools))
+  // RE-ANCHORED 13 Sep 2026 (frame 4a). The card is no longer conditional at
+  // all — idle it holds the total you would be starting — so `roundLive &&
+  // <RoundCard` is now the shape that would be WRONG. The property is
+  // unchanged and stronger: while a round runs there is nothing that can hide
+  // the card short of asking for full screen.
+  check('a running round is always visible',
+    /<RoundCard\s+live=\{roundLive\}/.test(tools) && !/\{roundLive && <RoundCard/.test(tools))
   check('...and the field takes the tab only when she asks for it',
     /if \(roundLive && timers\.roundFullScreen\)/.test(tools))
   check('...and a finished one still holds, so the red state does not vanish',

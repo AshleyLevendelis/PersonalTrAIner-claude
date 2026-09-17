@@ -23,7 +23,8 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, readdirSync, statSync } from 'fs'
-import { join, dirname, extname } from 'path'
+import { join, dirname, extname, sep } from 'path'
+import { existsSync as fileExists } from 'fs'
 import { fileURLToPath } from 'url'
 import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY, type TourStep } from '../src/lib/app-tour-steps'
 import { TABS } from '../src/lib/app-route'
@@ -70,21 +71,50 @@ for (const { path, text } of SOURCE) {
 }
 
 /**
- * The tab bar sets its attribute through a map — `data-tour={TOUR_KEY[tab]}`
- * — so no literal appears at the attribute site and the scan above finds
- * nothing there. That indirection is deliberate and worth keeping (it is what
- * stops a newly added tab from silently having no key), so the gate reads the
- * map instead of forcing the component to spell four literals.
+ * A COMPONENT MAY BIND THE ATTRIBUTE TO A VARIABLE, and several do. The tab bar
+ * writes `data-tour={TOUR_KEY[tab]}` from a map; ToolsTab writes
+ * `data-tour={row.tour}` from its row list. No literal appears at the attribute
+ * site in either, so the scan above finds nothing there.
  *
- * This half was written after the first run of this file reported all four nav
- * targets missing. They were not: the check was.
+ * THIS HAS NOW REPORTED A PHANTOM MISSING TAG TWICE. The first time it was all
+ * four nav targets, and a bespoke reader for the tab bar's map was added. On
+ * 14 Sep it was `toolstimer`, after the Tools rebuild moved the stop from the
+ * round card onto the Timers row — the tag was present and correct the whole
+ * time, and the check said the app tour pointed at nothing. A third bespoke
+ * reader would just move the next phantom one component along.
+ *
+ * So the rule is general instead: IN ANY FILE THAT BINDS data-tour TO AN
+ * EXPRESSION, every string literal that is a key some stop actually references
+ * counts as that file tagging it. Narrow, because it applies only to files that
+ * already bind the attribute, and comments are stripped first so a note naming
+ * a key cannot satisfy it.
  */
 {
-  const path = 'src/components/BottomTabBar.tsx'
-  const text = SOURCE.find(f => f.path === path)?.text ?? ''
-  const block = /const TOUR_KEY: Record<Tab, string> = \{([\s\S]*?)\}/.exec(text)
-  check('the tab bar still derives its tour keys from one map', !!block)
-  for (const m of (block?.[1] ?? '').matchAll(/(\w+):\s*'([\w-]+)'/g)) addAttr(m[2], path)
+  const stripComments = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/([^:])\/\/.*$/gm, '$1')
+  let boundFiles = 0
+  for (const { path, text } of SOURCE) {
+    if (path.startsWith('src/lib/app-tour-steps')) continue
+    const bare = stripComments(text)
+    // Every expression binding in this file, e.g. `TOUR_KEY[tab]`, `row.tour`.
+    const bindings = [...bare.matchAll(/data-tour=\{([^}]+)\}/g)].map(m => m[1].trim())
+    const indirect = bindings.filter(b => !/['"]/.test(b))
+    if (indirect.length === 0) continue
+    boundFiles++
+    for (const expr of indirect) {
+      // `row.tour` -> the property name; `TOUR_KEY[tab]` -> the object name.
+      const prop = /\.(\w+)\s*$/.exec(expr)?.[1]
+      const obj = /^(\w+)\s*\[/.exec(expr)?.[1]
+      if (prop) {
+        // Values given to that property anywhere in the file.
+        for (const m of bare.matchAll(new RegExp(`\\b${prop}\\s*:\\s*['"]([\\w-]+)['"]`, 'g'))) addAttr(m[1], path)
+      }
+      if (obj) {
+        const block = new RegExp(`const ${obj}[^=]*=\\s*\\{([\\s\\S]*?)\\n\\}`).exec(bare)
+        for (const m of (block?.[1] ?? '').matchAll(/['"]?[\w-]+['"]?\s*:\s*['"]([\w-]+)['"]/g)) addAttr(m[1], path)
+      }
+    }
+  }
+  check(`components bind data-tour to an expression, so this rule has teeth (${boundFiles})`, boundFiles > 0, boundFiles)
 }
 
 /** Keys the tour actually points at: a stop's spotlight target and its tap target. */
@@ -180,7 +210,15 @@ console.log('\n4. Nothing the tour promises is a capability the coach declines')
     const body = chat.slice(m.index!, handlerAt[i + 1]?.index ?? m.index! + 2000)
     return /coming in an update soon/.test(body)
   }).map(m => m[1])
-  check('something still declines, so this check has teeth', decliningStubs.length > 0, decliningStubs)
+  // TEETH WITHOUT NEEDING A DEFECT. This asserted at least one tool still
+  // declines, so it depended on a declining stub existing. On 14 Sep 2026
+  // ban_exercise was wired — Ashley's instruction, the last screen-only
+  // capability — and nothing declines any more, so the guard went red for
+  // being right. The detector is proved on a synthetic handler instead, and
+  // the real count being zero is the property.
+  check('the decline detector actually detects (proved on a synthetic stub)',
+    /coming in an update soon/.test('reply: "that is coming in an update soon"'))
+  check('...and no declared tool declines any more', decliningStubs.length === 0, decliningStubs)
 
   // Vocabulary that would have the user ask for one of them. Narrower than the
   // chip screen: the tour DESCRIBES rather than puts words in the user's
@@ -530,6 +568,168 @@ console.log('\n8. The meals stop survives meals that have not arrived yet')
   check('...bounded, so a slow or failed build can never trap anyone',
     /MEALS_WAIT_MS/.test(tour) && /setMealsWaitExpired\(true\)/.test(tour))
   check('App tells the tour whether the meals are still coming', /mealsPending=\{/.test(app))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n9. No stop claims a feature that is not on the tab it is pointing at')
+// ---------------------------------------------------------------------------
+// THE HOLE CLAUDE.md NAMES, AND IT HAS ALREADY COST US ONCE. The must-have
+// list records the APP TOUR's copy as UNGUARDED "for exactly this class of
+// claim", with the receipt: the Tools stop told every new user the grocery
+// list was there for a day after grocery moved off that tab (12 -> 13 Sep
+// 2026). It was found by a spotlight overflowing the screen, not by a check.
+//
+// §7 above already ties FOUR claims to the source facts behind them — steps,
+// water, appearance, the settings loop. Each is a hand-written row, and the
+// grocery move fell through because nobody wrote a fifth. So this section is
+// the GENERAL form of §7 rather than a fifth row: for each named feature,
+// work out WHICH TAB PROVIDES IT from the app's own wiring, then require that
+// no stop on any other tab claims it.
+//
+// HOW THE OWNER IS DERIVED, because the derivation is the check. App.tsx
+// renders each tab inside `<TabsContent value="...">`; the components named in
+// that block, plus the components THEY import directly, are that tab. Nothing
+// here is a list of files someone has to remember to update: move a component
+// from one tab to another and the owner moves with it, which is exactly what
+// did not happen when grocery moved.
+//
+// TWO THINGS THAT ARE NOT LIES, both learned by running this against correct
+// copy and watching it fail:
+//
+//  - NAMING A FEATURE IS NOT CLAIMING IT. The Nutrition stop says the targets
+//    "calories, macros, water" are set on that tab. True — Nutrition sets the
+//    water TARGET; Home does the logging. A bare /water/ test called that a
+//    lie. So a feature's pattern matches the ACTION, not the noun.
+//  - POINTING SOMEWHERE ELSE IS NOT CLAIMING IT EITHER. The Home stop says
+//    "Start session hands you to Exercise, where every set gets logged" — it
+//    names the other tab, on purpose, and then says "Home shows; it never
+//    logs". A sentence that names a different tab is a signpost, not a claim
+//    about here, and is skipped.
+{
+  const appSrc = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  const SRC_DIR = join(ROOT, 'src')
+
+  // COMMENTS STRIPPED BEFORE ANY MARKER IS TESTED — CLAUDE.md's rule, and it
+  // caught this check rather than the other way round. Replaying the real 12
+  // Sep grocery move (rename the import out of ToolsTab, leave the Tools copy
+  // naming the grocery list) left this section GREEN, because ToolsTab still
+  // carries a COMMENT saying "subscribeGroceryStore is the same seam the
+  // grocery screen itself listens on". The note explaining the wiring
+  // satisfied the check that the wiring was there.
+
+  const codeOf = (file: string) => readFileSync(file, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+
+  const findComponentFile = (name: string): string | null => {
+    const walk = (dir: string): string | null => {
+      for (const e of readdirSync(dir)) {
+        const full = join(dir, e)
+        if (statSync(full).isDirectory()) { const hit = walk(full); if (hit) return hit }
+        else if (e === `${name}.tsx`) return full
+      }
+      return null
+    }
+    return walk(join(SRC_DIR, 'components'))
+  }
+
+  // Direct imports only, and never the shared ui/ primitives: a transitive
+  // crawl reaches the design system and then every tab "owns" everything,
+  // which is a check that can never fail.
+  const directComponentImports = (file: string): string[] => {
+    const src = readFileSync(file, 'utf8')
+    const out: string[] = []
+    for (const m of src.matchAll(/from ['"]([^'"]+)['"]/g)) {
+      const spec = m[1]
+      let p: string
+      if (spec.startsWith('@/')) p = join(SRC_DIR, spec.slice(2))
+      else if (spec.startsWith('.')) p = join(dirname(file), spec)
+      else continue
+      if (p.includes(`components${sep}ui${sep}`)) continue
+      for (const ext of ['.tsx', '.ts']) {
+        const cand = p + ext
+        if (cand.includes(`${sep}components${sep}`) && fileExists(cand)) out.push(cand)
+      }
+    }
+    return out
+  }
+
+  const filesForTab = (tab: string): string[] => {
+    const at = appSrc.indexOf(`<TabsContent value="${tab}"`)
+    if (at === -1) return []
+    const rest = appSrc.slice(at + 1)
+    const nextTab = rest.indexOf('<TabsContent value="')
+    const endTabs = rest.indexOf('</Tabs>')
+    const stop = [nextTab, endTabs].filter(i => i !== -1).sort((a, b) => a - b)[0] ?? rest.length
+    const body = rest.slice(0, stop)
+    const files = new Set<string>()
+    for (const m of new Set([...body.matchAll(/<([A-Z]\w+)/g)].map(x => x[1]))) {
+      const f = findComponentFile(m)
+      if (!f) continue
+      files.add(f)
+      for (const d of directComponentImports(f)) files.add(d)
+    }
+    return [...files]
+  }
+
+  const TAB_FILES = new Map(TABS.map(t => [t as string, filesForTab(t as string)]))
+  for (const t of TABS) {
+    check(`the "${t}" tab resolves to real components (sanity check on this check)`,
+      (TAB_FILES.get(t as string) ?? []).length > 0, TAB_FILES.get(t as string)?.length)
+  }
+
+  // The name the USER sees, read from the tab bar rather than spelled here —
+  // the same move test:chat-app-reality makes, and for the same reason: the
+  // route id is `dashboard` and the label is "Home".
+  const tabBar = readFileSync(join(ROOT, 'src/components/BottomTabBar.tsx'), 'utf8')
+  const TAB_LABEL: Record<string, string> = { chat: 'Chat' }
+  for (const t of TABS) {
+    TAB_LABEL[t as string] ??= new RegExp(`tab: '${t}', label: '([^']+)'`).exec(tabBar)?.[1] ?? ''
+  }
+  for (const t of TABS) {
+    check(`the tab bar labels "${t}" (sanity check on this check)`, !!TAB_LABEL[t as string], TAB_LABEL[t as string])
+  }
+
+  // `marker` is how the app PROVIDES the feature — a component the tab
+  // renders, or the writer it calls. `claim` is the tour asserting you can do
+  // it. Rows are cheap; the point is that the OWNER is never written down.
+  const FEATURES: { label: string; marker: RegExp; claim: RegExp }[] = [
+    // The one that actually went wrong. Grocery lives on Nutrition (its own
+    // screen) and on Tools (a counted row) today; when it left Tools on 12 Sep
+    // the Tools stop kept naming it, and this is the check that would have
+    // said so.
+    { label: 'the grocery list', marker: /<GroceryScreen|<GroceryList|subscribeGroceryStore/, claim: /grocer|shopping list/i },
+    { label: 'the interval timers', marker: /<RoundCard/, claim: /tabata|emom|round timer/i },
+    { label: 'weigh-in logging', marker: /<WeighInCard|logWeight/, claim: /weigh[- ]in[^.]{0,40}\b(log|logged|tap)/i },
+    { label: 'step logging', marker: /logStepsManual/, claim: /steps[^.]{0,40}\b(log|logged|tap)|\blog[^.]{0,20}steps/i },
+    { label: 'water logging', marker: /logWater\b/, claim: /water[^.]{0,40}\b(log|logged|tap)|\blog[^.]{0,20}water|\+250/i },
+    { label: 'the plate calculator', marker: /<PlateCalculator/, claim: /plate calculator|plate math/i },
+    { label: 'the technique screen', marker: /form_cues/, claim: /form cue|technique|how to do/i },
+  ]
+
+  for (const f of FEATURES) {
+    const owners = TABS.filter(t => (TAB_FILES.get(t as string) ?? []).some(file => f.marker.test(codeOf(file))))
+    // A FEATURE NO TAB PROVIDES means the marker has gone stale, and a stale
+    // marker makes the rest of this row pass vacuously — the exact shape
+    // CLAUDE.md warns a mechanism-pinned check takes when the mechanism moves.
+    check(`${f.label}: some tab provides it (sanity check on this row)`, owners.length > 0, owners)
+    // ...and a feature EVERY tab provides is equally useless: nothing could
+    // ever violate it.
+    check(`...and not every tab does, or the row proves nothing`, owners.length < TABS.length, owners)
+
+    for (const step of TOUR_STEPS) {
+      const copy = step.copy ?? ''
+      for (const sentence of copy.split(/(?<=[.!?])\s+/)) {
+        if (!f.claim.test(sentence)) continue
+        // A sentence naming another tab is a signpost, not a claim about here.
+        const pointsElsewhere = TABS.some(t =>
+          t !== step.tab && new RegExp(`\\b${TAB_LABEL[t as string]}\\b`).test(sentence))
+        if (pointsElsewhere) continue
+        check(`the "${step.key}" stop may claim ${f.label} — ${TAB_LABEL[step.tab as string]} provides it`,
+          owners.includes(step.tab as never), { sentence, owners })
+      }
+    }
+  }
 }
 
 console.log(failures === 0 ? '\nAll app-tour checks passed.\n' : `\n${failures} FAILED\n`)

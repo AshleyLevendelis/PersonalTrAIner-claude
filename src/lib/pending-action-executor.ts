@@ -12,22 +12,27 @@
 // guard against double-execution, that's the claim's job.
 // ---------------------------------------------------------------------------
 
+import { didNotSave } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
-import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity } from './types'
+import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, FitnessGoal, ConcurrentActivity, SessionDuration } from './types'
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
-import { removeExerciseFromSession, moveExerciseInSession } from './session-edit'
-import { saveMesocycle, saveMesocycleWeek, saveScopedEdit } from './mesocycle-persistence'
+import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
+import { settleWeek } from './settle-week'
+import { rebuildDayAroundMainLift } from './session-rebuild'
+import { shortenDayTo } from './exercise-plan'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
-import { setSessionMove, setDeliberateRest, setMarkedMissed } from './daily-tracking'
+import { setSessionMove, setDeliberateRest, setMarkedMissed, setSwappedForActivity } from './daily-tracking'
 import { saveCardioLog } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
-import { STYLE_OPTIONS } from './onboarding-slots'
+import type { MealMovePayload } from './meal-move'
+import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
 
@@ -85,20 +90,18 @@ export async function executeExerciseSwap(
   }
 
   try {
-    if (payload.scope === 'today') {
-      const week = updatedMesocycle.find(w => w.week_number === payload.weekNumber)
-      if (week) await saveMesocycleWeek(profile.id, week)
-    } else {
-      const touchedBlock = updatedMesocycle.find(w => w.week_number === payload.weekNumber)?.block_number
-      const touchedWeeks = updatedMesocycle.filter(w => w.block_number === touchedBlock && w.week_number >= payload.weekNumber)
-      await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
-    }
+    // ONE SAVER. This inlined the scope branch that saveScopedEdit exists to
+    // own — a byte-for-byte copy of it, under a comment promising it "mirrors
+    // handleSwapExercise exactly", which is a promise nothing checked. The
+    // other three executors in this file already call the shared one. No
+    // behaviour changes here; what goes is the second copy that could drift.
+    await saveScopedEdit(profile.id, updatedMesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseSwap: persisting swap failed', err)
     return {
       mesocycle: updatedMesocycle,
       preImage,
-      receipt: { landed: [], failed: [{ op: 'save', error: 'The swap could not be saved — try again' }] },
+      receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The swap') }] },
     }
   }
 
@@ -115,6 +118,24 @@ export interface ExerciseRemovePayload {
   exIndex: number
   exerciseName: string
   scope: SwapScope
+}
+
+export interface ExerciseAddPayload {
+  weekNumber: number
+  dayName: string
+  exerciseName: string
+  scope: SwapScope
+}
+
+/**
+ * A ban is the widest edit in the app: every week of every block, and a slot
+ * can vanish entirely where no substitute exists. There is no weekNumber and no
+ * scope, deliberately — those would imply it could be narrower, and it cannot.
+ */
+export interface ExerciseBanPayload {
+  exerciseName: string
+  /** Sessions the ban will touch, counted when the card was built — for the receipt. */
+  sessionsAffected: number
 }
 
 export interface ExerciseReorderPayload {
@@ -168,11 +189,160 @@ export async function executeExerciseRemove(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseRemove: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return {
     mesocycle: result.mesocycle, preImage,
     receipt: { landed: [`${payload.dayName}: ${payload.exerciseName} removed`], failed: [] },
+  }
+}
+
+/**
+ * Put one exercise INTO a session. The pure decision is session-edit's; this
+ * shell resolves the movement, prices it and persists.
+ *
+ * THE RESOLUTION IS THE SAFETY STEP AND IT HAPPENS HERE, NOT IN THE MODEL.
+ * The coach sends a NAME in the user's words; `getConstrainedPool` is what
+ * decides whether that name is something this person can be prescribed, with
+ * their equipment and their injuries. A movement that is not in the pool is
+ * refused — so a hallucinated exercise, or a real one this profile is
+ * filtered out of, fails closed instead of entering the plan.
+ *
+ * Pricing happens here rather than in the card for the reason recorded on the
+ * swap path: the builder is synchronous, and previewing a number that confirm
+ * supersedes anyway would duplicate real logic to be approximately wrong.
+ */
+export async function executeExerciseAdd(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: ExerciseAddPayload,
+  /** The bans, passed in rather than read off the profile — the same way the
+   *  injury and equipment executors take theirs, because the live list is the
+   *  one the chat surface holds, not a stale copy on the profile row. */
+  exclusions: string[] = [],
+): Promise<SessionEditExecResult> {
+  const preImage = mesocycle
+  const fail = (error: string): SessionEditExecResult =>
+    ({ mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_add', error }] } })
+
+  const { mapTier } = await import('./exercise-plan')
+  const { resolveAdditionRequest } = await import('./exercise-add-candidates')
+  // RE-RESOLVED AT CONFIRM, not trusted from the payload. The card may have
+  // been sitting for a while, and equipment or injuries can have changed under
+  // it — the same reason every other confirm re-runs its edit rather than
+  // replaying a stored diff.
+  const entry = resolveAdditionRequest(payload.exerciseName, profile, exclusions)
+  if (!entry) return fail(`I can't add ${payload.exerciseName} — it isn't something I can prescribe with your equipment and injuries.`)
+
+  const day = mesocycle
+    .find(w => w.week_number === payload.weekNumber)?.days
+    .find(d => d.day === payload.dayName)
+  if (!day) return fail("I couldn't find that day on your plan.")
+
+  const programming = peerProgrammingFor(day.exercises, mapTier(entry.mechanics_tier))
+  if (!programming) return fail(`${payload.dayName} is a rest day. Make it a training day first, then add to it.`)
+
+  const { recomputeLoad } = await import('./mesocycle-edit')
+  const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
+
+  const result = addExerciseToSession({
+    mesocycle, profile,
+    weekNumber: payload.weekNumber, dayName: payload.dayName,
+    entry, load, scope: payload.scope,
+  })
+  if (!result.changed) return fail(result.refusal ?? "That couldn't be added")
+  if (!profile.id) {
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
+  } catch (err) {
+    console.error('executeExerciseAdd: persisting failed', err)
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
+  }
+  return {
+    mesocycle: result.mesocycle, preImage,
+    receipt: { landed: [`${payload.dayName}: ${entry.name} added`], failed: [] },
+  }
+}
+
+/**
+ * BAN ONE EXERCISE, EVERYWHERE — the coach's half of the button on the exercise
+ * row, wired 14 Sep 2026 on Ashley's instruction.
+ *
+ * It was the LAST thing a screen could do that chat could not, and it was left
+ * out on purpose: `ban_exercise` was declared to the model, then declined by
+ * the handler with "use the ban button on the exercise itself". That decline
+ * was itself a safety fix — before it, whatever the model sent was echoed back
+ * as if it had happened.
+ *
+ * THE SAME TWO WRITES THE SCREEN MAKES, in the same order, because a ban that
+ * rewrote the plan without recording the preference would come back at the next
+ * regeneration:
+ *   1. a user_facts row (an independent INSERT, so two bans cannot clobber each
+ *      other the way a shared array column did), then
+ *   2. the rebuilt mesocycle, every week, saved whole.
+ * If the fact lands and the plan save fails, the ban is still real and the
+ * receipt says exactly that rather than the generic "didn't save" — the same
+ * distinction App.tsx draws, for the same reason: otherwise someone re-taps a
+ * thing that already worked.
+ */
+export async function executeExerciseBan(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: ExerciseBanPayload,
+  /** The live ban list, passed in rather than read off the profile — as the add,
+   *  injury and equipment executors all take theirs. */
+  exclusions: string[] = [],
+  /** Preserved so a ban does not rewind live-week detection to week 1. */
+  planCreatedAt?: string,
+): Promise<SessionEditExecResult> {
+  const preImage = mesocycle
+  const fail = (error: string): SessionEditExecResult =>
+    ({ mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_ban', error }] } })
+
+  const name = payload.exerciseName
+  if (!profile.id) return fail('No profile to save against')
+  if (exclusions.some(e => e.toLowerCase() === name.toLowerCase())) {
+    return fail(`${name} is already on your never-again list.`)
+  }
+  if (mesocycle.length === 0) return fail("Your plan hasn't loaded yet — give it a moment and ask me again.")
+
+  const { createFact } = await import('./memory-store')
+  try {
+    await createFact({
+      profileId: profile.id,
+      kind: 'exercise_preference',
+      source: 'chat',
+      rawPhrase: name,
+      displayText: `won't eat/do ${name}`,
+      polarity: 'dislike',
+      hardness: 'hard',
+      resolvedRefs: [name],
+    })
+  } catch (err) {
+    console.error('executeExerciseBan: recording the ban failed', err)
+    return fail(`Couldn't save that — ${name} hasn't been removed. Check your connection and try again.`)
+  }
+
+  const updated = [...new Set([...exclusions, name])]
+  const { banExerciseFromMesocycle } = await import('./mesocycle-edit')
+  const next = await banExerciseFromMesocycle({ mesocycle, profile, bannedName: name, exclusions: updated })
+
+  try {
+    await saveMesocycle(profile.id, next, planCreatedAt ?? profile.created_at)
+  } catch (err) {
+    console.error('executeExerciseBan: persisting failed', err)
+    // THE FACT LANDED, so the ban is real and survives — only this plan's
+    // rewrite failed. Say that, not "didn't save".
+    return {
+      mesocycle: next, preImage,
+      receipt: { landed: [`${name} won't be picked again`], failed: [{ op: 'save', error: `${name} won't be picked again, but this plan couldn't be updated — reopen the app to retry.` }] },
+    }
+  }
+  return {
+    mesocycle: next, preImage,
+    receipt: { landed: [`${name} removed from ${payload.sessionsAffected} session${payload.sessionsAffected === 1 ? '' : 's'}, and never picked again`], failed: [] },
   }
 }
 
@@ -198,7 +368,7 @@ export async function executeExerciseReorder(
     await saveScopedEdit(profile.id, result.mesocycle, payload.weekNumber, payload.scope)
   } catch (err) {
     console.error('executeExerciseReorder: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'That could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   const where = payload.neighbourName ? ` — now ${payload.placement ?? 'next to'} ${payload.neighbourName}` : ''
   return {
@@ -382,7 +552,7 @@ export async function applyMealOptionToSlot(
   // from the insert, so this removes the row it wrote and never a same-named
   // meal that was already there.
   await undoMealAddition(profileId, payload, result.poolIndex)
-  return { receipt: { landed: [], failed: [{ op: 'save', error: "The meal didn't save — try again" }] }, poolIndex: null }
+  return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The meal') }] }, poolIndex: null }
 }
 
 /**
@@ -446,6 +616,52 @@ export async function undoMealAddition(
   const picks = await getMealPicksForDate(profileId, date)
   if (picks[slot] === option.name) await clearMealPick(profileId, date, slot)
   return true
+}
+
+/**
+ * TWO MEALS TRADE PLACES — Ashley's ruling, 14 Sep 2026, on what happens to
+ * the slot a moved meal leaves: "they swap places".
+ *
+ * BOTH LEGS OR NEITHER. A swap that lands one half is a day with the same
+ * meal in two slots and the other meal gone — strictly worse than not moving
+ * at all, and invisible until she looks at her own plan. So each leg goes
+ * through `applyMealOptionToSlot` (pool write, then pick, with the pool write
+ * rolled back if the pick fails), and if the SECOND leg fails, the first is
+ * undone too.
+ *
+ * No new writer. The same two functions the swap, the addition and the food
+ * edits already use — for the same reason those share them: an edit made by
+ * tapping a row and the same edit made by asking the coach have to leave the
+ * plan in the same state.
+ */
+export async function executeMealMove(
+  profileId: string,
+  payload: MealMovePayload,
+  pick: (payload: MealAdditionPayload) => Promise<boolean>,
+): Promise<PendingActionReceipt> {
+  const landed: string[] = []
+  const done: { payload: MealAdditionPayload; poolIndex: number | null }[] = []
+
+  for (const leg of payload.legs) {
+    const result = await applyMealOptionToSlot(profileId, leg.payload, pick)
+    if (result.receipt.failed.length > 0) {
+      // Undo whatever already landed, so the plan is exactly as it was.
+      for (const prior of done) await undoMealAddition(profileId, prior.payload, prior.poolIndex)
+      return {
+        landed: [],
+        failed: [{
+          op: 'propose_meal_move',
+          error: done.length > 0
+            ? "The swap didn't save, so nothing moved — your meals are as they were"
+            : didNotSave('The move'),
+        }],
+      }
+    }
+    done.push({ payload: leg.payload, poolIndex: result.poolIndex })
+    landed.push(`${leg.slot}: ${leg.originalName} (${leg.afterKcal} kcal)`)
+  }
+
+  return { landed, failed: [] }
 }
 
 export interface InjuryAdaptationPayload {
@@ -512,7 +728,7 @@ export async function executeInjuryAdaptation(
     await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeInjuryAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
@@ -600,7 +816,7 @@ export async function executeLastingInjury(
     }
   } catch (err) {
     console.error('executeLastingInjury: persisting failed', err)
-    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
 
   return {
@@ -646,7 +862,7 @@ export async function executeInjuryRecovered(
     await updateProfileField(profile.id, { injuries: profile.injuries.filter(i => i !== payload.injuryCode) })
   } catch (err) {
     console.error('executeInjuryRecovered: persisting failed', err)
-    return { receipt: { landed: [], failed: [{ op: 'save', error: 'Could not save this — try again' }] } }
+    return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
   return { receipt: { landed: [`Injuries: removed ${payload.injuryCode.replace('_', ' ')}`], failed: [] } }
 }
@@ -671,7 +887,7 @@ export async function executeEquipmentAdaptation(
     await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeEquipmentAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'The adaptation could not be saved — try again' }] } }
+    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
@@ -722,13 +938,23 @@ export async function executeVolumeChange(
   const next = mesocycle.map(week => {
     if (!payload.weekNumbers.includes(week.week_number)) return week
     if (!isVolumeAdjustable(week)) return week
+    let touched: string | null = null
     const days = (week.days ?? []).map(day => {
       if (day.day.toLowerCase() !== payload.dayName.toLowerCase()) return day
       const result = adjustDayVolume(day, payload.direction, profile)
-      if (result.changed) landed.push(`Week ${week.week_number}: ${describeVolumeChange(result, day.day)}`)
+      if (result.changed) {
+        landed.push(`Week ${week.week_number}: ${describeVolumeChange(result, day.day)}`)
+        touched = day.day
+      }
       return result.day
     })
-    return { ...week, days }
+    // THE SHARED TAIL, 13 Sep 2026. This path changes SET COUNTS and re-ran
+    // nothing — while enforceSetHierarchy exists precisely to stop an accessory
+    // out-setting its day's main lift, and the week balance pass exists to stop
+    // the week's pushing and pulling drifting apart. Both are exactly what
+    // adding a set to every eligible exercise on one day can break.
+    if (!touched) return { ...week, days }
+    return settleWeek({ ...week, days }, touched, profile).week
   })
 
   if (landed.length === 0) {
@@ -746,6 +972,214 @@ export async function executeVolumeChange(
     preImage,
     receipt: { landed, failed },
   }
+}
+
+export interface SessionShortenPayload {
+  weekNumber: number
+  dayName: string
+  minutes: number
+  reason?: string
+}
+
+/**
+ * "I'VE ONLY GOT 25 MINUTES TODAY", from the coach — 13 Sep 2026.
+ *
+ * The mirror of TodayPanel's shortenToday, and deliberately the same three
+ * steps in the same order: shortenDayTo (which protects the main lift and
+ * drops the accessory tail — Ashley's ruling), then settleWeek so a shortened
+ * day gets the same tail every other edit does, then ONE week row written.
+ *
+ * SCOPE IS NOT A PARAMETER HERE. Shortening is today-only by definition — the
+ * whole point is that next week's session is the full one — so this writes the
+ * live week and nothing else, and there is no way for a caller to widen it.
+ */
+export async function executeSessionShorten(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: SessionShortenPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const week = mesocycle.find(w => w.week_number === payload.weekNumber)
+  if (!week) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'shorten', error: "I can't see that week on your plan just now." }] } }
+  }
+
+  const result = shortenDayTo(week, payload.dayName, profile, payload.minutes)
+  if (!result.changed) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'shorten', error: result.refusal ?? "I couldn't shorten that one." }] } }
+  }
+
+  const settled = settleWeek(result.week, payload.dayName, profile)
+  const next = mesocycle.map(w => (w.week_number === payload.weekNumber ? settled.week : w))
+
+  landed.push(
+    `${payload.dayName}: about ${result.achievedMinutes} min` +
+    (result.droppedExercises.length > 0 ? ` — out came ${result.droppedExercises.join(', ')}` : '') +
+    (result.setsRemoved > 0 ? `${result.droppedExercises.length > 0 ? ', and' : ' —'} ${result.setsRemoved} set${result.setsRemoved === 1 ? '' : 's'} off what stayed` : ''),
+  )
+
+  try { if (profile.id) await saveMesocycleWeek(profile.id, settled.week) }
+  catch { failed.push({ op: 'save', error: didNotSave('That') }) }
+
+  return { mesocycle: next, preImage, receipt: { landed, failed } }
+}
+
+export interface SessionRebuildPayload {
+  weekNumber: number
+  dayName: string
+  /** The compiled exclusion list, resolved by the caller that has it. */
+  exclusions: string[]
+  reason?: string
+}
+
+/**
+ * "GIVE ME A DIFFERENT SESSION TODAY", from the coach — 16 Sep 2026.
+ *
+ * The mirror of TodayPanel's rebuildToday, and deliberately the same steps in
+ * the same order. Ashley's ruling: the main lift is kept exactly as it is and
+ * everything else is rebuilt around it.
+ *
+ * UNLIKE executeSessionShorten ABOVE, this does NOT call settleWeek itself —
+ * rebuildDayAroundMainLift runs it internally, because a rebuild has to settle
+ * between the replacements and the result rather than after. Calling it twice
+ * would be harmless and misleading; calling it here and not there would be a
+ * second place to keep in step.
+ *
+ * WHAT IT COULD NOT DO IS IN THE RECEIPT. A rebuild that quietly kept three
+ * slots and reported success is the defect this file's own §6 exists to stop.
+ */
+export async function executeSessionRebuild(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: SessionRebuildPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const result = await rebuildDayAroundMainLift({
+    mesocycle,
+    profile,
+    weekNumber: payload.weekNumber,
+    dayName: payload.dayName,
+    exclusions: payload.exclusions,
+  })
+  if (!result.changed) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'rebuild', error: result.refusal ?? "I couldn't rebuild that one." }] } }
+  }
+
+  landed.push(
+    `${payload.dayName}: ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed` +
+    (result.mainLift ? `, ${result.mainLift} untouched` : '') +
+    (result.kept.length > 0 ? ` — ${result.kept.map(k => k.name).join(', ')} stayed, nothing else fits ${result.kept.length === 1 ? 'that slot' : 'those slots'}` : ''),
+  )
+
+  const settledWeek = result.mesocycle.find(w => w.week_number === payload.weekNumber)
+  try { if (profile.id && settledWeek) await saveMesocycleWeek(profile.id, settledWeek) }
+  catch { failed.push({ op: 'save', error: didNotSave('That') }) }
+
+  return { mesocycle: result.mesocycle, preImage, receipt: { landed, failed } }
+}
+
+export interface CardioSessionPayload {
+  weekNumber: number
+  dayName: string
+  activity: string
+  minutes: number
+  targetRpe: number
+  reason?: string
+  /** 'today' writes the live week only; 'permanent' carries it to the rest of the block. */
+  scope: 'today' | 'permanent'
+}
+
+/**
+ * PUTS A CARDIO SESSION ON A DAY, as part of the plan.
+ *
+ * Ashley, 15 Sep 2026: *"I want when it adds a session like a cardio session
+ * that it's actually a useful card like other workouts not empty."*
+ *
+ * It writes a `PlannedActivity`, which is the shape three screens learned to
+ * render earlier the same day — the card on Today, the week list, tomorrow's
+ * preview. That ordering was the point: a card that cannot be rendered must
+ * not be offered, and before that fix this would have produced exactly the
+ * blank "log a walk or other activity" box she reported.
+ *
+ * IT REFUSES A DAY THAT ALREADY HAS LIFTING ON IT. `plannedActivity` means
+ * "this activity is the WHOLE day" (types.ts says so), so writing one onto a
+ * day holding exercises would make "is this the session or an extra?"
+ * unanswerable from the data — and the screens, which lead with the
+ * prescription, would hide the lifting behind it. Adding cardio AFTER a lift
+ * is what `recommendedCardio` already means and is a different request.
+ */
+export async function executeCardioSession(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: CardioSessionPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const landed: string[] = []
+  const failed: { op: string; error: string }[] = []
+
+  const week = mesocycle.find(w => w.week_number === payload.weekNumber)
+  if (!week) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: "I can't see that week on your plan just now." }] } }
+  }
+  const day = week.days.find(d => d.day === payload.dayName)
+  if (!day) {
+    return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: `I couldn't find ${payload.dayName} on your plan.` }] } }
+  }
+  if (day.exercises.length > 0) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed, failed: [{ op: 'add', error: `${payload.dayName} already has a session on it.` }] },
+    }
+  }
+
+  const withActivity = (w: MesocycleWeek): MesocycleWeek => ({
+    ...w,
+    days: w.days.map(d => d.day !== payload.dayName ? d : {
+      ...d,
+      focus: payload.activity,
+      is_scheduled: true,
+      // THE SUGGESTION GOES WHEN THE PRESCRIPTION ARRIVES. recommendedCardio
+      // is an add-on the generator offers for an empty day; once the day HAS a
+      // session, leaving it would be two prescriptions on one day and no way
+      // to tell which is which.
+      recommendedCardio: undefined,
+      plannedActivity: {
+        activity: payload.activity,
+        duration: payload.minutes,
+        targetRpe: payload.targetRpe,
+        ...(payload.reason ? { reason: payload.reason } : {}),
+      },
+    }),
+  })
+
+  // THE SAME ANSWER THE SAVER USES, asked rather than re-derived. This had its
+  // own copy of the scope branch until test:silent-writes §6 — written earlier
+  // the same day, after the swap path was found with THREE copies of it — went
+  // red on this file. A caller that changes a run of weeks and a saver that
+  // writes a run of weeks must not disagree about which run.
+  const touched = new Set(weeksTouchedByScope(mesocycle, payload.weekNumber, payload.scope).map(w => w.week_number))
+  const next = mesocycle.map(w => (touched.has(w.week_number) ? withActivity(w) : w))
+
+  landed.push(`${payload.dayName}: ${payload.activity}, ${payload.minutes} min at RPE ${payload.targetRpe}`)
+
+  if (!profile.id) {
+    return { mesocycle: next, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  try {
+    await saveScopedEdit(profile.id, next, payload.weekNumber, payload.scope)
+  } catch (err) {
+    console.error('executeCardioSession: persisting failed', err)
+    return { mesocycle: next, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That session') }] } }
+  }
+
+  return { mesocycle: next, preImage, receipt: { landed, failed } }
 }
 
 export interface ScheduleChangePayload {
@@ -876,6 +1310,153 @@ export async function executeStyleChange(
 }
 
 // ---------------------------------------------------------------------------
+// HOW LONG SESSIONS ARE, FROM NOW ON — 16 Sep 2026.
+//
+// The lasting twin of executeSessionShorten, which is TODAY only. Deliberately
+// the same shape as executeStyleChange rather than a new one: both are a
+// lasting profile-column change that invalidates the plan, and holding them in
+// one shape is what stops the two answering differently.
+//
+// ASHLEY'S RULING, from three options: rebuild the rest of the block around
+// the new length. Over trimming what is already there — a 60-minute session
+// with its end chopped off is not a session designed for 45 — and over waiting
+// for the next block, which leaves weeks of sessions that do not fit.
+// ---------------------------------------------------------------------------
+// GOAL CHANGE — the LAST setup answer that existed on neither surface, added
+// 17 Sep 2026. Built in the same shape as executeStyleChange rather than a
+// new one, for the reason that shape exists: both are a lasting profile-column
+// change that invalidates the plan, and holding them in one shape is what
+// stops the two answering differently.
+//
+// ASHLEY'S RULING, 17 Sep 2026, from three options: training AND food, from
+// this week. Over asking about food as a second question — somebody training
+// for muscle while still eating a fat-loss deficit is the worst of both — and
+// over finishing the current block first, which can mean three weeks of work
+// they have already said they do not want.
+//
+// THE FOOD HALF IS NOT IN THIS FUNCTION, AND THAT IS NOT AN OMISSION.
+// The calorie and macro targets are DERIVED from fitness_goal every time
+// computeTargets runs (macro-calculator reads it for the deficit, the carb
+// prescription and the label), and App owns a macro effect keyed on that
+// field. So writing the goal below IS the food change: the targets move on
+// the next render, with the notice that effect now carries. Recomputing them
+// here would be a second, divergent copy of a number the app already derives.
+// Rebuilding the MEALS around the new targets is the caller's, because it
+// costs an edge call — the screen does it on the rebuild confirm, and so does
+// the coach's confirm branch.
+// ---------------------------------------------------------------------------
+
+export interface GoalChangePayload {
+  /** What they are training for from now on, replacing whatever was there. */
+  fitnessGoal: FitnessGoal
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeGoalChange(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: GoalChangePayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const updated: UserProfile = { ...profile, fitness_goal: payload.fitnessGoal }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  // Rebuild first, write second — the same order executeStyleChange holds, and
+  // it matters more here. Writing the goal and then failing the rebuild would
+  // leave someone labelled for a goal, eating for it (the targets follow the
+  // field immediately), and training the old plan. That is a worse state than
+  // the one before they asked.
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { fitness_goal: payload.fitnessGoal }) }
+    catch { failed.push({ op: 'save', error: "The new goal didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  return {
+    mesocycle: rebuild.mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Goal: ${GOAL_OPTIONS.find(o => o.value === payload.fitnessGoal)?.label ?? payload.fitnessGoal}`,
+           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+        : [],
+      failed,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+export interface SessionLengthPayload {
+  /** The band their sessions run to from now on, replacing whatever was set. */
+  sessionDuration: SessionDuration
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeSessionLength(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: SessionLengthPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const updated: UserProfile = { ...profile, session_duration_preference: payload.sessionDuration }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  // REBUILD FIRST, WRITE SECOND — the same order as the style change, for the
+  // same reason: writing the new length and then failing the rebuild would
+  // leave the profile saying 45 minutes while every session on screen still
+  // ran to 60. That divergence is the exact thing this tool exists to close,
+  // so the failure path must not recreate it.
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { session_duration_preference: payload.sessionDuration }) }
+    catch { failed.push({ op: 'save', error: "The new session length didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  return {
+    mesocycle: rebuild.mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Sessions: ${DURATION_OPTIONS.find(o => o.value === payload.sessionDuration)?.label ?? payload.sessionDuration}`,
+           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+        : [],
+      failed,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
 // RESTING A PRESCRIBED DAY — 31 Aug 2026.
 //
 // The plainer half of the swap this file already executes. "I'm doing Muay
@@ -922,6 +1503,81 @@ export async function executeRestDay(
 /** Clears the flag. The day goes back to whatever it was — due, or missed. */
 export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
   await setDeliberateRest(profileId, payload.date, false)
+}
+
+// ---------------------------------------------------------------------------
+// "I'M DOING MUAY THAI INSTEAD" — now on the same rail as the other three.
+//
+// This was the FIRST of the four day-verbs to exist (25 Aug 2026) and the last
+// to ask. It was built to stop the coach SAYING a day was marked when nothing
+// could mark it, and it fixed that by writing immediately, server-side. Six
+// days later Ashley ruled on the rest-day version — "record it, but confirm
+// first" — and every day-verb built afterwards proposed. This one never came
+// back for it, so on 15 Sep 2026 the coach changed her record with no card and
+// no tap, and she reported it as the chat lying to her.
+//
+// THE WRITES ARE THE SCREEN'S, NOT A SECOND COPY. setSwappedForActivity and
+// saveCardioLog are exactly what WhatHappenedSheet's "I did something else
+// instead" calls, so the coach and the day menu leave identical rows — and
+// swapped_for_activity keeps the single client writer test:what-happened §3
+// pins.
+// ---------------------------------------------------------------------------
+
+export interface SwapForActivityPayload {
+  /** ISO date of the day being swapped. */
+  date: string
+  /** The day's name, for the receipt — resolved by the caller, not re-derived here. */
+  dayName: string
+  /** What they are doing instead, in their own words. */
+  activityName: string
+  /** What the session would have been, for the receipt. */
+  sessionFocus?: string
+  /** Only ever a figure they actually said; null when they did not. */
+  durationMinutes?: number | null
+  intensityRpe?: number | null
+  /** Still to come, so there is nothing to log yet — the day is marked either way. */
+  activityPlanned?: boolean
+}
+
+export interface SwapForActivityResult {
+  receipt: PendingActionReceipt
+}
+
+export async function executeSwapForActivity(
+  profile: UserProfile,
+  payload: SwapForActivityPayload,
+): Promise<SwapForActivityResult> {
+  if (!profile.id) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  const ok = await setSwappedForActivity(profile.id, payload.date, payload.activityName)
+  if (!ok) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: "Couldn't swap that day — try again in a moment" }] } }
+  }
+  const landed = [`${payload.dayName}: ${payload.activityName}${payload.sessionFocus ? ` instead of ${payload.sessionFocus}` : ''}`]
+  // THE DAY IS MARKED EITHER WAY; THE ACTIVITY IS LOGGED ONLY WHEN THERE IS
+  // SOMETHING TRUE TO LOG. A class that has not happened yet has no duration
+  // to record, and a duration nobody stated is a number the app invented —
+  // both were live defects on the write path (8 Sep 2026, two rows for one
+  // evening and a guessed 60 minutes for a class still hours away).
+  const minutes = payload.durationMinutes
+  if (!payload.activityPlanned && typeof minutes === 'number' && minutes > 0) {
+    saveCardioLog({
+      userId: profile.id,
+      date: payload.date,
+      activityName: payload.activityName,
+      durationMinutes: Math.round(minutes),
+      intensityRpe: payload.intensityRpe ?? 6,
+      notes: 'Swapped in place of the prescribed lifting session',
+    })
+    landed.push(`${payload.activityName}: ${Math.round(minutes)} min logged`)
+  }
+  return { receipt: { landed, failed: [] } }
+}
+
+/** Clears the swap. The day goes back to whatever it was — due, or missed. */
+export async function undoSwapForActivity(profileId: string, payload: SwapForActivityPayload): Promise<void> {
+  await setSwappedForActivity(profileId, payload.date, null)
 }
 
 export interface MissedSessionPayload {

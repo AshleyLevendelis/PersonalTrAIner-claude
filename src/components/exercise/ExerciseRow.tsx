@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Ban, History, MoreVertical, BookOpen, Info, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
+import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreVertical, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
@@ -271,10 +271,21 @@ export function ExerciseRow({
                   )}
                 </div>
               )}
+              {/* ONE PLACE FOR EVERY CHANGE TO AN EXERCISE — Ashley's ruling,
+                  14 Sep 2026, from three options, after reporting the split:
+                  "Swap exercise is an inline link above the sets table, while
+                  the rest of the actions are inside the 3-dot overflow menu."
+                  She chose all of them behind the ⋮ over making them all
+                  inline, and over keeping Swap in both places, so there is
+                  nothing to remember about which control lives where.
+
+                  PLATE CALCULATOR STAYS. It is the one thing on this row that
+                  does not change the plan — it is a tool you reach for with a
+                  bar in front of you, mid-set, and burying it behind a menu
+                  would cost taps in exactly the moment that matters. The line
+                  the ruling draws is "changes to the plan go in the menu", not
+                  "links go in the menu". */}
               <div className="mt-1.5 flex items-center gap-3.5">
-                <button type="button" className="hit-slop-44 text-xs font-semibold text-primary-text" onClick={onSwap}>
-                  Swap exercise
-                </button>
                 <button
                   type="button"
                   className="hit-slop-44 text-xs text-muted-foreground"
@@ -307,10 +318,17 @@ export function ExerciseRow({
                     History
                   </DropdownMenuItem>
                 )}
-                {/* ORDER, THEN REMOVAL, THEN THE BAN. Moving is the least
-                    consequential and the ban is the most — it rewrites every
-                    week of every block — so the menu runs cheap to expensive,
-                    and only the ban is styled destructive. */}
+                {/* SWAP, THEN ORDER, THEN REMOVAL, THEN THE BAN. The menu runs
+                    cheap to expensive — swapping keeps the slot and the work,
+                    moving keeps everything, taking out loses the slot today,
+                    and the ban rewrites every week of every block — so only the
+                    ban is styled destructive. Swap leads because it is the
+                    change people make most, which is also why it used to sit
+                    outside the menu. */}
+                <DropdownMenuItem onClick={onSwap} data-testid="swap-exercise">
+                  <ArrowRightLeft className="size-3.5" />
+                  Swap exercise
+                </DropdownMenuItem>
                 {onMove && (
                   <DropdownMenuItem disabled={!canMoveUp} onClick={() => onMove(-1)} data-testid="move-up">
                     <ArrowUp className="size-3.5" />

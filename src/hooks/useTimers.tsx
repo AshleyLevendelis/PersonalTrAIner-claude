@@ -9,7 +9,30 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useDeadlineTick } from './useDeadlineTick'
-import { getAppNow } from '@/lib/dev-clock'
+// ---------------------------------------------------------------------------
+// A TIMER MEASURES ELAPSED TIME, SO IT READS THE WALL CLOCK — NOT getAppNow.
+//
+// Every reading in this file used `getAppNow(profileId)`, the app's answer to
+// "what day is it". That is a CALENDAR clock: it honours the dev-clock
+// override, which returns a FIXED instant. So with an override set, every
+// timer in the app froze — the round timer's countdown sat on its starting
+// number and never moved.
+//
+// FOUND 14 Sep 2026 by three browser drivers going red at once
+// (verify:tools-timer, verify:round-presets, verify:round-lead-in), after the
+// harness started pinning the app clock. Before that the harness set no
+// override, getAppNow returned real time, and the fault was invisible.
+//
+// INERT FOR A LIVE USER, and said plainly: with no override getAppNow IS
+// new Date(), so a real trainee's timer has always counted correctly. It is
+// fixed because the distinction is real — what day it is and how long you have
+// been resting are different questions, and only one of them is allowed to be
+// pinned. It is the same rule .tour-harness/anchor.mjs applies to the checks,
+// pointing the other way.
+//
+// SELF-CONSISTENT EITHER WAY: startedAtIso is written and read with the same
+// clock, so the only thing that changes is which clock both ends use.
+const nowMs = () => Date.now()
 import { playTimerCue } from '@/lib/timer-cues'
 import {
   computeStopwatchElapsedMs,
@@ -19,6 +42,7 @@ import {
   type RoundConfig,
   type RoundPhase,
   totalRoundSeconds,
+  sessionTotalRounds,
 } from '@/lib/timer-engine'
 import {
   getTimerRecord,
@@ -49,6 +73,22 @@ export interface TimersValue {
   elapsedMs: number
   laps: LapEntry[]
   roundConfig: RoundConfig | null
+  /**
+   * The protocol the idle card is describing and Start would run — design
+   * handoff 4a. Provider state for the same reason `roundFullScreen` is: the
+   * Tools tab unmounts on a tab switch and the choice must not go with it.
+   */
+  selectedRoundConfig: RoundConfig | null
+  selectRoundConfig: (config: RoundConfig) => void
+  /** A protocol tapped mid-round, waiting for the next round boundary. */
+  queuedRoundConfig: RoundConfig | null
+  /** Queue a switch (running) — the caller decides; this never applies it now. */
+  queueRoundConfig: (config: RoundConfig) => void
+  /** Undo, before the boundary arrives. */
+  clearQueuedRound: () => void
+  /** Her saved Custom numbers — what the Custom chip shows, and selects. */
+  customRoundConfig: RoundConfig | null
+  setCustomRoundConfig: (config: RoundConfig) => void
   currentRound: number
   currentPhase: RoundPhase
   phaseRemainingMs: number | null
@@ -134,30 +174,39 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
 
   const start = useCallback(() => {
     if (!profileId) return
-    persist({ ...record, running: true, startedAtIso: getAppNow(profileId).toISOString() })
+    persist({ ...record, running: true, startedAtIso: new Date(nowMs()).toISOString() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
   const stop = useCallback(() => {
     if (!profileId) return
-    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, getAppNow(profileId).getTime())
+    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, nowMs())
     persist({ ...record, running: false, accumulatedMs: elapsed, startedAtIso: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
   const reset = useCallback(() => {
-    if (profileId) clearTimerRecord(profileId)
     // BACK TO THE CARD. Full screen is a view she asked for on ONE round;
     // carrying it into the next one would flood the tab for a round nobody
     // asked to flood it with.
     setRoundFullScreen(false)
-    setRecord(defaultTimerRecord(record.mode))
+    // THE CHOICE SURVIVES THE RESET, the run does not. Reset means "I am done
+    // with that round", not "forget which protocol I train". The idle card
+    // has to say something the moment the round clears, and Tabata-by-default
+    // after every reset would quietly undo a choice she made once.
+    const next: TimerRecord = {
+      ...defaultTimerRecord(record.mode),
+      selectedRoundConfig: record.selectedRoundConfig ?? null,
+      customRoundConfig: record.customRoundConfig ?? null,
+    }
+    if (profileId) saveTimerRecord(profileId, next)
+    setRecord(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, record.mode])
+  }, [profileId, record.mode, record.selectedRoundConfig])
 
   const lap = useCallback(() => {
     if (!profileId) return
-    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, getAppNow(profileId).getTime())
+    const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, nowMs())
     const nextLap: LapEntry = { lapNumber: record.laps.length + 1, elapsedMs: elapsed }
     persist({ ...record, laps: [...record.laps, nextLap] })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,14 +225,14 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
    */
   const pauseRound = useCallback(() => {
     if (!profileId || !record.startedAtIso || !record.running) return
-    const elapsed = getAppNow(profileId).getTime() - new Date(record.startedAtIso).getTime()
+    const elapsed = nowMs() - new Date(record.startedAtIso).getTime()
     persist({ ...record, running: false, accumulatedMs: Math.max(0, elapsed), startedAtIso: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
   const resumeRound = useCallback(() => {
     if (!profileId || record.running || !record.roundConfig) return
-    const anchor = getAppNow(profileId).getTime() - record.accumulatedMs
+    const anchor = nowMs() - record.accumulatedMs
     persist({ ...record, running: true, startedAtIso: new Date(anchor).toISOString() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
@@ -191,13 +240,17 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const startRound = useCallback((config: RoundConfig) => {
     if (!profileId) return
     setRoundFullScreen(false)
-    const now = getAppNow(profileId)
+    const now = new Date(nowMs())
     // startedAtIso is the round timer's single source of truth: round, phase
     // and remaining are all derived from (now - startedAt) against the
     // schedule. phaseEndsAtIso/currentRound/currentPhase stay in the record
     // shape for storage compat but are no longer read back for computation.
     persist({
       ...defaultTimerRecord('round'),
+      // The chosen protocol is what is now running; keeping it means the card
+      // has something to describe again the moment this round is reset.
+      selectedRoundConfig: config,
+      customRoundConfig: record.customRoundConfig ?? null,
       running: true,
       // The lead-in is stored ON the config, so the whole schedule — including
       // a reload part-way through the countdown — stays derivable from the one
@@ -209,7 +262,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
       currentPhase: 'lead_in',
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, persist])
+  }, [profileId, persist, record])
 
   /**
    * "I'm ready now" — ends the countdown rather than waiting it out.
@@ -220,11 +273,48 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
    * round 1 with its full work interval. Nothing about computeRoundState
    * changes, and there is no "skipped" flag to disagree with the clock.
    */
+  /**
+   * CHOOSING A PROTOCOL IS NOT STARTING ONE — design handoff 4a. The card is
+   * always on screen, so a tap on a chip while nothing runs changes what the
+   * card describes and what Start would run, and nothing else moves.
+   */
+  const selectRoundConfig = useCallback((config: RoundConfig) => {
+    persist({ ...record, selectedRoundConfig: config })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persist, record])
+
+  /**
+   * A TAP MID-ROUND QUEUES. 4a: "A tap while a round is running QUEUES — it
+   * never restarts mid-round." The round you are in is the one thing a person
+   * cannot get back, so nothing about it changes; the switch waits for the
+   * boundary, and until then it is undoable.
+   */
+  const queueRoundConfig = useCallback((config: RoundConfig) => {
+    persist({ ...record, queuedRoundConfig: config })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persist, record])
+
+  const clearQueuedRound = useCallback(() => {
+    if (!record.queuedRoundConfig) return
+    persist({ ...record, queuedRoundConfig: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persist, record])
+
+  /**
+   * Her own numbers, saved — what the Custom chip shows. Written as the
+   * Custom panel is edited, so the chip's suffix is live while she is
+   * choosing rather than only after some Save she might not tap.
+   */
+  const setCustomRoundConfig = useCallback((config: RoundConfig) => {
+    persist({ ...record, customRoundConfig: config, selectedRoundConfig: config })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persist, record])
+
   const skipLeadIn = useCallback(() => {
     if (!profileId || !record.running || !record.startedAtIso || !record.roundConfig) return
     const leadInMs = leadInMsOf(record.roundConfig)
     if (leadInMs <= 0) return
-    const now = getAppNow(profileId).getTime()
+    const now = nowMs()
     // Already working — nothing to skip, and re-anchoring here would rewind
     // the run to the top of round 1.
     if (now - new Date(record.startedAtIso).getTime() >= leadInMs) return
@@ -235,7 +325,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const elapsedMs = useMemo(() => {
     if (!profileId) return record.accumulatedMs
     void tick
-    return computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, getAppNow(profileId).getTime())
+    return computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, nowMs())
   }, [profileId, record.accumulatedMs, record.startedAtIso, record.running, tick])
 
   /**
@@ -259,7 +349,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     if (!profileId || record.mode !== 'round' || !record.roundConfig) return null
     void tick
     const elapsedMs = record.running && record.startedAtIso
-      ? getAppNow(profileId).getTime() - new Date(record.startedAtIso).getTime()
+      ? nowMs() - new Date(record.startedAtIso).getTime()
       : record.accumulatedMs
     if (elapsedMs <= 0 && !record.running) return null
     return computeRoundState(record.roundConfig, EPOCH_ISO, Math.max(0, elapsedMs))
@@ -275,11 +365,62 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   // those cues are stale, so none fire, never a queued burst. The anchor key
   // resets the baseline on a new round start or reload without cueing.
   const lastCueRef = useRef<{ anchor: string; index: number } | null>(null)
+  // The block round last observed, for the queued-switch boundary. Separate
+  // from the cue ref because they watch different things — the cue watches
+  // every phase edge, this watches only the ones that start a new round.
+  const lastRoundRef = useRef<{ anchor: string; round: number } | null>(null)
   useEffect(() => {
     if (!roundState || !record.roundConfig || !record.startedAtIso) return
     const index = roundPhaseIndex(roundState, record.roundConfig)
     const prev = lastCueRef.current
     lastCueRef.current = { anchor: record.startedAtIso, index }
+
+    // -----------------------------------------------------------------------
+    // A QUEUED PROTOCOL LANDS HERE, at the first tick of a new round.
+    //
+    // IN THIS EFFECT RATHER THAN ITS OWN, deliberately: this is already the
+    // one place that writes the record in response to the clock, and two
+    // effects both keyed on roundState both calling persist is how the
+    // per-phase deadline corruption this engine was rewritten to remove got
+    // in. One writer, one ordering.
+    //
+    // A NEW BLOCK, NOT A NEW SESSION. `rounds` is only what remains and the
+    // countdown is zero — a second get-ready in the middle of a session would
+    // be the app stopping her to say it was about to continue. Everything
+    // already done is handed over in `carried`, which is the only reason the
+    // card can go on saying "Round 4 of 8" a tick after the switch.
+    // -----------------------------------------------------------------------
+    const prevRound = lastRoundRef.current
+    lastRoundRef.current = { anchor: record.startedAtIso, round: roundState.currentRound }
+    const queued = record.queuedRoundConfig
+    if (
+      queued && profileId
+      && !roundState.isComplete
+      && roundState.currentPhase !== 'lead_in'
+      && prevRound && prevRound.anchor === record.startedAtIso
+      && roundState.currentRound > prevRound.round
+    ) {
+      const cfg = record.roundConfig
+      const doneInBlock = Math.max(0, roundState.currentRound - 1)
+      const carried = {
+        rounds: (cfg.carried?.rounds ?? 0) + doneInBlock,
+        // Whole work+rest cycles: the switch happens after the previous
+        // round's rest ended, so nothing is double-counted and nothing is lost.
+        seconds: (cfg.carried?.seconds ?? 0) + doneInBlock * (cfg.workSeconds + cfg.restSeconds),
+      }
+      const remaining = Math.max(1, sessionTotalRounds(cfg) - carried.rounds)
+      persist({
+        ...defaultTimerRecord('round'),
+        selectedRoundConfig: record.selectedRoundConfig,
+        customRoundConfig: record.customRoundConfig ?? null,
+        running: true,
+        roundConfig: { ...queued, rounds: remaining, leadInSeconds: 0, carried },
+        startedAtIso: new Date(nowMs()).toISOString(),
+        currentRound: 1,
+        currentPhase: 'work',
+      })
+      return
+    }
     // Completion always stops the record — including when it's the very
     // first observation after a reload (prev === null), where no cue plays.
     const isFirstObservation = !prev || prev.anchor !== record.startedAtIso
@@ -312,6 +453,13 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     elapsedMs,
     laps: record.laps,
     roundConfig: record.roundConfig,
+    selectedRoundConfig: record.selectedRoundConfig ?? null,
+    selectRoundConfig,
+    queuedRoundConfig: record.queuedRoundConfig ?? null,
+    queueRoundConfig,
+    clearQueuedRound,
+    customRoundConfig: record.customRoundConfig ?? null,
+    setCustomRoundConfig,
     currentRound: roundState?.currentRound ?? record.currentRound,
     currentPhase: roundState?.currentPhase ?? record.currentPhase,
     phaseRemainingMs: roundState?.phaseRemainingMs ?? null,

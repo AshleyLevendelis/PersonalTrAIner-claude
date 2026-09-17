@@ -123,8 +123,15 @@ for (const file of ['src/components/exercise/SetGrid.tsx', 'src/components/exerc
   check(`${file} has no onFirstEverLog with nobody passing it`, !read(file).includes('onFirstEverLog?.('))
 }
 
-check('the timer panel is actually given today\'s conditioning',
-  /<TimersPanel todaysConditioning=\{todaysConditioning\}/.test(stripComments(read('src/components/ToolsTab.tsx'))))
+// RE-ANCHORED 13 Sep 2026 (frame 4a). Today's conditioning no longer reaches
+// a panel behind a row — it is the FIRST CHIP on the tab, starred. The
+// property is the same one and slightly stronger: what the plan prescribes
+// today has to arrive at the timer surface, parsed, rather than being
+// something the person has to retype from memory.
+check('today\'s conditioning is actually offered on the timer surface',
+  /parseConditioningInterval\(todaysConditioning\?\.activity\)/.test(stripComments(read('src/components/ToolsTab.tsx')))
+  && /protocolChoices\(todaysConfig,/.test(stripComments(read('src/components/ToolsTab.tsx')))
+  && /label: 'Today', config: todaysConfig, fromToday: true/.test(stripComments(read('src/components/timers/ProtocolChips.tsx'))))
 check('...derived from the plan the tab is given',
   /exercisePlan \?\? \[\]/.test(stripComments(read('src/components/ToolsTab.tsx'))))
 

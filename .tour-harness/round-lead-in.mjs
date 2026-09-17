@@ -49,22 +49,42 @@ console.log('\nTHE COUNTDOWN BEFORE ROUND 1 — on the screen, real clock\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/tools` })
 await wait(4000)
 
-// The setup opens from the one row that changes the intervals — it is not on
-// the tab by default, which is a fact about Tools, not about this feature.
-// RE-ANCHORED 12 Sep 2026 (design handoff 2a): this used to tap a tile in a
-// six-tile grid, and the grid is gone. What is being checked — that a
-// countdown is announced before it happens and that it really falls — has not
-// changed at all.
-check('0. Tools offers a row to change the intervals',
-  await ev(`(() => { const b = document.querySelector('[data-change-intervals]'); if (!b) return false; b.click(); return true })()`))
-await wait(900)
-check('0b. ...which opens the round setup', await ev(`[...document.querySelectorAll('[role="tab"]')].some(n => /round/i.test(n.textContent))`))
+// 4b (14 Sep 2026): THE ROUND TIMER IS NO LONGER ON THE TAB. Ashley asked for
+// it to sit behind a "Timers" row with the stopwatch and the lap timer rather
+// than permanently at the top of Tools. Everything this driver checks is
+// unchanged in substance — the card, the chips, the numbers — it is two taps
+// further in. Anchored on the row's TEXT and the choice's data attribute, not
+// on position, so re-ordering the list does not break it.
+const openRoundTimer = async () => {
+  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Timers/.test((x.innerText || '').trim())); if (b) b.click(); return !!b })()`)
+  await wait(700)
+  await ev(`(() => { const b = document.querySelector('[data-timer-choice="round"]'); if (b) b.click(); return !!b })()`)
+  await wait(700)
+}
+await openRoundTimer()
+
+// RE-ANCHORED TWICE. This used to tap a tile in a six-tile grid (gone, 2a),
+// then a row that opened a setup panel (gone, 4a). What is being checked —
+// that a countdown is announced BEFORE it happens and that it really falls —
+// has not changed either time.
+//
+// Under 4a there is nothing to open: the card is on the tab holding whatever
+// protocol is chosen, and Start is on it. A protocol with a 30-second work
+// interval is picked first so that check 10 has something long enough to
+// measure — the point there is that round 1 gets its WHOLE interval, not what
+// the countdown left behind, which needs an interval longer than the slack.
+check('0. Tools offers the timer without opening anything',
+  await ev(`(() => { const b = document.querySelector('[data-protocol="30-30"]'); if (!b) return false; b.click(); return true })()`))
+await wait(700)
+check('0b. ...with the card already describing what Start would run',
+  await ev(`/READY · 10 ROUNDS/i.test(document.querySelector('[data-round-card]')?.innerText || '')`),
+  await ev(`document.querySelector('[data-round-card]')?.innerText || ''`))
 const panelText = await ev(`document.body.innerText`)
-check('1. the setup says a countdown is coming, before you press anything',
+check('1. the card says a countdown is coming, before you press anything',
   /10s countdown/.test(panelText), (panelText.match(/Start · [^\n]*/) || ['no such line'])[0])
 
 check('2. Start is pressed',
-  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Start · /.test((x.textContent||'').trim())); if (!b) return false; b.click(); return true })()`))
+  await ev(`(() => { const b = document.querySelector('[data-round-card-start]'); if (!b) return false; b.click(); return true })()`))
 await wait(900)
 // FULL SCREEN IS OPT-IN NOW, so the flooded field this run measures has to be
 // asked for. The countdown itself starts with the round, not with the view.

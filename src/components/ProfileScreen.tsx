@@ -36,15 +36,17 @@ import { AppearanceSection } from '@/components/AppearanceSection'
 import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
 import type { RevealSpeed } from '@/lib/reveal-speed-store'
 import {
-  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS,
+  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS, START_PREFERENCE_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
   DAYS_FULL, partitionInjuries, GOAL_OPTIONS,
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
-import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay } from '@/lib/types'
+import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference, FitnessGoal } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
+import { resolveExerciseName } from '@/lib/set-parse'
+import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -95,6 +97,19 @@ interface ProfileScreenProps {
    * explicit confirm changes a plan.
    */
   onPlanInvalidated?: (invalidation: PlanInvalidation) => void
+  /**
+   * Fired after a corrected implement ceiling is SAVED — the three numbers
+   * that cap every prescribed weight.
+   *
+   * Separate from `onPlanInvalidated` on purpose, and the separation is the
+   * point: those fields invalidate the PLAN (which exercises it holds) and end
+   * in a confirm dialog. A ceiling invalidates only the WEIGHTS, and Ashley's
+   * ruling of 13 Sep 2026 was to apply it rather than ask — the same shape
+   * ceiling-reconcile already runs on. Reporting it the same way would put a
+   * "Rebuild my plan" dialog in front of a change that must not rebuild
+   * anything.
+   */
+  onCeilingsCorrected?: (corrected: Partial<UserProfile>) => void
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
@@ -180,7 +195,18 @@ function EditableTextField({
         onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
         placeholder={placeholder}
-        className={placeholder ? 'h-7 w-44 text-sm text-right' : 'h-7 w-20 text-sm text-right'}
+        // 44px, NOT 28px, AND AN INPUT IS THE ONE CONTROL THAT CANNOT CHEAT
+        // THIS. The app's tap-target bar is a 44px thumb reach, and 68
+        // controls meet it with `hit-slop-44`, which expands the touch area
+        // via ::after without changing the layout. ::after does not render on
+        // a replaced element, so an input has no such escape: its reach IS
+        // its height. Probed at 390x844 on the three weight-cap rows, all
+        // three were 28px and two of the three lost a tap to the dead space
+        // of a neighbouring row. Lifts every numeric Profile row — age,
+        // height, onboarding weight, daily steps — which had the same defect
+        // and had never been measured, because ProfileScreen was mounted in
+        // no browser harness until 13 Sep 2026.
+        className={placeholder ? 'h-11 w-44 text-sm text-right' : 'h-11 w-20 text-sm text-right'}
       />
       {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
     </div>
@@ -376,7 +402,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
@@ -539,6 +565,78 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     await onMemoryChanged()
   }
 
+  /**
+   * EXERCISES SHE NEVER WANTS TO SEE — added 14 Sep 2026, closing the half of
+   * this the screen could not do.
+   *
+   * CLAUDE.md recorded exercise dislikes as `coach only`. Measured on 14 Sep,
+   * that was half wrong: this screen already LISTS every exercise_preference
+   * fact with edit and delete, so an existing one could always be changed or
+   * removed here. What it could not do was ADD one — and the whole group is
+   * hidden when there are none, so a first dislike had no screen route at all.
+   * The accurate line was "edit and delete on both, add on the coach only",
+   * and this closes it.
+   *
+   * THE SAME SHAPE AS "FOODS TO AVOID", deliberately: same component, same
+   * create/delete pair, same failure handling. A dislike that silently failed
+   * to save would leave someone believing an exercise is banned when the app
+   * has no record of it — the exercise version of the one thing the dietary
+   * list must never do.
+   */
+  const exerciseDislikes = facts.filter(f => f.kind === 'exercise_preference' && f.polarity === 'dislike')
+  const exerciseDislikeValues = exerciseDislikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
+
+  const saveDislikedExercises = async (next: string[]) => {
+    if (!profileId) return
+    const added = next.filter(v => !exerciseDislikeValues.includes(v))
+    const removed = exerciseDislikes.filter(f => !next.includes(f.resolved_refs?.[0] ?? f.display_text))
+
+    // RESOLVED AGAINST THE CATALOGUE, NEVER STORED AS TYPED.
+    //
+    // The exclusion filter matches a FULL exercise name, case-insensitively
+    // (exercise-plan.ts: `ex.toLowerCase() === e.name.toLowerCase()`). So
+    // "squats" stored verbatim matches nothing the catalogue is called —
+    // the tag would sit on this screen looking like a ban and never remove a
+    // single exercise. A control that appears to work and does not is worse
+    // than no control.
+    //
+    // AND AMBIGUITY IS A QUESTION, NOT A GUESS — the rule the coach's ban card
+    // already follows, for the same reason and off the same resolver. "row"
+    // resolves to "Rowing Machine", a cardio machine; banning it on a guess is
+    // silent and permanent.
+    const resolutions: { typed: string; name: string }[] = []
+    for (const typed of added) {
+      const out = resolveExerciseDislike(typed, resolveExerciseName)
+      if (out.ok) { resolutions.push({ typed, name: out.name }); continue }
+      setSaveError(out.reason)
+      throw new Error('unresolved exercise dislike')
+    }
+
+    try {
+      await Promise.all([
+        ...resolutions.map(({ typed, name }) => createFact({
+          profileId, kind: 'exercise_preference', source: 'manual',
+          rawPhrase: typed, displayText: `won't do ${name}`,
+          polarity: 'dislike', hardness: 'hard', resolvedRefs: [name],
+        })),
+        ...removed.map(f => deleteFactPermanently(f.id)),
+      ])
+    } catch (err) {
+      console.error('Saving exercises to avoid failed:', err)
+      await reload().catch(() => {})
+      await Promise.resolve(onMemoryChanged()).catch(() => {})
+      setSaveError(
+        added.length > 0
+          ? "That wasn't saved, so it is NOT being avoided yet. Check your connection and add it again."
+          : "That wasn't removed — it's still being avoided. Check your connection and try again.",
+      )
+      throw err
+    }
+    setSaveError(null)
+    await reload()
+    await onMemoryChanged()
+  }
+
   const grouped = (['food_preference', 'exercise_preference', 'timing_rule', 'hard_constraint'] as const)
     .map(kind => ({
       kind,
@@ -622,6 +720,23 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     window.location.reload()
   }
 
+  /**
+   * The three columns `statedCeilingKg` reads. Named once here rather than
+   * spelled out at the comparison, so adding a fourth implement cannot leave
+   * the re-price silently not firing for it.
+   */
+  const CEILING_FIELDS = ['max_dumbbell_kg', 'max_single_implement_kg', 'max_improvised_kg'] as const
+
+  /**
+   * Whether the three known lifts were ever answered. Onboarding asks them of
+   * somebody skipping the calibration week and keeps any that were volunteered
+   * otherwise, so "answered" is the honest test for showing the rows rather
+   * than the skip flag alone.
+   */
+  const knownLiftsAnswered = profile.known_squat_kg != null
+    || profile.known_bench_kg != null
+    || profile.known_deadlift_kg != null
+
   const savePatch = (patch: Partial<UserProfile>) => {
     if (!profileId) return
     const revertPatch = Object.fromEntries(
@@ -631,12 +746,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     // patch to an already-updated profile would find no change and offer
     // nothing, which is how this fix would silently do nothing at all.
     const invalidation = detectPlanInvalidation(profile, patch)
+    // A CORRECTED CEILING IS A DIFFERENT KIND OF WRONG. Compared here, before
+    // the merge, for the same reason the invalidation is.
+    const ceilingsMoved = CEILING_FIELDS.some(k => k in patch && patch[k] !== profile[k])
     onProfileChanged(patch)
     updateProfileField(profileId, patch).then(() => {
       // Only once the write actually lands. Offering to rebuild around an
       // injury whose save then failed would rebuild the plan around something
       // the database does not know about.
       if (invalidation) onPlanInvalidated?.(invalidation)
+      if (ceilingsMoved) onCeilingsCorrected?.(patch)
     }).catch(err => {
       console.error('Profile field save failed — reverting', err)
       onProfileChanged(revertPatch)
@@ -650,7 +769,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // blank where the third should be.
   const identitySummary = [
     GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label,
-    profile.training_days?.length ? `${profile.training_days.length} days/week` : null,
+    // THE DAYS SHE TRAINS, NOT THE LENGTH OF THE ARRAY. training_days is
+    // contractually ALWAYS seven entries with an `available` flag —
+    // assembleProfile says so in as many words ("ALWAYS a 7-entry array, both
+    // formats") — so `.length` is the constant 7 and this line read
+    // "7 days/week" for every user in the app, whatever they actually train.
+    // Found 13 Sep 2026 by reading a screenshot of a four-day profile.
+    // ChatAssistant already counts it correctly; this was the copy that
+    // didn't. Zero available still drops the clause, which is the existing
+    // rule for a fact we don't have.
+    profile.training_days?.filter(d => d.available).length
+      ? `${profile.training_days.filter(d => d.available).length} days/week` : null,
     EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label,
   ].filter(Boolean).join(' · ')
 
@@ -719,8 +848,155 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 The `??` here is display-only — an activity profile shows the
                 same neutral placeholder any unset field would, rather than
                 these rows vanishing mid-edit. */}
+            {/* WHAT YOU'RE TRAINING FOR — added 17 Sep 2026, and it was the
+                last setup answer on NEITHER surface. Not for want of
+                machinery: fitness_goal was already in
+                PLAN_INVALIDATING_FIELDS, detectPlanInvalidation already had a
+                finished goal branch, goal-policies.ts already declared how
+                the four goals differ, and macro-calculator.ts already reads
+                the goal for the deficit. Every piece existed and nothing
+                wrote the field, so someone who chose fat loss and now wants
+                to build muscle had exactly one route: a brand-new plan, and
+                their history with it.
+
+                FIRST in this group deliberately. It is the answer the other
+                three qualify — experience, equipment and starting point all
+                describe HOW you pursue a goal — and it is the one the
+                identity summary above leads with.
+
+                It carries further than any other row here. savePatch raises
+                the rebuild offer for the training half; the food half moves
+                on its own, because App's macro effect is keyed on
+                fitness_goal and recomputes calories and macros the moment
+                this lands. See that effect for the notice that goes with it. */}
+            <Row label="Goal"><EditableSelectField value={profile.fitness_goal} options={GOAL_OPTIONS} onSave={v => savePatch({ fitness_goal: v as FitnessGoal })} /></Row>
             <Row label="Experience"><EditableSelectField value={profile.training_experience ?? ''} options={EXPERIENCE_OPTIONS} onSave={v => savePatch({ training_experience: v as TrainingExperience })} /></Row>
             <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
+            {/* WHERE YOU'RE STARTING FROM — added 14 Sep 2026, on Ashley's
+                instruction to close the setup answers that could never be
+                changed afterwards. This one was the most consequential of them:
+                starting-out.ts reads exactly this field to decide whether the
+                app builds the easing-in walking plan or a training plan, so
+                being stuck on the wrong answer meant being stuck on the wrong
+                KIND of plan with no way to say so.
+
+                It sits on the rebuild path with goal and style, not the
+                re-price one, because it does not change a number — it changes
+                which plan you have. detectPlanInvalidation offers the rebuild
+                and nothing happens until the offer is accepted. */}
+            <Row label="Starting from"><EditableSelectField
+              value={profile.start_preference ?? ''}
+              options={START_PREFERENCE_OPTIONS}
+              onSave={v => savePatch({ start_preference: v as StartPreference })}
+            /></Row>
+            {/* WHAT YOU CAN LIFT — added 13 Sep 2026, beside Equipment
+                because that is the field that decides whether these apply at
+                all, and because they are the same kind of fact: what this
+                person's training actually has available.
+
+                NOT A FIFTH GROUP, though the first attempt made one.
+                test:profile-groups pins exactly four, and it is right to:
+                the design handoff's answer to "eight headings and every
+                editor open at once" was four named groups, and a fifth for
+                three rows would start the drift back. The gate blocked a
+                change that should have fitted the design instead of bending
+                it.
+
+                These three were collected at setup and then locked — no way
+                to see them, no way to correct them. They are not preferences:
+                `statedCeilingKg` treats any number it finds as a HARD CLAMP
+                on every prescribed weight (load-prescription.ts:818), so a
+                wrong one quietly holds every session below what she can
+                actually do, and she had no way to say so.
+
+                ONLY FOR A TRAINEE WHOSE KIT IS LIMITED. `assembleProfile`
+                discards all three for a full-gym answer
+                (onboarding-slots.ts:1138) — "a FULL-GYM ANSWER DISCARDS
+                THEM… writing it anyway would clamp a gym trainee to a home
+                number for sixteen weeks". Offering the rows to a gym trainee
+                would be a control that must not take effect. */}
+            {profile.equipment_access !== 'full_gym' && (
+              <div data-testid="stated-ceilings">
+                <Row label="Heaviest dumbbell (per hand)">
+                  <EditableTextField
+                    value={profile.max_dumbbell_kg ?? undefined}
+                    unit="kg" min={1} max={100}
+                    onSave={n => savePatch({ max_dumbbell_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                <Row label="Heaviest single weight">
+                  <EditableTextField
+                    value={profile.max_single_implement_kg ?? undefined}
+                    unit="kg" min={1} max={100}
+                    onSave={n => savePatch({ max_single_implement_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                <Row label="What your backpack holds">
+                  <EditableTextField
+                    value={profile.max_improvised_kg ?? undefined}
+                    unit="kg" min={1} max={60}
+                    onSave={n => savePatch({ max_improvised_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                {/* A DECLINE IS A VALUE, NOT AN ABSENCE — the reason
+                    load_ceilings_declined is its own column. Reversible from
+                    here, because "I'm not sure" stops the app asking and
+                    somebody who later finds out needs a way back in. */}
+                {profile.load_ceilings_declined && (
+                  <p className="pt-1 text-xs text-muted-foreground" data-testid="ceilings-declined">
+                    You said you weren't sure what these weigh, so nothing is capped. Fill any of them
+                    in and I'll use it.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* THE THREE KNOWN LIFTS — the last setup answers that could never
+                be corrected. Added 14 Sep 2026 on Ashley's ruling: "rebuild
+                only when it matters".
+                ONLY SHOWN WHEN THEY WERE ASKED. Onboarding asks these of
+                someone skipping the calibration week, or keeps whatever was
+                volunteered. Rendering three empty boxes to somebody who was
+                never asked would be a control that cannot take effect — the
+                same rule the weight caps above follow for a full-gym profile. */}
+            {(profile.skip_calibration_week || knownLiftsAnswered) && (
+              <div data-testid="known-lifts" className="space-y-1">
+                <Row label="Your squat">
+                  <EditableTextField
+                    value={profile.known_squat_kg ?? undefined}
+                    unit="kg" min={20} max={400}
+                    onSave={n => savePatch({ known_squat_kg: n })}
+                  />
+                </Row>
+                <Row label="Your bench press">
+                  <EditableTextField
+                    value={profile.known_bench_kg ?? undefined}
+                    unit="kg" min={20} max={300}
+                    onSave={n => savePatch({ known_bench_kg: n })}
+                  />
+                </Row>
+                <Row label="Your deadlift">
+                  <EditableTextField
+                    value={profile.known_deadlift_kg ?? undefined}
+                    unit="kg" min={20} max={500}
+                    onSave={n => savePatch({ known_deadlift_kg: n })}
+                  />
+                </Row>
+                {/* HER RULING'S OTHER HALF, and it has to be on the screen or
+                    the app is silently doing nothing. After a calibration week
+                    the plan is anchored to what was actually lifted, so these
+                    numbers are a record and correcting one changes no weight.
+                    Saying so is the difference between "nothing happened" and
+                    "nothing happened, and here is why". */}
+                {!profile.skip_calibration_week && (
+                  <p className="pt-1 text-xs text-muted-foreground" data-testid="known-lifts-record-only">
+                    Your plan follows what you've actually lifted since your first week, so correcting
+                    one of these updates the record and changes no weights.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-1">
               <span className="text-muted-foreground">Training days</span>
               <TrainingDaysEditor days={profile.training_days} onSave={v => savePatch({ training_days: v })} />
@@ -818,6 +1094,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <span className="text-muted-foreground">Foods to avoid</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
               <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
+            </div>
+            {/* EXERCISES TO AVOID — the same control, the other side of the
+                app. These become the same user_facts rows a "never give me
+                burpees" chat turn produces, so the coach and the screen are
+                writing to one place rather than two. */}
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground">Exercises to avoid</span>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything you'd rather never see in a session.</p>
+              <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
                 canonical picker's tag-based checks AND the free-text

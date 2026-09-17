@@ -103,9 +103,112 @@ console.log('\n2. And nothing else does')
   // while the plan on screen was still the other. Found while building the
   // chat tool for it; fixing only chat would have made chat the more honest
   // door, the opposite of parity.
+  // start_preference joined 14 Sep 2026, on Ashley's instruction to close the
+  // setup answers that could never be changed. It is the most plan-shaping of
+  // them: starting-out.ts reads exactly this field to decide whether the app
+  // builds the easing-in walking plan or a training plan, so a wrong answer
+  // meant being stuck on the wrong KIND of plan with no way to say so.
+  // The three known lifts joined 14 Sep 2026, on Ashley's ruling "rebuild only
+  // when it matters" — and they are the first CONDITIONAL entries on this
+  // list. §2b below is the condition.
+  // session_duration_preference joined 16 Sep 2026, on Ashley's ruling from
+  // three options: rebuild the rest of the block around the new length, over
+  // trimming what is already there and over waiting for the next block. Its
+  // ABSENCE was the defect, not an oversight — setting session length wrote
+  // the number and touched nothing else, so the plan kept the old length and
+  // today's card simply started saying the session ran over. Generation reads
+  // it everywhere (the duration budget, the session minimum and maximum, sets
+  // and reps per tier, the warm-up budget and the filler), which is exactly
+  // the test this list's name states.
+  //
+  // THIS CHECK BLOCKED THE FIX, AND WAS RIGHT TO. It enumerates rather than
+  // derives, which CLAUDE.md warns about — but here the enumeration IS the
+  // property: the whole point is that a field cannot join silently, because
+  // joining means the app starts rebuilding somebody's plan. A derived check
+  // would have let this through unread. Suspect a blocking check; do not
+  // assume it is wrong.
   check('the invalidating list is exactly the fields that change what the plan contains',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,training_days,training_style',
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,session_duration_preference,start_preference,training_days,training_style',
     PLAN_INVALIDATING_FIELDS)
+
+  // BOTH DIRECTIONS, because the copy differs and only one of them is the
+  // obvious case: easing-in -> training is someone getting fitter, and
+  // training -> easing-in is someone coming back from a break or an illness.
+  // THE DIRECTION IS THE TEST, and asserting on a phrase is not enough to
+  // catch it getting reversed. Both copies name BOTH plans — they have to, the
+  // sentence is "you are on X, I can build you Y" — so /training plan/ matched
+  // the easing-in copy too and swapping the two branches left this section
+  // fully green. Measured, not reasoned: the swap was applied and the check
+  // passed. So anchor on WHICH PLAN THE COPY ENDS ON, which is the plan the
+  // person would end up with, and is the only thing the reversal changes.
+  const endsOn = (detail: string): 'training' | 'easing' | 'unclear' => {
+    const training = detail.toLowerCase().lastIndexOf('training plan')
+    const easing = Math.max(detail.toLowerCase().lastIndexOf('easing-in'),
+      detail.toLowerCase().lastIndexOf('walks and easy movement'))
+    if (training < 0 || easing < 0) return 'unclear'
+    return training > easing ? 'training' : 'easing'
+  }
+  const toTrain = detectPlanInvalidation(base({ start_preference: 'move_more' }), { start_preference: 'train' })
+  check('moving to a training plan offers the rebuild', toTrain?.field === 'start_preference', toTrain)
+  check('...and the copy ends on the plan she would GET — the training one',
+    endsOn(toTrain?.detail ?? '') === 'training', toTrain?.detail)
+  check('...and the heading names it too', /training/i.test(toTrain?.title ?? ''), toTrain?.title)
+  const toEase = detectPlanInvalidation(base({ start_preference: 'train' }), { start_preference: 'move_more' })
+  check('moving back to easing in offers it too', toEase?.field === 'start_preference', toEase)
+  check('...and THAT copy ends on the easing-in plan, not the training one',
+    endsOn(toEase?.detail ?? '') === 'easing', toEase?.detail)
+  check('...with a heading that does not promise training',
+    /easing in/i.test(toEase?.title ?? '') && !/training/i.test(toEase?.title ?? ''), toEase?.title)
+  check('...and the two are not the same words either way',
+    (toTrain?.detail ?? 'x') !== (toEase?.detail ?? 'y'), [toTrain?.detail, toEase?.detail])
+  check('...both saying the change starts from this week, not from week 1',
+    /from this week/i.test(toTrain?.detail ?? '') && /from this week/i.test(toEase?.detail ?? ''),
+    [toTrain?.detail, toEase?.detail])
+  check('...and both promising nothing logged is lost',
+    /already logged stays/i.test(toTrain?.detail ?? '') && /already logged stays/i.test(toEase?.detail ?? ''),
+    [toTrain?.detail, toEase?.detail])
+  const sameStart = detectPlanInvalidation(base({ start_preference: 'train' }), { start_preference: 'train' })
+  check('...and saving the same answer offers nothing', sameStart === null, sameStart)
+
+  // -------------------------------------------------------------------------
+  // 2b. THE KNOWN LIFTS, AND THE CONDITION THAT IS HER RULING
+  // -------------------------------------------------------------------------
+  // Asked on 14 Sep 2026 what a corrected setup lift should do, from three
+  // options, she chose "rebuild only when it matters" over always offering and
+  // over never offering. The reason it matters: `knownWorkingWeights` is packed
+  // from these three ONLY when skip_calibration_week is set. After a real
+  // calibration week the plan is anchored to what was actually lifted, so
+  // correcting the setup guess changes no weight — and offering a rebuild would
+  // be asking someone to give up their progression for nothing.
+  const skipped = (o: Partial<UserProfile>) => base({ skip_calibration_week: true, known_bench_kg: 60, ...o } as Partial<UserProfile>)
+  const calibrated = (o: Partial<UserProfile>) => base({ skip_calibration_week: false, known_bench_kg: 60, ...o } as Partial<UserProfile>)
+
+  const benchFixed = detectPlanInvalidation(skipped({}), { known_bench_kg: 90 } as Partial<UserProfile>)
+  check('correcting a lift the weights were BUILT from offers the rebuild',
+    benchFixed?.field === 'known_bench_kg', benchFixed)
+  check('...naming the lift in her words, not the field', /bench press/i.test(benchFixed?.title ?? ''), benchFixed?.title)
+  check('...saying WHY it bears on the plan — the testing week was skipped',
+    /skipped the first week/i.test(benchFixed?.detail ?? ''), benchFixed?.detail)
+  check('...from this week, not from week 1', /from this week/i.test(benchFixed?.detail ?? ''), benchFixed?.detail)
+  check('...and promising nothing logged is lost', /already logged stays/i.test(benchFixed?.detail ?? ''), benchFixed?.detail)
+
+  // THE HALF THAT IS THE RULING. Same correction, a plan that was calibrated:
+  // no offer, because nothing would change.
+  const afterCalibration = detectPlanInvalidation(calibrated({}), { known_bench_kg: 90 } as Partial<UserProfile>)
+  check('...while the SAME correction after a calibration week offers nothing',
+    afterCalibration === null, afterCalibration)
+
+  check('...and re-saving the same number offers nothing either',
+    detectPlanInvalidation(skipped({}), { known_bench_kg: 60 } as Partial<UserProfile>) === null)
+  // CLEARING one is not correcting it, and must not rebuild around a blank.
+  check('...nor does clearing one', detectPlanInvalidation(skipped({}), { known_bench_kg: null } as unknown as Partial<UserProfile>) === null)
+
+  // ALL THREE, not just the one that happened to be wired first.
+  for (const [field, word] of [['known_squat_kg', 'squat'], ['known_deadlift_kg', 'deadlift']] as const) {
+    const r = detectPlanInvalidation(skipped({ [field]: 100 } as Partial<UserProfile>), { [field]: 140 } as Partial<UserProfile>)
+    check(`...and ${word} is wired too, not just the bench`, r?.field === field, r)
+    check(`...naming the ${word} in her words`, new RegExp(word, 'i').test(r?.title ?? ''), r?.title)
+  }
 
   const daysChanged = detectPlanInvalidation(
     base({ training_days: [{ day: 'Monday', available: true }, { day: 'Tuesday', available: true }] }),
@@ -226,6 +329,24 @@ console.log('\n4. Nothing rebuilds without somebody saying yes')
   // The rebuild must start from the live week, or it would rewrite history.
   check('it starts from the current week, not from week 1',
     /getActiveMesocycleWeek\([\s\S]{0,200}rebuildFromCurrentWeek/.test(app))
+
+  // THE WORDS HAVE TO REACH A SCREEN. Everything above proves the offer is
+  // RAISED and that saying yes or no does the right thing; none of it proves
+  // anybody ever reads the sentence. detectPlanInvalidation writes a title and
+  // a detail, and a dialog that dropped either would still pass every check
+  // above while asking "rebuild my plan?" over a blank space.
+  // This is here rather than in a browser driver for a measured reason, found
+  // 16 Sep 2026: the harness page that drives Profile renders its OWN plain div
+  // for the offer, so verify:setup-answers can read the words but can never see
+  // this dialog. Nothing in .tour-harness boots App.tsx. A source check cannot
+  // prove the branch is reached — but it can prove that when it is, both halves
+  // of the offer are rendered, which is the part that can silently rot.
+  const offerDialogAt = app.indexOf('<Dialog open={planInvalidation !== null}')
+  const offerDialog = offerDialogAt < 0 ? '' : app.slice(offerDialogAt, app.indexOf('</Dialog>', offerDialogAt))
+  check('the offer dialog renders the title it was given',
+    /\{planInvalidation\?\.title\}/.test(offerDialog), { offerDialogAt })
+  check('...and the detail underneath it',
+    /\{planInvalidation\?\.detail\}/.test(offerDialog), { offerDialogAt })
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

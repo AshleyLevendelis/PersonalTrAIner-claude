@@ -7,6 +7,28 @@
 // backgrounded tab only delays the redraw, never corrupts the value.
 // ---------------------------------------------------------------------------
 
+/**
+ * WHAT THIS SESSION ALREADY DID before the current block began — the one
+ * field a mid-round protocol switch needs, and deliberately the only one.
+ *
+ * Tapping 40/20 during round 3 of 8 must pick up at round 4, still of 8. That
+ * is two schedules in one block, and this file's single hard-won property is
+ * that everything derives from ONE immutable anchor (see computeRoundState's
+ * header, and the per-phase deadline that corrupted it before). So a switch
+ * starts a genuinely new block whose `rounds` is only what remains, and hands
+ * it what came before rather than trying to describe both schedules at once.
+ *
+ * DISPLAY ONLY. computeRoundState never reads it: the block's own arithmetic
+ * is about the block. Only the words a person reads — the headline, the
+ * subline, the pips, the log — are about the session.
+ */
+export interface CarriedRounds {
+  /** Rounds of this session completed before this block. */
+  rounds: number
+  /** Work+rest seconds of this session completed before this block. */
+  seconds: number
+}
+
 export interface RoundConfig {
   rounds: number
   workSeconds: number
@@ -54,9 +76,27 @@ export interface RoundConfig {
    * no such field and must keep behaving exactly as it started.
    */
   style?: 'intervals' | 'emom'
+  /**
+   * WHAT THIS SESSION ALREADY DID before this block — see CarriedRounds. Set
+   * only by a mid-round protocol switch, and read only by the words a person
+   * sees. Optional and read as `?? 0` everywhere, like the two fields above
+   * and for the same reason: a round already in flight from a persisted
+   * record has none and must keep behaving exactly as it started.
+   */
+  carried?: CarriedRounds
 }
 
 export type RoundPhase = 'lead_in' | 'work' | 'rest'
+
+/** Rounds in the SESSION, not in this block — the number a person is counting to. */
+export function sessionTotalRounds(config: RoundConfig): number {
+  return (config.carried?.rounds ?? 0) + config.rounds
+}
+
+/** The round they are on, counted from the start of the session. */
+export function sessionRoundNumber(config: RoundConfig, blockRound: number): number {
+  return (config.carried?.rounds ?? 0) + blockRound
+}
 
 /** Ms of lead-in this config asks for. The one place the `?? 0` rule lives. */
 export function leadInMsOf(config: RoundConfig): number {
@@ -159,12 +199,18 @@ export function totalRoundSeconds(config: RoundConfig): number {
  */
 export function roundPips(state: RoundState, config: RoundConfig): ('done' | 'current' | 'upcoming')[] {
   const out: ('done' | 'current' | 'upcoming')[] = []
-  for (let r = 1; r <= Math.max(0, config.rounds); r++) {
+  // ONE PIP PER ROUND OF THE SESSION. A switch mid-way starts a shorter block,
+  // and pips that shrank with it would report the session getting smaller as
+  // it went on. The carried rounds are done by definition.
+  const carried = config.carried?.rounds ?? 0
+  const here = sessionRoundNumber(config, state.currentRound)
+  for (let r = 1; r <= Math.max(0, sessionTotalRounds(config)); r++) {
+    if (r <= carried) out.push('done')
     // Nothing is current during the lead-in: round 1 has not started, and a
     // lit first pip would say it had.
-    if (state.currentPhase === 'lead_in') out.push('upcoming')
-    else if (state.isComplete || r < state.currentRound) out.push('done')
-    else if (r === state.currentRound) out.push('current')
+    else if (state.currentPhase === 'lead_in') out.push('upcoming')
+    else if (state.isComplete || r < here) out.push('done')
+    else if (r === here) out.push('current')
     else out.push('upcoming')
   }
   return out
@@ -253,7 +299,9 @@ export const ROUND_PRESETS: RoundPreset[] = [
   // Three three-minute rounds with a minute between them. Here because the app
   // already knows some people train a combat sport alongside their lifting
   // (concurrent_activities), and "rounds" is what that word means to them.
-  { key: 'boxing', label: 'Boxing rounds', config: { rounds: 3, workSeconds: 180, restSeconds: 60 } },
+  // "Boxing", not "Boxing rounds": the chip carries "3×3 min" beside the name
+  // since 4a, and "Boxing rounds 3×3 min" says rounds twice.
+  { key: 'boxing', label: 'Boxing', config: { rounds: 3, workSeconds: 180, restSeconds: 60 } },
   // EMOM, built 12 Sep 2026 after Ashley reported the tile advertising it.
   // Ten minutes is the common prescription; E2MOM is here because the whole
   // point of naming the style separately is that the interval is not always
@@ -268,6 +316,98 @@ export const ROUND_PRESETS: RoundPreset[] = [
  * An EMOM has no rest to show, and "10 × 60s / 0s" would put a rest interval
  * on screen that the protocol does not have. It states its interval instead.
  */
+/**
+ * The preset a config came from, by its numbers.
+ *
+ * MATCHED, NEVER STORED. The config is the fact; a "this came from Tabata"
+ * flag would be a second one to keep in step with it, and the two would
+ * eventually disagree after an edit. Lived in RoundCard until 4a needed the
+ * same answer for the chip row and the queued strip.
+ */
+export function presetForConfig(config: RoundConfig): RoundPreset | null {
+  return ROUND_PRESETS.find(p =>
+    p.config.rounds === config.rounds
+    && p.config.workSeconds === config.workSeconds
+    && p.config.restSeconds === config.restSeconds
+    && roundStyleOf(p.config) === roundStyleOf(config)) ?? null
+}
+
+/**
+ * What to CALL a config in a sentence — "Tabata", "40/20", or "Custom".
+ *
+ * A protocol switch and a chip both have to name one, and "your 8 × 40/20"
+ * read out mid-sentence is the numbers twice. The preset's own label is the
+ * name people use; anything not in the table is honestly Custom rather than
+ * given an invented name.
+ */
+export function protocolNameOf(config: RoundConfig): string {
+  return presetForConfig(config)?.label ?? 'Custom'
+}
+
+/**
+ * "20s work · 10s rest" / "every 60s" — the line beside the idle card's total.
+ *
+ * SHORTER THAN roundSubline AND FOR A DIFFERENT MOMENT: that one narrates a
+ * round in progress ("Round 3 of 8 — 10s rest next"), and there is no round in
+ * progress to narrate. This says what the protocol IS.
+ */
+export function secondsPhrase(config: RoundConfig): string {
+  const unit = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} min` : `${s}s`)
+  return roundStyleOf(config) === 'emom'
+    ? `every ${unit(config.workSeconds)}`
+    : `${unit(config.workSeconds)} work · ${unit(config.restSeconds)} rest`
+}
+
+/**
+ * Two configs describe the same protocol.
+ *
+ * BY THE FOUR THINGS THAT DECIDE WHAT RUNS, and nothing else: rounds, work,
+ * rest and style. Not the lead-in (a running block's is 10 and a chip's is
+ * absent) and not `carried` (a switch's second block would otherwise stop
+ * matching the chip that started it, and the row would show nothing selected
+ * in the middle of running that very protocol).
+ */
+export function sameRoundConfig(a: RoundConfig, b: RoundConfig): boolean {
+  return a.rounds === b.rounds
+    && a.workSeconds === b.workSeconds
+    && a.restSeconds === b.restSeconds
+    && roundStyleOf(a) === roundStyleOf(b)
+}
+
+/**
+ * The small mono number beside a protocol chip's name — "8×20/10", "10 min".
+ *
+ * SHORTER THAN describeRoundPreset ON PURPOSE, and separate from it: the chip
+ * carries this at 11px inside a 44px pill, and the setup rows carry the long
+ * form under a name with room for it. One function for both would have to
+ * pick, and the picked one would be wrong in the other place.
+ */
+export function chipNumbers(config: RoundConfig, label?: string): string {
+  if (roundStyleOf(config) === 'emom') {
+    const totalSeconds = config.rounds * config.workSeconds
+    return totalSeconds % 60 === 0 ? `${totalSeconds / 60} min` : `${config.rounds}×${config.workSeconds}s`
+  }
+  // NEVER SAY IT TWICE. Some protocols are NAMED after their numbers — the
+  // "40/20" chip beside "8×40/20" reads as a stutter — so when the label
+  // already carries the work and rest, the suffix carries what the label
+  // cannot: how many rounds of it. Read from the label rather than from a
+  // list of which presets are numeric, so a new one behaves correctly by
+  // itself. Found on a real screen, 13 Sep 2026.
+  if (label && label.includes(`${config.workSeconds}/${config.restSeconds}`)) {
+    return `${config.rounds} rds`
+  }
+  // MINUTES ONLY WHEN MINUTES ARE HOW IT IS SAID, and the threshold is two of
+  // them, not one. A boxing round is three minutes, not 180 seconds — but the
+  // minute form states the WORK alone, so a one-minute round with thirty
+  // seconds off rendered as "6×1 min" and the rest vanished off the chip.
+  // Read off a real screen, 13 Sep 2026; every check passed while it was
+  // wrong, because none of them looked at a 60-second interval with a rest.
+  const unit = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} min` : `${s}s`)
+  return config.workSeconds >= 120
+    ? `${config.rounds}×${unit(config.workSeconds)}`
+    : `${config.rounds}×${config.workSeconds}/${config.restSeconds}`
+}
+
 export function describeRoundPreset(p: RoundPreset): string {
   return roundStyleOf(p.config) === 'emom'
     ? `${p.config.rounds} × every ${p.config.workSeconds}s`
@@ -300,12 +440,13 @@ export function intervalNoun(config: RoundConfig): 'minute' | 'interval' | 'roun
 /** "Round 3 of 10" / "Minute 3 of 10" — the headline over the clock. */
 export function roundHeadline(config: RoundConfig, currentRound: number): string {
   const noun = intervalNoun(config)
-  return `${noun[0].toUpperCase()}${noun.slice(1)} ${currentRound} of ${config.rounds}`
+  return `${noun[0].toUpperCase()}${noun.slice(1)} ${sessionRoundNumber(config, currentRound)} of ${sessionTotalRounds(config)}`
 }
 
 /** "10 of 10 minutes done" — the same noun, at the end. */
 export function roundDoneLabel(config: RoundConfig): string {
-  return `${config.rounds} of ${config.rounds} ${intervalNoun(config)}s done`
+  const total = sessionTotalRounds(config)
+  return `${total} of ${total} ${intervalNoun(config)}s done`
 }
 
 /**
@@ -316,17 +457,22 @@ export function roundDoneLabel(config: RoundConfig): string {
 export function roundSubline(config: RoundConfig, phase: 'ready' | 'work' | 'rest' | 'done', round: number): string {
   const noun = intervalNoun(config)
   const Noun = `${noun[0].toUpperCase()}${noun.slice(1)}`
-  if (phase === 'ready') return `${Noun} 1 of ${config.rounds} starts in a moment. Tap anywhere to start now.`
-  if (phase === 'done') return `All ${config.rounds} ${noun}s done — nice.`
+  // COUNTED IN THE SESSION, not in the block. After a protocol switch the
+  // block restarts at 1 and the person has not — telling someone mid-session
+  // that they are on round 1 of 5 is the exact defect the carry exists for.
+  const total = sessionTotalRounds(config)
+  const here = sessionRoundNumber(config, round)
+  if (phase === 'ready') return `${Noun} ${sessionRoundNumber(config, 1)} of ${total} starts in a moment. Tap anywhere to start now.`
+  if (phase === 'done') return `All ${total} ${noun}s done — nice.`
   if (phase === 'work') {
     if (round >= config.rounds) return `Last ${noun} — finish this one and you’re done.`
     return roundStyleOf(config) === 'emom'
       // NO REST TO NAME. The next interval starts the moment this one ends —
       // that IS the protocol, and promising a rest here would invent one.
-      ? `${Noun} ${round} of ${config.rounds} — the next one starts as this hits zero.`
-      : `${Noun} ${round} of ${config.rounds} — ${config.restSeconds}s rest next.`
+      ? `${Noun} ${here} of ${total} — the next one starts as this hits zero.`
+      : `${Noun} ${here} of ${total} — ${config.restSeconds}s rest next.`
   }
-  return `${Noun} ${Math.min(round + 1, config.rounds)} of ${config.rounds} starts when this hits zero.`
+  return `${Noun} ${Math.min(here + 1, total)} of ${total} starts when this hits zero.`
 }
 
 // ---------------------------------------------------------------------------
@@ -373,15 +519,26 @@ export interface RoundLogSummary {
 
 export function roundLogSummary(config: RoundConfig): RoundLogSummary {
   const emom = roundStyleOf(config) === 'emom'
-  const workedSeconds = config.rounds * config.workSeconds
+  // THE WHOLE SESSION, INCLUDING WHAT CAME BEFORE A SWITCH. Eight rounds
+  // happened; a log reading five because the protocol changed at round four
+  // would be the app disbelieving her — the same defect this function's own
+  // header was written about, in a new place.
+  const carried = config.carried
+  const blockSeconds = config.rounds * config.workSeconds
     + Math.max(0, config.rounds - 1) * config.restSeconds
+  // The rest that joined the two blocks belongs to the session too: the
+  // carried figure counts full work+rest cycles, so nothing is double-counted.
+  const workedSeconds = (carried?.seconds ?? 0) + blockSeconds
+  const detail = emom
+    ? `${config.rounds} × every ${config.workSeconds}s`
+    : `${config.rounds} rounds · ${config.workSeconds}s work / ${config.restSeconds}s rest`
   return {
     activityName: emom ? 'EMOM' : 'Intervals',
     // Rounded, never floored to zero: a 40-second round is still a thing that
     // happened, and a log reading "0 min" would be the app disbelieving her.
     durationMinutes: Math.max(1, Math.round(workedSeconds / 60)),
-    detail: emom
-      ? `${config.rounds} × every ${config.workSeconds}s`
-      : `${config.rounds} rounds · ${config.workSeconds}s work / ${config.restSeconds}s rest`,
+    detail: carried && carried.rounds > 0
+      ? `${sessionTotalRounds(config)} rounds · first ${carried.rounds}, then ${detail}`
+      : detail,
   }
 }

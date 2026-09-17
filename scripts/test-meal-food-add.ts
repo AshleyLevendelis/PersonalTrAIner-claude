@@ -121,5 +121,29 @@ console.log('\n5. Wired end to end, on the custom-meal rails')
   check('the receipt kind exists', /'propose_meal_food_add'/.test(types))
 }
 
+console.log("\n8. It says \"today\", not a date off her own clock")
+{
+  // meal-food-edit.ts has carried this rule since it was written: "a date she
+  // can read off her own phone's clock is not information; it is the app
+  // talking to itself in front of her." This file did not follow it, and
+  // nobody noticed while the sentence only ever scrolled past in a chat
+  // bubble. It went on a SCREEN on 14 Sep 2026 and the screenshot read
+  // "Becomes your breakfast for 2026-09-16".
+  const today = buildMealFoodAddProposal({ ...base, rawArgs: {
+    meal_slot: 'breakfast', food_lines: ['1 banana'], origin_verbatim_quote: 'x',
+  } })
+  const said = today.ok ? (today.diff.implications ?? []).map(i => i.text).join(' ') : ''
+  check('the card has something to say about when (sanity check on this check)', said.length > 20, said)
+  check('...and says "today" rather than the date', /for today/.test(said), said)
+  check('...with no bare YYYY-MM-DD anywhere in it', !/\d{4}-\d{2}-\d{2}/.test(said), said)
+
+  // A DIFFERENT DAY STILL GETS ITS DATE, or "today" would just be a constant.
+  const other = buildMealFoodAddProposal({ ...base, rawArgs: {
+    meal_slot: 'breakfast', food_lines: ['1 banana'], date: '2026-09-05', origin_verbatim_quote: 'x',
+  } })
+  const otherSaid = other.ok ? (other.diff.implications ?? []).map(i => i.text).join(' ') : ''
+  check('...while another day is still named', /2026-09-05/.test(otherSaid), otherSaid)
+}
+
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll meal-food-add checks passed.')

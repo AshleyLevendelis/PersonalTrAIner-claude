@@ -9,8 +9,8 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
-import { buildWarmup, getWarmupReserveSeconds } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
+import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup } from './warmup'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
@@ -1435,7 +1435,7 @@ const BAND_WITHOUT_WEIGHT_PENALTY = 12
 /** Shared empty set, so the no-injury path doesn't allocate one per candidate scored. */
 const EMPTY_JOINTS: Set<string> = new Set()
 
-interface ScoreContext {
+export interface ScoreContext {
   /** The day's own patterns (track.primary_patterns + secondary_patterns) — what "supports today's session" is measured against. */
   trackPatterns: MovementPattern[]
   selectedSoFar: ExerciseEntry[]
@@ -1485,7 +1485,7 @@ interface ScoreContext {
  * candidates factor-by-factor to find what actually decided a pick, instead
  * of guessing from the final score alone.
  */
-interface ScoreFactors {
+export interface ScoreFactors {
   role_support: number
   goal_fit: number
   experience_fit: number
@@ -1496,7 +1496,7 @@ interface ScoreFactors {
   style_fit: number
 }
 
-interface ScoredCandidate {
+export interface ScoredCandidate {
   e: ExerciseEntry
   score: number
   factors: ScoreFactors
@@ -1517,7 +1517,20 @@ interface ScoredCandidate {
  * used-name tracking. This function only orders ONE day's candidates at the
  * moment of the initial pick.
  */
-function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): { score: number; factors: ScoreFactors } {
+/**
+ * EXPORTED FOR test:chosen-not-shuffled, 16 Sep 2026, and for the same reason
+ * getAffinityPrimerPool is: a check that hand-copies this logic can silently
+ * drift out of sync with it, and then proves nothing about the plan people
+ * actually get.
+ *
+ * VISION's claim is "score eligible candidates... then pick the best, not any
+ * valid one". That was UNGUARDED — nothing here would have noticed the ranking
+ * becoming a shuffle, which is not hypothetical: this file's own comments
+ * record 906 main/secondary slots resolved by a coin flip before the band rule
+ * existed, and a jitter term big enough to overturn a real difference would put
+ * the app straight back there with every gate still green.
+ */
+export function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): { score: number; factors: ScoreFactors } {
   const factors: ScoreFactors = { role_support: 0, goal_fit: 0, experience_fit: 0, session_balance: 0, weekly_variety: 0, equipment_fit: 0, style_fit: 0 }
 
   // 1. Quality for the role: an isolation exercise that directly supports
@@ -1681,7 +1694,7 @@ function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, rawExperie
   return { score, factors }
 }
 
-function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ScoredCandidate[] {
+export function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy, rawExperience: TrainingExperience, ctx: ScoreContext): ScoredCandidate[] {
   // Answered here, once, from the list actually being ranked — not by any
   // caller and not from the pool at large. "Was a real weight on offer for
   // THIS slot?" is the only form of the question that makes the band rule
@@ -1753,7 +1766,7 @@ const REASON_CLAUSES: { [K in keyof ScoreFactors]: (winner: ExerciseEntry, runne
  * single deciding factor (or one only separated by tier/jitter) stays
  * silent, same as an obvious pick always has.
  */
-function explainWinner(winner: ScoredCandidate, runnerUp: ScoredCandidate | undefined, policy: GoalPolicy): string | undefined {
+export function explainWinner(winner: ScoredCandidate, runnerUp: ScoredCandidate | undefined, policy: GoalPolicy): string | undefined {
   if (!runnerUp) return undefined
   const totalGap = winner.score - runnerUp.score
   if (totalGap <= 0) return undefined
@@ -3054,7 +3067,42 @@ function substituteFloorClampedIsolation(
 // Exported for test:single-leg-calf, which runs the pass on a two-exercise
 // day directly: the plan-level version of that check passed under mutation
 // by one stack rounding step (12kg cap -> 12.5kg, "more than twice 6kg").
+/**
+ * THE WEIGHT CHIPS MATCH THE SET COUNT.
+ *
+ * Ashley saw a card reading "3 working sets" above FOUR weight chips.
+ * Measured across four profiles: 149 of 1,029 loaded exercises (14.5%) shipped
+ * a `per_set_load` whose length disagreed with `sets`.
+ *
+ * TWO CAUSES, OPPOSITE DIRECTIONS, and the split is worth keeping because my
+ * first written note got it wrong. 145 of the 149 were chips LONGER than sets,
+ * from the time-cap trimmers decrementing after the loads were built
+ * (`enforceDayDurationBudget`, `sizeBlockToRestBudget`). The other 4 were chips
+ * SHORTER, from the weekly balance pass bumping a set on. The note named only
+ * the balance pass and had the common case's direction backwards — it accounts
+ * for 3% of this, not for it. The direction alone disproves it: a bump leaves
+ * too FEW chips.
+ *
+ * ONE PASS, NOT A PATCH AT EACH WRITER. Sets are changed in at least four
+ * places and more will be added; fixing each is the three-copies-of-one-rule
+ * failure this file keeps finding. Called wherever days are FINALISED, which
+ * is the only ordering that holds: `enforceLoadCoherence` alone left 52 of the
+ * 149 behind, because the day-duration trimmer runs on the very next line
+ * after it. Measured, not assumed — that number is why this is a function.
+ */
+export function reconcilePerSetLoads(days: WorkoutDay[]): void {
+  for (const day of days) {
+    for (const ex of day.exercises) {
+      const entry = findEntry(ex.name)
+      if (!entry || !ex.per_set_load?.length || ex.per_set_load.length === ex.sets) continue
+      ex.per_set_load = resizePerSetLoads(ex.per_set_load, ex.sets, entry)
+    }
+  }
+}
+
 export function enforceLoadCoherence(days: WorkoutDay[]): void {
+  reconcilePerSetLoads(days)
+
   for (const day of days) {
     const mainLifts = day.exercises.filter(ex => {
       const entry = findEntry(ex.name)
@@ -3744,7 +3792,19 @@ function balanceWeeklyStructure(
 // runs under plain tsx for scripts) — reach through globalThis rather than
 // referencing `process` directly so this compiles in both contexts without
 // pulling in Node's type definitions project-wide.
-const BALANCE_DEV_LOGGING = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== 'production'
+/**
+ * DEV ONLY, IN BOTH RUNTIMES. The NODE_ENV half alone was silently true in the
+ * shipped browser bundle: Vite defines no `process`, so `process?.env?.NODE_ENV`
+ * is undefined and `undefined !== 'production'` passes. That only ever spilled
+ * a few lines per plan generation, which is why nobody noticed; from 13 Sep
+ * 2026 this pass also runs on every edit, so it would have become chatter on a
+ * user's console. `import.meta.env.PROD` is Vite's own answer and is undefined
+ * under tsx, where NODE_ENV still governs — the same dual-context resolution
+ * supabase.ts already needed.
+ */
+const BALANCE_DEV_LOGGING =
+  (import.meta as unknown as { env?: { PROD?: boolean } }).env?.PROD !== true
+  && (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== 'production'
 
 function logWeeklyBalanceDecision(message: string): void {
   if (BALANCE_DEV_LOGGING) console.debug(`[weekly-pattern-balance] ${message}`)
@@ -4039,6 +4099,79 @@ function enforceWeeklyPatternBalance(days: WorkoutDay[]): void {
       logWeeklyBalanceDecision(`only ${legDayCount} of ${trainingDays.length} training day(s) carry a real leg pattern (knee/hip-dominant, main or accessory role)`)
     }
   }
+}
+
+/**
+ * THE WEEK-LEVEL BALANCE PASS, MADE REACHABLE FROM AN EDIT — 13 Sep 2026.
+ *
+ * Ashley's promise is that a plan can be adjusted "while still aiming to keep
+ * the quality", and her ruling of the same day: a change to one day MAY touch
+ * another day to even the week out, and the app says so before the tap.
+ *
+ * WHY THIS IS AN EXPORT AND enforceWeeklyPatternBalance IS NOT. Two things had
+ * to travel together or not at all. The pass BUMPS SETS, and sets cost
+ * minutes; generation therefore follows it immediately with a safety trim
+ * against the session MAXIMUM (see the call site's comment, which records the
+ * 45.8-minute overrun that made the trim necessary). trimWeekRestForBudget and
+ * the goal policy it needs are private to this module. Exporting the pass
+ * alone would have handed every caller a way to blow the time cap, and
+ * exporting three pieces would have let the edit path and generation drift
+ * apart on the order. One export, doing the pair, in generation's order.
+ *
+ * The note this replaces claimed the pass "needs the candidate pool and the
+ * whole generation context". It does not — its signature is
+ * (days: WorkoutDay[]) => void, the same shape as enforceLoadCoherence and
+ * enforceOneWeightPerPrescription, which edits have re-run for two days.
+ * balanceWeeklyStructure genuinely does need the pool and the trace, and it
+ * swaps exercise IDENTITIES, which would overwrite the change somebody just
+ * made — that one stays inside.
+ *
+ * DELOAD WEEKS ARE EXEMPT, exactly as at the generation call site: a deload's
+ * volume is deliberately and uniformly cut, and nudging set counts to balance
+ * it would fight the taper. The flag is read from the week rather than passed,
+ * so no caller can forget it.
+ *
+ * Returns what it changed, so the confirm card can say it. Diffed from set
+ * counts before and after rather than instrumented inside the pass: the diff
+ * is true whatever the pass does next, and an instrumented pass would be one
+ * more thing to keep in step.
+ */
+export interface BalanceSettlement {
+  /** One entry per exercise whose set count moved. Empty when nothing moved. */
+  changes: { day: string; exercise: string; from: number; to: number }[]
+  /** Set when the pass was deliberately not run, and why. */
+  skipped: 'deload' | null
+}
+
+export function settleWeekBalance(week: MesocycleWeek, profile: UserProfile): BalanceSettlement {
+  if (week.is_deload) return { changes: [], skipped: 'deload' }
+
+  const before = new Map<string, number>()
+  for (const day of week.days) {
+    for (const ex of day.exercises) before.set(`${day.day}\u0000${ex.name}`, ex.sets)
+  }
+
+  enforceWeeklyPatternBalance(week.days)
+
+  // THE SAME BACKSTOP GENERATION RUNS, against the stated maximum rather than
+  // the midpoint budget — rest is the only lever it is allowed to pull, since
+  // trimming sets here would fight the pass that just set them.
+  const policy = getGoalPolicy(profile.fitness_goal || 'hypertrophy')
+  trimWeekRestForBudget(
+    week.days,
+    getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
+    undefined,
+    policy.minLoadedMainLiftRestSeconds,
+  )
+
+  const changes: BalanceSettlement['changes'] = []
+  for (const day of week.days) {
+    for (const ex of day.exercises) {
+      const was = before.get(`${day.day}\u0000${ex.name}`)
+      if (was !== undefined && was !== ex.sets) changes.push({ day: day.day, exercise: ex.name, from: was, to: ex.sets })
+    }
+  }
+  return { changes, skipped: null }
 }
 
 /**
@@ -4726,6 +4859,11 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   enforceLoadCoherence(days)
 
   const budgetedDays = days.map(d => enforceDayDurationBudget(d, totalBudgetSeconds, getFlaggedJoints(profile.injuries ?? [])))
+  // FINALISATION POINT for the single-week plan this function returns. The
+  // duration-budget pass above trims SETS, and it runs after
+  // enforceLoadCoherence, so the chips would ship one longer than the count
+  // beside them.
+  reconcilePerSetLoads(budgetedDays)
   // Last step, after every rest-modifying stage (style assignment,
   // stageTimeCap's per-day trimming, this duration-budget pass) — the
   // periodized mesocycle inherits this base plan's warmup/rest fields
@@ -5510,6 +5648,120 @@ export function sizeBlockToRestBudget(
       ? { ...day, exercises, block_size_note: 'Fewer exercises this block — heavier lifts need longer rest between sets.' }
       : { ...day, exercises }
   })
+}
+
+/**
+ * ONE DAY, FITTED TO THE TIME SOMEBODY ACTUALLY HAS — 13 Sep 2026.
+ *
+ * Ashley picked "I've only got 25 minutes today" as the next gap, and ruled on
+ * what gets cut: options were protect the main lift and drop accessories
+ * (recommended), take a set off everything, or shorten the rests. She chose
+ * PROTECT THE MAIN LIFT. You still squat, and you still squat properly; the
+ * accessory work at the end goes, from the bottom up, until it fits.
+ *
+ * ALMOST NONE OF THAT IS NEW. sizeBlockToRestBudget already trims a day to an
+ * explicit budget and already does it in exactly that order — its Phase A
+ * refuses to touch a `main` role's sets while anything else can still give,
+ * and its Phase B removes whole exercises lowest-tier-first, never a protected
+ * name, never below three. It has simply never been called with a budget
+ * SMALLER than the one the profile asks for, or pointed at a single day.
+ *
+ * ONE EXPORT, DOING THE PAIR, for the reason settleWeekBalance's comment gives
+ * a few hundred lines up: trimming sets and then trimming rest have to travel
+ * together, and trimWeekRestForBudget and getGoalPolicy stay private so no
+ * caller can reach for half of it.
+ *
+ * IT REPORTS WHAT IT COULD NOT DO. A day with three exercises and a long main
+ * lift may not reach 25 minutes at all; the honest answer is the day it CAN
+ * build plus the time that day really takes, so the confirm card can say "the
+ * closest I can get is 32 minutes" rather than quietly missing the target.
+ */
+export interface DayShortening {
+  week: MesocycleWeek
+  changed: boolean
+  /** Exercises that came out entirely, in the order they were dropped. */
+  droppedExercises: string[]
+  /** Working sets removed from exercises that stayed. */
+  setsRemoved: number
+  /** What the day actually takes now, rounded to a minute — not what was asked for. */
+  achievedMinutes: number
+  /** Why nothing happened, in words a person can read. Empty when `changed`. */
+  refusal?: string
+}
+
+/**
+ * The lifts a shortening must not touch: every genuine tier-1 compound on the
+ * day, or — on a day that has none — the one dayAnchorExercise promotes.
+ *
+ * dayAnchorExercise deliberately returns undefined when a real tier-1 is
+ * present (its own comment: so a caller can never confuse "promoted" with "was
+ * always the main lift"), which is why both halves are needed here.
+ */
+function mainLiftNamesOf(day: WorkoutDay): Set<string> {
+  const tierOne = day.exercises.filter(ex => findEntry(ex.name)?.mechanics_tier === 'tier1_compound')
+  if (tierOne.length > 0) return new Set(tierOne.map(ex => ex.name))
+  const promoted = dayAnchorExercise(day.exercises)
+  return new Set(promoted ? [promoted.name] : [])
+}
+
+export function shortenDayTo(
+  week: MesocycleWeek,
+  dayName: string,
+  profile: UserProfile,
+  minutes: number,
+): DayShortening {
+  const day = week.days.find(d => d.day === dayName)
+  const nothing = (refusal: string): DayShortening =>
+    ({ week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: 0, refusal })
+
+  if (!day || day.exercises.length === 0) return nothing(`There's no session on ${dayName} to shorten.`)
+  if (!Number.isFinite(minutes) || minutes <= 0) return nothing("I need a number of minutes to aim for.")
+
+  const budgetSeconds = Math.round(minutes * 60)
+  const before = estimateDaySeconds(day)
+  if (before <= budgetSeconds) {
+    return { week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: Math.round(before / 60), refusal: `${dayName}'s session already fits in ${minutes} minutes.` }
+  }
+
+  const policy = getGoalPolicy(profile.fitness_goal || 'hypertrophy')
+  // restAdjustSeconds 0: this day's rest is already prescribed and stored, so
+  // there is no block-level adjustment still to come. The estimate reads what
+  // the day actually says.
+  const [sized] = sizeBlockToRestBudget([day], 0, budgetSeconds, mainLiftNamesOf(day), policy)
+
+  // COPIED BEFORE THE MUTATING TRIM. sizeBlockToRestBudget returns a new day,
+  // but the exercises it did not touch are the caller's own objects — the
+  // trap settle-week.ts's header records paying for on 13 Sep.
+  const shortened: WorkoutDay = { ...sized, exercises: sized.exercises.map(e => ({ ...e })) }
+  trimWeekRestForBudget([shortened], budgetSeconds, undefined, policy.minLoadedMainLiftRestSeconds)
+
+  const keptBefore = new Map(day.exercises.map(ex => [ex.name, ex.sets]))
+  const droppedExercises = day.exercises.filter(ex => !shortened.exercises.some(e => e.name === ex.name)).map(ex => ex.name)
+  let setsRemoved = 0
+  for (const ex of shortened.exercises) {
+    const was = keptBefore.get(ex.name)
+    if (was !== undefined && was > ex.sets) setsRemoved += was - ex.sets
+  }
+
+  const after = estimateDaySeconds(shortened)
+  const changed = droppedExercises.length > 0 || setsRemoved > 0 || after < before
+  if (!changed) return nothing(`I can't get ${dayName} under ${minutes} minutes without cutting into the main lift.`)
+
+  // THE MARKER, AND WHY IT IS NOT block_size_note. sizeBlockToRestBudget writes
+  // that note when it drops something, in the block's own words ("heavier lifts
+  // need longer rest"), which is not what happened here. A day shortened on
+  // purpose says so in its own terms, and session-shortfall reads the same
+  // field to stay quiet rather than warning that a deliberately short session
+  // is short.
+  const marked: WorkoutDay = { ...shortened, shortened_to_minutes: minutes, block_size_note: day.block_size_note }
+
+  return {
+    week: { ...week, days: week.days.map(d => (d.day === dayName ? marked : d)) },
+    changed: true,
+    droppedExercises,
+    setsRemoved,
+    achievedMinutes: Math.round(after / 60),
+  }
 }
 
 // Below this underrun, a day is "close enough" and gets no filler — matches
@@ -7119,6 +7371,23 @@ export function generateMesocycle(
         }
       }
 
+      // THE WARM-UP LAST, BECAUSE THE DAY IS ONLY NOW FINAL — added 13 Sep 2026.
+      //
+      // buildWarmup ran early, off the day as it stood then. Weekly accessory
+      // rotation and periodization both reshape the day afterwards, and
+      // nothing re-derived the warm-up from the result. MEASURED across 64
+      // plans and 4,096 training days: 7.0% of days shipped ramping an
+      // exercise the session no longer contained — a Tuesday whose Deadlifts
+      // had rotated to a Trap Bar Deadlift still said "ramp up on Deadlifts".
+      // No check compared the two, so it had never been seen.
+      //
+      // Runs BEFORE the trims below, so they price the warm-up the day will
+      // actually ship with, and outside the !isDeload guard because a deload's
+      // warm-up goes just as stale as a loading week's.
+      for (let i = 0; i < days.length; i++) {
+        if (days[i].exercises.length > 0) days[i] = rebuildWarmup(days[i], profile)
+      }
+
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
       // filler there would fight the whole point of the recovery week, so
       // this only applies to loading weeks.
@@ -7181,6 +7450,14 @@ export function generateMesocycle(
         }
       }
 
+      // FINALISATION POINT for this week. Deliberately the LAST thing before
+      // the week is handed over, because four separate passes between here
+      // and enforceLoadCoherence change `sets` — the weekly pattern-balance
+      // pass in both directions, the duration filler, the conditioning
+      // progression and the rest trimmer. Reconciling at each of them is the
+      // three-copies-of-one-rule failure this file keeps finding; reconciling
+      // here holds for writers that do not exist yet.
+      reconcilePerSetLoads(days)
       weeks.push({
         week_number: weekCounter,
         block_number: blockIndex + 1,

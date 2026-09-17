@@ -99,8 +99,14 @@ export function ProposalCard({
         <p className="text-[0.625rem] text-muted-foreground/70">Unchanged: {diff.unchanged.join(', ')}</p>
       )}
 
+      {/* data-severity: the card's own classification of each line, readable
+          from outside. A driver that has to tell "what this costs you" from
+          "what happens next" by matching the WORDS is a driver that passes on
+          any sentence with a number in it — which is how the swap card's first
+          cost check came to be satisfied by "Sets × reps: 2×8" sitting in the
+          Unchanged row above. The severity is the app's own answer; read that. */}
       {diff.implications?.map((imp, i) => (
-        <p key={i} className={`flex items-start gap-1.5 text-xs ${imp.severity === 'warn' ? 'text-[color:var(--role-warn)]' : 'text-muted-foreground'}`}>
+        <p key={i} data-severity={imp.severity} className={`flex items-start gap-1.5 text-xs ${imp.severity === 'warn' ? 'text-[color:var(--role-warn)]' : 'text-muted-foreground'}`}>
           {imp.severity === 'warn' ? <ShieldAlert className="size-3.5 mt-0.5 shrink-0" /> : <Info className="size-3.5 mt-0.5 shrink-0" />}
           <span>{imp.text}</span>
         </p>

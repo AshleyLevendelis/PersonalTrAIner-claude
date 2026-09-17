@@ -143,11 +143,16 @@ function pendingLogToRow(log: PendingLog): WaterLogRow {
   return { id: log.id, profile_id: log.profileId, date: log.date, amount_ml: log.amountMl, source: log.source, client_id: log.id, created_at: log.createdAt }
 }
 
-function mergePendingForProfile(profileId: string, serverRows: WaterLogRow[]): WaterLogRow[] {
+function mergePendingForProfile(profileId: string, serverRows: WaterLogRow[], date?: string): WaterLogRow[] {
   const byId = new Map(serverRows.map(r => [r.id, r]))
   for (const op of loadPending()) {
     if (op.kind === 'upsert') {
       if (op.log.profileId !== profileId) continue
+      // The pending queue is bounded the same way the query is. Merging every
+      // pending op into a single day's rows would hand a caller entries it did
+      // not ask for — harmless while both callers filter again afterwards, and
+      // a trap for the first one that does not.
+      if (date !== undefined && op.log.date !== date) continue
       byId.set(op.log.id, pendingLogToRow(op.log))
     } else {
       if (op.del.profileId !== profileId) continue
@@ -157,21 +162,29 @@ function mergePendingForProfile(profileId: string, serverRows: WaterLogRow[]): W
   return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at))
 }
 
-/** All water logs for a profile — server + pending merged. Never throws offline. */
-export async function getAllLogs(profileId: string): Promise<WaterLogRow[]> {
+/**
+ * ONE DAY'S WATER LOGS — server + pending merged. Never throws offline.
+ *
+ * BOUNDED TO THE DATE, and that is the whole point. This was `getAllLogs`:
+ * `select('*').eq('profile_id', …)` with no date bound, downloading every row
+ * a person had ever logged so that both of its callers could immediately
+ * filter down to one day and throw the rest away. Someone logging four glasses
+ * a day for a year would re-download 1,400 rows to draw one ring.
+ */
+export async function getLogsForDate(profileId: string, date: string): Promise<WaterLogRow[]> {
   try {
-    const { data, error } = await supabase.from('water_logs').select('*').eq('profile_id', profileId)
+    const { data, error } = await supabase.from('water_logs').select('*').eq('profile_id', profileId).eq('date', date)
     if (error) throw error
-    return mergePendingForProfile(profileId, (data ?? []) as WaterLogRow[])
+    return mergePendingForProfile(profileId, (data ?? []) as WaterLogRow[], date)
   } catch {
-    return mergePendingForProfile(profileId, [])
+    return mergePendingForProfile(profileId, [], date)
   }
 }
 
 /** Today's logged total in ml — a plain sum over today's rows, never a separately-tracked counter. */
 export async function getTotalForDate(profileId: string, date: string): Promise<number> {
-  const logs = await getAllLogs(profileId)
-  return logs.filter(l => l.date === date).reduce((sum, l) => sum + l.amount_ml, 0)
+  const logs = await getLogsForDate(profileId, date)
+  return logs.reduce((sum, l) => sum + l.amount_ml, 0)
 }
 
 function enqueueUpsert(log: PendingLog): void {

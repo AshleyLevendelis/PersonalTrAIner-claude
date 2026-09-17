@@ -26,6 +26,38 @@ export interface ClarificationOption {
   value: string
 }
 
+/**
+ * WHAT THE TRAINEE CAN ANSWER WITH — exported, and executed by
+ * test:correction-loop rather than grepped for.
+ *
+ * The rule has one job: NO QUESTION IS EVER UNANSWERABLE. Ashley's endless
+ * correction loop was exactly that — "What weight did you use for Barbell
+ * Bench Press?" rendered with no options and no box, so the answer went back
+ * through the model as a fresh turn and the same question came back.
+ *
+ * It lives here, beside the card that renders it, because the card owns how a
+ * question gets answered. It is a function rather than an inline ternary in
+ * ChatAssistant because the gate that guards it used to pin the ternary's
+ * exact text: adding a branch for the exercise question (14 Sep 2026) broke a
+ * check whose subject had not changed at all. A check that can be executed
+ * against every field cannot go stale that way.
+ *
+ * WHY AN EXERCISE QUESTION KEEPS ITS BOX EVEN WITH TAPS BESIDE IT: the taps
+ * are today's session, and the work being logged may not be on it — an extra
+ * lift, something done elsewhere. A picker that can only offer the plan makes
+ * that unsayable.
+ */
+export function answerPlaceholderFor(
+  field: 'exercise_name' | 'weight' | 'sets_x_reps' | undefined,
+  hasOptions: boolean,
+): string | undefined {
+  if (field === 'exercise_name') return 'or type the exercise'
+  if (hasOptions) return undefined
+  if (field === 'weight') return 'e.g. 60kg'
+  if (field === 'sets_x_reps') return 'e.g. 3x8'
+  return 'Your answer'
+}
+
 export function ClarificationCard({
   contextLines,
   prompt,

@@ -117,6 +117,7 @@ check('once the plan lands the opener is replaced, not frozen',
 // says it is waiting for the plan".
 check('...and it no longer says it is waiting for the plan',
   !/Checking your plan/i.test(chatLate), chatLate.slice(0, 300))
+const chatPlanFocus = await ev(`window.__todayFocus`)
 await shoot('rest-day-race-chat-settled')
 
 // ---------------------------------------------------------------------------
@@ -145,11 +146,26 @@ const homeLate = await text()
 // real exercise count where "Checking your plan…" was, whichever day it is.
 check('the block fills in once the plan arrives',
   !/Checking your plan/.test(homeLate) && /TODAY'S SESSION[\s\S]{0,200}\d+ exercises/.test(homeLate), homeLate.slice(0, 240))
-// AND THE TWO SCREENS NAME THE SAME SESSION. The strongest form of the old
-// hard-coded check: whatever Home says today's session is, the coach's first
-// bubble said the same — read off Home, not typed in by whoever wrote this.
+// EACH SURFACE AGREES WITH THE PLAN IT IS RENDERING.
+//
+// This used to say "the coach named the same session Home shows", comparing
+// the coach's first bubble with Home's session name. The two are read off
+// DIFFERENT HARNESS PAGES — the chat half from chat.html, Home from real.html —
+// and those pages generate their own plans from their own profiles, so the same
+// weekday holds a different session on each. On 14 Sep the coach correctly said
+// "Day one is today: Squat & Carry" while Home correctly said "Upper Pull &
+// Core", and the check called that a contradiction. It was comparing two
+// universes.
+//
+// The promise underneath is "the coach never contradicts the app's numbers",
+// which is a claim WITHIN one universe. So each page publishes the focus its
+// own plan holds for today, and each surface is held to its own.
 const homeFocus = /TODAY'S SESSION\s+~\d+ min\s+([^\n]+)/.exec(homeLate)?.[1]?.trim() ?? null
-check('...and the coach named the same session Home shows', !!homeFocus && chatLate.includes(homeFocus), { homeFocus, chat: chatLate.slice(0, 200) })
+const homePlanFocus = await ev(`window.__todayFocus`)
+check('...and Home named the session its own plan holds for today',
+  !!homeFocus && homeFocus === homePlanFocus, { homeFocus, homePlanFocus })
+check('...and the coach named the session ITS plan holds for today',
+  !!chatPlanFocus && chatLate.includes(chatPlanFocus), { chatPlanFocus, chat: chatLate.slice(0, 300) })
 check('...with the button to start it', /Start session/.test(homeLate), homeLate.slice(0, 240))
 check('...and it no longer says it is checking', !/Checking your plan…/.test(homeLate))
 check('the week header knows which week it is', /WEEK 2 OF 16/.test(homeLate), homeLate.slice(0, 80))

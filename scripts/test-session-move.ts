@@ -365,19 +365,43 @@ check('the move card carries a lead for the day she asked for AND for the re-rou
 // here rather than passing on a variable that happens to exist.
 check('the origin name the lead uses is the TRUE origin, resolved through the remap',
   /const trueFromDayName = target\.remapFrom\s*\n\s*\?/.test(moveBuilder), null)
+// WHICH THREE FACTS, AND WHERE THEY ARE ALLOWED TO SIT. Until 15 Sep 2026 all
+// three had to appear in the reason BRANCH, because the branch was the whole
+// sentence. Ashley's "Want me to X?" grammar moved the session name into the
+// ask that follows it, so the branch alone no longer carries all three and the
+// assembled lead does. Checking the branch would now fail on a card that says
+// everything it should — so the fact-coverage check reads the WHOLE lead
+// expression, and the per-branch loop keeps only the claim check, which is
+// about the words in that branch and nothing else.
+// LINE-BASED, not a backtick-matching regex: the lead now nests a template
+// literal inside ${ask(`...`)}, and any /`[^`]*`/ shape stops at that inner
+// backtick and silently drops the half of the sentence that holds the session
+// name. Caught by the check going red against a lead that does name it.
+const assembledLead = (moveBuilder.split('\n').find(l => l.trim().startsWith('lead:')) ?? '') + leads.join(' ')
+check('the lead names the landing day, the origin day and the session',
+  /\$\{target\.dayName\}/.test(assembledLead) && /\$\{trueFromDayName\}/.test(assembledLead)
+    && /\$\{session\.focus\}/.test(assembledLead), assembledLead.slice(0, 200))
 for (const lead of leads) {
-  check(`"${lead.slice(0, 44)}…" names the landing day, the origin day and the session`,
-    /\$\{target\.dayName\}/.test(lead) && /\$\{trueFromDayName\}/.test(lead)
-      && /\$\{session\.focus\}/.test(lead), lead)
   check('...and claims nothing has happened yet',
     !/\b(moved|has been|is now|done)\b/.test(lead), lead)
 }
+// RE-ANCHORED 15 Sep 2026. This pinned the lead's exact source text, "Shall
+// I?" included, so Ashley's change of grammar that day ("Want me to X?") made
+// it red without anything being wrong. The PROPERTY it was protecting is
+// right and was kept: whatever the wording, the question is the last thing
+// read before the buttons, and any passenger clause comes before it. Pinned
+// now on the shape — the lead ends in a call to ask(), after the clause.
 check('...and every lead ends as a question, after any passenger clause',
-  /lead: `\$\{leadBase\}\$\{alsoDoing \? alsoDoingLeadClause\(alsoDoing\) : ''\} Shall I\?`/.test(moveBuilder))
+  /lead: `\$\{leadBase\}\$\{alsoDoing \? alsoDoingLeadClause\(alsoDoing\) : ''\} \$\{ask\(/.test(moveBuilder), null)
 check('the re-routed lead says why the day changed',
   leads.some(l => /\$\{target\.requestedDayName\} already has a session/.test(l)), leads)
+// Same re-anchoring, same reason. The clause this used to require in the lead
+// ("so it won't show as missed") now sits in the card's implications, where
+// the rest-day card already said it verbatim — so the fact a person reads is
+// unchanged and only its position moved.
+const restBuilder = chat.slice(chat.indexOf('buildRestDayProposal ='), chat.indexOf('buildSwapForActivityProposal ='))
 check('the rest-day card got the same treatment',
-  /lead: `I'll mark \$\{dayName\} as a rest day you chose, so it won't show as missed\. Shall I\?`/.test(chat))
+  /lead: ask\(/.test(restBuilder) && /won't count as a missed session/.test(restBuilder), null)
 const store = strip(src('src/lib/pending-actions-store.ts'))
 check('the lead rides on the diff, optional, so older rows still render', /lead\?: string/.test(store))
 

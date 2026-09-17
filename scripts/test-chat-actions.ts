@@ -66,7 +66,12 @@ for (const m of edge.matchAll(/action:\s*(?:[^,{}]*\?\s*)?\{\s*type:\s*["']([a-z
 }
 
 console.log('\n1. The edge function emits actions, and we can see them')
-check(`actions found in ${EDGE} (${emitted.size})`, emitted.size >= 3, [...emitted].join(', '))
+// THE FLOOR DROPPED FROM 3 TO 2 ON PURPOSE, 15 Sep 2026, and the reason is the
+// point rather than the number: day-level verbs have been leaving this rail for
+// the propose->confirm one ever since Ashley's "record it, but confirm first"
+// ruling. ban_exercise went on 14 Sep, the activity swap on the 15th. A rising
+// floor here would be the wrong direction of travel.
+check(`actions found in ${EDGE} (${emitted.size})`, emitted.size >= 2, [...emitted].join(', '))
 
 console.log('\n2. Every emitted action has a client branch')
 {
@@ -84,11 +89,33 @@ console.log('\n3. Every emitted action is in the PlanAction union')
     missing.map(t => `"${t}" has no interface in ${TYPES}`).join(' | '))
 }
 
-console.log('\n4. The two that prompted this, named so a regression is loud')
-for (const t of ['log_workout_set', 'swap_session_for_activity']) {
-  check(`${t} is emitted, typed, and handled`,
-    emitted.has(t) && types.includes(`type: '${t}'`) && client.includes(`action.type === '${t}'`),
-    `emitted=${emitted.has(t)} typed=${types.includes(`type: '${t}'`)} handled=${client.includes(`action.type === '${t}'`)}`)
+console.log('\n4. The one still on this rail that prompted this, named so a regression is loud')
+check(`log_workout_set is emitted, typed, and handled`,
+  emitted.has('log_workout_set') && types.includes(`type: 'log_workout_set'`) && client.includes(`action.type === 'log_workout_set'`),
+  `emitted=${emitted.has('log_workout_set')}`)
+
+console.log('\n5. THE DEPLOY WINDOW. The frontend merges on a push; the edge function')
+console.log('   is deployed by hand afterwards. Between the two they disagree.')
+{
+  // swap_session_for_activity left this rail on 15 Sep 2026 — the new function
+  // proposes instead. But PRODUCTION runs the old function until someone types
+  // the deploy confirmation, and the old one still emits this action. Deleting
+  // the client branch before that deploy re-creates the exact defect this file
+  // exists for: the write lands and the user is told "Action failed".
+  //
+  // So the rule inverts for a retired action: it must NOT be emitted by the
+  // source any more, and it must STILL be handled. Both halves, or the check
+  // passes while the window is broken.
+  check('the retired swap action is no longer emitted by the current source',
+    !emitted.has('swap_session_for_activity'), [...emitted].join(', '))
+  check('...but the client still handles it, for the window before the function is deployed',
+    client.includes(`action.type === 'swap_session_for_activity'`) && types.includes(`type: 'swap_session_for_activity'`),
+    'delete this branch only AFTER npm run deploy:functions:prod -- chat-gemini')
+  // AND NOTHING WENT BACK. A day-level verb that reappears here is a change to
+  // someone's record with no card and no tap — Ashley's ruling, twice over.
+  const DAY_VERBS = ['swap_session_for_activity', 'propose_session_activity_swap', 'rest_day', 'missed_session', 'session_move']
+  const back = [...emitted].filter(t => DAY_VERBS.some(v => t.includes(v)))
+  check('no day-level verb writes without a card', back.length === 0, back.join(', '))
 }
 
 console.log(failures === 0 ? '\nAll chat-action checks passed.\n' : `\n${failures} FAILED\n`)

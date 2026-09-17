@@ -24,7 +24,8 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { generateMesocycle, enforceSetHierarchy, enforceLoadCoherence } from '../src/lib/exercise-plan'
+import { enforceLoadCoherence, enforceSetHierarchy, generateMesocycle, resetRandomSource, setRandomSource } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
 import {
   removeExerciseFromSession,
   moveExerciseInSession,
@@ -32,6 +33,7 @@ import {
   MIN_EXERCISES_PER_SESSION,
 } from '../src/lib/session-edit'
 import { describeBalanceCost, weekBalance } from '../src/lib/session-balance-cost'
+import { weeksTouchedByScope } from '../src/lib/mesocycle-persistence'
 import type { UserProfile, MesocycleWeek, Exercise } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -60,9 +62,23 @@ const profile = {
   recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
 } as unknown as UserProfile
 
+// SEEDED, and that is a correctness fix rather than tidiness. Unseeded, this
+// file generated a different plan on every run — and §5's "a single removal
+// inside the band says nothing" failed on roughly one run in three, because
+// the fixture week sometimes landed outside the chest:back band before any
+// removal happened. Measured 14 Sep 2026 during a sweep: one FAIL and two
+// PASSes on identical code, with the set counts differing between runs
+// (19 back, then 17).
+//
+// CLAUDE.md's rule about the harness clock is the same rule one level over —
+// a check that does not give the same answer twice means green is not
+// evidence, and nothing about looking at it tells you which you have. The
+// clock fix pinned "today"; this pins the plan.
 const quiet = console.log
 console.log = () => {}
+setRandomSource(seededRngFromKey('session-edit-fixture'))
 const MESO = generateMesocycle(profile)
+resetRandomSource()
 console.log = quiet
 
 const WEEK = MESO[0].week_number
@@ -350,13 +366,92 @@ console.log('\n6. One saver, two surfaces — and the coach on the proposal rail
 {
   const persistence = strip(read('src/lib/mesocycle-persistence.ts'))
   check('there is one scoped saver', /export async function saveScopedEdit/.test(persistence))
-  check('...whose two branches are the scope, not a guess',
-    /if \(scope === 'today'\)[\s\S]{0,200}saveMesocycleWeek/.test(persistence) && /block_number === block && w\.week_number >= weekNumber/.test(persistence))
+
+  // RE-ANCHORED 16 Sep 2026, TWICE, and both rounds are worth keeping.
+  //
+  // It used to require saveMesocycleWeek within 200 characters of the scope
+  // branch. On 15 Sep that branch was EXTRACTED into weeksTouchedByScope so a
+  // second caller could ask the same question instead of re-deriving it — a fix
+  // THIS FILE's duplication check asked for. The code got better and the check
+  // went red: "a check anchored on exact lines fails the next time those lines
+  // move, and proves nothing when they don't."
+  //
+  // My first re-anchor was still a source read, and mutation caught it inside
+  // an hour: gutting the 'today' branch to `return mesocycle` left the gate
+  // green, because the pattern it looked for — w.week_number === weekNumber —
+  // also appears on the line BELOW, where the permanent branch finds the block.
+  // The check was matching something the break did not touch.
+  //
+  // So it calls the function instead, which is what this file's own header says
+  // every check here should do. A scope branch cannot lie about what it returns.
+  const laterInBlock = MESO.filter(w => w.block_number === MESO[0].block_number && w.week_number > WEEK)
+  const otherBlock = MESO.filter(w => w.block_number !== MESO[0].block_number)
+  check('the fixture can tell the two scopes apart', laterInBlock.length > 0 && otherBlock.length > 0,
+    { laterInBlock: laterInBlock.length, otherBlock: otherBlock.length })
+
+  const today = weeksTouchedByScope(MESO, WEEK, 'today').map(w => w.week_number)
+  check("...and 'today' reaches exactly this week", today.length === 1 && today[0] === WEEK, today)
+
+  const permanent = weeksTouchedByScope(MESO, WEEK, 'permanent').map(w => w.week_number)
+  check("...'permanent' reaches this week and the rest of its block",
+    permanent.includes(WEEK) && laterInBlock.every(w => permanent.includes(w.week_number)), permanent)
+  check('...and stops at the block boundary', otherBlock.every(w => !permanent.includes(w.week_number)),
+    { permanent, otherBlockWeeks: otherBlock.map(w => w.week_number) })
+  // PROBED FROM A LATER WEEK, and the fixture is the reason. WEEK is the first
+  // week of its block, so "never reaches back" is unfalsifiable there — there
+  // is nothing behind it to wrongly include. Mutation proved exactly that:
+  // dropping the >= weekNumber guard left the gate green. A fixture has to be
+  // able to express the defect, or the check is decoration.
+  const mid = laterInBlock[laterInBlock.length - 1].week_number
+  const earlierInBlock = MESO.filter(w => w.block_number === MESO[0].block_number && w.week_number < mid)
+  check('the fixture has a week with earlier weeks behind it', earlierInBlock.length > 0, { mid, earlier: earlierInBlock.map(w => w.week_number) })
+  const fromMid = weeksTouchedByScope(MESO, mid, 'permanent').map(w => w.week_number)
+  check('...never reaching back past the week being edited',
+    fromMid.every(n => n >= mid), { mid, fromMid })
+
+  // The one thing that IS about source shape: the saver must not work the
+  // answer out a second time. That is the duplication §6 exists to stop.
+  const declBody = (src: string, decl: string) => {
+    const at = src.indexOf(decl)
+    if (at === -1) return ''
+    const next = src.indexOf('\nexport ', at + 1)
+    return src.slice(at, next === -1 ? src.length : next)
+  }
+  const saver = declBody(persistence, 'export async function saveScopedEdit')
+  check('the saver saves what that returns, deciding nothing itself',
+    /weeksTouchedByScope\(/.test(saver) && !/scope === '/.test(saver), saver.slice(0, 240))
 
   const panel = strip(read('src/components/exercise/TodayPanel.tsx'))
   const executor = strip(read('src/lib/pending-action-executor.ts'))
   check('the screen saves through it', /saveScopedEdit\(profileId, next\.mesocycle, liveWeek, scope\)/.test(panel))
-  check('the coach saves through it too', (executor.match(/saveScopedEdit\(profile\.id, result\.mesocycle, payload\.weekNumber, payload\.scope\)/g) || []).length === 2)
+  // RE-ANCHORED 13 Sep 2026, from "there are exactly two of these calls" to
+  // "every session-edit executor makes one". The count was a mechanism: adding
+  // a third session edit (putting an exercise IN) broke a check whose subject
+  // had not changed, which is CLAUDE.md's "when a check blocks a fix, suspect
+  // the check" arriving on schedule. The property is that no session-edit
+  // executor persists any other way.
+  const sessionExecutors = [...executor.matchAll(/export async function (executeExercise\w+)\(/g)].map(m => m[1])
+  check('the session-edit executors are found by name', sessionExecutors.length >= 2, sessionExecutors)
+  const bodyOf = (name: string) => {
+    const at = executor.indexOf(`export async function ${name}(`)
+    const next = executor.indexOf('\nexport ', at + 1)
+    return executor.slice(at, next === -1 ? executor.length : next)
+  }
+  // SCOPED TO THE EXECUTORS BACKED BY session-edit, and that boundary is
+  // principled rather than a carve-out: those three take a scope and a week
+  // number, which is exactly what saveScopedEdit's two branches are for.
+  // executeExerciseSwap is deliberately outside it — it predates the shared
+  // saver and still branches on scope itself through saveMesocycleWeek, which
+  // this check surfaced on 13 Sep 2026 and which is recorded in BACKLOG as a
+  // lead rather than fixed here.
+  const sessionEditBacked = sessionExecutors.filter(n =>
+    /addExerciseToSession|removeExerciseFromSession|moveExerciseInSession/.test(bodyOf(n)))
+  check('the session-edit-backed executors are found', sessionEditBacked.length >= 3, sessionEditBacked)
+  const notSaving = sessionEditBacked.filter(n =>
+    !/saveScopedEdit\(profile\.id, result\.mesocycle, payload\.weekNumber, payload\.scope\)/.test(bodyOf(n)))
+  check('every one of them saves through the one scoped saver', notSaving.length === 0, notSaving)
+  const sideWriting = sessionEditBacked.filter(n => /saveMesocycleWeek\(|\.from\(/.test(bodyOf(n)))
+  check('...and none of them writes a week any other way', sideWriting.length === 0, sideWriting)
   check('neither re-implements the branch', !/scope === 'today'[\s\S]{0,120}saveMesocycleWeek/.test(panel))
 
   const row = strip(read('src/components/exercise/ExerciseRow.tsx'))

@@ -20,6 +20,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { ANCHOR_ISO, anchorDate, DAY_NAMES, iso as anchorIso } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -86,7 +87,9 @@ const read = () => ev(`(() => {
   }
 })()`)
 
-const tomorrowName = new Date(Date.now() + 86400000).toLocaleDateString('en-US', { weekday: 'long' })
+// THE DAY AFTER THE ANCHOR — see .tour-harness/anchor.mjs. Read off DAY_NAMES
+// rather than toLocaleDateString, which also depends on the machine's locale.
+const tomorrowName = (() => { const d = anchorDate(); d.setDate(d.getDate() + 1); return DAY_NAMES[d.getDay()] })()
 
 console.log('\nA SESSION MOVED TO ANOTHER DAY — and an ordinary day, which must be untouched\n')
 

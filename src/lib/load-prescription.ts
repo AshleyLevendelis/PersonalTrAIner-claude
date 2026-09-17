@@ -660,7 +660,25 @@ export function loadingMode(entry: ExerciseEntry): LoadingMode {
   // Olympic bar prescribed 20kg skull crushers to every user regardless of
   // size — too heavy for a lighter or newer lifter on an elbow-sensitive lift.
   if (entry.equipment.some(e => e === 'EZ bar')) return 'ez_bar'
-  if (entry.equipment.some(e => e === 'barbell' || e === 'trap bar' || e === 't-bar')) return 'barbell'
+  // A SMITH MACHINE IS A BARBELL ON RAILS, and the fall-through below would
+  // call it a stack — a 5kg pin floor on something that starts at bar weight.
+  // Added with the six machines above on 13 Sep 2026: turning the loaded flag
+  // on without this would have swapped one wrong number for another.
+  //
+  // A Smith bar's true weight varies by gym (a counterbalanced one can be 7kg,
+  // a plain one 20kg). The app already has the answer for "we do not know your
+  // starting number" — the calibration week finds it and the ramp takes over —
+  // so barbell is the consistent treatment rather than a new guess.
+  //
+  // A BELT SQUAT IS DELIBERATELY NOT HERE, and I had it wrong first. It is
+  // plate-loaded, so "barbell" looked right — but there is no bar, and the
+  // barbell mode's floor is an empty 20kg one. Its ceiling is already correct
+  // without this: getLoadingCeilingKg special-cases category 'leg_press'
+  // (which `belt squat` deliberately maps to, for the reason written at that
+  // rule) to 400kg BEFORE it ever consults the loading mode. So 'stack' gives
+  // it the honest 5kg floor and costs it nothing at the top.
+  if (entry.equipment.some(e => e === 'barbell' || e === 'trap bar' || e === 't-bar'
+    || e === 'smith machine')) return 'barbell'
   return 'stack'
 }
 
@@ -965,10 +983,49 @@ export function getLoadIncrementKg(entry: ExerciseEntry, category: string | null
 // resistance bands have no meaningful kg value, and cardio machines are not
 // loaded at all. Matching on a loose substring like 'machine' would wrongly
 // sweep all of those in.
-const LOADED_EQUIPMENT = new Set([
+export const LOADED_EQUIPMENT = new Set([
   'barbell', 'dumbbell', 'dumbbells', 'EZ bar', 'kettlebell', 'trap bar',
   't-bar', 'cable machine', 'machine', 'leg press machine',
   'hack squat machine', 'farmer handles', 'medicine ball', 'weighted backpack',
+  // ADDED 13 Sep 2026. The machine-floor catalogue expansion (12 Sep) brought
+  // six new equipment strings and this Set never grew with them, so every
+  // exercise using one was prescribed "Bodyweight" — measured at 26% of
+  // generated plans (14 of 54 across the gym/style/goal/experience spread).
+  // A Smith machine shoulder press with no weight on it.
+  'smith machine', 'hip thrust machine', 'glute kickback machine',
+  'hip abduction machine', 'hip adduction machine', 'belt squat machine',
+])
+
+/**
+ * EVERYTHING ELSE, NAMED — the half that makes this a partition instead of an
+ * allowlist, and the actual fix.
+ *
+ * `isExternallyLoaded` used to answer "is this string in the loaded set?",
+ * which means an equipment string nobody has classified reads as NO WEIGHT.
+ * That failure is silent and it is open: adding an exercise to the catalogue
+ * could put "Bodyweight" on a loaded machine without anything objecting. It
+ * did exactly that.
+ *
+ * Listing the unloaded ones does not change what `isExternallyLoaded` returns.
+ * It gives `test:load-ceilings` something to check the catalogue AGAINST, so
+ * an unrecognised string fails a build rather than quietly costing someone
+ * their working weight.
+ *
+ * THREE OF THESE LOOK LIKE MISSES AND ARE NOT. An ASSISTED pull-up or dip
+ * machine subtracts weight rather than adding it and is prescribed through
+ * `suggested_assistance_kg`. A resistance band's resistance is real but is not
+ * expressible in kilos. The cardio machines have no load to set at all.
+ */
+export const UNLOADED_EQUIPMENT = new Set([
+  'bodyweight', 'resistance band', 'pull-up bar', 'dip bars',
+  'assisted pull-up machine',
+  // Furniture the lift happens on or in, never the load itself — anything
+  // loaded that uses one also carries its own implement string.
+  'bench', 'incline bench', 'preacher bench', 'squat rack', 'box', 'plyo box',
+  // Implements with no settable weight.
+  'ab wheel', 'jump rope', 'battle ropes',
+  // Cardio.
+  'treadmill', 'stationary bike', 'rowing machine', 'elliptical machine',
 ])
 
 export function isExternallyLoaded(entry: ExerciseEntry): boolean {
@@ -1290,6 +1347,57 @@ function buildPerSetLoads(
       display: formatLoad(kg, labelMode),
     }
   })
+}
+
+/**
+ * KEEP THE WEIGHT CHIPS IN STEP WHEN THE SET COUNT CHANGES.
+ *
+ * Measured 14 Sep 2026 across four profiles: 149 of 1,029 loaded exercises
+ * (14.5%) shipped a `per_set_load` whose length did not match `sets` — a card
+ * reading "3 working sets" above four weight chips. Ashley saw it on a real
+ * screen.
+ *
+ * MANY WRITERS, BOTH DIRECTIONS. `sets` is changed by at least five passes
+ * after the loads are built: the time-cap set trimmer (two sites), the
+ * duration-budget pass, the duration filler, the conditioning progression,
+ * and the weekly pattern-balance pass — which both bumps AND trims. Chips
+ * longer than sets is the common shape; chips shorter happens too.
+ *
+ * I NAMED THE CAUSE WRONG TWICE, which is why this paragraph exists rather
+ * than a single culprit. The first note said the balance pass bumped sets;
+ * the direction alone disproved that, since the observed defect was too MANY
+ * chips. The correction then named the time-cap trimmer as "the" cause —
+ * true of the majority, and still wrong as a diagnosis, because patching
+ * those two sites left 52 behind and the last 72 came from the balance pass
+ * after all, trimming rather than bumping. Both errors came from reasoning
+ * about which pass could produce the symptom instead of reconciling at the
+ * point where days are handed over and measuring what was left.
+ *
+ * WHY RE-DERIVED, NOT SLICED. A ramp is 70/80/90/100% of the top set, so
+ * dropping a set is not "delete an entry" — it is a different ramp. Taking it
+ * through `getSetPercents` means a resized ramp is the same shape generation
+ * would have produced for that many sets, rather than a truncation that only
+ * looks right.
+ *
+ * Ramping is read off the array rather than passed in: if every entry is the
+ * same weight it was never a ramp, and inventing one here would add work
+ * nobody prescribed.
+ */
+export function resizePerSetLoads(
+  perSet: PerSetLoad[] | null | undefined,
+  sets: number,
+  entry: ExerciseEntry,
+): PerSetLoad[] | null {
+  if (!perSet || perSet.length === 0) return perSet ?? null
+  if (sets <= 0) return perSet
+  if (perSet.length === sets) return perSet
+  const mode = loadingMode(entry)
+  const labelMode = labelModeForEntry(entry)
+  // The top set is what every percent is a percent OF, and it survives a
+  // resize unchanged — you lose or gain a lighter set, never the working one.
+  const top = perSet.reduce((max, p) => Math.max(max, p.load_kg), 0)
+  const ramping = new Set(perSet.map(p => p.load_kg)).size > 1
+  return buildPerSetLoads(top, sets, mode, labelMode, ramping)
 }
 
 /**

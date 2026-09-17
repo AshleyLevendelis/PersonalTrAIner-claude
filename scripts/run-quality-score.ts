@@ -1,5 +1,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { execFile } from 'child_process'
+import { cpus } from 'os'
+import * as os from 'os'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import {
@@ -169,32 +172,108 @@ function formatDeduction(d: { rule: string; detail: string; weekNumber?: number;
   return `    [${d.rule}]${location ? ` ${location}:` : ''} ${d.detail}${expectedActual}`
 }
 
+/** Score one combination. The ONLY place a plan is generated, so a shard and a
+ *  serial run cannot drift apart in how they do it. */
+function scoreOne(combo: Combination): ScoredCombo {
+  const key = comboKey(combo)
+  const profile = buildProfile(combo)
+  setRandomSource(seededRngFromKey(key))
+  const mesocycle = generateMesocycle(profile)
+  resetRandomSource()
+  return { combo, label: comboLabel(combo), result: scorePlan(profile, mesocycle, key) }
+}
+
+// ---------------------------------------------------------------------------
+// SHARDING — why, and why it is safe.
+//
+// This check is the sweep. Roughly an hour of gates, and about 25 minutes of it
+// is this one script: 9,216 plans at ~165 ms each, on one core of four.
+//
+// MEASURED BEFORE CHANGED, and the note that sent me here was wrong. The
+// backlog said the slowdown was dev logging left switched on under tsx. It is
+// switched on — BALANCE_DEV_LOGGING resolves true because NODE_ENV is undefined
+// — but it costs nothing: 40 plans took 6729 ms with it on and 6901 ms with it
+// off (952 log lines over 640 weeks). The work is simply CPU-bound in plan
+// generation, and the only honest way to make it finish sooner is to use the
+// other three cores.
+//
+// SAFE BECAUSE EVERY COMBINATION IS INDEPENDENT AND SEEDED BY ITS OWN KEY.
+// scoreOne calls setRandomSource(seededRngFromKey(key)) per combination, so a
+// plan depends on its key and nothing else — not on what ran before it, not on
+// which process it ran in. Sharding by index and merging back in index order
+// therefore produces the identical report, which is checked rather than
+// asserted: `--serial` still exists and the two reports are compared.
+const SHARD_ARG = process.argv.find(a => a.startsWith('--shard='))
+const OUT_ARG = process.argv.find(a => a.startsWith('--out='))
+const SERIAL = process.argv.includes('--serial')
+
+async function runShard(spec: string, outPath: string): Promise<void> {
+  const [meRaw, ofRaw] = spec.split('/')
+  const me = Number(meRaw), of = Number(ofRaw)
+  const combos = generateAllCombinations()
+  const out: ScoredCombo[] = []
+  for (let i = 0; i < combos.length; i++) if (i % of === me) out.push(scoreOne(combos[i]))
+  // A FILE, NOT stdout. The first version wrote the payload to stdout and the
+  // parent parsed it — and every run came back as a JSON syntax error, because
+  // generation's own balance logging goes to stdout too (console.debug IS
+  // console.log in Node). Handing back a path cannot be corrupted by anything
+  // the work happens to print, now or later.
+  fs.writeFileSync(outPath, JSON.stringify(out), 'utf-8')
+}
+
+/** Fan the combinations across processes and collect them back in index order. */
+async function scoreInParallel(combos: Combination[], workers: number): Promise<ScoredCombo[]> {
+  const self = new URL(import.meta.url).pathname
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'quality-shard-'))
+  const runs = Array.from({ length: workers }, (_, k) => new Promise<ScoredCombo[]>((resolve, reject) => {
+    const outPath = path.join(dir, `${k}.json`)
+    execFile('npx', ['tsx', self, `--shard=${k}/${workers}`, `--out=${outPath}`],
+      { cwd: process.cwd(), maxBuffer: 64 * 1024 * 1024 },
+      err => {
+        if (err) return reject(err)
+        try { resolve(JSON.parse(fs.readFileSync(outPath, 'utf-8')) as ScoredCombo[]) } catch (e) { reject(e) }
+      })
+  }))
+  const parts = await Promise.all(runs)
+  fs.rmSync(dir, { recursive: true, force: true })
+  // Back into the original order: shard k holds indices k, k+workers, k+2*workers…
+  const merged: ScoredCombo[] = new Array(combos.length)
+  for (let k = 0; k < workers; k++) {
+    parts[k].forEach((sc, j) => { merged[j * workers + k] = sc })
+  }
+  const missing = merged.findIndex(x => x === undefined)
+  if (missing >= 0) throw new Error(`shard merge lost combination ${missing} of ${combos.length}`)
+  return merged
+}
+
 async function main() {
+  if (SHARD_ARG) {
+    if (!OUT_ARG) throw new Error('--shard needs --out=<path>')
+    return runShard(SHARD_ARG.slice('--shard='.length), OUT_ARG.slice('--out='.length))
+  }
+
   console.log('Running Plan Quality Scoring Harness...')
   const combos = generateAllCombinations()
   console.log(`Scoring ${combos.length} combinations (equipment x injuries x duration x style x experience x goal)...`)
+
+  const workers = SERIAL ? 1 : Math.max(1, Math.min(4, cpus().length))
+  console.log(workers > 1 ? `Across ${workers} processes.` : 'Serially, on one process.')
   console.log('')
 
-  const scored: ScoredCombo[] = []
   const start = performance.now()
-  let lastProgress = 0
-
-  for (let i = 0; i < combos.length; i++) {
-    const combo = combos[i]
-    const key = comboKey(combo)
-    const profile = buildProfile(combo)
-
-    setRandomSource(seededRngFromKey(key))
-    const mesocycle = generateMesocycle(profile)
-    resetRandomSource()
-
-    const result = scorePlan(profile, mesocycle, key)
-    scored.push({ combo, label: comboLabel(combo), result })
-
-    const percent = Math.round(((i + 1) / combos.length) * 100)
-    if (percent % 10 === 0 && percent !== lastProgress) {
-      console.log(`  Progress: ${i + 1}/${combos.length} (${percent}%)`)
-      lastProgress = percent
+  let scored: ScoredCombo[]
+  if (workers > 1) {
+    scored = await scoreInParallel(combos, workers)
+  } else {
+    scored = []
+    let lastProgress = 0
+    for (let i = 0; i < combos.length; i++) {
+      scored.push(scoreOne(combos[i]))
+      const percent = Math.round(((i + 1) / combos.length) * 100)
+      if (percent % 10 === 0 && percent !== lastProgress) {
+        console.log(`  Progress: ${i + 1}/${combos.length} (${percent}%)`)
+        lastProgress = percent
+      }
     }
   }
 

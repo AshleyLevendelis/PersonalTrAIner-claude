@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Loader2, ShieldAlert, Info } from 'lucide-react'
-import type { MacroTargets } from '@/lib/types'
+import type { MacroTargets, FitnessGoal } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { MealAdditionPayload } from '@/lib/meal-addition'
 import { applyMealOptionToSlot } from '@/lib/pending-action-executor'
@@ -11,6 +11,8 @@ import {
   type MealFoodEditResult,
 } from '@/lib/meal-food-edit'
 import { parseIngredientLines } from '@/lib/portion-scaler'
+import { assessMealEdit, type MealEditKind } from '@/lib/meal-tradeoff'
+import { applyTradeoff, downgradeToCard } from '@/lib/tradeoff-shape'
 
 // ---------------------------------------------------------------------------
 // CHANGING ONE FOOD, BY TAPPING IT.
@@ -53,6 +55,20 @@ export interface MealFoodEditContext {
   meal: { name: string; ingredients: string[]; macros: { calories: number; protein: number; carbs: number; fat: number } }
   /** Every ingredient line across today's meals — orders the swaps offered. */
   pantryFoods: string[]
+  /** Whose goal this is judged against — see tradeoffFor. */
+  fitnessGoal?: FitnessGoal
+  /**
+   * THE WHOLE DAY AS IT STANDS, so this sheet can say what a change costs the
+   * GOAL rather than only what it does to one meal's numbers. The slot's own
+   * budget cannot answer "does the day still hit protein", which is the only
+   * question worth asking here.
+   *
+   * Optional, and that is deliberate: a caller that cannot supply it gets the
+   * card it always got, never a judgement made up from a day this sheet does
+   * not know about. Silence is the safe direction — see assessMealEdit's own
+   * "no planned day, no judgement".
+   */
+  dayTotals?: MacroTargets
 }
 
 export function MealFoodEditSheet({
@@ -106,11 +122,59 @@ export function MealFoodEditSheet({
   const removal = useMemo(() => build('remove'), [line, ctx])
   const suggestions = removal.ok ? (removal.diff.alternatives ?? []) : []
 
-  const proposal: MealFoodEditResult | null =
+  /**
+   * WHAT IT COSTS THE GOAL, on the screen too.
+   *
+   * THE SCREEN TAKES THE GUARDED-OUT PATH BY CONSTRUCTION, and that is a
+   * decision rather than a shortcut. Ashley's ruling says a change working
+   * against the goal is ASKED about — but a question is a conversational move,
+   * and a sheet has no turn to ask in. `downgradeToCard` is exactly the shape
+   * the coach already falls back to when an ask is guarded out (asked already
+   * this block, or mid-session): the cost is stated, the cheaper route is
+   * offered, and nothing is blocked. So both surfaces say the same sentence,
+   * from the same phrasebook, and only the coach turns it into a question.
+   *
+   * NO DAY TOTALS, NO SENTENCE — the caller may not know the day, and a
+   * judgement invented from a day this sheet cannot see is worse than silence.
+   */
+  const verbKind: Record<Verb, MealEditKind> = {
+    remove: 'meal_food_remove', replace: 'meal_food_replace', resize: 'meal_food_resize',
+  }
+  const tradeoffFor = (v: Verb, result: MealFoodEditResult) => {
+    if (!result.ok || !ctx.dayTotals || !ctx.fitnessGoal) return null
+    const after = result.payload.option.macros
+    return downgradeToCard(assessMealEdit({
+      goal: ctx.fitnessGoal,
+      targets: ctx.targets,
+      dayBefore: ctx.dayTotals,
+      dayAfter: {
+        calories: ctx.dayTotals.calories - ctx.meal.macros.calories + after.calories,
+        protein: ctx.dayTotals.protein - ctx.meal.macros.protein + after.protein,
+        carbs: ctx.dayTotals.carbs - ctx.meal.macros.carbs + after.carbs,
+        fat: ctx.dayTotals.fat - ctx.meal.macros.fat + after.fat,
+      },
+      kind: verbKind[v],
+      slot: ctx.slot,
+      foodName: food,
+    }))
+  }
+
+  const rawProposal: MealFoodEditResult | null =
     verb === 'remove' ? removal
     : verb === 'replace' ? (withFood.trim() ? build('replace', { with_food: withFood.trim() }) : null)
     : verb === 'resize' ? (amount.trim() ? build('resize', { amount: Number(amount) }) : null)
     : null
+
+  // THE COST GOES ON THE CARD, through the SAME function the coach uses. The
+  // sheet already renders `implications`, so a warn line lands where the
+  // structural ones do, and the cheaper route joins the swaps already offered.
+  // Nothing is blocked: Apply is untouched below.
+  const proposal: MealFoodEditResult | null = (() => {
+    if (!rawProposal?.ok || !verb) return rawProposal
+    const t = tradeoffFor(verb, rawProposal)
+    if (!t || t.tier === 0) return rawProposal
+    return { ...rawProposal, diff: applyTradeoff(rawProposal.diff, t) }
+  })()
 
   const apply = async () => {
     if (!proposal?.ok) return

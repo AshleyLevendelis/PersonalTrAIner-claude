@@ -5,5 +5,7 @@
     "I've got a work thing tonight, move today's session to Thursday",
     "thanks"
   ],
-  "checks": {}
+  "checks": {
+    "expectsProposal": true
+  }
 }

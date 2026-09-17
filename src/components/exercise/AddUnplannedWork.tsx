@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Plus, X, Dumbbell, Activity, Clock, Flame, Loader2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -30,6 +31,7 @@ export function AddUnplannedWork({
   onOpenChange,
   hideTrigger,
   prefill,
+  overlay,
 }: {
   onLiftAdded?: () => void
   onCardioLogged?: () => void
@@ -52,6 +54,26 @@ export function AddUnplannedWork({
    * The fields stay editable: a prefill is a head start, not a claim.
    */
   prefill?: { activityName: string; durationMinutes: number; notes?: string }
+  /**
+   * RENDER AS A REAL SHEET, ABOVE EVERYTHING — not as a block in the page.
+   *
+   * Ashley, 14 Sep 2026, after a finished round: "Tapping Log session in the
+   * Round Timer modal after finishing 6/6 rounds does nothing. The button
+   * doesn't even click, and nothing is logged or submitted."
+   *
+   * The button fired every time. This component returned a plain <div> in
+   * normal document flow, and ToolsTab's full-screen branch renders it as a
+   * sibling of RoundField — which is `fixed inset top-0 z-30` with an opaque
+   * background. The form opened underneath the timer, so there was nothing to
+   * see and nothing to tap.
+   *
+   * A PROP RATHER THAN KEYED OFF `hideTrigger`, because the two call sites
+   * genuinely differ. On the exercise tab this expands inline beneath its own
+   * button and that is the design; only the timer needs to clear a
+   * viewport-covering field. The caller knows which it is; this component
+   * cannot.
+   */
+  overlay?: boolean
 }) {
   const { profileId, date, declareOffPlan } = useActiveSession()
   const [mode, setMode] = useState<null | 'lift' | 'cardio'>(null)
@@ -134,7 +156,7 @@ export function AddUnplannedWork({
     )
   }
 
-  return (
+  const body = (
     <div className="rounded-xl p-3 space-y-3 bg-[color:var(--surface-deep)]">
       <div className="flex items-center justify-between">
         <div className="flex gap-1">
@@ -157,7 +179,11 @@ export function AddUnplannedWork({
             Cardio
           </Button>
         </div>
-        <Button variant="ghost" size="icon" className="hit-slop-44 size-6" onClick={reset} aria-label="Cancel">
+        {/* ONE CLOSE CONTROL, NOT TWO. In overlay mode the Dialog shell draws
+            its own × in the corner, and stacking a second one directly beneath
+            it reads as two different exits for one sheet. Read off the
+            screenshot, not reasoned about. */}
+        <Button variant="ghost" size="icon" className={`hit-slop-44 size-6 ${overlay ? 'hidden' : ''}`} onClick={reset} aria-label="Cancel">
           <X className="size-3.5" />
         </Button>
       </div>
@@ -241,5 +267,22 @@ export function AddUnplannedWork({
         </div>
       )}
     </div>
+  )
+
+  // THE SAME SHELL EVERY OTHER SHEET IN THE APP USES (Dialog, z-50), so it
+  // clears RoundField's z-30 by construction rather than by a number chosen
+  // here — and picks up the scrim, the escape key and the focus trap that a
+  // hand-rolled overlay would have had to reinvent.
+  if (!overlay) return body
+  return (
+    <Dialog open onOpenChange={o => { if (!o) reset() }}>
+      <DialogContent data-testid="unplanned-work-sheet">
+        <DialogHeader>
+          <DialogTitle className="pr-8">Log what you did</DialogTitle>
+          <DialogDescription>{prefill?.notes ?? 'Anything you did that was not on the plan.'}</DialogDescription>
+        </DialogHeader>
+        {body}
+      </DialogContent>
+    </Dialog>
   )
 }

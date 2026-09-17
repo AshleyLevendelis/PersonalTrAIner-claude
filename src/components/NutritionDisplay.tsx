@@ -5,9 +5,10 @@ import { Calculator, Layers } from 'lucide-react'
 import { MealPlan, SLOT_ORDER, SLOT_LABEL } from '@/components/MealPlan'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
+import { mealsDrifted } from '@/lib/coach-voice'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
-import { getAllLogs as getAllWaterLogs, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
+import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
@@ -109,6 +110,24 @@ export interface NutritionDisplayProps {
   /** "More options" in the swap panel — the same append-only generator the chat's pool-refresh offer uses. Ashley's depth ruling holds: it only ever runs when SHE taps it. */
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAllMeals: () => Promise<void>
+  /**
+   * The drift offer, or null when the day fits / she already said no.
+   * App owns the decision; this component only renders it, so the rule for
+   * WHEN to offer stays in one place a gate can read (meal-refit.ts).
+   */
+  mealRefit?: MealRefitOffer | null
+  mealRefitBusy?: boolean
+  mealRefitError?: string | null
+  onMealRefitConfirm?: () => void
+  onMealRefitDecline?: () => void
+}
+
+/** Only the parts of a refit this screen shows. Narrower than MealRefit on purpose: a component that cannot see the resized pools cannot accidentally render one as if it were saved. */
+export interface MealRefitOffer {
+  before: { totals: MacroTargets }
+  after: { totals: MacroTargets }
+  resized: { slot: MealSlotName; name: string; before: MacroTargets; after: MacroTargets }[]
+  couldNotFix: string | null
 }
 
 export function NutritionDisplay({
@@ -116,6 +135,7 @@ export function NutritionDisplay({
   profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
+  mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
@@ -204,7 +224,7 @@ export function NutritionDisplay({
 
   useEffect(() => {
     if (!profileId) return
-    void getAllWaterLogs(profileId).then(setWaterLogs)
+    void getWaterLogsForDate(profileId, date).then(setWaterLogs)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, date])
 
@@ -215,7 +235,9 @@ export function NutritionDisplay({
   // (design_handoff_app_polish, "Home becomes the day"); water is the H2O
   // ring and its legend entry here, and the TARGET is still set here, inside
   // "How it's set". What is left is the total the ring is drawn from.
-  const todayWaterMl = waterLogs.filter(l => l.date === date).reduce((s, l) => s + l.amount_ml, 0)
+  // Already bounded to `date` by the query above — the filter that used to
+  // stand here existed because the read returned every row ever logged.
+  const todayWaterMl = waterLogs.reduce((s, l) => s + l.amount_ml, 0)
   const handleSaveWaterTarget = async () => {
     const n = Number(waterTargetInput)
     if (!profileId || !Number.isFinite(n) || n <= 0) { setEditingWaterTarget(false); return }
@@ -389,7 +411,47 @@ export function NutritionDisplay({
           pairs the rings are drawn from — no second source, no new call. */}
       {macroNudge && <TrainerNudge text={macroNudge} openChat />}
 
+      {/* THE DRIFT OFFER. Ashley's ruling, 17 Sep 2026: tell her, and offer to
+          refit. It sits ABOVE the meal list because it is about that list, and
+          it states every meal it would change before she taps anything — the
+          same before/after discipline every other edit card in the app keeps.
+          The lead comes from the phrasebook, so it is one voice with the rest. */}
+      {mealRefit && (
+        <div data-testid="meal-refit-offer">
+          <TrainerNudge
+            text={mealsDrifted(mealRefit.before.totals.calories, macros?.calories ?? 0)}
+            actions={[
+              { label: mealRefitBusy ? 'Resizing…' : 'Resize them', onClick: () => onMealRefitConfirm?.(), disabled: mealRefitBusy },
+              { label: 'Leave them', onClick: () => onMealRefitDecline?.(), disabled: mealRefitBusy, secondary: true },
+            ]}
+          />
+          <ul className="mt-2 space-y-1 px-1" data-testid="meal-refit-rows">
+            {mealRefit.resized.map(r => (
+              <li key={r.slot} className="flex items-baseline justify-between gap-3 text-[0.6875rem] text-muted-foreground">
+                <span className="truncate">{SLOT_LABEL[r.slot]} · {r.name}</span>
+                <span className="shrink-0 tabular-nums">{Math.round(r.before.calories)} → {Math.round(r.after.calories)} kcal</span>
+              </li>
+            ))}
+          </ul>
+          {/* THE HONEST HALF, and never suppressed. A resize has rails, so
+              some days cannot be made to fit by portions alone; saying so is
+              the difference between this and a card claiming a success it did
+              not achieve. */}
+          {mealRefit.couldNotFix && (
+            <p className="mt-1.5 px-1 text-[0.6875rem] leading-[1.35] text-muted-foreground/80" data-testid="meal-refit-residue">
+              {mealRefit.couldNotFix}
+            </p>
+          )}
+        </div>
+      )}
+      {mealRefitError && (
+        <InsightBanner tone="warning" data-testid="meal-refit-error">
+          <span className="min-w-0 flex-1">{mealRefitError}</span>
+        </InsightBanner>
+      )}
+
       <MealPlan
+        fitnessGoal={profile.fitness_goal}
         profileId={profileId}
         date={date}
         pools={pools}

@@ -5,14 +5,14 @@ import { useWakeLock } from '@/hooks/useWakeLock'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
-import { getDoubleProgressionRecommendation, getAddedLoadProgression, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
+import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
-import { estimateDaySeconds } from '@/lib/session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -28,28 +28,46 @@ import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
+// DEFERRED, the same trade the two nutrition sheets took on 14 Sep: a sheet
+// nobody has opened yet has no business in the chunk that has to arrive before
+// the first pixel. It costs one extra chunk header in the total and takes its
+// whole weight off first paint.
+const TightnessSheet = lazy(() => import('./TightnessSheet').then(m => ({ default: m.TightnessSheet })))
+import type { TightnessAnswer } from './TightnessSheet'
+import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
 import { FinisherRow } from './FinisherRow'
+import { isScheduledDay, dayDetail } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
 import type { WhatHappenedTarget } from './WhatHappenedSheet'
 import type { RemoveTarget } from './RemoveExerciseSheet'
+import type { ReasonAnswer } from './EditReasonStep'
 // NOT LAZY, DELIBERATELY — tried and measured 11 Sep 2026. Loading these two
 // on demand saved nothing: ChatAssistant imports the same module statically
 // for the coach's side of the same two operations, so the bundler keeps it in
 // the main chunk either way, and the dynamic form only added an await between
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
-import { removeExerciseFromSession, moveExerciseInSession, type SessionEditResult } from '@/lib/session-edit'
-import { describeBalanceCost } from '@/lib/session-balance-cost'
+import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
+import { describeEditImpact } from '@/lib/session-balance-cost'
+import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
+import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
+import { settleWeek } from '@/lib/settle-week'
+import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
-import type { SwapScope } from '@/lib/mesocycle-edit'
+import { executeCardioSession } from '@/lib/pending-action-executor'
+import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
+import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
 // opened from a menu item, by a person who has something to explain about a
 // day — not a screen every load pays for. test:bundle holds the budget.
 const WhatHappenedSheet = lazy(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
 const RemoveExerciseSheet = lazy(() => import('./RemoveExerciseSheet').then(m => ({ default: m.RemoveExerciseSheet })))
+// Same bargain as the two above: a sheet reached from one button at the foot
+// of the list, carrying the whole exercise catalogue's search with it.
+const AddExerciseSheet = lazy(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
@@ -81,6 +99,8 @@ export function TodayPanel({
   onOpenSwap,
   onBanExercise,
   onMesocycleUpdated,
+  onInjury,
+  onEquipment,
   onProfileChanged,
   onOpenPlateCalc,
   onOpenHistory,
@@ -105,6 +125,14 @@ export function TodayPanel({
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
+  /**
+   * "It hurts" — owned a level up, because the swap dialog needs the same
+   * triage and lives beside this panel rather than inside it. See
+   * ExerciseTab.applyInjury.
+   */
+  onInjury?: (answer: Extract<ReasonAnswer, { type: 'injury' }>) => Promise<string | null>
+  /** "I haven't got the kit" — rebuild this week around a different tier. Same owner, same reason. */
+  onEquipment?: (tier: string) => Promise<string | null>
   onProfileChanged?: (patch: Partial<UserProfile>) => void
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
@@ -119,7 +147,7 @@ export function TodayPanel({
    */
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
 }) {
-  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession } = useActiveSession()
+  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas } = useActiveSession()
 
   // Audit §6.4 — hold the screen awake for as long as the session is
   // actually running, and no longer. Before this the phone dimmed and locked
@@ -151,11 +179,32 @@ export function TodayPanel({
   const [removeTarget, setRemoveTarget] = useState<RemoveTarget | null>(null)
   const [borrowedDayName, setBorrowedDayName] = useState<string | null>(null)
   const [expandedWarmup, setExpandedWarmup] = useState(false)
+  const [tightOpen, setTightOpen] = useState(false)
+
+  // COMPUTED HERE, NEVER STORED. The plan's warm-up is untouched; these exist
+  // for as long as today's answer does and no longer. Injuries still veto a
+  // drill, which is why the profile's list is handed in.
+  const tightness = useMemo(
+    () => tightnessWarmup(tightAreas, profile?.injuries ?? []),
+    [tightAreas, profile?.injuries],
+  )
+
+  const handleTightness = async (a: TightnessAnswer) => {
+    // THE TWO THAT ARE NOT ABOUT TIGHTNESS go straight to the triage that owns
+    // them — the same handler the exercise row uses, so there is one pain path
+    // in the app and not two. Ashley's ruling, 15 Sep 2026.
+    if (a.type === 'red_flag') return                     // advice only; nothing moves
+    if (a.type === 'injury') { if (onInjury) await onInjury(a); return }
+    setTightAreas(a.type === 'tight' ? a.areas : [])
+    // Open it, so the answer is visibly an answer rather than a sheet closing.
+    if (a.type === 'tight') setExpandedWarmup(true)
+  }
   const [banBusy, setBanBusy] = useState<string | null>(null)
   // Turn 5: "Add unplanned work" moved from an always-visible bottom button
   // to the day-level "⋮" menu (WeekContextRow) — this is that controlled
   // open state.
   const [unplannedWorkOpen, setUnplannedWorkOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
   const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
@@ -286,11 +335,139 @@ export function TodayPanel({
     return null
   }
 
+  /**
+   * "MAKE TODAY A CARDIO DAY" — the screen half of the coach's
+   * propose_cardio_session, 15 Sep 2026.
+   *
+   * THE SAME EXECUTOR THE COACH'S CONFIRM CALLS, not a second implementation
+   * of the same verb. That is what parity means here and it is also what stops
+   * the two surfaces disagreeing about scope: executeCardioSession writes the
+   * rest of the block from this week, both ways round.
+   */
+  const handleAddCardio = async (activity: string, minutes: number, targetRpe: number): Promise<string | null> => {
+    if (!profileId || !profile || !mesocycle || mesocycle.length === 0) return 'No plan to add it to yet.'
+    const result = await executeCardioSession(profile, mesocycle, {
+      weekNumber: liveWeek,
+      dayName: todayName,
+      activity,
+      minutes,
+      targetRpe,
+      scope: 'permanent',
+    })
+    if (result.receipt.failed.length > 0) return result.receipt.failed[0].error
+    onMesocycleUpdated?.(result.mesocycle)
+    weekTrain.refresh()
+    onLogsUpdated?.()
+    return null
+  }
+
   const dropExercise = async (exIndex: number, scope: SwapScope): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
     return applySessionEdit(
       removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope }),
       scope,
+    )
+  }
+
+  /**
+   * "I'VE ONLY GOT 25 MINUTES TODAY" — 13 Sep 2026.
+   *
+   * Ashley's ruling: the main lift is protected and the accessory work at the
+   * end comes out until it fits. shortenDayTo carries that; this is the route
+   * from the day menu to it, through applySessionEdit like every other plan
+   * edit on this screen, and with scope 'today' so the same day next week is
+   * the full session again.
+   *
+   * settleWeek runs inside applySessionEdit's callee for the other edits; this
+   * one goes through it explicitly, so a shortened day gets the same
+   * hierarchy/coherence/warm-up/balance tail everything else does.
+   */
+  const shortenToday = async (minutes: number): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const week = mesocycle.find(w => w.week_number === liveWeek)
+    if (!week) return "I can't see this week on your plan just now."
+    const result = shortenDayTo(week, effectiveDayName, profile, minutes)
+    if (!result.changed) return result.refusal ?? "I couldn't shorten that one."
+    const settled = settleWeek(result.week, effectiveDayName, profile)
+    return applySessionEdit(
+      { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
+      'today',
+    )
+  }
+
+  /**
+   * "GIVE ME A DIFFERENT SESSION TODAY" — 16 Sep 2026.
+   *
+   * Ashley's ruling, from three options: keep the main lift and rebuild around
+   * it. You still do today's main lift at the weight and sets already
+   * prescribed; everything else changes. It matches her 13 Sep ruling for
+   * shortening (protect the main lift, drop accessories), so the two
+   * change-today verbs treat it the same way.
+   *
+   * rebuildDayAroundMainLift runs settleWeek itself — unlike shortenToday
+   * above, which has to. Scope 'today', so the same day next week is the
+   * session that was always planned.
+   */
+  const rebuildToday = async (): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const result = await rebuildDayAroundMainLift({
+      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exclusions,
+    })
+    if (!result.changed) return result.refusal ?? "I couldn't rebuild that one."
+    const saved = await applySessionEdit({ mesocycle: result.mesocycle, changed: true }, 'today')
+    if (saved) return saved
+    // WHAT IT COULD NOT DO IS SAID, NOT SWALLOWED. A rebuild that quietly left
+    // three exercises alone and reported success is the defect this codebase
+    // keeps finding — the app knowing something and the screen saying nothing.
+    const kept = result.kept.length
+    const main = result.mainLift ? ` ${result.mainLift} is untouched, as planned.` : ''
+    setRebuildNote(kept === 0
+      ? `Rebuilt today — ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed.${main} Back to the planned session next week.`
+      : `Rebuilt today — ${result.replaced.length} changed, ${kept} stayed because nothing else fits ${kept === 1 ? 'that slot' : 'those slots'} with your equipment and injuries.${main} Back to the planned session next week.`)
+    return null
+  }
+
+  /**
+   * WHERE EACH ANSWER GOES. docs/how-the-app-talks-about-a-change.md §3's
+   * table, and every destination already existed — this routes, it does not
+   * build. The injury branch is the caller's because the swap dialog needs the
+   * same one and lives a level up; see ExerciseTab.applyInjury.
+   */
+  const handleRemoveReason = async (a: ReasonAnswer): Promise<string | null> => {
+    if (a.type === 'red_flag') return null       // advice only; the plan is untouched, deliberately
+    if (a.type === 'injury') return onInjury ? onInjury(a) : 'I can\'t adjust for that just now.'
+    if (a.type === 'equipment') return onEquipment ? onEquipment(a.tier) : 'I can\'t adjust for that just now.'
+    switch (a.reason) {
+      case 'no_time': return shortenToday(getSessionMinimumSeconds(profile?.session_duration_preference || '45-60') / 60)
+      case 'tired': return lighterToday()
+      // 'dislike' never reaches here — the sheet keeps its own drop/swap step
+      // for it, because "and never again" is a different question from "what
+      // goes in its place", and Ashley ruled on that one separately (11 Sep).
+      default: return null
+    }
+  }
+
+  /** One step lighter, this week's session only — the same tail, the same scope. */
+  const lighterToday = async (): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const week = mesocycle.find(w => w.week_number === liveWeek)
+    const day = week?.days.find(d => d.day === effectiveDayName)
+    if (!week || !day) return "I can't see today's session just now."
+    if (!isVolumeAdjustable(week)) return "This is a deload week — it's already lighter on purpose."
+    const result = adjustDayVolume(day, 'lighter', profile)
+    if (!result.changed) {
+      return result.blocked[0]
+        ? `Nothing left to take out — ${result.blocked[0].name} is ${result.blocked[0].reason}.`
+        : 'Every exercise is already at its minimum.'
+    }
+    const settled = settleWeek(
+      { ...week, days: week.days.map(d => (d.day === effectiveDayName ? result.day : d)) },
+      effectiveDayName,
+      profile,
+    )
+    return applySessionEdit(
+      { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
+      'today',
     )
   }
 
@@ -311,14 +488,85 @@ export function TodayPanel({
     )
   }
 
-  /** What dropping this one costs the week's balance — read-only, shown before the tap. */
-  const removalBalanceCost = (exIndex: number, scope: SwapScope): string | null => {
+  /**
+   * PUT ONE EXERCISE INTO THE SESSION — the last operation in the exercise
+   * grain, and the only one that makes the day longer.
+   *
+   * Pricing happens here rather than inside session-edit because
+   * `recomputeLoad` is async and that module is not. `peerProgrammingFor`
+   * gives BOTH sides the same peer, so the weight on the card is computed for
+   * the sets and reps the plan actually receives.
+   *
+   * The reset branch (`isMainLiftReset: true`) is right for any tier here:
+   * it means "a movement with no history in this plan", and its basis already
+   * reads "find your working weight this session".
+   */
+  const priceAddition = async (entry: ExerciseEntry) => {
     if (!profile || !mesocycle) return null
+    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === effectiveDayName)
+    if (!day) return null
+    const tier = mapTier(entry.mechanics_tier)
+    const programming = peerProgrammingFor(day.exercises, tier)
+    if (!programming) return null
+    const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
+    return { load, day }
+  }
+
+  const addExercise = async (entry: ExerciseEntry, scope: SwapScope): Promise<string | null> => {
+    if (!profile || !mesocycle) return 'No plan to edit.'
+    const priced = await priceAddition(entry)
+    if (!priced) return `I couldn't work out what to prescribe for ${entry.name} here.`
+    return applySessionEdit(
+      addExerciseToSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, entry, load: priced.load, scope }),
+      scope,
+    )
+  }
+
+  /**
+   * What adding this one does to the week AND to the clock — read off a TRIAL
+   * of the real edit, the same rule `removalBalanceCost` keeps below.
+   *
+   * ASHLEY'S RULING, 13 Sep 2026: the session gets longer and the app says so
+   * rather than trimming something else to pay for it. The minutes come from
+   * `estimateDaySeconds`, which is what the header prints, so the card and the
+   * screen cannot disagree about one day's length.
+   */
+  const additionImpact = async (entry: ExerciseEntry) => {
+    const nothing = { cost: null, balancing: null, minutes: null, overBy: null }
+    if (!profile || !mesocycle) return nothing
+    const priced = await priceAddition(entry)
+    if (!priced) return nothing
+    const result = addExerciseToSession({
+      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName,
+      entry, load: priced.load, scope: 'today',
+    })
+    if (!result.changed) return nothing
+    const afterWeek = result.mesocycle.find(w => w.week_number === liveWeek)
+    const afterDay = afterWeek?.days.find(d => d.day === effectiveDayName)
+    const minutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : null
+    const capMinutes = Math.round(getSessionMaximumSeconds(profile.session_duration_preference) / 60)
+    const overBy = minutes != null && minutes > capMinutes ? minutes - capMinutes : null
+    return {
+      ...describeEditImpact(mesocycle.find(w => w.week_number === liveWeek), afterWeek, effectiveDayName),
+      minutes,
+      overBy,
+    }
+  }
+
+  /**
+   * What dropping this one costs the week, and what the app will even out on
+   * other days — both read off a TRIAL of the real edit, never a second
+   * model of what the edit would do.
+   */
+  const removalBalanceCost = (exIndex: number, scope: SwapScope): { cost: string | null; balancing: string | null } => {
+    const nothing = { cost: null, balancing: null }
+    if (!profile || !mesocycle) return nothing
     const result = removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope })
-    if (!result.changed) return null
-    return describeBalanceCost(
+    if (!result.changed) return nothing
+    return describeEditImpact(
       mesocycle.find(w => w.week_number === liveWeek),
       result.mesocycle.find(w => w.week_number === liveWeek),
+      effectiveDayName,
     )
   }
 
@@ -404,10 +652,20 @@ export function TodayPanel({
   const tomorrowWorkout = tomorrowCell?.movedTo
     ? undefined
     : (tomorrowCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === tomorrowName)
-  const tomorrowPreview = tomorrowWorkout && tomorrowWorkout.exercises.length > 0
-    ? { dayName: tomorrowName, focus: tomorrowWorkout.focus, exerciseCount: tomorrowWorkout.exercises.length }
+  // A DAY IS SCHEDULED IF IT SAYS IT IS. `is_scheduled` exists precisely
+  // because "scheduled" was being inferred from the exercise count, which
+  // makes an activity-shaped day — a walk, a swim, no exercises array —
+  // invisible: the beginner's whole plan never appeared in tomorrow's preview.
+  // Same expression dashboard-data.ts's streak input already uses, and the
+  // fallback is for plans stored before the field existed.
+  const tomorrowPreview = isScheduledDay(tomorrowWorkout)
+    ? { dayName: tomorrowName, focus: tomorrowWorkout!.focus, detail: dayDetail(tomorrowWorkout!) }
     : undefined
 
+  // DELIBERATELY STILL THE EXERCISE COUNT. "Train anyway" borrows another
+  // day's PRESCRIPTION to do today, and an activity day has no exercises to
+  // borrow — offering one here would open a session with nothing in it, which
+  // is the defect this whole change exists to remove.
   const trainAnywayOptions = liveWeekPlan
     .filter(d => d.exercises.length > 0 && d.day !== todayName)
     .map(d => d.day)
@@ -419,10 +677,34 @@ export function TodayPanel({
   // differ only in keep_full_volume, so the gap is the notch and nothing else.
   // Costs nothing for anyone without a qualifying sport — the memo returns
   // before generating.
-  const volume = profile ? volumeNotice(profile) : null
+  // MEMOISED, and the reason is two full plan generations. volumeNotice builds
+  // a fresh object every call, and volumeReduction below lists `volume` in its
+  // dependencies — so for anyone with a qualifying second sport the memo was
+  // busted on EVERY render and regenerated the whole mesocycle twice, at
+  // roughly 80-190ms each, purely to render one percentage in a banner. Keyed
+  // on the two things volumeNotice actually reads.
+  // KEYED ON THE PROFILE OBJECT, not on the fields volumeNotice reads. Naming
+  // recovery_capacity here was a raw read, and test:concurrent-activity refuses
+  // one anywhere in this file for a good reason: a second sport has to reach
+  // every reader of that field through effectiveRecoveryCapacity, or it reaches
+  // some and not others. The profile reference is stable between renders, which
+  // is all this needs — the churn came from `volume` being rebuilt each time,
+  // not from the profile.
+  const volume = useMemo(() => (profile ? volumeNotice(profile) : null), [profile])
   const volumeNames = volume ? volume.names.join(' and ') : ''
   const [volumeBusy, setVolumeBusy] = useState(false)
   const [volumeError, setVolumeError] = useState<string | null>(null)
+  /**
+   * What the rebuild changed and what it could not, after the tap.
+   *
+   * TRANSIENT ON PURPOSE, and the limit is worth stating: unlike the shortened
+   * marker (workout.shortened_to_minutes, which is stored on the day and so
+   * survives a reload), this is component state and goes on refresh. The
+   * session itself visibly changed and stays changed; what is lost on a reload
+   * is only the list of slots that STAYED. Storing that needs a field on the
+   * day, which is a persistence change this build did not take.
+   */
+  const [rebuildNote, setRebuildNote] = useState<string | null>(null)
   const volumeReduction = useMemo(() => {
     if (!profile || !volume || volume.atFloor || !hasMesocycle) return null
     const activities = profile.concurrent_activities ?? []
@@ -499,14 +781,39 @@ export function TodayPanel({
   // a WeekContextRow prop and documented in its header — it had simply never
   // been passed, so the "~52 min" chip it describes never rendered at all.
   const sessionEstimate = (() => {
-    if (!workout || workout.exercises.length === 0) return { minutes: undefined, shortfall: null }
+    if (!workout || workout.exercises.length === 0) return { minutes: undefined, note: undefined }
     const seconds = estimateDaySeconds(workout)
+    // A DAY SOMEBODY SHORTENED SAYS SO. Otherwise the only trace of "I've only
+    // got 25 minutes" is a session that is quietly two exercises thinner than
+    // yesterday's, which reads as the app having lost something. The shortfall
+    // warning is suppressed for exactly the same day (see the describer), so
+    // this replaces it rather than stacking with it.
+    //
+    // AND IT NEVER STATES A LENGTH THE HEADER CONTRADICTS. A 48-minute session
+    // asked down to 20 lands at 26, because the main lift is protected and
+    // three exercises are the floor — so printing "shortened to 20 min" beside
+    // this row's own "~26 min" would be the app arguing with itself. Found on
+    // a real screen, 13 Sep 2026, by the browser driver comparing the two.
+    const shortened = workout.shortened_to_minutes
+    const actual = Math.round(seconds / 60)
+    const shortenedLine = shortened == null ? null
+      : actual <= shortened
+        ? `Shortened to ${shortened} min for today. Your main lift is untouched, and it’s back to the full session next week.`
+        : `Shortened for today — ${actual} min is as low as this one goes without touching your main lift. Back to the full session next week.`
+    // THE DESCRIBER OWNS THE SUPPRESSION, not this branch. Both notes are
+    // collected and joined rather than one short-circuiting the other, so the
+    // exemption inside describeSessionShortfall is the only thing keeping "you
+    // shortened this to 26 min" and "this runs shorter than the 45-60 you asked
+    // for" off the same screen — which is what makes deleting that exemption
+    // something a check can see.
+    const shortfall = describeSessionShortfall(seconds, profile?.session_duration_preference, {
+      isDeload: currentMesoWeekObj?.is_deload,
+      lowRecovery: !!profile && effectiveRecoveryCapacity(profile) === 'low',
+      shortenedToMinutes: shortened,
+    })
     return {
-      minutes: Math.round(seconds / 60),
-      shortfall: describeSessionShortfall(seconds, profile?.session_duration_preference, {
-        isDeload: currentMesoWeekObj?.is_deload,
-        lowRecovery: !!profile && effectiveRecoveryCapacity(profile) === 'low',
-      }),
+      minutes: actual,
+      note: [shortenedLine, shortfall?.note].filter(Boolean).join(' ') || undefined,
     }
   })()
 
@@ -555,7 +862,7 @@ export function TodayPanel({
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
         estimatedMinutes={sessionEstimate.minutes}
-        shortfallNote={sessionEstimate.shortfall?.note}
+        shortfallNote={sessionEstimate.note}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
         onOpenWhatHappened={profileId ? openWhatHappened : undefined}
@@ -575,6 +882,19 @@ export function TodayPanel({
         weekOf={d => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)}
         weekNumber={liveWeek}
         onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+        onShorten={shortenToday}
+        onLighter={lighterToday}
+        onRebuild={rebuildToday}
+      />
+      </Suspense>
+      <Suspense fallback={null}>
+      <AddExerciseSheet
+        target={addOpen && workout ? { dayName: effectiveDayName, day: workout } : null}
+        onClose={() => setAddOpen(false)}
+        profile={profile}
+        exclusions={exclusions}
+        onConfirm={addExercise}
+        impactFor={additionImpact}
       />
       </Suspense>
       <Suspense fallback={null}>
@@ -583,7 +903,8 @@ export function TodayPanel({
         onClose={() => setRemoveTarget(null)}
         onDrop={scope => dropExercise(removeTarget!.exIndex, scope)}
         onSwapInstead={() => removeTarget && onOpenSwap(removeTarget.dayName, removeTarget.exIndex, removeTarget.exerciseName)}
-        balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : null)}
+        balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : { cost: null, balancing: null })}
+        onReason={handleRemoveReason}
       />
       </Suspense>
 
@@ -603,7 +924,12 @@ export function TodayPanel({
           </div>
         ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
           <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground">
-            {peekDay} is a rest or recovery day.
+            {/* A peeked day with a prescribed activity is NOT a rest day, and
+                saying so was the same defect as the empty card — it just said
+                it in one sentence instead of a blank form. */}
+            {peekWorkout?.plannedActivity
+              ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
+              : `${peekDay} is a rest or recovery day.`}
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
           </div>
         ) : (
@@ -635,6 +961,7 @@ export function TodayPanel({
           onPeek={d => setPeekDay(d)}
           trainAnywayOptions={trainAnywayOptions}
           onTrainAnyway={setBorrowedDayName}
+          onAddCardio={handleAddCardio}
         />
       ) : isActiveRecovery ? (
         <ActiveRecoveryCard
@@ -642,6 +969,7 @@ export function TodayPanel({
           weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned }}
           tomorrow={tomorrowPreview}
           onPeek={d => setPeekDay(d)}
+          onAddCardio={handleAddCardio}
         />
       ) : (
         <div className="space-y-3">
@@ -688,6 +1016,7 @@ export function TodayPanel({
             </InsightBanner>
           )}
           {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
+          {rebuildNote && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{rebuildNote}</p>}
           {/* Turn 5 hero block — supersedes IdentityLine's old day/focus text
               (now deleted; its timers entry point moved into WeekContextRow's
               "⋮" menu above). New: a 2px session-progress line under the
@@ -785,7 +1114,39 @@ export function TodayPanel({
               <p className="text-xs text-muted-foreground">{workout!.block_size_note}</p>
             </div>
           )}
-          <WarmupSection warmup={workout!.warmup} open={expandedWarmup} onToggle={() => setExpandedWarmup(v => !v)} />
+          <WarmupSection
+            warmup={workout!.warmup}
+            open={expandedWarmup}
+            onToggle={() => setExpandedWarmup(v => !v)}
+            extra={tightness.items}
+            extraNote={tightness.note}
+            extraCaveat={uncoveredNote(tightness)}
+          />
+          {/* BEFORE THE SESSION, BESIDE THE WARM-UP IT CHANGES. Not on the
+              session dock: this is a question you answer while you are still
+              deciding what the next hour looks like, and it has nothing to say
+              once you are three sets in. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start min-h-[44px] text-xs"
+            data-testid="tightness-open"
+            onClick={() => setTightOpen(true)}
+          >
+            {tightAreas.length > 0
+              ? `Tight: ${tightness.items.length > 0 ? 'warm-up updated' : 'noted'} — change it`
+              : 'Anything feeling tight?'}
+          </Button>
+          {tightOpen && (
+            <Suspense fallback={null}>
+              <TightnessSheet
+                open={tightOpen}
+                onOpenChange={setTightOpen}
+                selected={tightAreas}
+                onAnswer={handleTightness}
+              />
+            </Suspense>
+          )}
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
           <ExerciseList
             workout={workout!}
@@ -822,13 +1183,38 @@ export function TodayPanel({
               it behind that menu; the polish handoff puts it back at the foot
               of the list, which is where someone finishing a session looks
               for "I also did…". One entry point either way. */}
-          <button
-            type="button"
-            onClick={() => setUnplannedWorkOpen(true)}
-            className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
-          >
-            ＋ Add unplanned work
-          </button>
+          {/* PUT ONE IN THE PLAN — beside "I also did…", and above it, because
+              this one changes the session and the other only records what
+              happened outside it. ONE entry point, deliberately: the day
+              header's menu lost "Add unplanned work" on 6 Sep for exactly the
+              reason written there — two ways into one dialog is how they
+              drift apart. Only shown where an edit can actually be saved,
+              the same gate onRemove and onMove use. */}
+          {/* A COLUMN, NOT TWO BUTTONS LEFT TO FLOW. A <button> is inline, and
+              while there was only one of these at the foot of the list that
+              never showed; the second landed beside it on the same line, so
+              the screen read "＋ Add an exercise＋ Add unplanned work" as one
+              run-on string with abutting tap targets. Found by reading a
+              screenshot at 390px on 13 Sep 2026 — every check was green. */}
+          <div className="flex flex-col items-start gap-1" data-testid="session-foot-actions">
+            {profileId && mesocycle && (
+              <button
+                type="button"
+                data-testid="add-exercise"
+                onClick={() => setAddOpen(true)}
+                className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+              >
+                ＋ Add an exercise
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setUnplannedWorkOpen(true)}
+              className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+            >
+              ＋ Add unplanned work
+            </button>
+          </div>
           <AddUnplannedWork
             open={unplannedWorkOpen}
             onOpenChange={setUnplannedWorkOpen}
@@ -968,9 +1354,18 @@ function ExerciseList({
     // rather than mutating the plan — the peek and program-browse surfaces
     // deliberately show plan-derived numbers only.
     const progressedAdded = progressedAddedLoads[ex.name]
-    const rowEx = progressedAdded != null && ex.suggested_added_load_kg != null
+    const withAdded = progressedAdded != null && ex.suggested_added_load_kg != null
       ? { ...ex, suggested_added_load_kg: progressedAdded }
       : ex
+    // AND THE ORDINARY WEIGHT, for the same reason and on the same copy. The
+    // chip above already said "from your last session" and the note below
+    // already said "Held at 35kg" — the figure between them was still the
+    // plan's. withWorkingLoadKg moves all three views of it together and
+    // scales the ramp rather than flattening it; see its own note.
+    const progressedLoad = progressedLoads[ex.name]
+    const rowEx = progressedLoad != null
+      ? withWorkingLoadKg(withAdded, progressedLoad, profile)
+      : withAdded
     return {
       ex: rowEx,
       dayName,

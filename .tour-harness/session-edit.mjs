@@ -80,6 +80,33 @@ check('1b. it offers move earlier, move later and take out', ['move-up', 'move-d
 check('1c. ...cheap first, the ban last', ids.indexOf('remove-exercise') < ids.length - 1 && /ban/i.test(items[items.length - 1].t), items.map(i => i.t))
 check('1d. the first exercise cannot move earlier', items.find(i => i.id === 'move-up')?.disabled === true, items.find(i => i.id === 'move-up'))
 check('1e. ...but can move later', items.find(i => i.id === 'move-down')?.disabled === false, items.find(i => i.id === 'move-down'))
+
+// ONE PLACE FOR EVERY CHANGE — Ashley's ruling, 14 Sep 2026, from three
+// options, after reporting: "Swap exercise is an inline link above the sets
+// table, while the rest of the actions are inside the 3-dot overflow menu."
+// She chose all of them behind the ⋮.
+check('1f. swapping is in the same menu as the rest', ids.includes('swap-exercise'), items.map(i => i.t))
+// THE OTHER HALF, AND THE ONE THAT WOULD ROT. "It is in the menu" stays true
+// if a copy is also left outside it, which is the state she reported. So the
+// row itself is read: every control on it that CHANGES the exercise must be
+// gone. Plate calculator is named as the deliberate exception rather than
+// allowlisted by silence — it changes nothing, and it is reached mid-set with
+// a bar in front of you.
+const strayVerbs = await ev(`(() => {
+  const rows = [...document.querySelectorAll('[data-exercise-name]')]
+  const out = []
+  for (const r of rows) {
+    for (const b of r.querySelectorAll('button')) {
+      if (b.closest('[role="menu"]')) continue
+      const t = (b.textContent || '').trim()
+      if (/swap|move (earlier|later)|take out|ban|never show/i.test(t)) out.push(t)
+    }
+  }
+  return [...new Set(out)]
+})()`)
+check('1g. ...and no change to an exercise is left loose on the row', (strayVerbs || []).length === 0, strayVerbs)
+check('1h. ...while the plate calculator, which changes nothing, stays one tap away',
+  (await ev(`[...document.querySelectorAll('[data-exercise-name] button')].some(b => /plate calculator/i.test(b.textContent || ''))`)) === true)
 await shoot('session-edit-menu')
 
 // --- moving ----------------------------------------------------------------
@@ -106,18 +133,52 @@ const victim = afterTrip[afterTrip.length - 1]
 check('3a. the last exercise’s menu opens', (await openRowMenu(victim)) === 'open')
 check('3b. ...and it cannot move later', (await menuItems()).find(i => i.id === 'move-down')?.disabled === true)
 check('3c. "Take out of this session" opens the sheet', await tap('[data-testid="remove-exercise"]') && (await wait(700), await has('[data-testid="remove-exercise-sheet"]')))
+
+// WHY COMES FIRST NOW (15 Sep 2026). docs/how-the-app-talks-about-a-change.md
+// §3: one tap and the app knows which of six problems it is solving, instead
+// of answering all of them with the same removal.
+check('3c2. it asks WHY before anything else', await has('[data-testid="reason-chips"]'))
+const reasons = await ev(`[...document.querySelectorAll('[data-testid="reason-chips"] [data-reason]')].map(b => b.getAttribute('data-reason'))`)
+check('3c3. ...offering the four a removal can have',
+  JSON.stringify(reasons) === JSON.stringify(['no_time', 'tired', 'hurts', 'dislike']), reasons)
+check('3c4. ...naming the exercise', (await ev(`document.querySelector('[data-testid="reason-chips"]')?.innerText || ''`)).includes(victim), victim)
+// NEVER GATED BEHIND AN ANSWER — "reason required" was the option Ashley did
+// NOT pick on 14 Sep, and a question you cannot walk past is that option in
+// disguise.
+check('3c5. ...and a way past it without answering', await has('[data-testid="reason-skip"]'))
+await shoot('session-edit-reason')
+await clickSel('[data-testid="reason-skip"]'); await wait(500)
+
 const verbs = await ev(`[...document.querySelectorAll('[data-testid="remove-exercise-sheet"] [data-verb]')].map(b => b.getAttribute('data-verb'))`)
 check('3d. it ASKS — drop it, or put something else there (her ruling, 11 Sep)', JSON.stringify(verbs) === JSON.stringify(['drop', 'swap-instead']), verbs)
 check('3e. ...and it names the exercise being taken out', (await ev(`document.querySelector('[data-testid="remove-exercise-sheet"]')?.innerText || ''`)).includes(victim), victim)
 await shoot('session-edit-remove-asks')
 
 // --- the swap route out of it ----------------------------------------------
-check('4a. "Put something else there" reaches the swap list', await clickSel('[data-verb="swap-instead"]') && (await wait(900), (await ev(`document.body.innerText`)).includes('Smart Exercise Swap')))
-check('4b. ...for the same exercise', (await ev(`document.body.innerText`)).includes(victim))
+// POLLED, NOT SLEPT ON. The swap dialog is lazy (15 Sep 2026), so the first
+// open waits on a chunk fetch — a fixed 900ms passed before it was lazy and
+// failed after, which is a driver measuring the network rather than the app.
+const untilSel = async (sel, ms = 6000) => {
+  for (let i = 0; i < ms / 250; i++) { if (await has(sel)) return true; await wait(250) }
+  return false
+}
+// ANCHORED ON THE DIALOG, NOT ITS TITLE. Two things changed under this check
+// on 15 Sep 2026 and each broke it for a different reason: the dialog went
+// lazy, so a fixed 900ms wait became a race with a chunk fetch; and its title
+// is now "Swap X?" while it asks why, because promising "constraint-checked
+// replacements" above that question describes something it may not do. The
+// property is that the swap surface opened for this exercise — which survives
+// both.
+check('4a. "Put something else there" reaches the swap dialog',
+  await clickSel('[data-verb="swap-instead"]') && await untilSel('[data-testid="swap-dialog"]'))
+check('4b. ...for the same exercise', (await ev(`document.querySelector('[data-testid="swap-dialog"]')?.innerText || ''`)).includes(victim), victim)
+check('4c. ...and it asks why here too, the same question as the sheet',
+  await has('[data-testid="swap-dialog"] [data-testid="reason-chips"]'))
 await escape(); await wait(600)
 
 // --- dropping it ------------------------------------------------------------
-check('5a. reopening and choosing "Drop it"', (await openRowMenu(victim)) === 'open' && await tap('[data-testid="remove-exercise"]') && (await wait(700), await clickSel('[data-verb="drop"]')))
+check('5a. reopening and choosing "Drop it"', (await openRowMenu(victim)) === 'open' && await tap('[data-testid="remove-exercise"]')
+  && (await wait(700), await clickSel('[data-testid="reason-skip"]')) && (await wait(400), await clickSel('[data-verb="drop"]')))
 await wait(400)
 check('5b. ...asks how far it should reach', await has('[data-testid="remove-scope"]'))
 const scopes = await ev(`[...document.querySelectorAll('[data-testid="remove-scope"] [data-scope]')].map(b => ({ s: b.getAttribute('data-scope'), t: b.textContent.trim() }))`)
@@ -135,6 +196,36 @@ await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
 const finalOrder = await untilOrder(o => o.length === dropped.length)
 check('5h. the removal survives leaving the tab and coming back', finalOrder.join('|') === dropped.join('|'), { dropped, finalOrder })
 
-console.log(failures === 0 ? '\nRemoving asks, moving moves, and both stick.\n' : `\n${failures} check(s) FAILED.\n`)
+// --- 6. WHAT IT COSTS, AND WHAT THE APP WILL DO ABOUT IT --------------------
+//
+// Ashley's ruling, 13 Sep 2026: a change to one day may touch another day to
+// keep the week balanced, and the app SAYS SO before the tap. That sentence
+// only appears when there is something to say, and a healthy generated plan
+// never has anything to say — so this reloads the harness with ?tilt=lopsided,
+// which triples the sets on every day but the first. Without the tilt the only
+// browser check available would be "the paragraph is absent", which is exactly
+// what it would also report if the feature had been deleted.
+console.log('\n  on a deliberately lopsided week')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&tilt=lopsided#/tab/exercise` })
+await wait(4500)
+const tilted = await order()
+check('6a. the tilted week still renders a session', Array.isArray(tilted) && tilted.length >= 4, tilted)
+const tiltVictim = tilted[tilted.length - 1]
+check('6b. the remove sheet opens on it', (await openRowMenu(tiltVictim)) === 'open' && await tap('[data-testid="remove-exercise"]')
+  && (await wait(700), await clickSel('[data-testid="reason-skip"]')) && (await wait(400), await clickSel('[data-verb="drop"]')))
+await wait(500)
+check('6c. ...and reaches the scope step', await has('[data-testid="remove-scope"]'))
+const balancing = await ev(`document.querySelector('[data-testid="remove-balancing"]')?.textContent?.trim() || ''`)
+const costLine = await ev(`document.querySelector('[data-testid="remove-balance-cost"]')?.textContent?.trim() || ''`)
+check('6d. the app says what it will even out on other days, before the tap',
+  balancing.startsWith("I'll also ") && /\bto keep your week balanced\.$/.test(balancing), { balancing, costLine })
+// It has to name a day that is NOT the one being edited — the whole point of
+// the sentence is the reach of the change.
+const editedDay = await ev(`document.querySelector('[data-today-day-name]')?.getAttribute('data-today-day-name') || ''`)
+check('6e. ...naming a real weekday', /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/.test(balancing), balancing)
+check('6f. ...and it is not the day being edited', !editedDay || !balancing.includes(`on ${editedDay}`), { editedDay, balancing })
+await shoot('session-edit-balancing')
+
+console.log(failures === 0 ? '\nRemoving asks, moving moves, both stick, and the reach of a change is stated.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

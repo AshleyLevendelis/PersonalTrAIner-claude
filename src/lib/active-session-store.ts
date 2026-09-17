@@ -91,6 +91,18 @@ export interface ActiveSessionRecord {
    * else in this record, so it expires on its own.
    */
   rampTicks?: Record<string, number[]>
+  /**
+   * Areas she said felt tight before this session, for the extra mobility
+   * drills the warm-up shows.
+   *
+   * HERE AND NOT ON THE PLAN, deliberately. "My hips feel tight this morning"
+   * is a fact about one day. Writing it into the mesocycle's warm-up would
+   * carry it into next Tuesday's session, which is not what she said. This
+   * record is already keyed by date and already expires on its own, so the
+   * answer lasts exactly as long as it is true — and a reload halfway through
+   * changing into gym kit does not lose it.
+   */
+  tightAreas?: string[]
 }
 
 type RecordMap = Record<string /* date */, ActiveSessionRecord>

@@ -227,8 +227,13 @@ console.log('\n6. The app signs in BEFORE it reads, and stamps what it writes')
   check('a new profile is stamped with its owner', /owner_id: signIn\.userId/.test(insert), insert.slice(0, 200))
   check('...from a sign-in performed first', app.lastIndexOf('ensureSignedIn(', insertAt) > 0)
 
+  // RE-ANCHORED 15 Sep 2026. This pinned the pronoun: "We couldn't sign you
+  // in". The voice work made the app speak as one person throughout ("I"), so
+  // this went red on a change that improved exactly what it was guarding. The
+  // property is that a failed sign-in EXPLAINS itself rather than showing an
+  // empty screen — which pronoun it uses is not this check's business.
   check('the app shows a reason when sign-in fails, rather than an empty screen',
-    /We couldn't sign you in/.test(app))
+    /couldn't sign you in/i.test(app))
   check('the email prompt is rendered, and closeable', /<EmailPrompt onClose=/.test(app))
 }
 

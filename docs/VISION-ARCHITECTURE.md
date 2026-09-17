@@ -298,7 +298,9 @@ The incident had two halves: the schedule was **mutated**, and the user was **to
 **Five structural defences, in order of strength:**
 
 **D1 — The client discards model prose on any turn that produced a proposal.**
-When a turn yields a `pending_actions` row with `action_class='plan_mutation'`, `processResponse` renders **only client-authored copy plus the card**. Model free text is permitted only on turns that produced no proposal and no execution. Enforced client-side, no model cooperation required. (Evidence this is needed: `stripStreamingTags` already line-filters `^Schedule updated —` as a hack.)
+When a turn yields a `pending_actions` row with `action_class='plan_mutation'`, `processResponse` renders **only client-authored copy plus the card**. Enforced client-side, no model cooperation required. (Evidence this is needed: `stripStreamingTags` already line-filters `^Schedule updated —` as a hack.)
+
+**CORRECTED 15 Sep 2026.** This rule used to end: *"Model free text is permitted only on turns that produced no proposal and no execution."* That sentence did not merely leave the no-tool turn uncovered — it **licensed** it, and D6 below is what it cost. Free text is permitted on a turn that produced no proposal and no execution **and claims no change**.
 
 **D2 — Server-side imperative classification.**
 The tool call must carry `origin.verbatim_quote`, asserted to be a literal substring of the user's message *this turn*. That alone is a null gate — "I didn't train today" is a substring of itself. So the quote is additionally run through a **deterministic imperative classifier in code** (closed verb list + interrogative/negation heuristics). Fails ⇒ downgrade from `propose_` to `offer_`.
@@ -308,9 +310,18 @@ An `offer_` renders as a lightweight suggestion chip ("Want me to move Thursday'
 
 **D4 — Declines are remembered.** `subject_key` + `suppressed_until` stop a detector re-proposing something the user already rejected — the dynamic that made the old PROACTIVE EXECUTION RULE feel necessary in the first place.
 
+**D6 — A turn that called no tool may not claim a change.** *(Added 15 Sep 2026, after the whole D1-D5 chain was walked around.)*
+Every defence above is entered **through the model's tool call**: D2 classifies a quote the tool carried, D3 downgrades a tool call to an offer, D1 discards prose on a turn that produced a proposal. A model that calls **nothing** skips all five. Measured live that day — *"I've swapped out today's lifting session for Muay Thai on your schedule"*, no tool, no row, no card, straight onto her screen, and she reported the chat as lying to her.
+
+So the reply itself is checked, on both sides of the wire, by one shared detector (`plan-claim.ts`, duplicated into `_shared/` for the edge runtime): a **completed** plan mutation, stated by the coach, about a determined plan object, and not hedged in its own sentence. On a match the server retries once with a nudge saying the claim was false, then falls to a floor; the client substitutes the same floor before render. The floor is an **offer with chips**, not an apology — she asked for something the app can do, and a dead end would be the second mistake in one turn.
+
+`action` is the discriminator, not the absence of one: `log_weight` and the logging actions reach the same branch with the write already made, and their past tense is earned.
+
 **D5 — One plan-mutation proposal per turn.** More than one ⇒ take none, ask. (This rule applies **only** to plan mutations — immediate-class calls batch freely, or onboarding stalls on its own happy path when a user answers four fields in one sentence.)
 
 **Traced against the incident:** "I didn't train today" → D2's classifier finds no imperative → downgraded to an offer → no pending row, no card, no write → D1 means the assistant's own text can't claim a change either. The failure is structurally unreachable.
+
+**And traced against the one that got through, 15 Sep 2026:** "Im not going to hit that session in going to do muay thai instead" → the model calls **no tool at all** → D2 has no quote to classify, so no downgrade, so no offer → the turn falls to the branch D1 explicitly permitted → the sentence renders. That trace assumes a tool call at every step, which is why it read as complete. D6 closes it at the only place left: the words themselves.
 
 ---
 

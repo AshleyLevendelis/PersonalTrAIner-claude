@@ -25,6 +25,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { ANCHOR_ISO, anchorDate, DAY_NAMES, iso as anchorIso } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -65,7 +66,8 @@ const check = (name, ok, detail) => {
   else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 500)}` : ''}`) }
 }
 
-const iso = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+// OFFSETS FROM THE ANCHOR, not from now — see .tour-harness/anchor.mjs.
+const iso = n => { const d = anchorDate(); d.setDate(d.getDate() + n); return anchorIso(d) }
 const nameOf = n => new Date(`${iso(n)}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
 const TODAY = iso(0), TOMORROW = iso(1)
 const YESTERDAY_NAME = nameOf(-1), TOMORROW_NAME = nameOf(1), TODAY_NAME = nameOf(0)
@@ -191,8 +193,14 @@ check('9b. ...and so does the row under it, and the promise beside it',
 check('9c. the day that will not count as missed is the day it LEFT',
   new RegExp(`${YESTERDAY_NAME} won't count as a missed session`).test(moved.text)
     && !new RegExp(`${TODAY_NAME} won't count as a missed session`).test(moved.text), moved.sample)
+// RE-ANCHORED 15 Sep 2026, same reason as verify:activity-swap. This pinned the
+// literal "Shall I?" — Ashley's old card grammar — so her change that day
+// ("Want me to X?") turned it red with nothing wrong, and it would have stayed
+// GREEN on a card that tacked "Shall I?" onto an announcement. The property is
+// the pair: it ASKS (a question mark reaches the screen) and does not ANNOUNCE
+// (no completed-action verb). Neither half names a wording we chose.
 check('10. ...and it is still a question until she confirms',
-  /Shall I\?/.test(moved.text) && !/has been moved|is now on/i.test(moved.text), moved.sample)
+  /\?/.test(moved.text) && !/has been moved|is now on/i.test(moved.text), moved.sample)
 await shoot('moved-session-move-card')
 
 // --- the other answer: dropping it -----------------------------------------

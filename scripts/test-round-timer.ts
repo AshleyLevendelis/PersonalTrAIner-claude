@@ -15,14 +15,30 @@
 // between the ring and the pips.
 // ---------------------------------------------------------------------------
 
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   computeRoundState, totalRoundSeconds, roundPips, intervalProgress, type RoundConfig,
+  sessionTotalRounds, sessionRoundNumber, roundHeadline, roundDoneLabel, roundSubline,
+  roundLogSummary, chipNumbers, protocolNameOf, secondsPhrase, sameRoundConfig,
 } from '../src/lib/timer-engine'
 
+/** Comments stripped, so a note explaining a rule cannot satisfy the check for it. */
+const stripComments = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+/** Every .tsx under a directory — so "wherever a round can be started" is read, not listed. */
+function walkTsx(dir: string): string[] {
+  const out: string[] = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...walkTsx(full))
+    else if (entry.name.endsWith('.tsx')) out.push(full)
+  }
+  return out
+}
+
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
   if (ok) console.log(`  ✓ ${name}`)
@@ -161,12 +177,27 @@ console.log('\n7. The ten-second countdown before round 1')
     /if \(now - new Date\(record\.startedAtIso\)\.getTime\(\) >= leadInMs\) return/.test(hook))
   check('a new round is started WITH the countdown',
     /leadInSeconds: config\.leadInSeconds \?\? ROUND_LEAD_IN_SECONDS/.test(hook))
-  // THE SENTENCE MOVED ONTO THE BUTTON, 12 Sep 2026: the setup is chips now
-  // and "Start · 10s countdown" says it where the tap happens rather than in
-  // a line under it. Still before you press, which is the whole point.
-  check('...and the app says so before you press it',
-    /Start · \{ROUND_LEAD_IN_SECONDS\}s countdown/.test(
-      readFileSync(join(ROOT, 'src/components/timers/TimersPanel.tsx'), 'utf8')))
+  // THE SENTENCE MOVED ONTO THE BUTTON, 12 Sep 2026: "Start · 10s countdown"
+  // says it where the tap happens rather than in a line under it. Still
+  // before you press, which is the whole point.
+  //
+  // RE-ANCHORED 13 Sep 2026 (frame 4a) OFF THE FILENAME. Start moved from the
+  // setup panel to the always-present card, and a check that names one file
+  // would have failed on a move rather than on a broken promise. So: find
+  // every component that can start a round, and require each of them to name
+  // the countdown. That also catches the real future defect — a SECOND start
+  // control added somewhere quiet, without the promise.
+  //
+  // NOTE, and it is a deliberate departure from the mock: 4a's idle card
+  // draws a button reading only "Start". An app that pauses ten seconds after
+  // a tap without having said it would is indistinguishable from one that has
+  // not started, so the longer label wins over the shorter word.
+  const componentDir = join(ROOT, 'src/components')
+  const starters = walkTsx(componentDir).filter(f => /timers\.startRound\(/.test(readFileSync(f, 'utf8')))
+  check('something on screen can start a round (sanity check on this check)', starters.length > 0, starters.length)
+  const silent = starters.filter(f => !/\{ROUND_LEAD_IN_SECONDS\}s countdown/.test(readFileSync(f, 'utf8')))
+  check('...and the app says so before you press it, wherever it can be pressed',
+    silent.length === 0, silent.map(f => f.replace(ROOT, '')))
 }
 
 console.log('\n6. Audio and haptics exist, and are not a second copy')
@@ -179,6 +210,145 @@ console.log('\n6. Audio and haptics exist, and are not a second copy')
   // The round timer must use it rather than growing its own oscillator.
   const hook = readFileSync(join(ROOT, 'src/hooks/useTimers.tsx'), 'utf8')
   check('the round timer fires the shared cues', /playTimerCue/.test(hook))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n8. Switching protocol mid-round keeps the count honest')
+// ---------------------------------------------------------------------------
+//
+// Design handoff frame 4a, 13 Sep 2026. Tapping 40/20 during round 3 of 8 must
+// pick up at round 4, still of 8. The engine derives everything from ONE
+// immutable anchor, so the switch starts a genuinely new block whose `rounds`
+// is only what remains — and the ONLY thing that keeps the words honest across
+// that seam is `carried`.
+//
+// THE DEFECT THIS SECTION EXISTS TO CATCH is a card that says "Round 1 of 5" a
+// second after promising "at round 4". Every display function is driven with a
+// carried config and checked against the SESSION's numbers, not the block's.
+{
+  const base = { rounds: 8, workSeconds: 20, restSeconds: 10 }
+  // What the boundary watcher builds when it switches at round 4 of 8: five
+  // rounds left, three done, and the seconds those three took.
+  const after = { rounds: 5, workSeconds: 40, restSeconds: 20, carried: { rounds: 3, seconds: 3 * 30 } }
+
+  check('a plain config has nothing carried', sessionTotalRounds(base) === 8 && sessionRoundNumber(base, 3) === 3)
+  check('a switched block still totals the session', sessionTotalRounds(after) === 8, sessionTotalRounds(after))
+  check('...and its round 1 is the session\'s round 4', sessionRoundNumber(after, 1) === 4, sessionRoundNumber(after, 1))
+
+  check('the headline counts the session, not the block',
+    roundHeadline(after, 1) === 'Round 4 of 8', roundHeadline(after, 1))
+  check('...and so does the finished label',
+    roundDoneLabel(after) === '8 of 8 rounds done', roundDoneLabel(after))
+  check('...and the line under the clock',
+    roundSubline(after, 'work', 1) === 'Round 4 of 8 — 20s rest next.', roundSubline(after, 'work', 1))
+  // THE REST NAMED IS THE NEW BLOCK'S, because that is what happens next.
+  check('...quoting the rest the NEW protocol will actually give',
+    roundSubline(after, 'work', 1).includes('20s rest'), roundSubline(after, 'work', 1))
+
+  // ONE PIP PER ROUND OF THE SESSION. Pips that shrank with the block would
+  // report the session getting smaller as it went on.
+  const anchor = START.toISOString()
+  const midBlock = computeRoundState(after, anchor, START.getTime() + 1000)
+  const pips = roundPips(midBlock, after)
+  check('the pips span the whole session', pips.length === 8, pips.length)
+  check('...with the rounds done before the switch marked done',
+    pips.slice(0, 3).every(x => x === 'done'), pips)
+  check('...and the current one where the session says it is',
+    pips[3] === 'current', pips)
+  // AND DURING A COUNTDOWN. Nothing is "current" in a lead-in — round 1 has
+  // not started — but rounds already DONE stay done, and the branch that says
+  // so is only reachable from a config that carries something. The app never
+  // builds one (a switched block has no countdown), so this drives the
+  // function's contract directly rather than leaving the branch unwatched.
+  const leadInPips = roundPips(
+    computeRoundState({ ...after, leadInSeconds: 10 }, anchor, START.getTime() + 1000),
+    { ...after, leadInSeconds: 10 })
+  check('...and a countdown does not un-do the rounds already done',
+    leadInPips.slice(0, 3).every(x => x === 'done') && leadInPips.slice(3).every(x => x === 'upcoming'),
+    leadInPips)
+
+  // THE LOG COVERS BOTH HALVES. Eight rounds happened; a log saying five
+  // because the protocol changed at round four would be the app disbelieving
+  // her — the same defect roundLogSummary's own header was written about.
+  const logged = roundLogSummary(after)
+  const expectedSeconds = 3 * 30 + (5 * 40 + 4 * 20)
+  check('the logged duration counts the rounds before the switch too',
+    logged.durationMinutes === Math.max(1, Math.round(expectedSeconds / 60)),
+    { got: logged.durationMinutes, expectedSeconds })
+  check('...and it is strictly more than the block alone',
+    logged.durationMinutes > roundLogSummary({ rounds: 5, workSeconds: 40, restSeconds: 20 }).durationMinutes,
+    logged)
+  check('...and the note says the session switched rather than hiding it',
+    /8 rounds/.test(logged.detail) && /first 3/.test(logged.detail), logged.detail)
+
+  // CARRIED IS DISPLAY ONLY. The block's own schedule must not grow with it,
+  // or the finished state banks the wrong number and un-finishes itself.
+  check('the block\'s own length ignores what came before',
+    totalRoundSeconds(after) === totalRoundSeconds({ rounds: 5, workSeconds: 40, restSeconds: 20 }),
+    { withCarry: totalRoundSeconds(after) })
+
+  // THE CHIP ROW'S OWN VOCABULARY.
+  // ON A CONFIG NO PRESET SHARES, deliberately. Checking Tabata alone passed
+  // with the whole expression replaced by the literal "8×20/10" — the fixture
+  // was the answer.
+  check('a chip states its config in short form',
+    chipNumbers(base) === '8×20/10' && chipNumbers({ rounds: 5, workSeconds: 45, restSeconds: 15 }) === '5×45/15',
+    chipNumbers({ rounds: 5, workSeconds: 45, restSeconds: 15 }))
+  // AND NEVER SAYS IT TWICE. A protocol named after its own numbers gets the
+  // round count instead, so the chip does not read "40/20 · 8×40/20".
+  check('...and a chip named after its numbers says how many rounds instead',
+    chipNumbers({ rounds: 8, workSeconds: 40, restSeconds: 20 }, '40/20') === '8 rds',
+    chipNumbers({ rounds: 8, workSeconds: 40, restSeconds: 20 }, '40/20'))
+  check('...while a chip named after a protocol still states the numbers',
+    chipNumbers(base, 'Tabata') === '8×20/10', chipNumbers(base, 'Tabata'))
+  // A REST IS NEVER DROPPED TO SHORTEN THE CHIP. The minute form states the
+  // work alone, so it is reserved for intervals long enough that nobody says
+  // them in seconds; at one minute with a real rest, the rest is the half you
+  // need. Found by reading the screen, not by a check — none of these looked
+  // at a 60-second interval before.
+  check('a one-minute round still shows the rest it has',
+    chipNumbers({ rounds: 6, workSeconds: 60, restSeconds: 30 }) === '6×60/30',
+    chipNumbers({ rounds: 6, workSeconds: 60, restSeconds: 30 }))
+  check('...while a three-minute boxing round is said in minutes',
+    chipNumbers({ rounds: 3, workSeconds: 180, restSeconds: 60 }, 'Boxing') === '3×3 min',
+    chipNumbers({ rounds: 3, workSeconds: 180, restSeconds: 60 }, 'Boxing'))
+  check('...and an EMOM states its length, not a rest it does not have',
+    chipNumbers({ rounds: 10, workSeconds: 60, restSeconds: 0, style: 'emom' }) === '10 min',
+    chipNumbers({ rounds: 10, workSeconds: 60, restSeconds: 0, style: 'emom' }))
+  check('a protocol is named by its preset, and anything else is honestly Custom',
+    protocolNameOf(base) === 'Tabata' && protocolNameOf({ rounds: 7, workSeconds: 25, restSeconds: 5 }) === 'Custom')
+  check('the idle line says what the protocol IS',
+    secondsPhrase(base) === '20s work · 10s rest', secondsPhrase(base))
+
+  // TWO CONFIGS MATCH ON WHAT RUNS, not on bookkeeping. A running block
+  // carries a lead-in and a carry that a chip never has; if those counted,
+  // the row would show nothing selected in the middle of running that very
+  // protocol.
+  check('a running block still matches the chip that started it',
+    sameRoundConfig({ ...base, leadInSeconds: 10 }, base))
+  check('...and a switched block matches the chip it switched to',
+    sameRoundConfig(after, { rounds: 5, workSeconds: 40, restSeconds: 20 }))
+  check('...but a different protocol does not', !sameRoundConfig(base, { ...base, workSeconds: 30 }))
+
+  // THE BOUNDARY ITSELF, read off the provider. It has to land at a round
+  // edge and nowhere else, and it must not stop to count down again.
+  const hook = stripComments(readFileSync(join(ROOT, 'src/hooks/useTimers.tsx'), 'utf8'))
+  check('a queued switch waits for a new round to begin',
+    /roundState\.currentRound > prevRound\.round/.test(hook))
+  check('...and never lands during the get-ready countdown',
+    /roundState\.currentPhase !== 'lead_in'/.test(hook))
+  check('...nor after the session has finished', /!roundState\.isComplete/.test(hook))
+  check('the new block runs only what is left',
+    /rounds: remaining/.test(hook) && /sessionTotalRounds\(cfg\) - carried\.rounds/.test(hook))
+  check('...with no second countdown in the middle of a session',
+    /leadInSeconds: 0/.test(hook))
+  check('...and hands over what has already been done',
+    /rounds: \(cfg\.carried\?\.rounds \?\? 0\) \+ doneInBlock/.test(hook)
+    && /seconds: \(cfg\.carried\?\.seconds \?\? 0\) \+ doneInBlock \* \(cfg\.workSeconds \+ cfg\.restSeconds\)/.test(hook))
+  // ONE WRITER. Two effects both keyed on roundState both calling persist is
+  // how the per-phase deadline corruption got in the first time.
+  check('the switch is applied by the one effect that already writes the record',
+    hook.indexOf('const queued = record.queuedRoundConfig') > hook.indexOf('const lastCueRef'), null)
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

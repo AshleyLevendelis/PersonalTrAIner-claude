@@ -23,7 +23,15 @@ import { fileURLToPath } from 'url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 
-export interface Turn { user: string; reply: string; error?: string | null }
+export interface Turn {
+  user: string
+  reply: string
+  error?: string | null
+  /** The confirm card this turn offered, when it answered with one instead of
+   *  words. Written by scripts/run-coach-exam.mts off chat-gemini's own
+   *  `proposal`; absent on every transcript produced before 16 Sep 2026. */
+  proposal?: { kind: string; args?: unknown } | null
+}
 export interface Transcript {
   case: string
   why?: string
@@ -40,6 +48,10 @@ export interface ExamChecks {
   mustMention?: string[]
   /** A figure the context already holds; any other value for it is a contradiction. */
   statesNumber?: { turn: number; label: string; expected: number; unit: string }[]
+  /** The user asked for a CHANGE, so somewhere in this conversation a confirm
+   *  card has to appear. Declared per case rather than inferred, because only
+   *  the case author knows whether the message was a request or a remark. */
+  expectsProposal?: boolean
 }
 export interface Violation {
   rule: string
@@ -61,16 +73,59 @@ export function clauses(text: string): string[] {
 const quoteOf = (text: string, match: string) =>
   clauses(text).find(c => c.toLowerCase().includes(match.toLowerCase())) ?? match
 
+/** How a turn reads when the coach answered with a card rather than a sentence.
+ *  ONE definition, used by the report AND by the transcript the judge marks —
+ *  the rubric already learned that lesson (it is read from its file rather
+ *  than restated), and a second copy here would be the one that drifts. */
+export function coachLine(turn: Turn): string {
+  if (turn.reply.trim()) return turn.reply
+  if (turn.proposal?.kind) return `(no words — the app showed a confirm card: ${turn.proposal.kind}, waiting to be tapped)`
+  return '(no text at all)'
+}
+
 // --- rule: silence ---------------------------------------------------------
 // fa683fc: a tone rewrite that improved the voice and stopped the model
 // replying on 4 of 7 turns. It was caught only because a probe existed. A turn
 // that failed in TRANSPORT is not silence and is excluded — the probe learned
 // that distinction the same way.
+//
+// AND NEITHER IS A CARD. Every proposal chat-gemini returns carries an empty
+// reply by design: the card does the talking, in the app's own words. Before
+// 16 Sep 2026 the runner did not record the card, so those turns arrived here
+// as empty and this rule flagged the coach for its best behaviour — worst of
+// all on the two cases written to test that it proposes rather than announces.
+// An empty reply BESIDE A CARD is the app working; an empty reply beside
+// nothing is still the failure this rule was written for.
 function silence(t: Transcript): Violation[] {
   return t.turns.flatMap((turn, i) =>
-    !turn.error && turn.reply.trim().length === 0
+    !turn.error && !turn.proposal?.kind && turn.reply.trim().length === 0
       ? [{ rule: 'silence', turn: i, quote: '(no text at all)', note: `after: "${turn.user}"` }]
       : [])
+}
+
+// --- rule: missing-proposal ------------------------------------------------
+// The other half of test:question-not-a-card, which holds "a question must not
+// produce a card" inside the app. This holds the inverse, where it costs more:
+// a case declaring expectsProposal is one where the user asked for a CHANGE,
+// and answering a change request with words alone is either the coach doing
+// nothing while sounding helpful, or the Muay Thai incident itself — "I'll make
+// sure today is marked as a rest day", with nothing touched.
+//
+// A conversation in which EVERY turn failed in transport is not a coach that
+// declined to offer; it is no conversation at all, and is excluded for the
+// same reason `silence` excludes a failed turn.
+function missingProposal(t: Transcript): Violation[] {
+  if (!t.checks?.expectsProposal) return []
+  if (t.turns.length === 0) return []
+  if (t.turns.every(turn => !!turn.error)) return []
+  if (t.turns.some(turn => !!turn.proposal?.kind)) return []
+  const lastIndex = t.turns.length - 1
+  return [{
+    rule: 'missing-proposal',
+    turn: lastIndex,
+    quote: coachLine(t.turns[lastIndex]).slice(0, 200),
+    note: 'asked for a change and never offered a confirm card — in this app every change proposes and waits for a tap',
+  }]
 }
 
 // --- rule: allergen-verdict ------------------------------------------------
@@ -272,6 +327,7 @@ function missingMention(t: Transcript): Violation[] {
 export function hardRuleViolations(t: Transcript, tabs: string[] = realTabNames()): Violation[] {
   return [
     ...silence(t),
+    ...missingProposal(t),
     ...allergenVerdict(t),
     ...absentClaim(t),
     ...inventedFeature(t),

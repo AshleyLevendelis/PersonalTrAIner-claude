@@ -189,7 +189,16 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
   // Ashley, mid-session: "theres no way to log the ramp up weights." A tick is
   // only worth anything if it registers AND is still there when she comes back
   // from another tab, so both are driven here rather than argued from source.
+  // STAND ON A DAY THAT HAS A RAMP, and ask the page which day that is.
+  // This block never pinned a day at all, so it asserted a ramp on whatever
+  // weekday the machine woke up on — the exact situation verify:ramp-ticks
+  // added its (also wrong) Monday pin to avoid. real.tsx publishes the day
+  // using formatRampSets, the screen's own predicate.
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
+  await wait(2500)
+  const rampTarget = await ev(`window.__rampTarget`)
+  check('the fixture plan holds a ramped main lift somewhere', !!rampTarget && !!rampTarget.date, rampTarget)
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off${rampTarget ? `&today=${rampTarget.date}` : ''}#/tab/exercise` })
   await wait(2500)
   await ev(`location.hash = '#/tab/exercise'`)
   await wait(1500)
@@ -206,18 +215,23 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
   check('the main lift row opens', opened === 'opened', opened)
   await wait(900)
 
-  // NOTE the case: the label renders through a small-caps utility, so
-  // innerText comes back "RAMP:". A case-sensitive selector found nothing and
-  // sailed past two checks on an empty array — see the length guards below.
+  // FOUND BY WHAT THE STEPS ARE, NOT BY THE HEADING ABOVE THEM. This used to
+  // look for a div whose text began "RAMP:" — the heading's wording at the
+  // time. It now reads "Ramp up first:", deliberately (RampStrip's own comment:
+  // "the order is the instruction"), so the selector matched nothing and four
+  // checks went red against a strip that was on screen the whole time. The
+  // heading is copy and may be rewritten again; a step being a labelled,
+  // pressable control is the property this section is actually about, and it
+  // is the same handle verify:ramp-ticks uses.
+  const STEPS = `[...document.querySelectorAll('button')].filter(b => /warm-up/i.test(b.getAttribute('aria-label') || ''))`
   const readRamp = () => ev(`(() => {
-    const strip = [...document.querySelectorAll('div')].find(d => /^\s*RAMP:/i.test((d.innerText || '')))
-    if (!strip) return JSON.stringify({ found: false, steps: [] })
-    const steps = [...strip.querySelectorAll('button')].map(b => ({
+    const steps = ${STEPS}
+    if (!steps.length) return JSON.stringify({ found: false, steps: [] })
+    return JSON.stringify({ found: true, steps: steps.map(b => ({
       text: b.innerText.replace(/\s+/g, ' ').trim(),
       pressed: b.getAttribute('aria-pressed'),
       label: b.getAttribute('aria-label'),
-    }))
-    return JSON.stringify({ found: true, steps })
+    })) })
   })()`)
 
   const before = JSON.parse(await readRamp())
@@ -233,8 +247,8 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
   await shoot('six-ramp-before')
 
   const tapped = await ev(`(() => {
-    const strip = [...document.querySelectorAll('div')].find(d => /^\s*RAMP:/i.test((d.innerText || '')))
-    const steps = [...strip.querySelectorAll('button')]
+    const steps = ${STEPS}
+    if (steps.length < 2) return 'only ' + steps.length
     steps[0].click(); steps[1].click()
     return 'tapped ' + steps.length
   })()`)
@@ -267,10 +281,7 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
     returned.steps.filter(s => s.pressed === 'true').length === 2, returned.steps)
 
   // And it unticks — a mis-tap has to be undoable.
-  await ev(`(() => {
-    const strip = [...document.querySelectorAll('div')].find(d => /^\s*RAMP:/i.test((d.innerText || '')))
-    ;[...strip.querySelectorAll('button')][0].click()
-  })()`)
+  await ev(`(() => { const steps = ${STEPS}; if (steps[0]) steps[0].click() })()`)
   await wait(400)
   const undone = JSON.parse(await readRamp())
   check('...and a mis-tap can be taken back',

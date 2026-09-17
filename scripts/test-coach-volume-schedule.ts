@@ -164,14 +164,26 @@ console.log('\n7. Nothing applies without a Confirm, and the server writes nothi
 {
   const chat = stripComments(readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8'))
 
-  for (const tool of ['propose_volume_change', 'propose_schedule_change']) {
+  // propose_exercise_add joined this loop on 13 Sep 2026. It has its own gate
+  // (test:exercise-add §8) that checks the same four properties, and it is
+  // here as well deliberately: this is the GENERAL per-tool loop, and the hole
+  // CLAUDE.md names — nothing distinguishing a declared tool from a declining
+  // stub — closes one tool at a time by tools joining it.
+  for (const tool of ['propose_volume_change', 'propose_session_shorten', 'propose_schedule_change', 'propose_exercise_add']) {
     check(`${tool} is declared to the model`, new RegExp(`name: "${tool}"`).test(chat))
     // The handler must forward a PROPOSAL, not act. A handler that reached
     // for the database here would be the exact defect §2.4 closed: the old
     // update_workout_schedule PATCHed fitness_profiles server-side on every
     // call, with no confirm step anywhere.
+    // BOUNDED AT THE NEXT HANDLER, not by a fixed character count. A 1400-
+    // character window starting at one handler runs into the next one, and
+    // every courier ends with the same `reply: ""` — so the "puts no words in
+    // the model's mouth" check below was satisfied by the NEIGHBOUR's reply
+    // and stayed green with this handler's own reply rewritten. Found by
+    // mutation on 13 Sep 2026, on the third tool added to this loop.
     const at = chat.indexOf(`if (name === "${tool}")`)
-    const body = at === -1 ? '' : chat.slice(at, at + 1400)
+    const nextAt = at === -1 ? -1 : chat.indexOf('if (name === "', at + 10)
+    const body = at === -1 ? '' : chat.slice(at, nextAt === -1 ? at + 1400 : Math.min(nextAt, at + 1400))
     check(`...and its handler forwards a proposal`, new RegExp(`kind: "${tool}"`).test(body), body.slice(0, 120))
     check(`...and writes nothing itself`, !/supabase\s*\n?\s*\.from\(/.test(body) && !/\.update\(|\.insert\(|\.upsert\(/.test(body))
     check(`...and puts no words in the model's mouth`, /reply: ""/.test(body))
@@ -191,6 +203,35 @@ console.log('\n7. Nothing applies without a Confirm, and the server writes nothi
   }
   check('the volume tool takes a direction and nothing numeric',
     /enum: \["lighter", "heavier"\]/.test(chat))
+
+  // SCOPE, added 13 Sep 2026. "I'm knackered today" and "Tuesdays are always
+  // too much" are different requests, and before this the tool could only
+  // express the second — so one bad night quietly rewrote the rest of the
+  // plan. Declaring the parameter is not enough: an arg the courier drops
+  // reads on the client as the DEFAULT, which is the more far-reaching of
+  // the two, so the forwarding is checked as well as the declaration.
+  check('the volume tool can say whether this is one session or a lasting change',
+    /enum: \["today", "ongoing"\]/.test(chat))
+  {
+    const at = chat.indexOf('if (name === "propose_volume_change")')
+    const body = at === -1 ? '' : chat.slice(at, at + 1400)
+    check('...and the scope actually reaches the client', /scope: args\.scope/.test(body), body.slice(0, 200))
+  }
+  check('...and the client reads it, defaulting to the narrower reading only when told to',
+    /rawArgs\.scope === 'today'/.test(stripComments(readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'))))
+
+  // The shortening tool is a TIME request, not a volume one. Its own numeric
+  // parameter is the minutes the person actually has — the one number in the
+  // plan-mutation surface the model is allowed to carry, because it is theirs
+  // and not a prescription.
+  {
+    const at = chat.indexOf('name: "propose_session_shorten"')
+    const decl = at === -1 ? '' : chat.slice(at, chat.indexOf('required:', at))
+    const params = [...decl.matchAll(/^\s{8}(\w+): \{$/gm)].map(m => m[1])
+    check('the shortening tool is declared', at !== -1)
+    check('...and takes the minutes they have, and nothing that prescribes',
+      JSON.stringify(params) === JSON.stringify(['day', 'minutes', 'reason', 'origin_verbatim_quote']), params)
+  }
 
   // The prompt must not still be telling the model these decline. A rule
   // that says "calling either will always decline" outlives the code that
@@ -222,6 +263,8 @@ console.log('\n8. The client can actually execute what the server proposes')
     // obligations: a propose branch, a confirm branch that calls the executor,
     // and the new plan handed back to the app.
     propose_concurrent_activity: 'executeConcurrentActivity',
+    // Added 13 Sep 2026 with "I've only got 25 minutes today" — same rail.
+    propose_session_shorten: 'executeSessionShorten',
   }
   for (const [kind, executor] of Object.entries(EXECUTOR)) {
     check(`${kind} has a propose branch`, ui.includes(`result.proposal.kind === '${kind}'`))
