@@ -158,8 +158,22 @@ async function main() {
     handler.indexOf('checkLoggedSetWeight') > 0 && handler.indexOf('checkLoggedSetWeight') < handler.indexOf('logSet({'))
   check('an impossible weight leaves the handler without logging',
     /verdict === 'impossible'[\s\S]{0,240}?return\b[\s\S]{0,80}?\}/.test(handler), handler.slice(handler.indexOf("'impossible'"), handler.indexOf("'impossible'") + 240))
-  check('a warned weight is refused a FIRST tap — the confirm state gates it',
-    /verdict === 'above_ceiling' && confirmWeightSet !== setNumber[\s\S]{0,400}?setConfirmWeightSet\(setNumber\)[\s\S]{0,160}?return\b/.test(handler))
+  // RE-ANCHORED 17 Sep 2026. This named `setNumber`, and broke the day rows
+  // stopped being identified by a bare number: a warm-up row and a working
+  // row can both be "2", so every piece of row state is now keyed on the
+  // PAIR. The property was never the variable's name — it is that the row the
+  // arm is set on is the SAME row the check read, which a backreference
+  // states and a literal name only implied.
+  check('a warned weight is refused a FIRST tap — the confirm state gates it, on that row',
+    /verdict === 'above_ceiling' && confirmWeightSet !== (\w+)[\s\S]{0,700}?setConfirmWeightSet\(\1\)[\s\S]{0,160}?return\b/.test(handler))
+  // PINNED ON THE SPAN, NOT ON A DISTANCE. The first version asked for a
+  // `return` within 160 characters of the arm; deleting that very return left
+  // it green, because another one sat just past the window. The property is
+  // that control leaves the handler between noticing the weight and logging
+  // it, however long the branch grows.
+  const beforeLogging = handler.slice(handler.indexOf("verdict === 'above_ceiling'"), handler.indexOf('logSet('))
+  check('...and nothing is logged on that first tap — the handler returns before it',
+    beforeLogging.length > 100 && /setConfirmWeightSet\(\w+\)\s*\n\s*return\b/.test(beforeLogging))
   check('the warning says what the second tap will do',
     /Tap ✓ again to log it anyway/.test(grid))
   check('a second tap on the same row does log it — the arm is cleared on the way through',
@@ -167,7 +181,22 @@ async function main() {
   check('editing the weight disarms it: a new number is a new decision',
     /field === 'weight'[\s\S]{0,300}?setConfirmWeightSet\(null\)/.test(grid))
   check('the warning is not dressed as a refusal (amber, not destructive)',
-    /rowWarnings\[setNumber\][\s\S]{0,200}?text-amber-600/.test(grid))
+    /rowWarnings\[\w+\][\s\S]{0,200}?text-amber-600/.test(grid))
+  // AND THE ROW IDENTITY IS THE PAIR, NOT THE NUMBER. Keyed on the bare
+  // number, a weight warning armed on build-up step 2 would arm working set 2
+  // as well, and the second tap on the wrong row would log an unchecked
+  // weight. The arm, the warning and the error all take the same key.
+  check('row state is keyed on the row, not on a number two rows can share',
+    /const \[confirmWeightSet, setConfirmWeightSet\] = useState<string \| null>/.test(grid)
+    && /const k = rowKey\(ref\)/.test(grid))
+  // AND EVERY WRITE USES IT. Two were missed on the day rows gained a kind —
+  // rowErrors and inputs are string-keyed records, so `[setNumber]` compiles,
+  // type-checks and files the value under "2" where "w2" and "s2" are read.
+  // A red error cleared a key nothing reads; the just-logged numbers went
+  // where the boxes never look. Neither tsc nor any other check could see it.
+  check('no row-state map is written under a bare set number',
+    !/(rowErrors|rowWarnings|inputs|setInputs)[\s\S]{0,60}?\[setNumber\]/.test(grid),
+    (grid.match(/.{0,50}\[setNumber\].{0,30}/g) ?? []).slice(0, 4))
   check('the database column width is gone as a stand-in for a lifting bound',
     !/9999\.99/.test(grid))
   check('both SetGrid parents hand it the profile, so Additional Work is not the weak row',

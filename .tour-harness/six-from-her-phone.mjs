@@ -191,7 +191,7 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
   // from another tab, so both are driven here rather than argued from source.
   // STAND ON A DAY THAT HAS A RAMP, and ask the page which day that is.
   // This block never pinned a day at all, so it asserted a ramp on whatever
-  // weekday the machine woke up on — the exact situation verify:ramp-ticks
+  // weekday the machine woke up on — the exact situation verify:ramp-readonly
   // added its (also wrong) Monday pin to avoid. real.tsx publishes the day
   // using formatRampSets, the screen's own predicate.
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
@@ -222,7 +222,7 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
   // checks went red against a strip that was on screen the whole time. The
   // heading is copy and may be rewritten again; a step being a labelled,
   // pressable control is the property this section is actually about, and it
-  // is the same handle verify:ramp-ticks uses.
+  // is the same handle verify:ramp-readonly uses.
   const STEPS = `[...document.querySelectorAll('button')].filter(b => /warm-up/i.test(b.getAttribute('aria-label') || ''))`
   const readRamp = () => ev(`(() => {
     const steps = ${STEPS}

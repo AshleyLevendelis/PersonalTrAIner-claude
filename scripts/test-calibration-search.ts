@@ -164,18 +164,34 @@ check('...decided before the prescription is even looked up', calibrationBranch 
 check('...and set 1 keeps its pre-fill — the probe is one tap when the guess is right', !/setNumber >= 1\) return ''/.test(defaultFn) && /setNumber > 1\) return ''/.test(defaultFn))
 
 const save = grid.slice(grid.indexOf('const handleSaveSet = '), grid.indexOf('const weight = input.isBodyweight'))
+// RE-ANCHORED 17 Sep 2026: the condition gained a term (`!warm`) when the
+// build-up became real rows, and a check naming the exact conjunction failed
+// on a correct change. The property is the shape — probe, past set 1, blank
+// box, error and return — not the list of terms.
 check('the confirm path refuses an empty box in a calibration week instead of writing the guess',
-  /if \(calibrationProbe && setNumber > 1 && [^\n]*!input\.weight\.trim\(\)[^\n]*\) \{\s*\n\s*setRowErrors\([^\n]*\)\s*\n\s*return\s*\n\s*\}/.test(save))
+  /if \(calibrationProbe && [^\n]*setNumber > 1 && [^\n]*!input\.weight\.trim\(\)[^\n]*\) \{\s*\n\s*setRowErrors\([^\n]*\)\s*\n\s*return\s*\n\s*\}/.test(save))
+// AND NEVER ON A BUILD-UP ROW. Its number comes from the prescription, so a
+// blank box there is not a missing probe — refusing it would block the warm-up
+// of every calibration-week lift.
+check('...and a build-up row is exempt: its weight was never the guess being replaced',
+  /if \(calibrationProbe && !warm && setNumber > 1/.test(save))
 check('...before the weight is derived, so the fallback never runs', save.length > 0 && /!input\.weight\.trim\(\)/.test(save))
 check('...and the refusal names the probe, so it reads as the design', /set 1 was the probe/.test(save))
-check('the empty box asks to be typed into', /const d = defaultWeightFor\(setNumber\)\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
+check('the empty box asks to be typed into', /const d = defaultWeightFor\(\w+\)\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
 
-const cascade = grid.slice(grid.indexOf('{calibrationProbe && setNumber > 1 && !isSaved && (() => {'), grid.indexOf('{rowErrors[setNumber] && ('))
+const cascadeStart = grid.indexOf('{calibrationProbe && !warm && setNumber > 1 && !isSaved && (() => {')
+const cascadeEnd = grid.indexOf('{rowErrors[k] && (')
+// A SLICE THAT MISSED ITS END STILL SLICES. indexOf returning -1 quietly cuts
+// one character off the file instead of failing, so the checks below would have
+// read the whole component and passed on text from anywhere in it.
+check('the chip block was found where it is expected to be', cascadeStart > 0 && cascadeEnd > cascadeStart)
+const cascade = grid.slice(cascadeStart, cascadeEnd)
 check('the next-weight chips exist, in a calibration week, on an unlogged set', cascade.includes('data-testid="calibration-cascade"'))
 check('...computed off the previous LOGGED set', /existingLogs\.find\(l => l\.set_number === setNumber - 1\)/.test(cascade))
 check('...never off the prescription', !/suggestedLoadKg|perSetLoadKg|defaultWeightFor/.test(cascade))
 check('...snapped to the implement\'s real plate step', /roundToPlate\(target, mode\)/.test(cascade) && /plateStepKg\(mode\)/.test(cascade))
-check('...and a tap FILLS the box; it does not log the set', /updateInput\(setNumber, 'weight', String\(o\.kg\)\)/.test(cascade) && !/handleSaveSet/.test(cascade))
+check('...and a tap FILLS the box; it does not log the set', /updateInput\(\w+, 'weight', String\(o\.kg\)\)/.test(cascade) && !/handleSaveSet/.test(cascade))
+check('...and the chips are never offered on a build-up row', /calibrationProbe && !warm && setNumber > 1 && !isSaved/.test(grid))
 
 // THE RUNGS MUST BE THREE DIFFERENT WEIGHTS. Measured in the browser at
 // 27.5kg on a barbell (10 Sep 2026): 5% and 10% of it both snap to 30kg, so
@@ -206,7 +222,16 @@ check('the three identical per-set chips are hidden in a calibration week', /ex\
 check('...and one probe line takes their place', /Set 1 · probe at \$\{ex\.suggested_load\}/.test(chip))
 check('...under a label that names the action', /source === 'estimate' && calibration\) return 'start here'/.test(chip))
 const row = strip(read('src/components/exercise/ExerciseRow.tsx'))
-check('the ramp is drawn BEFORE the start number', row.indexOf('<RampStrip') > 0 && row.indexOf('<RampStrip') < row.indexOf('ds-num-lg'))
+// REPLACED 17 Sep 2026, not re-anchored: this asked whether the tickable ramp
+// STRIP was drawn above the start number on today's card. There is no strip on
+// today's card any more — Ashley's ruling that day replaced it with a box for
+// every build-up set, in the grid, above the working rows. The property she
+// ruled on survives ("the build-up comes first, and you can see it"); the
+// mechanism that carried it does not. The order on the real screen is read by
+// verify:warmup-rows §3; here we hold the two halves a source can see.
+check('today\'s card hands the build-up to the grid as rows, not as a strip',
+  /rampSets=\{/.test(row) && !/<RampStrip/.test(row))
+check('...and the build-up rows are built before the working ones', /const rowRefs: SetRef\[\] = \[\s*\n\s*\.\.\.warmupRowNumbers[\s\S]{0,160}?\.\.\.workingRowNumbers/.test(grid))
 check('...and the week reaches both the chip and the grid', (row.match(/calibration=\{isCalibrationWeek\}/g) || []).length >= 2)
 const ramp = strip(read('src/components/exercise/RampStrip.tsx'))
 check('the ramp says it comes first, on screen and not in a tooltip', /Ramp up first/.test(ramp) && /→ then set 1/.test(ramp) && !/title=[^\n]*then set 1/.test(ramp))
@@ -246,8 +271,8 @@ check('the grid\'s calibration behaviour is off unless the week turns it on', /c
 check('the search is gated on there being a weight to search for',
   /const calibrationProbe = calibration && suggestedLoadKg != null && !!catalogEntry && isExternallyLoaded\(catalogEntry\)/.test(grid))
 check('...and all three rules read that same flag, not the week alone',
-  (grid.match(/calibrationProbe && setNumber > 1/g) || []).length === 3
-  && !/[^a-zA-Z]calibration && setNumber > 1/.test(grid), (grid.match(/calibration(Probe)? && setNumber > 1/g) || []))
+  (grid.match(/calibrationProbe && [^\n]*setNumber > 1/g) || []).length === 3
+  && !/[^a-zA-Z]calibration && [^\n]*setNumber > 1/.test(grid), (grid.match(/calibration(Probe)? && [^\n]*setNumber > 1/g) || []))
 
 console.log(failures === 0 ? '\nAll calibration-search checks passed.' : `\n${failures} calibration-search check(s) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

@@ -183,105 +183,78 @@ async function main() {
     }
   }
 
-  console.log('\n[4] The ramp can be ticked off on today, and nowhere else (7 Sep 2026)')
+  console.log('\n[4] The build-up is boxes on today and text everywhere else (17 Sep 2026)')
   {
-    // Ashley, from the gym: "theres no way to log the ramp up weights." Five
-    // steps printed with weights and reps, none of them markable, so a warm-up
-    // you were three sets into looked exactly like one you had not started.
+    // Ashley, from the gym on 7 Sep 2026: "theres no way to log the ramp up
+    // weights." Her ruling then was TICK THEM OFF, do not log them — a
+    // place-keeper that wrote nothing down. Standing in the gym again on
+    // 17 Sep she reversed it, from three options: a box for every set,
+    // labelled, so the build-up is logged like any other work and marked so it
+    // never counts toward the weight going up.
     //
-    // Her ruling once the options were put to her: TICK THEM OFF, do not log
-    // them. That distinction is the whole of this section — a tick that
-    // quietly became a database row would put warm-up sets into a place every
-    // read in this app deliberately filters out.
+    // THIS SECTION USED TO PIN THE TICK MECHANISM, AND THAT IS THE LESSON.
+    // Fourteen checks asserted the toggle's onClick, its aria-pressed, its
+    // border before it was tapped, and the four pieces of rampTicks state
+    // behind it. Every one had to go red for her ruling to land, and while
+    // they stood they would have kept dead code alive — a mechanism-pinned
+    // check does not merely fail to catch a drift, it can BLOCK the
+    // correction. What is checked now is the property underneath: the
+    // build-up is on screen, it is never mistaken for working volume, and it
+    // cannot be tapped on a day nobody is training.
     const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
     const strip = read('src/components/exercise/RampStrip.tsx')
     const row = read('src/components/exercise/ExerciseRow.tsx')
     const browse = read('src/components/exercise/ReadOnlyDayList.tsx')
     const hook = read('src/hooks/useActiveSession.tsx')
 
-    check('a ramp step is a real control', /onClick=\{\(\) => onToggle!\(s\.setNumber\)\}/.test(strip))
-    check('...that says whether it is done', /aria-pressed=\{done\}/.test(strip))
-    check('...and says so in words, not only in styling',
-      /tap to unmark/.test(strip) && /tap to mark done/.test(strip))
+    check('today\'s card no longer renders the tickable strip — the grid has the rows',
+      !/<RampStrip[\s\S]{0,200}onToggle=/.test(row), row.match(/<RampStrip[\s\S]{0,120}/)?.[0])
+    const gridSrc = readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8')
+    check('...the grid draws a labelled build-up row', /data-testid={warm \? 'warmup-row' : 'working-row'}/.test(gridSrc))
+    check('...labelled by the shared function, with no third case', /\{setLabel\(ref\)\}/.test(gridSrc))
+    check('...and a build-up row is SAVED as one', /isWarmup: warm,/.test(gridSrc))
+    check('...and DELETED as one — the natural key includes the kind, so the wrong kind tombstones the other row',
+      /deleteSet\(\{ userId: profileId, date: today, exerciseId, setNumber: ref\.setNumber, isWarmup: isWarm\(ref\) \}\)/.test(gridSrc))
+    // WHAT THIS FILE CANNOT PROVE, said out loud rather than left implied:
+    // every check here reads SOURCE. Deleting the warm-up refs from the row
+    // list leaves all of this green while the rows vanish from the screen —
+    // measured, by doing exactly that. Only a browser can see a row that is
+    // not there, which is verify:warmup-rows' job.
+    // The half that makes it safe rather than merely visible.
+    check('...while a build-up never fires a personal best', /const pr = warm \? null : checkForPR\(/.test(gridSrc))
+    check('...and never starts the rest timer or the same-session bump', /if \(!warm && onSetCompleted && prescribedReps\)/.test(gridSrc))
+    check('...and never takes last week\'s WORKING weight as its ghost',
+      /const ghostFor = \(ref: SetRef\) => \(isWarm\(ref\) \? undefined :/.test(gridSrc))
 
-    // IT MUST LOOK TAPPABLE BEFORE IT IS TAPPED. Ashley reported "theres no
-    // way to log the ramp up weights" on 7 Sep 2026; this section was written
-    // for that fix — and she reported THE SAME SENTENCE on 10 Sep, because an
-    // untapped step rendered with the same colour, size and weight as the
-    // read-only <span> one branch above. No border, no icon, nothing. The
-    // difference only arrived after a tap nobody knew was possible, and the
-    // "tap one to mark it done" hint lives in a `title`, which a phone never
-    // shows. Everything above this passed the whole time.
-    //
-    // Pinned on the PROPERTY — an untapped step carries a visible affordance
-    // the plain-text branch does not — rather than on a class name, so a
-    // restyle moves with it and a deletion fails.
-    const untapped = (strip.match(/: '([^']*)'\s*\n?\s*\}`\}/) || [])[1] ?? ''
-    check('an UNTAPPED step is drawn as a control, not as text',
-      /border-\[/.test(untapped) && /bg-\[/.test(untapped), untapped)
-    check('...and carries an icon before it is tapped, not only after',
-      /done\s*\n?\s*\?\s*<Check[\s\S]{0,120}:\s*<Circle/.test(strip), null)
-    // Scoped to the read-only block itself. A window measured in characters
-    // after `if (!interactive)` reached past the closing brace into the
-    // interactive branch below and found its <button> — the check failed on
-    // its own regex rather than on the code.
-    const readOnlyBlock = strip.slice(
-      strip.indexOf('if (!interactive)'),
-      strip.indexOf('const done =') > strip.indexOf('if (!interactive)')
-        ? strip.indexOf('const done =')
-        : strip.indexOf('return (', strip.indexOf('if (!interactive)') + 200),
-    )
-    check('...while the read-only branch stays plain text, so the two are told apart',
-      readOnlyBlock.includes('<span') && !readOnlyBlock.includes('<button') && !/border-\[/.test(readOnlyBlock),
-      readOnlyBlock.slice(0, 160))
 
-    // NOT A LOG. If a tick ever writes a set, this whole design is wrong —
-    // warm-ups are excluded from volume, PRs, progression and history, so the
-    // row would be invisible the moment it was written.
-    // Comments stripped: the header explaining WHY warm-ups are not logged
-    // names is_warmup, and an absence check a comment can fail is no check at
-    // all. Third time this file family has learned that lesson.
+    // THE STRIP IS READ-ONLY EVERYWHERE NOW, AND THE MACHINERY IS GONE WITH IT.
+    // Left in place, the props and the stored ticks would be dead code that
+    // three checks in this very file insisted on.
     const stripCode = strip.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
-    check('ticking writes no set, anywhere in the strip',
+    check('the strip takes a ramp and nothing else — no toggle, no ticks',
+      /export function RampStrip\(\{ ramp \}: \{ ramp: RampDisplay \}\)/.test(stripCode), stripCode.slice(0, 200))
+    check('...so it draws no buttons at all', !/<button/.test(stripCode), stripCode.match(/<button[\s\S]{0,80}/)?.[0])
+    check('...and writes no set, as it never did',
       !/logSet|saveSet|isWarmup|is_warmup|supabase/.test(stripCode), stripCode.match(/logSet|saveSet|isWarmup|is_warmup|supabase/g))
-    check('...and the row hands it a toggle, not a logger',
-      /onToggle=\{n => toggleRampTick\(exerciseId, n\)\}/.test(row))
+    check('the tick state is gone from the session hook', !/rampTicks/.test(hook), hook.match(/.{0,40}rampTicks.{0,40}/g)?.slice(0, 3))
+    check('...and today\'s card no longer asks for it',
+      !/rampTicksFor|toggleRampTick/.test(row), row.match(/.{0,40}(rampTicksFor|toggleRampTick).{0,20}/g)?.slice(0, 3))
 
-    // IT HAS TO SURVIVE A TAB SWITCH. Component state would drop every tick
-    // the moment she glanced at Nutrition, which on a gym floor is the same
-    // as not having it. Stored beside the set drafts, date-keyed, so it
-    // expires on its own.
-    check('a tick outlives a tab switch', /rampTicks\?: Record<string, number\[\]>/.test(read('src/lib/active-session-store.ts')))
-
-    // THE BUG THE BROWSER FOUND, and the reason this check is shaped the way
-    // it is. The first version copied the set drafts next door, which read
-    // straight from localStorage on every call. Drafts can do that: they live
-    // in uncontrolled inputs and need no re-render. A TICK IS THE OPPOSITE —
-    // its entire job is to look different afterwards — and a localStorage read
-    // gives React nothing to re-render on. The tap wrote through correctly and
-    // the strip did not change; the tick only appeared once a tab switch
-    // remounted the row. verify:six caught it. This file's earlier check
-    // asserted the read came from the record, which is precisely the defect.
-    //
-    // So both halves are pinned: state for the repaint, record for the reload.
-    check('a tick repaints the strip, because it is React state',
-      /const \[rampTicks, setRampTicks\] = useState<Record<string, number\[\]>>/.test(hook)
-      && /rampTicks\[exerciseId\] \?\? \[\]/.test(hook))
-    check('...and is written through, so a reload mid-warm-up still has it',
-      /patchRecord\(\{ rampTicks: updated \}\)/.test(hook))
-    check('...and is read back out of the record on mount',
-      /setRampTicks\(record\?\.rampTicks \?\? \{\}\)/.test(hook))
-    check('...and tapping a ticked step unticks it', /current\.includes\(setNumber\)/.test(hook))
-
-    // READ-ONLY SURFACES STAY READ-ONLY. A tick on the program browser would
-    // be marking a set on a day that is not today.
-    check('browse and peek pass no handler', /<RampStrip ramp=\{ramp\} \/>/.test(browse))
-    check('...so those steps render as text rather than dead buttons',
-      /const interactive = typeof onToggle === 'function'/.test(strip) && /if \(!interactive\)/.test(strip))
-    // The tick is only offered before the working sets start, which is the
-    // only time a warm-up is still ahead of you.
-    check('...and today only offers it before the first working set is logged',
-      /completedSets === 0 && ramp && \(/.test(row))
+    // AND THE SENTENCE THAT STATES THE ORDER SURVIVED THE DELETION. It used to
+    // render only on the tickable surface; removing the ticks would have taken
+    // it off the only screen still showing this block, silently undoing
+    // Ashley's 10 Sep ruling that the order is said on screen, not in a
+    // tooltip. Checked as a rendered line outside any `interactive` guard.
+    check('browse and peek render the strip', /<RampStrip ramp=\{ramp\} \/>/.test(browse))
+    check('...and it still says the build-up comes first', /Ramp up first:/.test(stripCode))
+    // PINNED ON THE WHOLE CONDITION, not on part of it. A first version asked
+    // whether `ramp.kind === 'kg' && (` preceded the sentence, and passed with
+    // `{false && ramp.kind === 'kg' && (` in front of it — the sentence
+    // switched off and the check green. The property is that the KIND is the
+    // only thing standing between a reader and this line.
+    check('...and that set 1 follows it, on screen rather than in a title',
+      /\{ramp\.kind === 'kg' && \(\s*\n?\s*<span[\s\S]{0,200}?→ then set 1/.test(stripCode), stripCode.match(/.{0,140}then set 1/)?.[0])
+    check('...with no surviving notion of an interactive strip', !/interactive/.test(stripCode))
   }
 
   if (failures > 0) {

@@ -148,6 +148,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   nothing else. It does now, through the shared tail
 - Change its sets, reps or weight for today — via logging only (extra sets,
   typed numbers); the plan itself is not edited
+- **Log the build-up as well as the working sets** — `screen only`, since
+  17 Sep 2026. Ashley's ruling that day, from three options, standing in the
+  gym: **a box for every set, labelled** — Warm-up 1, 2, 3 then Set 1, 2, 3,
+  the build-up marked so it never counts toward the weight going up. **It
+  REVERSES her 7 Sep ruling** ("tick them off, don't record them"), which was
+  made about a strip of chips before anyone had watched a real lifter run out
+  of rows; she was told it was a reversal and chose it anyway. The tickable
+  strip is gone from today's card and survives read-only on browse and peek.
+  A warm-up row is filtered out of volume, personal bests, progression and
+  history by construction, so logging one changes no number the app shows
+  back. `working-sets`, `ramp-visibility`, `set-plausibility`,
+  `verify:warmup-rows`, `verify:ramp-readonly`
 
 **Every change to an exercise lives in one menu** — her ruling, 14 Sep 2026,
 from three options, after reporting that swapping sat outside the "⋮" while
@@ -899,6 +911,31 @@ old — the commands were right and the context was missing.
   So: for a function, require `name(`; for render order, anchor on the rendered
   block; and prove the detector on something that should FAIL it, in the gate
   itself, so it cannot go vacuous later.
+- **A CONTROL THAT WRITES AND DOES NOT REDRAW IS A DEAD CONTROL, and no gate
+  and no type can see it.** 17 Sep 2026: "Add Set" wrote the new row into the
+  stored session record correctly, and no pixel moved — nothing subscribes to
+  that store, so the box appeared later, whenever something unrelated
+  re-rendered the card. It had behaved that way since it was written. The
+  write succeeded, the value was right, the source read fine, and on a phone
+  the button was dead. Found by tapping it in a browser and counting rows.
+  **Anything stored outside React that a screen must react to needs a state
+  mirror beside the durable copy** — and the way to find the next one is to
+  tap the control and look, not to read the handler.
+- **TWO ROWS MUST NOT SHARE ONE SPOKEN NAME.** The same day: the tick button
+  said "Save set 2" on both the warm-up row and the working row, because its
+  label keyed on the number alone. Identical for a screen reader, and
+  identical to every driver — one of them logged the wrong row and made three
+  unrelated checks look broken. **When a list gains a second kind, every label
+  keyed on position becomes ambiguous**, including the ones only a screen
+  reader hears.
+- **A DRIVER WHOSE SUBJECT IS DELIBERATELY DELETED IS REPLACED, NOT
+  RE-ANCHORED.** `verify:ramp-ticks` measured a control Ashley's ruling
+  removed. Re-anchoring it would have meant inventing a subject; deleting it
+  would have dropped the coverage. It became `verify:ramp-readonly`, holding
+  the OPPOSITE property on the surface that still shows the block. And the
+  fourteen source checks behind it were the strongest case yet of the rule
+  above: left standing, they would have made the dead code impossible to
+  delete — a gate ENFORCING what nothing renders.
 - **A BROWSER DRIVER FINDS THINGS NO `test:` GATE CAN, AND THEY ARE NOT SMALL.**
   15 Sep 2026, two in one run, both on a card that every source check passed:
   a new control was on the wrong component (`RestDayCard` renders only when the

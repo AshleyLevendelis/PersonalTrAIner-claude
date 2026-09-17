@@ -225,3 +225,71 @@ able to LOG a warm-up, which parity rule 4 will require.
   record, which a high-rep warm-up row can still win. Those need the write.
 - The rest-period stacking and the style filter hiding machine leg curls are
   separate, and are Ashley's rulings, queued one at a time.
+
+---
+
+## What the build actually found, 17 Sep 2026
+
+Written after stage 2 shipped, because four of these were invisible from the
+plan and one contradicts a prediction in it.
+
+**The prediction that was wrong.** This document said `verify:ramp-ticks` would
+be "re-anchored, not deleted". It could not be: that driver's entire subject is
+the tickable strip on today's card, and her ruling removes it. A driver whose
+subject has been deliberately deleted is not re-anchored — it is replaced.
+`verify:ramp-readonly` now holds what is still there (the strip, read-only, on
+browse and peek) and the property is the OPPOSITE of the old one: on a day that
+is not today, nothing in the block may be tappable. `test:ramp-visibility` §4
+was rewritten the same way.
+
+**A gate that would have kept dead code alive.** Fourteen checks asserted the
+toggle's `onClick`, its `aria-pressed`, its border-before-tap and the four
+pieces of `rampTicks` state. Had they been left standing, the tick machinery
+could not have been deleted without turning them red — so the gate would have
+been ENFORCING code nothing renders. CLAUDE.md warns that a mechanism-pinned
+check can enforce a drift; this is that, in its strongest form.
+
+**Two row-state writes were missed in the re-keying, and nothing could see
+them.** `rowErrors[setNumber]` and `setInputs({ [setNumber]: … })` survived
+next to their `[k]` siblings. Both records are string-keyed, so a number
+indexes them happily: the error was cleared under a key nothing reads, and the
+just-logged values were filed where `inputFor()` never looks. `tsc` was clean,
+every gate was green. Found by reading the span a mutation printed. Gated now
+by "no row-state map is written under a bare set number".
+
+**Two rows shared one spoken name.** The tick button's `aria-label` was
+`Save set ${setNumber}`, so warm-up 2 and working set 2 were both "Save set 2" —
+indistinguishable to a screen reader and to every driver. `verify:calibration-search`
+proved it by logging the WARM-UP when it meant to log set 1, which is how the
+next-weight chips and the empty-box refusal both came to look broken.
+`setLabelLong` had been imported for exactly this and never wired: declared,
+not rendered.
+
+**A control that writes and does not redraw is a dead control** — and it was
+never about warm-ups. "Add Set" had behaved this way since it was written: the
+row went into the stored record correctly and no pixel moved until something
+unrelated re-rendered the card. Measured in the browser — a single keystroke in
+a weight box brought in both missing rows at once. The extra rows are React
+state now, mirroring the pattern the ramp ticks had proved, with the record
+still the durable copy for a reload mid-session.
+
+**The calibration chips were being offered on build-up rows.** They climb off
+the previous WORKING set, so on warm-up 2 they would have proposed a next
+weight derived from working set 1 — a ladder built from the wrong lift. Scoped
+to working rows, and gated.
+
+**The plate calculator now renders only where there is a plate to load**, which
+made a `verify:session-edit` check fail for a good reason: it asked whether ANY
+row carried one, and the row that happened to be open was a band warm-up. Her
+14 Sep ruling is unchanged (changes to the exercise live in the ⋮, the plate
+calculator stays on the row); the check now opens a row with a weight and reads
+that, plus its opposite — the calculator is not offered where there is nothing
+to load.
+
+**Mutations: 33 tried, 33 caught.** Three checks were rewritten because their
+first version missed: a `return`-within-160-characters window that a later
+`return` satisfied; a guard check that passed with `{false && …}` in front of
+it; and a first attempt at reverting the reactivity that left the `setState`
+in place, so the re-render still happened and the defect was never created.
+Two mutations had to be redone for the harness's own reasons (a bad anchor, a
+JSX edit that failed to compile).

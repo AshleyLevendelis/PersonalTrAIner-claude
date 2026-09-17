@@ -105,8 +105,40 @@ const strayVerbs = await ev(`(() => {
   return [...new Set(out)]
 })()`)
 check('1g. ...and no change to an exercise is left loose on the row', (strayVerbs || []).length === 0, strayVerbs)
-check('1h. ...while the plate calculator, which changes nothing, stays one tap away',
-  (await ev(`[...document.querySelectorAll('[data-exercise-name] button')].some(b => /plate calculator/i.test(b.textContent || ''))`)) === true)
+// RE-ANCHORED 17 Sep 2026. This asked whether ANY row on today's card carried
+// a plate calculator, and passed because the row that happened to be open was
+// the first one — a band warm-up, which had a plate calculator it had no use
+// for. It now renders only where there is a plate to load, so the check opens
+// a row with a WEIGHT on it and reads that. Her ruling is unchanged and this
+// is the half that tests it: the calculator stays ON THE ROW, not in the menu.
+await escape()
+const loadedName = (await ev(`(() => {
+  const r = [...document.querySelectorAll('[data-exercise-name]')].find(x => /~\\s*[\\d.]+\\s*kg/i.test(x.innerText || ''))
+  return r ? r.getAttribute('data-exercise-name') : null })()`))
+check('1h. a row with a weight on it is there to read', !!loadedName, loadedName)
+if (loadedName) {
+  await tap(`[data-exercise-name=${JSON.stringify(loadedName)}] [role="button"], [data-exercise-name=${JSON.stringify(loadedName)}] .cursor-pointer`)
+  await wait(900)
+}
+check('1i. ...while the plate calculator, which changes nothing, stays one tap away on it',
+  (await ev(`(() => {
+    const r = [...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === ${JSON.stringify(loadedName)})
+    if (!r) return 'row gone'
+    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.textContent || ''))
+  })()`)) === true)
+// AND NOT ON A ROW WITH NOTHING TO LOAD. A band warm-up offering to work out
+// your plates is the app claiming something it cannot do — the same class as
+// the "Bodyweight" label on a machine.
+check('1j. ...and is not offered where there is no weight to load',
+  (await ev(`(() => {
+    const r = [...document.querySelectorAll('[data-exercise-name]')].find(x => /\\b(Band|Bodyweight)\\b/.test(x.innerText || '') && !/~\\s*[\\d.]+\\s*kg/i.test(x.innerText || ''))
+    if (!r) return 'no unloaded row on this fixture'
+    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.textContent || ''))
+  })()`)) === false)
+
+// The menu was closed to read the row underneath it; the move checks below
+// need it open again on the SAME exercise the order was recorded from.
+check('1k. the first exercise’s menu re-opens for the move checks', (await openRowMenu(start[0])) === 'open')
 await shoot('session-edit-menu')
 
 // --- moving ----------------------------------------------------------------

@@ -2,6 +2,77 @@
 
 Newest first. One line each.
 
+- [x] **A BOX FOR EVERY SET, part 2: the rows, and the seven things drawing them
+  found.** Her 17 Sep ruling rendered. Today's card shows **W1 W2 W3 W4** with
+  their prescribed weights in real boxes, under *"Warm-up · doesn't count
+  toward your weight going up"*, then **1 2 3** at the working weight — one
+  grid, one weight column, so it reads as a single build down the card. "+ Add
+  warm-up" sits beside "+ Add Set". Read on a real 390x844 screen, not inferred
+  from a build that succeeded.
+
+  **The tickable ramp strip is GONE from today's card**, which is what her
+  ruling means: the build-up is logged like any other work now. The strip
+  survives read-only on browse and peek, where a tick would have marked a set
+  on a day nobody is training.
+
+  **SEVEN FINDINGS, five of them defects nothing would have caught.** Listed
+  because each is a different shape:
+
+  1. **"Add Set" was a dead control, and had been since it was written.** The
+     new row went into the stored record correctly and no pixel moved until
+     something unrelated re-rendered the card — nothing subscribes to that
+     store. Measured in the browser: one keystroke in a weight box brought in
+     two missing rows at once. Fixed by mirroring the rows in React state, the
+     pattern the ramp ticks had already proved, with the record still the
+     durable copy for a reload mid-session. **A control that writes and does
+     not redraw is a dead control** — invisible from the source, invisible
+     from the data.
+  2. **Two rows shared one spoken name.** The tick button said "Save set 2" on
+     both warm-up 2 and working set 2 — the same words for a screen reader and
+     for every driver. `verify:calibration-search` proved it by logging the
+     WARM-UP when it meant set 1, which made the next-weight chips and the
+     empty-box refusal both look broken when neither was. `setLabelLong` had
+     been imported for exactly this and never wired: declared, not rendered.
+  3. **Two row-state writes were missed in the re-keying.** `rowErrors` and
+     `inputs` are string-keyed records, so `[setNumber]` compiles, type-checks
+     and files the value under "2" where "w2" and "s2" are read: a red error
+     cleared a key nothing reads, and the just-logged numbers went where the
+     boxes never look. `tsc` clean, every gate green. Gated now.
+  4. **The calibration next-weight chips were being offered on build-up rows.**
+     They climb off the previous WORKING set, so warm-up 2 would have proposed
+     a weight derived from working set 1. Scoped and gated.
+  5. **A gate would have kept dead code alive.** Fourteen checks pinned the
+     tick toggle's `onClick`, its `aria-pressed`, its border-before-tap and
+     four pieces of `rampTicks` state. Deleting the machinery her ruling
+     retired would have turned them red — so the gate would have been
+     ENFORCING code nothing renders. CLAUDE.md warns a mechanism-pinned check
+     can enforce a drift; this is the strongest form of it yet seen here.
+  6. **A driver whose subject is deliberately deleted is replaced, not
+     re-anchored.** `verify:ramp-ticks` measured the tickable strip on today's
+     card. It is now `verify:ramp-readonly`, holding the OPPOSITE property on
+     the surfaces that still show the strip: nothing in the block may be
+     tappable on a day that is not today. The "→ then set 1" line rendered
+     only on the tickable surface, so removing the ticks would have silently
+     taken the sentence stating the ORDER off the only screen still showing
+     it — her 10 Sep ruling, undone by a deletion. It is unconditional now.
+  7. **The plate calculator renders only where there is a plate to load**, so a
+     `verify:session-edit` check went red for a good reason: it asked whether
+     ANY row carried one, and the open row was a band warm-up. Her 14 Sep
+     ruling is untouched — changes to the exercise live in the ⋮, the plate
+     calculator stays on the row — and the check now opens a row with a weight,
+     plus the opposite case.
+
+  **Verified**: 25 source gates and 7 browser drivers green, `npx tsc --noEmit`
+  clean, the card read off a real phone-sized screen. **33 mutations tried, 33
+  caught** — three checks were rewritten because their first version missed (a
+  `return`-within-160-characters window a later `return` satisfied; a guard
+  check that passed with `{false && …}` in front of it; and a revert that left
+  the `setState` in place, so the re-render still happened and the defect was
+  never created). New gate `verify:warmup-rows` (26 checks) proves what no
+  source check can: that the rows are actually on the screen.
+  **Not done**: the full sweep, and the merge to `main` — both need her word.
+  Nothing here needs an edge-function deploy.
+
 - [x] **A BOX FOR EVERY SET, part 1: the half that had to land first.** Ashley's
   ruling, 17 Sep 2026, from three options — *"A box for every set, labelled —
   Warm-up 1, 2, 3 then Set 1, 2, 3. Warm-up boxes are marked as warm-ups so

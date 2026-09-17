@@ -5,7 +5,6 @@ import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreV
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
-import { RampStrip } from './RampStrip'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
 import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
@@ -85,7 +84,7 @@ export function ExerciseRow({
   canMoveDown,
   profile,
 }: ExerciseRowProps) {
-  const { setsFor, requestedSetFocus, clearSetFocusRequest, rampTicksFor, toggleRampTick } = useActiveSession()
+  const { setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
@@ -181,26 +180,16 @@ export function ExerciseRow({
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              {/* THE RAMP COMES FIRST, SO IT IS DRAWN FIRST. It used to sit
-                  below the working-set chips, which is the order you would
-                  read it in if it were something you did after them. It is
-                  the warm-up to set 1 — its last rung lands just under the
-                  start weight — and the screen's order now says so without
-                  a tooltip (Ashley, 10 Sep 2026).
-                  TICKABLE HERE, AND ONLY HERE. This is today's session, so a
-                  tick means "I have done that one"; the browse and peek
-                  surfaces render the same component with no handler and get
-                  plain text, because a tick there would be marking a set on a
-                  day that is not today. Nothing is written to the database —
-                  see RampStrip's header for why recording warm-ups would
-                  change no number the app shows back. */}
-              {completedSets === 0 && ramp && (
-                <RampStrip
-                  ramp={ramp}
-                  ticked={rampTicksFor(exerciseId)}
-                  onToggle={n => toggleRampTick(exerciseId, n)}
-                />
-              )}
+              {/* THE STRIP IS GONE FROM TODAY'S CARD, 17 Sep 2026, and the
+                  grid below has the build-up as real rows instead — Ashley's
+                  ruling from three options, reversing her 7 Sep "tick them
+                  off, don't record them". Ticking was not enough once she was
+                  standing there with a bar in front of her: the strip also
+                  DISAPPEARED the moment the first working set was logged
+                  (`completedSets === 0`), so a build-up half done left her
+                  looking at a grid with no rows and no instruction.
+                  RampStrip itself survives, read-only, on browse and peek —
+                  a tick there would mark a set on a day that is not today. */}
               {/* The unit comes from the plan's own formatted string, split
                   into parts so the number can stay large and the unit small.
                   Hard-coding "kg" here printed a per-hand number as though it
@@ -402,6 +391,12 @@ export function ExerciseRow({
             loadUnitLabel={(ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null)?.unit}
             perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
             loadIsEstimate={loadIsUnverified}
+            // Derived ONCE, above, and passed down: formatRampSets is the one
+            // place percentages become kilos, and it re-derives off the CURRENT
+            // working weight every render. A second copy inside the grid is
+            // where two numbers start to disagree.
+            rampSets={ramp && ramp.kind !== 'stale' ? ramp.sets.map(r => ({ setNumber: r.setNumber, kg: 'kg' in r ? r.kg : undefined, reps: r.reps })) : undefined}
+            rampKind={ramp?.kind}
             calibration={isCalibrationWeek}
             profile={profile}
             onOpenPlateCalc={onOpenPlateCalc}

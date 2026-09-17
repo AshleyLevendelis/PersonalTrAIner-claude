@@ -80,7 +80,7 @@ if (!target) {
 }
 console.log(`  ${target.name}: the plan says ${target.planKg}kg, the log says ${target.liftedKg}kg was lifted`)
 
-// Expand the row, the same way ramp-ticks does.
+// Expand the row, the same way ramp-readonly does.
 const NAME = JSON.stringify(target.name)
 await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${NAME});
  if(!n) return false; let p=n; for(let i=0;i<6&&p.parentElement;i++){p=p.parentElement; if(p.tagName==='BUTTON'||p.getAttribute('role')==='button'){p.click();return true}} return false})()`)

@@ -71,10 +71,10 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Three screen-only, as of 17 Sep 2026** — the pre-session tightness check,
-macro mode, and macro split. The calorie target below is a fourth entry but a
-different kind: it is on NEITHER surface and cannot be, because it is derived
-rather than set.
+**Four screen-only, as of 17 Sep 2026** — the pre-session tightness check,
+macro mode, macro split, and logging a build-up set. The calorie target below
+is a fifth entry but a different kind: it is on NEITHER surface and cannot be,
+because it is derived rather than set.
 
 **THE COUNT IS RE-DERIVED FROM THE BULLETS, NEVER CARRIED FORWARD.** It has
 been wrong twice — "None" while tightness shipped, then "One" while three more
@@ -121,6 +121,16 @@ the difference.
   Both bypass the Profile screen's own writer and are applied from `App.tsx`
   with their own optimistic-apply and revert, so a coach path cannot simply
   reuse the profile-field executor.
+- **Logging a build-up set.** `screen only`, added 17 Sep 2026 the same day the
+  rows were built — written here BY the person adding it, which is the thing
+  this section has twice failed at. Ashley's ruling that day gave every
+  build-up step its own box in the grid; the coach's `log_workout_set` writes
+  working sets and has no way to say a set was a warm-up. The reason it is not
+  simply a parameter: the coach's own view of a session filters
+  `is_warmup=eq.false`, so a coach that could WRITE a warm-up would immediately
+  be unable to READ it back or correct it — a one-way door for the one surface
+  whose whole job is conversation. Closing it means giving the coach the
+  filtered-out half too, which is a bigger change than a flag.
 - **The calorie target itself.** On NEITHER surface, and not a gap that can be
   closed as written: there is no control because the number is derived by
   `computeTargets`, not stored as an intention. Changing "targets" means
