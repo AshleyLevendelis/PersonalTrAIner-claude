@@ -3,11 +3,20 @@
 Newest first. One line each.
 
 - [x] **THE FULL SWEEP, AND THE FOUR THINGS IT CAUGHT THAT THE AFFECTED-GATE RUN
-  COULD NOT.** 248 checks run, 242 pass. Two are the standing environmental
-  pair (`test:meal-quality`, `test:schema-parity`) — confirmed by reading each
-  one's own "Host not in allowlist" line rather than by ticking the names off a
-  list. The other four were real, all from part 1 of the set-boxes work, and
-  none of them could have been in the affected set I derived:
+  COULD NOT.** 201 gates and 47 browser drivers run, 242 of the 248 pass.
+  **TWO CORRECTIONS TO THE FIRST VERSION OF THIS ENTRY, both my own:** it said
+  "248 checks", which is wrong by a factor of about twenty — 248 is the count
+  of gates and drivers, each holding anything from one check to 170. And it
+  said both environmental failures were confirmed by their own "Host not in
+  allowlist" line. Only `test:meal-quality` prints that. `test:schema-parity`
+  prints *"Failed to link to TEST … Nothing was run against it"* — the same
+  cause, an unreachable database, said in different words, and it refuses to
+  report a verdict rather than passing over a link it never made, which is the
+  behaviour to want. The correction matters because the rule this file already
+  carries is to read each failure's OWN output rather than tick names off a
+  list, and I wrote the summary sentence before doing that for the second one.
+  The other four were real, all from part 1 of the set-boxes work, and none of
+  them could have been in the affected set I derived:
 
   1. **Two gates had been CRASHING, not failing.** `test:what-happened` and
      `test:session-move` built their day fixtures with the field name a day
