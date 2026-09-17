@@ -2,6 +2,76 @@
 
 Newest first. One line each.
 
+- [x] **HER DEADLIFT WAS FROZEN AT 95kg AND HER ROWS AT 20kg, AND SHE DID NOT
+  REPORT EITHER.** 17 Sep 2026. She reported the missing boxes: *"Only the ramp
+  up sets input fields were visible until I clicked add set."* The missing boxes
+  were the symptom. **THE DAMAGE WAS IN HER RECORD.**
+  `is_warmup` exists, is filtered by twelve readers, and NOTHING IN THE APP HAS
+  EVER BEEN ABLE TO SET IT. So her build-up is stored as working sets, and
+  `getDoubleProgressionRecommendation` asks `every(reps >= 8)`, sees her 50kg x
+  5, and holds the weight. Her card reads *"Held at 95kg — didn't hit 8 reps on
+  every set last time"* and would have read that every week for ever: three
+  perfect top sets can never clear it while one build-up row sits beside them.
+  Same for her rows at 20kg. **She cannot lift her way out of it.**
+
+  **A SECOND FREEZE NOBODY HAD NOTICED**, from the same cause and in the same
+  file. `checkDoubleProgression` takes the first N rows BY ORDER; her first
+  three rows were the build-up, so her three real 95kg sets at positions 4-6
+  were never looked at and the same-session bump could not fire for her at all.
+
+  **AND A HARM WORSE THAN THE FREEZE, one step from what she hit.** She pressed
+  "Add Set" four times. **Had she not**, the heaviest row would have been 70kg;
+  the screen stores the recommendation whether or not it progressed, so the
+  card would print 70kg as her working weight — and the ramp steps are scaled
+  FROM that number, so the next build-up is computed off 70, logged, and
+  becomes the next anchor. **Contamination does not only freeze the weight.
+  Left alone it walks the prescription DOWN.**
+
+  **FIXED AT READ TIME, which is the decision worth recording.** Every
+  already-logged session is reinterpreted on the next frontend deploy: no
+  migration, no rewrite of her diary, nothing that could lose a row — and it
+  holds whatever the set grid ends up looking like, so it does not wait on her
+  row ruling. **AND THAT CORRECTS SOMETHING SHE WAS TOLD.** When the three row
+  options were put to her, option A was described as "the only one that also
+  fixes the sets you have already logged wrongly". That was wrong; the repair
+  is independent of the row design. Worse, the repair the claim ASSUMED —
+  marking the old rows — is the one that is NOT available, because `is_warmup`
+  is part of the row's identity in both the local natural key and the upsert
+  conflict target, so flipping it inserts a second row instead of updating one.
+  How the wrong claim was reached: the row design and the repair were assumed
+  to share a mechanism, and the assumption was never checked before it went in
+  front of her. Her ruling is unaffected; only that reason for it was wrong.
+
+  **THE RULE IS A CONJUNCTION AND IT HAS TO BE.** A weight threshold alone
+  cannot work: `RAMP_SCHEMES` prescribes a BUILD-UP step at 85% of the top set
+  and `RAMP_PERCENT_TABLE` prescribes a ramped WORKING set at 85% of the top
+  set. Same number, opposite meaning; only the REPS separate them (2 versus the
+  bottom of the range). And the floor is DERIVED from the person's own
+  prescription rather than chosen, so a session prescribed [75, 85, 92, 96,
+  100] can never lose its 75% set to a number somebody typed — with a tolerance
+  under it, because plate rounding puts a set prescribed AT the floor a kilo
+  below it. Bodyweight is untouched by construction, not by a guard.
+
+  **THE GATE FOUND A HOLE THE DESIGN DID NOT.** An abandoned warm-up does not
+  collapse to nothing — it collapses to its heaviest BUILD-UP row, which is
+  that session's own top set. Filtering alone would still have handed the card
+  70kg. So the engine also refuses to judge a session containing fewer working
+  sets than it prescribed: the honest answer to "I have no complete session
+  here" is to leave the plan's own number standing.
+
+  `working-sets` (27 checks). 11 mutations tried, 10 caught. **ONE MISS WAS
+  REAL AND ONE WAS NOT, and the difference is the point.** Real: a mutation
+  stripping the prescription from ONE of two call sites ran green, because a
+  bare name match was still satisfied by the other — the check now derives the
+  call list and requires every one. Not real: removing the bodyweight
+  short-circuit changed no behaviour at all, because with a top set of zero
+  every comparison against a lighter weight is already false. The guard is
+  redundant and the comment claiming "by construction, not by a guard" is
+  literally true — the mutation proved the claim rather than exposing a gap.
+  Also caught by the gate on its own first run: a regex using `[^)]*` to grab a
+  call stopped at the first bracket INSIDE it, so every call looked
+  context-less. Ships with the frontend; no deploy, no migration.
+
 - [x] **"WHEN YOU SWAP AN EXERCISE FOR A NEW ONE NO WEIGHT IS PRESCRIBED."**
   Ashley, 17 Sep 2026, mid-session. **THE APP WAS RIGHT AND THE SCREEN WAS
   SILENT, which is why she read a correct answer as a failure.** She swapped a

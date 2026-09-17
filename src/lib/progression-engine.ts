@@ -63,6 +63,85 @@ function maxWorkingWeight(sets: ExerciseSetLog[]): number {
   return sets.reduce((max, s) => Math.max(max, s.weight_kg), 0)
 }
 
+// ---------------------------------------------------------------------------
+// WHICH OF THESE ROWS WERE WORKING SETS
+//
+// Ashley, 17 Sep 2026: her deadlift card said "Held at 95kg — didn't hit 8
+// reps on every set last time" and would have said it every week for ever.
+// She logged 20x10, 50x5, 70x3, then three clean 95x8. The build-up rows are
+// stored as working sets, because `is_warmup` exists, is filtered by twelve
+// readers, and NOTHING IN THE APP HAS EVER BEEN ABLE TO SET IT. So
+// `every(reps >= 8)` fails on a 5-rep warm-up, and three perfect top sets can
+// never clear it. Her dumbbell rows were frozen at 20kg the same way.
+//
+// THE HARM IS WORSE THAN THE FREEZE, and that is why this is read-time rather
+// than waiting on the labelled rows she ruled for. Had she NOT pressed "Add
+// Set" four times, `maxWorkingWeight` would be 70, TodayPanel stores the
+// recommendation whether or not it progressed, and the card would print 70kg
+// as the working weight. The ramp steps scale FROM that number, so the next
+// session's build-up is computed off 70, logged, and becomes the next anchor.
+// Left alone, contamination walks the prescription DOWN.
+//
+// SO THIS REPAIRS THE PAST WITHOUT WRITING TO IT. Every already-logged session
+// is reinterpreted on read: no migration, no rewrite of her diary, nothing
+// that could lose a row. It is also independent of how the rows are drawn, so
+// it holds whatever the grid ends up looking like.
+//
+// THE RULE IS A CONJUNCTION, AND IT HAS TO BE. A weight threshold alone cannot
+// work: `RAMP_SCHEMES.intermediate` prescribes a build-up step at 85% of the
+// top set, and `RAMP_PERCENT_TABLE` prescribes a ramped WORKING set at 85% of
+// the top set. Same number, opposite meaning. What separates them is REPS —
+// the build-up step is prescribed for 2, the working set for the bottom of the
+// rep range. So a row is a build-up when EITHER
+//   (a) it is below the floor of what this session's own prescription ramps
+//       through, or
+//   (b) it is lighter than the session's top set AND lighter in reps than the
+//       bottom of the prescribed range.
+//
+// THE FLOOR IS DERIVED, NEVER CHOSEN. Where the prescription carries its own
+// per-set weights, the floor is the lowest share it asks for — so a session
+// prescribed [75, 85, 92, 96, 100] can never have its 75% set thrown away by a
+// number somebody typed here. The tolerance below it absorbs plate rounding:
+// `buildPerSetLoads` rounds every step to the plates available, so a set
+// prescribed at exactly the floor can land a kilo under it.
+//
+// BODYWEIGHT IS UNTOUCHED BY CONSTRUCTION, not by a guard: with a top set of
+// 0 every comparison against a lighter weight is false, so nothing is dropped.
+// ---------------------------------------------------------------------------
+
+/** The share of the top set below which a row cannot be working, when the prescription says nothing more specific. */
+const DEFAULT_WORKING_FLOOR = 0.85
+/** Plate rounding can put a set prescribed AT the floor a little under it. */
+const FLOOR_ROUNDING_TOLERANCE = 0.03
+
+export interface WorkingSetContext {
+  /** Bottom of the prescribed rep range. Without it, clause (b) cannot fire and only the weight floor applies. */
+  repRangeLow?: number
+  /** The prescription's own per-set weights, when it ramps — the floor is read off these rather than assumed. */
+  perSetLoadKg?: number[]
+  /** How many working sets the session asked for. Fewer than this and there is nothing complete to judge. */
+  prescribedSets?: number
+}
+
+export function workingSetsOf(sets: ExerciseSetLog[], ctx: WorkingSetContext = {}): ExerciseSetLog[] {
+  const top = maxWorkingWeight(sets)
+  if (top <= 0) return sets
+
+  const prescribed = (ctx.perSetLoadKg ?? []).filter(kg => kg > 0)
+  const share = prescribed.length > 1 ? Math.min(...prescribed) / Math.max(...prescribed) : DEFAULT_WORKING_FLOOR
+  const floorKg = top * Math.max(0, Math.min(DEFAULT_WORKING_FLOOR, share) - FLOOR_ROUNDING_TOLERANCE)
+
+  const working = sets.filter(s => {
+    if (s.weight_kg < floorKg) return false
+    if (ctx.repRangeLow != null && s.weight_kg < top && s.reps_completed < ctx.repRangeLow) return false
+    return true
+  })
+  // NEVER JUDGE HER ON NOTHING. If a prescription this function does not
+  // understand would empty the session, the old behaviour is strictly safer
+  // than a confident answer drawn from no rows at all.
+  return working.length > 0 ? working : sets
+}
+
 /**
  * Same-session progressive-overload check (the toast after a completed set).
  * Reads today's merged sets — including ones still pending sync — so it works
@@ -74,7 +153,8 @@ export async function checkDoubleProgression(
   sessionDate: string,
   prescribedSets: number,
   prescribedReps: string,
-  tier?: ExerciseTier
+  tier?: ExerciseTier,
+  ctx: WorkingSetContext = {},
 ): Promise<ProgressionResult | null> {
   const exerciseId = getExerciseId(exerciseName)
   const todaySets = (await getSetsForDate(userId, sessionDate))
@@ -98,10 +178,17 @@ export async function checkDoubleProgression(
     return null
   }
 
-  if (todaySets.length < prescribedSets) return null
+  // BEFORE THE SLICE, and that ordering is the whole point. This takes the
+  // first `prescribedSets` rows BY ORDER; Ashley's first three rows were her
+  // build-up, so her three real 95kg sets at positions 4-6 were never looked
+  // at and the same-session bump could not fire for her at all. A second,
+  // independent freeze from the same cause, which nobody had reported.
+  const { high: topReps, low: bottomReps } = parseRepRange(prescribedReps)
+  const workingToday = workingSetsOf(todaySets, { repRangeLow: ctx.repRangeLow ?? bottomReps, perSetLoadKg: ctx.perSetLoadKg })
 
-  const relevantSets = todaySets.slice(0, prescribedSets)
-  const { high: topReps } = parseRepRange(prescribedReps)
+  if (workingToday.length < prescribedSets) return null
+
+  const relevantSets = workingToday.slice(0, prescribedSets)
 
   const allAtTop = relevantSets.every(s => s.reps_completed >= topReps)
   const avgRpe = relevantSets.reduce((sum, s) => sum + (s.rpe ?? 7), 0) / relevantSets.length
@@ -229,13 +316,26 @@ export async function getDoubleProgressionRecommendation(
   exerciseName: string,
   sessionDate: string,
   prescribedRepRangeHigh: number,
+  ctx: WorkingSetContext = {},
 ): Promise<DoubleProgressionRecommendation | null> {
   const exerciseId = getExerciseId(exerciseName)
   const sessionSets = await getLastSessionSets(profileId, exerciseId, sessionDate)
   if (sessionSets.length === 0) return null
 
-  const lastWeight = maxWorkingWeight(sessionSets)
-  const hitTopOnAllSets = sessionSets.every(s => s.reps_completed >= prescribedRepRangeHigh)
+  // Build-up rows out before either question is asked — they are what froze
+  // her deadlift at 95kg and her rows at 20kg.
+  const working = workingSetsOf(sessionSets, ctx)
+  // A SESSION THAT WAS ONLY WARMED UP IS NOT EVIDENCE OF ANYTHING, and saying
+  // so out loud is the other half of the fix. Filtering alone is not enough:
+  // a day logged as 20x10, 50x5, 70x3 and then abandoned collapses to its
+  // heaviest BUILD-UP row, and the caller stores the recommendation whether or
+  // not it progressed — so the card would print 70kg as the working weight and
+  // the next session's ramp would be scaled from it. Returning null leaves the
+  // plan's own prescription standing, which is the honest answer to "I have no
+  // complete session to judge".
+  if (ctx.prescribedSets != null && working.length < ctx.prescribedSets) return null
+  const lastWeight = maxWorkingWeight(working)
+  const hitTopOnAllSets = working.every(s => s.reps_completed >= prescribedRepRangeHigh)
 
   if (!hitTopOnAllSets) {
     return {
@@ -292,11 +392,16 @@ export async function getAddedLoadProgression(
   // A session where nothing carried added weight tells us nothing about it —
   // returning 0 would read as "you used no belt last time, add 2.5kg", which
   // is a claim about a session we have no such record of.
+  // THE TWIN, and it had a bug of its own: `every` ran over EVERY row,
+  // including ones carrying no added weight at all — so a single unweighted
+  // warm-up pull-up froze the belt weight exactly as a 5-rep build-up froze
+  // the deadlift. The question is about the sets that carried the belt.
   const withAdded = sessionSets.filter(s => s.added_load_kg != null)
   if (withAdded.length === 0) return null
 
   const lastAdded = withAdded.reduce((max, s) => Math.max(max, s.added_load_kg ?? 0), 0)
-  const hitTopOnAllSets = sessionSets.every(s => s.reps_completed >= prescribedRepRangeHigh)
+  const topAdded = withAdded.filter(s => (s.added_load_kg ?? 0) >= lastAdded)
+  const hitTopOnAllSets = topAdded.every(s => s.reps_completed >= prescribedRepRangeHigh)
 
   if (!hitTopOnAllSets) {
     return {

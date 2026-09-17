@@ -289,7 +289,8 @@
     "test:goal-change": "tsx scripts/test-goal-change.ts",
     "test:meal-refit": "tsx scripts/test-meal-refit.ts",
     "test:coach-moments": "tsx scripts/test-coach-moments.ts",
-    "test:coach-clock": "tsx scripts/test-coach-clock.ts"
+    "test:coach-clock": "tsx scripts/test-coach-clock.ts",
+    "test:working-sets": "tsx scripts/test-working-sets.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
