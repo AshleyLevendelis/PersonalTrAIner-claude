@@ -70,7 +70,15 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**One, as of 15 Sep 2026.**
+**Three screen-only, as of 17 Sep 2026** — the pre-session tightness check,
+macro mode, and macro split. The calorie target below is a fourth entry but a
+different kind: it is on NEITHER surface and cannot be, because it is derived
+rather than set.
+
+**THE COUNT IS RE-DERIVED FROM THE BULLETS, NEVER CARRIED FORWARD.** It has
+been wrong twice — "None" while tightness shipped, then "One" while three more
+sat listed underneath it. Both times somebody edited a bullet and left the
+header alone. Count what is below before trusting what is here.
 
 - **Saying something feels tight before a session.** Eight areas as taps on the
   Exercise screen; up to three mobility drills go into today's warm-up. There
@@ -116,7 +124,18 @@ the difference.
   closed as written: there is no control because the number is derived by
   `computeTargets`, not stored as an intention. Changing "targets" means
   changing an input.
-- **The fitness goal.** On NEITHER surface. See CLAUDE.md for the measurement.
+- ~~**The fitness goal.**~~ **CLOSED 17 Sep 2026** — a Goal row on Profile and
+  `propose_goal_change` in chat, with a row in the table above. It had been on
+  NEITHER surface while every piece of machinery for it existed, which is why
+  it sat in this section rather than being caught by the gate.
+  **AND THIS BULLET WAS LEFT STALE FOR A DAY BY THE PERSON WHO CLOSED IT** —
+  me. I noticed it, said in the same message that I would fix it, and shipped
+  without doing so; it went to `main` still claiming the goal was unreachable.
+  That is the second time this file's own closing instruction has been ignored
+  by whoever added the capability (the tightness entry, 15 Sep, was the first),
+  and it is the same root cause both times: **nothing in the sweep reads this
+  section**, so only the author's memory keeps it true. Noticing the rule is
+  not following it.
 
 Banning an exercise was the previous entry and closed 14 Sep 2026. This
 section exists so the answer stays written down rather than

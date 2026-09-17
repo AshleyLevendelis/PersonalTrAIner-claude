@@ -1,4 +1,4 @@
-import { couldNot, targetsMoved } from '@/lib/coach-voice'
+import { couldNot, targetsMoved, type TargetMoveCause } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -497,9 +497,15 @@ function App() {
   // targetWeightAnchorKg is state, not a fresh lookup: the anchor only moves
   // on a real trend, and re-querying it on every field edit would let a noisy
   // weigh-in retune calories through the back door.
+  // ONE LIST, NAMED, so the change-detector and the cause-detector cannot
+  // disagree. The first version of the cause read `split('|')[5]` for the goal
+  // — correct on the day and silently wrong the moment anybody reorders this
+  // array, with no test able to see it. Naming the keys makes the position
+  // derived rather than remembered.
+  const MACRO_INPUT_KEYS = ['weight_kg', 'age', 'height_cm', 'gender',
+    'activity_level', 'fitness_goal', 'macro_calculation_mode'] as const
   const macroInputs = profile
-    ? [profile.weight_kg, profile.age, profile.height_cm, profile.gender,
-       profile.activity_level, profile.fitness_goal, profile.macro_calculation_mode].join('|')
+    ? MACRO_INPUT_KEYS.map(k => String(profile[k] ?? '')).join('|')
     : null
   const lastMacroInputsRef = useRef<string | null>(null)
   useEffect(() => {
@@ -508,6 +514,7 @@ function App() {
     // recomputing immediately would just be the same numbers again.
     if (lastMacroInputsRef.current === null) { lastMacroInputsRef.current = macroInputs; return }
     if (lastMacroInputsRef.current === macroInputs) return
+    const previousMacroInputs = lastMacroInputsRef.current
     lastMacroInputsRef.current = macroInputs
     const targets = computeTargets(profile, {
       latestWeightKg: targetWeightAnchorKg ?? profile.weight_kg,
@@ -530,10 +537,27 @@ function App() {
     // input string, so this effect fires straight after it. snapshotTargetsIfChanged
     // compares against the last stored row and returns changedFromPrior: false
     // when the numbers match, so the notice is written once, not twice.
+    // THE CAUSE IS DERIVED FROM WHICH INPUT MOVED, not assumed. This effect
+    // fires for seven different fields, and until 17 Sep 2026 the sentence
+    // said "with your recent weigh-ins" for all of them — so changing your
+    // goal blamed weigh-ins that had not happened. The previous input string
+    // is already held for the skip-if-unchanged test, so the answer is
+    // readable rather than guessable.
+    const priorInputs = (previousMacroInputs ?? '').split('|')
+    const nowInputs = macroInputs.split('|')
+    const changed = (key: typeof MACRO_INPUT_KEYS[number]) => {
+      const i = MACRO_INPUT_KEYS.indexOf(key)
+      return priorInputs[i] !== undefined && priorInputs[i] !== nowInputs[i]
+    }
+    // The goal wins when both moved: a goal change is what a person would say
+    // happened, and its rebuild covers the rest anyway. Same precedence
+    // detectPlanInvalidation uses for the same reason.
+    const cause: TargetMoveCause =
+      changed('fitness_goal') ? 'goal' : changed('weight_kg') ? 'weigh_in' : 'settings'
     if (profile.id) {
       const profileId = profile.id
       snapshotTargetsIfChanged(profileId, profile, targets, targetWeightAnchorKg).then(result => {
-        const moved = result.previous && targets ? targetsMoved(result.previous, targets) : null
+        const moved = result.previous && targets ? targetsMoved(result.previous, targets, cause) : null
         if (result.changedFromPrior && moved) {
           setAdaptationMessages(prev => [...prev, { text: moved }])
         }
@@ -1033,7 +1057,7 @@ function App() {
         // hand-written copies of the same line, naming only calories and only
         // the new figure. targetsMoved returns null when nothing actually
         // moved, so the notice cannot fire on a change that did not happen.
-        const moved = result.previous && liveTargets ? targetsMoved(result.previous, liveTargets) : null
+        const moved = result.previous && liveTargets ? targetsMoved(result.previous, liveTargets, 'unknown') : null
         if (result.changedFromPrior && moved) {
           setAdaptationMessages(prev => [...prev, { text: moved }])
         }
@@ -2396,7 +2420,7 @@ function App() {
     const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
     setMacros(targets)
     snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
-      const moved = result.previous && targets ? targetsMoved(result.previous, targets) : null
+      const moved = result.previous && targets ? targetsMoved(result.previous, targets, 'weigh_in') : null
       if (result.changedFromPrior && moved) {
         setAdaptationMessages(prev => [...prev, { text: moved }])
       }
