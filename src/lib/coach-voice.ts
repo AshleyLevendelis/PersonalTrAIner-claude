@@ -304,7 +304,14 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_cardio_session: { done: 'Scheduled', failed: "I couldn't add that session" },
   propose_volume_change: { done: 'Adjusted', failed: "I couldn't adjust it" },
   propose_schedule_change: { done: 'Rescheduled', failed: "I couldn't change the schedule" },
+  propose_session_length: { done: 'Sessions resized', failed: "I couldn't change your session length" },
   propose_style_change: { done: 'Restyled', failed: "I couldn't change the style" },
+  // CAUGHT BY THIS FILE'S OWN GATE, 17 Sep 2026: my first title was "Rebuilt
+  // for your new goal", a sentence where every sibling is a word or two, and
+  // test:coach-voice failed it on the three-word ceiling. The ceiling is
+  // right — a receipt says what happened, and the card above it already said
+  // what that means.
+  propose_goal_change: { done: 'Goal changed', failed: "I couldn't change your goal" },
   propose_rest_day: { done: 'Marked as rest', failed: "I couldn't mark that day" },
   propose_missed_session: { done: 'Marked as missed', failed: "I couldn't mark that day" },
   propose_session_move: { done: 'Moved', failed: "I couldn't move that session" },

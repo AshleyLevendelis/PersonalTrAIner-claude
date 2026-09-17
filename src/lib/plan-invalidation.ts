@@ -21,8 +21,9 @@
 // remember doing, which is the same rule the coach's injury rebuild follows.
 // ---------------------------------------------------------------------------
 
-import type { UserProfile, MesocycleWeek } from './types'
+import type { UserProfile, MesocycleWeek, SessionDuration } from './types'
 import { rebuildAgainstProfile } from './plan-adaptations'
+import { getDurationBudgetSeconds } from './session-duration'
 
 /**
  * The fields that make an existing plan wrong, and nothing else.
@@ -64,7 +65,19 @@ import { rebuildAgainstProfile } from './plan-adaptations'
 // weight, and offering to rebuild would be the app asking someone to give up
 // their progression for nothing. See detectPlanInvalidation's branch.
 export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_deadlift_kg'] as const
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', ...KNOWN_LIFT_FIELDS] as const
+// `session_duration_preference` ADDED 16 Sep 2026. Its absence was not an
+// oversight to tidy — it was the whole defect. Changing session length on
+// Profile wrote the number and touched nothing else: no rebuild, no re-price.
+// The only visible effect was today's card starting to say the session runs
+// over (TodayPanel's shortfall line). So "you can set your session length"
+// was true about the NUMBER and false about the PLAN.
+//
+// ASHLEY'S RULING, 16 Sep 2026, from three options: rebuild the rest of the
+// block around the new length. Over trimming what is already there (a
+// 60-minute session with its end chopped off is not a session designed for
+// 45) and over waiting for the next block. Being in this list is what makes
+// that happen — everything below reuses the road goal and style already take.
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'session_duration_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 export interface PlanInvalidation {
@@ -200,15 +213,57 @@ export function detectPlanInvalidation(
     }
   }
 
+  // AFTER the others deliberately. This function returns the FIRST match, and
+  // a patch that changes goal AND length is really about the goal — that
+  // rebuild covers the length anyway, and offering the smaller reason would
+  // describe the change wrongly.
+  if ('session_duration_preference' in patch
+      && patch.session_duration_preference !== before.session_duration_preference) {
+    // ASKED OF THE ENGINE, NOT OF THE STRING. Comparing '30-45' < '45-60'
+    // lexicographically gives the right answer for all four current values
+    // by pure coincidence of their first digits — and a future '100-120'
+    // would sort BELOW '30-45' and silently invert the sentence. The budget
+    // function is the app's own source of truth for how long each tier is,
+    // so it is the thing to ask.
+    const shorter = getDurationBudgetSeconds(patch.session_duration_preference as SessionDuration)
+      < getDurationBudgetSeconds(before.session_duration_preference as SessionDuration)
+    return {
+      field: 'session_duration_preference',
+      title: 'Rebuild your sessions around the time you have?',
+      detail:
+        'Your current plan was built around your old session length, so the number of exercises, '
+        + 'how many sets and how long you rest all still follow it. I can rebuild it from this week '
+        + 'onwards to fit the time you actually have'
+        + (shorter
+          ? ' — sessions designed to be shorter, rather than the same ones with the end cut off.'
+          : ' — with the extra time used properly, rather than left over.')
+        + ' Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  // LAST, and the order matters for the same reason session length sits above
+  // it: this function returns the FIRST match, and the goal is the answer the
+  // others qualify. A patch that changes the goal alone reaches here; a patch
+  // that changes the goal AND something smaller is described by the smaller
+  // one only if that one is genuinely a different request. Nothing today
+  // produces such a patch — each row on Profile saves one field — so this
+  // ordering is a statement of intent rather than a live branch.
   if ('fitness_goal' in patch && patch.fitness_goal !== before.fitness_goal) {
     return {
       field: 'fitness_goal',
       title: 'Rebuild your plan for this goal?',
+      // BOTH HALVES, BEFORE THE TAP — Ashley's ruling, 17 Sep 2026, from three
+      // options: training and food, from this week. The goal is the only
+      // invalidating field that is also an input to the calorie and macro
+      // calculation, so it is the only one whose offer has a food sentence.
+      // Saying "your plan" and quietly rebuilding the meals too would be the
+      // silent change the whole propose-then-confirm rail exists to prevent.
       detail:
         'Your current plan was built for the goal you had before, so how much you do, how long ' +
         'you rest, the rep ranges and the conditioning all still follow it. I can rebuild it ' +
-        'from this week onwards for the new goal. Everything you have already logged stays ' +
-        'exactly as it is.',
+        'from this week onwards for the new goal, and rebuild your meals around the new ' +
+        'calorie and macro targets at the same time — that part takes a moment. Everything you ' +
+        'have already logged stays exactly as it is.',
     }
   }
 

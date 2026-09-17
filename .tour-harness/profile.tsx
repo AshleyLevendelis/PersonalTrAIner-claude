@@ -59,7 +59,12 @@ const availableIdx = new Set([0, 1, 3, 4])
 const baseProfile: UserProfile = {
   id: PROFILE_ID,
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
-  fitness_goal: 'build_muscle', preferred_time: 'morning', bmr: 1800, tdee: 2500,
+  // 'build_muscle' sat here until 17 Sep 2026 and is not a FitnessGoal at
+  // all — the four are fat_loss, hypertrophy, functional, conditioning. It
+  // never showed because nothing on this screen rendered the goal; the
+  // moment a Goal row existed it would have drawn an empty box. A fixture
+  // value outside its own union is invisible until something reads it.
+  fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   equipment_access: FULL_GYM ? 'full_gym' : 'home_gym',
   injuries: [], training_style: 'bodybuilding',
   training_experience: 'intermediate', session_duration_preference: '60-90',

@@ -43,7 +43,7 @@ import {
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
-import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference } from '@/lib/types'
+import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference, FitnessGoal } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
 import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
@@ -848,6 +848,28 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 The `??` here is display-only — an activity profile shows the
                 same neutral placeholder any unset field would, rather than
                 these rows vanishing mid-edit. */}
+            {/* WHAT YOU'RE TRAINING FOR — added 17 Sep 2026, and it was the
+                last setup answer on NEITHER surface. Not for want of
+                machinery: fitness_goal was already in
+                PLAN_INVALIDATING_FIELDS, detectPlanInvalidation already had a
+                finished goal branch, goal-policies.ts already declared how
+                the four goals differ, and macro-calculator.ts already reads
+                the goal for the deficit. Every piece existed and nothing
+                wrote the field, so someone who chose fat loss and now wants
+                to build muscle had exactly one route: a brand-new plan, and
+                their history with it.
+
+                FIRST in this group deliberately. It is the answer the other
+                three qualify — experience, equipment and starting point all
+                describe HOW you pursue a goal — and it is the one the
+                identity summary above leads with.
+
+                It carries further than any other row here. savePatch raises
+                the rebuild offer for the training half; the food half moves
+                on its own, because App's macro effect is keyed on
+                fitness_goal and recomputes calories and macros the moment
+                this lands. See that effect for the notice that goes with it. */}
+            <Row label="Goal"><EditableSelectField value={profile.fitness_goal} options={GOAL_OPTIONS} onSave={v => savePatch({ fitness_goal: v as FitnessGoal })} /></Row>
             <Row label="Experience"><EditableSelectField value={profile.training_experience ?? ''} options={EXPERIENCE_OPTIONS} onSave={v => savePatch({ training_experience: v as TrainingExperience })} /></Row>
             <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
             {/* WHERE YOU'RE STARTING FROM — added 14 Sep 2026, on Ashley's

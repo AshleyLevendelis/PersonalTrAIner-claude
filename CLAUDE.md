@@ -238,15 +238,75 @@ menu" stays true when a copy is also left outside it.
 
 **Changing the whole plan**
 - Start again — `screen only` (New Plan; `reset-clears-draft`)
-- Days, equipment, injuries (add / lasting / recovered), goal, style,
-  volume, other sports — both surfaces, proposed and confirmed —
-  `rebuild-offer`, `profile-restore`, `coach-volume-schedule`,
-  `injury-rebuild`, `enforcement-gaps`, `concurrent-activity`
-- Session length — `screen only`; targets and macro mode — `screen only`
-- Onboarding answers and the Profile screen. **As of 14 Sep 2026 there are no
-  locked answers left** — every one can be corrected. The history is kept
-  because each unlocking needed a different road and the reasons are the useful
-  part. CORRECTED 13 Sep, again 14 Sep:
+- Days, equipment, injuries (add / lasting / recovered), style, volume,
+  other sports — both surfaces, proposed and confirmed — `rebuild-offer`,
+  `profile-restore`, `coach-volume-schedule`, `injury-rebuild`,
+  `enforcement-gaps`, `concurrent-activity`
+- **GOAL — both surfaces since 17 Sep 2026**, and on 16 Sep it was the worst
+  kind of wrong: on NEITHER. **The road was built and nobody drove on it** —
+  `fitness_goal` was already in `PLAN_INVALIDATING_FIELDS`,
+  `detectPlanInvalidation` already had a finished goal branch with user-facing
+  copy, `goal-policies.ts` already declared how the four goals differ, and
+  `macro-calculator.ts` already read the goal in five places for the deficit,
+  the carb prescription and the label. Every assignment to `fitness_goal` was a
+  READ copied forward, the onboarding insert, or a fixture. **Nothing wrote the
+  field.** That shape is the one to remember: a capability can be absent while
+  every piece of machinery for it exists and looks, to a reader, like proof it
+  works. Same family as the walking plan (generator, type, no pixel) and
+  bodyweight PRs (six filters, no record) — and worse than both, because here
+  the *offer copy was already written*.
+  **Ashley's ruling, 17 Sep 2026, from three options: training AND food, from
+  this week** — over asking about food as a second question (somebody training
+  for muscle while still eating a fat-loss deficit is the worst of both) and
+  over finishing the current block first (up to three weeks of work they have
+  said they do not want). It is the ONLY setup answer that is an input to both
+  the plan generator and the calorie calculation, so it is the only offer with
+  a food sentence, and both halves are on the card before the tap.
+  **THE FOOD HALF NEEDED ALMOST NO CODE, AND THAT IS ITS RISK.** The targets
+  are DERIVED from the goal, and App's macro effect is already keyed on the
+  field — so writing it moves calories and macros on the next render. What was
+  missing was narrow and exact: the effect set the numbers and never called
+  `snapshotTargetsIfChanged`, so a weigh-in explained itself and every other
+  input change moved the targets SILENTLY. It does now. The meals follow on
+  confirm, by reusing `handleRegenerateAllMeals`.
+  `goal-change` (57 checks, 13 mutations), `verify:setup-answers` §7g-7o,
+  `rebuild-offer`, `coach-parity`. Needs the `chat-gemini` deploy for chat
+- Session length — **both surfaces since 16 Sep 2026**, and until that day it
+  was `screen only` in the emptiest sense: the screen wrote the number and
+  changed nothing about the plan. `session_duration_preference` was absent from
+  `PLAN_INVALIDATING_FIELDS` and from `CEILING_FIELDS`, so the screen neither
+  rebuilt nor re-priced; the one live effect was today's card re-labelling the
+  session as running over. "You can set your session length" was true about the
+  NUMBER and false about the PLAN.
+  **Ashley's ruling, 16 Sep 2026, from three options: rebuild the rest of the
+  block around the new length** — over trimming what is there (a 60-minute
+  session with its end chopped off is not a session designed for 45) and over
+  waiting for the next block. It binds BOTH surfaces, which is why the coach
+  got `propose_session_length` the same day: the same request must not answer
+  differently depending on where it was made.
+  `session-length-change`, `rebuild-offer`, `verify:setup-answers` §6i-6n,
+  `coach-parity`. Needs the `chat-gemini` deploy to work by chat
+- **"I only have 45 minutes today" ALREADY WORKS on both surfaces**, and is a
+  different thing from the above — `propose_session_shorten`
+  (`chat-gemini:810`, takes `minutes`, TODAY-only, main lift protected) and
+  `onShorten(minutes)` on the day menu. Recorded because the two requests are
+  one word apart ("today" / "from now on") and the tools are not. Both sides of
+  that pair are now the coach's too, and the prompt rule keys on the TIME SCOPE
+  rather than the number, because both requests carry a minute figure
+- Targets and macro mode — `screen only`, and "targets" is not one thing:
+  `calorie_target` has no control anywhere and never did. It is written once
+  at onboarding and derived by `computeTargets` thereafter, so changing it
+  means changing its INPUTS — macro split, activity level, or goal (which is
+  on neither surface, above)
+- Onboarding answers and the Profile screen. **"As of 14 Sep 2026 there are no
+  locked answers left" was FALSE when written (corrected 16 Sep 2026) and is
+  TRUE again from 17 Sep 2026, when the goal was unlocked.** It was missed for
+  three days because the unlocking work went field by field through the ones
+  somebody had complained about, and nobody re-derived the list from the
+  profile columns afterwards — **so the closing check is to re-derive from the
+  columns, not to tick off the complaints.** The history below is kept because
+  each unlocking needed a different road and the reasons are the useful part.
+  CORRECTED 13 Sep, again 14 Sep, closed 17 Sep:
   - The three implement ceilings — **now editable**, in "You" beside Equipment,
     and correcting one re-prices the running plan from this week onward with
     the exercises untouched (her ruling that day, from four options). Shown
@@ -807,6 +867,24 @@ old — the commands were right and the context was missing.
   the session. Neither is visible from the data or the source; both are obvious
   in one screenshot. When something new appears on a screen, the driver is not
   the last step after the gates pass — it is the step that finds the defect.
+- **A `verify:` DRIVER ONLY SEES WHAT ITS HARNESS PAGE RENDERS, AND THE
+  HARNESS IS NOT THE APP.** 16 Sep 2026: I added two checks asking whether the
+  rebuild offer was visible and whether anything was stacked on top of it. Both
+  went red, which read as every rebuild offer in the app being hidden under a
+  panel — a serious, long-standing defect. It was the harness. The testid the
+  checks queried is rendered by `.tour-harness/profile.tsx`, a bare div under
+  the page's own button; the app's real offer is a Dialog in `App.tsx` raised
+  from the same callback. I had measured test scaffolding and nearly "fixed"
+  the app for it.
+  So, before believing a driver result, ask WHICH FILE renders the node being
+  measured. A harness page can carry the real component and still substitute
+  its own chrome around it, and that substitution is invisible from the driver.
+  The split worth keeping: a harness like this DOES prove the real screen
+  raises the offer and what words it carries; it can prove nothing about
+  whether the app's own dialog appears, because no harness page boots
+  `App.tsx`. Write which half you have next to the checks, and **never make the
+  harness render a copy of the app's chrome to satisfy a check** — that
+  measures the copy.
 - **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
   beyond "did not apply" and "crashed", and the harness cannot see it: on
   15 Sep a mutation to the walking plan's day builder read MISSED because the

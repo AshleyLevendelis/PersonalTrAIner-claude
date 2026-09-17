@@ -509,10 +509,36 @@ function App() {
     if (lastMacroInputsRef.current === null) { lastMacroInputsRef.current = macroInputs; return }
     if (lastMacroInputsRef.current === macroInputs) return
     lastMacroInputsRef.current = macroInputs
-    setMacros(computeTargets(profile, {
+    const targets = computeTargets(profile, {
       latestWeightKg: targetWeightAnchorKg ?? profile.weight_kg,
       exercisePlan,
-    }))
+    })
+    setMacros(targets)
+    // AND SAY SO. Added 17 Sep 2026 with the goal change, because that is
+    // what exposed it: `fitness_goal` is one of the inputs above, and
+    // macro-calculator reads the goal for the deficit, the carb prescription
+    // and the label — so switching from fat loss to muscle growth moves every
+    // number on the Nutrition tab. Before this it moved them SILENTLY.
+    //
+    // The three lines are the ones handleWeightLogged has always had; this
+    // path never got them, so a weigh-in explained itself and every other
+    // input change did not. Ashley's standing rule is that the app says what
+    // changed in plain words, and it was being kept on one path out of four.
+    //
+    // SAFE TO RUN AFTER A CALLER THAT ALREADY SNAPSHOTTED — handleMacroModeChange
+    // does, and its own write changes macro_calculation_mode, which is in the
+    // input string, so this effect fires straight after it. snapshotTargetsIfChanged
+    // compares against the last stored row and returns changedFromPrior: false
+    // when the numbers match, so the notice is written once, not twice.
+    if (profile.id) {
+      const profileId = profile.id
+      snapshotTargetsIfChanged(profileId, profile, targets, targetWeightAnchorKg).then(result => {
+        const moved = result.previous && targets ? targetsMoved(result.previous, targets) : null
+        if (result.changedFromPrior && moved) {
+          setAdaptationMessages(prev => [...prev, { text: moved }])
+        }
+      })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [macroInputs, isRestoring])
 
@@ -2157,6 +2183,25 @@ function App() {
         return
       }
       setLogsVersion(v => v + 1)
+      // THE FOOD HALF OF A GOAL CHANGE — Ashley's ruling, 17 Sep 2026, from
+      // three options: training AND food, from this week. She rejected asking
+      // about food as a second question, because somebody training for muscle
+      // while still eating a fat-loss deficit is the worst of both.
+      //
+      // ONLY for the goal. Every other invalidating field (equipment, days,
+      // injuries, style, session length, the known lifts) changes what you
+      // DO, not what you need to eat — none of them is an input to
+      // computeTargets, so regenerating meals for them would be a slow paid
+      // call that changed nothing.
+      //
+      // The targets themselves already moved, at save time, through the macro
+      // effect keyed on fitness_goal — this is the MEALS following them.
+      // Deliberately here on the confirm rather than at save: it costs an edge
+      // call and real time, and the dialog says it is coming, so it must not
+      // start before the tap. What that leaves is stated in BACKLOG rather
+      // than hidden: declining means new targets with the old meals still
+      // fitted to the old ones, the same shape declining has always had.
+      if (planInvalidation?.field === 'fitness_goal') await handleRegenerateAllMeals()
     } finally {
       setRebuilding(false)
       setPlanInvalidation(null)
@@ -2718,6 +2763,7 @@ function App() {
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
               onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+              onGoalMealsNeedRebuild={handleRegenerateAllMeals}
               onMealSwapApplied={handleMealPickApplied}
               onFindMoreMealOptions={handleFindMoreMealOptions}
               memoryFacts={memoryFacts}

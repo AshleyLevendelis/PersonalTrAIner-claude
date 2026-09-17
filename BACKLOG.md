@@ -2,6 +2,146 @@
 
 Newest first. One line each.
 
+- [x] **YOU COULD NOT CHANGE WHAT YOU WERE TRAINING FOR — ON EITHER SURFACE —
+  AND EVERY PIECE OF MACHINERY FOR IT ALREADY EXISTED.**
+  Ashley chose this from four options, 17 Sep 2026. Someone who set up for fat
+  loss and decided to build muscle had exactly one route: start a brand-new
+  plan and abandon their training history.
+  **THE ROAD WAS BUILT AND NOBODY DROVE ON IT**, which is what makes this worth
+  more than the feature. `fitness_goal` was already in
+  `PLAN_INVALIDATING_FIELDS`. `detectPlanInvalidation` already had a goal
+  branch with finished user-facing copy. `goal-policies.ts` already declared
+  how the four goals differ in volume, phases, rep progression and
+  conditioning. `macro-calculator.ts` already read the goal in FIVE places for
+  the deficit, the carb prescription and the label. Every assignment to the
+  field in `src/` and `supabase/functions/` was a read copied forward, the
+  onboarding insert, or a test fixture. **Nothing wrote it.** A reader would
+  have concluded the feature worked — the offer copy was already written.
+  Same family as the walking plan (generator, type, no pixel) and bodyweight
+  PRs (six filters, no record), and worse than both.
+  **HER RULING, from three options: TRAINING AND FOOD, FROM THIS WEEK.** Over
+  asking about food as a second question — somebody training for muscle while
+  still eating a fat-loss deficit is the worst of both — and over finishing
+  the current four-week block first, which can mean three weeks of work they
+  have already said they do not want.
+  **THE FOOD HALF NEEDED ALMOST NO CODE, AND THAT WAS THE RISK, NOT THE RELIEF.**
+  The calorie and macro targets are DERIVED from the goal, and App's macro
+  effect was already keyed on the field — so writing it moves the numbers on
+  the next render, with nothing to add. What was missing was narrow and exact:
+  that effect called `setMacros` and never `snapshotTargetsIfChanged`, so a
+  weigh-in explained itself while every OTHER input change moved someone's
+  calories in silence. Three lines, copied from the path that already had
+  them. The meals follow on confirm by reusing `handleRegenerateAllMeals`.
+  **WHAT THE CARD SAYS BEFORE THE TAP** is the whole of her ruling made
+  visible: the goal is the only setup answer that is an input to both the plan
+  generator and the calorie calculation, so it is the only offer with a food
+  sentence — and the gate proves the other four invalidating fields do NOT
+  have one, because a food promise the app does not keep is worse than silence.
+  **THE HONEST RESIDUE, stated rather than hidden:** the field saves before the
+  offer appears (the architecture every invalidating field has used since it
+  existed), so declining the rebuild leaves the new goal, the new targets, and
+  the old meals and plan. The notice now says the targets moved. Changing that
+  ordering is a separate piece of work across six fields, not a rider on this.
+  **GATES.** `test:goal-change` — 57 checks, 13 mutations, 13 caught.
+  `verify:setup-answers` gained §7g-7o and is green at 57 checks; 3 mutations,
+  3 caught. Screenshot read: Goal sits first in Training setup showing "Fat
+  loss". Re-ran `rebuild-offer`, `coach-parity`, `coach-promises`,
+  `chat-app-reality`, `coach-rules-sync`, `setup-answers`, `pending-actions`,
+  `macro-split`, `fat-loss-deficit`, `target-change-notice`, `profile-groups`,
+  `coach-voice`: all pass. `npx tsc --noEmit` clean, which covers `src` only.
+  **THREE THINGS CAUGHT BY GATES RATHER THAN BY READING**, all mine:
+  `test:coach-voice` rejected my receipt title "Rebuilt for your new goal" — a
+  sentence where every sibling is a word or two, and the three-word ceiling was
+  right. `RECEIPTS` is a loose `Record<string, ...>`, so a missing key
+  typechecks clean and throws at runtime; the kind had to be registered in
+  three places, none of which `tsc` would have flagged. And the harness fixture
+  carried `fitness_goal: 'build_muscle'`, which is not one of the four values
+  and never showed, because until today nothing on that screen read the goal —
+  a fixture value outside its own union stays invisible until something reads it.
+  **AND TWO MUTATION-HARNESS FAILURES THAT WOULD HAVE READ AS PASSES.** All 13
+  first came back MISSED with zero failures and short runs: the gate writes
+  failures to stderr and my harness sent stderr to /dev/null. Then one genuinely
+  MISSED because its anchor text is identical in three executors and it patched
+  the wrong one — the "applied, ran, did not create the defect" case. Re-aimed
+  at a line unique to the goal executor: caught. A third mutation reported DID
+  NOT APPLY from shell quoting, which the harness's file-changed assertion
+  caught rather than scoring as a miss.
+  **NEEDS THE `chat-gemini` DEPLOY.** Changing your goal by chat does not work
+  until then; it joins the coach changes already waiting.
+  **NAMED, NOT DONE:** meals do not follow the targets when a WEIGH-IN moves
+  them. Same gap, wider than this build, and folding it in would change what a
+  weigh-in does without a ruling.
+
+- [x] **"MY SESSIONS NEED TO BE 45 MINUTES FROM NOW ON" — THE SCREEN WROTE THE
+  NUMBER AND CHANGED NOTHING, AND THE COACH COULD NOT SAY IT AT ALL.**
+  Ashley chose this from three options, 16 Sep 2026, and the shape of the hole
+  was worse than the ask: `session_duration_preference` was absent from
+  `PLAN_INVALIDATING_FIELDS` and from `CEILING_FIELDS`, so setting it neither
+  rebuilt nor re-priced. The only visible effect was today's card starting to
+  say the session ran over — the app labelling its own plan as wrong rather
+  than fixing it. "You can set your session length" was true about the NUMBER
+  and false about the PLAN.
+  **HER RULING, from three options: REBUILD THE REST OF THE BLOCK AROUND THE
+  NEW LENGTH.** Over trimming what is already there — a 60-minute session with
+  its end chopped off is not a session designed for 45 — and over waiting for
+  the next block, which leaves weeks of sessions that do not fit.
+  **IT BINDS BOTH SURFACES, which is why this is two commits and not one.**
+  The screen joined the rebuild road (`e8265d1`); the coach got
+  `propose_session_length` beside the `propose_session_shorten` it already had
+  (`2e69271`). Leaving the coach out would have meant the same sentence
+  answering differently depending on where it was said.
+  **THE TWO REQUESTS ARE ONE WORD APART AND BOTH CARRY A MINUTE FIGURE** — "45
+  minutes today" against "45 minutes from now on" — so the prompt rule keys on
+  the TIME SCOPE, never the number. And `propose_session_shorten`'s own
+  description used to end by pointing at the Profile screen, which Promise 2
+  forbids outright; it now names its sibling instead of a control.
+  **THE STRING COMPARISON THAT WORKED BY COINCIDENCE.** The offer's wording
+  differs for a shorter session versus a longer one, and my first version
+  compared `'30-45' < '45-60'` lexicographically. Right for all four current
+  values by pure accident of their first digits; a future `'100-120'` would
+  sort BELOW `'30-45'` and silently invert the sentence. It asks the engine now.
+  **THE PINNED-LIST CHECK BLOCKED THIS AND WAS RIGHT TO.** `test:rebuild-offer`
+  enumerates the invalidating fields rather than deriving them, which is
+  usually the wrong shape — here the enumeration IS the property, because a
+  field joining silently means the app starts rebuilding somebody's plan
+  unannounced. Updated deliberately, with the reason written beside it.
+  **GATES.** `test:session-length-change` — 33 checks, 12 mutations, 12 caught.
+  It proves the three things that can silently diverge: a LASTING change
+  reaches the plan, a TODAY-only one does not touch the profile, and the
+  rebuild starts from the current week rather than week 1. Two checks added to
+  `test:rebuild-offer` — 3 mutations, 3 caught — proving the offer's title AND
+  detail are actually rendered inside the dialog that opens on them, one of
+  which moved the title into a NEIGHBOURING dialog to prove the check is not a
+  whole-file grep. `verify:setup-answers` gained §6i-6n and is green at 49
+  checks. Re-ran `coach-parity`, `coach-promises`, `chat-app-reality`,
+  `today-only`, `session-length`, `pending-actions`, `coach-rules-sync`,
+  `coach-voice`: all pass. `npx tsc --noEmit` clean, which covers `src` only.
+  **ONE MUTATION READ MISSED AND WAS MY MISTAKE, NOT THE GATE'S.** Mutation 7
+  was meant to move a call and instead inserted a comment saying it had moved;
+  the gate strips comments, so nothing changed. Rewritten as a real reorder and
+  CAUGHT. The harness now asserts the file actually differs before believing a
+  green — "10 mutations, 10 caught" and "10 mutations, some meaningless" print
+  identically otherwise.
+  **AND THE HALF-DAY THAT PRODUCED A NEW STANDING RULE.** I added two browser
+  checks asking whether the rebuild offer was visible on screen and whether
+  anything covered it. Both went red, which looked like EVERY rebuild offer in
+  the app sitting under a panel since the screen existed. It was the harness:
+  the testid those checks queried is rendered by the harness page itself, a
+  bare div under its own button, while the app's real offer is a Dialog raised
+  from the same callback. I was measuring test scaffolding and came close to
+  changing the app for it. Both checks removed, the limitation written where
+  the next reader will hit it, and the general form is now in CLAUDE.md — ask
+  which FILE renders the node before believing a driver result, and never let
+  the harness render a copy of the app's chrome to satisfy a check.
+  **WHAT IS STILL NOT PROVEN, and cannot be from here:** no harness page boots
+  `App.tsx`, so no driver in this repo can watch the real offer dialog appear.
+  Source checks now cover its wiring and its words; the appearance is asserted.
+  **NEEDS THE `chat-gemini` DEPLOY.** Session length by chat does not work at
+  all until then — it joins the coach changes already waiting.
+  **NAMED, NOT DONE:** the fitness GOAL is on neither surface. Bigger hole than
+  this one, deliberately not folded in — it is its own build with its own
+  ruling to take from Ashley.
+
 - [x] **BODYWEIGHT TRAINING HAD NO PROGRESS AT ALL — SIX SEPARATE PLACES, AND
   FIXING ANY ONE WOULD HAVE CHANGED NOTHING.**
   Ashley chose this from three options, 16 Sep 2026, then ruled on the question

@@ -111,8 +111,24 @@ console.log('\n2. And nothing else does')
   // The three known lifts joined 14 Sep 2026, on Ashley's ruling "rebuild only
   // when it matters" — and they are the first CONDITIONAL entries on this
   // list. §2b below is the condition.
+  // session_duration_preference joined 16 Sep 2026, on Ashley's ruling from
+  // three options: rebuild the rest of the block around the new length, over
+  // trimming what is already there and over waiting for the next block. Its
+  // ABSENCE was the defect, not an oversight — setting session length wrote
+  // the number and touched nothing else, so the plan kept the old length and
+  // today's card simply started saying the session ran over. Generation reads
+  // it everywhere (the duration budget, the session minimum and maximum, sets
+  // and reps per tier, the warm-up budget and the filler), which is exactly
+  // the test this list's name states.
+  //
+  // THIS CHECK BLOCKED THE FIX, AND WAS RIGHT TO. It enumerates rather than
+  // derives, which CLAUDE.md warns about — but here the enumeration IS the
+  // property: the whole point is that a field cannot join silently, because
+  // joining means the app starts rebuilding somebody's plan. A derived check
+  // would have let this through unread. Suspect a blocking check; do not
+  // assume it is wrong.
   check('the invalidating list is exactly the fields that change what the plan contains',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,start_preference,training_days,training_style',
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,session_duration_preference,start_preference,training_days,training_style',
     PLAN_INVALIDATING_FIELDS)
 
   // BOTH DIRECTIONS, because the copy differs and only one of them is the
@@ -313,6 +329,24 @@ console.log('\n4. Nothing rebuilds without somebody saying yes')
   // The rebuild must start from the live week, or it would rewrite history.
   check('it starts from the current week, not from week 1',
     /getActiveMesocycleWeek\([\s\S]{0,200}rebuildFromCurrentWeek/.test(app))
+
+  // THE WORDS HAVE TO REACH A SCREEN. Everything above proves the offer is
+  // RAISED and that saying yes or no does the right thing; none of it proves
+  // anybody ever reads the sentence. detectPlanInvalidation writes a title and
+  // a detail, and a dialog that dropped either would still pass every check
+  // above while asking "rebuild my plan?" over a blank space.
+  // This is here rather than in a browser driver for a measured reason, found
+  // 16 Sep 2026: the harness page that drives Profile renders its OWN plain div
+  // for the offer, so verify:setup-answers can read the words but can never see
+  // this dialog. Nothing in .tour-harness boots App.tsx. A source check cannot
+  // prove the branch is reached — but it can prove that when it is, both halves
+  // of the offer are rendered, which is the part that can silently rot.
+  const offerDialogAt = app.indexOf('<Dialog open={planInvalidation !== null}')
+  const offerDialog = offerDialogAt < 0 ? '' : app.slice(offerDialogAt, app.indexOf('</Dialog>', offerDialogAt))
+  check('the offer dialog renders the title it was given',
+    /\{planInvalidation\?\.title\}/.test(offerDialog), { offerDialogAt })
+  check('...and the detail underneath it',
+    /\{planInvalidation\?\.detail\}/.test(offerDialog), { offerDialogAt })
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
