@@ -979,11 +979,23 @@ old — the commands were right and the context was missing.
   check the process is alive on every poll and say so when it is not.
   This is the "a crash reads as a pass" rule one level up: there, zero
   failures looked like success; here, a dead run looked like a live one.
-- **Two checks ALWAYS fail in a cloud session and are not your problem:**
-  `test:meal-quality` and `test:schema-parity`. Both need a live database this
-  machine cannot reach. Confirm by stashing your changes and re-running — they
-  fail identically on untouched code. Report them as environmental rather than
-  investigating them from scratch every session.
+- **THREE checks ALWAYS fail in a cloud session and are not your problem:**
+  `test:meal-quality`, `test:schema-parity` and `verify:rls`. All three need a
+  live database this machine cannot reach; each prints the same cause verbatim
+  — *"Host not in allowlist: …supabase.co"*. Report them as environmental
+  rather than investigating them from scratch every session.
+  CORRECTED 17 Sep 2026, measured: this line said TWO for weeks and named only
+  the first pair. `verify:rls` has the same cause and was simply never in a
+  reported sweep here. **The shape is the one this file keeps relearning: a
+  count written once goes stale silently, because nothing re-derives it.** The
+  honest way to confirm the set is to read each failure's own output for the
+  allowlist sentence, not to tick names off this list — a real failure could
+  hide behind a name that happens to be on it.
+  `verify:rls` is worth knowing about for a second reason: it refuses to pass
+  on an unreachable database and says so — *"INCONCLUSIVE… this run proves
+  nothing. Nothing here says your data is safe, and nothing here says it is
+  exposed."* It used to print PASSED over 28 failed connections. That is the
+  model for every check that can lose its subject.
 - The sweep REWRITES `audit-report.txt`, `quality-report.txt` and
   `differentiation-audit-report.txt`. Revert those three before committing
   unless the change is genuinely about them.

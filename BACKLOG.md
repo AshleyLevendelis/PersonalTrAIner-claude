@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **THE "TWO CHECKS ALWAYS FAIL IN A CLOUD SESSION" LINE SAID TWO AND THE
+  ANSWER IS THREE.** 17 Sep 2026, found by a full sweep rather than by reading.
+  250 gates, 247 passed, 3 failed: `test:meal-quality`, `test:schema-parity`
+  and `verify:rls`. The first two are the pair CLAUDE.md names; the third has
+  the identical cause — *"Host not in allowlist: …supabase.co"* — printed
+  verbatim by all three, and was simply never in a sweep reported from here.
+  Corrected in CLAUDE.md with the generalisation, which matters more than the
+  number: **a count written once goes stale silently, because nothing
+  re-derives it.** So the way to confirm the set is to read each failure's own
+  output for the allowlist sentence rather than tick names off the list — a
+  real failure could hide behind a name that happens to be on it.
+  Worth recording separately: `verify:rls` REFUSES to pass on a database it
+  could not reach, and says so in its own words — *"INCONCLUSIVE — 28 of 28
+  tables never answered, so this run proves nothing. Nothing here says your
+  data is safe, and nothing here says it is exposed."* Its comment records that
+  it used to print PASSED over 28 failed connections. That is the model for
+  every check that can lose its subject.
+
 - [x] **YOUR MEALS NOW FOLLOW YOUR CALORIES — AND THE ENGINE FOR IT HAD BEEN
   SHIPPED WITH NO CALLER.** 17 Sep 2026.
   A calorie target is DERIVED — from bodyweight, activity, goal and macro mode
