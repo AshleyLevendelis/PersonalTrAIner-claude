@@ -35,6 +35,21 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   else { failures++; console.error(`  FAIL: ${name}${detail !== undefined ? ` — ${JSON.stringify(detail)}` : ''}`) }
 }
 
+// A CEILING ONLY SPEAKS WHEN IT IS CROSSED. That is how every note in this
+// file came to quote headroom it no longer had — four separate times now, the
+// last measured 17 Sep 2026, when ALL FOUR budgets below turned out to be
+// within 5 kB of their line with nothing having said so.
+//
+// So each budgeted number now reports its remaining room on EVERY run, crossed
+// or not, and the summary at the bottom puts them side by side. This records
+// only; it decides nothing, so the checks themselves are untouched and the gate
+// still has exactly one exit. A budget quietly filling up is now visible in the
+// log instead of in a failure three days later.
+const room: { name: string; measured: number; ceiling: number; unit: string }[] = []
+const headroom = (name: string, measured: number, ceiling: number, unit: string) => {
+  room.push({ name, measured, ceiling, unit })
+}
+
 // A gate that reads a stale dist/ is measuring last week. Build unless the
 // caller has just done so and says so.
 if (!process.argv.includes('--no-build')) {
@@ -102,6 +117,7 @@ console.log('\n1. The libraries are cached separately from the app')
   //
   // Treat the stated headroom as a lead, not a fact: it decays silently, and
   // the app-chunk budget below is doing the same thing right now (918 of 920).
+  headroom('a deploy re-downloads', appGzip, 264, 'kB gzipped')
   check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 264, appGzip)
 }
 
@@ -162,6 +178,7 @@ console.log('\n2b. The coach is not on the path to first paint')
   const html = readFileSync(join(DIST, '..', 'index.html'), 'utf8')
   const firstLoad = chunks.filter(c => html.includes(c.name))
   const firstLoadGzip = kb(firstLoad.reduce((n, c) => n + c.gzip, 0))
+  headroom('first paint fetches', firstLoadGzip, 420, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
     firstLoadGzip < 420, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
@@ -242,6 +259,7 @@ console.log('\n3. Nothing has crept back up')
   // drift, not the user-facing measurement.
   const APP_CHUNK_BUDGET_KB = 940
   const app = find('index-')
+  headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
     !!app && app.raw < APP_CHUNK_BUDGET_KB * 1024, app ? kb(app.raw) : null)
 
@@ -350,14 +368,42 @@ console.log('\n3. Nothing has crept back up')
   // CLAUDE.md; what this entry adds is that writing the rule down has not yet
   // stopped it happening. Anyone raising this line again: measure BOTH ends
   // first, and assume the last note's figure is stale.
-  const TOTAL_BUDGET_KB = 1915
+  // 1,915 -> 1,935, 17 Sep 2026. MEASURED BOTH ENDS on real builds the same
+  // hour, the base on a clean detached worktree rather than by stashing:
+  //     f9c2207, before this session's work   total 1913   app 935   paint 416
+  //     15dd8fc, after it                     total 1915   app 936   paint 416
+  // (read through THIS gate at both ends, not off a separate script — a hand-
+  // rolled gzip at a different level printed 414/415 for the same two builds,
+  // which would have recorded a first-paint move that did not happen.)
+  // +2 kB for the opener rotation, the notification decision module and a
+  // personal best that carries its own unit. 1,935 is 20 above the 1,915
+  // measured TODAY, the same shape as Ashley's 16 Sep ruling on this line.
+  //
+  // AND THE NOTE ABOVE WAS ALREADY FALSE BEFORE THIS SESSION OPENED A FILE,
+  // WHICH IS THE FOURTH TIME. It claimed 20 kB of room over a 1,895 measured
+  // on 16 Sep; the base measured 1,913 today, so 18 of the 20 had gone to the
+  // meal-resize work overnight. Two kilobytes of opener rotation were the last
+  // straw, not the cause.
+  //
+  // This is the fourth entry saying the same thing, so the fix this time is
+  // not another warning in a comment: every budget in this file now PRINTS its
+  // remaining room on every run (see `headroom` at the top). Measured 17 Sep,
+  // all four were within 5 kB of their ceiling and only one of them said so.
+  const TOTAL_BUDGET_KB = 1935
   const total = chunks.reduce((s, c) => s + c.raw, 0)
+  headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
 
   // A first load fetches the app and the vendors, but neither lazy screen.
   const deferred = ['ConversationalOnboarding', 'DevTestPage']
     .map(find).filter(Boolean).reduce((s, c) => s + (c as Chunk).raw, 0)
   check(`${kb(deferred)} kB is deferred off the first load`, deferred > 50 * 1024, kb(deferred))
+}
+
+console.log('\nHeadroom, measured this run:')
+for (const b of room) {
+  const left = b.ceiling - b.measured
+  console.log(`  ${b.name.padEnd(22)} ${String(b.measured).padStart(5)} of ${String(b.ceiling).padStart(5)} ${b.unit.padEnd(11)} ${left > 0 ? `${left} left` : `OVER by ${-left}`}`)
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

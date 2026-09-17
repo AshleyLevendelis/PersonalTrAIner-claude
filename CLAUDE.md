@@ -970,6 +970,15 @@ old — the commands were right and the context was missing.
   inherited from the note; and when one fails, measure the baseline on a clean
   checkout before believing the change in front of you caused it. I guessed
   twice at the cause here and was wrong both times.
+  **17 Sep 2026, the FOURTH occurrence, so the rule gains a second half: a
+  ceiling must report its remaining room on EVERY run, not only when it is
+  crossed.** The same note had gone stale again (20 kB of claimed headroom, 2
+  kB real, eroded overnight by work that never touched the ceiling). Writing
+  the rule down three times did not stop it, because the information simply was
+  not on screen. `test:bundle` now prints a headroom line per budget; the first
+  printing was the finding — all four budgets sat within 4 kB of their line and
+  only the crossed one had said anything. Any check with a threshold that gets
+  moved should print its margin the same way.
 
 ### What a full sweep costs, so it is neither skipped nor stumbled into
 

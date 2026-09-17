@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **THE FOURTH TIME A SIZE CEILING QUOTED ROOM IT NO LONGER HAD — so this
+  time the ceilings report themselves.** 17 Sep 2026. The full sweep came back
+  with two real failures, both mine and both in the checks rather than the app.
+  **THE SIZE ONE, measured at both ends on real builds the same hour**, the
+  base on a clean detached copy rather than by stashing: before this session's
+  work the whole app was 1,913 kB, after it 1,915 — two kilobytes for the
+  opener rotation, the notification decision module and a personal best that
+  carries its own unit. The line it crossed was set the day before at 1,915,
+  described in its own note as *twenty kilobytes of room over a measured
+  1,895*. Eighteen of those twenty had already gone to the meal-resize work
+  overnight, silently, because **a ceiling only speaks when it is crossed**.
+  That is the third entry in that file saying so and the fourth occurrence, so
+  the fix is not another warning in a comment: **every size budget now prints
+  its remaining room on every run.** The first printing is the finding — all
+  four were within four kilobytes of their line and only one of them had said
+  so. The line itself moves to 1,935, twenty above a value measured TODAY,
+  which is the shape of Ashley's 16 Sep ruling on this same line applied to
+  today's numbers rather than re-asked. Nothing about how fast the app opens
+  changed: first paint and the after-deploy re-download are byte-identical
+  either side of this session's work.
+  **THE OTHER FAILURE WAS A CHECK PINNED ON A MECHANISM THAT MOVED.** The
+  opener gate asserted that a loaded rest day produces literally the rest-day
+  opener — true until the rotation built this morning made the rest-day line
+  one of three on an ordinary day. What that check exists to protect is the
+  7 Sep bug, where a plan that had not finished loading was announced as a rest
+  day. Re-pinned on that property instead, both directions: the two states can
+  never produce the same opener, an unloaded plan can never produce a rest-day
+  opener at ANY point in the rotation, and — because losing the line entirely
+  would otherwise pass — a genuine rest day still gets its own words once the
+  rotation reaches it. 4 mutations tried, 4 caught, each one landing on the
+  check written for it; every run executed all 39 checks, so no mutation passed
+  by crashing.
+  **DECIDED UNPROMPTED**, and worth recording as such: raising a size ceiling
+  is Ashley's call by precedent — she has ruled on this file three days running
+  — but her 16 Sep reasoning (*the numbers that decide how fast the app opens
+  all still have room; this line is the early warning, not the speed*) is
+  measurably still true today, and asking a fourth time in four days about two
+  kilobytes is the interruption she told me to stop making. What is new is not
+  the number but the reporting, which is mechanical.
+
 - [x] **"ALL IT DOES IS TELL ME EVERY TIME I SPEAK TO IT ABOUT AN UPCOMING
   WORKOUT."** Ashley, 17 Sep 2026, having raised it more than once — which is
   the part that matters. *"Thats not what a coach does. Yes it should know
