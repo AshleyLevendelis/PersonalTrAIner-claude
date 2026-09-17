@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **THE FULL SWEEP, AND THE FOUR THINGS IT CAUGHT THAT THE AFFECTED-GATE RUN
+  COULD NOT.** 248 checks run, 242 pass. Two are the standing environmental
+  pair (`test:meal-quality`, `test:schema-parity`) — confirmed by reading each
+  one's own "Host not in allowlist" line rather than by ticking the names off a
+  list. The other four were real, all from part 1 of the set-boxes work, and
+  none of them could have been in the affected set I derived:
+
+  1. **Two gates had been CRASHING, not failing.** `test:what-happened` and
+     `test:session-move` built their day fixtures with the field name a day
+     carried before it had two kinds of set. The reader throws on `undefined`,
+     the module dies at import, and **193 checks across the two files ran zero
+     times** while printing what looks like an ordinary failure. Fixed, and
+     mutation-proved they assert something again.
+     **This is the "compare the checks that RAN, not just the failures" rule
+     paying for itself**, and the reason the affected-gate run missed them is
+     worth keeping: I derived that set from the files I had edited in part 2,
+     and these two read a file edited in part 1. A sweep is the only thing that
+     asks every gate.
+  2. **A driver was typing into a box that no longer existed.** The absurd-weight
+     driver asked for the row ending `-2`; rows are `-s2` (working) and `-w2`
+     (build-up) now, so the weight went nowhere, the save was refused for an
+     EMPTY box, and the driver reported that the over-ceiling warning had
+     disappeared. **A failing check's name is not its finding** — the warning
+     was fine; the typing was not.
+  3. **A driver was still testing the retired ticks.** `verify:six` — the one
+     that replays Ashley's own six reports — drove the tick strip her 17 Sep
+     ruling removed. Its block now drives the boxes instead, keeping the two
+     properties that mattered under either design: what is logged survives a
+     trip to another tab, and a build-up never moves the working-set counter.
+  4. **A MUTATION HARNESS THAT REBUILDS A BUNDLE MUST REBUILD AFTER RESTORING
+     TOO.** Restoring the source file leaves the MUTANT bundle on disk, so the
+     next driver run measures the break that was just undone. It cost one
+     false alarm here: a clean tree "failed" a check it had passed ten minutes
+     earlier, and the finding was the harness, not the app. Same family as
+     "the harness is not the app", one level down.
+
+  Net: 4 gate files and 2 drivers fixed, 4 mutations tried and 4 caught
+  (one of which had to be redone — the first version broke a filter the
+  counter does not read, which applies, runs, and creates no defect).
+
 - [x] **A BOX FOR EVERY SET, part 2: the rows, and the seven things drawing them
   found.** Her 17 Sep ruling rendered. Today's card shows **W1 W2 W3 W4** with
   their prescribed weights in real boxes, under *"Warm-up · doesn't count

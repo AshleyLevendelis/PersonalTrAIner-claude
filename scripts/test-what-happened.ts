@@ -41,7 +41,12 @@ const TODAY = '2026-09-09'  // Wednesday
 const MON = '2026-09-07'
 const WED = '2026-09-09'
 const FRI = '2026-09-11'
-const dash = (session: Record<string, unknown> | null, logs: unknown[] = []) => ({ date: '', metric: null, nutrition: null, session, exercises: [], workoutLogs: logs, cardioLogs: [] }) as never
+// WORKING logs, and an empty build-up list beside them. The field was
+// `workoutLogs` until 17 Sep 2026, when a day gained two kinds of set;
+// classifyDay reads `workingLogs`, so a fixture still spelling the old name
+// hands it `undefined` and the whole file throws at import — zero checks run,
+// which reads as a failing gate and is really a missing fixture field.
+const dash = (session: Record<string, unknown> | null, logs: unknown[] = []) => ({ date: '', metric: null, nutrition: null, session, exercises: [], workingLogs: logs, warmupLogs: [], cardioLogs: [] }) as never
 
 // ---------------------------------------------------------------------------
 console.log('\n1. A declared miss is a real state, ranked where the ruling says')

@@ -184,16 +184,16 @@ console.log('\n5. HOME — last known numbers, not a grey line, on a tab switch\
   check('...and the fresh read still lands behind it', !/Loading your day/.test(settled), settled.slice(0, 160))
 }
 
-console.log('\nRAMP — the warm-up steps can be ticked off, and the tick survives a tab switch\n')
+console.log('\nRAMP — the build-up has a box per set, and what is logged survives a tab switch\n')
 {
-  // Ashley, mid-session: "theres no way to log the ramp up weights." A tick is
-  // only worth anything if it registers AND is still there when she comes back
-  // from another tab, so both are driven here rather than argued from source.
+  // Ashley, mid-session 7 Sep 2026: "theres no way to log the ramp up weights."
+  // Her first ruling gave the steps ticks that wrote nothing down. On 17 Sep,
+  // standing in the gym again, she reversed it from three options: a box for
+  // every set, labelled, logged like any other work. This block used to drive
+  // the ticks; it drives the boxes now, and keeps the two properties that
+  // mattered either way — it survives a tab switch, and it never becomes
+  // working volume.
   // STAND ON A DAY THAT HAS A RAMP, and ask the page which day that is.
-  // This block never pinned a day at all, so it asserted a ramp on whatever
-  // weekday the machine woke up on — the exact situation verify:ramp-readonly
-  // added its (also wrong) Monday pin to avoid. real.tsx publishes the day
-  // using formatRampSets, the screen's own predicate.
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
   await wait(2500)
   const rampTarget = await ev(`window.__rampTarget`)
@@ -203,96 +203,90 @@ console.log('\nRAMP — the warm-up steps can be ticked off, and the tick surviv
   await ev(`location.hash = '#/tab/exercise'`)
   await wait(1500)
 
-  // The main lift starts collapsed — the primer is the open row — and the ramp
-  // lives on the main lift. Open it the way a thumb would.
-  const opened = await ev(`(() => {
+  // The main lift starts collapsed — the primer is the open row — and the
+  // build-up lives on the main lift. Open it the way a thumb would.
+  const openMainLift = `(() => {
     const hdr = [...document.querySelectorAll('div,button')]
       .find(e => /MAIN LIFT/.test(e.innerText || '') && (e.innerText || '').length < 200)
     if (!hdr) return 'no MAIN LIFT row'
     ;(hdr.querySelector('[role="button"],button') || hdr).click()
     return 'opened'
-  })()`)
+  })()`
+  const opened = await ev(openMainLift)
   check('the main lift row opens', opened === 'opened', opened)
   await wait(900)
 
-  // FOUND BY WHAT THE STEPS ARE, NOT BY THE HEADING ABOVE THEM. This used to
-  // look for a div whose text began "RAMP:" — the heading's wording at the
-  // time. It now reads "Ramp up first:", deliberately (RampStrip's own comment:
-  // "the order is the instruction"), so the selector matched nothing and four
-  // checks went red against a strip that was on screen the whole time. The
-  // heading is copy and may be rewritten again; a step being a labelled,
-  // pressable control is the property this section is actually about, and it
-  // is the same handle verify:ramp-readonly uses.
-  const STEPS = `[...document.querySelectorAll('button')].filter(b => /warm-up/i.test(b.getAttribute('aria-label') || ''))`
-  const readRamp = () => ev(`(() => {
-    const steps = ${STEPS}
-    if (!steps.length) return JSON.stringify({ found: false, steps: [] })
-    return JSON.stringify({ found: true, steps: steps.map(b => ({
-      text: b.innerText.replace(/\s+/g, ' ').trim(),
-      pressed: b.getAttribute('aria-pressed'),
-      label: b.getAttribute('aria-label'),
-    })) })
+  // FOUND BY WHAT A ROW IS, NOT BY THE HEADING ABOVE IT. Two earlier versions
+  // of this block keyed on copy — "RAMP:" and then an aria-label containing
+  // "warm-up" — and both broke when the wording moved while the thing itself
+  // was on screen the whole time. The row's testid is the property.
+  const readBuildUp = () => ev(`(() => {
+    const rows = [...document.querySelectorAll('[data-testid="warmup-row"]')]
+    return JSON.stringify({ found: rows.length > 0, steps: rows.map(r => {
+      const inputs = [...r.querySelectorAll('input')]
+      const save = [...r.querySelectorAll('button')].find(b => /warm-up/i.test(b.getAttribute('aria-label') || ''))
+      return {
+        label: (r.querySelector('span')?.textContent || '').trim(),
+        kg: inputs[0] ? (inputs[0].value || inputs[0].placeholder) : null,
+        reps: inputs[1] ? (inputs[1].value || inputs[1].placeholder) : null,
+        saved: save ? /saved$/.test(save.getAttribute('aria-label') || '') : null,
+        tick: save ? save.getAttribute('aria-label') : null,
+      } })})
   })()`)
 
-  const before = JSON.parse(await readRamp())
-  check('the ramp strip is on the exercise card', before.found === true, before)
-  // EVERY ONE OF THESE ASSERTS A NON-EMPTY LIST FIRST. The first version used
+  const before = JSON.parse(await readBuildUp())
+  check('the build-up rows are on the exercise card', before.found === true, before)
+  // EVERY ONE OF THESE ASSERTS A NON-EMPTY LIST FIRST. An earlier version used
   // a bare .every(), which is true of [], so two checks reported green against
   // a strip that had not been found at all.
-  check('...and every step is a control, not plain text', before.steps.length >= 3, before.steps)
-  check('...none of them ticked to begin with',
-    before.steps.length >= 3 && before.steps.every(s => s.pressed === 'false'), before.steps)
-  check('...and each says what tapping will do',
-    before.steps.length >= 3 && before.steps.every(s => /tap to mark done/.test(s.label ?? '')), before.steps[0])
+  check('...and every step has a box of its own, with the prescribed numbers in it',
+    before.steps.length >= 3 && before.steps.every(s => /^[0-9.]+$/.test(s.kg ?? '') && /^[0-9]+$/.test(s.reps ?? '')), before.steps)
+  check('...none of them logged to begin with',
+    before.steps.length >= 3 && before.steps.every(s => s.saved === false), before.steps)
+  check('...and each tick names the row it belongs to, not just a number',
+    before.steps.length >= 3 && before.steps.every((s, i) => s.tick === `Save warm-up ${i + 1}`), before.steps.map(s => s.tick))
   await shoot('six-ramp-before')
 
   const tapped = await ev(`(() => {
-    const steps = ${STEPS}
-    if (steps.length < 2) return 'only ' + steps.length
-    steps[0].click(); steps[1].click()
-    return 'tapped ' + steps.length
+    const rows = [...document.querySelectorAll('[data-testid="warmup-row"]')]
+    if (rows.length < 2) return 'only ' + rows.length
+    for (const r of rows.slice(0, 2)) {
+      const b = [...r.querySelectorAll('button')].find(x => /^Save warm-up/.test(x.getAttribute('aria-label') || ''))
+      if (b) b.click()
+    }
+    return 'tapped ' + rows.length
   })()`)
-  check('two steps can be tapped', /^tapped/.test(tapped), tapped)
-  await wait(400)
+  check('two steps can be logged', /^tapped/.test(tapped), tapped)
+  await wait(1200)
 
-  const after = JSON.parse(await readRamp())
-  check('...and both come back ticked',
-    after.steps.filter(s => s.pressed === 'true').length === 2, after.steps)
+  const after = JSON.parse(await readBuildUp())
+  check('...and both come back logged',
+    after.steps.filter(s => s.saved === true).length === 2, after.steps)
   check('...with the rest untouched',
-    after.steps.filter(s => s.pressed === 'false').length === before.steps.length - 2, after.steps)
-  check('...and a ticked step now offers to unmark itself',
-    /tap to unmark/.test(after.steps.find(s => s.pressed === 'true')?.label ?? ''), after.steps[0])
+    after.steps.filter(s => s.saved === false).length === before.steps.length - 2, after.steps)
   await shoot('six-ramp-ticked')
 
   // THE POINT OF STORING IT AT ALL. A phone gets put down between sets, and
-  // component state would drop every tick the moment she looked at Nutrition.
+  // a build-up logged before a glance at Nutrition has to still be there.
   await ev(`location.hash = '#/tab/nutrition'`)
   await wait(900)
   await ev(`location.hash = '#/tab/exercise'`)
-  await wait(1500)
+  await wait(1800)
   await ev(`(() => {
     const hdr = [...document.querySelectorAll('div,button')]
       .find(e => /MAIN LIFT/.test(e.innerText || '') && (e.innerText || '').length < 200)
     if (hdr && !/OPEN/.test(hdr.innerText || '')) (hdr.querySelector('[role="button"],button') || hdr).click()
   })()`)
-  await wait(900)
-  const returned = JSON.parse(await readRamp())
-  check('the ticks survive a trip to another tab',
-    returned.steps.filter(s => s.pressed === 'true').length === 2, returned.steps)
+  await wait(1200)
+  const returned = JSON.parse(await readBuildUp())
+  check('what was logged survives a trip to another tab',
+    returned.steps.filter(s => s.saved === true).length === 2, returned.steps)
 
-  // And it unticks — a mis-tap has to be undoable.
-  await ev(`(() => { const steps = ${STEPS}; if (steps[0]) steps[0].click() })()`)
-  await wait(400)
-  const undone = JSON.parse(await readRamp())
-  check('...and a mis-tap can be taken back',
-    undone.steps.filter(s => s.pressed === 'true').length === 1, undone.steps)
-
-  // NOT A LOG. The working-set counter must not have moved.
-  // NOT A LOG. Nothing on the page may claim a set was logged. Read as "is
-  // there ANY non-zero logged counter", not "does the main lift's counter say
-  // zero" — the first version pinned one row's exact wording and came back
-  // empty when that row was collapsed, which is a check that cannot fail for
-  // the wrong reason and cannot pass for the right one either.
+  // NOT WORKING VOLUME. Nothing on the page may claim a working set was logged.
+  // Read as "is there ANY non-zero logged counter", not "does the main lift's
+  // counter say zero" — the first version pinned one row's exact wording and
+  // came back empty when that row was collapsed, which is a check that cannot
+  // fail for the wrong reason and cannot pass for the right one either.
   const counters = await ev(`JSON.stringify(document.body.innerText.match(/\\d+ working sets · \\d+ logged/g) || [])`)
   const rows = JSON.parse(counters)
   check('the working-set counters are on screen (sanity check on this check)', rows.length > 0, rows)

@@ -94,7 +94,12 @@ const read = setNumber => ev(`(() => {
 
 const type = (setNumber, value) => ev(`(() => {
   const sec = ${SECTION}
-  const el = sec.querySelector('input[id$="-${setNumber}"][id^="setgrid-weight-"]')
+  // A ROW IS A KIND AND A NUMBER (17 Sep 2026): the working row's box ends in
+  // -s2 and the build-up step's in -w2. Asking for -2 matched nothing, the
+  // typed weight went nowhere, and the save was refused for an EMPTY box —
+  // which read on this driver as "the ceiling warning is gone".
+  // (No backticks in this comment: it lives inside a template literal.)
+  const el = sec.querySelector('input[id$="-s${setNumber}"][id^="setgrid-weight-"]')
   if (!el) return false
   ;(${setValue})(el, '${value}')
   return true

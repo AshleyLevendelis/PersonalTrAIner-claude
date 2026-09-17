@@ -963,6 +963,15 @@ old — the commands were right and the context was missing.
   `App.tsx`. Write which half you have next to the checks, and **never make the
   harness render a copy of the app's chrome to satisfy a check** — that
   measures the copy.
+- **A MUTATION HARNESS THAT REBUILDS A BUNDLE MUST REBUILD AFTER RESTORING
+  TOO.** 17 Sep 2026: the browser mutation runner restored the source file in
+  its `finally` and left the MUTANT bundle sitting in `.tour-harness/dist`. The
+  next driver run measured the break that had just been undone — a clean tree
+  failing a check it passed ten minutes earlier, with the source visibly
+  correct. It reads exactly like a real regression and is worth ten minutes of
+  hunting before anyone thinks of the bundle. Same family as "the harness is
+  not the app", one level down: **the thing a driver measures is the last
+  build, not the working tree.**
 - **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
   beyond "did not apply" and "crashed", and the harness cannot see it: on
   15 Sep a mutation to the walking plan's day builder read MISSED because the
