@@ -44,10 +44,11 @@ import {
   hasEnoughTrendData,
   trendLabel,
   derivePRHistory,
+  readingForMoment,
   type ExerciseHistorySession,
 } from '@/lib/exercise-history'
 import { ExerciseStrengthChart } from './ExerciseStrengthChart'
-import { personalBest } from '@/lib/coach-voice'
+import { personalBest, BEST_SET_QUALIFIER } from '@/lib/coach-voice'
 import { MuscleMap } from './MuscleMap'
 
 export type ExerciseDetailTab = 'summary' | 'history' | 'howto'
@@ -249,9 +250,19 @@ export function ExerciseDetailPanel({
                       {prs.map(pr => (
                         <p key={`${pr.sessionId}-${pr.kind}`} className="flex items-center gap-1.5 text-sm">
                           <Trophy className="size-3.5 text-primary-text glow-mint shrink-0" aria-hidden />
+                          {/* THE ESTIMATE CASE, 17 Sep 2026. A moment whose
+                              kind is 'e1rm' is a best the estimate found —
+                              less weight, more reps — so the bare weight on
+                              its own read as a new record LOWER than the
+                              standing one. The whole set goes on the row, and
+                              the reading is decided in one place both this
+                              screen and the session summary call. */}
                           <span className="tabular-mono text-primary-text glow-mint">
-                            {personalBest(pr.metric, pr.metric === 'reps' ? pr.reps : pr.metric === 'added_load' ? pr.addedLoadKg : pr.weightKg)}
+                            {personalBest(readingForMoment(pr))}
                           </span>
+                          {pr.kind === 'e1rm' && (
+                            <span className="text-xs text-muted-foreground">· {BEST_SET_QUALIFIER}</span>
+                          )}
                           <span className="text-xs text-muted-foreground">· {pr.date}</span>
                         </p>
                       ))}

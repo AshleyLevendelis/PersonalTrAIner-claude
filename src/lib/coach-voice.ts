@@ -191,13 +191,60 @@ export function mealsDrifted(mealCalories: number, targetCalories: number): stri
  * is worse than no number: it looks right.
  *
  * Ashley's ruling, 16 Sep 2026: at bodyweight the record is the most reps
- * in one set; once a belt goes on, the record is the added weight. So the
- * three readings are three sentences, not one sentence with a variable.
+ * in one set; once a belt goes on, the record is the added weight. Hers of
+ * 17 Sep added a fourth: a best the estimate found shows the whole SET. So
+ * the readings are four sentences, not one sentence with a variable.
  */
-export function personalBest(metric: 'load' | 'added_load' | 'reps', value: number): string {
-  if (metric === 'reps') return `${value} reps`
-  if (metric === 'added_load') return `+${value}kg`
-  return `${value}kg`
+export type BestReading =
+  | { kind: 'load'; weightKg: number }
+  | { kind: 'added_load'; addedKg: number }
+  | { kind: 'reps'; reps: number }
+  /**
+   * A best the ESTIMATE found, not the bar. You lifted less weight for more
+   * reps and worked harder for it — real progress that a heaviest-ever record
+   * cannot see. It shows the whole set, because the alternative is what this
+   * used to do: fire on the estimate and then print the lighter weight on its
+   * own, so someone whose best is 100kg read "95kg" labelled as a best.
+   * Ashley's ruling, 17 Sep 2026, from three options.
+   */
+  | { kind: 'best_set'; weightKg: number; reps: number }
+
+/**
+ * ONE ARGUMENT, NOT A METRIC AND A LOOSE NUMBER. The old signature was
+ * (metric, value) and every one of its three call sites re-derived `value`
+ * with its own ternary over four fields — which is the bug surface, not the
+ * renderer. A caller that picked the wrong field passed a valid number for
+ * the wrong kind and this function had no way to know.
+ */
+export function personalBest(reading: BestReading): string {
+  if (reading.kind === 'reps') return `${reading.reps} reps`
+  if (reading.kind === 'added_load') return `+${reading.addedKg}kg`
+  if (reading.kind === 'best_set') return `${reading.weightKg}kg × ${reading.reps}`
+  return `${reading.weightKg}kg`
+}
+
+/**
+ * The words that go beside a best_set reading, so both screens that show one
+ * say the same thing. Kept here rather than written twice: two copies of a
+ * four-word qualifier is two things to drift, and the drifted one is the one
+ * nobody re-reads.
+ */
+export const BEST_SET_QUALIFIER = 'best set'
+
+/**
+ * The bridge for callers that hold a PRMetric and its already-chosen number —
+ * Home's recent list, which is built from the PR cache's heaviest-ever
+ * figures and therefore can never be the estimate case.
+ *
+ * It exists so that caller does not rebuild a reading with a ternary, which
+ * is exactly the shape that put "12 kg" on a reps record. There is no
+ * 'best_set' branch here ON PURPOSE: a metric alone cannot express it, so a
+ * caller holding only a metric must not be able to claim one.
+ */
+export function bestReadingOf(metric: 'load' | 'added_load' | 'reps', value: number): BestReading {
+  if (metric === 'reps') return { kind: 'reps', reps: value }
+  if (metric === 'added_load') return { kind: 'added_load', addedKg: value }
+  return { kind: 'load', weightKg: value }
 }
 
 export function ask(verbPhrase: string): string {

@@ -38,15 +38,20 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   prMetricFor, checkForPR, getTopPRSet, computeSessionPRs, toSessionSets,
-  EMPTY_PR_RECORD, type PRRecord, type SetShape, type SessionSet,
+  calculateE1RM, readingFor,
+  EMPTY_PR_RECORD, type PRRecord, type SetShape, type SessionSet, type PRResult,
 } from '../src/lib/pr-engine'
 import {
   groupSetsBySession, derivePRHistory, deriveStrengthTrend, hasEnoughTrendData, trendLabel,
+  readingForMoment,
 } from '../src/lib/exercise-history'
-import { personalBest } from '../src/lib/coach-voice'
+import { personalBest, BEST_SET_QUALIFIER } from '../src/lib/coach-voice'
 import type { ExerciseSetLog } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
+/** Comments blanked before any ABSENCE check: a note explaining why something was removed would otherwise satisfy the check that it was removed. */
+const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
   if (ok) console.log(`  ok: ${name}`)
@@ -258,18 +263,113 @@ console.log('\n9. Rows reach the engine with what it needs to decide (exclusion 
 
 console.log('\n10. A number never reaches the screen without its unit')
 {
-  check('reps read as reps', personalBest('reps', 12) === '12 reps')
-  check('added weight reads as added', personalBest('added_load', 15) === '+15kg')
-  check('a loaded best is unchanged', personalBest('load', 60) === '60kg')
+  // ONE ARGUMENT SINCE 17 Sep 2026. The signature was (metric, value) and
+  // each call site re-derived `value` with its own ternary over four fields,
+  // which is where the estimate case went wrong on two screens at once.
+  check('reps read as reps', personalBest({ kind: 'reps', reps: 12 }) === '12 reps')
+  check('added weight reads as added', personalBest({ kind: 'added_load', addedKg: 15 }) === '+15kg')
+  check('a loaded best is unchanged', personalBest({ kind: 'load', weightKg: 60 }) === '60kg')
   // The defect this prevents, stated as a check: the old renderers printed
   // `${value}kg` with no branch, so 12 reps would have read "12kg".
   check('...and no reading of a reps best contains "kg" alone',
-    !/^\d+kg$/.test(personalBest('reps', 12)), personalBest('reps', 12))
+    !/^\d+kg$/.test(personalBest({ kind: 'reps', reps: 12 })), personalBest({ kind: 'reps', reps: 12 }))
 
   // PROVING THE DETECTOR, so this section cannot go vacuous if personalBest
-  // is later reduced to a passthrough: the three readings must DIFFER.
-  const readings = new Set([personalBest('reps', 12), personalBest('added_load', 12), personalBest('load', 12)])
-  check('the same number reads three different ways', readings.size === 3, [...readings])
+  // is later reduced to a passthrough: the four readings must DIFFER.
+  const readings = new Set([
+    personalBest({ kind: 'reps', reps: 12 }),
+    personalBest({ kind: 'added_load', addedKg: 12 }),
+    personalBest({ kind: 'load', weightKg: 12 }),
+    personalBest({ kind: 'best_set', weightKg: 12, reps: 12 }),
+  ])
+  check('the same number reads four different ways', readings.size === 4, [...readings])
+}
+
+console.log('\n11. A best the ESTIMATE found shows the set, never a lower bare weight')
+{
+  // THE DEFECT, REPRODUCED RATHER THAN DESCRIBED. Lift 100kg x 5, then
+  // 95kg x 8: the second is harder work and the estimate says so, but the
+  // BAR went down. The app used to fire a personal best and print "95kg" to
+  // someone whose best is 100kg. Ashley's ruling, 17 Sep 2026, from three
+  // options: keep celebrating it, and show the whole set.
+  const heavy = calculateE1RM(100, 5)
+  const lighterButHarder = calculateE1RM(95, 8)
+  console.log(`     100kg x 5 -> e1RM ${heavy.toFixed(1)};  95kg x 8 -> e1RM ${lighterButHarder.toFixed(1)}`)
+  check('the lighter set really is the stronger one by estimate', lighterButHarder > heavy,
+    { heavy: +heavy.toFixed(1), lighterButHarder: +lighterButHarder.toFixed(1) })
+  check('...at a LOWER weight, which is what made the old reading wrong', 95 < 100)
+
+  const estimateDriven: PRResult = {
+    type: 'e1rm', metric: 'load',
+    newE1RM: lighterButHarder, newWeight: 95, previousE1RM: heavy, previousWeight: 100,
+    newReps: 8, previousReps: 5, newAddedLoadKg: 0, previousAddedLoadKg: 0,
+  }
+  const reading = readingFor(estimateDriven)
+  check('it reads as a set, not a weight', reading.kind === 'best_set', reading)
+  check('...and says both halves of it', personalBest(reading) === '95kg \u00d7 8', personalBest(reading))
+  // THE WHOLE POINT, as a check a future change cannot pass by accident: the
+  // string must not be the standing record's rival — a bare "95kg".
+  check('...and is never a bare weight lower than the record it did not beat',
+    personalBest(reading) !== '95kg' && !/^\d+kg$/.test(personalBest(reading)), personalBest(reading))
+
+  // THE CONTRAST, so the check above cannot pass vacuously by turning EVERY
+  // loaded best into a set. A real weight PR is still a plain weight.
+  const barWentUp: PRResult = { ...estimateDriven, type: 'weight', newWeight: 105, newReps: 3 }
+  check('a genuine weight PR is still a plain weight',
+    personalBest(readingFor(barWentUp)) === '105kg', personalBest(readingFor(barWentUp)))
+  const both: PRResult = { ...estimateDriven, type: 'both', newWeight: 105, newReps: 6 }
+  check('...and so is one that moved both', personalBest(readingFor(both)) === '105kg',
+    personalBest(readingFor(both)))
+  // Metric wins over type: a reps or belt record is never a set reading,
+  // whatever the type field says.
+  check('a reps record ignores the type field',
+    readingFor({ ...estimateDriven, metric: 'reps', newReps: 14 }).kind === 'reps')
+  check('a belt record ignores it too',
+    readingFor({ ...estimateDriven, metric: 'added_load', newAddedLoadKg: 20 }).kind === 'added_load')
+
+  // BOTH SCREENS SAY THE SAME WORDS. The qualifier is one constant, because
+  // two copies of four words is two things to drift.
+  const summary = strip(read('src/components/exercise/SessionSummaryDialog.tsx'))
+  const detail = strip(read('src/components/exercise/ExerciseDetailDialog.tsx'))
+  check('the session summary decides the reading in one place', /readingFor\(/.test(summary))
+  check('...and the exercise PR list does too', /readingForMoment\(/.test(detail))
+  check('neither rebuilds the reading with its own ternary',
+    !/metric === 'reps' \?/.test(summary) && !/metric === 'reps' \?/.test(detail))
+  // IMPORT LINES REMOVED BEFORE THE NAME CHECK. Found by mutation: replacing
+  // the constant's USE with the literal words left the import untouched, so a
+  // bare-name match still found it and the check passed over the exact drift
+  // it exists to stop. An import is not a use.
+  const noImports = (t: string) => t.replace(/^\s*import[\s\S]*?from '[^']+'$/gm, '')
+  const summaryBody = noImports(summary)
+  const detailBody = noImports(detail)
+  check('both mark an estimate-driven best with the shared words',
+    /BEST_SET_QUALIFIER/.test(summaryBody) && /BEST_SET_QUALIFIER/.test(detailBody))
+  // And the words themselves, ANYWHERE, not only inside quotes — the first
+  // version required a trailing apostrophe and so missed them written bare
+  // into JSX, which is precisely how a second copy would arrive.
+  check('...and neither writes those words itself',
+    !/best set/i.test(summaryBody.replace(/BEST_SET_QUALIFIER/g, '')) && !/best set/i.test(detailBody.replace(/BEST_SET_QUALIFIER/g, '')))
+  // PROVING THAT DETECTOR, so it cannot go vacuous: it must reject a file
+  // that does write the words itself.
+  check('...and that check would notice if one did',
+    /best set/i.test('<span>· best set</span>'))
+
+  // THE HISTORY BRIDGE, EXERCISED rather than read. Source checks proved the
+  // dialog CALLS readingForMoment and nothing proved what it returns — so
+  // deleting its estimate branch changed the screen and passed every check.
+  const moment = {
+    date: '2026-09-17', sessionId: 's1', weightKg: 95, e1rm: 120.3, reps: 8,
+    addedLoadKg: 0, kind: 'e1rm' as const, metric: 'load' as const,
+  }
+  check('a history moment found by the estimate reads as a set',
+    readingForMoment(moment).kind === 'best_set', readingForMoment(moment))
+  check('...with both halves of it', personalBest(readingForMoment(moment)) === '95kg \u00d7 8',
+    personalBest(readingForMoment(moment)))
+  check('...while one where the bar went up is a plain weight',
+    personalBest(readingForMoment({ ...moment, kind: 'weight', weightKg: 105 })) === '105kg',
+    personalBest(readingForMoment({ ...moment, kind: 'weight', weightKg: 105 })))
+  check('...and a reps moment is reps, whatever its kind says',
+    readingForMoment({ ...moment, metric: 'reps', reps: 14 }).kind === 'reps')
 }
 
 console.log(failures === 0 ? '\nAll bodyweight-progress checks passed.\n' : `\n${failures} check(s) FAILED.\n`)

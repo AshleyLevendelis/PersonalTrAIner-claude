@@ -9,8 +9,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Trophy } from 'lucide-react'
 import type { SessionSummary } from '@/lib/session-derive'
-import type { SessionPRHit } from '@/lib/pr-engine'
-import { personalBest } from '@/lib/coach-voice'
+import { readingFor, type SessionPRHit } from '@/lib/pr-engine'
+import { personalBest, BEST_SET_QUALIFIER } from '@/lib/coach-voice'
 import type { DoubleProgressionRecommendation } from '@/lib/progression-engine'
 
 export interface SessionSummaryData {
@@ -92,13 +92,18 @@ export function SessionSummaryDialog({
                     {/* `{pr.result.newWeight}kg` stood here, which printed
                         "0kg" for a bodyweight best and would have printed
                         "12kg" the moment reps records existed. The unit comes
-                        from the phrasebook with the number now. */}
+                        from the phrasebook with the number now.
+                        AND THE type === 'e1rm' CASE, 17 Sep 2026: that is a
+                        best the ESTIMATE found — you lifted LESS weight for
+                        more reps — so printing newWeight on its own told
+                        someone whose best is 100kg that their new best was
+                        95kg. The whole set goes on the row instead. */}
                     <span className="tabular-mono text-primary-text glow-mint">
-                      {personalBest(pr.result.metric,
-                        pr.result.metric === 'reps' ? pr.result.newReps
-                          : pr.result.metric === 'added_load' ? pr.result.newAddedLoadKg
-                          : pr.result.newWeight)}
+                      {personalBest(readingFor(pr.result))}
                     </span>
+                    {pr.result.type === 'e1rm' && (
+                      <span className="text-xs text-muted-foreground">· {BEST_SET_QUALIFIER}</span>
+                    )}
                   </p>
                 ))}
               </div>

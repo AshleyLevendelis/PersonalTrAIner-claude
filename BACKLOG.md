@@ -2,6 +2,51 @@
 
 Newest first. One line each.
 
+- [x] **THE APP CONGRATULATED YOU ON A PERSONAL BEST AND SHOWED A NUMBER
+  LOWER THAN YOUR RECORD.** 17 Sep 2026.
+  Lift 100kg x 5, then 95kg x 8. The second is harder work and the app's
+  hidden estimate agrees (e1RM 116.7 -> 120.3), so `comparePR` returns
+  `type: 'e1rm'` — a PR the ESTIMATE found, where the bar went DOWN. Two
+  screens then rendered `personalBest('load', newWeight)` and put **95kg** on
+  screen, labelled a personal best, to someone whose best is 100kg.
+  Reproduced numerically before it was believed, and the numbers are now a
+  live check rather than a comment.
+  **ASHLEY'S RULING, from three options: "Best set yet — 95kg x 8".** Keep
+  celebrating it, show the whole SET, and never a bare weight. She rejected
+  dropping it silently (eight reps at 95kg is real progress) and showing the
+  estimate itself (a number nobody has lifted, which is what her 16 Sep ruling
+  on bodyweight PRs already forbade).
+  **THE FIX IS A SIGNATURE, NOT A BRANCH.** `personalBest(metric, value)`
+  became `personalBest(reading)` over a four-case union, because the bug was
+  never in the renderer: each of the three call sites re-derived `value` with
+  its own ternary over four fields, and two of them got the same case wrong.
+  Two bridges — `readingFor` (a PRResult) and `readingForMoment` (a PRMoment)
+  — decide it once each, beside the type they read. The qualifier is one
+  exported constant so two screens cannot word it differently.
+  **HOME IS UNAFFECTED, and that is a fact about its source rather than luck:**
+  its list is built from the PR cache's heaviest-ever figures, which only move
+  when the bar does.
+  **THE TWO CHECKS I WROTE FIRST BOTH PASSED OVER THE DEFECT**, found by
+  mutation and worth more than the fix. A bare-name check for the shared
+  qualifier matched the IMPORT line after its USE was replaced with hand-typed
+  words — an import is not a use, for the second time in this repo. And nothing
+  exercised `readingForMoment` at all: source checks proved the screen CALLS it
+  and said nothing about what it returns, so deleting its estimate branch
+  changed the screen and passed everything.
+  **VERIFIED.** `test:bodyweight-progress` 74 checks (was 55), 8 mutations
+  tried, 8 caught. `npx tsc --noEmit` clean; `test:coach-voice`,
+  `test:dashboard`, `test:exercise-history`, `test:no-dead-code`,
+  `test:bundle`, `test:appearance` green; `verify:bodyweight-progress` still
+  passes unchanged.
+  **NOT BROWSER-VERIFIED, AND NAMED RATHER THAN OMITTED.** The estimate case
+  needs a LOADED lift on today's card, and the harness's today session is
+  entirely bodyweight — so the row is not reachable by the taps a person would
+  make. I built the fixture and the driver section for it, could not reach the
+  screen, and reverted both rather than leave a half-wired driver that reports
+  "could not reach" as if it were a finding. The reps and belt renderings ARE
+  driven on a real screen by the existing run. Closing this needs a harness
+  whose today session carries a loaded lift.
+
 - [x] **THE "TWO CHECKS ALWAYS FAIL IN A CLOUD SESSION" LINE SAID TWO AND THE
   ANSWER IS THREE.** 17 Sep 2026, found by a full sweep rather than by reading.
   250 gates, 247 passed, 3 failed: `test:meal-quality`, `test:schema-parity`
@@ -6446,9 +6491,17 @@ Newest first. One line each.
   yesterday's date.** Both known, both narrow, both listed here rather than
   quietly fixed inside an audit whose scope was elsewhere.
 
-- [ ] **e1RM and PR labelling.** The chart's "One Rep Max" is an estimate
-  presented as a measurement, and PRs on added weight (dip belt, weighted
-  chins) are still judged on `weight_kg`, which is 0 for those rows.
+- [x] **e1RM and PR labelling — TWO THIRDS OF THIS WAS ALREADY FIXED AND
+  NOBODY TICKED THE LINE.** Re-measured 17 Sep 2026 before acting on it, per
+  the rule that a written finding is a lead and not a fact. The "One Rep Max"
+  caption is GONE (`trendLabel` reads "Strength trend" / "Best set, in reps" /
+  "Added weight") and no `.tsx` in the app renders an e1RM at all; PRs on added
+  weight DO register (`metric: 'added_load'`, its own record, its own `+15kg`
+  reading). Both were closed by the bodyweight-progress work of 16 Sep and this
+  note was never revisited. **I offered Ashley a fix for a defect that did not
+  exist** — the correction is the finding: re-measure BEFORE offering, not
+  before building.
+  What was real underneath is recorded in the new entry at the top.
 
 - [x] **TWO FROM ASHLEY'S PHONE, 5 Sep 2026 — an invented time, and cardio the
   coach never heard about.**

@@ -1,3 +1,4 @@
+import type { BestReading } from './coach-voice'
 import { supabase } from './supabase'
 import type { ExerciseSetLog } from './types'
 
@@ -70,6 +71,25 @@ export interface PRResult {
   previousReps: number
   newAddedLoadKg: number
   previousAddedLoadKg: number
+}
+
+/**
+ * HOW A PR RESULT IS READ OUT, decided here rather than at each screen.
+ *
+ * Two screens used to rebuild this with their own ternary over four fields,
+ * and both got the estimate case wrong in the same way: `type === 'e1rm'`
+ * means the WEIGHT did not move — you lifted less for more reps — so printing
+ * newWeight alone told someone whose best is 100kg that their new best was
+ * 95kg. Ashley's ruling, 17 Sep 2026, from three options: keep celebrating
+ * it, and show the whole set.
+ *
+ * 'both' and 'weight' stay a plain weight: the bar genuinely went up.
+ */
+export function readingFor(result: PRResult): BestReading {
+  if (result.metric === 'reps') return { kind: 'reps', reps: result.newReps }
+  if (result.metric === 'added_load') return { kind: 'added_load', addedKg: result.newAddedLoadKg }
+  if (result.type === 'e1rm') return { kind: 'best_set', weightKg: result.newWeight, reps: result.newReps }
+  return { kind: 'load', weightKg: result.newWeight }
 }
 
 export interface SessionSet {

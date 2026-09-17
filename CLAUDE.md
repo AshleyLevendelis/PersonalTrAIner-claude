@@ -660,6 +660,17 @@ menu" stays true when a copy is also left outside it.
   measured — `load-prescription.ts:12` already forbids exactly that). Once a
   belt goes on, ADDED WEIGHT is the record and the reps best stays as the
   best-without-weight; they are different lifts and both are kept.
+- **AND A BEST THE ESTIMATE FOUND SHOWS THE SET, NEVER A BARE LOWER WEIGHT** —
+  Ashley's ruling 17 Sep 2026, from three options: *"Best set yet — 95kg x 8"*,
+  over dropping it silently and over showing the estimate itself. 100kg x 5
+  then 95kg x 8 is harder work at a LIGHTER weight, so the app fired a personal
+  best and printed **95kg** to someone whose best is 100kg. The fix was a
+  SIGNATURE: `personalBest` takes one reading over a four-case union instead of
+  a metric and a loose number, because the bug was never in the renderer —
+  three call sites each re-derived the value with their own ternary and two got
+  the same case wrong. `bodyweight-progress` (74 checks, 8 mutations).
+  NOT browser-driven: the case needs a loaded lift on today's card and the
+  harness's today is all bodyweight
 - **A NUMBER NEVER REACHES A SCREEN WITHOUT ITS UNIT**, and this generalises
   past PRs. Three renderers printed `${value}kg` with no branch, so a
   bodyweight best showed "0 kg" and a 12-rep best would have shown "12kg" —

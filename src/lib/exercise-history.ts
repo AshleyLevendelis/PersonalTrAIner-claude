@@ -1,3 +1,4 @@
+import type { BestReading } from './coach-voice'
 // ---------------------------------------------------------------------------
 // Part 3: exercise history — every session an exercise appears in, a
 // strength trend, and a real persisted PR list, all DERIVED from
@@ -207,6 +208,19 @@ export function hasEnoughTrendData(series: TrendSeries): boolean {
 
 /** What the trend is a trend OF, in Ashley's words rather than the code's.
  * One place, so the chart's caption and any future reader agree. */
+/**
+ * The same decision as pr-engine's readingFor, for the history list's own
+ * PRMoment shape. Two shapes, one rule — a moment whose `kind` is 'e1rm' is
+ * a best the ESTIMATE found, so it shows the whole set rather than a weight
+ * that is lower than the standing weight record. Ashley's ruling, 17 Sep 2026.
+ */
+export function readingForMoment(moment: PRMoment): BestReading {
+  if (moment.metric === 'reps') return { kind: 'reps', reps: moment.reps }
+  if (moment.metric === 'added_load') return { kind: 'added_load', addedKg: moment.addedLoadKg }
+  if (moment.kind === 'e1rm') return { kind: 'best_set', weightKg: moment.weightKg, reps: moment.reps }
+  return { kind: 'load', weightKg: moment.weightKg }
+}
+
 export function trendLabel(metric: PRMetric | null): string {
   if (metric === 'reps') return 'Best set, in reps'
   if (metric === 'added_load') return 'Added weight'
