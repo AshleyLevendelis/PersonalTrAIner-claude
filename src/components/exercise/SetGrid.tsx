@@ -473,7 +473,12 @@ export function SetGrid({
       return
     }
     setConfirmDeleteSet(null)
-    deleteSet({ userId: profileId, date: today, exerciseId, setNumber })
+    // EVERY ROW THIS GRID RENDERS TODAY IS A WORKING ROW, so this is a fact
+    // about the grid rather than a default — which is exactly the distinction
+    // the now-required parameter exists to force. When the warm-up block lands
+    // this reads the row's own kind; until then, stating it here is true and a
+    // reader can check it in one line.
+    deleteSet({ userId: profileId, date: today, exerciseId, setNumber, isWarmup: false })
     // deleteSet is the raw store function — refresh() is what makes the row
     // (and every other surface reading activeSession.logs) actually update.
     refresh()

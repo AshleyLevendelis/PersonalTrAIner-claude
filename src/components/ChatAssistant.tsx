@@ -4303,6 +4303,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         date: activeSession.date,
         exerciseId: key.exerciseId,
         setNumber: key.setNumber,
+        // Carried from the row being corrected, not assumed — the executor
+        // reads it off the log it is replacing.
+        isWarmup: key.isWarmup,
       }),
     })
     onLogsUpdated?.()
@@ -5881,7 +5884,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // clearing them), so restoring first and deleting second would delete
       // the sets just put back.
       for (const key of keys) {
-        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber })
+        // FALSE, AND IT IS A FACT ABOUT THIS PATH RATHER THAN A DEFAULT: an
+        // undo token only ever names sets the COACH logged, and the coach's
+        // writer hard-codes is_warmup false (chat-gemini/index.ts). If it ever
+        // gains a way to log a build-up, the token has to carry the kind and
+        // this line has to read it — the type now forces that conversation.
+        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false })
       }
       for (const pre of replaced) activeSession.logSet(pre)
       // deleteSet is the raw store function (unlike logSet, which already

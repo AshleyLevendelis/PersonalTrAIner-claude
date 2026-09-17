@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { sessionDeclaresWarmups } from './session-derive'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
 import { categorize, getLoadIncrementKg, isExternallyLoaded, getLoadingCeilingKg, loadingMode, roundToPlate, labelModeForEntry, formatLoad, effectiveLoadingCeilingKg } from './load-prescription'
 import { getLastSessionSets, getSetsForDate, isMalformedZeroWeight } from './set-log-store'
@@ -121,9 +122,20 @@ export interface WorkingSetContext {
   perSetLoadKg?: number[]
   /** How many working sets the session asked for. Fewer than this and there is nothing complete to judge. */
   prescribedSets?: number
+  /**
+   * True when the session carries at least one row explicitly marked as a
+   * build-up. THE INFERENCE BELOW THEN RETIRES ITSELF: it exists only because
+   * nothing in the app could ever mark a warm-up, so every row logged before
+   * 17 Sep 2026 looks like a working set. Once the app KNOWS, guessing is
+   * strictly worse than reading — a genuine light back-off set would be
+   * thrown away by a heuristic that is no longer needed.
+   */
+  sessionDeclaresWarmups?: boolean
 }
 
 export function workingSetsOf(sets: ExerciseSetLog[], ctx: WorkingSetContext = {}): ExerciseSetLog[] {
+  // THE SESSION ALREADY SAID. Nothing below is an improvement on being told.
+  if (ctx.sessionDeclaresWarmups) return sets
   const top = maxWorkingWeight(sets)
   if (top <= 0) return sets
 
@@ -157,8 +169,13 @@ export async function checkDoubleProgression(
   ctx: WorkingSetContext = {},
 ): Promise<ProgressionResult | null> {
   const exerciseId = getExerciseId(exerciseName)
-  const todaySets = (await getSetsForDate(userId, sessionDate))
-    .filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === exerciseId && !s.is_warmup)
+  const allTodayRows = (await getSetsForDate(userId, sessionDate))
+    .filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === exerciseId)
+  // ASKED BEFORE THE FILTER REMOVES THE EVIDENCE. Once she has ticked a real
+  // build-up row, the inference below has nothing left to add.
+  const declaresWarmups = sessionDeclaresWarmups(allTodayRows)
+  const todaySets = allTodayRows
+    .filter(s => !s.is_warmup)
     // A malformed 0kg/non-bodyweight row (chat-logged with no weight stated,
     // pre C0 fix #2) carries no real signal — must not count toward "did
     // every prescribed set land", nor toward the weight this progresses from.
@@ -184,7 +201,7 @@ export async function checkDoubleProgression(
   // at and the same-session bump could not fire for her at all. A second,
   // independent freeze from the same cause, which nobody had reported.
   const { high: topReps, low: bottomReps } = parseRepRange(prescribedReps)
-  const workingToday = workingSetsOf(todaySets, { repRangeLow: ctx.repRangeLow ?? bottomReps, perSetLoadKg: ctx.perSetLoadKg })
+  const workingToday = workingSetsOf(todaySets, { repRangeLow: ctx.repRangeLow ?? bottomReps, perSetLoadKg: ctx.perSetLoadKg, sessionDeclaresWarmups: declaresWarmups })
 
   if (workingToday.length < prescribedSets) return null
 

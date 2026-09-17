@@ -40,6 +40,89 @@ export function filterLoggableSets(
 }
 
 // ---------------------------------------------------------------------------
+// A SET'S IDENTITY IS A KIND AND A NUMBER, NOT A NUMBER
+//
+// Ashley, 17 Sep 2026, ruling from three options after standing in a gym with
+// three boxes for five sets: "A box for every set, labelled — Warm-up 1, 2, 3
+// then Set 1, 2, 3 — each with its own box. Warm-up boxes are marked as
+// warm-ups so they never count toward your weight going up." This reverses her
+// 7 Sep ruling ("tick them off, don't record them"), which was made about a
+// strip of chips before anyone had watched a real lifter run out of rows.
+//
+// TWO NAMESPACES, NOT ONE CONTINUOUS RUN, and that is forced by four
+// mechanisms that already exist rather than chosen for tidiness: the database
+// unique constraint includes is_warmup, `naturalKey` already spells the kind
+// 'w'/'s' (set-log-store.ts:175-177), getLastSessionSets dedupes on
+// `${set_number}|${is_warmup}`, and dedupeAndRenumberSets groups on
+// `${exerciseId}|${isWarmup}`. So warm-up 1 and working 1 are already distinct
+// rows everywhere it matters — no migration, no renumbering.
+//
+// WHICH IS EXACTLY WHY THE SCREEN MUST CARRY THE KIND TOO. The moment both can
+// exist, every place the UI uses a BARE set number as an identity becomes a
+// collision: the typed-value map, the row error, the armed delete, the PR
+// badge, the weight input's DOM id, and `deleteSet` itself — whose four
+// callers all omit the kind and default it to false, so deleting a warm-up row
+// would tombstone the WORKING set of the same number. One pair, threaded
+// through, closes all of them at once instead of six separate guards.
+// ---------------------------------------------------------------------------
+
+export type SetKind = 'warmup' | 'working'
+export interface SetRef { kind: SetKind; setNumber: number }
+
+/** 'w2' / 's2' — the same discriminator set-log-store's naturalKey spells, so the screen and the store never disagree about what a row is. */
+export function rowKey(ref: SetRef): string {
+  return `${ref.kind === 'warmup' ? 'w' : 's'}${ref.setNumber}`
+}
+
+/** The short prefix in the row's first column. No default branch: a third kind would fail to compile rather than render a bare number. */
+export function setLabel(ref: SetRef): string {
+  return ref.kind === 'warmup' ? `W${ref.setNumber}` : `${ref.setNumber}`
+}
+
+/** The full words, for anything read aloud or read back — a receipt or an aria-label must not say "W1". */
+export function setLabelLong(ref: SetRef): string {
+  return ref.kind === 'warmup' ? `Warm-up ${ref.setNumber}` : `Set ${ref.setNumber}`
+}
+
+/**
+ * The build-up rows for one exercise — the mirror of filterLoggableSets, with
+ * the same identity match and the same malformed-row guard.
+ *
+ * DELIBERATELY NOT A PARAMETER ON ITS SIBLING. `filterLoggableSets` is named by
+ * LAYOUT-DESIGN §5.2 as the sole source for every checkmark, count, progress
+ * line and completion state in the app; giving it a `kind` argument puts a
+ * footgun on the one function whose whole job is to be the thing nobody has to
+ * think about.
+ */
+export function filterWarmupSets(
+  logs: ExerciseSetLog[],
+  exerciseId: string,
+  exerciseName?: string,
+): ExerciseSetLog[] {
+  return logs.filter(l => {
+    const matches = l.exercise_id ? l.exercise_id === exerciseId : l.exercise_name === exerciseName
+    if (!matches) return false
+    if (!l.is_warmup) return false
+    if (isMalformedZeroWeight(l)) return false
+    return true
+  })
+}
+
+/**
+ * Does this session carry an explicit build-up marking at all?
+ *
+ * The bridge between the old data and the new. Every session logged before
+ * this shipped has `is_warmup` false on every row, because nothing could set
+ * it — so the progression engine has to INFER which rows were build-up, and
+ * `workingSetsOf` does. From the moment a session carries one real warm-up
+ * row, the app KNOWS, and guessing would be strictly worse than reading. This
+ * is what lets the inference retire by itself rather than living for ever.
+ */
+export function sessionDeclaresWarmups(logs: ExerciseSetLog[]): boolean {
+  return logs.some(l => l.is_warmup === true)
+}
+
+// ---------------------------------------------------------------------------
 // Warm-up shape normalization (cleanup round, defect 1) — a profile whose
 // mesocycle_weeks row predates a WarmupBlock field addition (e.g. `ramp_ups`,
 // added by the ramp-up-visibility fix) still has that JSON sitting in the
@@ -375,6 +458,12 @@ export function computeOffPlanWork(
     byId.set(id, { exerciseId: id, name, source: 'declared' })
   }
   for (const log of logs) {
+    // A BUILD-UP IS NOT "ADDITIONAL WORK". Its sibling at the bottom of this
+    // file has skipped warm-ups since it was written; this loop never did,
+    // because until 17 Sep 2026 no warm-up row could exist. Without it, a
+    // build-up logged against an exercise that was later swapped out raises an
+    // "Additional work" card for a lift nobody did a working set of.
+    if (log.is_warmup) continue
     const id = log.exercise_id ?? getExerciseId(log.exercise_name)
     if (plannedIds.has(id)) continue
     if (!byId.has(id)) byId.set(id, { exerciseId: id, name: log.exercise_name, source: 'logged' })

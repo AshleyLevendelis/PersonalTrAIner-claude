@@ -139,6 +139,26 @@ console.log('\n[4] The cases it must not touch')
   check('proof it can still drop: a 20kg row against a 95kg top set goes', mustDrop.length === 2, shape(mustDrop))
 }
 
+console.log('\n[4b] The guess retires the moment the session can speak for itself')
+{
+  // The inference exists ONLY because nothing in the app could mark a warm-up,
+  // so every row logged before 17 Sep 2026 looks like a working set. From the
+  // moment a session carries one real build-up row the app KNOWS — and a
+  // heuristic that keeps running would start throwing away genuine light work
+  // (a back-off set, a deliberately easy last set) that it has no business
+  // touching.
+  const logged = session([[20, 10], [50, 5], [70, 3], [95, 8], [95, 8], [95, 8]])
+  const guessed = workingSetsOf(logged, { repRangeLow: 6 })
+  const told = workingSetsOf(logged, { repRangeLow: 6, sessionDeclaresWarmups: true })
+  check('told, it changes nothing at all', told.length === logged.length, shape(told))
+  check('...while the SAME rows are still filtered when it has to guess', guessed.length === 3, shape(guessed))
+
+  const src2 = readFileSync('src/lib/progression-engine.ts', 'utf8')
+  check('and the same-session check asks BEFORE its own filter removes the evidence',
+    src2.indexOf('const declaresWarmups = sessionDeclaresWarmups(allTodayRows)') < src2.indexOf(".filter(s => !s.is_warmup)"))
+  check('...and hands the answer to the inference', /sessionDeclaresWarmups: declaresWarmups/.test(src2))
+}
+
 console.log('\n[5] The engine asks its questions of the working sets only')
 {
   const src = readFileSync('src/lib/progression-engine.ts', 'utf8')

@@ -38,7 +38,8 @@ export interface LogWorkoutContext {
    * flag is ignored rather than half-applied.
    */
   replaceExisting?: boolean
-  deleteSet?: (key: { exerciseId: string; setNumber: number }) => void
+  /** `isWarmup` is part of a row's identity — without it this deletes the WORKING set of the same number. */
+  deleteSet?: (key: { exerciseId: string; setNumber: number; isWarmup: boolean }) => void
 }
 
 /**
@@ -183,7 +184,11 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
           isWarmup: l.is_warmup,
           addedLoadKg: l.added_load_kg ?? null,
         })
-        ctx.deleteSet({ exerciseId, setNumber: l.set_number })
+        // THE SAME ROW IT JUST SAVED A COPY OF. The pre-image three lines
+        // above already carries `isWarmup: l.is_warmup`; the delete did not,
+        // so a correction touching a build-up row would have removed the
+        // working set beside it and left the build-up in place.
+        ctx.deleteSet({ exerciseId, setNumber: l.set_number, isWarmup: !!l.is_warmup })
         replacedSets++
       }
     }

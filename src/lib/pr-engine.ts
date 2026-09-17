@@ -110,6 +110,12 @@ export interface SessionSet {
  */
 export function toSessionSets(logs: ExerciseSetLog[]): SessionSet[] {
   return logs
+    // A BUILD-UP SET IS NOT A PERSONAL BEST, and this is the structural place
+    // to say so rather than at each caller. Added 17 Sep 2026, when warm-up
+    // rows became real: without it a 20kg opener on a brand-new exercise is a
+    // candidate maximum, and on a high-rep build-up it can win the bodyweight
+    // "most reps in one set" record outright.
+    .filter(l => !l.is_warmup)
     .filter(l => l.reps_completed > 0)
     .map(l => ({
       setNumber: l.set_number,

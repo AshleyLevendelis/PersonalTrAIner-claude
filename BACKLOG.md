@@ -2,6 +2,76 @@
 
 Newest first. One line each.
 
+- [x] **A BOX FOR EVERY SET, part 1: the half that had to land first.** Ashley's
+  ruling, 17 Sep 2026, from three options — *"A box for every set, labelled —
+  Warm-up 1, 2, 3 then Set 1, 2, 3. Warm-up boxes are marked as warm-ups so
+  they never count toward your weight going up."* **This reverses her 7 Sep
+  ruling** ("tick them off, don't record them"), which was made about a strip
+  of chips before anyone had watched a real lifter run out of rows. She was
+  told it was a reversal and chose it anyway.
+  **THE ROWS ARE NOT DRAWN YET. This is everything that would have been WRONG
+  the moment they were** — built first deliberately, because a rendering change
+  that ships a data bug is worse than no rendering change. Six readers and four
+  writers had never had to think about a warm-up row, because until today none
+  could exist.
+
+  **A SET'S IDENTITY IS A KIND AND A NUMBER, NOT A NUMBER.** Two namespaces
+  (warm-up 1 and working 1 are different rows), which is FORCED by four
+  mechanisms that already exist rather than chosen: the database unique
+  constraint, the local natural key which already spells the kind 'w'/'s', the
+  session dedupe key, and the renumbering group key. So no migration and no
+  renumbering — but every place the SCREEN used a bare number as an identity
+  became a collision the moment both can exist.
+
+  **THE WORST OF THEM: `deleteSet` took the kind as OPTIONAL, defaulting to
+  false, and all four callers omitted it.** Deleting warm-up 2 would have
+  tombstoned WORKING set 2. It is REQUIRED now, which turned four silent wrong
+  answers into four compile errors — the only version of this that stays fixed.
+  One caller had the right value three lines away and was not passing it: the
+  chat correction path already writes a pre-image carrying `isWarmup`, then
+  deleted without it.
+
+  **THE WEEK STRIP WOULD HAVE SAID SHE TRAINED.** Tick three build-up boxes,
+  walk out, and `workoutLogs.length > 0` read as "partial" — and the same field
+  satisfied the guard written FOR her Thursday, the session marked complete
+  with nothing in it. Fixed by a RENAME rather than a filter: `workoutLogs`
+  becomes `workingLogs` + `warmupLogs`, so every reader has to say which it
+  meant instead of inheriting the old answer. The build-up rows are kept, not
+  dropped — they are real history.
+  **A BUILD-UP IS NOT A PERSONAL BEST.** Filtered structurally in
+  `toSessionSets` rather than at each caller. The bodyweight record would have
+  broken first: her 16 Sep ruling made "most reps in one set" the record when
+  there is no weight, and a build-up set is by design the highest-rep set of
+  the session — a 15-rep opener would have taken the record from a hard 12.
+  **AND A BUILD-UP IS NOT "ADDITIONAL WORK"** — that loop never skipped
+  warm-ups while its sibling twenty lines away always has.
+
+  **THE GUESS NOW RETIRES ITSELF.** `workingSetsOf` (yesterday's read-time
+  unfreeze) exists only because nothing could mark a warm-up. From the moment a
+  session carries one real build-up row the app KNOWS, and a heuristic that
+  kept running would start throwing away genuine light work — a back-off set,
+  a deliberately easy last set. It now stands down when told.
+
+  `working-sets` (31), `training-week` (50, was 39), `bodyweight-progress`
+  (78, was 74). 7 mutations tried, 7 caught.
+  **TWO THINGS FOUND BY MUTATING, AND BOTH WERE MINE.** The first version of
+  the week-strip mutations was "caught" by CRASHING the gate at 8 checks of 50
+  — the fixtures had no warm-up field, so a reader touching it threw rather
+  than failing an assertion. Every fixture carries one now, and the same
+  mutations fail cleanly with all 50 running. And **a mutation collapsing the
+  partition passed every check**, because the gate builds its own fixtures and
+  never exercised the code producing them — the behaviour was guarded and the
+  thing PRODUCING it was not. The partition is an exported pure function now,
+  checked directly.
+  **AND I REINTRODUCED, BY HAND, THE DEFECT I FIXED THIS MORNING.** My two new
+  sections landed BELOW `test:training-week`'s `process.exit(1)`, so they
+  printed FAIL and the gate exited 0 — the identical hole found in
+  `test:slot-replacement` a few hours earlier. Appending to a gate is exactly
+  when this happens. One exit, at the bottom, in both files now. A `grep` for
+  gates missing the same thing produced twenty false positives (they use
+  `process.exit(failures === 0 ? 0 : 1)`), which is its own reminder to read
+  before believing a search.
+
 - [x] **HER DEADLIFT WAS FROZEN AT 95kg AND HER ROWS AT 20kg, AND SHE DID NOT
   REPORT EITHER.** 17 Sep 2026. She reported the missing boxes: *"Only the ramp
   up sets input fields were visible until I clicked add set."* The missing boxes
