@@ -398,6 +398,76 @@ await shoot('setup-answers-5-rebuild-offer')
   await shoot('setup-answers-6-session-length')
 }
 
+// --- THE GOAL, added 17 Sep 2026 ------------------------------------------
+// The LAST setup answer that lived on neither surface, and the one where the
+// written record was most misleading: every piece of machinery existed —
+// fitness_goal was already an invalidating field, detectPlanInvalidation
+// already had the branch, the calorie calculation already read it — and
+// nothing wrote the field. A source gate can prove all that machinery is
+// wired and still cannot prove a person can reach it. This is that check.
+//
+// Ashley's ruling, 17 Sep 2026, from three options: training AND food, from
+// this week. Both halves have to be on the card BEFORE the tap, and that is
+// what 7j reads.
+{
+  const receiptWas = await text('[data-testid="reprice-receipt"]')
+  await ev(`(() => {
+    const label = [...document.querySelectorAll('span')].find(s => /^Goal$/.test((s.textContent || '').trim()))
+    const c = label && label.parentElement.querySelector('button, [role="combobox"]')
+    if (c) c.click()
+  })()`)
+  await wait(500)
+  // The fixture is hypertrophy, so Fat loss is a real change in the direction
+  // a person most often makes — and the one where getting the food wrong
+  // matters most, because it means eating a surplus while trying to lean out.
+  const picked = await ev(`(() => {
+    const o = [...document.querySelectorAll('[role="option"]')].find(x => /Fat loss/i.test(x.textContent || ''))
+    if (!o) return [...document.querySelectorAll('[role="option"]')].map(x => (x.textContent||'').trim())
+    o.click(); return true
+  })()`)
+  check('7g. the goal can be changed on the screen at all', picked === true, picked)
+  await wait(600)
+
+  const offer = await until(() => text('[data-testid="plan-invalidation"]'), v => v.length > 0)
+  check('7h. changing it OFFERS a rebuild rather than silently rewriting the block',
+    offer.length > 0, offer)
+  check('7i. ...naming the plan half — what you do, how you rest, the rep ranges',
+    /rep ranges/i.test(offer), offer)
+  // ASHLEY'S RULING, READ OFF THE SCREEN. The goal is the only setup answer
+  // that also sets the deficit, so an offer that says "your plan" and then
+  // quietly moves someone's calories is the silent change the confirm rail
+  // exists to stop. Both halves, before the tap, or this fails.
+  check('7j. ...AND the food half, before the tap',
+    /calorie/i.test(offer) && /meal/i.test(offer), offer)
+  check('7k. ...warning that the meals take a moment to rebuild',
+    /takes a moment/i.test(offer), offer)
+  check('7l. ...and promising her logged work survives it',
+    /already logged stays/i.test(offer), offer)
+  check('7m. ...in plain words, naming no database field',
+    !/fitness_goal|hypertrophy|fat_loss/i.test(offer), offer)
+  // THE ROAD NOT TAKEN, the same shape as 6h and 6n: a re-price receipt here
+  // would mean the goal had been treated as a number to adjust rather than a
+  // different plan to build.
+  check('7n. ...and NO weights were silently re-priced behind it',
+    (await text('[data-testid="reprice-receipt"]')) === receiptWas,
+    { was: receiptWas, now: await text('[data-testid="reprice-receipt"]') })
+  // THE ROW ITSELF STILL READS BACK WHAT WAS CHOSEN. A select that fires the
+  // offer and then snaps back to the old value would leave somebody agreeing
+  // to a rebuild for a goal the screen no longer shows.
+  const shown = await ev(`(() => {
+    const label = [...document.querySelectorAll('span')].find(s => /^Goal$/.test((s.textContent || '').trim()))
+    const c = label && label.parentElement.querySelector('button, [role="combobox"]')
+    return c ? (c.textContent || '').trim() : null
+  })()`)
+  check('7o. the row shows the goal she picked, not the one she left',
+    typeof shown === 'string' && /Fat loss/i.test(shown), shown)
+  // Same harness limit as §6: the words are real and the dialog is not. See
+  // the note above the session-length shot.
+  await ev(`document.querySelector('[data-testid="plan-invalidation"]')?.scrollIntoView({ block: 'center' })`)
+  await wait(500)
+  await shoot('setup-answers-7-goal')
+}
+
 // --- THE THREE KNOWN LIFTS, added 14 Sep 2026 -----------------------------
 // The last setup answers that could never be corrected. §7 of the source gate
 // holds why the RE-PRICE path cannot act on them; this holds that they are on

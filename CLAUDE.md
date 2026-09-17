@@ -242,19 +242,35 @@ menu" stays true when a copy is also left outside it.
   other sports — both surfaces, proposed and confirmed — `rebuild-offer`,
   `profile-restore`, `coach-volume-schedule`, `injury-rebuild`,
   `enforcement-gaps`, `concurrent-activity`
-- **GOAL was in that list and is the worst kind of wrong: it is on NEITHER
-  surface.** CORRECTED 16 Sep 2026, measured. Every assignment to
-  `fitness_goal` in `src/` and `supabase/functions/` is a READ being copied
-  forward (profile load, the coach's context block, the onboarding insert), a
-  test fixture, or `onboarding-slots.ts:1096`. There is no `savePatch`, no
-  executor branch, no `propose_goal_change`. Someone who chose fat loss at
-  setup and now wants to build muscle has one route: start a whole new plan.
-  **The road is built and nobody drives on it** — `fitness_goal` IS in
-  `PLAN_INVALIDATING_FIELDS` and `plan-invalidation.ts:203` handles a goal
-  change in a patch that nothing produces. That shape is worth naming: a
-  capability can be absent while every piece of machinery for it exists and
-  looks, to a reader, like proof it works. Same family as the walking plan
-  (generator, type, no pixel) and bodyweight PRs (six filters, no record)
+- **GOAL — both surfaces since 17 Sep 2026**, and on 16 Sep it was the worst
+  kind of wrong: on NEITHER. **The road was built and nobody drove on it** —
+  `fitness_goal` was already in `PLAN_INVALIDATING_FIELDS`,
+  `detectPlanInvalidation` already had a finished goal branch with user-facing
+  copy, `goal-policies.ts` already declared how the four goals differ, and
+  `macro-calculator.ts` already read the goal in five places for the deficit,
+  the carb prescription and the label. Every assignment to `fitness_goal` was a
+  READ copied forward, the onboarding insert, or a fixture. **Nothing wrote the
+  field.** That shape is the one to remember: a capability can be absent while
+  every piece of machinery for it exists and looks, to a reader, like proof it
+  works. Same family as the walking plan (generator, type, no pixel) and
+  bodyweight PRs (six filters, no record) — and worse than both, because here
+  the *offer copy was already written*.
+  **Ashley's ruling, 17 Sep 2026, from three options: training AND food, from
+  this week** — over asking about food as a second question (somebody training
+  for muscle while still eating a fat-loss deficit is the worst of both) and
+  over finishing the current block first (up to three weeks of work they have
+  said they do not want). It is the ONLY setup answer that is an input to both
+  the plan generator and the calorie calculation, so it is the only offer with
+  a food sentence, and both halves are on the card before the tap.
+  **THE FOOD HALF NEEDED ALMOST NO CODE, AND THAT IS ITS RISK.** The targets
+  are DERIVED from the goal, and App's macro effect is already keyed on the
+  field — so writing it moves calories and macros on the next render. What was
+  missing was narrow and exact: the effect set the numbers and never called
+  `snapshotTargetsIfChanged`, so a weigh-in explained itself and every other
+  input change moved the targets SILENTLY. It does now. The meals follow on
+  confirm, by reusing `handleRegenerateAllMeals`.
+  `goal-change` (57 checks, 13 mutations), `verify:setup-answers` §7g-7o,
+  `rebuild-offer`, `coach-parity`. Needs the `chat-gemini` deploy for chat
 - Session length — **both surfaces since 16 Sep 2026**, and until that day it
   was `screen only` in the emptiest sense: the screen wrote the number and
   changed nothing about the plan. `session_duration_preference` was absent from
@@ -283,14 +299,14 @@ menu" stays true when a copy is also left outside it.
   means changing its INPUTS — macro split, activity level, or goal (which is
   on neither surface, above)
 - Onboarding answers and the Profile screen. **"As of 14 Sep 2026 there are no
-  locked answers left" stood here and is FALSE — corrected 16 Sep 2026.** The
-  GOAL is still locked, and was on the day that line was written; it was
-  missed because the unlocking work went field by field through the ones
+  locked answers left" was FALSE when written (corrected 16 Sep 2026) and is
+  TRUE again from 17 Sep 2026, when the goal was unlocked.** It was missed for
+  three days because the unlocking work went field by field through the ones
   somebody had complained about, and nobody re-derived the list from the
-  profile columns afterwards. Every OTHER answer can be corrected, and the
-  history below is kept because each unlocking needed a different road. The history is kept
-  because each unlocking needed a different road and the reasons are the useful
-  part. CORRECTED 13 Sep, again 14 Sep:
+  profile columns afterwards — **so the closing check is to re-derive from the
+  columns, not to tick off the complaints.** The history below is kept because
+  each unlocking needed a different road and the reasons are the useful part.
+  CORRECTED 13 Sep, again 14 Sep, closed 17 Sep:
   - The three implement ceilings — **now editable**, in "You" beside Equipment,
     and correcting one re-prices the running plan from this week onward with
     the exercises untouched (her ruling that day, from four options). Shown

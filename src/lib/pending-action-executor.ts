@@ -16,7 +16,7 @@ import { didNotSave } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
-import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, ConcurrentActivity, SessionDuration } from './types'
+import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, FitnessGoal, ConcurrentActivity, SessionDuration } from './types'
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
@@ -32,7 +32,7 @@ import { saveCardioLog } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
 import type { MealMovePayload } from './meal-move'
-import { STYLE_OPTIONS, DURATION_OPTIONS } from './onboarding-slots'
+import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
 
@@ -1321,6 +1321,85 @@ export async function executeStyleChange(
 // the new length. Over trimming what is already there — a 60-minute session
 // with its end chopped off is not a session designed for 45 — and over waiting
 // for the next block, which leaves weeks of sessions that do not fit.
+// ---------------------------------------------------------------------------
+// GOAL CHANGE — the LAST setup answer that existed on neither surface, added
+// 17 Sep 2026. Built in the same shape as executeStyleChange rather than a
+// new one, for the reason that shape exists: both are a lasting profile-column
+// change that invalidates the plan, and holding them in one shape is what
+// stops the two answering differently.
+//
+// ASHLEY'S RULING, 17 Sep 2026, from three options: training AND food, from
+// this week. Over asking about food as a second question — somebody training
+// for muscle while still eating a fat-loss deficit is the worst of both — and
+// over finishing the current block first, which can mean three weeks of work
+// they have already said they do not want.
+//
+// THE FOOD HALF IS NOT IN THIS FUNCTION, AND THAT IS NOT AN OMISSION.
+// The calorie and macro targets are DERIVED from fitness_goal every time
+// computeTargets runs (macro-calculator reads it for the deficit, the carb
+// prescription and the label), and App owns a macro effect keyed on that
+// field. So writing the goal below IS the food change: the targets move on
+// the next render, with the notice that effect now carries. Recomputing them
+// here would be a second, divergent copy of a number the app already derives.
+// Rebuilding the MEALS around the new targets is the caller's, because it
+// costs an edge call — the screen does it on the rebuild confirm, and so does
+// the coach's confirm branch.
+// ---------------------------------------------------------------------------
+
+export interface GoalChangePayload {
+  /** What they are training for from now on, replacing whatever was there. */
+  fitnessGoal: FitnessGoal
+  fromWeek: number
+  reason?: string
+}
+
+export async function executeGoalChange(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: GoalChangePayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const updated: UserProfile = { ...profile, fitness_goal: payload.fitnessGoal }
+
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return {
+      mesocycle,
+      preImage,
+      receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] },
+    }
+  }
+
+  // Rebuild first, write second — the same order executeStyleChange holds, and
+  // it matters more here. Writing the goal and then failing the rebuild would
+  // leave someone labelled for a goal, eating for it (the targets follow the
+  // field immediately), and training the old plan. That is a worse state than
+  // the one before they asked.
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, { fitness_goal: payload.fitnessGoal }) }
+    catch { failed.push({ op: 'save', error: "The new goal didn't save" }) }
+    for (const week of rebuild.mesocycle) {
+      if (week.week_number < payload.fromWeek) continue
+      try { await saveMesocycleWeek(profile.id, week) }
+      catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+    }
+  }
+
+  return {
+    mesocycle: rebuild.mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Goal: ${GOAL_OPTIONS.find(o => o.value === payload.fitnessGoal)?.label ?? payload.fitnessGoal}`,
+           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+        : [],
+      failed,
+    },
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 export interface SessionLengthPayload {

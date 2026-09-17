@@ -241,15 +241,29 @@ export function detectPlanInvalidation(
     }
   }
 
+  // LAST, and the order matters for the same reason session length sits above
+  // it: this function returns the FIRST match, and the goal is the answer the
+  // others qualify. A patch that changes the goal alone reaches here; a patch
+  // that changes the goal AND something smaller is described by the smaller
+  // one only if that one is genuinely a different request. Nothing today
+  // produces such a patch — each row on Profile saves one field — so this
+  // ordering is a statement of intent rather than a live branch.
   if ('fitness_goal' in patch && patch.fitness_goal !== before.fitness_goal) {
     return {
       field: 'fitness_goal',
       title: 'Rebuild your plan for this goal?',
+      // BOTH HALVES, BEFORE THE TAP — Ashley's ruling, 17 Sep 2026, from three
+      // options: training and food, from this week. The goal is the only
+      // invalidating field that is also an input to the calorie and macro
+      // calculation, so it is the only one whose offer has a food sentence.
+      // Saying "your plan" and quietly rebuilding the meals too would be the
+      // silent change the whole propose-then-confirm rail exists to prevent.
       detail:
         'Your current plan was built for the goal you had before, so how much you do, how long ' +
         'you rest, the rep ranges and the conditioning all still follow it. I can rebuild it ' +
-        'from this week onwards for the new goal. Everything you have already logged stays ' +
-        'exactly as it is.',
+        'from this week onwards for the new goal, and rebuild your meals around the new ' +
+        'calorie and macro targets at the same time — that part takes a moment. Everything you ' +
+        'have already logged stays exactly as it is.',
     }
   }
 

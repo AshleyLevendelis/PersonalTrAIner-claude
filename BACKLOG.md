@@ -2,6 +2,76 @@
 
 Newest first. One line each.
 
+- [x] **YOU COULD NOT CHANGE WHAT YOU WERE TRAINING FOR — ON EITHER SURFACE —
+  AND EVERY PIECE OF MACHINERY FOR IT ALREADY EXISTED.**
+  Ashley chose this from four options, 17 Sep 2026. Someone who set up for fat
+  loss and decided to build muscle had exactly one route: start a brand-new
+  plan and abandon their training history.
+  **THE ROAD WAS BUILT AND NOBODY DROVE ON IT**, which is what makes this worth
+  more than the feature. `fitness_goal` was already in
+  `PLAN_INVALIDATING_FIELDS`. `detectPlanInvalidation` already had a goal
+  branch with finished user-facing copy. `goal-policies.ts` already declared
+  how the four goals differ in volume, phases, rep progression and
+  conditioning. `macro-calculator.ts` already read the goal in FIVE places for
+  the deficit, the carb prescription and the label. Every assignment to the
+  field in `src/` and `supabase/functions/` was a read copied forward, the
+  onboarding insert, or a test fixture. **Nothing wrote it.** A reader would
+  have concluded the feature worked — the offer copy was already written.
+  Same family as the walking plan (generator, type, no pixel) and bodyweight
+  PRs (six filters, no record), and worse than both.
+  **HER RULING, from three options: TRAINING AND FOOD, FROM THIS WEEK.** Over
+  asking about food as a second question — somebody training for muscle while
+  still eating a fat-loss deficit is the worst of both — and over finishing
+  the current four-week block first, which can mean three weeks of work they
+  have already said they do not want.
+  **THE FOOD HALF NEEDED ALMOST NO CODE, AND THAT WAS THE RISK, NOT THE RELIEF.**
+  The calorie and macro targets are DERIVED from the goal, and App's macro
+  effect was already keyed on the field — so writing it moves the numbers on
+  the next render, with nothing to add. What was missing was narrow and exact:
+  that effect called `setMacros` and never `snapshotTargetsIfChanged`, so a
+  weigh-in explained itself while every OTHER input change moved someone's
+  calories in silence. Three lines, copied from the path that already had
+  them. The meals follow on confirm by reusing `handleRegenerateAllMeals`.
+  **WHAT THE CARD SAYS BEFORE THE TAP** is the whole of her ruling made
+  visible: the goal is the only setup answer that is an input to both the plan
+  generator and the calorie calculation, so it is the only offer with a food
+  sentence — and the gate proves the other four invalidating fields do NOT
+  have one, because a food promise the app does not keep is worse than silence.
+  **THE HONEST RESIDUE, stated rather than hidden:** the field saves before the
+  offer appears (the architecture every invalidating field has used since it
+  existed), so declining the rebuild leaves the new goal, the new targets, and
+  the old meals and plan. The notice now says the targets moved. Changing that
+  ordering is a separate piece of work across six fields, not a rider on this.
+  **GATES.** `test:goal-change` — 57 checks, 13 mutations, 13 caught.
+  `verify:setup-answers` gained §7g-7o and is green at 57 checks; 3 mutations,
+  3 caught. Screenshot read: Goal sits first in Training setup showing "Fat
+  loss". Re-ran `rebuild-offer`, `coach-parity`, `coach-promises`,
+  `chat-app-reality`, `coach-rules-sync`, `setup-answers`, `pending-actions`,
+  `macro-split`, `fat-loss-deficit`, `target-change-notice`, `profile-groups`,
+  `coach-voice`: all pass. `npx tsc --noEmit` clean, which covers `src` only.
+  **THREE THINGS CAUGHT BY GATES RATHER THAN BY READING**, all mine:
+  `test:coach-voice` rejected my receipt title "Rebuilt for your new goal" — a
+  sentence where every sibling is a word or two, and the three-word ceiling was
+  right. `RECEIPTS` is a loose `Record<string, ...>`, so a missing key
+  typechecks clean and throws at runtime; the kind had to be registered in
+  three places, none of which `tsc` would have flagged. And the harness fixture
+  carried `fitness_goal: 'build_muscle'`, which is not one of the four values
+  and never showed, because until today nothing on that screen read the goal —
+  a fixture value outside its own union stays invisible until something reads it.
+  **AND TWO MUTATION-HARNESS FAILURES THAT WOULD HAVE READ AS PASSES.** All 13
+  first came back MISSED with zero failures and short runs: the gate writes
+  failures to stderr and my harness sent stderr to /dev/null. Then one genuinely
+  MISSED because its anchor text is identical in three executors and it patched
+  the wrong one — the "applied, ran, did not create the defect" case. Re-aimed
+  at a line unique to the goal executor: caught. A third mutation reported DID
+  NOT APPLY from shell quoting, which the harness's file-changed assertion
+  caught rather than scoring as a miss.
+  **NEEDS THE `chat-gemini` DEPLOY.** Changing your goal by chat does not work
+  until then; it joins the coach changes already waiting.
+  **NAMED, NOT DONE:** meals do not follow the targets when a WEIGH-IN moves
+  them. Same gap, wider than this build, and folding it in would change what a
+  weigh-in does without a ruling.
+
 - [x] **"MY SESSIONS NEED TO BE 45 MINUTES FROM NOW ON" — THE SCREEN WROTE THE
   NUMBER AND CHANGED NOTHING, AND THE COACH COULD NOT SAY IT AT ALL.**
   Ashley chose this from three options, 16 Sep 2026, and the shape of the hole

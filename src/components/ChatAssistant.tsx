@@ -19,8 +19,8 @@ import { createPendingAction, claimPendingAction, declinePendingAction, markExec
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
-import { STYLE_OPTIONS, DURATION_OPTIONS } from '@/lib/onboarding-slots'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
+import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -227,6 +227,18 @@ interface ChatAssistantProps {
   onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
   /** Fired after a confirmed propose_injury_as_lasting/propose_injury_recovered writes fitness_profiles.injuries directly (executeLastingInjury/executeInjuryRecovered) — mirrors ProfileScreen's own onProfileChanged so App.tsx's profile state stays in sync with a write chat made outside its own setProfile calls. */
   onProfileChanged: (patch: Partial<UserProfile>) => void
+  /**
+   * Fired after a confirmed propose_goal_change has written the new goal and
+   * rebuilt the plan — App.tsx's handleRegenerateAllMeals, so the meals follow
+   * the calorie and macro targets the goal just moved. Ashley's ruling,
+   * 17 Sep 2026: training AND food, from this week.
+   *
+   * Lives in App rather than here for the same reason every other generation
+   * input does: App owns the live targets, the dietary preferences and the
+   * meal pools. Optional so a host that has no meals to rebuild (the chat
+   * harness) is not forced to invent one.
+   */
+  onGoalMealsNeedRebuild?: () => Promise<void>
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
@@ -306,7 +318,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1866,6 +1878,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     if (pendingAction.kind === 'propose_session_length') return "Here's your plan at the new session length:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
+    if (pendingAction.kind === 'propose_goal_change') return "Here's your plan and your food for the new goal:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
@@ -3400,6 +3413,64 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   /**
+   * "I want to build muscle instead of losing fat" — builds
+   * propose_goal_change's card. The sibling of the style card above, and
+   * everything structural is deliberately identical: a lasting profile-column
+   * change that the plan has to follow, validated against the app's own
+   * option list rather than the model's spelling.
+   *
+   * WHAT IS DIFFERENT IS THE FOOD ROW, and it is the reason this card exists
+   * rather than reusing the style one. The goal is the only profile field
+   * that is an input to BOTH the plan generator and the calorie calculation,
+   * so it is the only change where "rebuild your plan" describes half of what
+   * happens. Ashley's ruling, 17 Sep 2026, from three options: training and
+   * food, from this week — and stated before the tap, which is this row.
+   *
+   * The numbers are NOT quoted here, and that is on purpose rather than
+   * laziness. computeTargets needs body metrics that may be missing, and the
+   * targets move through App's own macro effect once the write lands — so a
+   * figure on this card would be a second, independently-computed copy of
+   * something the app is about to compute properly. The app's standing rule
+   * is that it never shows a number it would have to invent; naming the
+   * direction is honest and naming a calorie count would not be.
+   */
+  const buildGoalChangeProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: GoalChangePayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | null => {
+    const wantedOpt = GOAL_OPTIONS.find(o => o.value === String(rawArgs.goal ?? '').trim().toLowerCase())
+    if (!wantedOpt || mesocycle.length === 0) return null
+    const beforeValue = profile.fitness_goal
+    if (wantedOpt.value === beforeValue) return null
+    const beforeOpt = GOAL_OPTIONS.find(o => o.value === beforeValue)
+
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+
+    return {
+      scopeKey: `${profile.id}:propose_goal_change:${wantedOpt.value}:${startWeek}`,
+      preconditions: { before: beforeValue, wanted: wantedOpt.value, startWeek },
+      payload: { fitnessGoal: wantedOpt.value, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        lead: ask(`train you for ${wantedOpt.label.toLowerCase()} instead`),
+        rows: [{ field: 'Goal', before: beforeOpt?.label ?? beforeValue, after: wantedOpt.label }],
+        implications: [
+          { severity: 'info', text: `Rebuilds ${weeksAhead} week${weeksAhead === 1 ? '' : 's'} from week ${startWeek} on. ${SCOPE.historyKept}` },
+          { severity: 'warn', text: 'How much you do, the rep ranges and the conditioning all change — this is a different programme from here on.' },
+          { severity: 'warn', text: 'Your calorie and macro targets change with it, and your meals are rebuilt around the new ones. That part takes a moment.' },
+        ],
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
    * "I also do Muay Thai twice a week" — builds propose_concurrent_activity's
    * card. Ashley's ruling, 6 Sep 2026: the lighter gym sessions go on the
    * class days and prescribed cardio stays off them; volume is untouched.
@@ -4492,6 +4563,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           const current = STYLE_OPTIONS.find(o => o.value === (profile.training_style ?? 'hybrid'))?.label ?? 'this style'
           refusal = `You're already training ${current} — nothing to change there. If you meant just today's session, say so and I'll sort that instead.`
         }
+      } else if (result.proposal.kind === 'propose_goal_change' && result.proposal.rawArgs) {
+        const goal = buildGoalChangeProposal(result.proposal.rawArgs)
+        if (goal) built = { scopeKey: goal.scopeKey, preconditions: goal.preconditions, payload: goal.payload as unknown as Record<string, unknown>, preImage: goal.preImage, diff: goal.diff }
+        else {
+          // Same honesty as the style branch, with one thing added: the goal
+          // is the field people most often ASK about rather than instruct, so
+          // a no-change here usually means a question was read as a request.
+          // Name the goal they already have and leave the door open.
+          const current = GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label ?? 'that'
+          refusal = `You're already training for ${current.toLowerCase()} — nothing to change there. If you're weighing up a switch, tell me what you're after and I'll talk it through with you.`
+        }
       } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs) {
         const activity = buildConcurrentActivityProposal(result.proposal.rawArgs)
         if (activity) built = { scopeKey: activity.scopeKey, preconditions: activity.preconditions, payload: activity.payload as unknown as Record<string, unknown>, preImage: activity.preImage, diff: activity.diff }
@@ -5388,6 +5470,32 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       title = ok ? RECEIPTS['propose_style_change'].done : RECEIPTS['propose_style_change'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_goal_change') {
+      const payload = row.payload as unknown as GoalChangePayload
+      const result = await executeGoalChange(profile, mesocycle, exerciseExclusions, payload)
+      onMesocycleUpdated(result.mesocycle)
+      // executeGoalChange writes fitness_profiles.fitness_goal itself; mirror
+      // it into App state the same way the style branch does.
+      //
+      // AND THIS MIRROR IS THE FOOD HALF. App's macro effect is keyed on
+      // fitness_goal, so this one call moves the calorie and macro targets
+      // and raises the notice that says by how much — there is nothing else
+      // to call for the numbers. The MEALS are the caller's job, below.
+      if (result.receipt.failed.length === 0) {
+        onProfileChanged({ fitness_goal: payload.fitnessGoal })
+        // Ashley's ruling, 17 Sep 2026: training AND food, from this week.
+        // The card said this was coming before they tapped, and it is the
+        // one edit path that spends an edge call on confirm, so it happens
+        // here rather than at proposal time. A failure to rebuild meals must
+        // not undo the goal change: the plan and the targets are already
+        // right, and the old meals are stale rather than wrong.
+        await onGoalMealsNeedRebuild?.()
+      }
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_goal_change'].done : RECEIPTS['propose_goal_change'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_concurrent_activity') {
       const payload = row.payload as unknown as ConcurrentActivityPayload
       const result = await executeConcurrentActivity(profile, mesocycle, exerciseExclusions, payload)
@@ -5688,7 +5796,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!preImage || !planCreatedAt) return
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
-      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_concurrent_activity') {
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity') {
         // Both wrote a RUN of weeks, so undo restores the same run rather
         // than the swap's single week. The starting week comes off the
         // payload, not off today's live week — undoing tomorrow must put
@@ -5699,9 +5807,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ? Math.min(...(row.payload as unknown as VolumeChangePayload).weekNumbers)
           : row.kind === 'propose_style_change'
             ? (row.payload as unknown as StyleChangePayload).fromWeek
-            : row.kind === 'propose_concurrent_activity'
-              ? (row.payload as unknown as ConcurrentActivityPayload).fromWeek
-              : (row.payload as unknown as ScheduleChangePayload).fromWeek
+            : row.kind === 'propose_goal_change'
+              ? (row.payload as unknown as GoalChangePayload).fromWeek
+              : row.kind === 'propose_concurrent_activity'
+                ? (row.payload as unknown as ConcurrentActivityPayload).fromWeek
+                : (row.payload as unknown as ScheduleChangePayload).fromWeek
         await undoWeekRangeChange(profile.id, preImage, fromWeek)
         onMesocycleUpdated(preImage)
         if (row.kind === 'propose_schedule_change') {
@@ -5712,6 +5822,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           const restored = (profile.training_days ?? []).map(d => ({ ...d, available: before.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
           await updateProfileField(profile.id, { training_days: restored })
           onProfileChanged({ training_days: restored })
+        }
+        if (row.kind === 'propose_goal_change') {
+          // The goal change also wrote fitness_goal, and putting the plan
+          // back without it would leave someone on their old programme while
+          // the profile still claimed the new goal — and, worse than the
+          // schedule case, still EATING for it, because the calorie targets
+          // are derived from this field. Restoring it here moves the targets
+          // back through the same macro effect that moved them forward.
+          // The meals are not regenerated again: they are stale either way,
+          // and a second edge call on an undo is a spend nobody asked for.
+          const before = (row.preconditions as { before?: FitnessGoal } | null)?.before
+          if (before) {
+            await updateProfileField(profile.id, { fitness_goal: before })
+            onProfileChanged({ fitness_goal: before })
+          }
         }
         if (row.kind === 'propose_concurrent_activity') {
           // The plan goes back, so everything the card wrote goes back with
