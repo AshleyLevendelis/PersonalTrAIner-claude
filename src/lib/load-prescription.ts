@@ -1032,6 +1032,34 @@ export function isExternallyLoaded(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => LOADED_EQUIPMENT.has(e))
 }
 
+/**
+ * WHAT TO PRINT WHERE THE WEIGHT WOULD GO, when there is no weight.
+ *
+ * Ashley, 17 Sep 2026, swapped a loaded leg curl for a slider curl mid-session
+ * and the card showed nothing at all where every other card carried a number.
+ * The answer was right; the screen rendered it as an absence, so it read as a
+ * failure. "No external load" has to SAY so.
+ *
+ * AND IT IS NOT ONE KIND. The partition above already makes the distinction
+ * this needs, in its own words: "a resistance band's resistance is real but is
+ * not expressible in kilos". Printing "Bodyweight" on a band pull-apart would
+ * be a second, smaller lie of exactly the kind this is fixing — MEASURED: 22
+ * catalogue entries use a band. So the KIND travels with the value, which is
+ * the standing rule (CLAUDE.md, the personalBest union of the same week).
+ *
+ * Returns null rather than guessing for anything whose prescription is not a
+ * set of reps at all — a treadmill has no load to state and no reps column to
+ * state it beside, and inventing a word for it is how the last one started.
+ */
+const CARDIO_EQUIPMENT = new Set(['treadmill', 'stationary bike', 'rowing machine', 'elliptical machine'])
+
+export function unloadedLoadLabel(entry: ExerciseEntry): string | null {
+  if (isExternallyLoaded(entry)) return null
+  if (entry.equipment.some(e => CARDIO_EQUIPMENT.has(e))) return null
+  if (entry.equipment.includes('resistance band')) return 'Band'
+  return 'Bodyweight'
+}
+
 // SAFETY: a backpack (or other improvised implement) is not a farmer's
 // handle or a dumbbell — there's no rigid frame, the load rides on straps
 // and shifts with movement, and failure modes are strap tearing or the

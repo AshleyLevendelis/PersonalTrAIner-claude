@@ -256,4 +256,86 @@ if (!sawDetail) {
   await shoot('bodyweight-progress-trend')
 }
 
+// --- [3] A MOVEMENT WITH NO WEIGHT SAYS SO, RATHER THAN SAYING NOTHING ------
+// Ashley, 17 Sep 2026, mid-session: she swapped a loaded leg curl for a slider
+// curl and the replacement card showed her NOTHING where every other card on
+// the page carried a weight — no load word, no effort target — while still
+// offering a plate calculator and a weight box pre-filled with 0. The app's
+// answer was CORRECT (a slider curl has no external load) and it rendered as a
+// blank, so a right answer read as a failure and she reported it as a bug.
+//
+// THIS IS THE CASE NO SOURCE CHECK CATCHES. Every branch involved was already
+// correct: LoadChip deliberately returns null with no load to explain, and the
+// weight header is guarded on a null weight. The defect is what the COMPOSITION
+// of those correct branches leaves on the screen — an absence — which is only
+// visible in a screenshot.
+console.log('\n[3] A bodyweight card states its prescription')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1#/tab/exercise` })
+await wait(4000)
+const bw = await ev(`(() => {
+  const rows = [...document.querySelectorAll('[data-exercise-name]')]
+  const first = rows[0]
+  if (!first) return { err: 'no exercise rows' }
+  const card = first.closest('[data-exercise-name]') || first
+  const txt = (card.innerText || '')
+  return {
+    name: first.getAttribute('data-exercise-name'),
+    rows: rows.length,
+    saysBodyweight: !!card.querySelector('[data-testid="bodyweight-load"]'),
+    loadWord: card.querySelector('[data-testid="bodyweight-load"]')?.textContent?.trim() || '',
+    equipment: (first.getAttribute('data-exercise-equipment') || ''),
+    keepsEffortTarget: !!card.querySelector('[data-testid="effort-only"]'),
+    offersPlateCalc: /Plate calculator/i.test(txt),
+    printsABareKg: /(^|[^a-z])0\s*kg/i.test(txt),
+  }
+})()`)
+check('3a. today\'s first card rendered', !bw?.err && !!bw?.name, bw)
+check('3b. it states its load where a weight would be, instead of nothing', bw?.saysBodyweight === true, bw)
+// AND IT NAMES THE RIGHT KIND. Today's first card is Band Pull-Aparts — a
+// resistance band, whose resistance is real but not expressible in kilos (the
+// catalogue's own words). Printing "Bodyweight" on it would be a second,
+// smaller version of the lie this whole section exists to fix, so the word is
+// checked, not just its presence.
+check('3b2. ...and calls a band a Band, not Bodyweight', bw?.loadWord === 'Band', bw)
+check('3c. ...and keeps the effort target, which is the only thing it prescribes', bw?.keepsEffortTarget === true, bw)
+check('3d. ...and offers no plate calculator for a movement with no plates', bw?.offersPlateCalc === false, bw)
+check('3e. ...and never prints a bare "0 kg"', bw?.printsABareKg === false, bw)
+await shoot('bodyweight-card-states-its-load')
+
+// TEETH: the same checks must come out the OTHER way on a loaded card, or
+// 3b-3e would pass equally well if the card stopped rendering altogether.
+// ONLY THE FIRST CARD ON THE DAY IS EXPANDED, and it is the bodyweight one —
+// so a loaded row has to be OPENED before there is anything to read. Measured:
+// without the click, every other row's text is just its collapsed summary, and
+// the first version of this check reported "no loaded card on the default
+// fixture" against a week with five of them.
+console.log('\n  and a loaded card is unaffected')
+const loadedRowName = await ev(`(() => {
+  const rows = [...document.querySelectorAll('[data-exercise-name]')]
+  const loadedRow = rows.find(r => /~\\s*[\\d.]+\\s*kg/i.test(r.innerText || ''))
+  if (!loadedRow) return null
+  const name = loadedRow.getAttribute('data-exercise-name')
+  const opener = loadedRow.querySelector('button, [role="button"]') || loadedRow
+  opener.click()
+  return name
+})()`)
+await wait(1500)
+const loaded = await ev(`(() => {
+  const row = [...document.querySelectorAll('[data-exercise-name]')].find(r => r.getAttribute('data-exercise-name') === ${JSON.stringify(loadedRowName)})
+  if (!row) return { err: 'no loaded row found or it vanished when opened' }
+  const txt = row.innerText || ''
+  return {
+    name: row.getAttribute('data-exercise-name'),
+    expanded: /working sets/i.test(txt),
+    showsAWeight: /[\\d.]+\\s*kg/i.test(txt),
+    saysBodyweight: !!row.querySelector('[data-testid="bodyweight-load"]'),
+    offersPlateCalc: /Plate calculator/i.test(txt),
+  }
+})()`)
+check('3f. a loaded card opened, so 3b-3e are not vacuous',
+  !loaded?.err && loaded?.expanded === true && loaded?.showsAWeight === true, { loadedRowName, loaded })
+check('3g. ...it does NOT claim bodyweight', loaded?.saysBodyweight === false, loaded)
+check('3h. ...and it keeps its plate calculator', loaded?.offersPlateCalc === true, loaded)
+await shoot('loaded-card-keeps-its-weight')
+
 await finish()

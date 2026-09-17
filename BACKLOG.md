@@ -2,6 +2,42 @@
 
 Newest first. One line each.
 
+- [x] **"WHEN YOU SWAP AN EXERCISE FOR A NEW ONE NO WEIGHT IS PRESCRIBED."**
+  Ashley, 17 Sep 2026, mid-session. **THE APP WAS RIGHT AND THE SCREEN WAS
+  SILENT, which is why she read a correct answer as a failure.** She swapped a
+  loaded leg curl for a slider curl; a slider curl has no external load, so
+  there is genuinely no weight to prescribe. The card then showed her NOTHING
+  where every other card on the page carried a number — no load word, no effort
+  target — while still offering a plate calculator and a weight box holding 0.
+  The swap itself prescribes correctly, on both surfaces, from the same
+  function. There is no parity defect and no missing prescription.
+  **THIS IS THE CASE NO SOURCE CHECK CATCHES.** Every branch involved was
+  already correct in isolation: the load chip deliberately renders nothing when
+  there is no load to explain, and the weight header is guarded on a null
+  weight. The defect is what the COMPOSITION of two correct branches leaves on
+  a screen, and an absence is only visible in a screenshot.
+  Three fixes, all from the standing rule that the KIND travels with the value
+  and the renderer has no default branch: the card states its load where the
+  weight would be; the effort target survives, because on a movement with no
+  weight the RPE IS the prescription and it was falling out of the screen
+  alongside the chip that was meant to suppress it; and there is no plate
+  calculator on a movement with no plates.
+  **AND THE OBVIOUS WORD WOULD HAVE BEEN A SECOND, SMALLER LIE.** The first
+  version printed "Bodyweight" — which is wrong for the 22 catalogue entries
+  that use a resistance band, whose own partition comment already says a band's
+  resistance "is real but is not expressible in kilos". Found by driving it:
+  today's first card is Band Pull-Aparts. It says **Band**. The check asserts
+  the WORD, not just that a label exists, because a label that exists and is
+  wrong is worse than none.
+  `verify:bodyweight-progress` §3 (29 checks). 4 mutations tried, 4 caught, all
+  applied, all ran the full count — including one that puts the effort target
+  back inside the chip's early return, which is the original defect exactly.
+  Two things found on the way and worth keeping: the teeth check needed a
+  LOADED card opened, because only the first card on a day is expanded and the
+  first version reported "no loaded card on the default fixture" against a week
+  with five of them; and a variable-name clash crashed the driver to ZERO
+  checks, which reads as a pass if you only count failures.
+
 - [x] **"IT WAS 6 PM AND THE APP WAS ASKING IF I WAS GOING TO HIT MY MORNING
   SESSION."** Ashley, 17 Sep 2026, phone clock reading 17:58, three turns
   running. **THE OBVIOUS DIAGNOSIS WAS WRONG, and that is the useful part:

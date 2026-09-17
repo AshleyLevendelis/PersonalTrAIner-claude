@@ -137,7 +137,29 @@ export function LoadChip({
   /** Week 1 with nothing verified yet — changes the words, never the number. */
   calibration?: boolean
 }) {
-  if (source == null) return null
+  // THE EFFORT TARGET IS THE PRESCRIPTION WHEN THERE IS NO WEIGHT, so it must
+  // not fall out of the screen along with the chip.
+  //
+  // Ashley, 17 Sep 2026: she swapped a loaded leg curl for a slider curl
+  // mid-session and the replacement card showed her nothing at all — no
+  // weight, no effort target — while still offering a plate calculator. The
+  // app's answer was CORRECT (a slider curl has no external load), and it
+  // rendered as a blank, so a right answer read as a failure and she reported
+  // it as one. This early return was half of that: `source == null` is true
+  // for every bodyweight movement, and it took `ex.intensity` — the RPE line,
+  // the only thing such a movement is prescribed AT — down with the chip it
+  // was meant to suppress.
+  //
+  // The chip itself still goes: there is genuinely no load to explain, and the
+  // ⓘ would open an explainer about a number that does not exist.
+  if (source == null) {
+    if (!ex.intensity) return null
+    return (
+      <div className="flex flex-col gap-0.5 mt-0.5" data-testid="effort-only">
+        <span className="inline-flex items-center gap-0.5 text-[0.625rem] text-muted-foreground">{ex.intensity}</span>
+      </div>
+    )
+  }
   const explainer = explainerFor(source, ex.load_guidance, calibration)
   const label = loadSourceLabel(source, calibration)
   // Suppressed once a real logged number is driving the weight: 'logged'
