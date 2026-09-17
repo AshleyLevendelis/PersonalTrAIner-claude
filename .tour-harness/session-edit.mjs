@@ -174,6 +174,7 @@ check('4a. "Put something else there" reaches the swap dialog',
 check('4b. ...for the same exercise', (await ev(`document.querySelector('[data-testid="swap-dialog"]')?.innerText || ''`)).includes(victim), victim)
 check('4c. ...and it asks why here too, the same question as the sheet',
   await has('[data-testid="swap-dialog"] [data-testid="reason-chips"]'))
+
 await escape(); await wait(600)
 
 // --- dropping it ------------------------------------------------------------
@@ -225,6 +226,83 @@ const editedDay = await ev(`document.querySelector('[data-today-day-name]')?.get
 check('6e. ...naming a real weekday', /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/.test(balancing), balancing)
 check('6f. ...and it is not the day being edited', !editedDay || !balancing.includes(`on ${editedDay}`), { editedDay, balancing })
 await shoot('session-edit-balancing')
+
+// --- [7] WHY THIS LIST IS SHORT, WHERE SHE CAN READ IT ----------------------
+// Ashley, 17 Sep 2026, mid-session in a gym: offered three unloaded leg curls
+// as replacements while standing next to a leg-curl machine, with nothing
+// telling her that her TRAINING STYLE was the filter. The sentence that says
+// so existed and was correct — it rendered INSIDE the list's own `max-h-80
+// overflow-y-auto` box, below the option cards, so reading it meant scrolling
+// past the very options it was meant to frame.
+//
+// NO `test:` GATE COULD HAVE CAUGHT THIS. The string was in the file, the
+// branch was reached, the node was in the DOM. Only geometry on a real screen
+// tells you that a true sentence was rendered where nobody reads it. So this
+// measures POSITION, and it reads both halves — "it is above the list" stays
+// true if the node quietly stops rendering at all, so presence is asserted
+// separately.
+//
+// FIXTURE FOUND, NOT ASSUMED. The default full-gym week hands the dialog four
+// or more options, where the sentence is not supposed to render — every check
+// below would then pass by being vacuous. Measured: the first attempt did
+// exactly that and 4e caught it. So this uses the home-gym leg fixture and
+// SCANS for a genuinely short list rather than naming an exercise that might
+// stop being short.
+console.log('\n  a short swap list on the home-gym leg day')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&legcurl=1#/tab/exercise` })
+await wait(4500)
+const legDay = await order()
+check('7a. the home-gym leg fixture renders a session', Array.isArray(legDay) && legDay.length >= 3, legDay)
+let shortList = null
+let shortOn = ''
+for (const name of legDay || []) {
+  if ((await openRowMenu(name)) !== 'open') continue
+  if (!(await tap('[data-testid="swap-exercise"]')) || !(await untilSel('[data-testid="swap-dialog"]'))) { await escape(); await wait(400); continue }
+  if (await has('[data-testid="swap-dialog"] [data-testid="reason-skip"]')) { await clickSel('[data-testid="swap-dialog"] [data-testid="reason-skip"]'); await wait(800) }
+  const seen = await ev(`(() => {
+    const d = document.querySelector('[data-testid="swap-dialog"]'); if (!d) return null
+    const options = [...d.querySelectorAll('[data-testid="swap-option"]')]
+    const reason = d.querySelector('[data-testid="swap-short-list-reason"]')
+    const dr = d.getBoundingClientRect()
+    const rr = reason && reason.getBoundingClientRect()
+    // The list's OWN scrolling box — the one the sentence used to be trapped
+    // inside, below the options. The dialog itself may also scroll and that is
+    // fine, so this walks up from an OPTION rather than collecting every
+    // scroller in the tree. MEASURED 17 Sep 2026: a first version asked "is it
+    // inside any scroller at all" and went red on the fixed build, because
+    // Radix's own content box scrolls.
+    const listScroller = (() => {
+      let n = options[0]
+      while (n && n !== d) { if (/auto|scroll/.test(getComputedStyle(n).overflowY)) return n; n = n.parentElement }
+      return null
+    })()
+    return {
+      options: options.length,
+      hasReason: !!reason,
+      text: reason ? reason.textContent.trim().slice(0, 64) : '',
+      listScrolls: !!listScroller,
+      insideTheListScroller: !!reason && !!listScroller && listScroller.contains(reason),
+      aboveFirstOption: !!reason && options.length > 0 && rr.bottom <= options[0].getBoundingClientRect().top + 1,
+      withinDialogBox: !!reason && rr.top >= dr.top - 1 && rr.bottom <= dr.bottom + 1,
+    }
+  })()`)
+  if (seen && seen.options > 0 && seen.options < 4) { shortList = seen; shortOn = name; await shoot('session-edit-swap-short-list'); break }
+  await escape(); await wait(400)
+}
+// TEETH FIRST: the shape of the fixture is asserted before the property that
+// depends on it, so a fixture that stopped being short can never read as a pass.
+check('7b. some exercise here really does have a SHORT list, so 7c-7d mean something',
+  !!shortList && shortList.options > 0 && shortList.options < 4, { shortOn, shortList })
+check('7c. the reason is rendered, and ABOVE the options rather than below them in the list\'s own scroller',
+  !!shortList && shortList.hasReason === true && shortList.aboveFirstOption === true && shortList.insideTheListScroller === false,
+  { shortOn, shortList })
+// The list really does scroll — otherwise 7c passes for the wrong reason,
+// because a list that fits on screen can never hide anything below it.
+check('7e. ...and the options list really is a scrolling box, so 7c has teeth',
+  !!shortList && shortList.listScrolls === true, { shortOn, shortList })
+check('7d. ...inside the part of the dialog she can actually see',
+  !!shortList && shortList.withinDialogBox === true, { shortOn, shortList })
+await escape(); await wait(400)
 
 console.log(failures === 0 ? '\nRemoving asks, moving moves, both stick, and the reach of a change is stated.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

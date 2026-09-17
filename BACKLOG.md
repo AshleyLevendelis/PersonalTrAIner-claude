@@ -2,6 +2,82 @@
 
 Newest first. One line each.
 
+- [x] **SIX THINGS ASHLEY HIT WHILE ACTUALLY TRAINING, 17 Sep 2026 — all six
+  real, one of them worse than she reported.** She sent six issues and five
+  screenshots from a live session. Each was traced end to end and then attacked
+  by three independent checks — refute the mechanism, re-read the screen,
+  check the judgement against her own past rulings — before anything was
+  believed. None survived as "working as designed". Two came back with
+  corrections that changed what to do, and both corrections were about
+  JUDGEMENT rather than mechanism; they are recorded on their own entries.
+  **THIS ENTRY COVERS THE SWAP SCREEN. The others follow separately.**
+
+  **THE SEARCH BOX COULD NOT FIND WHAT SHE TYPED.** *"Iso lateral leg curl
+  isn't available as a swap"*. It is in the catalogue, and so are the lying and
+  seated machine versions. MEASURED: typing her exact words returned "No
+  matching exercise found", because the matcher wanted ONE CONTIGUOUS SUBSTRING
+  and the entry is called "Iso-Lateral Kneeling Leg Curl" — her hyphen missing
+  and the word "Kneeling" sitting in the middle. Even "iso-lateral leg curl"
+  failed. Only the bare fragment "iso-lateral" worked.
+  **AND IT WAS NEVER ABOUT ONE EXERCISE: 49 of the 200 live entries could not
+  be found by typing their OWN NAME without punctuation** — every Push-Ups
+  variant, T-Bar Rows, Chest-Supported Row, every Neutral-Grip anything. A
+  quarter of the catalogue. Now 0.
+  **WHY THIS IS A BUG AND NOT A PREFERENCE**: that box is the escape hatch she
+  RULED FOR on 13 Sep 2026 ("show everything, warn me" — the shortlist is
+  constrained, the search reaches the whole catalogue). A search that cannot
+  find her own words makes her ruling untrue in practice, so there was no
+  decision to re-take here.
+  **THE FIX IS SHAPED BY WHAT ELSE USES IT, and that is the part worth
+  keeping.** The obvious move — widen the matcher — would have been wrong.
+  Its other two callers are RESOLVERS, not pickers: one turns a typed phrase
+  into a hard exercise BAN over every name it returns, the other keys on
+  "exactly one match" to decide a logged set is unambiguous. More recall there
+  silently bans more than she named. A picker's false positive costs one line
+  of reading; a resolver's changes her plan or her diary. **One function was
+  serving two opposite requirements, and that was the actual defect.** So the
+  difference is now named, the picker's search is built by CALLING the strict
+  one and appending a looser tier, and a gate fails if a future tidy-up
+  unifies them.
+
+  **THE SENTENCE EXPLAINING A SHORT LIST WAS RENDERED WHERE NOBODY READS IT.**
+  She was offered three unloaded leg curls while standing next to a machine,
+  with nothing saying her TRAINING STYLE was the filter. That sentence existed
+  and was correct — it sat INSIDE the list's own scrolling box, below the
+  option cards, so reading it meant scrolling past the very options it was
+  meant to frame. Moved above the list, which also puts it in the right reading
+  order: what this list is, then the list.
+  **NO `test:` GATE COULD HAVE CAUGHT THIS.** The string was in the file, the
+  branch was reached, the node was in the DOM. Only geometry on a real screen
+  tells you a true sentence was rendered somewhere invisible. The browser check
+  measures POSITION, and the mutation that puts it back where it was reports
+  not merely "below" but OUTSIDE THE VISIBLE DIALOG — which is what she
+  experienced.
+  **A FIXTURE FOUND, NOT ASSUMED**: the first attempt measured the default
+  full-gym week, which hands the dialog four options — where the sentence is
+  not supposed to render at all — so every check would have passed by being
+  vacuous. The teeth-first check caught that on the first run, which is why it
+  is written before the property that depends on it.
+
+  **AND THE GATE THAT OWNS THIS AREA COULD PRINT FAIL AND EXIT 0.** Found on
+  the way in: `test:slot-replacement`'s only `process.exit(1)` sat ABOVE its
+  section [6], so every check below it was decorative. PROVEN by breaking one
+  on purpose — it printed "FAIL: the query still finds the live sibling", then
+  "All slot-replacement hygiene checks passed", then exited 0. That section had
+  been ornamental since the day it was written. Moved to the bottom; CLAUDE.md's
+  rule (a gate has exactly ONE exit) now holds here.
+  5 source mutations tried, 5 caught, all applied, all ran 26/26 checks — one
+  of them is the exit fix itself. 2 browser mutations tried, 2 caught, both ran
+  47/47. `slot-replacement` §7, `verify:session-edit` §7.
+  **STILL OPEN AND NOT FIXED HERE**: the three machine leg curls are hidden
+  from her shortlist because they are tagged "bodybuilding" and her style is
+  "functional". MEASURED across 7 styles x 3 experience levels — only
+  "functional" and "combat" produce an all-unloaded leg-curl list; every other
+  style puts the machines at the top. That is NOT a tagging slip: 31 of 44
+  machine entries lack the "functional" tag, so it is a deliberate convention,
+  and changing it changes what every functional trainee is prescribed. It is
+  Ashley's ruling to make and is queued for her.
+
 - [x] **THE FOURTH TIME A SIZE CEILING QUOTED ROOM IT NO LONGER HAD — so this
   time the ceilings report themselves.** 17 Sep 2026. The full sweep came back
   with two real failures, both mine and both in the checks rather than the app.
