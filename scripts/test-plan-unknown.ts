@@ -53,8 +53,25 @@ check('and the kind says so', unknown.kind === 'plan_unknown', unknown.kind)
 check('the shared sentence claims nothing about today',
   !/rest day|today|recovery|session/i.test(PLAN_UNKNOWN_TEXT), PLAN_UNKNOWN_TEXT)
 check('it is not empty — silence is not an opener', PLAN_UNKNOWN_TEXT.trim().length > 0)
-check('a loaded plan with nothing on today is still a rest day',
-  pickOpener({ ...base, planKnown: true }).kind === 'rest_day')
+// RE-ANCHORED 17 Sep 2026, when the ordinary day became a rotation (Ashley's
+// ruling: the coach must stop opening every conversation with the workout).
+// This used to assert the KIND — that a loaded rest day is literally
+// 'rest_day' — which is a mechanism, and the mechanism moved. The property it
+// exists to protect is the 7 Sep bug: a plan that has NOT loaded must never be
+// mistaken for a real rest day. Pinned on that instead, both ways.
+const loadedRest = pickOpener({ ...base, planKnown: true })
+check('a plan that has not loaded and a genuine rest day are not the same opener',
+  loadedRest.kind !== unknown.kind, { loaded: loadedRest.kind, unknown: unknown.kind })
+check('...and neither of them claims a rest day while the plan is unknown',
+  !/rest day/i.test(unknown.text), unknown.text)
+// AND THE REST-DAY LINE IS STILL REACHABLE — the rotation defers it, it does
+// not delete it. Without this, silently losing the line entirely would pass.
+check('...while a genuine rest day still gets its own line once the rotation reaches it',
+  pickOpener({ ...base, planKnown: true, lastOrdinaryKind: 'noticed' }).kind === 'rest_day',
+  pickOpener({ ...base, planKnown: true, lastOrdinaryKind: 'noticed' }).kind)
+check('...which an unloaded plan can never produce, at any point in the rotation',
+  (['check_in', 'noticed', 'session'] as const).every(k => pickOpener({ ...base, lastOrdinaryKind: k }).kind === 'plan_unknown'),
+  (['check_in', 'noticed', 'session'] as const).map(k => pickOpener({ ...base, lastOrdinaryKind: k }).kind))
 
 // ---------------------------------------------------------------------------
 console.log('\n[2] The synchronous greeting — the bubble she actually saw')

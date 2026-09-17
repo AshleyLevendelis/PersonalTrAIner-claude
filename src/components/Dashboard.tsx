@@ -24,7 +24,7 @@ import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
 import { ShopDayCard } from '@/components/ShopDayCard'
-import { personalBest } from '@/lib/coach-voice'
+import { personalBest, bestReadingOf } from '@/lib/coach-voice'
 
 interface DashboardProps {
   profile: UserProfile
@@ -824,9 +824,15 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                       weight. `{pr.weightKg} kg` printed "0 kg" for a
                       bodyweight best and would have printed "12 kg" for a
                       12-rep one. The unit comes from the phrasebook with the
-                      number, and there is no default branch to fall into. */}
+                      number, and there is no default branch to fall into.
+                      NEVER A best_set READING HERE, and that is a fact about
+                      the source rather than an omission: this list is built
+                      from the PR CACHE's heaviest-ever figures, which only
+                      move when the bar does. The estimate-driven best exists
+                      only on a single session's result, so it shows up in the
+                      session summary and the exercise's own PR list. */}
                   <span className="shrink-0 tabular-mono text-[0.8125rem] font-semibold text-primary-text">
-                    {personalBest(pr.metric, pr.value)}
+                    {personalBest(bestReadingOf(pr.metric, pr.value))}
                   </span>
                 </div>
               ))}

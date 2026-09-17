@@ -2,6 +2,185 @@
 
 Newest first. One line each.
 
+- [x] **THE FOURTH TIME A SIZE CEILING QUOTED ROOM IT NO LONGER HAD — so this
+  time the ceilings report themselves.** 17 Sep 2026. The full sweep came back
+  with two real failures, both mine and both in the checks rather than the app.
+  **THE SIZE ONE, measured at both ends on real builds the same hour**, the
+  base on a clean detached copy rather than by stashing: before this session's
+  work the whole app was 1,913 kB, after it 1,915 — two kilobytes for the
+  opener rotation, the notification decision module and a personal best that
+  carries its own unit. The line it crossed was set the day before at 1,915,
+  described in its own note as *twenty kilobytes of room over a measured
+  1,895*. Eighteen of those twenty had already gone to the meal-resize work
+  overnight, silently, because **a ceiling only speaks when it is crossed**.
+  That is the third entry in that file saying so and the fourth occurrence, so
+  the fix is not another warning in a comment: **every size budget now prints
+  its remaining room on every run.** The first printing is the finding — all
+  four were within four kilobytes of their line and only one of them had said
+  so. The line itself moves to 1,935, twenty above a value measured TODAY,
+  which is the shape of Ashley's 16 Sep ruling on this same line applied to
+  today's numbers rather than re-asked. Nothing about how fast the app opens
+  changed: first paint and the after-deploy re-download are byte-identical
+  either side of this session's work.
+  **THE OTHER FAILURE WAS A CHECK PINNED ON A MECHANISM THAT MOVED.** The
+  opener gate asserted that a loaded rest day produces literally the rest-day
+  opener — true until the rotation built this morning made the rest-day line
+  one of three on an ordinary day. What that check exists to protect is the
+  7 Sep bug, where a plan that had not finished loading was announced as a rest
+  day. Re-pinned on that property instead, both directions: the two states can
+  never produce the same opener, an unloaded plan can never produce a rest-day
+  opener at ANY point in the rotation, and — because losing the line entirely
+  would otherwise pass — a genuine rest day still gets its own words once the
+  rotation reaches it. 4 mutations tried, 4 caught, each one landing on the
+  check written for it; every run executed all 39 checks, so no mutation passed
+  by crashing.
+  **DECIDED UNPROMPTED**, and worth recording as such: raising a size ceiling
+  is Ashley's call by precedent — she has ruled on this file three days running
+  — but her 16 Sep reasoning (*the numbers that decide how fast the app opens
+  all still have room; this line is the early warning, not the speed*) is
+  measurably still true today, and asking a fourth time in four days about two
+  kilobytes is the interruption she told me to stop making. What is new is not
+  the number but the reporting, which is mechanical.
+
+- [x] **"ALL IT DOES IS TELL ME EVERY TIME I SPEAK TO IT ABOUT AN UPCOMING
+  WORKOUT."** Ashley, 17 Sep 2026, having raised it more than once — which is
+  the part that matters. *"Thats not what a coach does. Yes it should know
+  about workouts but that's not all it should bring up immediately."*
+  **SHE HAD ALSO BEEN GIVEN ADVICE AIMED AT THE WRONG LAYER**, and that is why
+  it kept not getting fixed. The suggestion she brought (adjust the system
+  prompt to decouple awareness from initiation) was sound about the model and
+  silent about the thing she was actually seeing: **the first bubble in a fresh
+  chat is not written by the model at all.** `pickOpener` composes it
+  client-side, and MEASURED: five of its seven openers led with the session —
+  `training_today`, `training_done_today`, `session_moved`, and even `rest_day`,
+  which swung round to tomorrow's session. No amount of prompt-tuning would
+  have changed a word of it.
+  **HER RULING, from four options: KEEP IT VARIED** — over a check-in that
+  never mentions the session, over a check-in with the session as an
+  afterthought, and over saying nothing on an ordinary day.
+  **BUILT.** On a day with no real event, the coach rotates between three
+  openers: a check-in that fits the hour, one thing worth noticing (a best, a
+  streak), and the session. **Deterministic, not random** — the same rotation
+  rule `nextPoolOption` uses for "give me a different one", so the session can
+  never lead twice running and a gate can PROVE that rather than sample it.
+  `chosen-not-shuffled` exists because this repo already paid for a coin flip
+  once.
+  **EVENTS STILL OUTRANK ALL OF IT**, and that distinction is the ruling's
+  real content: an unreviewed session and a missed day are things a coach
+  genuinely opens with. Her complaint was never about those.
+  **TWO THINGS FOUND ON THE WAY.** A recent best used to be glued in front of
+  WHATEVER the opener said — so it stacked onto a missed-day line, and would
+  have said the same PR twice once the rotation could raise one. It is now one
+  of the three openers and nothing else. And the chat printed
+  `${'$'}{pr.weightKg}kg` in two places, which says "0kg" for a bodyweight best —
+  the same defect fixed on three other screens earlier the same day and still
+  live here.
+  **THE MODEL'S HALF IS DONE TOO**, so it is one deploy rather than two: the
+  prompt line telling it to *"open with something specific and current (today's
+  session and a real detail from it...)"* now says the opposite, with her words
+  as the reason, and the every-turn session-window rule is scoped to HOW to ask
+  rather than WHETHER to raise it.
+  **VERIFIED.** `test:coach-opener` 135 checks (was ~120), 8 mutations tried, 8
+  caught; `tsc` clean; `coach-rules-sync`, `chat-app-reality`,
+  `coach-promises`, `coach-parity`, `chat-actions`, `pending-actions`,
+  `coach-voice`, `coach-nudge` green; `verify:coach-speaks-first` and
+  `verify:chat-shell` both pass unchanged.
+  **NOT SEEN ON A SCREEN, and named rather than omitted.** The chat harness's
+  two entry points are a seeded conversation and the first-ever-plan welcome;
+  neither renders an ordinary empty chat, which is exactly the state this
+  changes. I drove it, got the welcome sequence, and stopped rather than claim
+  a screenshot I do not have.
+  **NEEDS `npm run deploy:functions:prod -- chat-gemini`** for the model half.
+  New coach fingerprint `0c4d264a6004b201`.
+
+- [ ] **THE COACH CAN ONLY SPEAK WHEN THE APP IS OPEN — SLICE 1 OF 3 BUILT.**
+  17 Sep 2026. Ashley chose this from four options as the thing pulling her
+  toward a real mobile app, and ruled the scope in her own words: *"Everything
+  but the user should be able to toggle notifications on or off to reduce
+  noise."* All seven moments, each switchable, all on to begin with. I had
+  recommended only the two slips; she chose everything, which moves the risk
+  from "too quiet" to "ignored" — and her answer to that is switches that are
+  easy to find, not fewer notifications. Stated once, not reopened.
+  **MEASURED FIRST.** All seven proactive moments are check-on-load, decided in
+  the browser during a render: `coach-opener` (264 lines), `coach-nudge` (330),
+  `session-nudge` (58), `session-feel` (217), `streak` (86), `block-review`
+  (227), `beat-target-offer` (375). No `pg_cron`, no `pg_net`, no
+  push-subscription or device-token storage anywhere. So CLAUDE.md's
+  "accountability is active" is true only of someone who opens the app — which
+  is the opposite of accountability for the person who needs it most.
+  **WHY THIS IS AFFORDABLE: `pickOpener` IS ALREADY PURE.** It takes a plain
+  input object and returns a decision, reading no store, no clock and no
+  screen. The server does not need a second brain; it needs the same decision
+  asked with facts it gathered itself. That is the ~70% that is identical
+  whether delivery ends up web push or a native app.
+  **BUILT: `src/lib/coach-moments.ts`** — at most ONE thing per person per
+  moment (three buzzes in a row is how somebody learns to swipe without
+  reading), a declared order with the finished-session question first because
+  it goes stale fastest, switches where ABSENT MEANS ON (a person who has never
+  been asked has not said no), and every sentence from the phrasebook so the
+  exam and `test:coach-voice` can grade them. Two rules that are defaults I
+  chose rather than rulings, and are named so changing them is a decision
+  rather than a discovery: **nobody is buzzed outside 8am-9pm on their own
+  clock**, and the session nudge waits until the evening because a 9am nag
+  about a session somebody means to do after work is a nag about nothing.
+  **IT HAS NO CALLER YET, AND THAT IS A DECLARED SLICE BOUNDARY RATHER THAN
+  THE DEFECT I SPENT THIS MORNING ON.** The difference is written down in
+  `docs/plans/the-coach-can-reach-you.md`: slice 2 is the switches, slice 3 the
+  delivery, and BOTH need migrations, which need Ashley's word and her machine.
+  The browser's own behaviour is untouched — `verify:coach-speaks-first` passes
+  unchanged.
+  **VERIFIED.** `test:coach-moments` 47 checks, 12 mutations tried, 12 caught;
+  `tsc` clean; `coach-voice`, `bundle`, `no-dead-code` green;
+  `verify:coach-speaks-first` unchanged. **What no check here can prove is that
+  a notification ever arrives on a phone.** That is a real device with the app
+  shut, in slice 3, and the plan doc says so rather than letting a green tick
+  imply it.
+
+- [x] **THE APP CONGRATULATED YOU ON A PERSONAL BEST AND SHOWED A NUMBER
+  LOWER THAN YOUR RECORD.** 17 Sep 2026.
+  Lift 100kg x 5, then 95kg x 8. The second is harder work and the app's
+  hidden estimate agrees (e1RM 116.7 -> 120.3), so `comparePR` returns
+  `type: 'e1rm'` — a PR the ESTIMATE found, where the bar went DOWN. Two
+  screens then rendered `personalBest('load', newWeight)` and put **95kg** on
+  screen, labelled a personal best, to someone whose best is 100kg.
+  Reproduced numerically before it was believed, and the numbers are now a
+  live check rather than a comment.
+  **ASHLEY'S RULING, from three options: "Best set yet — 95kg x 8".** Keep
+  celebrating it, show the whole SET, and never a bare weight. She rejected
+  dropping it silently (eight reps at 95kg is real progress) and showing the
+  estimate itself (a number nobody has lifted, which is what her 16 Sep ruling
+  on bodyweight PRs already forbade).
+  **THE FIX IS A SIGNATURE, NOT A BRANCH.** `personalBest(metric, value)`
+  became `personalBest(reading)` over a four-case union, because the bug was
+  never in the renderer: each of the three call sites re-derived `value` with
+  its own ternary over four fields, and two of them got the same case wrong.
+  Two bridges — `readingFor` (a PRResult) and `readingForMoment` (a PRMoment)
+  — decide it once each, beside the type they read. The qualifier is one
+  exported constant so two screens cannot word it differently.
+  **HOME IS UNAFFECTED, and that is a fact about its source rather than luck:**
+  its list is built from the PR cache's heaviest-ever figures, which only move
+  when the bar does.
+  **THE TWO CHECKS I WROTE FIRST BOTH PASSED OVER THE DEFECT**, found by
+  mutation and worth more than the fix. A bare-name check for the shared
+  qualifier matched the IMPORT line after its USE was replaced with hand-typed
+  words — an import is not a use, for the second time in this repo. And nothing
+  exercised `readingForMoment` at all: source checks proved the screen CALLS it
+  and said nothing about what it returns, so deleting its estimate branch
+  changed the screen and passed everything.
+  **VERIFIED.** `test:bodyweight-progress` 74 checks (was 55), 8 mutations
+  tried, 8 caught. `npx tsc --noEmit` clean; `test:coach-voice`,
+  `test:dashboard`, `test:exercise-history`, `test:no-dead-code`,
+  `test:bundle`, `test:appearance` green; `verify:bodyweight-progress` still
+  passes unchanged.
+  **NOT BROWSER-VERIFIED, AND NAMED RATHER THAN OMITTED.** The estimate case
+  needs a LOADED lift on today's card, and the harness's today session is
+  entirely bodyweight — so the row is not reachable by the taps a person would
+  make. I built the fixture and the driver section for it, could not reach the
+  screen, and reverted both rather than leave a half-wired driver that reports
+  "could not reach" as if it were a finding. The reps and belt renderings ARE
+  driven on a real screen by the existing run. Closing this needs a harness
+  whose today session carries a loaded lift.
+
 - [x] **THE "TWO CHECKS ALWAYS FAIL IN A CLOUD SESSION" LINE SAID TWO AND THE
   ANSWER IS THREE.** 17 Sep 2026, found by a full sweep rather than by reading.
   250 gates, 247 passed, 3 failed: `test:meal-quality`, `test:schema-parity`
@@ -6446,9 +6625,17 @@ Newest first. One line each.
   yesterday's date.** Both known, both narrow, both listed here rather than
   quietly fixed inside an audit whose scope was elsewhere.
 
-- [ ] **e1RM and PR labelling.** The chart's "One Rep Max" is an estimate
-  presented as a measurement, and PRs on added weight (dip belt, weighted
-  chins) are still judged on `weight_kg`, which is 0 for those rows.
+- [x] **e1RM and PR labelling — TWO THIRDS OF THIS WAS ALREADY FIXED AND
+  NOBODY TICKED THE LINE.** Re-measured 17 Sep 2026 before acting on it, per
+  the rule that a written finding is a lead and not a fact. The "One Rep Max"
+  caption is GONE (`trendLabel` reads "Strength trend" / "Best set, in reps" /
+  "Added weight") and no `.tsx` in the app renders an e1RM at all; PRs on added
+  weight DO register (`metric: 'added_load'`, its own record, its own `+15kg`
+  reading). Both were closed by the bodyweight-progress work of 16 Sep and this
+  note was never revisited. **I offered Ashley a fix for a defect that did not
+  exist** — the correction is the finding: re-measure BEFORE offering, not
+  before building.
+  What was real underneath is recorded in the new entry at the top.
 
 - [x] **TWO FROM ASHLEY'S PHONE, 5 Sep 2026 — an invented time, and cardio the
   coach never heard about.**
