@@ -37,7 +37,7 @@ import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE } from '@/lib/coach-voice'
 import { isHedged } from '@/lib/definite-mention'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
@@ -94,7 +94,7 @@ import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { pickOpener, missedYesterdayFrom, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
+import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
@@ -928,7 +928,44 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
       todayLogged: activeSession.logs.length > 0,
       tomorrowSession,
+      // ONE REAL THING WORTH NOTICING, or nothing. Built from facts the
+      // proactive read already holds, so this costs no extra query — and
+      // null when there is nothing, because a "noticed" line invented to
+      // fill a rotation slot is the app making small talk about a fact it
+      // does not have.
+      noticed: noticedFact(),
+      lastOrdinaryKind: readLastOrdinaryKind(profile.id ?? ''),
     })
+  }
+
+  /**
+   * THE "SOMETHING IT NOTICED" OPENER'S SUBJECT.
+   *
+   * A personal best outranks a streak because it is the more specific fact,
+   * and specificity is the whole difference between a coach who is paying
+   * attention and one making conversation. Both are read off the same
+   * proactive data Home draws from, so the two can never disagree.
+   *
+   * THE UNIT COMES FROM THE PHRASEBOOK. Two other lines in this file printed
+   * `${pr.weightKg}kg` and would have said "0kg" for a bodyweight best — the
+   * same defect fixed on three screens on 17 Sep 2026 and still live here.
+   */
+  const noticedFact = (): { text: string; chips?: string[] } | null => {
+    const pr = proactiveData?.recentPRs[0]
+    if (pr) {
+      return {
+        text: `nice one on ${pr.exerciseName} — ${personalBest(bestReadingOf(pr.metric, pr.value))} is a best. How's it feeling?`,
+        chips: ['How am I doing so far?'],
+      }
+    }
+    const streak = proactiveData?.streak ?? 0
+    if (streak >= 3) {
+      return {
+        text: `${streak} days on the trot now. How are you holding up?`,
+        chips: ['How am I doing so far?'],
+      }
+    }
+    return null
   }
 
   // ---------------------------------------------------------------------------
@@ -1107,7 +1144,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const recentPR = proactiveData?.recentPRs[0]
       const detail = initialGreetingDetail()
       const scheduleLine = recentPR
-        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${personalBest(bestReadingOf(recentPR.metric, recentPR.value))}. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
         : buildInitialGreeting()
       // Chat round 2, item 1 — a brand-new user meets someone, rather than
       // opening a tool. Several short messages instead of one block: who this
@@ -1138,10 +1175,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // complete sentence; the how-did-it-feel kind carries none, per
       // Ashley's ruling that the answer there should be a sentence, not a tap.
       const opener = composeOpener()
-      const detailLine = `${opener.text.charAt(0).toUpperCase()}${opener.text.slice(1)}`
-      const content = recentPR
-        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detailLine}`
-        : `${greetName()} — ${opener.text}`
+      // ONE MECHANISM FOR THE PR, NOT TWO. A recent best used to be glued in
+      // front of WHATEVER the opener said — so it stacked onto a missed-day
+      // line, and from 17 Sep 2026 it would have said the same PR twice, once
+      // as the prefix and once as the rotation's "noticed" opener. It is now
+      // one of the three things the coach may open with, and nothing else.
+      const content = `${greetName()} — ${opener.text}`
       void scheduleLine
       setMessages([{
         role: 'assistant',
@@ -1149,13 +1188,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         status: 'complete',
         quickReplies: opener.chips.length > 0 ? opener.chips : undefined,
       }])
+      // ADVANCE THE ROTATION, so the next conversation opens differently.
+      // After setMessages rather than before: a bubble that never rendered
+      // should not count as something the coach said.
+      rememberOrdinaryKind(profile.id ?? '', opener.kind)
       // The opener has now said its one thing, so coach-nudge.ts must not say
       // it again the moment she replies. Burnt WITHOUT starting the quiet
       // period: she opened the chat herself, so this bubble is not an
       // interruption and must not delay one that would be.
       writeNudgeStore(rememberWithoutSpeaking(
         nudgeStore(),
-        keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), Boolean(recentPR)),
+        keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), opener.kind === 'noticed'),
       ))
     }
 

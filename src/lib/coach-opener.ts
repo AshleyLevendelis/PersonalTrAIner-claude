@@ -25,6 +25,8 @@
 // ---------------------------------------------------------------------------
 
 export type OpenerKind =
+  | 'check_in'
+  | 'noticed'
   | 'session_feel'
   | 'missed_yesterday'
   | 'training_done_today'
@@ -79,6 +81,59 @@ export interface OpenerInput {
   todayLogged: boolean
   /** The next scheduled session after today, from the live week, or null. */
   tomorrowSession: { dayName: string; focus: string; lead: string | null } | null
+  /**
+   * ONE THING WORTH NOTICING about this person right now, in the coach's own
+   * words — a lift that moved, a run of weeks, something real. Supplied by the
+   * caller so this module keeps its promise of reading nothing itself.
+   *
+   * Null when there is genuinely nothing, and the rotation below simply skips
+   * it. A "noticed" line invented to fill a slot would be the app making
+   * small talk about a fact it does not have.
+   */
+  noticed?: { text: string; chips?: string[] } | null
+  /**
+   * WHICH ORDINARY OPENER WAS USED LAST TIME, so the next one differs.
+   *
+   * Ashley, 17 Sep 2026, after raising it more than once: *"All it does is
+   * tell me every time I speak to it about an upcoming workout. Thats not what
+   * a coach does."* She was right, and the cause was here rather than in the
+   * model's persona — five of this module's seven openers led with the
+   * session, and the rest-day one swung round to tomorrow's. Her ruling, from
+   * four options: KEEP IT VARIED.
+   *
+   * Undefined on a first-ever chat, which starts the rotation at its first
+   * entry — a check-in, not the session.
+   */
+  lastOrdinaryKind?: OrdinaryKind | null
+}
+
+/**
+ * THE ORDINARY DAY'S ROTATION, in order.
+ *
+ * DETERMINISTIC, NOT RANDOM, and that is the codebase's own answer to "give
+ * me a different one" — `nextPoolOption` in meal-store rotates rather than
+ * draws, so N-1 asks show N-1 different things and a gate can prove it. A
+ * random opener would be varied and untestable, and `chosen-not-shuffled`
+ * exists because this repo has already paid for a coin flip once.
+ *
+ * The session is LAST, which is the whole point: it is one of three things
+ * the coach might open with rather than the thing it always opens with, and
+ * it can never come up twice running.
+ */
+export const ORDINARY_ROTATION = ['check_in', 'noticed', 'session'] as const
+export type OrdinaryKind = typeof ORDINARY_ROTATION[number]
+
+/**
+ * A warm opening that is not about the plan at all.
+ *
+ * THREE, BY TIME OF DAY, rather than one repeated every third conversation —
+ * and by the hour rather than by a counter, so it needs no state and is right
+ * about the day as well as different from last time.
+ */
+function checkInText(hour: number): string {
+  if (hour < 12) return `how's the morning going?`
+  if (hour < 18) return `how's the day been so far?`
+  return `how are you doing this evening?`
 }
 
 export interface Opener {
@@ -109,7 +164,7 @@ export interface Opener {
 export const PLAN_UNKNOWN_TEXT = `how's it going?`
 
 export function pickOpener(input: OpenerInput): Opener {
-  const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession, movedTo } = input
+  const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession, movedTo, noticed, lastOrdinaryKind } = input
 
   // 1. A finished session nobody has asked about. Outranks everything: it is
   //    the one signal the research says predicts whether they come back, and
@@ -195,9 +250,11 @@ export function pickOpener(input: OpenerInput): Opener {
     }
   }
 
-  // 4. A training day, past the hour they usually train, nothing awaiting a
-  //    feel (so either they logged nothing, or the session is not marked
-  //    finished). The pre-existing line, unchanged.
+  // 4. A SESSION ALREADY BEHIND THEM. Kept out of the rotation below and
+  //    ranked above it, because this is not reciting a schedule — it is
+  //    asking about something that happened, which is what a coach does. Past
+  //    their usual hour with nothing awaiting a feel means either they logged
+  //    nothing or never marked it finished; both want the same question.
   if (todaySession && hour >= cutoffHour) {
     return {
       kind: 'training_done_today',
@@ -207,34 +264,82 @@ export function pickOpener(input: OpenerInput): Opener {
     }
   }
 
-  // 5. A training day still ahead. The pre-existing line, plus the one chip
-  //    that maps cleanly onto an existing tool (propose_volume_change,
-  //    direction lighter). Mid-session gets no chip: trimming a session
-  //    they are already in is a different conversation.
-  if (todaySession) {
+  // ---------------------------------------------------------------------
+  // 5. THE ORDINARY DAY, AND THE THING ASHLEY KEPT RAISING.
+  // ---------------------------------------------------------------------
+  // Everything above this line is a real event — an unreviewed session, a
+  // missed day, a plan that has not loaded, a moved session. Below it there
+  // is no event at all, and until 17 Sep 2026 the coach filled that silence
+  // by reciting the plan: "today's Push: bench, rows. Feeling good for it?"
+  // every single time, or on a rest day the same thing about tomorrow.
+  //
+  // Her words, having raised it more than once: "All it does is tell me every
+  // time I speak to it about an upcoming workout. Thats not what a coach
+  // does. Yes it should know about workouts but that's not all it should
+  // bring up immediately."
+  //
+  // Her ruling, from four options: KEEP IT VARIED. So the session becomes one
+  // of three things the coach might open with, rotated deterministically so
+  // it can never come up twice running — and so a gate can prove that rather
+  // than sample it.
+  const sessionOpener = (): Opener => {
+    if (todaySession) {
+      return {
+        kind: 'training_today',
+        text: `today's ${todaySession.focus}: ${todaySession.movements}. Feeling good for it?`,
+        chips: todayLogged ? [] : ["I'm short on time today — can you trim the session?"],
+        attention: false,
+      }
+    }
+    const ahead = tomorrowSession
+      ? ` ${tomorrowSession.dayName === 'tomorrow' ? "Tomorrow's" : `${tomorrowSession.dayName}'s`} ${tomorrowSession.focus}${tomorrowSession.lead ? ` leads with ${tomorrowSession.lead}` : ''}.`
+      : ''
     return {
-      kind: 'training_today',
-      text: `today's ${todaySession.focus}: ${todaySession.movements}. Feeling good for it?`,
-      chips: todayLogged ? [] : ["I'm short on time today — can you trim the session?"],
+      kind: 'rest_day',
+      text: `it's a rest day on your plan. How's the recovery going?${ahead}`,
+      chips: [
+        tomorrowSession ? `What's ${tomorrowSession.dayName === 'tomorrow' ? 'tomorrow' : tomorrowSession.dayName} looking like?` : "What's my next session?",
+        'Any mobility work worth doing today?',
+      ],
       attention: false,
     }
   }
 
-  // 6. A rest day. The pre-existing line, plus a look ahead when there is
-  //    one — that is the blueprint's "preview tomorrow", and it costs nothing.
-  //    Both chips are questions the coach can always answer from context.
-  const ahead = tomorrowSession
-    ? ` ${tomorrowSession.dayName === 'tomorrow' ? "Tomorrow's" : `${tomorrowSession.dayName}'s`} ${tomorrowSession.focus}${tomorrowSession.lead ? ` leads with ${tomorrowSession.lead}` : ''}.`
-    : ''
-  return {
-    kind: 'rest_day',
-    text: `it's a rest day on your plan. How's the recovery going?${ahead}`,
-    chips: [
-      tomorrowSession ? `What's ${tomorrowSession.dayName === 'tomorrow' ? 'tomorrow' : tomorrowSession.dayName} looking like?` : "What's my next session?",
-      'Any mobility work worth doing today?',
-    ],
+  const checkInOpener = (): Opener => ({
+    kind: 'check_in',
+    text: checkInText(hour),
+    // CHIPS THAT ARE NOT THE SESSION. The point of this opener is that the
+    // plan is not the headline; three buttons about the plan underneath it
+    // would put it straight back.
+    chips: ['How am I doing so far?', 'I could do with some advice'],
     attention: false,
+  })
+
+  const noticedOpener = (): Opener | null => noticed
+    ? { kind: 'noticed', text: noticed.text, chips: noticed.chips ?? ['How am I doing so far?'], attention: false }
+    : null
+
+  // WHAT IS ACTUALLY AVAILABLE TODAY. `noticed` is absent whenever the caller
+  // has no real fact, and the rotation skips it rather than inventing one.
+  const build: Record<OrdinaryKind, () => Opener | null> = {
+    check_in: checkInOpener,
+    noticed: noticedOpener,
+    session: sessionOpener,
   }
+
+  // STEP FORWARD FROM WHERE WE WERE, the same rule nextPoolOption uses for
+  // "give me a different one". Starting the search AFTER last time's entry is
+  // what guarantees the session cannot open two conversations running while
+  // anything else is available.
+  const start = lastOrdinaryKind ? ORDINARY_ROTATION.indexOf(lastOrdinaryKind) + 1 : 0
+  for (let i = 0; i < ORDINARY_ROTATION.length; i++) {
+    const built = build[ORDINARY_ROTATION[(start + i) % ORDINARY_ROTATION.length]]()
+    if (built) return built
+  }
+  // Unreachable in practice — sessionOpener always returns something — and a
+  // fallback rather than a throw, because a first bubble that crashes is a
+  // chat that does not open.
+  return checkInOpener()
 }
 
 /**
@@ -261,4 +366,41 @@ export function missedYesterdayFrom(
   if (y.markedMissed) return null
   const focus = livePlan.find(d => d.day === y.dayName)?.focus ?? 'session'
   return { dayName: y.dayName, focus }
+}
+
+
+// ---------------------------------------------------------------------------
+// REMEMBERING WHICH ORDINARY OPENER WAS USED LAST, so the next one differs.
+//
+// Device-local, the same shape goal-proximity.ts and meal-refit.ts use for
+// their dismissals, and for the same reason: this steers which friendly
+// sentence appears, not a number the app computes. A second device
+// occasionally repeating an opener is a shrug; it is not a correctness
+// problem, and it is not worth a column and a migration.
+// ---------------------------------------------------------------------------
+const LAST_OPENER_KEY = 'fitplan_last_ordinary_opener_v1'
+
+export function readLastOrdinaryKind(profileId: string): OrdinaryKind | null {
+  try {
+    const raw = localStorage.getItem(`${LAST_OPENER_KEY}:${profileId}`)
+    // VALIDATED, NOT TRUSTED. A stale value from an older rotation would make
+    // indexOf return -1, and -1 + 1 is 0 — which silently restarts at the
+    // beginning rather than failing. Correct by luck is still by luck.
+    return (ORDINARY_ROTATION as readonly string[]).includes(raw ?? '') ? (raw as OrdinaryKind) : null
+  } catch {
+    return null
+  }
+}
+
+export function rememberOrdinaryKind(profileId: string, kind: OpenerKind): void {
+  // ONLY THE THREE THAT ROTATE. An unreviewed session or a missed day is an
+  // event, not a turn of the rotation, and letting one advance the cursor
+  // would mean a real event quietly decided which small talk came next.
+  const ordinary: OrdinaryKind | null =
+    kind === 'check_in' ? 'check_in'
+      : kind === 'noticed' ? 'noticed'
+        : kind === 'training_today' || kind === 'rest_day' ? 'session'
+          : null
+  if (!ordinary) return
+  try { localStorage.setItem(`${LAST_OPENER_KEY}:${profileId}`, ordinary) } catch { /* best-effort */ }
 }

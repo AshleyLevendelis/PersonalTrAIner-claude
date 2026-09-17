@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **"ALL IT DOES IS TELL ME EVERY TIME I SPEAK TO IT ABOUT AN UPCOMING
+  WORKOUT."** Ashley, 17 Sep 2026, having raised it more than once — which is
+  the part that matters. *"Thats not what a coach does. Yes it should know
+  about workouts but that's not all it should bring up immediately."*
+  **SHE HAD ALSO BEEN GIVEN ADVICE AIMED AT THE WRONG LAYER**, and that is why
+  it kept not getting fixed. The suggestion she brought (adjust the system
+  prompt to decouple awareness from initiation) was sound about the model and
+  silent about the thing she was actually seeing: **the first bubble in a fresh
+  chat is not written by the model at all.** `pickOpener` composes it
+  client-side, and MEASURED: five of its seven openers led with the session —
+  `training_today`, `training_done_today`, `session_moved`, and even `rest_day`,
+  which swung round to tomorrow's session. No amount of prompt-tuning would
+  have changed a word of it.
+  **HER RULING, from four options: KEEP IT VARIED** — over a check-in that
+  never mentions the session, over a check-in with the session as an
+  afterthought, and over saying nothing on an ordinary day.
+  **BUILT.** On a day with no real event, the coach rotates between three
+  openers: a check-in that fits the hour, one thing worth noticing (a best, a
+  streak), and the session. **Deterministic, not random** — the same rotation
+  rule `nextPoolOption` uses for "give me a different one", so the session can
+  never lead twice running and a gate can PROVE that rather than sample it.
+  `chosen-not-shuffled` exists because this repo already paid for a coin flip
+  once.
+  **EVENTS STILL OUTRANK ALL OF IT**, and that distinction is the ruling's
+  real content: an unreviewed session and a missed day are things a coach
+  genuinely opens with. Her complaint was never about those.
+  **TWO THINGS FOUND ON THE WAY.** A recent best used to be glued in front of
+  WHATEVER the opener said — so it stacked onto a missed-day line, and would
+  have said the same PR twice once the rotation could raise one. It is now one
+  of the three openers and nothing else. And the chat printed
+  `${'$'}{pr.weightKg}kg` in two places, which says "0kg" for a bodyweight best —
+  the same defect fixed on three other screens earlier the same day and still
+  live here.
+  **THE MODEL'S HALF IS DONE TOO**, so it is one deploy rather than two: the
+  prompt line telling it to *"open with something specific and current (today's
+  session and a real detail from it...)"* now says the opposite, with her words
+  as the reason, and the every-turn session-window rule is scoped to HOW to ask
+  rather than WHETHER to raise it.
+  **VERIFIED.** `test:coach-opener` 135 checks (was ~120), 8 mutations tried, 8
+  caught; `tsc` clean; `coach-rules-sync`, `chat-app-reality`,
+  `coach-promises`, `coach-parity`, `chat-actions`, `pending-actions`,
+  `coach-voice`, `coach-nudge` green; `verify:coach-speaks-first` and
+  `verify:chat-shell` both pass unchanged.
+  **NOT SEEN ON A SCREEN, and named rather than omitted.** The chat harness's
+  two entry points are a seeded conversation and the first-ever-plan welcome;
+  neither renders an ordinary empty chat, which is exactly the state this
+  changes. I drove it, got the welcome sequence, and stopped rather than claim
+  a screenshot I do not have.
+  **NEEDS `npm run deploy:functions:prod -- chat-gemini`** for the model half.
+  New coach fingerprint `0c4d264a6004b201`.
+
 - [ ] **THE COACH CAN ONLY SPEAK WHEN THE APP IS OPEN — SLICE 1 OF 3 BUILT.**
   17 Sep 2026. Ashley chose this from four options as the thing pulling her
   toward a real mobile app, and ruled the scope in her own words: *"Everything
