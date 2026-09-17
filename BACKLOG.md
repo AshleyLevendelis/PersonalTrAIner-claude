@@ -2,6 +2,71 @@
 
 Newest first. One line each.
 
+- [x] **"IT WAS 6 PM AND THE APP WAS ASKING IF I WAS GOING TO HIT MY MORNING
+  SESSION."** Ashley, 17 Sep 2026, phone clock reading 17:58, three turns
+  running. **THE OBVIOUS DIAGNOSIS WAS WRONG, and that is the useful part:
+  the coach WAS told the correct local time all along.** Her own clock reaches
+  the model. Three other things were the problem, and they compounded.
+
+  **1. THE APP INVENTED A FACT ABOUT HER AND THEN REASONED FROM IT.** Every
+  account is stamped "trains mornings" at sign-up — a setup question that was
+  DELETED after being measured to make no difference to the plan, whose column
+  is NOT NULL, so it was quietly defaulted rather than left empty. Nobody has
+  ever asked Ashley when she trains. That invented value reached the deployed
+  coach in THREE places: as a claim about her under her profile, on the context
+  line right beside the correct clock, and inside the only time-of-day
+  reasoning rule the prompt has. So the coach was told, in effect, "it is 5:58
+  PM; she is a morning trainer" — and "morning" was the only time-word attached
+  to HER, while "evening" was merely a description of a clock.
+  **THE IN-FILE COMMENT SAID THE OPPOSITE AND HAD BEEN WRONG FOR WEEKS**: "its
+  only consumer is a chat greeting… Nothing reads it to decide when a session
+  happens." Three readers in the deployed prompt say otherwise. Same family as
+  the walking plan and the goal — machinery that looks, to a reader, like proof
+  of how the app behaves.
+
+  **2. THE SECTION HEADED "TEMPORAL AWARENESS" WAS THE ONE THAT WAS WRONG.** It
+  gave the time only as a raw UTC instant — an hour behind her clock in British
+  summer, with no timezone note and no time-of-day word anywhere in it. The two
+  correct statements lived elsewhere and were quieter than the two assertions
+  that she trains mornings. It now leads with her own clock and the part of the
+  day in words, from the same one place the plan header uses; the UTC instant
+  survives, labelled for arithmetic and explicitly not for time of day.
+
+  **3. ONE WRONG "MORNING" BECAME THE WHOLE DAY'S, and this is why it repeated
+  three times.** Chat history is restored with no date filter and sent as bare
+  role-and-text, so the coach's own 8am turn containing "this morning" sat in
+  the window looking exactly like the sentence before this one. Turn 2 mirrored
+  turn 1; turn 3 mirrored turn 2. Every message has carried the time it was
+  sent all along, and the app already reads that field twenty lines away for
+  something else. Turns older than 90 minutes now say when they were said. A
+  live back-and-forth is left alone, because stamping every line is noise.
+
+  **DECIDED WITHOUT ASKING, and the reason is a standing rule rather than my
+  taste:** the app must not assert a fact it never collected. That is the same
+  class as the load-prescription rule forbidding invented numbers shown as
+  measured, and the same shape as the "assumed body" work. There was no
+  trade-off to put to her. **WHAT IS HER CALL, and is queued**: whether to ASK
+  her when she trains (one question on Profile), learn it from her logged
+  sessions, or never claim it at all — which is where today's stopgap leaves it.
+
+  **THE COACH EXAM COULD NEVER HAVE CAUGHT THIS, and now says so out loud.**
+  Every one of its 20 cases is set at 9:15 AM, so a coach that says "this
+  morning" at every hour of the day scores perfectly. That blindness is now a
+  CHECK in `coach-clock` §4 rather than a fact somebody has to notice — and it
+  fails if the fixture is moved to the afternoon, which is how it was proven.
+
+  `coach-clock` (35 checks). 9 mutations tried, 9 caught, all applied, all ran
+  the full count. **ONE WAS MISSED FIRST TIME AND THE MISS WAS REAL**: the
+  part-of-day consistency loop stamped every hour against a `now` on the NEXT
+  day, so all six cases went through the other-day branch and the same-day
+  branch was never exercised — a mutation giving that branch its own opinion
+  about when evening begins ran green across all 29 checks. The fixture, not
+  the check, was wrong. Both branches are covered now.
+  **Needs the `chat-gemini` deploy** for parts 1 and 2 — the prompt is inside
+  the deployed function. Part 3 is client-side and ships on merge, deliberately:
+  the function replays each turn's text verbatim, which is the same lever the
+  plan header uses to reach her phone without a deploy.
+
 - [x] **SIX THINGS ASHLEY HIT WHILE ACTUALLY TRAINING, 17 Sep 2026 — all six
   real, one of them worse than she reported.** She sent six issues and five
   screenshots from a live session. Each was traced end to end and then attacked

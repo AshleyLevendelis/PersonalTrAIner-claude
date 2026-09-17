@@ -71,7 +71,7 @@ import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDo
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
-import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter } from '@/lib/chat-plan-context'
+import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -1520,6 +1520,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const liveTdee = liveBmr != null ? computeStaticTDEE(liveBmr, profile.activity_level) : null
 
     return {
+      /**
+       * HER LOCAL TIME, IN WORDS, from the one place that decides what part of
+       * the day it is. Added 17 Sep 2026: the prompt section literally headed
+       * TEMPORAL AWARENESS stated the time ONLY as `current_date`, a raw UTC
+       * instant — an hour behind her clock in British summer, with no timezone
+       * note and no time-of-day word anywhere in it. The two correct
+       * statements were elsewhere and quieter than the two assertions that she
+       * trains mornings.
+       */
+      current_part_of_day: partOfDay(now.getHours()),
       current_date: now.toISOString(),
       /**
        * TODAY, AS THE APP RECKONS IT — the same YYYY-MM-DD every screen and
@@ -1786,11 +1796,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
+    // EVERY TURN SAYS WHEN IT WAS SAID — see stampTurnTime. History is
+    // restored with no date filter, so this morning's conversation is replayed
+    // into this evening's; undated, the coach's own 8am "this morning" reads
+    // as the sentence immediately before this one.
+    const historyNow = getAppNow(profile.id)
     const history = messages
       .filter(m => m.status === 'complete' || m.status === undefined)
       .slice(1)
       .slice(-PAGE_SIZE)
-      .map(m => ({ role: m.role, content: m.content }))
+      .map(m => ({ role: m.role, content: stampTurnTime(m.content, m.created_at, historyNow) }))
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
