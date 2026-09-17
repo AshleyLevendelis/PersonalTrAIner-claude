@@ -2,6 +2,49 @@
 
 Newest first. One line each.
 
+- [ ] **THE COACH CAN ONLY SPEAK WHEN THE APP IS OPEN — SLICE 1 OF 3 BUILT.**
+  17 Sep 2026. Ashley chose this from four options as the thing pulling her
+  toward a real mobile app, and ruled the scope in her own words: *"Everything
+  but the user should be able to toggle notifications on or off to reduce
+  noise."* All seven moments, each switchable, all on to begin with. I had
+  recommended only the two slips; she chose everything, which moves the risk
+  from "too quiet" to "ignored" — and her answer to that is switches that are
+  easy to find, not fewer notifications. Stated once, not reopened.
+  **MEASURED FIRST.** All seven proactive moments are check-on-load, decided in
+  the browser during a render: `coach-opener` (264 lines), `coach-nudge` (330),
+  `session-nudge` (58), `session-feel` (217), `streak` (86), `block-review`
+  (227), `beat-target-offer` (375). No `pg_cron`, no `pg_net`, no
+  push-subscription or device-token storage anywhere. So CLAUDE.md's
+  "accountability is active" is true only of someone who opens the app — which
+  is the opposite of accountability for the person who needs it most.
+  **WHY THIS IS AFFORDABLE: `pickOpener` IS ALREADY PURE.** It takes a plain
+  input object and returns a decision, reading no store, no clock and no
+  screen. The server does not need a second brain; it needs the same decision
+  asked with facts it gathered itself. That is the ~70% that is identical
+  whether delivery ends up web push or a native app.
+  **BUILT: `src/lib/coach-moments.ts`** — at most ONE thing per person per
+  moment (three buzzes in a row is how somebody learns to swipe without
+  reading), a declared order with the finished-session question first because
+  it goes stale fastest, switches where ABSENT MEANS ON (a person who has never
+  been asked has not said no), and every sentence from the phrasebook so the
+  exam and `test:coach-voice` can grade them. Two rules that are defaults I
+  chose rather than rulings, and are named so changing them is a decision
+  rather than a discovery: **nobody is buzzed outside 8am-9pm on their own
+  clock**, and the session nudge waits until the evening because a 9am nag
+  about a session somebody means to do after work is a nag about nothing.
+  **IT HAS NO CALLER YET, AND THAT IS A DECLARED SLICE BOUNDARY RATHER THAN
+  THE DEFECT I SPENT THIS MORNING ON.** The difference is written down in
+  `docs/plans/the-coach-can-reach-you.md`: slice 2 is the switches, slice 3 the
+  delivery, and BOTH need migrations, which need Ashley's word and her machine.
+  The browser's own behaviour is untouched — `verify:coach-speaks-first` passes
+  unchanged.
+  **VERIFIED.** `test:coach-moments` 47 checks, 12 mutations tried, 12 caught;
+  `tsc` clean; `coach-voice`, `bundle`, `no-dead-code` green;
+  `verify:coach-speaks-first` unchanged. **What no check here can prove is that
+  a notification ever arrives on a phone.** That is a real device with the app
+  shut, in slice 3, and the plan doc says so rather than letting a green tick
+  imply it.
+
 - [x] **THE APP CONGRATULATED YOU ON A PERSONAL BEST AND SHOWED A NUMBER
   LOWER THAN YOUR RECORD.** 17 Sep 2026.
   Lift 100kg x 5, then 95kg x 8. The second is harder work and the app's

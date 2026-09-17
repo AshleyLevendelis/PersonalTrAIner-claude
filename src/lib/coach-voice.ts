@@ -165,6 +165,40 @@ export function mealsDrifted(mealCalories: number, targetCalories: number): stri
   return `Your meals add up to ${grouped(mealCalories)} calories against a ${grouped(targetCalories)} target. I can resize them — same meals, different amounts.`
 }
 
+/**
+ * WHAT A NOTIFICATION SAYS, and it is the coach saying it.
+ *
+ * Ashley chose notifications on 17 Sep 2026. These live here rather than beside
+ * the sending code for the reason every other card lead does: a notification is
+ * the coach speaking, and a second place to write the coach's words is a second
+ * voice. `test:coach-voice` and the coach exam can only grade what is in the
+ * phrasebook.
+ *
+ * SHORT, because a phone truncates. Lower case and no exclamation marks, which
+ * is the house voice everywhere else — a notification that shouts is a
+ * different personality arriving in someone's pocket.
+ *
+ * NO NUMBERS EXCEPT THE STREAK, deliberately. A notification is read on a lock
+ * screen, out of context, possibly days late; a figure quoted there is one the
+ * app cannot promise is still true when it is read. The streak is the
+ * exception because it IS the subject of its own line.
+ */
+export function notification(key: string, streakDays = 0): string {
+  switch (key) {
+    case 'session_feel': return 'how did that session actually feel?'
+    case 'session_not_logged': return "today's session is still waiting — got twenty minutes?"
+    case 'missed_yesterday': return 'yesterday got away from you. want to move it or let it go?'
+    case 'week_gone_quiet': return "it's been a quiet week. shall we pick something small to start again?"
+    case 'streak_at_risk': return `${streakDays} days in a row so far — today would keep it going.`
+    case 'block_review': return "that's a block done. come and see what moved."
+    case 'beat_target': return "you're beating the weights I set you. want them raised?"
+    // A KEY WITH NO SENTENCE IS NOT A SENTENCE. Returning something generic
+    // here would let a new moment ship with placeholder words nobody wrote,
+    // which is exactly how a screen ends up speaking in a voice no one chose.
+    default: return ''
+  }
+}
+
 // ---------------------------------------------------------------------------
 // ASKING
 // ---------------------------------------------------------------------------
