@@ -285,7 +285,8 @@
     "test:bodyweight-progress": "tsx scripts/test-bodyweight-progress.ts",
     "verify:bodyweight-progress": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/bodyweight-progress.mjs",
     "test:session-length-change": "tsx scripts/test-session-length-change.ts",
-    "test:goal-change": "tsx scripts/test-goal-change.ts"
+    "test:goal-change": "tsx scripts/test-goal-change.ts",
+    "test:meal-refit": "tsx scripts/test-meal-refit.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
