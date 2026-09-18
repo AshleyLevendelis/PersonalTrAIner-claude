@@ -116,6 +116,28 @@ Newest first. One line each.
   defect exactly: the day keeps a lateral raise and loses its squat.
   **Verified, final**: `test:pattern-floor` 15 checks, **6 mutations tried, 6
   caught**, and unlike the first round the integration sections catch them too.
+  **AND THE BROWSER DRIVER WAS MEASURING THE FIXTURE, NOT THE APP** — the
+  third thing this build found about its own checks, and the worst of them.
+  `verify:prep-weight`'s `?prep=1` fixture hand-wrote `load.display`,
+  `load.starting_weight_kg` and `load.per_set` straight onto the slot, so the
+  prep weight never went through the primer branch AT ALL. Every green run of
+  that driver, including the ones reported yesterday, proved the fixture's own
+  number reached the screen and nothing about the app's decision.
+  **Found by mutation, not by reading**: doubling the log box's placeholder in
+  `SetGrid` changed no pixel, because the fixture was still supplying a per-set
+  ladder that a real primer no longer carries, so the row never reached the
+  line being broken. A MISSED mutation was the only visible symptom.
+  The fixture now calls `resolveLoadFields` — the one function generation and
+  the swap path both call — so it IS the app. New browser check 8, the one
+  thing no source gate can see: the number on the card and the number the log
+  box offers are read off one real screen and must be equal, which is the
+  "value right, two pixels disagree" shape this repo keeps finding. With the
+  fixture corrected the mutation is CAUGHT (card 12, box 24). And the driver's
+  own limit is written beside it: it proves the two pixels agree, not that the
+  number is half — break the halving and both would read 24 together. The
+  arithmetic belongs to `test:primer-load` §8; the pixels belong here.
+  On a real 390x844 screen the card reads **12kg against a 24kg working
+  weight** — the ruling, visible.
   **Not done**: the full sweep has not been re-run since these two changes —
   named rather than assumed. No deploy needed; frontend ships on merge.
 

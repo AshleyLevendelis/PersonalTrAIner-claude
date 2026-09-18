@@ -35,6 +35,7 @@ import { setSupabaseClient } from '@/lib/supabase'
 import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
+import { resolveLoadFields } from '@/lib/warmup'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { getPools, setMealPick } from '@/lib/meal-store'
 import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
@@ -229,9 +230,17 @@ const generated = !PREP_BELL ? generated0 : generated0.map(w => ({
       id: bell.id,
       name: bell.name,
       prescription_type: bell.prescription_type,
-      suggested_load: load.display,
-      suggested_load_kg: load.starting_weight_kg,
-      per_set_load: load.per_set,
+      // THE APP'S OWN DECISION, not a copy of it. This used to hand-write
+      // `load.display` / `load.starting_weight_kg` / `load.per_set` straight
+      // onto the slot, which meant the driver was measuring THE FIXTURE and
+      // not the app: the prep weight never went through the primer branch at
+      // all. Found 18 Sep 2026 by mutation — doubling the box's placeholder in
+      // SetGrid changed nothing on screen, because the fixture was supplying a
+      // per-set ladder the real generator no longer puts on a primer, so the
+      // row never reached the suggested-load line being broken.
+      // `resolveLoadFields` is the one function generation and the swap path
+      // both call, so calling it here is what makes this fixture the app.
+      ...resolveLoadFields(bell, true, load),
       ramp_up: undefined,
     } as typeof exercises[number]
     return { ...d, exercises }

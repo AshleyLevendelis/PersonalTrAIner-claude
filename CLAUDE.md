@@ -1145,6 +1145,23 @@ old — the commands were right and the context was missing.
   `App.tsx`. Write which half you have next to the checks, and **never make the
   harness render a copy of the app's chrome to satisfy a check** — that
   measures the copy.
+- **A HARNESS FIXTURE THAT HAND-BUILDS THE THING UNDER TEST IS TESTING ITSELF.**
+  18 Sep 2026, the sharpest version of "the harness is not the app" yet. The
+  `?prep=1` fixture wrote `load.display`, `load.starting_weight_kg` and
+  `load.per_set` straight onto a slot instead of calling the function
+  generation calls — so `verify:prep-weight` had never once exercised the
+  primer branch, and every green run proved the FIXTURE's number reached the
+  screen. Nothing about it looked wrong: the values came from a real
+  `prescribeLoad`, the card rendered, the checks passed.
+  **The only symptom was a MISSED mutation** — doubling the log box's
+  placeholder changed no pixel, because the fixture was supplying a per-set
+  ladder the real path no longer produces, so the row never reached the broken
+  line. Reading the fixture would not have shown it; mutating the code it
+  claims to cover did.
+  So: **a fixture may choose the INPUT but must never assemble the OUTPUT.**
+  Put the bell in the slot by name, then let the app decide what that slot
+  carries. And when a driver's mutation comes back MISSED, suspect the fixture
+  before the check.
 - **A MUTATION HARNESS THAT REBUILDS A BUNDLE MUST REBUILD AFTER RESTORING
   TOO.** 17 Sep 2026: the browser mutation runner restored the source file in
   its `finally` and left the MUTANT bundle sitting in `.tour-harness/dist`. The

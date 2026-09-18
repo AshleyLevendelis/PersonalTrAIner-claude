@@ -132,6 +132,27 @@ if (cols.kinds.length === 0) {
 check('6. no row of per-set chips says the same number more than once',
   cols.chipRows.every(r => new Set(r.map(c => c.split(':')[1].trim())).size > 1), cols.chipRows)
 
+// 8 IS THE ONE THING NO SOURCE GATE CAN SEE. The prep weight is computed once
+// and then travels to two different pixels — the big number on the card, and
+// the placeholder in the box you tap to log. Different components, different
+// props, and "the value was right and the two places disagreed" is the exact
+// defect shape this repo keeps finding (three PR renderers on 17 Sep, three
+// primer call sites on 18 Sep). Reading BOTH off one real screen is the only
+// way to know the halving reached the whole card and not just the headline.
+if (card.found) {
+  const bigNum = (card.big.find(v => /^[0-9]/.test(v)) || '').replace(/[^0-9.]/g, '')
+  const ghost = (card.boxes.find(b => b.placeholder && /[0-9]/.test(b.placeholder)) || {}).placeholder
+  check('8. the number on the card is the number the log box offers',
+    bigNum !== '' && ghost !== undefined && Number(bigNum) === Number(ghost),
+    { card: bigNum, box: ghost, allBig: card.big, boxes: card.boxes })
+  // WHAT THIS CHECK CANNOT SEE, stated so nobody over-trusts it: it proves the
+  // two pixels AGREE, not that the number is half. Break the halving itself
+  // and both would read 24 together and this would stay green. That the value
+  // is the ladder's first rung is held by test:primer-load §8, with mutations.
+  // The screen reads 12 against a 24kg working weight, which is the split
+  // working — the source gate owns the arithmetic, the driver owns the pixels.
+}
+
 const err = await ev('window.__err ?? null')
 check('7. no uncaught error on the page', err === null, err)
 
