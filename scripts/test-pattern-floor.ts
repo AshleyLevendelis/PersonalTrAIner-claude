@@ -184,12 +184,20 @@ console.log('\n[3] A real generated week keeps every pattern its kit can supply'
     { equipment: 'full_gym', duration: '30-45', style: 'combat', experience: 'novice', goal: 'conditioning', recovery: 'high', cardio: 'love' },
     { equipment: 'home_gym', duration: '30-45', style: 'combat', experience: 'novice', goal: 'fat_loss', recovery: 'moderate', cardio: 'love' },
     { equipment: 'home_gym', duration: '30-45', style: 'combat', experience: 'advanced', goal: 'conditioning', recovery: 'moderate', cardio: 'love' },
+    // AND THREE THAT LOSE THEIR WARM-UP, measured the same way after the first
+    // fix shipped. Protecting the patterns alone sent the trimmer to the front
+    // of the day: prep-less days went 16 -> 102 while squat-less went 22 -> 0.
+    // These are real cases out of that run, so §3c below is not decoration.
+    { equipment: 'full_gym', duration: '30-45', style: 'functional', experience: 'intermediate', goal: 'fat_loss', recovery: 'low', cardio: 'love' },
+    { equipment: 'full_gym', duration: '30-45', style: 'functional', experience: 'advanced', goal: 'conditioning', recovery: 'high', cardio: 'tolerate' },
+    { equipment: 'full_gym', duration: '30-45', style: 'bodybuilding', experience: 'advanced', goal: 'hypertrophy', recovery: 'moderate', cardio: 'love' },
     // And a spread beside them, so the gate is not pinned to one shape.
     { equipment: 'full_gym', duration: '30-45', style: 'bodybuilding', experience: 'intermediate', goal: 'hypertrophy', recovery: 'moderate', cardio: 'tolerate' },
     { equipment: 'minimalist', duration: '30-45', style: 'functional', experience: 'intermediate', goal: 'hypertrophy', recovery: 'moderate', cardio: 'tolerate' },
   ]
   let trimmedSomewhere = 0
   const gaps: string[] = []
+  const prepGaps: string[] = []
   for (const combo of cases) {
     const profile = profileFor(combo)
     setRandomSource(seededRngFromKey(comboKey(combo)))
@@ -203,6 +211,13 @@ console.log('\n[3] A real generated week keeps every pattern its kit can supply'
       for (const day of week1?.days ?? []) {
         exerciseCount += day.exercises.length
         for (const ex of day.exercises) if (ex.movement_pattern) present.add(ex.movement_pattern)
+      }
+      // The same question for movement prep, by the scorer's own definition: a
+      // training day that has exercises but none of them a prep slot.
+      for (const day of week1?.days ?? []) {
+        if (day.exercises.length === 0) continue
+        if (day.exercises.some(e => (e as unknown as { tier?: string }).tier === 'tier_0_primer')) continue
+        prepGaps.push(`${comboKey(combo)} / ${day.day}`)
       }
       // Vacuity guard: a week nobody trimmed proves nothing about a trimmer.
       // A 30-45 minute session that still fits every exercise it was handed is
@@ -222,6 +237,8 @@ console.log('\n[3] A real generated week keeps every pattern its kit can supply'
     gaps.length === 0, gaps.slice(0, 4))
   check('3b. ...and at least some of these sessions were actually squeezed, so 3a is not vacuous',
     trimmedSomewhere > 0, { trimmedSomewhere, of: cases.length })
+  check('3c. no training day lost its movement-prep slot to the clock either',
+    prepGaps.length === 0, prepGaps.slice(0, 4))
 }
 
 // ---------------------------------------------------------------------------

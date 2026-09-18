@@ -165,11 +165,23 @@ Newest first. One line each.
   counts only what a change BOUGHT is half a measurement. This one bought 22
   and spent 86, and nothing in a green gate would have said so.
   `test:pattern-floor` is now 21 checks.
-  **Not done at the time of writing**: the coverage re-measurement and the
-  plan-quality re-score with BOTH protections are still running — in
-  particular whether protecting the prep slot pushes `time_fit` back up, which
-  is the next thing the trimmer has left to give. Named, not assumed. No deploy
-  needed; frontend ships on merge.
+  **THE COVERAGE RE-MEASUREMENT WITH BOTH PROTECTIONS, over all 9,216: push 0,
+  pull 0, hinge 0, squat 0, prep-less days 0.** Better than the state before
+  any of this week's work, which had 16 — so those 16 were trimmer removals
+  too, and nobody had looked.
+  **AND §3 CAN NOW SEE IT.** Three real prep-loss cases from the guard-on run
+  are pinned beside the four squat cases, and §3c asks the prep question of
+  every generated day. Proven: with the primer branch removed, §3c goes red and
+  names four combat profiles by combination — so the integration section
+  catches this one, not just the unit check. The same discipline as the squat
+  half: **let the broken code name the fixture.**
+  `test:pattern-floor` is 22 checks; **10 mutations tried across the two
+  rounds, 10 caught**, and both the pattern half and the prep half are now
+  caught at the integration level as well as the unit level.
+  **Not done at the time of writing**: the plan-quality re-score with both
+  protections is still running — specifically whether protecting the prep slot
+  pushes `time_fit` back up, which is the next thing the trimmer has left to
+  give. Named, not assumed. No deploy needed; frontend ships on merge.
 
 - [x] **FIVE FROM THE GYM FLOOR, AND TWO OF THEM WERE ALREADY FIXED AND
   UNMERGED.** Ashley, 18 Sep 2026, mid-session, five reports. Triaged by
