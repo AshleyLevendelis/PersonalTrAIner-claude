@@ -2,6 +2,87 @@
 
 Newest first. One line each.
 
+- [x] **THE RESIDUE WAS REAL, AND IT WAS A LOADED CARRY IN FRONT OF THE BENCH
+  PRESS.** 18 Sep 2026. Exempting the rehab slot (entry below) took
+  `core_before_main` from 725 plans to 148. Those 148 were a different defect
+  and a genuine one: **a Farmer's Walk running before the day's barbell main
+  lift**, for 30-45 minute combat-style trainees with a flagged joint.
+
+  **Root cause — the selector was innocent.** Traced by printing each track's
+  own output: `selectExercisesForTrack` returned
+  `Barbell Bench Press (tier1) | Landmine Press | Farmer's Walk | ...`, sorted
+  tier1 -> tier2 -> tier3 exactly as its comment says. The day that reached the
+  screen read `warm-up | Bird Dog | Farmer's Walk | Barbell Bench Press`. **The
+  superset pass reordered a correctly sorted day.** `core` and `carry` are
+  antagonists in the pairing table; the corrective slot is core-patterned and
+  sits at position 2 by design ("rehab is prep, so it belongs where the joint is
+  still fresh"); so the A1/A2 adjacency reorder — which exists for a good reason
+  and was added after an earlier review caught a superset whose halves were four
+  exercises apart — pulled the carry up to sit beside it and pushed the bench to
+  fourth.
+
+  **A SORT CAN BE CORRECT AND THE ORDER STILL WRONG.** Worth keeping as a shape:
+  three separate ordering rules each held (tier sort, rehab-first, supersets
+  adjacent) and the composition of them did not. Every gate was green and
+  nothing in any one function looked wrong.
+
+  **The fix: a superset may not straddle the day's main lift.** One shared
+  helper, read by BOTH passes that pair — `stageTimeCap`'s rest-halving and
+  `buildSupersetPairs`' labelling — because they already share
+  `isSupersetEligible`, and a pair that one compresses and the other refuses
+  prints a halved rest under no superset at all.
+
+  **CSCS basis** (mine under Ashley's 18 Sep delegation, recorded rather than
+  asserted): the main lift is the day's priority by definition — highest neural
+  and technical demand, and the movement the block's progression is written on
+  — so it goes first, after prep. A loaded carry ahead of it spends grip, trunk
+  and postural endurance on the exercise that needs them least. The carry still
+  gets done, afterwards, which is where a grip-limited postural task belongs.
+  Refusing the pair is the only honest lever: keeping the label without the
+  reorder recreates the unexecutable superset, and pushing the corrective slot
+  down to meet its partner puts rehab behind the heavy work, which is the
+  placement the generator deliberately avoids.
+
+  **The five-question review, answered.** (1) Training effect: the main lift
+  arrives with an unfatigued trunk and grip; the carry is done fatigued, which
+  is the correct trade because the tier-1 is the day's priority. (2) What it
+  takes away: a superset pairing, i.e. rest compression — measured on the full
+  grid with the guard switched off and on, see the numbers below. (3)
+  Fundamentals: nothing is removed, so pattern coverage, overload and recovery
+  are untouched; specificity improves. (4) Redefined floors: none — no number
+  changes, and `core_before_main` still asks exactly the question it asked
+  yesterday, so these readings ARE comparable with the 148. (5) Scope: exercise
+  order, squarely inside the delegation.
+
+  **Not done, and named rather than smuggled in: `['core', 'carry']` is not an
+  antagonist pair.** A loaded carry is a maximal anti-lateral-flexion, grip and
+  postural trunk task; a plank or a dead bug is the same demand. They are
+  synergists, so a superset of the two gives neither the rest the halving
+  assumes. On days with no tier-1 the guard does not apply and this pairing
+  still happens. Removing the pair would take a real time lever off short and
+  combat sessions, so it needs its own measurement rather than riding along
+  with this one. Also noticed and parked: a PROMOTED anchor (the main lift on a
+  day with no tier-1) can be superset-eligible when it is a carry, which gives
+  it a halved rest the promoted-anchor floor says it should not have.
+
+  **Verified**: `test:rehab-order` extended from 6 checks to 27 — the rule as a
+  unit, a source property that every function consulting `isSupersetEligible`
+  also consults the guard (so a third pairing pass fails here rather than
+  silently reintroducing this), the real pass driven on a constructed day of the
+  exact failing shape, a detector proof that the pass still reorders when there
+  is no main lift to protect, and the measured offender generated end to end.
+  **8 mutations tried, 8 caught**, every one confirmed to have applied and every
+  run confirmed to have executed all 27 checks. Plus 16 affected gates green
+  (rest-floors, pattern-floor, session-edit, edit-keeps-the-bar, session-length,
+  session-shortfall, main-lift-rest, block-rest-sizing, chosen-not-shuffled,
+  primer-load, session-derive, muscle-balance, today-only, session-rebuild,
+  cardio-share-score) and `npx tsc --noEmit` clean.
+
+  **MEASUREMENT PENDING IN THIS COMMIT.** The 9,216-profile grid is running A/B
+  behind a temporary switch (guard off, then on) so the cost can be attributed
+  rather than reasoned about. Numbers land in the next commit; if they are not
+  there, this line is the evidence they were never taken.
+
 - [x] **"CORE BEFORE THE MAIN LIFT" IS NOT A SEQUENCING DEFECT — IT IS THE
   REHAB SLOT, AND THE SCORER CANNOT SEE IT.** Investigated 18 Sep 2026 after
   Ashley relayed a second opinion (Gemini) ranking it the highest-priority fix

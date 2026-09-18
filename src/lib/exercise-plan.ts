@@ -956,6 +956,66 @@ function isSupersetEligible(entry: ExerciseEntry): boolean {
   return entry.mechanics_tier === 'tier3_isolation'
 }
 
+/**
+ * Where the day's main lift sits, or -1 on a day that has none.
+ *
+ * Deliberately the FIRST tier1_compound and nothing cleverer. The promoted
+ * anchor (dayAnchorExercise) cannot be used here: it excludes superset
+ * members by design, so asking it which exercise is the anchor while
+ * DECIDING the supersets is circular. A day with no tier-1 has no main lift
+ * to protect at this stage — promotion happens later, and it already refuses
+ * to land on a paired movement.
+ *
+ * Same notion quality-score.ts's core_before_main rule reads
+ * (`ex.tier === 'tier_1_primary'`), so the guard below and the measurement
+ * that caught the defect are asking one question, not two.
+ */
+export function mainLiftIndexOf(entries: readonly (ExerciseEntry | null | undefined)[]): number {
+  return entries.findIndex(e => e?.mechanics_tier === 'tier1_compound')
+}
+
+/**
+ * A SUPERSET MAY NOT STRADDLE THE DAY'S MAIN LIFT.
+ *
+ * Pairing is only half of a superset; the other half is making the pair
+ * ADJACENT, which buildSupersetPairs does by pulling the A2 partner up to sit
+ * immediately behind its A1. When A1 sits before the main lift and A2 after
+ * it, that pull drags a working exercise in FRONT of the main lift.
+ *
+ * MEASURED 18 Sep 2026, and this is the whole of the residual
+ * `core_before_main` finding: 148 of 9,216 plans. Every one had the same
+ * shape — an injured trainee's corrective slot sits at position 2 by design
+ * ("rehab is prep, so it belongs where the joint is still fresh"), it is
+ * core-patterned, core's antagonist in the table is `carry`, and so a loaded
+ * Farmer's Walk was pulled up to position 3 and the barbell bench press
+ * pushed to position 4. Nothing was mis-tiered: the selector's own output was
+ * correctly sorted tier1 -> tier2 -> tier3 and this pass reordered it.
+ *
+ * THE CSCS CALL (18 Sep 2026, under Ashley's standing delegation): the day's
+ * main lift is the day's priority by definition — it is the movement with the
+ * highest neural and technical demand and the one the block's progression is
+ * written on, so it goes first, after prep. A loaded carry ahead of it spends
+ * grip, trunk and postural endurance on the exercise that needs them least.
+ * The carry still gets done; it gets done afterwards, which is where a
+ * grip-limited postural task belongs. The corrective drill goes back to being
+ * unhurried prep instead of half of a couplet.
+ *
+ * Refusing the pair is the only honest lever. Keeping the label without the
+ * reorder recreates the defect the adjacency pass exists to fix ("Farmer's
+ * Walk is tagged [A1] and Dead Bug [A2], but they're separated by four other
+ * exercises. Nobody can execute that superset as written"), and pushing A1
+ * down to meet A2 would move the corrective slot AFTER the main lift, which
+ * is the placement the generator deliberately avoids.
+ *
+ * Read by BOTH passes that pair — stageTimeCap's rest-halving and
+ * buildSupersetPairs' labelling — because they already share
+ * isSupersetEligible and a pair that is compressed by one and refused by the
+ * other prints a halved rest under no superset at all.
+ */
+export function pairCrossesMainLift(mainIdx: number, i: number, j: number): boolean {
+  return mainIdx >= 0 && i < mainIdx && j >= mainIdx
+}
+
 function estimateSessionDuration(exercises: { entry: ExerciseEntry; sets: number; reps: string; restSeconds: number }[]): number {
   return estimateSlotsSeconds(exercises)
 }
@@ -965,7 +1025,7 @@ interface SupersetLabel {
   label: string
 }
 
-function buildSupersetPairs(
+export function buildSupersetPairs(
   exercises: Exercise[],
   pool: ExerciseEntry[],
   duration: SessionDuration,
@@ -979,6 +1039,11 @@ function buildSupersetPairs(
   const paired = new Set<number>()
   let labelCounter = 0
 
+  // Read once, off the order this pass was handed: the reorder below only
+  // ever moves an A2 EARLIER, so no pairing can change where the main lift
+  // sits relative to an exercise that started in front of it.
+  const mainIdx = mainLiftIndexOf(result.map(ex => pool.find(e => e.name === ex.name)))
+
   for (let i = 0; i < result.length; i++) {
     if (paired.has(i)) continue
     const entryA = pool.find(e => e.name === result[i].name)
@@ -989,6 +1054,7 @@ function buildSupersetPairs(
 
     for (let j = i + 1; j < result.length; j++) {
       if (paired.has(j)) continue
+      if (pairCrossesMainLift(mainIdx, i, j)) continue
       const entryB = pool.find(e => e.name === result[j].name)
       if (!entryB || !isSupersetEligible(entryB)) continue
 
@@ -1191,6 +1257,7 @@ function stageTimeCap(
   // keep full rest even under time pressure; only isolation/core/carry work
   // gets compressed here.
   const paired = new Set<number>()
+  const mainIdxForPairing = mainLiftIndexOf(dayExercises.map(e => e.entry))
   for (let i = 0; i < dayExercises.length; i++) {
     if (paired.has(i)) continue
     if (!isSupersetEligible(dayExercises[i].entry)) continue
@@ -1198,6 +1265,11 @@ function stageTimeCap(
     if (!opposing) continue
     for (let j = i + 1; j < dayExercises.length; j++) {
       if (paired.has(j)) continue
+      // The same refusal buildSupersetPairs makes, off the same helper —
+      // this pass halves the rest and that one prints the label, and a pair
+      // only one of them believes in shows a compressed rest under no
+      // superset at all.
+      if (pairCrossesMainLift(mainIdxForPairing, i, j)) continue
       if (!isSupersetEligible(dayExercises[j].entry)) continue
       if (dayExercises[j].entry.movement_pattern === opposing) {
         dayExercises[j] = { ...dayExercises[j], restSeconds: Math.round(dayExercises[j].restSeconds * 0.5), rest: `${Math.round(dayExercises[j].restSeconds * 0.5)}s` }
