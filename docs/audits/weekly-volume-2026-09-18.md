@@ -144,8 +144,8 @@ block does drop 17 sets, so the mechanism works; it has a hole.
 
 ### 3. Muscles getting nothing at all
 
-Counted in the same run, because a ceiling aims pressure at whatever is left and
-measuring only what a change buys is half a measurement.
+**MEASURED PROPERLY 18 Sep 2026, and most of it dissolved.** The table below is
+the original, unguarded reading; the section after it is the real answer.
 
 | muscle | 0 sets in the peak week | under 5 sets |
 |---|---|---|
@@ -155,10 +155,74 @@ measuring only what a change buys is half a measurement.
 | shoulders | 800 | 81 |
 | erectors | 120 | 2,337 |
 
-Calves at zero for 1,197 profiles and under five for 4,295 (47%) is the biggest
-single gap. Some of these will be legitimate — an equipment or injury
-combination with no available movement — and that has to be separated out the
-way pattern coverage already separates it, before any of it is called a defect.
+## 3b. The same question, with the app's own exclusions
+
+A week cannot hold what its own equipment and injuries forbid. Split on whether
+this trainee's **constrained pool** — the pool generation itself selects from —
+held anything for that muscle at all:
+
+| muscle | zero, pool COULD have | zero, pool could not | under 5, pool COULD |
+|---|---|---|---|
+| chest | **0** | 1,024 | 1,653 |
+| back | **0** | 192 | 574 |
+| triceps | **0** | 832 | 838 |
+| quads / hamstrings / glutes / core | **0** | 0–160 | 0–483 |
+| shoulders | **32** | 768 | 81 |
+| erectors | **108** | 0 | 2,390 |
+| biceps | **192** | 0 | 923 |
+| calves | **1,188** | 0 | 4,261 |
+
+**Chest, back and triceps go to zero.** Every one of those was a constraint, not
+an omission.
+
+### The guard had to be corrected too, and that is the lesson
+
+My first version counted PRIMERS as "the pool could have supplied this", and it
+reported 768 bodyweight profiles with a shoulder injury getting zero chest work
+that the app could have given them. Reproduced one: their pool holds exactly one
+chest-capable movement, **Scapular Push-Ups**, and it is a warm-up drill. They
+are correctly given it as a warm-up and correctly given no chest working sets —
+every press is contraindicated for that shoulder and they own no equipment.
+
+`weeklySetsByMuscle` excludes primers from volume. A guard that counts them asks
+a different question from the column it is guarding. **Third time in one session
+that a first reading came out too big for the same reason: the measurement did
+not make the exclusions the app makes.**
+
+### What is left, and what a coach would say about it
+
+**Calves — 1,188 profiles (12.9%).** The only substantial one. It clusters on
+short sessions (771 of 1,188 are 30-45 minutes) and on combat style (626).
+- **Short sessions: correct prioritisation, not a defect.** With four to six
+  slots, spending one on calf raises instead of a squat, hinge or press is the
+  wrong trade for every goal, and calves already take load from every standing
+  and stepping movement in the session.
+- **Combat style: also defensible.** Checked six long-session hypertrophy
+  profiles with zero calf work and every one was combat — a style whose tracks
+  carry no calf slot at all. A Muay Thai athlete does not need seated calf
+  raises prescribed for them.
+- **The arguable subset is bodybuilding style, 424 profiles.** Zero direct calf
+  work in a physique-focused plan is the one version of this a coach would
+  query. Not drilled into by session length — worth its own look before anything
+  is built.
+
+**Biceps — 192**, all bodyweight + bodybuilding + shoulder-injured. They get
+biceps from rows and pulls; no direct curl is available without equipment.
+Defensible.
+
+**Erectors — 108**, and 2,390 under five. Erectors take work from every hinge,
+squat, carry and plank, so a low direct count is attribution, not absence.
+
+**Shoulders — 32.** Small enough to be worth a look and not worth a fix on its
+own.
+
+### Recommendation
+
+**Nothing here is worth building yet.** The one subset that would make a coach
+pause is direct calf work for bodybuilding-style plans (424 profiles), and even
+that is a prescription-priority question rather than a defect. The measurement's
+real value was negative: three of the five headline gaps were the measurement's
+own fault, and the app was right.
 
 ## One correction to my own framing
 

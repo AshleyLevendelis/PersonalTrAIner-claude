@@ -47,12 +47,12 @@ import * as path from 'path'
 import * as os from 'os'
 import { execFile } from 'child_process'
 import { cpus } from 'os'
-import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { generateMesocycle, setRandomSource, resetRandomSource, getConstrainedPool } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { weeklySetsByMuscle } from '../src/lib/edit-tradeoff'
 import type { MuscleGroup } from '../src/lib/exercise-db'
 import type { MesocycleWeek } from '../src/lib/types'
-import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, muscleGroupsOf } from '../src/lib/exercise-db'
 
 const entryFor = (name: string) => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === name.toLowerCase())
 import { type Combination, buildProfile, comboKey, comboLabel, generateAllCombinations } from './quality-grid'
@@ -140,6 +140,21 @@ interface Reading {
    * So the defect is a deload lighter in NONE of the three, and nothing else.
    */
   deloadAxes: { block: number; lighterSets: boolean; lighterLoad: boolean; lighterReps: boolean }[]
+  /**
+   * Which muscles this trainee's OWN constrained pool could have trained at
+   * all, given their equipment, injuries and style.
+   *
+   * THE GUARD THAT MAKES A ZERO READABLE, and the one the first reading of
+   * section 4 did not have. A week cannot hold what its own constraints forbid:
+   * some equipment and injury combinations leave no calf movement standing, and
+   * counting those as "the app gave them no calf work" is the same mistake
+   * pattern coverage already made once — 832 push-less weeks that turned out to
+   * be 0 the moment the pool guard was added (`poolHasPush && pushSets === 0`).
+   *
+   * Read off `getConstrainedPool`, the pool generation itself selects from, so
+   * the guard cannot drift from what the app can actually reach.
+   */
+  poolSupplies: MuscleGroup[]
 }
 
 /** Midpoint of a rep range, or null for AMRAP / time / distance prescriptions. */
@@ -258,6 +273,28 @@ function readOne(combo: Combination): Reading {
     peak,
     peakStrength,
     week1: weeklySetsByMuscle(meso.find(w => w.week_number === 1)),
+    poolSupplies: (() => {
+      // PRIMERS EXCLUDED, BECAUSE THE COUNTER EXCLUDES THEM.
+      //
+      // `weeklySetsByMuscle` skips `tier_0_primer` — a warm-up is preparation,
+      // not training volume. A guard that counts primers as "the pool could
+      // have trained this" therefore asks a different question from the column
+      // it is guarding, and the two disagree exactly where it matters.
+      //
+      // MEASURED: a bodyweight trainee with a shoulder injury reads as "zero
+      // chest, and the pool could have supplied some". Their pool holds
+      // precisely ONE chest-capable movement — Scapular Push-Ups — and it is a
+      // primer. They are correctly given it as a warm-up, and correctly given
+      // no chest working sets, because every press is contraindicated for that
+      // shoulder and they own no equipment. Constraint, not defect.
+      //
+      // Third time in one session that a first reading came out too big for the
+      // same reason: the measurement did not make the exclusions the app makes.
+      const pool = getConstrainedPool(profile, []).filter(e => e.mechanics_tier !== 'primer')
+      const can = new Set<MuscleGroup>()
+      for (const e of pool) for (const g of muscleGroupsOf(e)) can.add(g)
+      return MUSCLES.filter(m => can.has(m))
+    })(),
     dayWorking,
     dayAll,
     daysWithFinisher,
@@ -402,15 +439,38 @@ function report(rows: Reading[]): string {
   w()
 
   // -- 4. The floor, measured in the same run -------------------------------
-  w('4. THE LOW END — what a ceiling would be trading against')
+  w('4. THE LOW END — and what is a CONSTRAINT rather than a defect')
   w('-'.repeat(72))
+  w('  A week cannot hold what its own equipment and injuries forbid. Every row')
+  w('  below is split on that question, read off getConstrainedPool — the pool')
+  w('  generation itself selects from. Pattern coverage learned this the hard')
+  w('  way (832 phantom push-less weeks, 0 once the same guard was added), so')
+  w('  the unguarded column is printed beside the guarded one rather than')
+  w('  replaced by it.')
+  w()
+  w('  muscle       zero sets, pool COULD    zero, pool could not   under 5, pool COULD')
   for (const m of MUSCLES) {
-    const peaks = rows.map(r => r.peak[m] ?? 0)
-    const zero = peaks.filter(v => v === 0).length
-    const thin = peaks.filter(v => v > 0 && v < 5).length
-    w(`  ${m.padEnd(12)} 0 sets in ${String(zero).padStart(5)} profiles   under 5 sets in ${String(thin).padStart(5)}`)
+    const could = rows.filter(r => r.poolSupplies.includes(m))
+    const couldNot = rows.filter(r => !r.poolSupplies.includes(m))
+    const zeroReal = could.filter(r => (r.peak[m] ?? 0) === 0).length
+    const zeroConstrained = couldNot.filter(r => (r.peak[m] ?? 0) === 0).length
+    const thinReal = could.filter(r => (r.peak[m] ?? 0) > 0 && (r.peak[m] ?? 0) < 5).length
+    w(`  ${m.padEnd(12)} ${String(zeroReal).padStart(10)}${' '.repeat(12)}${String(zeroConstrained).padStart(8)}${' '.repeat(15)}${String(thinReal).padStart(6)}`)
   }
   w()
+  w('  The first column is the only one that could be a defect: the app had')
+  w('  something it could have given this person for that muscle, and gave none.')
+  w()
+  for (const m of MUSCLES) {
+    const offenders = rows.filter(r => r.poolSupplies.includes(m) && (r.peak[m] ?? 0) === 0)
+    if (offenders.length === 0) continue
+    w(`  ${m} — ${offenders.length} profiles, clustering on:`)
+    for (const f of ['equipment', 'duration', 'style', 'experience', 'goal', 'injuries'] as (keyof Reading)[]) {
+      w(`    ${String(f).padEnd(11)} ${cluster(offenders, f)}`)
+    }
+    for (const r of offenders.slice(0, 4)) w(`    named: ${r.key}`)
+    w()
+  }
 
   // -- 5. Does the block step back at the end? ------------------------------
   w('5. DELOAD SANITY — inside each block, is the deload week lighter?')

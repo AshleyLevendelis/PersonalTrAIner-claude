@@ -2,6 +2,50 @@
 
 Newest first. One line each.
 
+- [x] **MUSCLES GETTING NEAR-ZERO WORK — MEASURED, AND THREE OF THE FIVE
+  HEADLINE GAPS WERE MY MEASUREMENT'S FAULT.** 18 Sep 2026, on Ashley's ask.
+  Full table in `docs/audits/weekly-volume-2026-09-18.md` §3b.
+
+  The unguarded reading said chest 1,024 profiles at zero, triceps 832,
+  shoulders 800, calves 1,197. Split on whether the trainee's own CONSTRAINED
+  POOL held anything for that muscle — the same guard pattern coverage already
+  uses, read off `getConstrainedPool` — **chest, back and triceps all go to
+  ZERO**. Every one was a constraint the app was right to enforce.
+
+  **AND THE GUARD ITSELF NEEDED CORRECTING, which is the part worth keeping.**
+  My first version counted PRIMERS as "the pool could have supplied this" and
+  reported 768 shoulder-injured bodyweight profiles with a chest gap. Reproduced
+  one: their pool holds exactly one chest-capable movement, Scapular Push-Ups,
+  and it is a warm-up drill. They get it as a warm-up and get no chest working
+  sets, because every press is contraindicated for that shoulder and they own no
+  kit. `weeklySetsByMuscle` excludes primers from volume, so a guard that counts
+  them asks a different question from the column it guards.
+  **THIRD TIME IN ONE SESSION a first reading came out too big for the same
+  reason** — after the 2,966-block deload and the 832 push-less weeks before it.
+  The pattern is now unmistakable: **a measurement that does not make the app's
+  own exclusions will always over-report, and the size of the over-report tells
+  you nothing about whether anything is wrong.** Check the guard against the
+  counter before believing either.
+
+  **What survives**: calves 1,188 (12.9%), biceps 192, erectors 108, shoulders
+  32. Assessed as a CSCS under Ashley's delegation, and none is worth building
+  for yet:
+  - **Calves** cluster on 30-45 minute sessions (771 of 1,188) and combat style
+    (626). On a four-to-six-slot session, a calf raise instead of a squat, hinge
+    or press is the wrong trade for every goal, and calves already load on every
+    standing and stepping movement. Six long-session hypertrophy zero-calf cases
+    were checked and ALL were combat — a style whose tracks carry no calf slot,
+    which is right for a fighter. **The one arguable subset is bodybuilding
+    style, 424 profiles**; zero direct calf work in a physique plan is the
+    version a coach would query. Named for its own look, not built.
+  - **Biceps 192** are all bodyweight + bodybuilding + shoulder-injured: they
+    get biceps from rows and pulls and no curl exists without equipment.
+  - **Erectors 108**, with 2,390 under five, is attribution rather than absence
+    — every hinge, squat, carry and plank loads them.
+
+  **Nothing built. The measurement's value was negative**, which is a legitimate
+  result and the reason it was worth doing before touching the generator.
+
 - [x] **A DELOAD WITH NO LEVER LEFT TO PULL — AND MY OWN FINDING WAS 12x TOO
   BIG BEFORE I FIXED ANYTHING.** 18 Sep 2026, on Ashley's "fix the deload week
   next".
