@@ -178,10 +178,40 @@ Newest first. One line each.
   `test:pattern-floor` is 22 checks; **10 mutations tried across the two
   rounds, 10 caught**, and both the pattern half and the prep half are now
   caught at the integration level as well as the unit level.
-  **Not done at the time of writing**: the plan-quality re-score with both
-  protections is still running — specifically whether protecting the prep slot
-  pushes `time_fit` back up, which is the next thing the trimmer has left to
-  give. Named, not assumed. No deploy needed; frontend ships on merge.
+  **THE FINAL PLAN-QUALITY RE-SCORE, both protections, 9,216 profiles:
+  11.57 / 12, 0 below the 7.2 floor** — the first time the overall average has
+  moved off 11.56 all week, and it moved UP. Per dimension: time fit 1.94,
+  structure 1.97, progression 1.82, selection 1.90, goal alignment 1.94,
+  primer fit 2.00. `missing_squat_pattern`, `missing_hinge_pattern` and
+  `primer_absent` are all absent from the rule table.
+  **AND THE FEARED TRADE-OFF DID NOT HAPPEN.** The worry was that protecting
+  both patterns and prep leaves a squeezed day with nothing it may remove, so
+  the overrun would come back: `timeFit/time_fit` is **339, identical to the
+  patterns-only run** and still far below the 403 this week started from. The
+  pressure fell through to SETS, which is where the house ruling says it
+  belongs, and the set floors absorbed it. Nothing to put to Ashley: the
+  question only needed asking if the number had moved.
+  So against the state before this week's work: squat-less weeks 4 → 0,
+  prep-less days 16 → 0, time-budget violations 403 → 339, overall 11.56 →
+  11.57, and 0 plans below the floor throughout.
+  **Re-run after this second fix** (a fix made in response to a measurement is
+  not covered by that measurement): `block-rest-sizing`, `rest-floors`,
+  `session-length`, `session-shortfall`, `main-lift-rest`, `cardio-share-score`,
+  `edit-keeps-the-bar`, `session-edit`, `block-phases`, `frozen-weeks`,
+  `primer-load`, `pattern-floor` and `audit` — all green. `npx tsc --noEmit`
+  clean.
+  **THE TRACKED MEASUREMENT ARTIFACTS ARE STALE AND ARE LEFT THAT WAY ON
+  PURPOSE, which is worth naming so nobody reads them as current.**
+  `quality-report.txt` is the 16 Sep snapshot and now disagrees with the app on
+  three numbers this entry cites: it says overall 11.56 (now 11.57), time fit
+  1.93 (now 1.94) and `missing_squat_pattern` 4 (now absent). I staged a
+  refresh and the pre-commit hook refused it; on reflection the hook is right
+  and so is the standing rule. Refreshing a baseline is a deliberate act that
+  belongs in its own commit — doing it as a side effect of a feature change is
+  exactly how a stale baseline gets believed — and I would have refreshed two
+  of the three, leaving the set inconsistent by date, which is a new hazard
+  rather than a fix. The numbers above are the record; the artifacts are not.
+  No deploy needed; frontend ships on merge.
 
 - [x] **FIVE FROM THE GYM FLOOR, AND TWO OF THEM WERE ALREADY FIXED AND
   UNMERGED.** Ashley, 18 Sep 2026, mid-session, five reports. Triaged by
