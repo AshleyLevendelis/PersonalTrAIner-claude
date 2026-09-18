@@ -138,8 +138,38 @@ Newest first. One line each.
   arithmetic belongs to `test:primer-load` §8; the pixels belong here.
   On a real 390x844 screen the card reads **12kg against a 24kg working
   weight** — the ruling, visible.
-  **Not done**: the full sweep has not been re-run since these two changes —
-  named rather than assumed. No deploy needed; frontend ships on merge.
+  **AND THE FIX HAD A COST THAT WAS BIGGER THAN THE DEFECT, which is the whole
+  reason the measurement counts both sides.** The quality re-score came back
+  11.56/12 with 0 below the floor and `missing_squat_pattern` /
+  `missing_hinge_pattern` gone from the rule table entirely — and
+  `primerFit/primer_absent` up 14 → 102 in the same report. The committed
+  baseline artifact is two days old and covers the rest work too, so it could
+  not say whose those 88 plans were. **Attributed by measurement rather than by
+  reasoning**, running the same 9,216 grid twice with the guard switched off
+  and on:
+      guard off → squat-less 22, prep-less 16
+      guard on  → squat-less  0, prep-less 102
+  Mine. **Eighty-six warm-ups spent to save twenty-two squats**, and the cause
+  is structural rather than incidental: protecting something inside a trimmer
+  does not create room, it aims the trimmer at whatever is left — and what was
+  left was the movement-prep slot at the front of the day.
+  **Decided, same delegation, no ask**: movement prep is not adjustable volume
+  either. A short session means fewer SETS, which is what Ashley's "protect the
+  rest, do less" ruling already says one level up and what Phase 5 does once
+  Phase 4 runs out of things it may remove. A day that will not fit at every
+  set floor is a day that does not fit, and the app says so rather than quietly
+  deleting the warm-up. `isLastCarrierOfPattern` became `isStructuralSlot` and
+  both trimmers ask the wider question; §2c forbids either from asking the
+  narrower one again, because that state is exactly what this replaced.
+  **THE GENERAL LESSON, and it is worth more than the fix**: a measurement that
+  counts only what a change BOUGHT is half a measurement. This one bought 22
+  and spent 86, and nothing in a green gate would have said so.
+  `test:pattern-floor` is now 21 checks.
+  **Not done at the time of writing**: the coverage re-measurement and the
+  plan-quality re-score with BOTH protections are still running — in
+  particular whether protecting the prep slot pushes `time_fit` back up, which
+  is the next thing the trimmer has left to give. Named, not assumed. No deploy
+  needed; frontend ships on merge.
 
 - [x] **FIVE FROM THE GYM FLOOR, AND TWO OF THEM WERE ALREADY FIXED AND
   UNMERGED.** Ashley, 18 Sep 2026, mid-session, five reports. Triaged by

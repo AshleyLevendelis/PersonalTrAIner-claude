@@ -21,10 +21,10 @@
 
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { getExerciseEntry } from '../src/lib/exercise-db'
+import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import {
   generateMesocycle, setRandomSource, resetRandomSource, sizeBlockToRestBudget,
-  isLastCarrierOfPattern, getConstrainedPool, mapMovementPattern,
+  isLastCarrierOfPattern, isStructuralSlot, getConstrainedPool, mapMovementPattern,
 } from '../src/lib/exercise-plan'
 import { getGoalPolicy } from '../src/lib/goal-policies'
 import { seededRngFromKey } from '../src/lib/seeded-random'
@@ -126,6 +126,23 @@ console.log('\n[1] The rule itself: what may be shed and what may not')
 
   check('1g. an index that holds nothing is not protected by accident',
     !isLastCarrierOfPattern([squatA, null], 1) && !isLastCarrierOfPattern([], 0))
+
+  // MOVEMENT PREP IS PROTECTED ON THE SAME FOOTING, and this half exists
+  // because protecting the patterns alone made things WORSE. Measured over the
+  // full 9,216 grid with the pattern guard off and on: squat-less weeks 22 ->
+  // 0, prep-less days 16 -> 102. The trimmer did not gain room, it moved on to
+  // the front of the day. Eighty-six warm-ups for twenty-two squats.
+  const primer = EXERCISE_DATABASE.find(e => e.mechanics_tier === 'primer')!
+  check('1h. the fixture really is a primer', primer.mechanics_tier === 'primer', { name: primer.name })
+  check('1i. a movement-prep slot is never shed, even with prep beside it',
+    isStructuralSlot([primer, primer, squatA, curl], 0)
+    && isStructuralSlot([primer, primer, squatA, curl], 1))
+  check('1j. ...and it is the TIER that protects it, not being last of a pattern',
+    !isLastCarrierOfPattern([primer, primer, squatA, curl], 0))
+  check('1k. an accessory is still shedding material with a primer in the day',
+    !isStructuralSlot([primer, squatA, curl], 2))
+  check('1l. and the wider rule still carries the pattern half',
+    isStructuralSlot([press, squatA, curl], 1) && !isStructuralSlot([press, squatA, curl], 2))
 }
 
 // ---------------------------------------------------------------------------
@@ -135,11 +152,16 @@ console.log('\n[2] Both trimmers ask, and the pressure is real')
   const plan = stripComments(readFileSync(join(ROOT, 'src/lib/exercise-plan.ts'), 'utf8'))
   // `name(` rather than the bare name: an import line is not a use, and a
   // check that matches one passes over the exact defect it was written for.
-  const calls = (plan.match(/isLastCarrierOfPattern\(/g) ?? []).length
+  const calls = (plan.match(/isStructuralSlot\(/g) ?? []).length
   check('2a. both removal loops consult it, not just the one that was reported',
     calls >= 3, { calls, note: 'one definition + one call in each of the two trimmers' })
   check('2b. the detector needs a call, not an import',
-    !/isLastCarrierOfPattern\(/.test('import { isLastCarrierOfPattern } from "./exercise-plan"'))
+    !/isStructuralSlot\(/.test('import { isStructuralSlot } from "./exercise-plan"'))
+  // AND NEITHER TRIMMER MAY ASK THE NARROWER QUESTION. A loop still calling
+  // isLastCarrierOfPattern directly would protect the patterns and go on
+  // shedding warm-ups, which is precisely the state this fix replaced.
+  const narrow = (plan.match(/^\s*!?isLastCarrierOfPattern\(entriesNow/gm) ?? []).length
+  check('2c. no removal loop asks only about patterns any more', narrow === 0, { narrow })
 }
 
 // ---------------------------------------------------------------------------

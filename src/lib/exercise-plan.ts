@@ -1299,7 +1299,7 @@ function stageTimeCap(
       removeIdx >= 0 && (
         dayExercises[removeIdx].entry.mechanics_tier === 'cardio' ||
         protectedNames.has(dayExercises[removeIdx].entry.name) ||
-        isLastCarrierOfPattern(entriesNow, removeIdx)
+        isStructuralSlot(entriesNow, removeIdx)
       )
     ) removeIdx--
     if (removeIdx < 0 || dayExercises.length <= 3) break
@@ -5276,6 +5276,38 @@ const FUNDAMENTAL_PATTERNS: ReadonlySet<MesocycleMovementPattern> = new Set([
  * both trimmers — one holding `ExerciseEntry` directly, one resolving from a
  * name — ask the same question of the same data.
  */
+/**
+ * WHAT A TIME-CAP TRIMMER MAY NOT SHED AT ALL.
+ *
+ * Two things, and the second was learned by measuring the first.
+ *
+ * MEASURED 18 Sep 2026, over the full 9,216-profile grid, with the pattern
+ * guard switched off and on:
+ *     guard off -> 22 weeks with no squat pattern, 16 with a prep-less day
+ *     guard on  ->  0 weeks with no squat pattern, 102 with a prep-less day
+ * Protecting the patterns did not create room; it aimed the trimmer at
+ * whatever was left, and what was left was the movement-prep slot at the front
+ * of the day. Eighty-six warm-ups spent to save twenty-two squats is a worse
+ * trade than the one it replaced, and it is the kind a gate that only counts
+ * what a change BOUGHT would never show.
+ *
+ * So movement prep is protected on the same footing, for the same reason: it
+ * is not adjustable volume. A short session means fewer SETS — which is
+ * exactly what Ashley's "protect the rest, do less" ruling says one level up,
+ * and what Phase 5 already does once Phase 4 runs out of things it may remove.
+ * A day that still will not fit at every set floor is a day that does not fit,
+ * and the app says so rather than quietly deleting the warm-up.
+ */
+export function isStructuralSlot(
+  entries: readonly (ExerciseEntry | null | undefined)[],
+  index: number,
+): boolean {
+  const self = entries[index]
+  if (!self) return false
+  if (self.mechanics_tier === 'primer') return true
+  return isLastCarrierOfPattern(entries, index)
+}
+
 export function isLastCarrierOfPattern(
   entries: readonly (ExerciseEntry | null | undefined)[],
   index: number,
@@ -5831,7 +5863,7 @@ export function sizeBlockToRestBudget(
         if (
           entry && entry.mechanics_tier !== 'cardio' &&
           !protectedNames.has(exercises[removeIdx].name) &&
-          !isLastCarrierOfPattern(entriesNow, removeIdx)
+          !isStructuralSlot(entriesNow, removeIdx)
         ) break
         removeIdx--
       }

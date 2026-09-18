@@ -1061,6 +1061,20 @@ old — the commands were right and the context was missing.
   45 while a block that genuinely wants 40s still gets 40. **Any clamp applied
   at more than one stage has this shape** — ask what the value would be with no
   pressure at all, and clamp against that.
+- **PROTECTING SOMETHING INSIDE A TRIMMER DOES NOT CREATE ROOM — IT AIMS THE
+  TRIMMER AT WHATEVER IS LEFT. A measurement that counts only what a change
+  BOUGHT is half a measurement.** 18 Sep 2026: stopping the time-cap trimmer
+  deleting the week's last squat took squat-less weeks from 22 of 9,216 to 0,
+  and every gate was green. The same run's `primer_absent` went 14 → 102 —
+  eighty-six warm-ups spent to save twenty-two squats, a worse trade than the
+  one it replaced. The tracked baseline was two days stale and could not
+  attribute it, so it was attributed by running the same grid twice with the
+  guard switched off and on behind an env flag.
+  So, whenever a pass is taught to refuse: **ask what it will remove instead,
+  and count that in the same run.** The fix was to protect movement prep on the
+  same footing and let the pressure fall through to SETS, which is where the
+  house ruling already says it belongs — but the point is that the second
+  number had to exist before the trade could be seen at all.
 - **SLACK IS NOT A FIX, IT IS A COVER, and removing it is how you find what it
   was hiding.** The same day: protecting rest made 17 sessions run past the
   time their trainee had set aside. The cause was years older than the change —
