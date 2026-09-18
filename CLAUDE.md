@@ -1244,6 +1244,16 @@ old — the commands were right and the context was missing.
   check the process is alive on every poll and say so when it is not.
   This is the "a crash reads as a pass" rule one level up: there, zero
   failures looked like success; here, a dead run looked like a live one.
+  **AND THE PROCESS CHECK ITSELF CAN BE WRONG, IN THE OTHER DIRECTION.** 18 Sep
+  2026: a watcher reported "PROCESSES GONE — the run died" while the sweep was
+  sitting at 99.7% CPU with three of four shards already written. The cause was
+  one character: `pgrep -f "quality-score\|run-audit"` — pgrep takes an ERE,
+  where alternation is `|` and `\|` is a literal backslash, so the pattern
+  matched nothing and "no match" was read as "no process". It failed safe this
+  time, but a false death report is still a false report, and the next one
+  could be a false green. **Before believing a watcher, prove its own detector
+  finds the thing while it is definitely running** — the same "prove the
+  detector on something that should fail" habit the gates already use.
 - **THREE checks ALWAYS fail in a cloud session and are not your problem:**
   `test:meal-quality`, `test:schema-parity` and `verify:rls`. All three need a
   live database this machine cannot reach; each prints the same cause verbatim
