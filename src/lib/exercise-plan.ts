@@ -4623,7 +4623,27 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
  * actually be given. Periodization needs this so a rotated variation cannot
  * escape the equipment, injury and skill constraints.
  */
-export function getConstrainedPool(profile: UserProfile, exclusions: string[] = []): ExerciseEntry[] {
+export function getConstrainedPool(
+  profile: UserProfile,
+  exclusions: string[] = [],
+  /**
+   * `skipStyle` runs every stage BUT the style one. Generation never passes
+   * it; the swap shortlist does, on Ashley's ruling of 18 Sep 2026 (show
+   * off-style options, below the ones that match, with a line saying so).
+   *
+   * Style is the only one of the four stages that can be relaxed, and the
+   * reason is already written at `stageStyleFilter`: *"style is a preference,
+   * not a safety constraint — unlike equipment (you physically don't have the
+   * kit) or injury (it will hurt you)"*. Skill stays because a novice offered
+   * an advanced movement is the same kind of harm as the injury one.
+   *
+   * It is an OPTION on this function rather than a second pipeline next to it
+   * so the two can never drift — the mistake `getExerciseCompatibilityWarnings`
+   * records, where a hand-rolled equipment test quietly disagreed with the
+   * real filter for weeks.
+   */
+  opts: { skipStyle?: boolean } = {},
+): ExerciseEntry[] {
   const throwaway: ConstraintTrace = {
     equipment_filtered: [], injury_filtered: [], style_filtered: [], skill_filtered: [],
     time_cap_adjusted: [], exclusion_filtered: [], structure_adjusted: [],
@@ -4634,7 +4654,9 @@ export function getConstrainedPool(profile: UserProfile, exclusions: string[] = 
   )
   pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
-  pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+  if (!opts.skipStyle) {
+    pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+  }
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
   return pool
 }

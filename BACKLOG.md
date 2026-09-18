@@ -2,6 +2,69 @@
 
 Newest first. One line each.
 
+- [x] **THE SWAP OPTIONS HER TRAINING STYLE WAS HIDING — and the collision
+  that showing them caused.** Ashley, 18 Sep, standing next to a leg-curl
+  machine on a functional plan: every alternative the app offered was a slider,
+  a band or a bodyweight curl. All three machine leg curls are tagged
+  bodybuilding and the style stage of the filter removed them outright.
+
+  **MEASURED TWICE, and the second measurement corrected the first.** 31 of the
+  catalogue's 45 machine and cable entries carry no functional tag — a
+  convention, not a slip, so retagging them would change what every functional
+  trainee is PRESCRIBED. And the all-unloaded list needs the outgoing lift to
+  be the Dumbbell Leg Curl, the only loaded option her style allows; swap a
+  machine and the dumbbell version is still offered. The note carried over from
+  14 Sep said "functional and combat produce an all-unloaded list" and never
+  named that condition.
+
+  **Her ruling, from three options: SHOW THEM, MARKED.** Over retagging the
+  machines, and over leaving the search box as the only route to one. Style is
+  the only one of the four filter stages that may be relaxed, and the filter's
+  own comment already said why — *"style is a preference, not a safety
+  constraint"*. Equipment, injuries and skill still remove, all three gated.
+
+  **THEN IT BROKE AN EARLIER RULING OF HERS, AND THE GATE CAUGHT IT.** Sinking
+  off-style options put a matching SLIDER above a non-matching MACHINE — a
+  loaded lift offered bodyweight replacements first, which is the exact report
+  behind her 10 Sep rule. Measured at 8 movements in the hybrid catalogue
+  alone, among them the lateral raise and the shrug. **Her second ruling, from
+  three options: WEIGHT ALWAYS WINS.** For a lift carrying a number every
+  loaded alternative comes first whatever its style, each marked on its own
+  row; the unloaded ones follow. She rejected keeping style outermost (it
+  re-creates the 10 Sep report with an explanation attached) and a narrow
+  override firing only where her style offered nothing loaded.
+
+  That second ruling changed the SHAPE of what had just been built, not only
+  its order: a "matching group, then the rest" layout cannot draw a loaded
+  off-style option above an unloaded matching one, so the heading over a group
+  became a marker on each row. Live on a real 390x844 screen: *Cable Shrug*
+  under an outline badge reading **Outside your training style**, third in a
+  list whose first two are the loaded options that match.
+
+  **NO PARITY GAP, and the check is the useful part.** The coach's swap
+  resolves the incoming name from the whole catalogue, never from the filtered
+  pool — so it could ALREADY swap in an off-style machine while the screen
+  could not. This closes the gap from the narrow side rather than opening one.
+  (The coach's ADD path does use the strict pool; that is a different verb with
+  its own ruling and is untouched.)
+
+  **Verified**: new gate `test:swap-style` (28 checks, **14 mutations tried, 14
+  caught**, all applied, all ran the full 28) — it holds the two sort keys
+  separately, because "off-style never above on-style" is now false by design
+  and checking them as one rule is what produced the wrong build first time.
+  Four new browser checks in `verify:session-edit` §8 off a new full-gym
+  functional fixture. `test:single-implement` is what caught the collision.
+  20 source gates and 3 browser drivers green; `npx tsc --noEmit` clean.
+
+  **TWO THINGS THE BROWSER FOUND THAT NO SOURCE CHECK COULD**, both while the
+  grouped version still existed: a geometry check comparing option rectangles
+  read a correctly-painted screen as interleaved, because the matching list is
+  a 320px scrolling box and the fourth row's rect extends past the box it is
+  clipped inside — the comparison has to be against the BOX; and a backtick
+  inside a comment inside an injected template literal killed the whole driver
+  with a syntax error, which CLAUDE.md already records from 17 Sep.
+  No deploy needed; frontend ships on merge.
+
 - [x] **WHOSE NUMBERS ARE IN THE BOXES — the faint figures now say "last time".**
   Ashley, 18 Sep, reading her own dumbbell rows: *"Last sets prescribed were
   sets of 11 reps. Is thay correct at the end of a exercise?"* Nothing had

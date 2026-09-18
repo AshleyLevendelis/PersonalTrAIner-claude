@@ -23,6 +23,14 @@ import { prescribeLoad, type LoadPrescription, isExternallyLoaded} from './load-
 
 export type SwapScope = 'today' | 'permanent'
 
+/**
+ * A ranked swap option. `offStyle` is true when the exercise survives every
+ * constraint EXCEPT the trainee's training style — shown, below the ones that
+ * match, per Ashley's 18 Sep 2026 ruling. It is a fact about the option, not a
+ * sentence: the words belong to the screen and live in the phrasebook.
+ */
+export type ReplacementCandidate = { exercise: ExerciseEntry; note: string; offStyle: boolean }
+
 /** Constraint-filtered, ranked candidates for swapping OUT `exerciseName` — the same pool equipment/injury/style/skill filtering that generation itself uses. */
 /**
  * @param soft  Soft exercise likes/dislikes — a LEAN, not a ban. Liked
@@ -45,13 +53,34 @@ export function getReplacementCandidates(
   profile: UserProfile,
   exclusions: string[],
   soft?: { liked: string[]; disliked: string[] },
-): { exercise: ExerciseEntry; note: string }[] {
+): ReplacementCandidate[] {
+  // TWO POOLS, AND THE STRICT ONE IS WHAT "MATCHES YOUR STYLE" MEANS.
+  //
+  // Ashley, 18 Sep 2026, standing next to a leg-curl machine on a functional
+  // plan: the shortlist was two sliders and a band, because all three machine
+  // leg curls are tagged bodybuilding and nothing functional. Measured that
+  // day — 31 of the catalogue's 45 machine and cable entries carry no
+  // functional tag — so this was never one movement being mislabelled.
+  //
+  // Her ruling, from three options: SHOW THEM, LOWER DOWN. Options matching
+  // her style stay at the top, the rest sit below with a line saying so, and
+  // nothing about anyone's PLAN changes. She rejected retagging the machines
+  // (which would start prescribing them to every functional trainee) and
+  // leaving it (which left the search box as the only route to a machine).
+  //
+  // MEMBERSHIP OF THE STRICT POOL IS THE TEST, rather than reading
+  // `style_tags` here. `stageStyleFilter` is not a tag lookup — it exempts
+  // rehab movements for a flagged joint and holds a per-pattern floor — so a
+  // local re-implementation would disagree with it exactly the way
+  // `getExerciseCompatibilityWarnings`'s hand-rolled equipment test once did.
   const pool = getConstrainedPool(profile, exclusions)
+  const wide = getConstrainedPool(profile, exclusions, { skipStyle: true })
+  const onStyle = new Set(pool.map(e => e.name))
   // The flagged joints ride along for the NOTE only — getConstrainedPool has
   // already done every bit of filtering. Without them a cross-training
   // suggestion ("a squat, instead of your bench press") arrives unexplained.
   const restingJoints = [...getFlaggedJoints(profile.injuries ?? [])]
-  const ranked = getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions, restingJoints)
+  const ranked = getSmartReplacements(exerciseName, wide, profile.training_experience || 'novice', exclusions, restingJoints)
 
   // IMPROVISED KIT SINKS, IT DOES NOT VANISH. getSmartReplacements ranks on
   // tier, joint stress and muscle overlap and has no equipment term at all, so
@@ -101,23 +130,55 @@ export function getReplacementCandidates(
   // someone wants the slider, just not offered ahead of the machine.
   const outgoing = getExerciseEntry(exerciseName)
   const outgoingIsLoaded = outgoing ? isExternallyLoaded(outgoing) : false
-  const candidates = !outgoingIsLoaded
-    ? equipmentSorted
-    : equipmentSorted
-        .map((c, i) => ({ c, i, u: isExternallyLoaded(c.exercise) ? 0 : 1 }))
-        .sort((a, b) => a.u - b.u || a.i - b.i)
-        .map(x => x.c)
 
-  if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return candidates
   // Stable partition, never a filter: a disliked movement stays offered — it
   // is a lean, and someone who asks for a swap may still want it. Order is
   // preserved within each band so the ranker underneath still decides.
-  const liked = new Set(soft.liked)
-  const disliked = new Set(soft.disliked)
-  const rank = (name: string) => (liked.has(name) ? 0 : disliked.has(name) ? 2 : 1)
-  return candidates
-    .map((c, i) => ({ c, i, r: rank(c.exercise.name) }))
-    .sort((a, b) => a.r - b.r || a.i - b.i)
+  const bySoftPreference = (list: { exercise: ExerciseEntry; note: string }[]) => {
+    if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return list
+    const liked = new Set(soft.liked)
+    const disliked = new Set(soft.disliked)
+    const rank = (name: string) => (liked.has(name) ? 0 : disliked.has(name) ? 2 : 1)
+    return list
+      .map((c, i) => ({ c, i, r: rank(c.exercise.name) }))
+      .sort((a, b) => a.r - b.r || a.i - b.i)
+      .map(x => x.c)
+  }
+
+  // Style sinks an option; it never removes one. Within each band the order
+  // everything above produced is preserved exactly.
+  const byStyle = (list: { exercise: ExerciseEntry; note: string }[]): ReplacementCandidate[] =>
+    list
+      .map((c, i) => ({ c, i, s: onStyle.has(c.exercise.name) ? 0 : 1 }))
+      .sort((a, b) => a.s - b.s || a.i - b.i)
+      .map(x => ({ ...x.c, offStyle: x.s === 1 }))
+
+  // WEIGHT IS THE OUTERMOST KEY, AND THAT IS ASHLEY'S RULING OF 18 Sep 2026,
+  // from three options, made to settle a collision between two of her own.
+  //
+  // Widening the list for style (above) handed her 10 Sep rule the very
+  // problem it was written for: a slider that matched her style landed above
+  // a machine that did not, so a loaded lift was again offered bodyweight
+  // replacements first. Measured — 8 movements in the hybrid catalogue alone,
+  // among them the lateral raise and the shrug.
+  //
+  // Her ruling: WEIGHT ALWAYS WINS. For a lift that carries a number, every
+  // loaded alternative comes first whatever its style, each marked; the
+  // unloaded ones follow. She rejected keeping style outermost (it re-creates
+  // the 10 Sep report with a sentence of explanation attached) and a narrow
+  // override that fired only where her style offered nothing loaded (two
+  // different orderings depending on the catalogue is not a rule anyone can
+  // hold in their head).
+  //
+  // So the sort keys, outermost first: loaded, then style, then stated likes,
+  // then implement quality, then the ranker. Only the first is conditional —
+  // replacing a plank with a slider is not a downgrade, so an unloaded
+  // outgoing lift has no loaded band at all and style leads.
+  const ordered = byStyle(bySoftPreference(equipmentSorted))
+  if (!outgoingIsLoaded) return ordered
+  return ordered
+    .map((c, i) => ({ c, i, u: isExternallyLoaded(c.exercise) ? 0 : 1 }))
+    .sort((a, b) => a.u - b.u || a.i - b.i)
     .map(x => x.c)
 }
 

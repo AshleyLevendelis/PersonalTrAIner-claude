@@ -135,6 +135,28 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   equipment; a loaded lift never replaced by an unloaded one by default —
   both surfaces; `swap-target`, `slot-replacement`,
   `single-implement`, `verify:swap-request`
+- **And the shortlist no longer hides an option for TRAINING STYLE** — since
+  18 Sep 2026. Ashley, next to a leg-curl machine on a functional plan, was
+  offered two sliders and a band: all three machine leg curls are tagged
+  bodybuilding, and the style stage of the pool filter removed them outright.
+  Measured that day: 31 of the catalogue's 45 machine and cable entries carry
+  no functional tag, so it is a convention and not a slip — retagging them
+  would change what every functional trainee is PRESCRIBED.
+  **Her ruling, from three options: show them, marked**, over retagging the
+  machines and over leaving the search box as the only route to one. Style is
+  the only one of the four filter stages that may be relaxed, and
+  `stageStyleFilter`'s own comment says why: *"style is a preference, not a
+  safety constraint"*. Equipment, injuries and skill still remove.
+  **AND HER SECOND RULING THE SAME DAY, because the first broke an earlier one
+  of hers.** Sinking off-style options put a matching SLIDER above a
+  non-matching MACHINE — a loaded lift offered bodyweight replacements first,
+  which is exactly what her 10 Sep rule exists to prevent (measured: 8
+  movements in the hybrid catalogue). From three options: **weight always
+  wins.** For a lift carrying a number, every loaded alternative comes first
+  whatever its style, each marked on its own row; the unloaded ones follow.
+  So the sort keys, outermost first: loaded, style, stated likes, implement
+  quality, the ranker. `swap-style` (28 checks, 14 mutations),
+  `verify:session-edit` §8, `single-implement`
 - Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
   `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
   and quoted the decline "NOT WIRED UP YET… point the user at the ban button"
@@ -709,6 +731,17 @@ menu" stays true when a copy is also left outside it.
   the same case wrong. `bodyweight-progress` (74 checks, 8 mutations).
   NOT browser-driven: the case needs a loaded lift on today's card and the
   harness's today is all bodyweight
+- **A NEW RULING CAN BREAK AN OLD ONE, AND THE COLLISION IS THE FINDING.**
+  18 Sep 2026: Ashley ruled that swap options outside her training style should
+  be shown below the ones that match. Building it re-created the report that
+  produced her 10 Sep ruling — an unloaded option above a loaded one for a
+  lift that carries weight — because the new key was outermost and the old one
+  was not. A gate caught it, which is the argument for gating a ruling rather
+  than only obeying it. **Do not resolve it by picking the newer one: put both
+  in front of her, say which broke, and let her order them.** She chose the
+  older rule and the newer one moved inward, which also changed the SHAPE of
+  what had just been built — a grouped layout could no longer express the
+  order, so the marker moved onto the row.
 - **A HINT AND A RECORD MUST NOT LOOK ALIKE.** 18 Sep 2026, one screen along
   from the rule below and the same family: a box's placeholder is the app's
   suggestion on a row with no history and the person's own last session

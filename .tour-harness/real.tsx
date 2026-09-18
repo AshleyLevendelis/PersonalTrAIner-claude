@@ -122,6 +122,15 @@ const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, 
 // unchanged.
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
 const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
+// ?offstyle=1 — A FULL GYM AND A FUNCTIONAL TRAINEE, which is the only pairing
+// where the swap shortlist has anything to demote. Ashley, 18 Sep 2026: offered
+// two sliders and a band for her leg curl while standing next to the machine,
+// because all three machine leg curls are tagged bodybuilding. Off by default
+// so every existing run of this harness is unchanged.
+//
+// FULL GYM IS LOAD-BEARING, not scenery: at home_gym there are no machines to
+// demote and the driver would measure an empty group as a pass.
+const OFF_STYLE = new URLSearchParams(location.search).get('offstyle') === '1'
 // ?finisher=1 — A POST-SESSION FINISHER ON A TRAINING DAY, for verify:finisher.
 //
 // The default profile's conditioning lands on REST days, where TodayPanel
@@ -173,7 +182,7 @@ const profile: UserProfile = {
   // hand-seeding a plan row, which would have proved only that a string I
   // wrote myself renders.
   equipment_access: WALKER ? 'bodyweight' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: [],
-  training_style: WALKER ? 'functional' : 'hybrid',
+  training_style: WALKER || OFF_STYLE ? 'functional' : 'hybrid',
   training_experience: WALKER ? 'beginner' : 'intermediate', session_duration_preference: '45-60',
   workout_split_preference: LEG_CURL ? 'push_pull_legs' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),

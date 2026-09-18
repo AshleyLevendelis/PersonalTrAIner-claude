@@ -323,6 +323,19 @@ export function loggedSetReading(log: {
   return { kind: 'loaded', weightKg: log.weight_kg, reps: log.reps_completed }
 }
 
+/**
+ * The heading over the swap options that clear every constraint except the
+ * trainee's training style. Ashley's ruling, 18 Sep 2026: show them, below
+ * the ones that match, with a line saying what they are.
+ *
+ * IT DOES NOT NAME THE STYLE, deliberately. The four style labels are phrases
+ * ("Functional / athletic", "Combat / conditioning") that do not fit inside a
+ * possessive, and a second copy of them here would be a second thing to drift.
+ * There is exactly one training style on a profile, so "your training style"
+ * points at it without ambiguity.
+ */
+export const OUTSIDE_YOUR_STYLE = 'Outside your training style'
+
 export const BEST_SET_QUALIFIER = 'best set'
 
 /**

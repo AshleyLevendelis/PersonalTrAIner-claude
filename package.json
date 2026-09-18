@@ -160,6 +160,7 @@
     "test:app-tour": "tsx scripts/test-app-tour.ts",
     "test:overlay-artifacts": "tsx scripts/test-overlay-artifacts.ts",
     "test:correction-loop": "tsx scripts/test-correction-loop.ts",
+    "test:swap-style": "tsx scripts/test-swap-style.ts",
     "test:swap-target": "tsx scripts/test-swap-target.ts",
     "test:plan-unknown": "tsx scripts/test-plan-unknown.ts",
     "test:moved-session-stuck": "tsx scripts/test-moved-session-stuck.ts",

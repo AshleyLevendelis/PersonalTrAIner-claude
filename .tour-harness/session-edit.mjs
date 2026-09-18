@@ -336,6 +336,69 @@ check('7d. ...inside the part of the dialog she can actually see',
   !!shortList && shortList.withinDialogBox === true, { shortOn, shortList })
 await escape(); await wait(400)
 
+// ---------------------------------------------------------------------------
+// 8. THE OPTIONS HER STYLE USED TO HIDE, read off the screen.
+//
+// Ashley, 18 Sep 2026, standing next to a leg-curl machine on a functional
+// plan: every alternative the app offered was unloaded, because all three
+// machine leg curls are tagged bodybuilding and the style filter removed them.
+// Her ruling: show them, marked. And her second the same day, after the first
+// re-created her 10 Sep report: WEIGHT ALWAYS WINS — for a lift carrying a
+// number the loaded options lead whatever their style.
+//
+// WHY A BROWSER. test:swap-style proves the builder returns them flagged and
+// ordered, and proves the JSX reads that flag. It cannot prove the marker is
+// PAINTED on the right row: the flag and the badge are two different things,
+// and a marker rendered against the wrong index looks identical in source.
+// ---------------------------------------------------------------------------
+console.log('\n  the off-style marker, on a full gym and a functional trainee')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&offstyle=1#/tab/exercise` })
+await wait(4500)
+const styleDay = await order()
+check('8a. the functional full-gym fixture renders a session', Array.isArray(styleDay) && styleDay.length >= 3, styleDay)
+
+let marked = null
+let markedOn = ''
+for (const name of styleDay || []) {
+  if ((await openRowMenu(name)) !== 'open') continue
+  if (!(await tap('[data-testid="swap-exercise"]')) || !(await untilSel('[data-testid="swap-dialog"]'))) { await escape(); await wait(400); continue }
+  if (await has('[data-testid="swap-dialog"] [data-testid="reason-skip"]')) { await clickSel('[data-testid="swap-dialog"] [data-testid="reason-skip"]'); await wait(800) }
+  const seen = await ev(`(() => {
+    const d = document.querySelector('[data-testid="swap-dialog"]'); if (!d) return null
+    const rows = [...d.querySelectorAll('[data-testid="swap-option"]')]
+    if (rows.length === 0) return null
+    const box = el => el.getBoundingClientRect()
+    const visible = el => { const r = box(el); return r.width > 0 && r.height > 0 }
+    const read = rows.map(r => {
+      const mark = r.querySelector('[data-testid="swap-off-style-mark"]')
+      return {
+        name: (r.querySelector('p') || {}).textContent || '',
+        marked: !!mark,
+        markText: mark ? (mark.textContent || '').trim() : null,
+        markVisible: !!mark && visible(mark),
+        insideRow: !!mark && r.contains(mark),
+      }
+    })
+    return { rows: read, count: rows.length }
+  })()`)
+  if (seen && seen.rows.some(r => r.marked)) { marked = seen; markedOn = name; await shoot('session-edit-off-style-mark') ; break }
+  await escape(); await wait(400)
+}
+
+// TEETH FIRST, as section 7 does: without a marked row and an unmarked one in
+// the same list, every check below would pass by measuring nothing.
+check('8b. this list really has both a marked and an unmarked option, so 8c-8e mean something',
+  !!marked && marked.rows.some(r => r.marked) && marked.rows.some(r => !r.marked),
+  { markedOn, rows: marked && marked.rows })
+check('8c. the marker says it in the app’s own words',
+  !!marked && marked.rows.filter(r => r.marked).every(r => r.markText === 'Outside your training style'),
+  { markedOn, marks: marked && marked.rows.filter(r => r.marked).map(r => r.markText) })
+check('8d. ...on the option’s own row, not floating beside the list',
+  !!marked && marked.rows.filter(r => r.marked).every(r => r.insideRow === true), { markedOn })
+check('8e. ...and painted, not merely in the DOM',
+  !!marked && marked.rows.filter(r => r.marked).every(r => r.markVisible === true), { markedOn })
+await escape(); await wait(400)
+
 console.log(failures === 0 ? '\nRemoving asks, moving moves, both stick, and the reach of a change is stated.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)
