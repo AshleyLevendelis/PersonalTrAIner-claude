@@ -65,9 +65,36 @@ Newest first. One line each.
   **THIS CHANGES WHAT THE METRIC MEASURES.** Structure rises, and scores from
   this commit on are not comparable with any earlier run — including the 11.57
   recorded above. Quote them with that said.
-  **Still running**: the re-score, which also yields the RESIDUE — how many of
-  the 725 are NOT rehab-indicated. Those, if any, are the genuine version of
-  the reported finding. Named rather than assumed to be zero.
+  **THE RE-SCORE, and the residue is NOT zero.** 9,216 profiles: overall
+  **11.59 / 12** (was 11.57, and **not comparable** — this is the metric change
+  she approved), Structure **1.97 → 1.99**, 0 below the floor.
+  `core_before_main` **725 → 148**. So **577 were the corrective slot, correctly
+  placed, and 148 are real.**
+
+  **WHAT THE 148 ARE, found by scanning until four turned up (292 combinations)
+  rather than by reasoning**: every one is the same shape, and it is not core
+  at all — it is a **loaded carry before the main lift**.
+      `full_gym | lower_back | 30-45 | combat | beginner | hypertrophy`
+      Tuesday: Scapular Push-Ups → Bird Dog → **Farmer's Walk** → Barbell Bench
+      Press → Landmine Press → Machine Lateral Raise
+  A loaded carry taxes grip and trunk bracing, and it belongs after the day's
+  main lift, not in front of it. **This is the genuine version of the reported
+  defect** — an eighth the size, and about carries rather than core.
+
+  **NOT FIXED, and named rather than half-done.** The cause is not the day
+  template: `Squat & Carry`'s own slot list already puts its carry after the
+  tier-1 knee-dominant slot, and the day-ordering sort ranks tier2 behind
+  tier1. So a carry is reaching a PUSH day ahead of the bench by some route
+  other than that sort — most likely the weekly `required_patterns: ['carry']`
+  coverage placing it without re-sorting. Root-causing that means working in
+  the selection engine, which is the heart of the app, and the CSCS review's
+  own question 2 ("what does it take away?") needs a measurement pass before
+  anything moves. Starting that at the end of a long session is how the next
+  entry gets written about a regression.
+  **Next session, in order**: root-cause the carry placement, fix, gate,
+  re-measure; then the progressive-overload audit (`frozen_week`, 4,060 —
+  split deliberate deload and calibration weeks from genuinely stalled ones
+  before treating any of it as a defect).
 
 - [x] **EVERY CHANGE NOW GETS A CSCS REVIEW — and its first outing found a
   floor I had silently redefined an hour earlier.** Ashley, 18 Sep 2026,
