@@ -98,10 +98,26 @@ Newest first. One line each.
   caught** (one re-aimed after a MISSED turned out to be the dead line above,
   not a gap). `npx tsc --noEmit` clean. Plans and decisions:
   `docs/plans/a-prep-move-that-needs-a-bell.md`.
-  **Not done at the time of writing**: the pattern-coverage re-measurement over
-  all 9,216 profiles is still running, and the full sweep has not been re-run
-  since these two changes. Both are named rather than assumed. No deploy
-  needed; frontend ships on merge.
+  **THE RE-MEASUREMENT LANDED, and the gate got stronger because of it.**
+  Guarded, over all 9,216 profiles: **push 0, pull 0, hinge 0, squat 0** — no
+  week is missing a fundamental pattern its own equipment and injuries could
+  have supplied. Squat-less weeks are 22 → 0.
+  **AND SECTION 3 OF THE NEW GATE WAS VACUOUS UNTIL THIS.** Measured: disabling
+  the guard entirely left all six of my hand-picked "obviously tight" profiles
+  passing, so only the unit checks were catching anything and the integration
+  section was decoration. Switching the defect back on behind an env flag and
+  re-running the real grid named four genuine offenders in minutes — **every
+  one a combat profile on a 30-45 minute session**, the style whose own rest
+  table asks the longest rests meeting the smallest budget, which is not a
+  combination I would have guessed. Those four are now pinned in §3 with the
+  same seed key the measurement used, and a new §4 hands the exported trimmer a
+  constructed day whose only squat sits last — deterministic, instant, and
+  guaranteed to be under pressure. With the guard removed §4 now shows the
+  defect exactly: the day keeps a lateral raise and loses its squat.
+  **Verified, final**: `test:pattern-floor` 15 checks, **6 mutations tried, 6
+  caught**, and unlike the first round the integration sections catch them too.
+  **Not done**: the full sweep has not been re-run since these two changes —
+  named rather than assumed. No deploy needed; frontend ships on merge.
 
 - [x] **FIVE FROM THE GYM FLOOR, AND TWO OF THEM WERE ALREADY FIXED AND
   UNMERGED.** Ashley, 18 Sep 2026, mid-session, five reports. Triaged by

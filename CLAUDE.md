@@ -1079,6 +1079,20 @@ old — the commands were right and the context was missing.
   second reason: the trimmers only run on a day that is OVER budget, and every
   profile the gate sampled was comfortable. **A gate built from comfortable
   fixtures never reaches the code it exists to hold.**
+  **AND THE ONLY HONEST WAY TO FIND A FIXTURE THAT IS UNDER PRESSURE IS TO LET
+  THE BROKEN CODE NAME IT.** 18 Sep 2026, `test:pattern-floor`: six profiles I
+  picked as obviously tight ALL PASSED with the guard switched off, so the
+  integration section proved nothing and only the unit checks were doing any
+  work — invisible from reading it, visible the moment a mutation was run.
+  Putting the defect back behind an env switch and running the real
+  9,216-profile grid named four genuine offenders in minutes, every one a
+  combat profile on the shortest session: the style whose own table asks the
+  LONGEST rests meeting the smallest budget, which is not a combination anyone
+  would guess. Pin those, seeded with the same key the measurement used.
+  **The cheap companion, and do both**: where the pass is exported, hand it a
+  constructed input already in the failing state — deterministic, instant,
+  guaranteed under pressure. The constructed case proves the mechanism; the
+  measured offender proves it matters in a real plan.
 - **A CONTROL THAT WRITES AND DOES NOT REDRAW IS A DEAD CONTROL, and no gate
   and no type can see it.** 17 Sep 2026: "Add Set" wrote the new row into the
   stored session record correctly, and no pixel moved — nothing subscribes to

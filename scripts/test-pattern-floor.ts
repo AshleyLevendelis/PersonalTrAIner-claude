@@ -23,11 +23,14 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { getExerciseEntry } from '../src/lib/exercise-db'
 import {
-  generateMesocycle, setRandomSource, resetRandomSource,
+  generateMesocycle, setRandomSource, resetRandomSource, sizeBlockToRestBudget,
   isLastCarrierOfPattern, getConstrainedPool, mapMovementPattern,
 } from '../src/lib/exercise-plan'
+import { getGoalPolicy } from '../src/lib/goal-policies'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import type { UserProfile, SessionDuration, EquipmentAccess, TrainingStyle } from '../src/lib/types'
+import type {
+  UserProfile, SessionDuration, EquipmentAccess, TrainingStyle, WorkoutDay, Exercise,
+} from '../src/lib/types'
 
 const ROOT = join(import.meta.dirname, '..')
 let failures = 0
@@ -40,14 +43,35 @@ const stripComments = (s: string) =>
 
 const FUNDAMENTALS = ['push', 'pull', 'hinge', 'squat'] as const
 
-function profileFor(equipment: EquipmentAccess, style: TrainingStyle, duration: SessionDuration): UserProfile {
+/**
+ * The quality harness's profile, field for field. It has to be: the cases
+ * below are REAL OFFENDERS lifted out of a 9,216-profile measurement run with
+ * the guard disabled, and a fixture that differs by one field is a different
+ * plan.
+ */
+interface Combo {
+  equipment: EquipmentAccess
+  duration: SessionDuration
+  style: TrainingStyle
+  experience: UserProfile['training_experience']
+  goal: UserProfile['fitness_goal']
+  recovery: UserProfile['recovery_capacity']
+  cardio: UserProfile['conditioning_preference']
+}
+
+/** Byte-for-byte the key `measure-pattern-coverage.ts` seeds each combo with. */
+function comboKey(c: Combo): string {
+  return [c.equipment, 'none', c.duration, c.style, c.experience, c.goal, c.recovery, c.cardio].join('|')
+}
+
+function profileFor(c: Combo): UserProfile {
   return {
     age: 30, gender: 'male', height_cm: 178, weight_kg: 80,
-    activity_level: 'moderate', fitness_goal: 'hypertrophy', preferred_time: 'morning',
+    activity_level: 'moderate', fitness_goal: c.goal, preferred_time: 'morning',
     bmr: 1800, tdee: 2500,
-    equipment_access: equipment, injuries: [],
-    training_style: style, training_experience: 'intermediate',
-    session_duration_preference: duration,
+    equipment_access: c.equipment, injuries: [],
+    training_style: c.style, training_experience: c.experience,
+    session_duration_preference: c.duration,
     workout_split_preference: 'ai_recommendation',
     training_days: [
       { day: 'Monday', available: true },
@@ -61,7 +85,7 @@ function profileFor(equipment: EquipmentAccess, style: TrainingStyle, duration: 
     weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
     exercise_exclusions: [], macro_calculation_mode: 'STANDARD_STATIC',
     coaching_persona: 'supportive',
-    recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+    recovery_capacity: c.recovery, conditioning_preference: c.cardio,
   } as UserProfile
 }
 
@@ -127,19 +151,26 @@ console.log('\n[3] A real generated week keeps every pattern its kit can supply'
 // test:rest-floors on 18 Sep, which passed unseeded and failed on its next run
 // against identical code.
 {
-  const cases: [EquipmentAccess, TrainingStyle, SessionDuration][] = [
-    ['full_gym', 'bodybuilding', '30-45'],
-    ['full_gym', 'functional', '30-45'],
-    ['home_gym', 'hybrid', '30-45'],
-    ['minimalist', 'functional', '30-45'],
-    ['full_gym', 'combat', '30-45'],
-    ['home_gym', 'bodybuilding', '45-60'],
+  // THE FIRST FOUR ARE MEASURED OFFENDERS, not plausible fixtures. They come
+  // out of a 9,216-profile run with the guard switched off, which is the only
+  // honest way to know a case is under pressure — my own hand-picked six all
+  // passed with the guard disabled and proved nothing. Every one is a combat
+  // profile on a 30-45 minute session: the shortest budget against a style
+  // whose own table asks for the longest rests.
+  const cases: Combo[] = [
+    { equipment: 'full_gym', duration: '30-45', style: 'combat', experience: 'novice', goal: 'fat_loss', recovery: 'moderate', cardio: 'love' },
+    { equipment: 'full_gym', duration: '30-45', style: 'combat', experience: 'novice', goal: 'conditioning', recovery: 'high', cardio: 'love' },
+    { equipment: 'home_gym', duration: '30-45', style: 'combat', experience: 'novice', goal: 'fat_loss', recovery: 'moderate', cardio: 'love' },
+    { equipment: 'home_gym', duration: '30-45', style: 'combat', experience: 'advanced', goal: 'conditioning', recovery: 'moderate', cardio: 'love' },
+    // And a spread beside them, so the gate is not pinned to one shape.
+    { equipment: 'full_gym', duration: '30-45', style: 'bodybuilding', experience: 'intermediate', goal: 'hypertrophy', recovery: 'moderate', cardio: 'tolerate' },
+    { equipment: 'minimalist', duration: '30-45', style: 'functional', experience: 'intermediate', goal: 'hypertrophy', recovery: 'moderate', cardio: 'tolerate' },
   ]
   let trimmedSomewhere = 0
   const gaps: string[] = []
-  for (const [equipment, style, duration] of cases) {
-    const profile = profileFor(equipment, style, duration)
-    setRandomSource(seededRngFromKey(`${equipment}|${style}|${duration}`))
+  for (const combo of cases) {
+    const profile = profileFor(combo)
+    setRandomSource(seededRngFromKey(comboKey(combo)))
     try {
       const meso = generateMesocycle(profile)
       const week1 = meso.find(w => w.week_number === 1)
@@ -158,7 +189,7 @@ console.log('\n[3] A real generated week keeps every pattern its kit can supply'
       if (trimmed) trimmedSomewhere++
       for (const p of FUNDAMENTALS) {
         if (poolPatterns.has(p) && !present.has(p)) {
-          gaps.push(`${equipment}/${style}/${duration}: no ${p} (${exerciseCount} exercises in the week)`)
+          gaps.push(`${comboKey(combo)}: no ${p} (${exerciseCount} exercises in the week)`)
         }
       }
     } finally {
@@ -169,6 +200,57 @@ console.log('\n[3] A real generated week keeps every pattern its kit can supply'
     gaps.length === 0, gaps.slice(0, 4))
   check('3b. ...and at least some of these sessions were actually squeezed, so 3a is not vacuous',
     trimmedSomewhere > 0, { trimmedSomewhere, of: cases.length })
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n[4] The real trimmer, on a day built to make it choose')
+// ---------------------------------------------------------------------------
+// §3 asks whether generated weeks come out intact, which is the outcome that
+// matters but is a WEAK test of the guard: measured, disabling
+// isLastCarrierOfPattern entirely leaves §3 green, because none of six
+// reasonable profiles happens to sit on the knife edge. A gate built from
+// comfortable fixtures never reaches the code it exists to hold.
+//
+// So this hands the real exported trimmer a day that is genuinely over budget
+// and whose ONLY squat sits LAST — the position Phase B removes from first.
+// Before the guard this day lost its squat; after it, an accessory goes
+// instead. Deterministic, no seed, no dice.
+{
+  const ex = (name: string, sets: number, rest: string): Exercise =>
+    ({ name, sets, reps: '8-10', rest, substitution: '' })
+
+  const squeezedDay = (): WorkoutDay => ({
+    day: 'Monday',
+    focus: 'Full body',
+    exercises: [
+      ex('Barbell Bench Press', 3, '90s'),
+      ex('Dumbbell Shoulder Press', 3, '75s'),
+      ex('Cable Lateral Raises', 3, '60s'),
+      ex('Overhead Tricep Extension', 3, '60s'),
+      ex('Cable Woodchops', 3, '60s'),
+      // The whole point: the day's only squat pattern, at the end of the
+      // array, where the lowest-tier work lives and the trimmer starts.
+      ex('Goblet Squats', 3, '75s'),
+    ],
+  })
+
+  const before = squeezedDay().exercises.map(e => e.name)
+  const [after] = sizeBlockToRestBudget(
+    [squeezedDay()], 200, 18 * 60, new Set(), getGoalPolicy('hypertrophy'), [],
+  )
+  const names = after.exercises.map(e => e.name)
+
+  check('4a. the day really was squeezed — something had to go',
+    names.length < before.length, { before: before.length, after: names.length })
+  check('4b. and what went was not the day\'s only squat',
+    names.includes('Goblet Squats'), { names })
+  check('4c. an accessory went in its place, from the end inwards',
+    !names.includes('Cable Woodchops'), { names })
+  // Contrast, so 4b cannot pass by the trimmer simply doing nothing: the
+  // exercises that SHOULD survive are the ones that did.
+  check('4d. the main lift and the day\'s only squat are what is left standing',
+    names.includes('Barbell Bench Press') && names.includes('Goblet Squats')
+    && names.length === 3, { names })
 }
 
 console.log(failures === 0 ? '\nPASS\n' : `\n${failures} FAILED\n`)
