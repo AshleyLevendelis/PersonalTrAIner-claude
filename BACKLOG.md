@@ -2,6 +2,73 @@
 
 Newest first. One line each.
 
+- [x] **MEASURED THE VOLUME CEILING BEFORE BUILDING IT, AND THE MEASUREMENT
+  FOUND SOMETHING ELSE.** 18 Sep 2026, on Ashley's instruction, against a
+  relayed proposal to cap working sets per workout at 20-24.
+  Full write-up: `docs/audits/weekly-volume-2026-09-18.md`. Script:
+  `scripts/measure-volume.ts` (`npm run measure:volume`), 9,216 profiles x 16
+  weeks = 589,824 training days.
+
+  **The proposal's own question, answered**: a 20-set cap WOULD fire — 23.6% of
+  sessions are over 20 working sets, 14.1% over 24, 6.1% over 30, median 15,
+  max 53. So it is not theatre. But 552 of the 678 highest-volume profiles are
+  90+ minute sessions, and a 90-minute advanced session at 27 working sets is a
+  session rather than a defect. And the per-muscle numbers a ceiling would have
+  to be calibrated against are inflated by the app's own counting convention
+  (one set credits EVERY muscle its exercise names as primary — glutes median
+  is 23 because every squat, lunge and hinge counts). **Building it now means
+  picking a threshold nothing justifies**, so: not first.
+
+  **WHAT THE RUN ACTUALLY FOUND — TWO MAIN LIFTS IN ONE SESSION, 2,477 of
+  9,216 profiles (26.9%), 49,988 of 589,824 days.** The commonest shape is
+  `Pull-Ups + Chin-Ups` on one day, both tier-1, five or six sets each — the
+  same movement twice as two separate main lifts. On a full-gym functional
+  beginner it is `Deadlifts + Barbell Squats`, every week of the block. Neither
+  is a session a qualified coach would sign: the reason a day has one flagship
+  lift is that everything after it is accessory work.
+  **Probable cause, read off the code and recorded as a LEAD, not a fact**: the
+  app forbids this at three places and misses it at a fourth. Both
+  weekly-coverage fills (`exercise-plan.ts:3726`, `:3847`) and the day-label
+  pattern fill exclude `tier1_compound` explicitly, the last with a comment
+  saying why ("Filling with another main lift here silently doubled a day's
+  main-compound count"). `refill` (`:2473-2477`) excludes primers and cardio and
+  nothing else. Same recorded shape as the rest-floor bug — a constraint
+  asserted at three paths, missed at the fourth. Confirm by mutation before
+  acting.
+
+  **AND TWO SMALLER ONES, both counted in the same run because a ceiling aims
+  pressure at whatever is left**: a deload week that is not lighter than its own
+  block's peak in 2,966 of 36,864 blocks (8.0%; the median block does drop 17
+  sets, so the mechanism works and has a hole); and muscles getting nothing at
+  all in the peak week — calves 0 sets in 1,197 profiles and under 5 in 4,295
+  (47%), chest 0 in 1,024, triceps 0 in 832, shoulders 0 in 800. The zero counts
+  need the same pool guard pattern coverage already uses before any of them is
+  called a defect — a week cannot hold what its equipment and injuries forbid.
+
+  **CORRECTION TO MY OWN FRAMING, measured**: the script header said "volume
+  ramps inside a block, so week 1 understates every plan". False for most plans
+  — week 1 carries the heaviest TOTAL set count for 6,709 of 9,216 profiles
+  (73%). Reading the peak is still right, for a different reason: different
+  muscles peak in different weeks. Corrected in the script rather than quietly.
+
+  **ONE GRID, NOT TWO.** `scripts/quality-grid.ts` is lifted out of
+  run-quality-score.ts unchanged and imported by both sweeps, because a copied
+  enumeration is how two readings of one question end up with different
+  denominators — which has already happened here once, with pattern coverage.
+  Proven identical rather than assumed: both versions emit the same 9,216 keys
+  with the same SHA-256.
+
+  **TWO PROCESS NOTES worth more than the numbers.** (1) A background run
+  launched with `nohup` from a tool call the harness then marked complete was
+  REAPED — the log stopped mid-run and looked exactly like a run still in
+  progress, which is the recorded "a killed sweep's log is indistinguishable
+  from a running one" trap arriving by a new route. Launch long runs through the
+  harness's own background mode. (2) My wait condition was
+  `until [ -f volume-report.txt ]` and it returned instantly, satisfied by the
+  8-profile report a smoke test had written minutes earlier — "asking a question
+  of evidence you just created", one level up from the code version of it
+  already recorded here. Wait on the PROCESS, and clear the artefact first.
+
 - [x] **THE RESIDUE WAS REAL, AND IT WAS A LOADED CARRY IN FRONT OF THE BENCH
   PRESS.** 18 Sep 2026. Exempting the rehab slot (entry below) took
   `core_before_main` from 725 plans to 148. Those 148 were a different defect

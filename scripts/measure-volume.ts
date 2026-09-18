@@ -26,9 +26,14 @@
 //    below is therefore expressed against the app's own distribution, never
 //    against an outside number.
 //
-// 2. THE PEAK WEEK, NOT WEEK ONE. Volume ramps inside a block, so a week-1
-//    reading understates every plan's real high-water mark. Both are reported,
-//    and the gap between them is itself worth seeing.
+// 2. THE PEAK WEEK, NOT WEEK ONE — but not for the reason I first wrote here.
+//    This said "volume ramps inside a block, so week 1 understates every plan".
+//    MEASURED, and that is wrong for most plans: week 1 carries the heaviest
+//    total set count for 73% of profiles (section 5). The per-MUSCLE peak does
+//    still exceed week 1, because different muscles peak in different weeks, so
+//    reading the peak remains right — the stated reason was not. Corrected here
+//    rather than quietly, because the claim was an assertion and the run is what
+//    settled it.
 //
 // 3. THE FLOOR IS MEASURED IN THE SAME RUN. A ceiling aims pressure at
 //    whatever is left; the standing rule is to count what a change would take
@@ -47,6 +52,9 @@ import { seededRngFromKey } from '../src/lib/seeded-random'
 import { weeklySetsByMuscle } from '../src/lib/edit-tradeoff'
 import type { MuscleGroup } from '../src/lib/exercise-db'
 import type { MesocycleWeek } from '../src/lib/types'
+import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
+
+const entryFor = (name: string) => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === name.toLowerCase())
 import { type Combination, buildProfile, comboKey, comboLabel, generateAllCombinations } from './quality-grid'
 
 /**
@@ -94,6 +102,11 @@ interface Reading {
   dayWorking: number[]
   /** Same days, finishers (conditioning rounds) counted back in. */
   dayAll: number[]
+  /** How many of this plan's days carry a conditioning row at all. */
+  daysWithFinisher: number
+  /** Days carrying MORE THAN ONE tier1_compound, with an example. */
+  daysWithTwoMains: number
+  twoMainExample: string | null
   /** Total working sets in the block's biggest week, and which week that was. */
   peakWeekTotal: number
   peakWeekNumber: number
@@ -119,6 +132,9 @@ function readOne(combo: Combination): Reading {
   const dayWorking: number[] = []
   const dayAll: number[] = []
   const weekTotals: number[] = []
+  let daysWithFinisher = 0
+  let daysWithTwoMains = 0
+  let twoMainExample: string | null = null
 
   const byBlock = new Map<number, { peak: number; deload: number | null }>()
 
@@ -149,6 +165,18 @@ function readOne(combo: Combination): Reading {
       dayWorking.push(working)
       dayAll.push(all)
       weekTotal += working
+      if (day.exercises.some(e => e.tier === 'tier_4_finisher')) daysWithFinisher++
+
+      // A day is supposed to hold exactly ONE main lift — selectExercisesForTrack
+      // says so in its own comment ("that slot is reserved to exactly one
+      // exercise per day"), and the goal-alignment scorer counts on it. Counted
+      // here because this measurement is already generating every plan, and an
+      // invariant nothing checks is worth a column.
+      const mains = day.exercises.filter(e => entryFor(e.name)?.mechanics_tier === 'tier1_compound')
+      if (mains.length > 1) {
+        daysWithTwoMains++
+        if (!twoMainExample) twoMainExample = `wk${week.week_number} ${day.day}: ${mains.map(m => m.name).join(' + ')}`
+      }
     }
     weekTotals.push(weekTotal)
 
@@ -175,6 +203,9 @@ function readOne(combo: Combination): Reading {
     week1: weeklySetsByMuscle(meso.find(w => w.week_number === 1)),
     dayWorking,
     dayAll,
+    daysWithFinisher,
+    daysWithTwoMains,
+    twoMainExample,
     peakWeekTotal: weekTotals.length ? Math.max(...weekTotals) : 0,
     peakWeekNumber: weekTotals.length ? meso[weekTotals.indexOf(Math.max(...weekTotals))].week_number : 0,
     blockDrops: [...byBlock.entries()].map(([block, v]) => ({ block, peak: v.peak, deload: v.deload })),
@@ -241,6 +272,10 @@ function report(rows: Reading[]): string {
   const allDaysAll = rows.flatMap(r => r.dayAll)
   w(`  working sets only (no warm-up, no conditioning rounds):  ${describe(allDaysWorking)}`)
   w(`  conditioning rounds counted in:                          ${describe(allDaysAll)}`)
+  const finDays = rows.reduce((n, r) => n + r.daysWithFinisher, 0)
+  w(`  (the two lines can only differ on the ${finDays} of ${allDaysWorking.length} days that carry a`)
+  w('   conditioning row at all — printed so an identical pair reads as "rare",')
+  w('   which is a fact, rather than as "the column is broken", which would not be.)')
   w()
   for (const t of [20, 24, 30]) {
     const over = allDaysWorking.filter(v => v > t).length
@@ -261,8 +296,11 @@ function report(rows: Reading[]): string {
   w('  And week 1 alone, for contrast with the peak column above:')
   for (const m of MUSCLES) w(`  ${m.padEnd(12)} ${describe(rows.map(r => r.week1[m] ?? 0))}`)
   w()
-  w('  A week-1-only reading understates the block. The gap is why the peak is')
-  w('  the column a ceiling would have to be set against.')
+  w('  Week 1 is NOT uniformly the light week: it carries the heaviest TOTAL set')
+  w('  count for most profiles (section 5). What the peak column adds is that')
+  w('  different muscles peak in different weeks, so a per-muscle high-water mark')
+  w('  is higher than any single week read alone — which is why a ceiling would')
+  w('  have to be set against this column rather than against week 1.')
   w()
 
   // -- 3. Where the high end actually is ------------------------------------
@@ -317,6 +355,21 @@ function report(rows: Reading[]): string {
   const wc = new Map<number, number>()
   for (const n of peakWeeks) wc.set(n, (wc.get(n) ?? 0) + 1)
   w(`  which week carries the heaviest total: ${[...wc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n, c]) => `wk${n} x${c}`).join(', ')}`)
+  w()
+
+  w('6. ONE MAIN LIFT PER DAY — an invariant nothing currently checks')
+  w('-'.repeat(72))
+  const twoMainDays = rows.reduce((n, r) => n + r.daysWithTwoMains, 0)
+  const affected = rows.filter(r => r.daysWithTwoMains > 0)
+  w(`  days carrying more than one tier-1 compound: ${twoMainDays} of ${allDaysWorking.length}`)
+  w(`  profiles affected: ${affected.length} of ${rows.length} (${(100 * affected.length / rows.length).toFixed(1)}%)`)
+  if (affected.length > 0) {
+    for (const f of ['goal', 'experience', 'duration', 'style', 'equipment'] as (keyof Reading)[]) {
+      w(`    ${String(f).padEnd(11)} ${cluster(affected, f)}`)
+    }
+    w('  examples:')
+    for (const r of affected.slice(0, 8)) w(`    ${r.twoMainExample}   ${r.key}`)
+  }
   w()
 
   return out.join('\n')
