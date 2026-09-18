@@ -257,7 +257,19 @@ console.log('\n3. Nothing has crept back up')
   // this one. That is 411 kB gzipped against 483 before the coach was deferred,
   // and it has its own check. This budget is a proxy for it and a brake on
   // drift, not the user-facing measurement.
-  const APP_CHUNK_BUDGET_KB = 940
+  //
+  // 18 Sep 2026: 940 -> 960. MEASURED ON THIS BRANCH, both figures from a
+  // build run minutes apart: 940 kB without the "last time" marker, 941 kB
+  // with it. The marker itself is about a kilobyte; the ceiling had ZERO room
+  // and a one-kilobyte feature tipped it, which is the 15 and 17 Sep notes
+  // above happening for the fourth and fifth time.
+  //
+  // It is Ashley's 15 Sep ruling applied rather than a new decision — raise it
+  // with room to grow, over trimming on every commit — so the only new thing
+  // here is the measurement: 19 kB of real headroom above a measured 941,
+  // which the line printed by `headroom` above will now show eroding on every
+  // run rather than only when it is crossed.
+  const APP_CHUNK_BUDGET_KB = 960
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

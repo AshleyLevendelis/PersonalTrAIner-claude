@@ -263,6 +263,66 @@ export function personalBest(reading: BestReading): string {
  * four-word qualifier is two things to drift, and the drifted one is the one
  * nobody re-reads.
  */
+/**
+ * WHAT YOU DID LAST TIME, said so it cannot be read as an instruction.
+ *
+ * Ashley, 17 Sep 2026, looking at her own dumbbell rows: *"Last sets
+ * prescribed were sets of 11 reps. Is thay correct at the end of a
+ * exercise?"* Nothing had prescribed 11. The faint numbers in the boxes were
+ * her OWN last session — 9, 11, 11 — shown in the same grey the app uses for
+ * a hint, with nothing saying which they were. She read her history as a
+ * prescription, and it is the only reading the screen supported.
+ *
+ * Her ruling, 18 Sep 2026, from three options: **mark them "last time"** —
+ * the numbers stay in the boxes where her thumb is, and the row says what
+ * they are. She rejected moving them out of the boxes to a line above the
+ * sets (history one glance further away mid-set) and emptying the boxes
+ * entirely (a number to type on every set instead of a tap).
+ *
+ * ONE ARGUMENT OVER A UNION, the same shape as personalBest above and for the
+ * same reason: a reps count and a kilo figure are different quantities, and a
+ * caller holding a loose number must not be able to render it as either.
+ */
+export type LoggedSetReading =
+  | { kind: 'loaded'; weightKg: number; reps: number }
+  | { kind: 'bodyweight'; reps: number }
+  | { kind: 'added_load'; addedKg: number; reps: number }
+
+export function lastTime(reading: LoggedSetReading): string {
+  // NEVER A BARE COUNT. "last time 9" beside a weight box reads as 9kg;
+  // the kind travels with the number, same rule as personalBest.
+  if (reading.kind === 'bodyweight') return `last time bodyweight × ${reading.reps}`
+  if (reading.kind === 'added_load') return `last time +${reading.addedKg}kg × ${reading.reps}`
+  return `last time ${reading.weightKg}kg × ${reading.reps}`
+}
+
+/**
+ * The bridge from a stored set to the reading above, for the same reason
+ * `bestReadingOf` exists: the caller must not rebuild it with a ternary.
+ * That exact shape is what put "12 kg" on a reps record — three call sites,
+ * each with its own ternary, two of them wrong.
+ *
+ * The order of the branches is the whole content of this function. A belted
+ * dip carries `is_bodyweight: true` AND an added load, so added load must be
+ * tested first or it renders as a plain bodyweight set with its belt lost.
+ * And a row with no weight is a bodyweight row whether or not the flag was
+ * set — the flag arrived later than the rows, so history predates it.
+ */
+export function loggedSetReading(log: {
+  weight_kg: number
+  reps_completed: number
+  is_bodyweight?: boolean | null
+  added_load_kg?: number | null
+}): LoggedSetReading {
+  if (log.added_load_kg != null && log.added_load_kg > 0) {
+    return { kind: 'added_load', addedKg: log.added_load_kg, reps: log.reps_completed }
+  }
+  if (log.is_bodyweight || !(log.weight_kg > 0)) {
+    return { kind: 'bodyweight', reps: log.reps_completed }
+  }
+  return { kind: 'loaded', weightKg: log.weight_kg, reps: log.reps_completed }
+}
+
 export const BEST_SET_QUALIFIER = 'best set'
 
 /**

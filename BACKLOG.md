@@ -2,6 +2,73 @@
 
 Newest first. One line each.
 
+- [x] **WHOSE NUMBERS ARE IN THE BOXES — the faint figures now say "last time".**
+  Ashley, 18 Sep, reading her own dumbbell rows: *"Last sets prescribed were
+  sets of 11 reps. Is thay correct at the end of a exercise?"* Nothing had
+  prescribed 11. The faint 9, 11, 11 in the boxes were her OWN last session,
+  drawn in exactly the grey the app uses for a suggestion on a row with no
+  history. Two different things, one appearance, and nothing on screen telling
+  them apart — she read her history as a prescription, and it was the only
+  reading the screen supported.
+
+  **Her ruling, 18 Sep 2026, from three options: MARK THEM "last time".** The
+  numbers stay in the boxes where her thumb is, and a small marker sits on the
+  row whenever they are history. She rejected moving them out of the boxes to a
+  line above the sets (it costs the one-tap repeat) and emptying the boxes
+  entirely (it costs the repeat outright).
+
+  Live on a real 390x844 screen: *last time 9kg × 1* under each working row, in
+  the dimmest grey on the card, and nothing at all under the build-up row above
+  them or under any lift with no session behind it.
+
+  **THE SENTENCE CARRIES THE KIND OF QUANTITY, NOT JUST THE NUMBER** — the
+  17 Sep personal-best rule, one screen along. "last time 9" beside a weight
+  box reads as 9kg. So the phrasebook takes one reading over a three-case union
+  (loaded / bodyweight / belted) and there is no default branch; a belted dip
+  reads *+12kg × 5* and an unweighted row never prints "0kg". And the
+  ternary that turns a stored row into that reading is in the phrasebook too,
+  not at the JSX — it is the same shape that put "12 kg" on a reps record from
+  three call sites, two of which got it wrong.
+
+  **THE BRANCH ORDER IS THE WHOLE CONTENT OF THAT FUNCTION.** A belted set
+  carries the bodyweight flag AND an added load, so added load has to be tested
+  first or the belt is silently lost; and a row with no weight is a bodyweight
+  row whether or not the flag is set, because the flag arrived after the rows
+  did. Both are gated.
+
+  **Verified**: new gate `test:last-time` (29 checks), **10 mutations tried, 10
+  caught**, every one confirmed to have applied and to have run the full 29.
+  Six new browser checks in `verify:one-number` — the driver already loads a
+  real logged session on today's lift, which is the same screen and the same
+  confusion — **5 mutations tried, 5 caught**, and the mutant bundle rebuilt
+  away afterwards. One of the six had nothing to read at first: this fixture's
+  logged lift is a tier-2 under 60kg and the generator prescribes it no
+  build-up, so the driver now taps "+ Add warm-up" and reads the row it makes,
+  which is the stronger check anyway — a row created at runtime is exactly what
+  no source check can see. 20 source gates and 4 browser drivers re-run green;
+  `npx tsc --noEmit` clean.
+
+  **THE BUNDLE CEILING HAD ZERO ROOM AND A ONE-KILOBYTE FEATURE TIPPED IT.**
+  Measured on this branch minutes apart: 940 kB without the marker, 941 with
+  it, against a 940 budget. Raised to 960 — Ashley's 15 Sep ruling applied
+  (raise with room to grow, over trimming on every commit), not a new decision,
+  and the measured 941 is recorded beside it rather than the note's inherited
+  figure. **Two more ceilings are now within 2 kB of their line** (the deploy
+  re-download at 263 of 264, first paint at 418 of 420) and will trip on
+  whatever lands next. They are named here rather than pre-emptively raised:
+  they are not crossed, and the headroom line prints them on every run.
+
+  **THE QUALITY SWEEP OWED BY THE ENTRY BELOW, now finished.** Protecting rest
+  cost nothing measurable: 9,216 profiles, overall 11.56/12 before and after,
+  **0 below the 7.2 floor** either way, and time fit up 1.93 → 1.94 with 40
+  more plans in the top band. Time-budget violations fell 403 → 339, which is
+  the overrun fix the rest work exposed. **One rule moved the wrong way and is
+  a real cost of "do less": plans with no squat pattern at all went 4 → 22 of
+  9,216** (0.04% → 0.24%). Shedding an accessory to pay for rest can take the
+  week's only squat with it when the day's main lift is something else. Not
+  fixed — it is a consequence of her ruling, small, and hers to weigh.
+  No deploy needed; frontend ships on merge.
+
 - [x] **REST THAT SUITS THE EXERCISE — her 30-second lat pulldown, and the two
   older things under it.** Ashley from the gym floor, 17 Sep: *"The rest breaks
   between the lat pulldown seem very short 30s, check that is correct."*

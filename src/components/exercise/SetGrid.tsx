@@ -21,11 +21,12 @@ import { Check, Dumbbell, Plus, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
+import { lastTime, loggedSetReading } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
-import type { ExerciseSetLog, UserProfile } from '@/lib/types'
+import type { UserProfile } from '@/lib/types'
 
 // REPLACED 8 Sep 2026 by set-plausibility.ts's MAX_LOGGABLE_SET_KG. The old
 // constant here was 9999.99 — the width of the database column, not a claim
@@ -286,7 +287,6 @@ export function SetGrid({
    * nowhere else.
    */
   const ghostFor = (ref: SetRef) => (isWarm(ref) ? undefined : ghostValues.find(g => g.set_number === ref.setNumber))
-
   const updateInput = (ref: SetRef, field: 'weight' | 'reps', value: string) => {
     const setNumber = ref.setNumber
     const k = rowKey(ref)
@@ -844,6 +844,19 @@ export function SetGrid({
           {rowWarnings[k] && (
             <p className="text-[0.625rem] text-amber-600 dark:text-amber-400 px-1 -mt-0.5" data-testid="weight-warning">
               {rowWarnings[k]}
+            </p>
+          )}
+          {/* WHOSE NUMBERS ARE THOSE. Ashley read her own last session — 9,
+              11, 11 — as a prescription, because the faint figures in the
+              boxes are her history wherever she has any and the app's
+              suggestion wherever she has none, drawn identically. Her ruling,
+              18 Sep 2026, from three options: mark them, leave them in the
+              boxes. Only where a ghost is actually driving the placeholder,
+              and never once the row is saved — then the boxes hold today's
+              real numbers and the marker would be describing nothing. */}
+          {ghost && !isSaved && (
+            <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="last-time">
+              {lastTime(loggedSetReading(ghost))}
             </p>
           )}
           </React.Fragment>

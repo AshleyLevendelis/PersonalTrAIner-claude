@@ -175,6 +175,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   history by construction, so logging one changes no number the app shows
   back. `working-sets`, `ramp-visibility`, `set-plausibility`,
   `verify:warmup-rows`, `verify:ramp-readonly`
+- **The faint numbers in the boxes say whose they are** — `screen only`, since
+  18 Sep 2026. Ashley, reading her own dumbbell rows: *"Last sets prescribed
+  were sets of 11 reps. Is thay correct at the end of a exercise?"* Nothing had
+  prescribed 11. The 9, 11, 11 were her OWN last session, drawn in exactly the
+  grey the app uses for a suggestion on a row with no history — two different
+  things, one appearance. **Her ruling that day, from three options: mark them
+  "last time"**, over moving them out of the boxes to a line above the sets and
+  over emptying the boxes; both of those cost the one-tap repeat, which is the
+  reason the numbers are there. The marker is on the row, only where history is
+  actually driving the boxes, never once the row is saved and never on a
+  build-up row. `last-time`, `verify:one-number` §8
 
 **Every change to an exercise lives in one menu** — her ruling, 14 Sep 2026,
 from three options, after reporting that swapping sat outside the "⋮" while
@@ -698,6 +709,15 @@ menu" stays true when a copy is also left outside it.
   the same case wrong. `bodyweight-progress` (74 checks, 8 mutations).
   NOT browser-driven: the case needs a loaded lift on today's card and the
   harness's today is all bodyweight
+- **A HINT AND A RECORD MUST NOT LOOK ALIKE.** 18 Sep 2026, one screen along
+  from the rule below and the same family: a box's placeholder is the app's
+  suggestion on a row with no history and the person's own last session
+  wherever they have one, drawn identically, and the reader has no way to tell.
+  A prescription read as history is harmless; history read as a prescription is
+  the app appearing to ask for something it never asked for. **Anywhere one
+  slot can hold either, the screen says which** — and the marker goes where the
+  numbers are, because moving them somewhere safer costs whatever the placement
+  was for.
 - **A NUMBER NEVER REACHES A SCREEN WITHOUT ITS UNIT**, and this generalises
   past PRs. Three renderers printed `${value}kg` with no branch, so a
   bodyweight best showed "0 kg" and a 12-rep best would have shown "12kg" —

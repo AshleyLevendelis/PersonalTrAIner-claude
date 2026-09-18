@@ -170,6 +170,142 @@ check('7. across the headline, the chips, the note and the boxes there is ONE we
   distinct.length === 1 && distinct[0] === lifted, { distinct, lifted })
 
 // ---------------------------------------------------------------------------
+// 8. WHOSE NUMBERS ARE THOSE — read off the same screen, one day later.
+//
+// Ashley, 18 Sep 2026, on her dumbbell rows: "Last sets prescribed were sets
+// of 11 reps. Is thay correct at the end of a exercise?" Nothing prescribed
+// 11. The faint figures in the boxes were her own last session, drawn in the
+// identical grey the app uses for a suggestion on a row with no history.
+//
+// Her ruling, from three options: mark them "last time" — the numbers stay in
+// the boxes where her thumb is, and a small marker says when they are history.
+//
+// WHY A BROWSER. test:last-time proves the sentence and proves the guard is in
+// the source. It cannot prove the marker lands on the RIGHT ROW: the marker
+// and the row are siblings in one flat grid, so a caption, a warning line or
+// an extra set can put it under the wrong one, and every source check still
+// passes. Reading the DOM in document order is the only way to see it.
+// ---------------------------------------------------------------------------
+const MARKERS = `(() => {
+  const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent.trim() === ${NAME})
+  if (!leaf) return { found: false }
+  let card = leaf
+  for (let i = 0; i < 12 && card.parentElement; i++) {
+    card = card.parentElement
+    if (card.querySelector('input') && /kg/i.test(card.innerText)) break
+  }
+  const anyRow = card.querySelector('[data-testid="working-row"]')
+  if (!anyRow) return { found: true, grid: false }
+  const kids = [...anyRow.parentElement.children]
+  const isRow = el => { const t = el.getAttribute('data-testid'); return t === 'warmup-row' || t === 'working-row' }
+  const rows = []
+  for (let i = 0; i < kids.length; i++) {
+    if (!isRow(kids[i])) continue
+    // Everything between this row and the next one belongs to this row.
+    let marker = null
+    for (let j = i + 1; j < kids.length && !isRow(kids[j]); j++) {
+      const m = kids[j].matches('[data-testid="last-time"]') ? kids[j] : kids[j].querySelector('[data-testid="last-time"]')
+      if (m) { marker = (m.textContent || '').trim(); break }
+    }
+    const boxes = [...kids[i].querySelectorAll('input')].map(inp => (inp.value || inp.placeholder || '').trim())
+    rows.push({ kind: kids[i].getAttribute('data-testid'), marker, boxes })
+  }
+  return { found: true, grid: true, rows }
+})()`
+
+const marked = await ev(MARKERS)
+check('8a. the set grid is readable row by row', marked.found === true && marked.grid === true && marked.rows.length > 0, marked)
+
+if (marked.grid) {
+  const working = marked.rows.filter(r => r.kind === 'working-row')
+  const warmups = marked.rows.filter(r => r.kind === 'warmup-row')
+
+  // THE FIXTURE MUST BE UNDER PRESSURE. ?logged=1 seeds a real prior session
+  // on this lift, so every working row here IS history-driven. A run where
+  // none of them carried a marker would otherwise read as a quiet pass.
+  check('8b. every working row on a lift with a logged session says "last time"',
+    working.length > 0 && working.every(r => r.marker && r.marker.startsWith('last time')),
+    working)
+
+  // The whole harm, inverted: a marker that names figures the boxes do not
+  // show is a second prescription, which is what she was reading in the first
+  // place. Every number in the marker must be in that row's own boxes.
+  const mismatched = working.filter(r => {
+    if (!r.marker) return true
+    const nums = (r.marker.match(/[0-9]+(?:[.][0-9]+)?/g) || [])
+    return !nums.every(n => r.boxes.some(b => parseFloat(b) === parseFloat(n)))
+  })
+  check('8c. ...and every figure it names is a figure in that row’s own boxes',
+    working.length > 0 && mismatched.length === 0, mismatched)
+
+  // A build-up number comes from the prescription and nowhere else, so a
+  // marker there would be a plain lie. This lift ramps, so there are rows to
+  // check; when there are none that is reported rather than folded into a pass.
+  //
+  // MEASURED, not assumed: this fixture's logged lift is a tier-2 under 60kg,
+  // and `needsRampUp` skips those — so the card arrives with no build-up rows
+  // at all and this check had nothing to read. Rather than move the fixture,
+  // the driver makes one the way she would, with "+ Add warm-up" on this very
+  // card. That is the stronger read anyway: a row created at runtime is
+  // exactly the row no source check can see.
+  let warmRows = warmups
+  if (warmRows.length === 0) {
+    const added = await ev(`(() => {
+      const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent.trim() === ${NAME})
+      if (!leaf) return 'no leaf'
+      let card = leaf
+      for (let i = 0; i < 12 && card.parentElement; i++) {
+        card = card.parentElement
+        if (card.querySelector('input') && /kg/i.test(card.innerText)) break
+      }
+      const btn = card.querySelector('[data-testid="add-warmup-set"]')
+      if (!btn) return 'no button'
+      btn.click()
+      return 'clicked'
+    })()`)
+    await wait(1200)
+    const after = await ev(MARKERS)
+    warmRows = (after.rows ?? []).filter(r => r.kind === 'warmup-row')
+    check('8d. "+ Add warm-up" really adds a build-up row to this card',
+      added === 'clicked' && warmRows.length > 0, { added, rows: (after.rows ?? []).map(r => r.kind) })
+  }
+  check('8e. no build-up row claims to be showing last time',
+    warmRows.length > 0 && warmRows.every(r => r.marker === null), warmRows)
+
+  // AND IT IS NOT SIMPLY ALWAYS ON. Every other exercise on this day has no
+  // history behind it, so its boxes hold the app's own suggestion and must
+  // say nothing. Without this the marker could be unconditional and 8b-8c
+  // would still be green.
+  const elsewhere = await ev(`(() => {
+    const grids = [...document.querySelectorAll('[data-testid="working-row"]')].map(r => r.parentElement)
+    const seen = new Set()
+    const out = []
+    for (const g of grids) {
+      if (seen.has(g)) continue
+      seen.add(g)
+      const rows = [...g.children].filter(c => c.getAttribute('data-testid') === 'working-row')
+      const boxes = rows.flatMap(r => [...r.querySelectorAll('input')].map(i => (i.value || i.placeholder || '').trim()))
+      out.push({ markers: g.querySelectorAll('[data-testid="last-time"]').length, rows: rows.length, boxes: boxes.slice(0, 4) })
+    }
+    return out
+  })()`)
+  const unmarked = elsewhere.filter(g => g.markers === 0)
+  check('8f. a set grid with no session behind it shows no marker at all',
+    elsewhere.length > 1 && unmarked.length > 0, elsewhere)
+
+  // Framed on the grid itself, not the card heading: the thing to look at is
+  // a marker sitting under its own row, small enough to ignore and legible
+  // enough to answer "whose numbers are these?" without tapping anything.
+  await ev(`(() => {
+    const row = document.querySelector('[data-testid="last-time"]')
+    if (row) row.scrollIntoView({ block: 'center' })
+  })()`)
+  await wait(600)
+  const shot8 = await send('Page.captureScreenshot', { format: 'png' })
+  writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/one-number-lasttime.png', Buffer.from(shot8.result.data, 'base64'))
+}
+
+// ---------------------------------------------------------------------------
 // 9. THE COUNT, not just the numbers — every row on one day's screen.
 //
 // Ashley's second report from the same training session: a card reading "3

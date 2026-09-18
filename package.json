@@ -291,6 +291,7 @@
     "test:meal-refit": "tsx scripts/test-meal-refit.ts",
     "test:coach-moments": "tsx scripts/test-coach-moments.ts",
     "test:coach-clock": "tsx scripts/test-coach-clock.ts",
+    "test:last-time": "tsx scripts/test-last-time.ts",
     "test:working-sets": "tsx scripts/test-working-sets.ts",
     "report:rest-floors": "tsx scripts/measure-rest-floors.ts",
     "test:rest-floors": "tsx scripts/test-rest-floors.ts"
