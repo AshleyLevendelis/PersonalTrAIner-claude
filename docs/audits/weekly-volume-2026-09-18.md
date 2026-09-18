@@ -95,18 +95,26 @@ one exercise done twice, and a heavy squat and a heavy deadlift in one session
 is a session a beginner cannot recover from — the whole point of one flagship
 lift per day is that everything after it is accessory work.
 
-**Probable cause, found in the code and stated as a lead rather than a fact**:
-the app already forbids this at three places and misses it at a fourth. The
-weekly-coverage fills (`exercise-plan.ts:3726`, `:3847`) and the
-day-label pattern fill all exclude `tier1_compound` explicitly, the last with a
-comment saying exactly why ("Filling with another main lift here silently
-doubled a day's main-compound count"). The `refill` fallback (`:2473-2477`)
-excludes primers and cardio and nothing else, so it can and does reach for a
-second main lift when a day runs short of candidates. Needs confirming by
-mutation before anyone acts on it.
+**Probable cause, stated here as a lead rather than a fact — AND THE LEAD WAS
+WRONG. Corrected in place, same day.** I wrote that the `refill` fallback was
+reaching for a second main lift when a day ran short of candidates, reasoning
+from the one comment in the file that already mentioned the rule
+(`ensurePatternPresent`, which excludes `tier1_compound` outright and says
+why). I guarded the fallbacks and the gate's generated-plan section came
+straight back holding the same `Pull-Ups + Chin-Ups`.
 
-This is the same recorded shape as the rest-floor bug: a constraint asserted at
-three paths and missed at the fourth.
+**What actually produces it**: `fillSlot` claims the track's own tier-1 slot,
+and then `pickFromTier('tier1_compound', ...)` claims another — the ordinary
+path every single day runs, not a fallback at all. Six paths could add a main
+lift and only two of them checked.
+
+Keeping the wrong version above matters more than tidying it away: **a
+source-shaped check written from the same reasoning I used would have passed
+and shipped the defect.** What caught it was a check that generates real plans
+and looks at what is in them.
+
+The shape is still the recorded one — a constraint asserted at some paths and
+missed at others — but the paths were not the ones the reasoning picked.
 
 ### 2. A deload week that is not lighter — 2,966 of 36,864 blocks (8.0%)
 
@@ -155,3 +163,52 @@ threshold nothing justifies.
 
 The two-main-lifts defect is a real, common, coach-visible fault with a probable
 one-line cause. That first.
+
+---
+
+# What the fix changed — measured, 18 Sep 2026
+
+Run as a genuine before/after: the "before" is a separate git worktree at the
+pre-fix commit, the "after" is the working tree, same script and same 9,216
+combinations. No env switch in shipped code. The before half reproduced this
+document's original figures exactly (49,988 two-main days, 2,477 profiles),
+which is what makes the pair comparable.
+
+## What it bought
+
+| | before | after |
+|---|---|---|
+| days carrying two main lifts | 49,988 of 589,824 | **0** |
+| profiles affected | 2,477 of 9,216 (26.9%) | **0** |
+| dropped side-delt slots (day-coverage grid) | 12 of 540 days | **0** |
+
+## What it cost
+
+**Session length: nothing.** Exercises per session is identical on every
+statistic — median 6, p90 10, p99 12, max 15. The freed slot is taken by a
+tier-2 or tier-3 movement rather than left empty, which was the open question
+and the main risk.
+
+**Movement coverage: nothing.** Push, pull, hinge and squat all sit at 0 weeks
+uncovered on both sides, as does the movement-prep slot. This was the bigger
+risk — a second main lift can be the only thing covering a pattern — and the
+weekly-balance backfill, which already excludes tier-1, absorbs it.
+
+**Working sets: a small, expected fall at the top.** Median, p90, p99 and max
+are unchanged; sessions over 20 working sets go 139,002 → 137,980 (23.57% →
+23.39%). Removing a five-set duplicate from ~50,000 days and replacing it with a
+three-to-four-set accessory is exactly this size.
+
+**Weekly sets per muscle: down where the duplicate was doing the work.** Biceps
+p99 29 → 25 and max 42 → 32 (the chin-up duplicate). Core p99 69 → 64, max 91 →
+80. Quads max 57 → 56. Shoulders and glutes essentially flat.
+
+**AND ONE REAL COST, named rather than buried.** Profiles whose chest gets under
+five sets in their peak week rise **1,485 → 1,653** (+168), and erectors under
+five rise 2,337 → 2,390 (+53). The duplicate main lift was contributing those
+sets. The count at *zero* chest sets does not move (1,024 either way), so nobody
+loses chest work entirely — a thin week gets slightly thinner for about 1.8% of
+profiles. That is the correct trade (the second bench-pattern main lift should
+not have been there) but it is a cost, and it points at the same gap section 4
+already names: nothing in the app notices a muscle running thin. Calves move
+the other way, slightly better (0 sets: 1,197 → 1,188).

@@ -69,12 +69,34 @@ Newest first. One line each.
   the code it covered came back MISSED. A check is not present because you
   remember writing it.
 
-  **COST MEASUREMENT RUNNING.** Refusing a second main lift could leave a day
-  one exercise SHORT rather than swapping a tier-2 in, and could cost movement
-  coverage. Both are being measured pre-fix against post-fix on the full grid
-  (`measure:volume`, which now reports exercises-per-session, and
-  `measure-pattern-coverage`). Numbers in the next commit; if they are not
-  there, this line is the evidence they were never taken.
+  **COST MEASURED, pre-fix worktree against post-fix working tree, same script
+  and same 9,216 combinations — no env switch in shipped code.** The before half
+  reproduced the figures exactly (49,988 / 2,477), which is what makes the pair
+  comparable.
+  **Bought**: two-main days 49,988 -> **0**, profiles 2,477 -> **0**, dropped
+  side-delt slots 12 -> **0**.
+  **Cost, session length: none.** Exercises per session identical on every
+  statistic (median 6, p90 10, p99 12, max 15) — the freed slot is taken by a
+  tier-2 or tier-3, which was the open question and the main risk.
+  **Cost, movement coverage: none.** Push, pull, hinge, squat and the
+  movement-prep slot all at 0 weeks uncovered on both sides. This was the bigger
+  risk, and the weekly-balance backfill (which already excludes tier-1) absorbs
+  it.
+  **Working sets**: median/p90/p99/max unchanged; sessions over 20 go 139,002 ->
+  137,980. Removing a five-set duplicate from ~50,000 days and putting a
+  three-to-four-set accessory in its place is exactly that size.
+  **Per muscle, down where the duplicate did the work**: biceps p99 29 -> 25 and
+  max 42 -> 32 (the chin-up duplicate), core p99 69 -> 64 and max 91 -> 80.
+  **AND ONE REAL COST, named**: profiles whose chest gets under five sets in
+  their peak week rise 1,485 -> 1,653 (+168, ~1.8%), erectors under five 2,337
+  -> 2,390. The duplicate was contributing those sets. The count at ZERO chest
+  does not move (1,024 either way), so nobody loses chest work entirely — a thin
+  week gets thinner for a small group. Correct trade, still a cost, and it
+  points at the same gap the audit's section 4 already names: nothing notices a
+  muscle running thin.
+  Full write-up in `docs/audits/weekly-volume-2026-09-18.md`, which also
+  CORRECTS ITS OWN wrong cause in place rather than tidying it away — the
+  reasoning that produced it would have produced a passing source check too.
 
 - [x] **MEASURED THE VOLUME CEILING BEFORE BUILDING IT, AND THE MEASUREMENT
   FOUND SOMETHING ELSE.** 18 Sep 2026, on Ashley's instruction, against a
