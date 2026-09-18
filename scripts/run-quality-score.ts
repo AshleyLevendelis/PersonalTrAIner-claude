@@ -8,13 +8,6 @@ import { seededRngFromKey } from '../src/lib/seeded-random'
 import {
   scorePlan, DIMENSION_KEYS, type DimensionKey, type PlanScoreResult,
 } from '../src/lib/quality-score'
-import {
-  ALL_EQUIPMENT, ALL_DURATIONS, ALL_STYLES, ALL_EXPERIENCE, getInjuryCombinations,
-} from '../src/lib/dev-constraint-audit'
-import type {
-  UserProfile, EquipmentAccess, TrainingStyle, SessionDuration, TrainingExperience,
-  FitnessGoal, RecoveryCapacity, ConditioningPreference,
-} from '../src/lib/types'
 
 // ---------------------------------------------------------------------------
 // Plan quality scoring harness
@@ -41,95 +34,9 @@ import type {
 // conditioning) pairings actually occur, spread independently across the
 // grid, while staying a pure deterministic function of one counter.
 
-const ALL_GOALS: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'conditioning', 'functional']
-const ALL_RECOVERY: RecoveryCapacity[] = ['low', 'moderate', 'high']
-const ALL_CONDITIONING_PREF: ConditioningPreference[] = ['love', 'tolerate', 'avoid']
-
-interface Combination {
-  equipment: EquipmentAccess
-  injuries: string[]
-  duration: SessionDuration
-  style: TrainingStyle
-  experience: TrainingExperience
-  goal: FitnessGoal
-  recovery: RecoveryCapacity
-  conditioningPref: ConditioningPreference
-}
-
-function buildProfile(combo: Combination): UserProfile {
-  return {
-    age: 30,
-    gender: 'male',
-    height_cm: 178,
-    weight_kg: 80,
-    activity_level: 'moderate',
-    fitness_goal: combo.goal,
-    preferred_time: 'morning',
-    bmr: 1800,
-    tdee: 2500,
-    equipment_access: combo.equipment,
-    injuries: combo.injuries,
-    training_style: combo.style,
-    training_experience: combo.experience,
-    session_duration_preference: combo.duration,
-    workout_split_preference: 'ai_recommendation',
-    training_days: [
-      { day: 'Monday', available: true },
-      { day: 'Tuesday', available: true },
-      { day: 'Wednesday', available: false },
-      { day: 'Thursday', available: true },
-      { day: 'Friday', available: true },
-      { day: 'Saturday', available: false },
-      { day: 'Sunday', available: false },
-    ],
-    weekly_schedule: {},
-    dietary_preferences: [],
-    concurrent_activities: [],
-    exercise_exclusions: [],
-    macro_calculation_mode: 'STANDARD_STATIC',
-    coaching_persona: 'supportive',
-    recovery_capacity: combo.recovery,
-    conditioning_preference: combo.conditioningPref,
-    // No `id` — keeps any Supabase-dependent code path (logged-history
-    // lookups) untouched during a plain-Node scoring run.
-  }
-}
-
-function comboKey(combo: Combination): string {
-  return [
-    combo.equipment, combo.injuries.join('+') || 'none', combo.duration, combo.style,
-    combo.experience, combo.goal, combo.recovery, combo.conditioningPref,
-  ].join('|')
-}
-
-function comboLabel(combo: Combination): string {
-  return `${combo.equipment} / ${combo.injuries.join('+') || 'none'} / ${combo.duration} / ${combo.style} / ${combo.experience} / ${combo.goal} / recovery=${combo.recovery} / cardio=${combo.conditioningPref}`
-}
-
-function generateAllCombinations(): Combination[] {
-  const injuryCombinations = getInjuryCombinations()
-  const combos: Combination[] = []
-  let rotationIndex = 0
-  for (const equipment of ALL_EQUIPMENT) {
-    for (const injuries of injuryCombinations) {
-      for (const duration of ALL_DURATIONS) {
-        for (const style of ALL_STYLES) {
-          for (const experience of ALL_EXPERIENCE) {
-            for (const goal of ALL_GOALS) {
-              combos.push({
-                equipment, injuries, duration, style, experience, goal,
-                recovery: ALL_RECOVERY[rotationIndex % ALL_RECOVERY.length],
-                conditioningPref: ALL_CONDITIONING_PREF[Math.floor(rotationIndex / ALL_RECOVERY.length) % ALL_CONDITIONING_PREF.length],
-              })
-              rotationIndex++
-            }
-          }
-        }
-      }
-    }
-  }
-  return combos
-}
+import {
+  type Combination, buildProfile, comboKey, comboLabel, generateAllCombinations,
+} from './quality-grid'
 
 interface ScoredCombo {
   combo: Combination

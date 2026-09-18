@@ -23,6 +23,11 @@ supabase/.temp/
 # committed, but the file itself stays), so they can't be listed here —
 # .githooks/pre-commit refuses those instead.
 meal-quality-report.txt
+# volume-report.txt is a one-off measurement, not a tracked snapshot — the
+# findings live in docs/audits/ where they can be read without regenerating
+# 9,216 plans. Ignored rather than tracked so it never becomes a third file
+# the pre-commit hook has to defend.
+volume-report.txt
 .tour-harness/dist/
 .tour-harness/*.png
 .onb-harness/dist/
