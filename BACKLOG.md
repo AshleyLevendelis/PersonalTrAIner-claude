@@ -3,7 +3,7 @@
 Newest first. One line each.
 
 - [x] **THE PRE-MERGE SWEEP: four real failures, and the worst one was a gate
-  that had never been green.** 231 gates and drivers run before merging.
+  that had never been green.** 257 gates and drivers run before merging.
   Three failures were environmental (`meal-quality`, `schema-parity`, and
   `verify:rls` — all need a live database this machine cannot reach) and two
   more were MY SWEEP HARNESS, not the code: `test:audit` and
