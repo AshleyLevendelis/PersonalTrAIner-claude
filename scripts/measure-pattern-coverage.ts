@@ -38,6 +38,13 @@ const ALL_CONDITIONING_PREF: ConditioningPreference[] = ['love', 'tolerate', 'av
 
 const FUNDAMENTALS = ['push', 'pull', 'hinge', 'squat'] as const
 
+// Counted alongside the patterns because protecting one thing from a trimmer
+// necessarily aims it at another, and the honest way to know WHICH is to
+// measure both under the same run. The quality sweep's primer_absent moved
+// 14 -> 102 across this week's work and the committed baseline is too old to
+// say which change did it.
+const PRIMER_KEY = 'primer_missing_day'
+
 interface Combination {
   equipment: EquipmentAccess
   injuries: string[]
@@ -117,6 +124,7 @@ function comboKey(combo: Combination): string {
 function runShard(from: number, to: number, stopAfter = Infinity): Record<string, number> & { scored: number; offenders: string[] } {
   const combos = generateAllCombinations()
   const missing: Record<string, number> = Object.fromEntries(FUNDAMENTALS.map(p => [p, 0]))
+  missing[PRIMER_KEY] = 0
   const offenders: string[] = []
   let scored = 0
   for (let i = from; i < to && i < combos.length; i++) {
@@ -143,6 +151,16 @@ function runShard(from: number, to: number, stopAfter = Infinity): Record<string
       const poolPatterns = new Set(
         getConstrainedPool(profile, []).map(e => mapMovementPattern(e.movement_pattern)),
       )
+      // Same shape as the scorer's own rule: a training day with exercises but
+      // no tier_0_primer among them.
+      const primerless = (week1?.days ?? []).some(
+        d => d.exercises.length > 0
+          && !d.exercises.some(e => (e as unknown as { tier?: string }).tier === 'tier_0_primer'),
+      )
+      if (primerless) {
+        missing[PRIMER_KEY]++
+        if (offenders.length < 40) offenders.push(`${PRIMER_KEY}|${comboKey(combo)}`)
+      }
       for (const p of FUNDAMENTALS) {
         if (present.has(p) || !poolPatterns.has(p)) continue
         missing[p]++
@@ -222,6 +240,9 @@ async function main(): Promise<void> {
     const pct = ((summed[p] / summed.scored) * 100).toFixed(2)
     console.log(`  ${p.padEnd(6)} ${String(summed[p]).padStart(5)}  ${pct}%`)
   }
+  const primerPct = ((summed[PRIMER_KEY] / summed.scored) * 100).toFixed(2)
+  console.log(`weeks with a training day carrying no movement-prep slot:`)
+  console.log(`  primer ${String(summed[PRIMER_KEY]).padStart(5)}  ${primerPct}%`)
   if (offenders.length > 0) {
     console.log('offending combinations (pattern|equipment|injuries|duration|style|experience|goal|recovery|cardio):')
     for (const o of offenders.slice(0, 25)) console.log(`  ${o}`)
