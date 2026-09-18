@@ -2,6 +2,80 @@
 
 Newest first. One line each.
 
+- [x] **ONE MAIN LIFT PER DAY — CONFIRMED, AND MY FIRST FIX WAS AIMED AT THE
+  WRONG PATHS.** 18 Sep 2026. The entry below measured 2,477 of 9,216 profiles
+  (26.9%) carrying a second tier-1 compound on a day, and named `refill` as the
+  probable cause, explicitly as a lead. **The lead was wrong, and the gate is
+  what said so.**
+
+  `getExerciseCountForDuration` returns `tier1: 1` for all four session lengths,
+  so one flagship lift per day is the design, not a coincidence.
+
+  **What actually produces `Pull-Ups + Chin-Ups`**: `fillSlot` claims the
+  track's own tier-1 slot, and then `pickFromTier('tier1_compound', ...)` claims
+  another — the ordinary path every single day runs, not a fallback at all. I
+  reasoned from the one comment in the file that already mentioned the rule
+  (`ensurePatternPresent`, which excludes tier-1 outright and says why), guarded
+  the four FALLBACK paths, and the gate's generated-plan section came straight
+  back holding the same pair. **A source-shaped check written from the same
+  reasoning would have passed and shipped the defect.** That is the argument for
+  §3 existing in the form it does.
+
+  Now one shared predicate, `isSecondMainLift(selected, candidate)`, pure and
+  exported, asked by every path that can put an exercise in a day: the
+  track-slot fill (both its pick and its nearest-pattern substitute), the tier
+  pass (twice — the candidate list is built once, so its filter cannot see a
+  main lift the same loop claims a moment later, exactly why the family
+  re-check already sits beside it), the refill fallback, and both
+  required-pattern fills. **Never "no main lift here"**: a day whose tier-1 slot
+  came up empty — no barbell, an injury ruling every press out — should still be
+  given one, and 1d pins that.
+
+  **A MEASURED BENEFIT I DID NOT EXPECT**: `test:day-coverage` went RED, because
+  the fix emptied its subject. That grid dropped 12 named isolation slots
+  (all side-delt) before and drops **0** after — refusing the second main lift
+  frees the slot, and a lateral raise now fills it. The check asserted
+  `shoulder > tricep`, which needs the loss to still be happening, so it failed
+  on the commit that removed it. Re-anchored on the property it actually holds
+  ("IF a slot is lost it is the side delt, not the triceps"), which passes
+  honestly at zero and still fails if triceps become dominant — verified both
+  ways against the pre-fix engine in a worktree, and the count is printed every
+  run so a zero reads as a zero rather than as silence.
+
+  **CSCS basis** (mine under her 18 Sep delegation): two maximal-demand
+  compounds in one session means the second is performed already fatigued, so it
+  takes the same prescribed load at a worse stimulus and degrades everything
+  after it. One flagship lift at high intent and then accessory work is why a
+  session has a shape. Squat and deadlift together for a beginner is the version
+  a coach would refuse outright; pull-ups beside chin-ups is not two exercises,
+  it is one exercise twice.
+
+  **Verified**: new `test:one-main-lift`, 20 checks — the predicate as a unit,
+  a per-path source property, the real offenders the 9,216-profile run named by
+  key, and a detector proof. **11 mutations tried, 11 caught**, all confirmed
+  applied and all running the full 20. Plus 21 affected gates green and
+  `npx tsc --noEmit` clean.
+
+  **THREE THINGS THE MUTATION ROUND FOUND THAT READING COULD NOT**, all worth
+  more than the fix. (1) A COUNT OF GUARD CALLS IS NOT A CHECK THAT EVERY PATH
+  GUARDS: `>= 7` passed with any single site unguarded, because the guards
+  overlap — strip one and another still catches it. Four mutations MISSED with
+  every check running. Counting pushes per region and requiring one ask each is
+  the same property said precisely. (2) MY OWN HOISTED `function
+  wouldBeSecondMainLift(` DECLARATION COUNTED AS A CALL, giving its region a
+  spare guard — the "your own edit satisfied the search" shape, in a gate this
+  time; fixed with a negative lookbehind. (3) **A CHECK I BELIEVED EXISTED HAD
+  BEEN DROPPED BY ONE OF MY OWN REWRITES** and nothing said so until breaking
+  the code it covered came back MISSED. A check is not present because you
+  remember writing it.
+
+  **COST MEASUREMENT RUNNING.** Refusing a second main lift could leave a day
+  one exercise SHORT rather than swapping a tier-2 in, and could cost movement
+  coverage. Both are being measured pre-fix against post-fix on the full grid
+  (`measure:volume`, which now reports exercises-per-session, and
+  `measure-pattern-coverage`). Numbers in the next commit; if they are not
+  there, this line is the evidence they were never taken.
+
 - [x] **MEASURED THE VOLUME CEILING BEFORE BUILDING IT, AND THE MEASUREMENT
   FOUND SOMETHING ELSE.** 18 Sep 2026, on Ashley's instruction, against a
   relayed proposal to cap working sets per workout at 20-24.

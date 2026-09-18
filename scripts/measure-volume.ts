@@ -104,6 +104,13 @@ interface Reading {
   dayAll: number[]
   /** How many of this plan's days carry a conditioning row at all. */
   daysWithFinisher: number
+  /**
+   * Exercises per training day, warm-ups excluded. Here because refusing a
+   * second main lift could leave a day one exercise SHORT rather than swapping
+   * a tier-2 in — and a measurement that counts only what a change buys is
+   * half a measurement.
+   */
+  dayExerciseCount: number[]
   /** Days carrying MORE THAN ONE tier1_compound, with an example. */
   daysWithTwoMains: number
   twoMainExample: string | null
@@ -133,6 +140,7 @@ function readOne(combo: Combination): Reading {
   const dayAll: number[] = []
   const weekTotals: number[] = []
   let daysWithFinisher = 0
+  const dayExerciseCount: number[] = []
   let daysWithTwoMains = 0
   let twoMainExample: string | null = null
 
@@ -164,6 +172,7 @@ function readOne(combo: Combination): Reading {
       }
       dayWorking.push(working)
       dayAll.push(all)
+      dayExerciseCount.push(day.exercises.filter(e => e.tier !== 'tier_0_primer').length)
       weekTotal += working
       if (day.exercises.some(e => e.tier === 'tier_4_finisher')) daysWithFinisher++
 
@@ -204,6 +213,7 @@ function readOne(combo: Combination): Reading {
     dayWorking,
     dayAll,
     daysWithFinisher,
+    dayExerciseCount,
     daysWithTwoMains,
     twoMainExample,
     peakWeekTotal: weekTotals.length ? Math.max(...weekTotals) : 0,
@@ -276,6 +286,8 @@ function report(rows: Reading[]): string {
   w(`  (the two lines can only differ on the ${finDays} of ${allDaysWorking.length} days that carry a`)
   w('   conditioning row at all — printed so an identical pair reads as "rare",')
   w('   which is a fact, rather than as "the column is broken", which would not be.)')
+  w()
+  w(`  exercises per session (warm-ups excluded):               ${describe(rows.flatMap(r => r.dayExerciseCount))}`)
   w()
   for (const t of [20, 24, 30]) {
     const over = allDaysWorking.filter(v => v > t).length

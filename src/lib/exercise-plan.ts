@@ -2292,7 +2292,7 @@ function selectExercisesForTrack(
       findForSlot(slot.patterns, slot.tier, false) ??
       findForSlot(slot.patterns, null, true) ??
       findForSlot(slot.patterns, null, false)
-    if (pick) {
+    if (pick && !wouldBeSecondMainLift(pick)) {
       selected.push(pick)
       usedGroups.add(getMovementFamily(pick))
       if (slot.required) requiredNames.add(pick.name)
@@ -2301,7 +2301,7 @@ function selectExercisesForTrack(
     if (!slot.required) return
     const nearest = slot.patterns.flatMap(p => NEAREST_PATTERN_FALLBACK[p] ?? [])
     const substitute = nearest.length > 0 ? (findForSlot(nearest, null, true) ?? findForSlot(nearest, null, false)) : null
-    if (substitute) {
+    if (substitute && !wouldBeSecondMainLift(substitute)) {
       selected.push(substitute)
       usedGroups.add(getMovementFamily(substitute))
       requiredNames.add(substitute.name)
@@ -2319,10 +2319,18 @@ function selectExercisesForTrack(
   }
   for (const slot of track.slots) fillSlot(slot)
 
+  // A function DECLARATION, not a const arrow: fillSlot runs before the point
+  // where a const would be initialised, and the temporal dead zone turns that
+  // into a crash rather than a missed guard. Hoisting is the whole reason.
+  function wouldBeSecondMainLift(e: ExerciseEntry): boolean {
+    return isSecondMainLift(selected, e)
+  }
+
   function pickFromTier(tier: string, count: number, patterns: MovementPattern[]) {
     const candidates = orderCandidates(
       trackPool.filter(e =>
         e.mechanics_tier === tier &&
+        !wouldBeSecondMainLift(e) &&
         patterns.includes(e.movement_pattern) &&
         !weeklyUsed.has(e.name) &&
         !selected.some(s => s.name === e.name) &&
@@ -2341,6 +2349,10 @@ function selectExercisesForTrack(
       // otherwise slip through — which is how Chest Dips and Tricep Dips
       // (both family 'dip') ended up in the same session.
       if (usedGroups.has(getMovementFamily(c.e))) continue
+      // And the main-lift re-check, for exactly the reason above: `candidates`
+      // is evaluated once, so the day's FIRST tier-1 — claimed by this very
+      // loop a moment ago — is invisible to the filter that built the list.
+      if (wouldBeSecondMainLift(c.e)) continue
       selected.push(c.e)
       usedGroups.add(getMovementFamily(c.e))
       // Runner-up is the next entry in this same ranked list — the real
@@ -2472,6 +2484,7 @@ function selectExercisesForTrack(
         trackPool.filter(e =>
           e.mechanics_tier !== 'primer' &&
           e.mechanics_tier !== 'cardio' &&
+          !wouldBeSecondMainLift(e) &&
           !selected.some(s => s.name === e.name) &&
           (!respectFamilies || !usedGroups.has(getMovementFamily(e))) &&
           (!respectWeeklyCap || !weeklyAppearanceCount || (weeklyAppearanceCount.get(e.name) ?? 0) < WEEKLY_APPEARANCE_CAP)
@@ -2508,6 +2521,7 @@ function selectExercisesForTrack(
     if (!selected.some(e => e.movement_pattern === reqPattern)) {
       const fill = trackPool.find(e =>
         e.movement_pattern === reqPattern &&
+        !wouldBeSecondMainLift(e) &&
         !selected.some(s => s.name === e.name) &&
         !usedGroups.has(getMovementFamily(e))
       )
@@ -2526,6 +2540,7 @@ function selectExercisesForTrack(
         // PASS 1: Strict search (respect all constraints)
         const fill = pool.find(e =>
           e.movement_pattern === reqPattern &&
+          !wouldBeSecondMainLift(e) &&
           !selected.some(s => s.name === e.name) &&
           !forbidden.has(e.movement_pattern) &&
           !usedGroups.has(getMovementFamily(e))
@@ -2538,6 +2553,7 @@ function selectExercisesForTrack(
           // PASS 2: Relaxed search (allow reusing substitution groups)
           const relaxedFill = pool.find(e =>
             e.movement_pattern === reqPattern &&
+            !wouldBeSecondMainLift(e) &&
             !selected.some(s => s.name === e.name) &&
             !forbidden.has(e.movement_pattern)
           )
@@ -5412,6 +5428,53 @@ export function isLastCarrierOfPattern(
   return !entries.some(
     (other, i) => i !== index && other && mapMovementPattern(other.movement_pattern) === pattern,
   )
+}
+
+/**
+ * ONE MAIN LIFT PER DAY — the question every path that fills a day must ask.
+ *
+ * `getExerciseCountForDuration` returns `tier1: 1` for all four session
+ * lengths, so exactly one flagship lift per day is the design and not a
+ * coincidence; the goal-alignment scorer counts main-compound SLOTS, so a day
+ * holding two reads as a different kind of day than it is.
+ *
+ * MEASURED 18 Sep 2026 (docs/audits/weekly-volume-2026-09-18.md), 9,216
+ * profiles x 16 weeks: 49,988 of 589,824 days carried a second tier-1, across
+ * 2,477 profiles (26.9%). The commonest shape was `Pull-Ups + Chin-Ups` on one
+ * day, both at five or six sets — the same movement twice, as two separate main
+ * lifts. On a full-gym functional beginner it was `Deadlifts + Barbell Squats`,
+ * every week of the block.
+ *
+ * THE CONSTRAINT WAS ASSERTED AT TWO PATHS AND MISSED AT FOUR, which reads
+ * backwards from how the code looks. `ensurePatternPresent` excludes
+ * tier1_compound outright with a comment giving the exact reason ("silently
+ * doubled a day's main-compound count"), and both weekly-coverage fills exclude
+ * it too — while `refill` and the two required-pattern fills, which are what
+ * actually run on a normal day, did not. Same family as the rest-floor bug: a
+ * rule stated at several sites and forgotten at one more.
+ *
+ * NOT "never add a main lift here". A day whose tier-1 slot came up empty — no
+ * barbell, or an injury ruling every press out — SHOULD be given one by a
+ * fallback; that is the fallback doing its job. What may never happen is a
+ * SECOND.
+ *
+ * THE CSCS READ, recorded rather than asserted (mine under Ashley's 18 Sep
+ * delegation): two maximal-demand compounds in one session means the second is
+ * performed already fatigued, so it takes the same prescribed load at a worse
+ * stimulus and degrades everything after it. One flagship lift at high intent
+ * and then accessory work is the reason a session has a shape at all. Squat and
+ * deadlift together for a beginner is the version a coach would refuse outright;
+ * pull-ups beside chin-ups is not two exercises, it is one exercise twice.
+ *
+ * Pure and exported so the gate can hand it states directly — a predicate only
+ * reachable through a 400-line selector is one nothing can pin.
+ */
+export function isSecondMainLift(
+  selected: readonly ExerciseEntry[],
+  candidate: ExerciseEntry,
+): boolean {
+  if (candidate.mechanics_tier !== 'tier1_compound') return false
+  return selected.some(e => e.mechanics_tier === 'tier1_compound')
 }
 
 export function mapTier(mechanicsTier: string): ExerciseTier {
