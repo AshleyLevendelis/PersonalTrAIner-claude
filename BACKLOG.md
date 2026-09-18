@@ -42,7 +42,11 @@ Newest first. One line each.
   **Nothing here would have been found by the gates I derived as affected.**
   That is the third time this month the sweep has earned its hour, and the
   second time a gate reported green at the commit that introduced it.
-  All four fixed, the affected gates re-run, sweep repeated before the merge.
+  All four fixed. **NOT a second full sweep** — 17 source gates and 4 browser
+  drivers covering everything the fixes touched, re-run green after them, which
+  is what the "a fix made in response to a sweep is not covered by that sweep"
+  rule asks for and is the honest description of what was done.
+  Final: 249 of 257 pass; the 8 are 3 environmental, 2 harness, 3 fixed.
 
 - [x] **THE SWAP OPTIONS HER TRAINING STYLE WAS HIDING — and the collision
   that showing them caused.** Ashley, 18 Sep, standing next to a leg-curl
