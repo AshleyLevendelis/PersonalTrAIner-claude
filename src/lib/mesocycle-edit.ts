@@ -1,7 +1,8 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
 import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
-import { prescribeLoad, type LoadPrescription, isExternallyLoaded, primerCarriesWeight } from './load-prescription'
+import { prescribeLoad, type LoadPrescription, isExternallyLoaded } from './load-prescription'
+import { resolveLoadFields } from './warmup'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
 // module-evaluation time. That's fine in the real (Vite) app, but it means
@@ -267,6 +268,7 @@ export async function recomputeLoad(
  */
 export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription, sessionDurationPreference?: UserProfile['session_duration_preference']): Exercise {
   const isPrimer = entry.mechanics_tier === 'primer'
+  const loadFields = resolveLoadFields(entry, isPrimer, load)
 
   // A slot's prescription UNITS belong to the exercise in it, not to whatever
   // was there before. Inheriting them is the same defect class as inheriting
@@ -304,9 +306,12 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
     // with them deliberately, because a swap must leave the plan in the state
     // generation would have produced. The intensity and the guidance above
     // are unchanged on both branches.
-    suggested_load: isPrimer && !primerCarriesWeight(entry) ? 'Light' : load.display,
-    suggested_load_kg: isPrimer && !primerCarriesWeight(entry) ? null : load.starting_weight_kg,
-    per_set_load: isPrimer && !primerCarriesWeight(entry) ? null : load.per_set,
+    // Only these three of resolveLoadFields' four: this site has never written
+    // load_source, and spreading the whole object would quietly add a field
+    // the swap path does not own.
+    suggested_load: loadFields.suggested_load,
+    suggested_load_kg: loadFields.suggested_load_kg,
+    per_set_load: loadFields.per_set_load,
     load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : load.basis,
     movement_pattern: mapMovementPattern(entry.movement_pattern),
     tier: mapTier(entry.mechanics_tier),

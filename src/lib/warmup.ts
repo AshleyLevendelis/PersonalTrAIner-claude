@@ -1,6 +1,10 @@
 import type { EquipmentAccess, TrainingExperience } from './types'
 import type { ExerciseEntry, MovementPattern } from './exercise-db'
-import { isExternallyLoaded, type PrescribedLoadSource } from './load-prescription'
+import {
+  isExternallyLoaded, primerCarriesWeight, roundToPlate, loadingMode,
+  formatLoad, labelModeForEntry,
+  type PrescribedLoadSource, type LoadPrescription,
+} from './load-prescription'
 import { getExerciseEntry } from './exercise-db'
 import { getDurationBudgetSeconds } from './session-duration'
 import type { UserProfile, WorkoutDay } from './types'
@@ -356,6 +360,104 @@ const ABBREVIATED_RAMP_SCHEME: { load_percent: number; reps: number }[] = [
   { load_percent: 70, reps: 3 },
   { load_percent: 85, reps: 2 },
 ]
+
+/**
+ * HOW HEAVY A PREP MOVE IS, when it needs an implement at all.
+ *
+ * Ashley ruled on 17 Sep that a prep move needing a bell shows a starting
+ * weight, kept light. This is the "kept light" half, and it was left open that
+ * day with the residue named: the app was printing the movement's own WORKING
+ * weight under the word "Light", which is fine for a swing and wrong for
+ * anything heavy.
+ *
+ * Decided 18 Sep 2026 under Ashley's standing delegation of training questions
+ * rather than asked: a specific warm-up set is submaximal by definition, and
+ * the conventional first rung of a build-up is about half the working load.
+ *
+ * DERIVED, NOT WRITTEN DOWN AGAIN. The app already commits to that number in
+ * the tables right above this one — every RAMP_SCHEME's first loaded rung is
+ * 50%, and the abbreviated scheme agrees. Reading the lowest non-zero rung off
+ * those tables means changing the ladder moves the prep weight with it, and
+ * means no constant here can silently disagree with the build-up printed on
+ * the very same card. Inventing a fraction instead is the thing
+ * load-prescription.ts's own header forbids.
+ */
+export const PREP_LOAD_PERCENT: number = Math.min(
+  ...Object.values(RAMP_SCHEMES).flat().map(step => step.load_percent).filter(pct => pct > 0),
+  ...ABBREVIATED_RAMP_SCHEME.map(step => step.load_percent).filter(pct => pct > 0),
+)
+
+/**
+ * The prep weight itself: the ladder's first rung of the working load, put
+ * through the same plate rounding every other prescription goes through.
+ *
+ * NO FLOOR IS APPLIED HERE, deliberately, and this is worth a sentence because
+ * the obvious reading is that one is missing. Half of a light bell can land
+ * below the lightest implement that exists — but `roundToPlate` already floors
+ * on every one of its five modes (`Math.max(floor, ...)` for dumbbell,
+ * single_implement and stack; "below bar weight, prescribe the bar" for
+ * barbell and ez_bar), against the very same LOADING_FLOOR_KG table
+ * `getEquipmentFloorKg` reads. A second Math.max here was written first and
+ * was UNKILLABLE BY MUTATION — removing it changed no value, which is how it
+ * was found. The property is still asserted by the gate, one layer down on
+ * roundToPlate, where it actually lives.
+ */
+export function prepLoadKg(entry: ExerciseEntry, workingKg: number | null | undefined): number | null {
+  if (workingKg == null || !(workingKg > 0)) return null
+  return roundToPlate(workingKg * (PREP_LOAD_PERCENT / 100), loadingMode(entry))
+}
+
+/**
+ * THE ONE PLACE THAT DECIDES WHAT LOAD FIELDS AN EXERCISE CARRIES.
+ *
+ * Four call sites — three in generation, one in the swap path — each held
+ * their own copy of a four-way ternary over the same two questions. That is
+ * precisely the shape that produced the personal-best defect the day before
+ * ("three call sites each re-derived the value with their own ternary and two
+ * got the same case wrong"), and it is also how the original 64-of-64 primer
+ * bug survived: the rule was written three times and each copy discarded the
+ * weight independently.
+ *
+ * Returning the whole set from one function makes the weight and the words
+ * printed beside it impossible to disagree about.
+ */
+export interface ResolvedLoadFields {
+  suggested_load: string
+  suggested_load_kg: number | null
+  load_source: PrescribedLoadSource | undefined
+  per_set_load: LoadPrescription['per_set'] | null
+}
+
+export function resolveLoadFields(
+  entry: ExerciseEntry,
+  isPrimer: boolean,
+  load: LoadPrescription,
+): ResolvedLoadFields {
+  if (!isPrimer) {
+    return {
+      suggested_load: load.display,
+      suggested_load_kg: load.starting_weight_kg,
+      load_source: load.load_source,
+      per_set_load: load.per_set,
+    }
+  }
+  if (!primerCarriesWeight(entry)) {
+    return { suggested_load: 'Light', suggested_load_kg: null, load_source: undefined, per_set_load: null }
+  }
+  const kg = prepLoadKg(entry, load.starting_weight_kg)
+  if (kg == null) {
+    return { suggested_load: 'Light', suggested_load_kg: null, load_source: undefined, per_set_load: null }
+  }
+  return {
+    suggested_load: formatLoad(kg, labelModeForEntry(entry)),
+    suggested_load_kg: kg,
+    load_source: load.load_source,
+    // A prep move does not ramp within itself — it IS the ramp. One light
+    // weight for every set, so the per-set strip has nothing to say.
+    per_set_load: null,
+  }
+}
+
 
 // A tier2_compound (secondary/accessory compound work — Dumbbell Rows,
 // Arnold Press, single-leg dumbbell work) doesn't automatically need a ramp

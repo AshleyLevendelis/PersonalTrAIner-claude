@@ -2,6 +2,107 @@
 
 Newest first. One line each.
 
+- [x] **TRAINING QUESTIONS STOP COMING TO ASHLEY — and the first two she gets
+  back were both already sitting in this file marked "hers to weigh".**
+  Ashley, 18 Sep 2026: *"Ask the questions you ask me regarding how the app
+  should act should be answered from a cscs perspective. So with that in mind
+  you should be able to answer them as a cscs coach would"*.
+
+  **What changed in the rules** (`CLAUDE.md`, *Asking*). The old line sent
+  every "what should a coach do here?" to her. Programming decisions now stay
+  here and get recorded with their basis: exercise selection and substitution;
+  sets, reps, load, rest and every floor on them; what gets protected when a
+  session is cut; warm-up and movement prep; movement-pattern coverage,
+  push:pull and volume; periodisation, deloads and progression; what counts as
+  a personal best; how other sport counts as load; and performance nutrition at
+  the population level the app already works at.
+  **Three things deliberately did NOT move.** What the app SAYS and how often
+  (voice, nagging, how much it asks before acting) is hers — "ask every time or
+  only when she sounds definite" is a question about her app's character, not
+  about training. What the app may CLAIM is hers. And a CSCS does not diagnose,
+  treat or write clinical nutrition, so the red-flag rule — sharp, one-sided or
+  worsening names a professional and changes NOTHING — stays exactly as it is
+  and is not mine to reopen.
+  **AND IT CHANGES NOTHING ABOUT RULE 5.** Deciding as a CSCS makes a decision
+  defensible; it does not make the coach's advice good. The coach exam still
+  has never run against the current coach, and "best-in-class advice" is still
+  asserted, not known.
+
+  **FIRST DECISION — a trimmed session loses sets, never a movement pattern.**
+  The rest work's own sweep showed squat-less weeks going 4 → 22 of 9,216, and
+  this file recorded it as "a consequence of her ruling, small, and hers to
+  weigh". It is not a preference: a microcycle containing no knee-dominant work
+  is an incomplete needs analysis, and push/pull/hinge/squat are the patterns a
+  programme is built from while accessory volume is the adjustable part. So it
+  is a defect and it is fixed.
+  **THE APP ALREADY HELD THE POSITION AND ONE LOOP DID NOT READ IT.**
+  `stageTimeCap`'s Phase 5 says in its own comment *"a short session should
+  mean fewer sets, not a session missing whole movement patterns"*. Phase 4 —
+  the loop immediately above it — removed whole exercises with no such guard,
+  and `sizeBlockToRestBudget`'s Phase B was written to match Phase 4 and
+  inherited the gap. Both now refuse to drop the day's LAST carrier of a
+  fundamental pattern. Per-day is enough to protect the week and needs no
+  cross-day plumbing: a pattern the week holds is held on some day, and on that
+  day it is the last carrier once its siblings are gone.
+  **A MEASUREMENT I HAD BEEN QUOTING WAS A LEAD, NOT A FACT**, and the report
+  artifact it came from no longer existed — so `scripts/measure-pattern-coverage.ts`
+  now re-derives it over the same 9,216-combination grid the quality sweep
+  uses, seeded per combination so a before/after is not measuring the dice.
+  ON THE WAY, TWO WRONG THINGS I DID NOT PUBLISH, both caught by checking
+  before asserting:
+  1. My first hypothesis was that the scorer asks the question in two different
+     vocabularies (the pool check reads `knee_dominant`, the week scan reads
+     `squat`) and that the 22 was an artifact. MEASURED AND WRONG —
+     `mapMovementPattern` coarsens one into the other and the scorer is
+     self-consistent. The loss is real.
+  2. The measurement's FIRST run reported **832 push-less weeks (9.03%)**,
+     which reads like a defect forty times larger than the one being fixed.
+     It was the measurement. Some injury combinations remove every pressing
+     movement from the pool, and a week cannot hold a pattern its own
+     constraints forbid — the scorer has always guarded exactly this
+     (`poolHasPush && pushSets === 0`), which is why its own report showed
+     nothing. **A NEW MEASUREMENT IS NOT COMPARABLE TO AN OLD ONE UNTIL IT
+     MAKES THE SAME EXCLUSIONS**, and the tell was that the two disagreed by
+     two orders of magnitude on a question they both claim to answer. Guarded,
+     and the number re-derived.
+
+  **SECOND DECISION — "kept light" is half the working weight.** Her 17 Sep
+  ruling gave a loaded prep move a starting weight; the residue named that day
+  was that the number shown was the movement's own WORKING weight, printed
+  under the word "Light". A specific warm-up set is submaximal by definition,
+  and the conventional first rung of a build-up is about half the working load.
+  **The app did not need telling.** `RAMP_SCHEMES` already starts every
+  experience level's build-up at 50% and the abbreviated scheme agrees, so the
+  prep weight is READ OFF the ladder printed on the same card rather than
+  written down again — change the ladder and it follows, and no number is
+  invented, which `load-prescription.ts`'s own header forbids.
+  **One decision, not four.** The four call sites each held their own copy of a
+  four-way ternary, which is exactly the shape that produced the personal-best
+  defect the day before and how the original 64-of-64 primer bug survived. They
+  now all call `resolveLoadFields`.
+  **AND A GATE WENT RED ON THE IMPROVEMENT.** `test:primer-load` §3 counted
+  occurrences of `primerCarriesWeight(` at the call sites — a MECHANISM — so
+  collapsing four copies into one shared decision took the count to zero and
+  the gate argued for keeping the duplication. Re-anchored on the property
+  ("one decision, reached from every site") plus a new §3d forbidding any
+  caller from re-deriving the branch, which is strictly stronger than what it
+  replaced. Same family as the grocery-list bullet on 13 Sep.
+  **AND A LINE NO MUTATION COULD KILL WAS DELETED.** `prepLoadKg` was written
+  with its own `Math.max(getEquipmentFloorKg(entry), ...)`; removing it changed
+  no value, because `roundToPlate` already floors on all five of its modes
+  against the same table. It was dead, it read as if the floor lived there, and
+  the gate now asserts the property one layer down where it actually is.
+
+  **Verified**: new gate `test:pattern-floor` (11 checks), **6 mutations tried,
+  6 caught**; `test:primer-load` extended to 36 checks, **8 mutations tried, 8
+  caught** (one re-aimed after a MISSED turned out to be the dead line above,
+  not a gap). `npx tsc --noEmit` clean. Plans and decisions:
+  `docs/plans/a-prep-move-that-needs-a-bell.md`.
+  **Not done at the time of writing**: the pattern-coverage re-measurement over
+  all 9,216 profiles is still running, and the full sweep has not been re-run
+  since these two changes. Both are named rather than assumed. No deploy
+  needed; frontend ships on merge.
+
 - [x] **FIVE FROM THE GYM FLOOR, AND TWO OF THEM WERE ALREADY FIXED AND
   UNMERGED.** Ashley, 18 Sep 2026, mid-session, five reports. Triaged by
   reading her phone's code (`origin/main`) against the branch rather than

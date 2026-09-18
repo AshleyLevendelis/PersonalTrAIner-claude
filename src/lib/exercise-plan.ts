@@ -9,8 +9,8 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
-import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION , primerCarriesWeight} from './load-prescription'
+import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields } from './warmup'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
@@ -1291,8 +1291,17 @@ function stageTimeCap(
   // later; those exercises can still lose sets in Phase 5, just not
   // disappear outright.
   while (estimated > budgetSeconds && dayExercises.length > 3) {
+    // Re-derived each pass: the array shrinks below, so "last carrier of this
+    // pattern" is a question about the CURRENT day, not the one we started on.
+    const entriesNow = dayExercises.map(e => e.entry)
     let removeIdx = dayExercises.length - 1
-    while (removeIdx >= 0 && (dayExercises[removeIdx].entry.mechanics_tier === 'cardio' || protectedNames.has(dayExercises[removeIdx].entry.name))) removeIdx--
+    while (
+      removeIdx >= 0 && (
+        dayExercises[removeIdx].entry.mechanics_tier === 'cardio' ||
+        protectedNames.has(dayExercises[removeIdx].entry.name) ||
+        isLastCarrierOfPattern(entriesNow, removeIdx)
+      )
+    ) removeIdx--
     if (removeIdx < 0 || dayExercises.length <= 3) break
     const removed = dayExercises.splice(removeIdx, 1)[0]
     trace.time_cap_adjusted.push({
@@ -3404,10 +3413,7 @@ function rebuildExerciseForSwap(
     // The rotation path rebuilds a slot the same way the two generation sites
     // do, and a rule applied at three of four places is the shape that put a
     // silent primer in front of Ashley in the first place.
-    suggested_load: isPrimer && !primerCarriesWeight(newEntry) ? 'Light' : load.display,
-    suggested_load_kg: isPrimer && !primerCarriesWeight(newEntry) ? null : load.starting_weight_kg,
-    load_source: isPrimer && !primerCarriesWeight(newEntry) ? undefined : load.load_source,
-    per_set_load: isPrimer && !primerCarriesWeight(newEntry) ? null : load.per_set,
+    ...resolveLoadFields(newEntry, isPrimer, load),
     // Old exercise's assistance fields (spread above) must not leak through
     // a swap into a non-assistance exercise — explicit undefined here always
     // wins over the spread, mirroring how suggested_load_kg already
@@ -3558,13 +3564,11 @@ function balanceWeeklyStructure(
       prescription_type: entry.prescription_type,
       load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
       // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling,
-      // 18 Sep 2026. `primerCarriesWeight` carries the whole reason; the
-      // guidance and the intensity above stay the same on both branches,
-      // which is the other half of that ruling.
-      suggested_load: isPrimer && !primerCarriesWeight(entry) ? 'Light' : load.display,
-      suggested_load_kg: isPrimer && !primerCarriesWeight(entry) ? null : load.starting_weight_kg,
-      load_source: isPrimer && !primerCarriesWeight(entry) ? undefined : load.load_source,
-      per_set_load: isPrimer && !primerCarriesWeight(entry) ? null : load.per_set,
+      // 18 Sep 2026, and "kept light" is half the working weight since the
+      // day after. `resolveLoadFields` carries the whole reason, and carries
+      // it ONCE — the guidance and the intensity above stay the same on both
+      // branches, which is the other half of that ruling.
+      ...resolveLoadFields(entry, isPrimer, load),
       suggested_assistance_kg: assistance?.assistance_kg,
       assistance_ready_to_graduate: assistance?.ready_to_graduate,
     })
@@ -4927,13 +4931,11 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
           ? 'Stay light and controlled. This is preparation, not a working set.'
           : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
         // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling,
-        // 18 Sep 2026. `primerCarriesWeight` carries the whole reason; the
-        // guidance and the intensity above stay the same on both branches,
-        // which is the other half of that ruling.
-        suggested_load: isPrimer && !primerCarriesWeight(slot.entry) ? 'Light' : load.display,
-        suggested_load_kg: isPrimer && !primerCarriesWeight(slot.entry) ? null : load.starting_weight_kg,
-        load_source: isPrimer && !primerCarriesWeight(slot.entry) ? undefined : load.load_source,
-        per_set_load: isPrimer && !primerCarriesWeight(slot.entry) ? null : load.per_set,
+        // 18 Sep 2026, and "kept light" is half the working weight since the
+        // day after. `resolveLoadFields` carries the whole reason, and carries
+        // it ONCE — the guidance and the intensity above stay the same on both
+        // branches, which is the other half of that ruling.
+        ...resolveLoadFields(slot.entry, isPrimer, load),
         suggested_assistance_kg: assistance?.assistance_kg,
         assistance_ready_to_graduate: assistance?.ready_to_graduate,
         selection_note: selectionNotes.get(slot.entry.name),
@@ -5245,6 +5247,46 @@ export function mapMovementPattern(pattern: MovementPattern): MesocycleMovementP
     cardio: 'isolation',
   }
   return mapping[pattern] || 'isolation'
+}
+
+/**
+ * The four fundamental movement patterns. A week that loses one of these
+ * entirely is not a lighter week — it is a different programme, and a
+ * needs-analysis that covered push, pull, hinge and squat no longer does.
+ *
+ * So a time-cap trimmer may shed an accessory, but never the DAY'S LAST
+ * carrier of one of these. Per-day is enough to protect the WEEK without any
+ * cross-day plumbing: a pattern the week holds is held on some day, and on
+ * that day it is the last carrier once its siblings are gone.
+ *
+ * Isolation, core, carry and cardio are deliberately absent. Accessory volume
+ * is the adjustable part — which is the position stageTimeCap's own Phase 5
+ * already states in prose ("a short session should mean fewer sets, not a
+ * session missing whole movement patterns"). Phase 4, one loop above it,
+ * simply never honoured it, and `sizeBlockToRestBudget`'s Phase B inherited
+ * the same gap by being written to match it.
+ */
+const FUNDAMENTAL_PATTERNS: ReadonlySet<MesocycleMovementPattern> = new Set([
+  'push', 'pull', 'hinge', 'squat',
+])
+
+/**
+ * True when removing `index` would take the last push / pull / hinge / squat
+ * exercise out of this day. Takes the resolved entries rather than names so
+ * both trimmers — one holding `ExerciseEntry` directly, one resolving from a
+ * name — ask the same question of the same data.
+ */
+export function isLastCarrierOfPattern(
+  entries: readonly (ExerciseEntry | null | undefined)[],
+  index: number,
+): boolean {
+  const self = entries[index]
+  if (!self) return false
+  const pattern = mapMovementPattern(self.movement_pattern)
+  if (!FUNDAMENTAL_PATTERNS.has(pattern)) return false
+  return !entries.some(
+    (other, i) => i !== index && other && mapMovementPattern(other.movement_pattern) === pattern,
+  )
 }
 
 export function mapTier(mechanicsTier: string): ExerciseTier {
@@ -5782,10 +5824,15 @@ export function sizeBlockToRestBudget(
     // never removed; floor of 3 exercises remaining, matching
     // stageTimeCap's own floor).
     for (let guard = 0; guard < 10 && estimate(exercises) > totalBudgetSeconds && exercises.length > 3; guard++) {
+      const entriesNow = exercises.map(ex => findEntry(ex.name))
       let removeIdx = exercises.length - 1
       while (removeIdx >= 0) {
-        const entry = findEntry(exercises[removeIdx].name)
-        if (entry && entry.mechanics_tier !== 'cardio' && !protectedNames.has(exercises[removeIdx].name)) break
+        const entry = entriesNow[removeIdx]
+        if (
+          entry && entry.mechanics_tier !== 'cardio' &&
+          !protectedNames.has(exercises[removeIdx].name) &&
+          !isLastCarrierOfPattern(entriesNow, removeIdx)
+        ) break
         removeIdx--
       }
       if (removeIdx < 0) break

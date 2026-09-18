@@ -32,7 +32,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   lighter than the week before — `block-phases`, `frozen-weeks`,
   `calibration-search`, `starting-out`
 - Every loaded lift has a weight, in its implement's unit, under a ceiling
-  that warns before it clamps — `load-ceilings`, `load-ceiling-units`,
+  that warns before it clamps — and a movement-prep move that needs an
+  implement gets one too, at **half the working load**, read off the app's own
+  warm-up ladder rather than invented (18 Sep 2026, CSCS delegation; her 17 Sep
+  ruling gave it a number, this is the "kept light" half) — `primer-load`,
+  `load-ceilings`, `load-ceiling-units`,
   `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
@@ -45,7 +49,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   session did not fit and the generator paid for it out of rest.
   **Her ruling that day, from four options: protect the rest, do less.** Every
   exercise keeps a rest that suits it and the session sheds an accessory or a
-  set instead. She rejected keeping the work at short rests, a flat one-minute
+  set instead — but **never the last exercise covering a movement pattern**,
+  decided 18 Sep 2026 under her CSCS delegation once the cost of "do less"
+  turned out to include weeks holding no squat pattern at all (22 of 9,216, now
+  0). A shorter session is fewer sets, not a missing pattern: push, pull, hinge
+  and squat are protected, accessory volume is the adjustable part.
+  `pattern-floor`. She rejected keeping the work at short rests, a flat one-minute
   middle floor, and being told to train longer. Her reason, in her own words:
   30 seconds on a lat pulldown is not a short rest, it is a different exercise,
   and the reps printed beside it stop being reachable.
@@ -823,7 +832,46 @@ menu" stays true when a copy is also left outside it.
 ## Asking
 
 - Work autonomously by default. When a decision genuinely is Ashley's to make, ask her directly in the conversation — don't guess and don't wait for it to arrive secondhand.
-- ASK when the decision is about how the app behaves: what a coach should do in a situation, what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours, or anything safety-adjacent (allergens, injuries, medical, mental health).
+- **ANSWER TRAINING AND NUTRITION QUESTIONS AS A CSCS WOULD — do not bring them
+  to her.** Ashley's ruling, 18 Sep 2026, in her own words: *"Ask the questions
+  you ask me regarding how the app should act should be answered from a cscs
+  perspective. So with that in mind you should be able to answer them as a cscs
+  coach would"*. She is delegating the whole class, not one question. The old
+  rule sent "what should a coach do here?" to her by default; it now stays
+  here, gets decided against the standards, and gets recorded with its basis.
+  - MINE now, decided and recorded, never asked: exercise selection and what is
+    an acceptable substitute for what; sets, reps, load, rest, tempo and every
+    floor or ceiling on them; exercise order and what gets protected when a
+    session is cut; warm-up and movement prep; weekly structure — movement
+    pattern coverage, push:pull, volume distribution, frequency; periodisation,
+    blocks, phases, deloads, progression, calibration and re-anchoring; what
+    counts as a personal best and how progress is measured; how other sport
+    counts as training load; and general performance nutrition at the
+    population level the app already works at — protein targets, deficit rate,
+    macro split logic, meal timing.
+  - STILL HERS, because the training science is neutral and the question is
+    what her app is like: what the app SAYS and how it sounds; when it speaks
+    and how often; how much it asks before doing something; what it is allowed
+    to CLAIM about itself; anything reaching live users, money or data. "Ask
+    every time or only when she sounds definite" is hers. "Sixty seconds or
+    forty-five between sets" is mine.
+  - NEITHER, and this is a real professional boundary rather than caution: a
+    CSCS does not diagnose, treat, rehabilitate, or write clinical nutrition.
+    The app's existing red-flag rule — sharp, one-sided or worsening names a
+    professional and changes NOTHING — is itself the CSCS answer and stays
+    exactly as it is. Deciding to have the app prescribe rehab, interpret a
+    symptom, or write a diet for a medical condition is outside the delegation
+    and is not mine to take.
+  - **RECORD THE BASIS, not just the choice.** A CSCS decision goes in BACKLOG
+    with what the standards say and why this case falls where it does — the
+    same bar as every other decision here. "A coach would do X" with nothing
+    behind it is an assertion, and this file's whole habit is that assertions
+    get marked as such.
+  - **AND IT IS STILL ASSERTION, NOT MEASUREMENT.** Reasoning as a CSCS makes a
+    decision defensible; it does not make the coach's advice good. That is what
+    the coach exam is for, it has never run against the current coach, and this
+    delegation does not move that line one inch — rule 5 stands.
+- ASK when the decision is about how the app behaves in the ways left to her above: what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours where the training science does not pick a winner, or anything in the medical/clinical band (allergens, diagnosis, mental health).
 - PROCEED WITHOUT ASKING on anything mechanical: bugs, tests, refactors, measurement, data consistency, performance — anything that has a right answer.
 - How to ask, which matters as much as when:
   - Ashley is non-technical. Never ask about a function, field, or file.
@@ -990,6 +1038,18 @@ old — the commands were right and the context was missing.
   So: for a function, require `name(`; for render order, anchor on the rendered
   block; and prove the detector on something that should FAIL it, in the gate
   itself, so it cannot go vacuous later.
+- **A NEW MEASUREMENT IS NOT COMPARABLE TO AN OLD ONE UNTIL IT MAKES THE SAME
+  EXCLUSIONS — and disagreeing by two orders of magnitude is the tell, not the
+  finding.** 18 Sep 2026: a fresh script counting weeks that hold no pushing
+  movement reported 832 of 9,216 (9.03%), which reads like a defect forty times
+  larger than the one being fixed. The scorer's own report showed nothing,
+  because it has always asked the narrower question — a week is only missing a
+  pattern its equipment and injuries could actually have supplied
+  (`poolHasPush && pushSets === 0`). Some injury combinations remove every
+  press from the pool, and a week cannot hold what its own constraints forbid.
+  **When a new number and an existing one disagree wildly about the same
+  question, suspect the denominators before the code**, and make the new one
+  reproduce the old one's guards before reading anything into the gap.
 - **A FLOOR MUST BE READ OFF THE UNBUDGETED PRESCRIPTION, NEVER OFF THE LIVE
   VALUE.** 18 Sep 2026. Three independent passes cut a rest — the day-level
   time cap, the per-block trimmer, the phase's own shift — and each floored

@@ -83,6 +83,36 @@ it is a load-prescription change and gets this plan first.
   take the fraction from the warm-up ladder the app already builds for working
   lifts rather than invent a constant — and that is its own change, with its
   own measurement, not a line smuggled into this one.
+
+  **CLOSED 18 Sep 2026 — and decided here rather than asked, under Ashley's
+  standing delegation of training questions** (CLAUDE.md, *Asking*): how heavy
+  a movement-prep set should be is programming, not product taste.
+
+  **The decision: half the working weight.** A specific warm-up set is
+  submaximal by definition — its job is to rehearse the pattern and raise
+  tissue temperature, not to accrue stimulus — and the conventional first
+  rung of a warm-up ramp is ~50% of the day's working load. Crucially the app
+  does not need told that: `RAMP_SCHEMES` in `warmup.ts` already starts every
+  experience level's build-up at 50%, and `ABBREVIATED_RAMP_SCHEME` agrees. So
+  the primer takes the LOWEST non-zero rung the ladder actually contains,
+  derived from those tables rather than written down again. Change the ladder
+  and the prep weight follows; nothing can drift apart, and no number is
+  invented — which is what `load-prescription.ts:12` demands.
+
+  **Floored, never rounded to nothing.** Half of a light bell can land below
+  the lightest implement that exists, so the result goes through the same
+  `roundToPlate` every other prescription does and then through the loading
+  mode's own floor. A prep weight is never a number nobody can load.
+
+  **One decision, not four.** The four call sites each carried their own
+  four-way ternary — the exact shape that produced the personal-best bug a day
+  earlier, where three sites re-derived one value and two got the same case
+  wrong. They now all call one function, so the weight and the words it is
+  printed beside cannot disagree.
+
+  **What stays**: `Light — movement prep` and the prep sentence, on both
+  branches, unchanged. The number only ever moves DOWN from what shipped
+  yesterday, so nothing that was readable becomes unreadable.
 - It can only ever go UP from what the app already computed and hid — the
   change reveals a number, it does not raise one.
 - The wording that keeps it prep rather than work is unchanged and is asserted

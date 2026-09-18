@@ -25,7 +25,8 @@
 
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { primerCarriesWeight, isExternallyLoaded } from '../src/lib/load-prescription'
+import { primerCarriesWeight, isExternallyLoaded, prescribeLoad, roundToPlate, loadingMode, getEquipmentFloorKg } from '../src/lib/load-prescription'
+import { PREP_LOAD_PERCENT, prepLoadKg, resolveLoadFields } from '../src/lib/warmup'
 import { getExerciseEntry } from '../src/lib/exercise-db'
 import { swapExerciseInMesocycle } from '../src/lib/mesocycle-edit'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
@@ -129,10 +130,28 @@ console.log('\n[3] All three call sites, not just the one she reported')
   // at three of four places, the exact shape of the original defect.
   const plan = stripComments(readFileSync(join(ROOT, 'src/lib/exercise-plan.ts'), 'utf8'))
   const edit = stripComments(readFileSync(join(ROOT, 'src/lib/mesocycle-edit.ts'), 'utf8'))
-  const planCalls = (plan.match(/primerCarriesWeight\(/g) ?? []).length
-  const editCalls = (edit.match(/primerCarriesWeight\(/g) ?? []).length
-  check('3a. generation asks the question at all three of its sites', planCalls >= 9, { planCalls })
-  check('3b. the swap asks it too', editCalls >= 3, { editCalls })
+  //
+  // RE-ANCHORED 18 Sep 2026, and the reason is the rule this repo keeps
+  // relearning. These two counted occurrences of `primerCarriesWeight(` at the
+  // call sites — a MECHANISM. The prep-weight change collapsed four copies of
+  // one four-way ternary into a single shared decision, which is strictly
+  // better and took the count to zero, so the gate went red ON THE IMPROVEMENT
+  // and would have argued for keeping the duplication. Same shape as the
+  // grocery-list bullet on 13 Sep.
+  //
+  // The PROPERTY is "one decision, reached from every site that builds an
+  // exercise's load fields" — which is stronger than the old count, because it
+  // also forbids a fifth site from quietly re-deriving the branch itself.
+  const planCalls = (plan.match(/resolveLoadFields\(/g) ?? []).length
+  const editCalls = (edit.match(/resolveLoadFields\(/g) ?? []).length
+  check('3a. generation routes every one of its sites through the one decision', planCalls >= 3, { planCalls })
+  check('3b. the swap routes through it too', editCalls >= 1, { editCalls })
+  // AND NOBODY RE-DERIVES IT. The primer branch belongs to load-prescription
+  // (which owns the predicate) and warmup (which owns the decision); a copy
+  // anywhere else is the duplication coming back.
+  const rederived = (plan.match(/primerCarriesWeight\(/g) ?? []).length
+    + (edit.match(/primerCarriesWeight\(/g) ?? []).length
+  check('3d. and no caller re-derives the primer branch for itself', rederived === 0, { rederived })
   // AND NOBODY STILL NULLS A PRIMER'S WEIGHT UNCONDITIONALLY — the shape the
   // defect had. A bare `isPrimer ? null` on the load is what she hit.
   const bare = [...plan.matchAll(/isPrimer \? null : load\.starting_weight_kg/g)].length
@@ -195,6 +214,72 @@ console.log('\n[7] Every source detector is proven on something that fails it')
   const brokenChip = '{ex.per_set_load && ex.per_set_load.length > 0 && !calibration ? ('
   check('7c. the chip detector fails on a row that always renders',
     !/new Set\(ex\.per_set_load\.map\(s => s\.load_kg\)\)\.size > 1/.test(brokenChip))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n[8] "Kept light" is half the working weight, and the app already said so')
+// ---------------------------------------------------------------------------
+// The residue the 17 Sep build named: the number shown under the word "Light"
+// was the movement's own WORKING weight. Decided 18 Sep under Ashley's
+// standing delegation of training questions rather than asked — a specific
+// warm-up set is submaximal by definition, and the conventional first rung of
+// a build-up is about half the working load.
+{
+  const warm = stripComments(readFileSync(join(ROOT, 'src/lib/warmup.ts'), 'utf8'))
+
+  // 8a is the whole point of the design: the fraction is READ OFF the ladder
+  // the app already prints on the same card, so the two can never disagree and
+  // no constant was invented (which load-prescription.ts's own header forbids).
+  check('8a. the fraction is derived from the ramp ladder, not written down again',
+    /PREP_LOAD_PERCENT[^=]*=\s*Math\.min\(/.test(warm)
+    && /Object\.values\(RAMP_SCHEMES\)/.test(warm),
+    { found: (warm.match(/PREP_LOAD_PERCENT.{0,80}/) ?? [])[0] })
+  check('8b. ...and what it derives is the ladder\'s own first loaded rung',
+    PREP_LOAD_PERCENT === 50, { PREP_LOAD_PERCENT })
+
+  const bell = getExerciseEntry('Kettlebell Swings')!
+  check('8c. a prep weight is half the working weight, plate-rounded',
+    prepLoadKg(bell, 40) === Math.max(getEquipmentFloorKg(bell), roundToPlate(20, loadingMode(bell))),
+    { got: prepLoadKg(bell, 40), working: 40 })
+  check('8d. ...and it is genuinely lighter than the working weight it came from',
+    (prepLoadKg(bell, 40) ?? Infinity) < 40, { got: prepLoadKg(bell, 40) })
+  // Held one layer down, on roundToPlate, because that is where the floor
+  // actually is — prepLoadKg applies none of its own, and the second Math.max
+  // it was written with was removed for being unkillable by mutation.
+  check('8e. half of a light bell never rounds below something you can hold',
+    prepLoadKg(bell, 1) === getEquipmentFloorKg(bell),
+    { got: prepLoadKg(bell, 1), floor: getEquipmentFloorKg(bell) })
+  check('8f. a movement with no working weight gets no prep weight',
+    prepLoadKg(bell, 0) === null && prepLoadKg(bell, null) === null)
+
+  // 8g is the defect this shape exists to prevent: the card prints the NUMBER
+  // and the DISPLAY STRING from two places, and before the shared decision they
+  // could disagree — a kg value halved while its caption still said the working
+  // weight is worse than either error alone.
+  const load = prescribeLoad(bell, PROFILE as UserProfile, {} as never)
+  const fields = resolveLoadFields(bell, true, load)
+  check('8g. the number and the words beside it come out of one call and agree',
+    fields.suggested_load_kg != null
+    && fields.suggested_load.includes(String(fields.suggested_load_kg)),
+    { kg: fields.suggested_load_kg, display: fields.suggested_load })
+  check('8h. a prep move does not ramp within itself, so it carries no per-set ladder',
+    fields.per_set_load === null, { per_set: fields.per_set_load })
+
+  // The branch that must not move: a NON-primer is handed straight through.
+  const working = resolveLoadFields(bell, false, load)
+  check('8i. a working lift is untouched by any of this',
+    working.suggested_load_kg === load.starting_weight_kg
+    && working.suggested_load === load.display
+    && working.per_set_load === load.per_set,
+    { got: working.suggested_load_kg, expected: load.starting_weight_kg })
+  check('8j. ...and it really is the heavier of the two, so 8c is not vacuous',
+    (working.suggested_load_kg ?? 0) > (fields.suggested_load_kg ?? 0),
+    { working: working.suggested_load_kg, prep: fields.suggested_load_kg })
+
+  // Detector proof, the same habit as section 7: the 8a regex must FAIL on a
+  // hand-written constant, or it would pass the very thing it forbids.
+  check('8k. the derived-fraction detector fails on an invented constant',
+    !/PREP_LOAD_PERCENT[^=]*=\s*Math\.min\(/.test('export const PREP_LOAD_PERCENT = 50'))
 }
 
 console.log(failures === 0 ? '\nPASS\n' : `\n${failures} FAILED\n`)
