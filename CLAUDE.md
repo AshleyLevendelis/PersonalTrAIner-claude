@@ -49,8 +49,19 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   middle floor, and being told to train longer. Her reason, in her own words:
   30 seconds on a lat pulldown is not a short rest, it is a different exercise,
   and the reps printed beside it stop being reachable.
-  Now 0.0% of second-tier compounds rest 30s or less, minimum 45s, median 60s.
-  `rest-floors` (22 checks, 6 mutations), `session-length`, `today-only`
+  Now 0.0% of second-tier compounds rest 30s or less, median 60s.
+  CORRECTED 18 Sep 2026: this said "minimum 45s", and the gate asserted it.
+  Both were wrong, and the gate was RED AT THE COMMIT THAT INTRODUCED IT while
+  being reported green. 45s was the lowest value in a 1,728-profile sample;
+  combat's own table asks 60s of a second-tier compound and a conditioning
+  block's adaptation phase shifts rest by -20s, so 40s is what that block
+  deliberately wants — and `restFloorFor` returns `min(unbudgeted, tierFloor)`
+  precisely so it gets 40. The app was right and the number was a measurement.
+  **The floor is now DERIVED in the gate from the style's own rest row and the
+  deepest phase shift, and printed on every run**, with her report kept beside
+  it as an absolute: no second-tier compound at 30s or less, whatever the
+  tables say. `rest-floors` (24 checks, 4 mutations), `session-length`,
+  `today-only`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:

@@ -134,7 +134,7 @@ export function getReplacementCandidates(
   // Stable partition, never a filter: a disliked movement stays offered — it
   // is a lean, and someone who asks for a swap may still want it. Order is
   // preserved within each band so the ranker underneath still decides.
-  const bySoftPreference = (list: { exercise: ExerciseEntry; note: string }[]) => {
+  const bySoftPreference = <T extends { exercise: ExerciseEntry }>(list: T[]): T[] => {
     if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return list
     const liked = new Set(soft.liked)
     const disliked = new Set(soft.disliked)
@@ -170,16 +170,27 @@ export function getReplacementCandidates(
   // different orderings depending on the catalogue is not a rule anyone can
   // hold in their head).
   //
-  // So the sort keys, outermost first: loaded, then style, then stated likes,
-  // then implement quality, then the ranker. Only the first is conditional —
-  // replacing a plank with a slider is not a downgrade, so an unloaded
-  // outgoing lift has no loaded band at all and style leads.
-  const ordered = byStyle(bySoftPreference(equipmentSorted))
-  if (!outgoingIsLoaded) return ordered
-  return ordered
+  // So the sort keys, outermost first: a STATED like, then loaded, then style,
+  // then implement quality, then the ranker.
+  //
+  // A STATED LIKE STAYS ON TOP OF ALL OF IT, and that is a deliberate limit on
+  // her ruling rather than an oversight. She was asked about style against
+  // weight and ruled on exactly that; the 10 Sep rule this restores order to
+  // says a loaded lift is not replaced by an unloaded one BY DEFAULT, and
+  // "I like push-ups" is not the default — it is an instruction. Found by
+  // `test:soft-preferences` going red when this ordering was first built with
+  // weight above everything: liking the one off-style bodyweight option no
+  // longer brought it to the front, which is behaviour nobody asked to change.
+  //
+  // The loaded key is the only conditional one — replacing a plank with a
+  // slider is not a downgrade, so an unloaded outgoing lift has no loaded band
+  // at all and style leads inside each preference band.
+  const styled = byStyle(equipmentSorted)
+  const weighted = !outgoingIsLoaded ? styled : styled
     .map((c, i) => ({ c, i, u: isExternallyLoaded(c.exercise) ? 0 : 1 }))
     .sort((a, b) => a.u - b.u || a.i - b.i)
     .map(x => x.c)
+  return bySoftPreference(weighted)
 }
 
 function parseRepsHigh(reps: string): number | null {

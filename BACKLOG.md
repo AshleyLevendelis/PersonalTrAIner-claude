@@ -2,6 +2,48 @@
 
 Newest first. One line each.
 
+- [x] **THE PRE-MERGE SWEEP: four real failures, and the worst one was a gate
+  that had never been green.** 231 gates and drivers run before merging.
+  Three failures were environmental (`meal-quality`, `schema-parity`, and
+  `verify:rls` — all need a live database this machine cannot reach) and two
+  more were MY SWEEP HARNESS, not the code: `test:audit` and
+  `test:injury-adaptation-safety` print megabytes of trace, and the runner's
+  1MB output buffer turned both into a thrown error. Both exit 0 when run
+  directly. **The tell was `checks=0` in a column I only have because
+  CLAUDE.md already says to compare how many checks RAN.**
+
+  **1. `test:rest-floors` was RED AT THE COMMIT THAT INTRODUCED IT**, and I
+  reported it green with "22 checks, 6 mutations, 6 caught". Proven by checking
+  out that commit in a throwaway worktree and running it there: identical
+  failure. It asserted a flat 45s floor for second-tier compounds — the lowest
+  value in the 1,728-profile sample behind the entry below. Combat's own table
+  asks 60s of that tier, a conditioning block's adaptation phase shifts rest by
+  -20s, and the floor deliberately returns the smaller of the two so a block
+  that genuinely wants 40s gets 40s. **The app was right; the number was a
+  measurement dressed as a rule.** The floor is now derived in the gate from
+  the style's rest row and the deepest phase shift, printed on every run, with
+  her actual report kept beside it as an absolute: no second-tier compound at
+  30s or less, whatever the tables say. 24 checks, 4 mutations tried, 4 caught
+  — including one that halves the shared cap, which only the absolute catches.
+
+  **2 and 3. Two gates my change broke that were nowhere near my affected
+  set.** `test:soft-preferences` — putting weight above everything meant a
+  stated LIKE no longer brought its movement to the front. That is a limit on
+  her ruling rather than an oversight: she was asked about style against
+  weight, and the 10 Sep rule says a loaded lift is not replaced by an unloaded
+  one BY DEFAULT — "I like push-ups" is not the default, it is an instruction.
+  The keys are now, outermost first: a stated like, then loaded, then style,
+  then implement quality, then the ranker. And `test:style-starve` pinned the
+  literal sentence "equipment, injuries, style and skill level", which my
+  change had to correct because style no longer filters — so the check went red
+  on the CORRECTED copy and would have enforced the lie. Same shape as the
+  coach prompt and the grocery list on 13 Sep. Re-anchored on the property.
+
+  **Nothing here would have been found by the gates I derived as affected.**
+  That is the third time this month the sweep has earned its hour, and the
+  second time a gate reported green at the commit that introduced it.
+  All four fixed, the affected gates re-run, sweep repeated before the merge.
+
 - [x] **THE SWAP OPTIONS HER TRAINING STYLE WAS HIDING — and the collision
   that showing them caused.** Ashley, 18 Sep, standing next to a leg-curl
   machine on a functional plan: every alternative the app offered was a slider,

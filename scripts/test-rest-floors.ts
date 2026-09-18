@@ -17,6 +17,8 @@
  */
 import { restFloorFor, unbudgetedRestSeconds, REST_FLOOR_BY_TIER, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
+import { STYLE_CONFIGS } from '../src/lib/exercise-plan'
+import { PHASE_CONFIGS } from '../src/lib/periodization'
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import type { UserProfile, TrainingStyle, SessionDuration, FitnessGoal, ExerciseTier } from '../src/lib/types'
 
@@ -175,8 +177,37 @@ console.log('\n[3] A whole generated plan — the defect was never in one functi
     }) },
   ]
 
+  // THE FLOOR IS DERIVED, NOT MEASURED ONCE.
+  //
+  // This gate shipped asserting a flat 45s for second-tier compounds and 30s
+  // for isolation — the lowest values seen in a 1,728-profile sample. It was
+  // RED AT THE COMMIT THAT INTRODUCED IT and reported green, because the sample
+  // under-represented one combination: combat's table asks 60s of a second-tier
+  // compound, a conditioning block's adaptation phase shifts rest by -20s, and
+  // `restFloorFor` deliberately returns `min(unbudgeted, tierFloor)` so a block
+  // that genuinely wants 40s gets 40s. The app was right and the number was
+  // wrong.
+  //
+  // So the floor now comes from the two tables the app itself reads — the
+  // style's own rest row and the deepest rest_adjust_seconds any phase applies
+  // — capped by the tier's own ceiling. It goes stale on its own if either
+  // table moves, which a pinned number cannot do.
+  const worstPhaseShift = Math.min(...Object.values(PHASE_CONFIGS).map(c => c.rest_adjust_seconds))
+  const floorFor = (style: TrainingStyle, tier: string): number => {
+    const row = STYLE_CONFIGS[style].restSeconds
+    const base = tier === 'tier2_compound' ? row.tier2 : row.tier3
+    const cap = tier === 'tier2_compound' ? REST_FLOOR_BY_TIER.tier_2_secondary : REST_FLOOR_BY_TIER.tier_3_isolation
+    return Math.min(cap, Math.max(0, base + worstPhaseShift))
+  }
+
   let checkedExercises = 0
-  const offenders: { case: string; week: number; name: string; tier: string; rest: string }[] = []
+  const offenders: { case: string; week: number; name: string; tier: string; rest: string; floor: string }[] = []
+  // AND THE RULING ITSELF, as an absolute. Ashley's report was a 30-second lat
+  // pulldown, and her words were that 30 seconds on one is not a short rest but
+  // a different exercise. The derived floors above are all 40s or more for a
+  // second-tier compound, so this can never pass vacuously — it is the one line
+  // that would still be here if every table changed.
+  const tooShort: { case: string; week: number; name: string; rest: string }[] = []
   for (const c of CASES) {
     for (const week of seeded(`rest-floors:${c.label}`, () => generateMesocycle(c.p))) {
       for (const day of week.days) {
@@ -194,15 +225,21 @@ console.log('\n[3] A whole generated plan — the defect was never in one functi
           // solo isolation rest was 30s; before it they were 30s and 20s. A
           // gate set at the measured minimum fails the moment any path stops
           // asking for the floor.
-          const mustBeAtLeast = tier === 'tier2_compound' ? 45 : 30
-          if (secs > 0 && secs < mustBeAtLeast) offenders.push({ case: c.label, week: week.week_number, name: ex.name, tier, rest: String(ex.rest) })
+          const mustBeAtLeast = floorFor(c.p.training_style as TrainingStyle, tier)
+          if (secs > 0 && secs < mustBeAtLeast) offenders.push({ case: c.label, week: week.week_number, name: ex.name, tier, rest: String(ex.rest), floor: `${mustBeAtLeast}s` })
+          if (tier === 'tier2_compound' && secs > 0 && secs <= 30) tooShort.push({ case: c.label, week: week.week_number, name: ex.name, rest: String(ex.rest) })
         }
       }
     }
   }
   check('the plans held second-tier compounds to read (the check is not vacuous)', checkedExercises > 200, checkedExercises)
-  check('NO solo compound or isolation slot rests below its measured floor, in any week of any plan',
+  check('NO solo compound or isolation slot rests below the floor its own style and phase imply',
     offenders.length === 0, offenders.slice(0, 5))
+  check('...and NO second-tier compound rests 30s or less — her report, as an absolute',
+    tooShort.length === 0, tooShort.slice(0, 5))
+  console.log(`  derived floors (worst phase shift ${worstPhaseShift}s): ` +
+    (['hybrid', 'bodybuilding', 'combat', 'functional'] as TrainingStyle[])
+      .map(st => `${st} t2=${floorFor(st, 'tier2_compound')}s t3=${floorFor(st, 'tier3_isolation')}s`).join('  '))
 
   // AND THE OPPOSITE ERROR: the floor must not have quietly LENGTHENED a style
   // that asks for density. Combat prescribes 45s isolation, and after this

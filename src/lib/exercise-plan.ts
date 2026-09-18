@@ -288,7 +288,12 @@ interface StyleConfig {
   requiresPatterns?: MovementPattern[]
 }
 
-const STYLE_CONFIGS: Record<TrainingStyle, StyleConfig> = {
+/**
+ * Exported since 18 Sep 2026 for the same reason PHASE_CONFIGS was: a gate that
+ * must know the lowest rest a style may legitimately ask for has to read the
+ * style's own row, not a number measured once and left to go stale. Data only.
+ */
+export const STYLE_CONFIGS: Record<TrainingStyle, StyleConfig> = {
   bodybuilding: {
     setRange: { tier1: 4, tier2: 3, tier3: 3 },
     repRange: { tier1: '6-8', tier2: '8-12', tier3: '12-15' },
