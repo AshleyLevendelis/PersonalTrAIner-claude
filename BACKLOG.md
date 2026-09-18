@@ -74,9 +74,12 @@ Newest first. One line each.
   tempo-prescription, interval-prescription, rehab-order, one-main-lift) and
   `npx tsc --noEmit` clean.
 
-  **GRID CONFIRMATION PENDING IN THIS COMMIT.** The 9,216-profile re-measure is
-  running; the number to beat is 252. If it is not in the next commit, this
-  line is the evidence it was never taken.
+  **GRID CONFIRMED: 252 -> 0** of 36,864 blocks, across the full 9,216-profile
+  re-measure. **And only the rep lever moved**, which is the check that the fix
+  did what it said and nothing more: deloads lighter in SETS held at 34,944 and
+  lighter in LOAD at 35,553 — both identical to the pre-fix run — while lighter
+  in REPS went 35,831 -> 36,763. Nothing was taken from anyone who already had
+  a working deload.
 
 - [x] **ONE MAIN LIFT PER DAY — CONFIRMED, AND MY FIRST FIX WAS AIMED AT THE
   WRONG PATHS.** 18 Sep 2026. The entry below measured 2,477 of 9,216 profiles

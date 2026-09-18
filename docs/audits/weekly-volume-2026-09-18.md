@@ -118,12 +118,29 @@ missed at others — but the paths were not the ones the reasoning picked.
 
 ### 2. A deload week that is not lighter — 2,966 of 36,864 blocks (8.0%)
 
-Every block carries a deload week, and in 8% of them the deload holds **the same
-or more total working sets** as that block's own heaviest week (e.g. peak 34 →
-deload 34). The median block does drop 17 sets, so the mechanism works; it has a
-hole. Whether the deload is meant to cut sets or only load needs settling before
-this is called a defect — but "the week labelled deload is not lighter in any
-respect the plan shows" is worth an answer either way.
+**CORRECTED IN PLACE, 18 Sep 2026: the real figure is 252 (0.68%), and this
+section's method was the reason it read twelve times too big.**
+
+What follows was the original finding. It asked ONE question — does the total
+set count fall? — of a mechanism with THREE levers. Reproducing its own named
+offender showed a perfectly good deload: main lifts 15kg → 10kg, reps 15-17 →
+13-15, tonnage 362 → 270. Its sets held because every row was already at the
+two-set floor and there was nowhere further down to go. The caveat I wrote at
+the time ("whether the deload is meant to cut sets or only load needs settling")
+was the right instinct and I should have settled it before publishing a number.
+
+The honest question is whether the deload is lighter in sets, **or** load, **or**
+reps, against the last loading week of the same block. Asked that way: **252 of
+36,864 blocks were lighter in nothing at all**, clustered almost perfectly on
+bodyweight equipment with low recovery — three levers dead at once. Fixed the
+same day (reps carry the reduction whenever there is no weight to shed, not only
+when the bar is at its floor), gated by `test:deload-lighter`, and re-measured
+at **0 of 36,864** with the sets and load columns unmoved.
+
+*Original text, kept because the method is the lesson:* every block carries a
+deload week, and in 8% of them the deload holds the same or more total working
+sets as that block's own heaviest week (e.g. peak 34 → deload 34). The median
+block does drop 17 sets, so the mechanism works; it has a hole.
 
 ### 3. Muscles getting nothing at all
 
