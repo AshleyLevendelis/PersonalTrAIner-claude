@@ -28,6 +28,7 @@
     "test:grocery": "tsx scripts/test-grocery.ts",
     "test:rehab-order": "tsx scripts/test-rehab-order.ts",
     "test:one-main-lift": "tsx scripts/test-one-main-lift.ts",
+    "test:deload-lighter": "tsx scripts/test-deload-lighter.ts",
     "test:pattern-floor": "tsx scripts/test-pattern-floor.ts",
     "test:primer-load": "tsx scripts/test-primer-load.ts",
     "test:profile-restore": "tsx scripts/test-profile-restore.ts",

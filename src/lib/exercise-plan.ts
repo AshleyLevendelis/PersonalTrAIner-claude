@@ -6845,7 +6845,7 @@ export function generateMesocycle(
           // more room in sets either — the rep target absorbs the rest of
           // the reduction instead (see repShift below).
           const floorDeloadSets = Math.max(2, Math.round(goalAdjustedBaseSets * 0.25))
-          const deloadNeedsRepCut = deloadAtFloor && floorDeloadSets === standardDeloadSets
+
           // Main >= accessory >= isolation, every loading week. Deload is
           // exempt — its whole point is going below these ranges — but every
           // non-deload set count is clamped to its role's floor/ceiling
@@ -6864,18 +6864,57 @@ export function generateMesocycle(
           // budget: the estimate used at selection time correctly assumed
           // 1 set, but the per-week sets computation was unconditionally
           // overriding it to 4 for every exercise, cardio included.
+          // What a LOADING week of this block gives this slot. Hoisted out of
+          // the expression below because the deload needs to compare against
+          // it: "did cutting sets actually buy anything this week?" cannot be
+          // answered by looking at the deload formula alone.
+          // + the once-per-block duration top-up (see computeDurationTopUp) —
+          // a fixed per-slot amount, so this holds sets flat across weeks 1-3
+          // despite being duration-driven.
+          const loadingWeekSets = clampToVolumeRole(
+            Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx],
+            volumeRole,
+            (profile.session_duration_preference || '45-60') === '90+',
+          )
+          const deloadSets = deloadAtFloor ? floorDeloadSets : standardDeloadSets
+
+          /**
+           * THE LOAD LEVER IS NOT AVAILABLE TO EVERY EXERCISE, and the deload
+           * used to assume it was.
+           *
+           * A deload's default move is to drop the weight ~30% and let the reps
+           * ease UP (+2) — "lighter bar, comfortable reps". That is right for a
+           * loaded lift and meaningless for a press-up: there is no weight to
+           * take off, so the +2 is the only thing that changes and the
+           * "recovery week" comes back HARDER than the week before it.
+           *
+           * MEASURED 18 Sep 2026, 9,216 profiles x 16 weeks: 252 of 36,864
+           * blocks ran a deload lighter in NOTHING — not sets, not load, not
+           * reps. They cluster almost perfectly: bodyweight equipment, low
+           * recovery. No load to shed; low recovery already scales base sets
+           * down so `Math.max(2, ...)` binds on the loading weeks too and sets
+           * have nowhere to go; and the rep cut that exists for exactly this
+           * situation was gated on `deloadAtFloor`, which needs an equipment
+           * floor and so can never be true for a bodyweight movement.
+           *
+           * The branch was written for a loaded lift at the bar's floor and
+           * never generalised to the other case with the same problem. Same
+           * recorded shape as the rest-floor and one-main-lift bugs: a rule
+           * that holds at the site it was written for and nowhere else.
+           */
+          const deloadLoadLeverDead = isDeload && dbEntry
+            ? deloadAtFloor || !isExternallyLoaded(dbEntry)
+            : false
+          // And reps only take the reduction OUTRIGHT when sets gave nothing.
+          // Compared against the loading week rather than against the other
+          // deload formula, which is what the old proxy did.
+          const deloadNeedsRepCut = deloadLoadLeverDead && deloadSets >= loadingWeekSets
+
           const sets = dbEntry?.prescription_type === 'steady_state'
             ? 1
             : isDeload
-              ? (deloadAtFloor ? floorDeloadSets : standardDeloadSets)
-              // + the once-per-block duration top-up (see computeDurationTopUp)
-              // — a fixed per-slot amount, so this still holds sets flat
-              // across weeks 1-3 despite being duration-driven.
-              : clampToVolumeRole(
-                  Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx],
-                  volumeRole,
-                  (profile.session_duration_preference || '45-60') === '90+',
-                )
+              ? deloadSets
+              : loadingWeekSets
 
           // No externally loaded weight to ramp (true bodyweight movement, or
           // one prescribeLoad can't categorize) — progress these via reps
@@ -6993,12 +7032,12 @@ export function generateMesocycle(
           // beginner's block is renamed alongside so the heading stays true.
           // docs/plans/consolidation-and-the-capped-bar.md.
           const phaseRepShift = isDeload
-            ? (deloadAtFloor
-                // Weight held flat (can't drop further) — reps carry the
-                // recovery reduction instead of the usual +2 "back off"
-                // bump, which would INCREASE volume here, the opposite of
-                // the point. If sets also had no room to cut, reps drop
-                // outright rather than just holding flat.
+            ? (deloadLoadLeverDead
+                // No weight to take off — at the bar's floor, or an exercise
+                // that never carried one. Reps carry the recovery reduction
+                // instead of the usual +2 "back off" bump, which would
+                // INCREASE the work here, the opposite of the point. If sets
+                // also gave nothing, reps drop outright rather than hold flat.
                 ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
                 : phaseConfig.rep_shift + 2)
             : phaseConfig.rep_shift

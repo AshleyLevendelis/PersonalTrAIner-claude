@@ -125,6 +125,47 @@ interface Reading {
    * a question nobody asked.
    */
   blockDrops: { block: number; peak: number; deload: number | null }[]
+  /**
+   * Per block: is the deload week lighter than the last LOADING week before
+   * it, on each of the three levers a deload can actually pull?
+   *
+   * THREE AXES, NOT ONE, AND THE FIRST READING OF THIS WAS WRONG BECAUSE IT
+   * ASKED ABOUT SETS ALONE. 2,966 blocks looked like "a deload that is not
+   * lighter"; the named offender turned out to drop its main lifts 15kg -> 10kg
+   * and its reps 15-17 -> 13-15, while sets held at 34 because every row was
+   * ALREADY at the two-set floor and there was nowhere further down to go. A
+   * deload with no room in sets is supposed to take it out of load and reps —
+   * `deloadNeedsRepCut` in exercise-plan.ts says exactly that.
+   *
+   * So the defect is a deload lighter in NONE of the three, and nothing else.
+   */
+  deloadAxes: { block: number; lighterSets: boolean; lighterLoad: boolean; lighterReps: boolean }[]
+}
+
+/** Midpoint of a rep range, or null for AMRAP / time / distance prescriptions. */
+function repMid(reps: string | undefined): number | null {
+  if (!reps) return null
+  const range = reps.match(/^(\d+)\s*-\s*(\d+)$/)
+  if (range) return (Number(range[1]) + Number(range[2])) / 2
+  const one = reps.match(/^(\d+)$/)
+  return one ? Number(one[1]) : null
+}
+
+/** Sets, tonnage and total reps for one week, warm-ups excluded. */
+function weekLevers(week: MesocycleWeek): { sets: number; tonnage: number; reps: number } {
+  let sets = 0, tonnage = 0, reps = 0
+  for (const day of week.days) {
+    for (const ex of day.exercises) {
+      if (ex.tier === 'tier_0_primer') continue
+      const n = ex.sets ?? 0
+      sets += n
+      const kg = (ex as unknown as { suggested_load_kg?: number | null }).suggested_load_kg
+      if (typeof kg === 'number' && kg > 0) tonnage += kg * n
+      const mid = repMid(ex.reps)
+      if (mid != null) reps += mid * n
+    }
+  }
+  return { sets, tonnage, reps }
 }
 
 function readOne(combo: Combination): Reading {
@@ -145,6 +186,8 @@ function readOne(combo: Combination): Reading {
   let twoMainExample: string | null = null
 
   const byBlock = new Map<number, { peak: number; deload: number | null }>()
+  // Keyed by block: the LAST loading week seen, and the deload week.
+  const leversByBlock = new Map<number, { last?: MesocycleWeek; deload?: MesocycleWeek }>()
 
   for (const week of meso) {
     const byMuscle = weeklySetsByMuscle(week)
@@ -194,6 +237,11 @@ function readOne(combo: Combination): Reading {
     if (week.is_deload) seen.deload = weekTotal
     else if (weekTotal > seen.peak) seen.peak = weekTotal
     byBlock.set(b, seen)
+
+    const lv = leversByBlock.get(b) ?? {}
+    if (week.is_deload) lv.deload = week
+    else lv.last = week   // weeks arrive in order, so this ends on the last loading week
+    leversByBlock.set(b, lv)
   }
 
   return {
@@ -219,6 +267,18 @@ function readOne(combo: Combination): Reading {
     peakWeekTotal: weekTotals.length ? Math.max(...weekTotals) : 0,
     peakWeekNumber: weekTotals.length ? meso[weekTotals.indexOf(Math.max(...weekTotals))].week_number : 0,
     blockDrops: [...byBlock.entries()].map(([block, v]) => ({ block, peak: v.peak, deload: v.deload })),
+    deloadAxes: [...leversByBlock.entries()]
+      .filter(([, v]) => v.last && v.deload)
+      .map(([block, v]) => {
+        const a = weekLevers(v.last!)
+        const d = weekLevers(v.deload!)
+        return {
+          block,
+          lighterSets: d.sets < a.sets,
+          lighterLoad: d.tonnage < a.tonnage,
+          lighterReps: d.reps < a.reps,
+        }
+      }),
   }
 }
 
@@ -363,6 +423,31 @@ function report(rows: Reading[]): string {
   w(`  deload weeks NOT lighter than their own block's peak: ${notLighter.length} of ${withDeload.length}`)
   for (const b of notLighter.slice(0, 5)) w(`    block ${b.block}: peak ${b.peak} -> deload ${b.deload}   ${b.key}`)
   w()
+  // THE THREE LEVERS. A deload can take work out of sets, out of load, or out
+  // of reps, and `deloadNeedsRepCut` in the generator says so outright: when
+  // the two-set floor leaves no room, the rep target absorbs the reduction.
+  // Asking about sets alone is what made 2,966 blocks look broken.
+  const axes = rows.flatMap(r => r.deloadAxes.map(a => ({ ...a, key: r.key })))
+  const lighterIn = (f: (a: typeof axes[number]) => boolean) => axes.filter(f).length
+  w('  Against the LAST LOADING WEEK of the same block, the deload is lighter in:')
+  w(`    sets           ${String(lighterIn(a => a.lighterSets)).padStart(6)} of ${axes.length}`)
+  w(`    load           ${String(lighterIn(a => a.lighterLoad)).padStart(6)}`)
+  w(`    reps           ${String(lighterIn(a => a.lighterReps)).padStart(6)}`)
+  w(`    at least one   ${String(lighterIn(a => a.lighterSets || a.lighterLoad || a.lighterReps)).padStart(6)}`)
+  const lighterInNothing = axes.filter(a => !a.lighterSets && !a.lighterLoad && !a.lighterReps)
+  w(`  DELOADS LIGHTER IN NOTHING AT ALL: ${lighterInNothing.length} of ${axes.length}`)
+  w('    (this, not the sets column, is the number that would be a defect)')
+  if (lighterInNothing.length > 0) {
+    w('  they cluster on:')
+    for (const f of ['equipment', 'duration', 'style', 'experience', 'goal', 'recovery'] as (keyof Reading)[]) {
+      const owners = rows.filter(r => r.deloadAxes.some(a => !a.lighterSets && !a.lighterLoad && !a.lighterReps))
+      w(`    ${String(f).padEnd(11)} ${cluster(owners, f)}`)
+    }
+    w('  named, so a gate can pin them:')
+    for (const a of lighterInNothing.slice(0, 10)) w(`    block ${a.block}  ${a.key}`)
+  }
+  w()
+
   const peakWeeks = rows.map(r => r.peakWeekNumber)
   const wc = new Map<number, number>()
   for (const n of peakWeeks) wc.set(n, (wc.get(n) ?? 0) + 1)

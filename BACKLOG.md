@@ -2,6 +2,82 @@
 
 Newest first. One line each.
 
+- [x] **A DELOAD WITH NO LEVER LEFT TO PULL — AND MY OWN FINDING WAS 12x TOO
+  BIG BEFORE I FIXED ANYTHING.** 18 Sep 2026, on Ashley's "fix the deload week
+  next".
+
+  **FIRST, THE CORRECTION, because the number she asked me to act on was
+  mine and it was wrong.** The volume audit reported "a deload week that is not
+  lighter — 2,966 of 36,864 blocks (8.0%)". That measurement asked ONE question,
+  about SETS. Reproducing its named offender
+  (`full_gym|wrists|30-45|bodybuilding|beginner|hypertrophy|low|love`) showed a
+  perfectly good deload: main lifts 15kg -> 10kg, reps 15-17 -> 13-15, tonnage
+  362 -> 270. Its sets held only because every row was already at the two-set
+  floor and there was nowhere further down. **A one-lever question about a
+  three-lever mechanism is not a measurement.** Re-asked properly — lighter in
+  sets, OR load, OR reps, against the last loading week of the same block — the
+  real figure is **252 of 36,864 (0.68%)**.
+
+  **The 252 are real, and they are one corner**: bodyweight equipment, low
+  recovery. Three levers, all dead at once. No external load, so weight cannot
+  move. Low recovery already scales base sets down, so `Math.max(2, ...)` binds
+  on the LOADING weeks too and the deload's 0.5x cut buys nothing. And the rep
+  cut that exists for exactly this dead end was gated on `deloadAtFloor`, which
+  needs an equipment floor and therefore can never be true of a press-up.
+  So the deload fell to the default branch — reps **+2**, the "lighter bar,
+  easier reps" move — which is meaningless without a bar.
+
+  **MEASURED, NOT ASSUMED, and my prediction was wrong**: I expected the +2 to
+  make the deload HARDER. On the pinned fixture it produced a week IDENTICAL to
+  week 3, rep for rep (2x15-17 both weeks), because the +2 bump exactly
+  cancelled the two ramp steps the deload does not take. The defect was a
+  carbon copy of the hardest week, labelled "Deload week — volume steps back so
+  you arrive at the next block recovered". After: 2x11-13, total reps 609 ->
+  473.
+
+  **The fix**: `deloadLoadLeverDead = deloadAtFloor || !isExternallyLoaded(...)`
+  — reps carry the reduction whenever there is no weight to take off, not only
+  when the bar is at its floor. And `deloadNeedsRepCut` now compares the
+  deload's set count against the LOADING week's (`deloadSets >=
+  loadingWeekSets`) instead of against the other deload formula, so reps only
+  drop outright when sets genuinely gave nothing. Same recorded shape as the
+  rest-floor and one-main-lift bugs: a rule that holds at the site it was
+  written for and nowhere else.
+
+  **CSCS basis** (mine under her delegation): a deload exists to shed fatigue
+  while keeping the movement pattern. It has three levers and needs to pull at
+  least one; which one depends on what the trainee has. A barbell trainee sheds
+  weight and keeps reps comfortable; somebody training on the floor with no kit
+  has only reps and sets, and once sets hit the floor, reps are the whole
+  lever. The existing code already said this for the bar-floor case — it simply
+  never generalised.
+
+  **TWO WRONG ASSERTIONS IN MY OWN GATE, both caught by running it, both kept
+  in the file.** (1) Comparing TOTAL reps (sets x target) went red because the
+  deload halves sets, so the total falls even while the rep RANGE eases up —
+  the metric conflated two levers. (2) Asserting every loaded lift drops weight
+  went red on a 2kg Rear Delt Flye, which is already the lightest thing in the
+  gym: `deloadAtFloor` correctly holds its weight and takes the cut elsewhere.
+  Checked against the pre-fix engine in a worktree before believing either
+  failure — those rows are identical on both sides, so the assertions were
+  wrong, not the code.
+
+  **Verified**: new `test:deload-lighter`, 14 checks — the measured offenders,
+  a fixture assertion that they really are the dead-end case, the ordinary
+  loaded deload still using the bar lever, unloaded rows in the SAME plan
+  taking the rep cut, and three source properties with a detector proof.
+  **9 mutations tried, 9 caught**, all applied, all running the full 14. Plus
+  20 affected gates green (frozen-weeks, block-phases, week-load-consistency,
+  ramp-arrived, main-lift-rest, session-length, block-rest-sizing,
+  muscle-balance, training-week, cardio-share-score, block-review,
+  block-consistency, day-coverage, load-suggestions, added-load,
+  tempo-prescription, interval-prescription, rehab-order, one-main-lift) and
+  `npx tsc --noEmit` clean.
+
+  **GRID CONFIRMATION PENDING IN THIS COMMIT.** The 9,216-profile re-measure is
+  running; the number to beat is 252. If it is not in the next commit, this
+  line is the evidence it was never taken.
+
 - [x] **ONE MAIN LIFT PER DAY — CONFIRMED, AND MY FIRST FIX WAS AIMED AT THE
   WRONG PATHS.** 18 Sep 2026. The entry below measured 2,477 of 9,216 profiles
   (26.9%) carrying a second tier-1 compound on a day, and named `refill` as the
