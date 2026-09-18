@@ -68,9 +68,15 @@ Newest first. One line each.
   slot's guidance and lives one tap away; what the card carries beside the
   number is "Light — movement prep". Recorded as it is, not as I hoped.
   21 source gates green, `test:audit` clean, `npx tsc --noEmit` clean.
-  **Not done at the time of writing**: the 9,216-profile quality sweep is still
-  running — this changes what is PRESCRIBED, so its numbers go in the next
-  entry and are not assumed here.
+  **THE QUALITY SWEEP THIS ENTRY OWED, now finished and recorded here rather
+  than in a later entry.** 9,216 profiles: overall **11.56 / 12**, **0 below
+  the 7.2 floor**, primer fit **2.00**, time fit 1.94. Those are identical to
+  the figures the rest-floor entry below already recorded, to two decimal
+  places on every dimension — so giving a loaded prep move a weight changed
+  nothing measurable about plan quality, which is what I hoped and had not
+  proven. The tracked baseline it was diffed against is the 16 Sep artifact, so
+  the 1.93 → 1.94 in that diff is the rest work, already attributed below and
+  **not claimable twice by this change**.
 
 - [x] **THE PRE-MERGE SWEEP: four real failures, and the worst one was a gate
   that had never been green.** 257 gates and drivers run before merging.
@@ -312,6 +318,10 @@ Newest first. One line each.
   Plan and measurements: `docs/plans/rest-that-suits-the-exercise.md`.
   **Not done at the time of writing**: the 9,216-profile quality sweep is still
   running; its before/after numbers go in the next entry. No deploy needed.
+  RESOLVED: it finished and its numbers are in the bundle-ceilings entry above
+  — 11.56/12, 0 below the floor, time fit 1.93 → 1.94, and the one real cost,
+  squat-less weeks 4 → 22 of 9,216. Pointer added because a "goes in the next
+  entry" line with nothing linking to it gets read as still open.
 
 - [x] **THE FULL SWEEP, AND THE FOUR THINGS IT CAUGHT THAT THE AFFECTED-GATE RUN
   COULD NOT.** 201 gates and 47 browser drivers run, 242 of the 248 pass.
