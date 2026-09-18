@@ -63,7 +63,8 @@ import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { getExerciseId, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
+import { getExerciseId, getExerciseEntry, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
+import { prescribeLoad } from '@/lib/load-prescription'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 
@@ -201,7 +202,41 @@ const profile: UserProfile = {
 // panel fed one shows a state no user can reach (a squat under an ACCESSORY
 // label, no MAIN LIFT anywhere). Seeded so a re-run is comparable.
 setRandomSource(seededRngFromKey('tour-real-screens'))
-const generated = generateMesocycle(profile)
+const generated0 = generateMesocycle(profile)
+// ?prep=1 — A PREP MOVE THAT NEEDS A BELL, which the generator does not pick.
+//
+// Ashley, 18 Sep 2026: her Kettlebell Swings sat in the prep slot with no
+// weight on the card at all and a box offering 0. Her ruling that day: a prep
+// move needing an implement gets a starting weight, kept light.
+//
+// THE GENERATOR WILL NOT PRODUCE THIS ON ITS OWN — measured: 64 of 64 primer
+// slots in a generated mesocycle are wall slides, band work and bodyweight
+// marches, none of which take a weight. So the fixture puts the bell in the
+// slot the way she did, by NAME, and the driver reads what the card says.
+// Off by default so every existing run of this harness is unchanged.
+const PREP_BELL = new URLSearchParams(location.search).get('prep') === '1'
+const generated = !PREP_BELL ? generated0 : generated0.map(w => ({
+  ...w,
+  days: w.days.map(d => {
+    const i = d.exercises.findIndex(e => (e as unknown as { tier?: string }).tier === 'tier_0_primer')
+    if (i < 0) return d
+    const bell = getExerciseEntry('Kettlebell Swings')
+    if (!bell) return d
+    const load = prescribeLoad(bell, profile, { targetRpeLabel: 'Light — movement prep', isFirstBlock: true, sets: d.exercises[i].sets })
+    const exercises = [...d.exercises]
+    exercises[i] = {
+      ...exercises[i],
+      id: bell.id,
+      name: bell.name,
+      prescription_type: bell.prescription_type,
+      suggested_load: load.display,
+      suggested_load_kg: load.starting_weight_kg,
+      per_set_load: load.per_set,
+      ramp_up: undefined,
+    } as typeof exercises[number]
+    return { ...d, exercises }
+  }),
+}))
 resetRandomSource()
 
 // ?tilt=lopsided — A DELIBERATELY UNBALANCED WEEK, for one driver only.

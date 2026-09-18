@@ -179,7 +179,18 @@ export function LoadChip({
             loudest "this is fixed" signal on the screen, directly above a cue
             asking her to climb. The week's number is a probe for set 1 and
             nothing else, so that is the one chip it gets. */}
-        {ex.per_set_load && ex.per_set_load.length > 0 && !calibration ? (
+        {/* AND NOT WHEN THEY ALL SAY THE SAME THING — Ashley, 18 Sep 2026,
+            on her suitcase carry: *"there's no ramp up sets which is fine but
+            the ui makes it seem as if there is because the numbers are also at
+            the top where the ramp up sets usually are."* S1 18kg, S2 18kg,
+            S3 18kg is a row of chips in the exact position and shape of a
+            build-up ladder, saying nothing the big number above them has not
+            already said. A ladder that does not climb should not look like
+            one. Where the loads genuinely differ the chips are the only place
+            that shows it, so they stay. Same reasoning as the calibration rule
+            above, generalised: the chips earn their place by disagreeing. */}
+        {ex.per_set_load && ex.per_set_load.length > 0 && !calibration
+          && new Set(ex.per_set_load.map(s => s.load_kg)).size > 1 ? (
           <>
             <Dumbbell className="size-2.5 text-muted-foreground shrink-0" />
             {ex.per_set_load.map(s => (

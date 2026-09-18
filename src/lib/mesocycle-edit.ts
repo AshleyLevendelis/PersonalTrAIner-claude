@@ -1,7 +1,7 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
 import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
-import { prescribeLoad, type LoadPrescription, isExternallyLoaded} from './load-prescription'
+import { prescribeLoad, type LoadPrescription, isExternallyLoaded, primerCarriesWeight } from './load-prescription'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
 // module-evaluation time. That's fine in the real (Vite) app, but it means
@@ -298,9 +298,15 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
     prescription_type: entry.prescription_type,
     ...(fixedUnits ? { sets: fixedUnits.sets, reps: fixedUnits.reps, rest: fixedUnits.rest } : {}),
     intensity: isPrimer ? 'Light — movement prep' : slot.intensity,
-    suggested_load: isPrimer ? 'Light' : load.display,
-    suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-    per_set_load: isPrimer ? null : load.per_set,
+    // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling, 18 Sep
+    // 2026, after swapping in Kettlebell Swings and being shown nothing.
+    // Generation does the same thing at its own two sites; this stays in step
+    // with them deliberately, because a swap must leave the plan in the state
+    // generation would have produced. The intensity and the guidance above
+    // are unchanged on both branches.
+    suggested_load: isPrimer && !primerCarriesWeight(entry) ? 'Light' : load.display,
+    suggested_load_kg: isPrimer && !primerCarriesWeight(entry) ? null : load.starting_weight_kg,
+    per_set_load: isPrimer && !primerCarriesWeight(entry) ? null : load.per_set,
     load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : load.basis,
     movement_pattern: mapMovementPattern(entry.movement_pattern),
     tier: mapTier(entry.mechanics_tier),

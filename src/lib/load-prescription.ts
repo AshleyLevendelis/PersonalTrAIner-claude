@@ -1033,6 +1033,37 @@ export function isExternallyLoaded(entry: ExerciseEntry): boolean {
 }
 
 /**
+ * DOES THIS PRIMER NEED A NUMBER, OR IS "LIGHT" THE WHOLE ANSWER?
+ *
+ * Ashley, 18 Sep 2026, mid-session: *"Swapped exercises doesnt show prescribed
+ * weights."* Her Kettlebell Swings sat in the primer slot with no weight
+ * anywhere on the card and a box offering 0. She put 24kg on the bell.
+ *
+ * MEASURED: `prescribeLoad` had already worked out 8kg for that slot, with the
+ * primer's own RPE label, under every existing ceiling. Three call sites then
+ * discarded it — `isPrimer ? null : load.starting_weight_kg` — and across a
+ * whole generated mesocycle 64 of 64 primers carried no weight at all. The
+ * swap was faithfully reproducing generation; there was no parity gap and
+ * nothing missing from the prescription. The app knew and did not say.
+ *
+ * **The blanket rule is right for most primers and wrong for this one.** The
+ * primers the generator picks are wall slides, band hip abductions, bodyweight
+ * squat marches — nothing to load, and a number there would be noise. A
+ * kettlebell swing cannot be done without choosing a weight.
+ *
+ * Her ruling, from three options: **a starting weight, kept light** — over
+ * saying "Light" with no number, and over asking her once and remembering.
+ *
+ * WHAT THIS DOES NOT CHANGE, and the half that makes the ruling safe: every
+ * primer keeps `Light — movement prep` and keeps *"Stay light and controlled.
+ * This is preparation, not a working set."* The number appears beside that
+ * sentence, never instead of it.
+ */
+export function primerCarriesWeight(entry: ExerciseEntry): boolean {
+  return isExternallyLoaded(entry)
+}
+
+/**
  * WHAT TO PRINT WHERE THE WEIGHT WOULD GO, when there is no weight.
  *
  * Ashley, 17 Sep 2026, swapped a loaded leg curl for a slider curl mid-session

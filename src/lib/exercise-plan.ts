@@ -10,7 +10,7 @@ import {
   type ExperienceConfig,
 } from './experience-config'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION , primerCarriesWeight} from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
@@ -3400,10 +3400,14 @@ function rebuildExerciseForSwap(
     intensity,
     prescription_type: newEntry.prescription_type,
     load_guidance: isPrimer ? oldExercise.load_guidance : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
-    suggested_load: isPrimer ? 'Light' : load.display,
-    suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-    load_source: isPrimer ? undefined : load.load_source,
-    per_set_load: isPrimer ? null : load.per_set,
+    // THE FOURTH SITE, and it was found by the gate rather than by reading.
+    // The rotation path rebuilds a slot the same way the two generation sites
+    // do, and a rule applied at three of four places is the shape that put a
+    // silent primer in front of Ashley in the first place.
+    suggested_load: isPrimer && !primerCarriesWeight(newEntry) ? 'Light' : load.display,
+    suggested_load_kg: isPrimer && !primerCarriesWeight(newEntry) ? null : load.starting_weight_kg,
+    load_source: isPrimer && !primerCarriesWeight(newEntry) ? undefined : load.load_source,
+    per_set_load: isPrimer && !primerCarriesWeight(newEntry) ? null : load.per_set,
     // Old exercise's assistance fields (spread above) must not leak through
     // a swap into a non-assistance exercise — explicit undefined here always
     // wins over the spread, mirroring how suggested_load_kg already
@@ -3553,10 +3557,14 @@ function balanceWeeklyStructure(
       intensity,
       prescription_type: entry.prescription_type,
       load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
-      suggested_load: isPrimer ? 'Light' : load.display,
-      suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-      load_source: isPrimer ? undefined : load.load_source,
-      per_set_load: isPrimer ? null : load.per_set,
+      // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling,
+      // 18 Sep 2026. `primerCarriesWeight` carries the whole reason; the
+      // guidance and the intensity above stay the same on both branches,
+      // which is the other half of that ruling.
+      suggested_load: isPrimer && !primerCarriesWeight(entry) ? 'Light' : load.display,
+      suggested_load_kg: isPrimer && !primerCarriesWeight(entry) ? null : load.starting_weight_kg,
+      load_source: isPrimer && !primerCarriesWeight(entry) ? undefined : load.load_source,
+      per_set_load: isPrimer && !primerCarriesWeight(entry) ? null : load.per_set,
       suggested_assistance_kg: assistance?.assistance_kg,
       assistance_ready_to_graduate: assistance?.ready_to_graduate,
     })
@@ -4918,10 +4926,14 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
         load_guidance: isPrimer
           ? 'Stay light and controlled. This is preparation, not a working set.'
           : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
-        suggested_load: isPrimer ? 'Light' : load.display,
-        suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-        load_source: isPrimer ? undefined : load.load_source,
-        per_set_load: isPrimer ? null : load.per_set,
+        // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling,
+        // 18 Sep 2026. `primerCarriesWeight` carries the whole reason; the
+        // guidance and the intensity above stay the same on both branches,
+        // which is the other half of that ruling.
+        suggested_load: isPrimer && !primerCarriesWeight(slot.entry) ? 'Light' : load.display,
+        suggested_load_kg: isPrimer && !primerCarriesWeight(slot.entry) ? null : load.starting_weight_kg,
+        load_source: isPrimer && !primerCarriesWeight(slot.entry) ? undefined : load.load_source,
+        per_set_load: isPrimer && !primerCarriesWeight(slot.entry) ? null : load.per_set,
         suggested_assistance_kg: assistance?.assistance_kg,
         assistance_ready_to_graduate: assistance?.ready_to_graduate,
         selection_note: selectionNotes.get(slot.entry.name),

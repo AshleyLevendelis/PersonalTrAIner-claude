@@ -2,6 +2,76 @@
 
 Newest first. One line each.
 
+- [x] **FIVE FROM THE GYM FLOOR, AND TWO OF THEM WERE ALREADY FIXED AND
+  UNMERGED.** Ashley, 18 Sep 2026, mid-session, five reports. Triaged by
+  reading her phone's code (`origin/main`) against the branch rather than
+  assuming:
+
+  **Already fixed, waiting on the merge (2 and 3).** *"Ramp up weights didnt
+  show input fields"* and *"after logging first set ramp up weights were no
+  longer shown"*. Measured: `origin/main`'s set grid has no warm-up rows at all
+  and still renders the tickable strip on today's card; the branch replaces it
+  with a box per set. **The harm was live while she trained**: with no build-up
+  boxes she typed the first ramp step (20kg x 10) into working set 1, and the
+  app fired a PERSONAL BEST for it. That is the contamination the branch's
+  `workingSetsOf` fix exists to prevent, happening in the gap between building
+  it and merging it.
+
+  **1. A prep move that needs a bell now gets a weight.** Her kettlebell swings
+  sat in the prep slot with no weight anywhere on the card and a box offering
+  0; she put 24kg on the bell and logged it. MEASURED: `prescribeLoad` had
+  already worked out a number for that slot and **four** call sites discarded
+  it for every primer — and across a generated mesocycle 64 of 64 primers
+  carried none. The swap was faithfully reproducing generation, so this was
+  never a swap bug. **Her ruling, from three options: a starting weight, kept
+  light**, over "say Light, no number" and over asking her once and
+  remembering. A prep move needing no kit still shows no number.
+  **The gate found the fourth site.** The build started from three and §3c went
+  red on a rotation path nobody had listed — a rule applied at three of four
+  places, which is the shape of the original defect.
+  **AND A CORRECTION TO MY OWN PLAN, measured before shipping.** It claimed the
+  number "is computed as prep" because the primer's RPE label is passed to
+  `prescribeLoad`. It is not: same movement, same profile, three labels, 10kg
+  every time. So the card shows the MOVEMENT's own conservative starting
+  weight, not a reduced one — honest, and better than a blank card, but only
+  half of "kept light". Named as a residue in the plan: the real fix takes the
+  fraction from the warm-up ladder the app already builds, and that is its own
+  change with its own measurement.
+
+  **A second defect on the same card**: with nothing prescribed the weight box
+  defaulted to `0`, so a blank tap logged 0kg. A default is a prescription, and
+  `load-prescription.ts:12` forbids the app inventing one. It now says *type
+  it* where the movement needs a weight, and keeps 0 only where 0 is the
+  honest record.
+
+  **4. The logging column says what it is counting, and in what.** *"says
+  distance 40 but it's not clear if that's feet meters etc."* The unit was in
+  the prescription ("3x40m") the whole time and thrown away on the way to the
+  screen. Now "Distance · m", "Hold · s", "Duration · min" — read off the
+  prescription, never guessed, and `Reps` stays plain because the word is the
+  unit. The standing no-number-without-its-unit rule, one column across.
+
+  **5. A row of identical chips stops pretending to be a ladder.** *"there's no
+  ramp up sets which is fine but the ui makes it seem as if there is because
+  the numbers are also at the top."* S1 18kg, S2 18kg, S3 18kg sat in the exact
+  position and shape of a build-up strip, saying nothing the big number above
+  had not. They now render only where the loads actually differ — the same
+  reasoning the calibration-week rule beside them already used, generalised:
+  the chips earn their place by disagreeing.
+
+  **Verified**: new gate `test:primer-load` (24 checks), **9 mutations tried, 9
+  caught**, all applied, all ran the full 24. New driver `verify:prep-weight`
+  (6 checks) on a new `?prep=1` fixture — the generator will not produce a
+  loaded primer on its own, so the fixture puts the bell in the slot the way
+  she did. **The driver corrected a check of mine on its first run**: I asserted
+  the full prep sentence was on the card and it is not — that string is the
+  slot's guidance and lives one tap away; what the card carries beside the
+  number is "Light — movement prep". Recorded as it is, not as I hoped.
+  21 source gates green, `test:audit` clean, `npx tsc --noEmit` clean.
+  **Not done at the time of writing**: the 9,216-profile quality sweep is still
+  running — this changes what is PRESCRIBED, so its numbers go in the next
+  entry and are not assumed here.
+
 - [x] **THE PRE-MERGE SWEEP: four real failures, and the worst one was a gate
   that had never been green.** 257 gates and drivers run before merging.
   Three failures were environmental (`meal-quality`, `schema-parity`, and

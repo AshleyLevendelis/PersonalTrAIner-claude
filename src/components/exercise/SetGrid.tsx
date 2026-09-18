@@ -333,7 +333,14 @@ export function SetGrid({
     if (calibrationProbe && setNumber > 1) return ''
     const perSet = perSetLoadKg?.[setNumber - 1]
     if (perSet != null) return String(perSet)
-    return suggestedLoadKg != null ? String(suggestedLoadKg) : '0'
+    if (suggestedLoadKg != null) return String(suggestedLoadKg)
+    // NEVER INVENT 0 FOR A MOVEMENT THAT NEEDS A WEIGHT. Ashley, 18 Sep 2026:
+    // her kettlebell swings offered a faint 0, and a blank tap would have
+    // logged 0kg against a bell she had actually loaded to 24. A default is a
+    // prescription, and `load-prescription.ts:12` forbids the app inventing
+    // one. Zero stays where it is the honest record — a movement carrying no
+    // external load, where 0kg x 12 is exactly what happened.
+    return catalogEntryIsLoaded ? '' : '0'
   }
   /** What the empty box SHOWS — the default where one exists, a prompt where it does not. */
   const weightPlaceholderFor = (ref: SetRef): string => {
@@ -892,16 +899,44 @@ export function SetGrid({
   )
 }
 
-function getRepsColumnLabel(reps: string, prescriptionType?: string): string {
-  switch (prescriptionType) {
-    case 'time': return 'Hold'
-    case 'distance_load': return 'Distance'
-    case 'intervals': return 'Work'
-    case 'steady_state': return 'Duration'
-    case 'reps': return 'Reps'
-  }
-  if (reps.includes('min')) return 'Duration'
-  if (reps.endsWith('s')) return 'Time'
-  if (reps.endsWith('m')) return 'Distance'
-  return 'Reps'
+/**
+ * WHAT THE SECOND COLUMN IS COUNTING — AND IN WHAT.
+ *
+ * Ashley, 18 Sep 2026, on her suitcase carry: *"says distance 40 but it's not
+ * clear if that's feet meters etc."* The header said "Distance", the box said
+ * 40, and the unit was sitting in the prescription the whole time ("3x40m")
+ * and was thrown away on the way to the screen.
+ *
+ * This is the standing rule one column across: a number never reaches a screen
+ * without its unit. `Reps` is the one label that needs none, because the unit
+ * IS the word.
+ */
+export function getRepsColumnLabel(reps: string, prescriptionType?: string): string {
+  const kind = ((): string => {
+    switch (prescriptionType) {
+      case 'time': return 'Hold'
+      case 'distance_load': return 'Distance'
+      case 'intervals': return 'Work'
+      case 'steady_state': return 'Duration'
+      case 'reps': return 'Reps'
+    }
+    if (reps.includes('min')) return 'Duration'
+    if (reps.endsWith('s')) return 'Time'
+    if (reps.endsWith('m')) return 'Distance'
+    return 'Reps'
+  })()
+  if (kind === 'Reps') return kind
+  const unit = unitOfPrescription(reps)
+  return unit ? `${kind} \u00b7 ${unit}` : kind
+}
+
+/**
+ * The unit the prescription itself is written in, read off the string rather
+ * than guessed from the kind — "40m" is metres, "45s" seconds, "3min" minutes.
+ * Returns null when the prescription carries no unit, so the caller shows the
+ * bare kind rather than a made-up one.
+ */
+function unitOfPrescription(reps: string): string | null {
+  const m = /([0-9])\s*(min|m|s|km|mi|ft|yd)\b/i.exec(reps.trim())
+  return m ? m[2].toLowerCase() : null
 }
