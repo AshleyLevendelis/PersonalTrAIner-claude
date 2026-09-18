@@ -42,10 +42,32 @@ Newest first. One line each.
   CSCS delegation, so the coaching call is mine (rehab before the main lift is
   correct; no plan change) and the metric call is Ashley's. Put to her with
   three options.
-  **Still to measure before any change**: the RESIDUE — how many of the 725 are
-  NOT rehab-indicated. Those, if any, are a genuine ordering defect and would
-  be the real version of the reported finding. Naming it rather than assuming
-  it is zero.
+  **HER RULING, 18 Sep 2026, from three options: exempt it in the PREP BLOCK
+  ONLY.** She rejected exempting corrective work anywhere before the main lift
+  — which would stop the app noticing work that drifted into the middle of the
+  heavy sets, a real problem when it happens — and rejected leaving the score
+  alone. So the exemption needs BOTH halves, exactly as `primer_not_first` has
+  always had them: indicated for a flagged joint, AND nothing but warm-up or
+  other corrective work in front of it.
+  **Built**, in `quality-score.ts`, with the reasoning and her ruling in the
+  comment. New gate `test:rehab-order` (6 checks), **4 mutations tried, 4
+  caught** — including one that widens the exemption to the option she
+  rejected, and one that drops the injury requirement so core is always
+  forgiven. Both go red.
+  **TWO FIXTURE MISTAKES OF MINE, both caught before they became findings.**
+  I expected these exercises to be tagged as primers and said so before
+  measuring — zero core or carry movements carry that tier, so the exemption
+  had to run off the injury flag instead. And the drift fixture spliced the
+  corrective exercise out and back in at `mainIdx`, which by then had shifted
+  down one, so it landed AFTER the main lift and correctly did not fire: the
+  fixture was wrong, not the code, and it read exactly like the exemption being
+  too broad. Both recorded in the gate beside the checks they nearly broke.
+  **THIS CHANGES WHAT THE METRIC MEASURES.** Structure rises, and scores from
+  this commit on are not comparable with any earlier run — including the 11.57
+  recorded above. Quote them with that said.
+  **Still running**: the re-score, which also yields the RESIDUE — how many of
+  the 725 are NOT rehab-indicated. Those, if any, are the genuine version of
+  the reported finding. Named rather than assumed to be zero.
 
 - [x] **EVERY CHANGE NOW GETS A CSCS REVIEW — and its first outing found a
   floor I had silently redefined an hour earlier.** Ashley, 18 Sep 2026,
