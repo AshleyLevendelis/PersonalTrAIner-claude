@@ -98,6 +98,25 @@ Newest first. One line each.
   CORRECTS ITS OWN wrong cause in place rather than tidying it away — the
   reasoning that produced it would have produced a passing source check too.
 
+  **QUALITY, scored on the same 9,216 profiles, pre-fix worktree against
+  post-fix tree: 11.60/12 either way, 0 below the 7.2 floor either way,
+  Structure 2.00 either way.** Score-neutral at the top line. Underneath it
+  moves four rules: push:pull imbalance 579 -> **431**, recovery volume not
+  reduced 724 -> **625**, fat-loss structure reduced 33 -> **11**, and against
+  those, worse-implement-than-available 1,312 -> **1,476** (+164, +1.8%). With
+  the duplicate gone the freed slot is sometimes filled by a movement the app
+  judges a poorer implement choice — almost certainly the same ~1.8% of profiles
+  whose chest week thins, a lesser accessory in place of a second barbell press.
+  A real regression in one selection sub-rule, against three improvements, an
+  unchanged overall, and 49,988 days that no longer prescribe two main lifts.
+  Named for its own look; not a reason to hold this.
+
+  **AND IT CLOSES THE CARRY DEBT.** `core_before_main` appears nowhere in
+  either run's rule table. This morning's carry-placement fix took it from 148
+  to 0 — measured then, but the confirming sweep died silently (a `nohup` run
+  reaped when the harness marked its launching call complete) and was never
+  re-run. It is confirmed now.
+
 - [x] **MEASURED THE VOLUME CEILING BEFORE BUILDING IT, AND THE MEASUREMENT
   FOUND SOMETHING ELSE.** 18 Sep 2026, on Ashley's instruction, against a
   relayed proposal to cap working sets per workout at 20-24.

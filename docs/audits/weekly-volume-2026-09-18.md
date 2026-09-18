@@ -212,3 +212,36 @@ profiles. That is the correct trade (the second bench-pattern main lift should
 not have been there) but it is a cost, and it points at the same gap section 4
 already names: nothing in the app notices a muscle running thin. Calves move
 the other way, slightly better (0 sets: 1,197 → 1,188).
+
+## Plan quality, scored across the same 9,216 profiles
+
+Two runs: the pre-fix worktree (which carries this morning's carry-placement fix
+but not this one) and the post-fix tree. Both against the same scorer.
+
+**Overall 11.60 / 12 either way. 0 plans below the 7.2 floor either way.
+Structure 2.00 either way.** The fix is score-neutral at the top line.
+
+Underneath, it moves four rules and the trade is worth stating:
+
+| rule | before | after |
+|---|---|---|
+| push:pull imbalance | 579 | **431** |
+| recovery volume not reduced | 724 | **625** |
+| fat-loss structure reduced | 33 | **11** |
+| worse implement than available | 1,312 | **1,476** |
+| load incoherent | 398 | 425 |
+| time fit | 338 | 349 |
+
+Three clear wins and one clear loss. **Worse-implement rises by 164 profiles
+(+1.8%)**: with the duplicate main lift gone, the freed slot is sometimes filled
+by a movement the app judges a poorer implement choice than something else
+available. That is almost certainly the same ~1.8% of profiles whose chest week
+thins — a lesser accessory in place of a second barbell press.
+
+It is a real regression in one selection sub-rule, set against three
+improvements, an unchanged overall score, and 49,988 days that no longer
+prescribe two main lifts. Worth its own look, not worth blocking this.
+
+**And it closes the other debt**: `core_before_main` appears nowhere in either
+run's rule table. The carry-placement fix earlier today took it from 148 to 0,
+which was measured but never confirmed on a full sweep until now.
