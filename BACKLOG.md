@@ -2,6 +2,66 @@
 
 Newest first. One line each.
 
+- [x] **EVERY CHANGE NOW GETS A CSCS REVIEW — and its first outing found a
+  floor I had silently redefined an hour earlier.** Ashley, 18 Sep 2026,
+  widening the morning's delegation: *"All changes shoukd be viewed through the
+  lens of a certified cscs coach."*
+
+  **What changed in the rules.** The morning's instruction delegated the
+  DECISIONS; this one makes the coaching read a standing review of every change
+  that touches a prescription, including changes that raise no question at all.
+  It is now step 0 of "what finished means" in `CLAUDE.md`, ahead of the gates,
+  because it is the only step that asks whether the change is right for the
+  person training rather than whether the code is right. Five questions, and
+  the report has to answer them: what it does to the TRAINING EFFECT rather
+  than the number; what it takes AWAY; whether the fundamentals survive
+  (pattern coverage, progressive overload, recovery, specificity); whether it
+  quietly redefines an existing floor or ceiling; and whether it is in scope.
+
+  **QUESTION 4 PAID FOR ITSELF IMMEDIATELY.** Both time-cap trimmers stop at
+  "more than three exercises left". When the movement-prep slot became
+  unremovable earlier the same day, that three started COUNTING it — so the
+  tightest days bottomed out at **two training exercises plus a warm-up** where
+  they had held three. Measured with a constructed day at an 8-minute budget:
+  `[Wall Slides, Bench, Squat]`, three slots, two exercises. **Nothing failed.
+  The number three had not changed; what it meant had**, which is exactly the
+  class of defect no gate asserting "the floor is three" can see.
+  The CSCS answer is that a warm-up is preparation FOR a session, not content
+  OF it, so a floor on training content counts training content.
+  `trainingSlotCount` now backs both loops and the same day floors at three
+  real exercises with its prep intact.
+
+  **AND A MUTATION FOUND THE LIMIT OF THE NEW CHECK.** `stageTimeCap` is
+  module-private, so no constructed input can drive it: reverting ITS floor to
+  a raw array length was MISSED while the identical revert in the exported
+  trimmer was caught. §5f covers both on the property — neither loop may
+  express the floor as a count of slots — with §5g proving the detector on the
+  expression it forbids.
+
+  **Verified**: `test:pattern-floor` 29 checks, **13 mutations tried across
+  three rounds, 13 caught** (P12 only after §5f was added; before that it was
+  an honest MISSED and is recorded as one). `npx tsc --noEmit` clean.
+  **Not done at the time of writing**: the coverage re-measurement and the
+  plan-quality re-score for THIS change are still running. It makes the
+  tightest days hold one more exercise, so `time_fit` is the number to watch
+  and it is the one I would expect to move. Named, not assumed.
+
+  **THREE THINGS THE LENS FLAGS THAT I HAVE NOT TOUCHED**, ranked, from the
+  same quality report rather than from opinion — recorded here so they are
+  leads for a future session rather than background noise in a rule table:
+  1. **`core_before_main`, 725 plans (7.9%)** — core or finisher work placed
+     BEFORE the day's main lift. A fatigued trunk before a heavy compound is a
+     bracing and safety problem, not a preference; this is the one a coach
+     would fix first.
+  2. **`frozen_week`, 4,060 plans (44.1%)** — a week where load and reps both
+     hold and only the RPE label moves. Some of that is deliberate (deload,
+     calibration); the share that is not is a progressive-overload failure,
+     which is the single most important principle in the file. Needs splitting
+     by phase before anyone acts on it.
+  3. **`push_pull_imbalance`, 575 plans (6.2%)** — mostly pull-heavy
+     (0.57, 0.40 in the printed examples), which is the safer direction but
+     still outside the band the app sets itself.
+
 - [x] **TRAINING QUESTIONS STOP COMING TO ASHLEY — and the first two she gets
   back were both already sitting in this file marked "hers to weigh".**
   Ashley, 18 Sep 2026: *"Ask the questions you ask me regarding how the app

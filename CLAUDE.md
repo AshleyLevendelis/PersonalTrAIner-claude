@@ -832,13 +832,18 @@ menu" stays true when a copy is also left outside it.
 ## Asking
 
 - Work autonomously by default. When a decision genuinely is Ashley's to make, ask her directly in the conversation — don't guess and don't wait for it to arrive secondhand.
-- **ANSWER TRAINING AND NUTRITION QUESTIONS AS A CSCS WOULD — do not bring them
-  to her.** Ashley's ruling, 18 Sep 2026, in her own words: *"Ask the questions
-  you ask me regarding how the app should act should be answered from a cscs
-  perspective. So with that in mind you should be able to answer them as a cscs
-  coach would"*. She is delegating the whole class, not one question. The old
-  rule sent "what should a coach do here?" to her by default; it now stays
-  here, gets decided against the standards, and gets recorded with its basis.
+- **EVERY CHANGE IS VIEWED THROUGH THE LENS OF A CERTIFIED CSCS COACH, and
+  training questions are ANSWERED here rather than brought to her.** Ashley,
+  18 Sep 2026, twice: *"Ask the questions you ask me regarding how the app
+  should act should be answered from a cscs perspective. So with that in mind
+  you should be able to answer them as a cscs coach would"*, and then, widening
+  it: *"All changes shoukd be viewed through the lens of a certified cscs
+  coach."*
+  The second sentence is the bigger one. The first delegated the DECISIONS; the
+  second makes the coaching read a standing review of every change, including
+  the ones that raise no question at all — a refactor, a bug fix, a gate. The
+  test is not "is this correct?" but **"would a qualified coach sign the plan
+  this produces, for this person?"**
   - MINE now, decided and recorded, never asked: exercise selection and what is
     an acceptable substitute for what; sets, reps, load, rest, tempo and every
     floor or ceiling on them; exercise order and what gets protected when a
@@ -871,6 +876,27 @@ menu" stays true when a copy is also left outside it.
     decision defensible; it does not make the coach's advice good. That is what
     the coach exam is for, it has never run against the current coach, and this
     delegation does not move that line one inch — rule 5 stands.
+  - **THE REVIEW, so "through a CSCS lens" is a step and not a sentiment.**
+    Before any change that touches what somebody is PRESCRIBED — exercise,
+    load, sets, reps, rest, order, frequency, or what survives a cut — ask
+    these five, and say the answers in the report:
+      1. **What does it do to the training effect**, not to the number? A value
+         can be correct and the stimulus still wrong.
+      2. **What does it take AWAY?** Protecting one thing inside a pass aims
+         that pass at whatever is left. Count the cost in the same run.
+      3. **Do the fundamentals survive** — movement-pattern coverage,
+         progressive overload, recovery, and specificity to the stated goal?
+      4. **Does it quietly redefine an existing floor or ceiling?** A number
+         that still reads the same while meaning something else is the worst
+         kind, because nothing fails.
+      5. **Is it inside scope** — not diagnosis, rehab or clinical nutrition?
+    **FOUND BY QUESTION 4 ON ITS FIRST OUTING, 18 Sep 2026**, against work
+    committed an hour earlier: protecting the movement-prep slot from the
+    time-cap trimmer left the "never below three exercises" floor counting that
+    slot, so the tightest days bottomed out at TWO training exercises plus a
+    warm-up where they had held three. Every gate was green and the number
+    three had not changed. Measured with a constructed over-budget day, not
+    reasoned about.
 - ASK when the decision is about how the app behaves in the ways left to her above: what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours where the training science does not pick a winner, or anything in the medical/clinical band (allergens, diagnosis, mental health).
 - PROCEED WITHOUT ASKING on anything mechanical: bugs, tests, refactors, measurement, data consistency, performance — anything that has a right answer.
 - How to ask, which matters as much as when:
@@ -1323,6 +1349,10 @@ same six files. Sizes are why it matters: these are not files to read whole.
 Not done until all of it is true. A piece of work that stops early is worse
 than one not started, because it looks finished in the log.
 
+0. **The CSCS review above has been done on anything that changes a
+   prescription, and its answers are in the report.** It is first because it is
+   the one step that asks whether the change is right for the person training,
+   rather than whether the code is right.
 1. The affected checks pass, and any NEW check has been mutation-tested.
 2. `npx tsc --noEmit` is clean, and a full sweep has run before a merge.
 3. Anything visible has been driven in a real browser at phone size — a

@@ -1290,7 +1290,7 @@ function stageTimeCap(
   // silently undo the "never silently drop the slot" promise one stage
   // later; those exercises can still lose sets in Phase 5, just not
   // disappear outright.
-  while (estimated > budgetSeconds && dayExercises.length > 3) {
+  while (estimated > budgetSeconds && trainingSlotCount(dayExercises.map(e => e.entry)) > 3) {
     // Re-derived each pass: the array shrinks below, so "last carrier of this
     // pattern" is a question about the CURRENT day, not the one we started on.
     const entriesNow = dayExercises.map(e => e.entry)
@@ -1302,7 +1302,7 @@ function stageTimeCap(
         isStructuralSlot(entriesNow, removeIdx)
       )
     ) removeIdx--
-    if (removeIdx < 0 || dayExercises.length <= 3) break
+    if (removeIdx < 0 || trainingSlotCount(entriesNow) <= 3) break
     const removed = dayExercises.splice(removeIdx, 1)[0]
     trace.time_cap_adjusted.push({
       exercise: removed.entry.name,
@@ -5298,6 +5298,27 @@ const FUNDAMENTAL_PATTERNS: ReadonlySet<MesocycleMovementPattern> = new Set([
  * A day that still will not fit at every set floor is a day that does not fit,
  * and the app says so rather than quietly deleting the warm-up.
  */
+/**
+ * HOW MANY TRAINING EXERCISES A DAY IS LEFT HOLDING — prep does not count.
+ *
+ * Found 18 Sep 2026 by the CSCS review's question 4 ("does this quietly
+ * redefine an existing floor?"), against a change committed an hour earlier.
+ * Both trimmers stop at `length > 3`, and once the movement-prep slot became
+ * unremovable that three started COUNTING it: a constructed day at an 8-minute
+ * budget bottomed out as [Wall Slides, Bench, Squat] — three slots, two
+ * exercises. Before the prep protection the same floor left three real ones.
+ *
+ * Nothing failed. The number three had not changed; what it meant had. That is
+ * the shape the question exists to catch, and it is invisible to every gate
+ * that asserts the floor is three.
+ *
+ * A warm-up is preparation FOR the session, not content OF it, so the floor
+ * counts what is left to train. The day keeps its prep either way.
+ */
+export function trainingSlotCount(entries: readonly (ExerciseEntry | null | undefined)[]): number {
+  return entries.filter(e => e && e.mechanics_tier !== 'primer').length
+}
+
 export function isStructuralSlot(
   entries: readonly (ExerciseEntry | null | undefined)[],
   index: number,
@@ -5855,7 +5876,12 @@ export function sizeBlockToRestBudget(
     // of the array is lowest-tier; required-slot and cardio exercises
     // never removed; floor of 3 exercises remaining, matching
     // stageTimeCap's own floor).
-    for (let guard = 0; guard < 10 && estimate(exercises) > totalBudgetSeconds && exercises.length > 3; guard++) {
+    for (
+      let guard = 0;
+      guard < 10 && estimate(exercises) > totalBudgetSeconds
+        && trainingSlotCount(exercises.map(e => findEntry(e.name))) > 3;
+      guard++
+    ) {
       const entriesNow = exercises.map(ex => findEntry(ex.name))
       let removeIdx = exercises.length - 1
       while (removeIdx >= 0) {

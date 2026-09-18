@@ -24,7 +24,8 @@ import { join } from 'path'
 import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import {
   generateMesocycle, setRandomSource, resetRandomSource, sizeBlockToRestBudget,
-  isLastCarrierOfPattern, isStructuralSlot, getConstrainedPool, mapMovementPattern,
+  isLastCarrierOfPattern, isStructuralSlot, trainingSlotCount,
+  getConstrainedPool, mapMovementPattern,
 } from '../src/lib/exercise-plan'
 import { getGoalPolicy } from '../src/lib/goal-policies'
 import { seededRngFromKey } from '../src/lib/seeded-random'
@@ -290,6 +291,62 @@ console.log('\n[4] The real trimmer, on a day built to make it choose')
   check('4d. the main lift and the day\'s only squat are what is left standing',
     names.includes('Barbell Bench Press') && names.includes('Goblet Squats')
     && names.length === 3, { names })
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n[5] The floor counts training, not the warm-up')
+// ---------------------------------------------------------------------------
+// FOUND BY THE CSCS REVIEW'S QUESTION 4 — "does this quietly redefine an
+// existing floor?" — against the prep protection committed an hour earlier.
+// Both trimmers stop at "more than three exercises left", and once prep became
+// unremovable that three started counting it: a constructed day at an 8-minute
+// budget bottomed out as three slots holding TWO exercises. Nothing failed.
+// The number three had not changed; what it meant had.
+{
+  const e = (name: string) => getExerciseEntry(name)!
+  const primer = EXERCISE_DATABASE.find(x => x.mechanics_tier === 'primer')!
+
+  check('5a. prep is not counted as training', trainingSlotCount([primer, e('Barbell Squats')]) === 1)
+  check('5b. ...and everything else is',
+    trainingSlotCount([e('Barbell Squats'), e('Barbell Bench Press'), e('Dumbbell Curls')]) === 3)
+  check('5c. a hole in the list counts as nothing, not as something',
+    trainingSlotCount([null, undefined, e('Barbell Squats')]) === 1)
+
+  const ex = (name: string, sets: number, rest: string): Exercise =>
+    ({ name, sets, reps: '8-10', rest, substitution: '' })
+  const crushed = (): WorkoutDay => ({
+    day: 'Monday', focus: 'Full body',
+    exercises: [
+      ex(primer.name, 2, '30s'),
+      ex('Barbell Bench Press', 3, '90s'),
+      ex('Barbell Squats', 3, '120s'),
+      ex('Cable Lateral Raises', 3, '60s'),
+      ex('Overhead Tricep Extension', 3, '60s'),
+      ex('Cable Woodchops', 3, '60s'),
+    ],
+  })
+  // Eight minutes is far past any real budget on purpose: it drives the
+  // trimmer all the way down so the floor is what stops it, not the clock.
+  const [floored] = sizeBlockToRestBudget(
+    [crushed()], 200, 8 * 60, new Set(), getGoalPolicy('hypertrophy'), [],
+  )
+  const left = floored.exercises.map(x => x.name)
+  const realLeft = trainingSlotCount(left.map(n => getExerciseEntry(n)))
+  check('5d. a day crushed to the floor still holds three TRAINING exercises',
+    realLeft === 3, { slots: left.length, training: realLeft, left })
+  check('5e. ...and it kept its warm-up as well, rather than instead',
+    left.includes(primer.name), { left })
+
+  // 5f EXISTS BECAUSE 5d CANNOT REACH BOTH TRIMMERS. stageTimeCap is
+  // module-private, so no constructed input can drive it; measured by
+  // mutation, reverting ITS floor to a raw array length was MISSED while the
+  // same revert in the exported one was caught. The property that covers both
+  // is that neither expresses the floor as a count of SLOTS.
+  const planSrc = stripComments(readFileSync(join(ROOT, 'src/lib/exercise-plan.ts'), 'utf8'))
+  const rawFloors = (planSrc.match(/\.length\s*(<=|>)\s*3\b/g) ?? []).length
+  check('5f. no trimmer expresses the floor as a count of slots', rawFloors === 0, { rawFloors })
+  check('5g. ...and that detector fails on the expression it forbids',
+    /\.length\s*(<=|>)\s*3\b/.test('if (removeIdx < 0 || dayExercises.length <= 3) break'))
 }
 
 console.log(failures === 0 ? '\nPASS\n' : `\n${failures} FAILED\n`)
