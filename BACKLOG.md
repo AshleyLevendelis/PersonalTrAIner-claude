@@ -2,6 +2,51 @@
 
 Newest first. One line each.
 
+- [x] **"CORE BEFORE THE MAIN LIFT" IS NOT A SEQUENCING DEFECT — IT IS THE
+  REHAB SLOT, AND THE SCORER CANNOT SEE IT.** Investigated 18 Sep 2026 after
+  Ashley relayed a second opinion (Gemini) ranking it the highest-priority fix
+  and directing an immediate ordering change. **Measured first, and the finding
+  inverts: there is nothing to fix in the plan, and making the change as
+  directed would have harmed exactly the people it was meant to protect.**
+
+  The ranking and the reasoning were sound in general terms — a fatigued trunk
+  before a heavy compound is a bracing problem, and multi-joint work comes
+  first while the nervous system is fresh. That is the right rule. It is just
+  not what these 725 plans are doing.
+
+  **What they are actually doing**, reproduced from the exact combination the
+  report names (`bodyweight / lower_back / 90+ / hybrid / intermediate /
+  fat_loss`): the day reads **Arm Circles (warm-up) → Side Plank → Pull-Ups**,
+  and Side Plank is `isIndicatedFor` the flagged lower back. Friday is the same
+  shape with Bird Dog before Chin-Ups. That is the app's REHAB slot, placed by
+  a branch whose own comment says *"Straight after the warm-up, before the
+  working sets: rehab is prep"*. Low-intensity corrective work for an injured
+  area, before the area gets loaded, is correct practice — not a defect.
+
+  **ONE HYPOTHESIS OF MINE WAS WRONG AND IS RECORDED AS SUCH.** I expected these
+  to be activation drills tagged as primers, and said so before measuring:
+  **zero** core or carry movements in the catalogue carry the `primer` tier, so
+  that was not it. The exemption these need runs off the injury flag, not the
+  tier — which is what `primer_not_first` already uses one rule above
+  (`allPrimersBefore && isIndicatedFor(entry, flaggedJoints)`). The core rule
+  simply never got the same clause. **The asymmetry between two neighbouring
+  rules is the whole finding.**
+
+  **SO THE DEFECT IS IN THE MEASUREMENT, NOT THE PLAN**, and the cost is real:
+  725 plans have been marked down on Structure for doing the right thing by an
+  injured trainee, which drags a dimension the app holds itself to.
+
+  **NOT CHANGED, AND DELIBERATELY SO.** Fixing the scorer changes what a metric
+  MEASURES — Structure would rise and today's 11.57 would stop being comparable
+  with yesterday's. `CLAUDE.md` names that as stop-and-wait regardless of the
+  CSCS delegation, so the coaching call is mine (rehab before the main lift is
+  correct; no plan change) and the metric call is Ashley's. Put to her with
+  three options.
+  **Still to measure before any change**: the RESIDUE — how many of the 725 are
+  NOT rehab-indicated. Those, if any, are a genuine ordering defect and would
+  be the real version of the reported finding. Naming it rather than assuming
+  it is zero.
+
 - [x] **EVERY CHANGE NOW GETS A CSCS REVIEW — and its first outing found a
   floor I had silently redefined an hour earlier.** Ashley, 18 Sep 2026,
   widening the morning's delegation: *"All changes shoukd be viewed through the
