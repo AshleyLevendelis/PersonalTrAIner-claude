@@ -1074,6 +1074,94 @@ function mainLiftRestFloor(
     : MAIN_LIFT_REST_FLOOR_SECONDS
 }
 
+/**
+ * THE SHORTEST REST THAT LEAVES THE EXERCISE THE EXERCISE IT IS.
+ *
+ * Ashley, from the gym floor 17 Sep 2026: *"The rest breaks between the lat
+ * pulldown seem very short 30s, check that is correct."* Measured the next
+ * day across 1,728 profiles: 49.2% of every exercise in a week rested 30
+ * seconds or less, and 29.1% of SECOND-TIER COMPOUNDS — the lat pulldown's
+ * class, prescribed 75s by the hybrid style's own table — sat at or under 30.
+ * Nothing was miscalculating. The session did not fit, and the generator paid
+ * for the overrun by taking rest off everything but the main lift, down to a
+ * flat 30 written in two independent places that therefore STACKED.
+ *
+ * Her ruling, 18 Sep 2026, from four options: PROTECT THE REST, DO LESS.
+ * Every exercise keeps a rest that suits it and the session sheds an
+ * accessory or a set instead. She rejected today's behaviour (keep the work,
+ * shrink the gaps), a flat one-minute middle floor, and being told to train
+ * longer. Her reason, in her own option: 30 seconds on a lat pulldown is not
+ * a short rest, it is a different exercise, and the reps printed beside it
+ * stop being reachable.
+ *
+ * THE `Math.min` IS THE HALF THAT MATTERS, and it is why this is a floor
+ * rather than a table. A floor must never RAISE a rest: combat style
+ * deliberately prescribes 60s/45s for its second-tier and isolation work, a
+ * primer is 20s on purpose, and some slots are prescribed 0. Taking the tier
+ * number as an absolute would quietly rewrite those styles' own density in
+ * the name of protecting them. What this stops is the TRIMMER going below
+ * what the style asked for.
+ *
+ * One function, two callers — stageTimeCap at generation time and
+ * trimWeekRestForBudget per block. They held separate copies of the 30, which
+ * is the shape this file has already recorded going wrong twice ("a
+ * constraint asserted at three paths, missed at the fourth").
+ */
+export const REST_FLOOR_BY_TIER: Record<ExerciseTier, number> = {
+  tier_0_primer: 20,
+  tier_1_primary: MAIN_LIFT_REST_FLOOR_SECONDS,
+  tier_2_secondary: 60,
+  tier_3_isolation: 45,
+  // Never reached: every caller exempts cardio before asking, because cutting
+  // an interval's rest changes what the exercise IS. Present so the record is
+  // total and a new caller cannot get `undefined` and fall through to zero.
+  tier_4_finisher: 0,
+}
+
+export function restFloorFor(
+  tier: ExerciseTier,
+  /**
+   * What the PLAN would prescribe for this exercise with no time pressure at
+   * all — the style's own number for this tier, plus the phase's deliberate
+   * shift. NOT the value currently on the exercise.
+   *
+   * MEASURED, and the reason this parameter is what it is: passing the
+   * current value made the floor useless one step later. A hybrid isolation
+   * slot is prescribed 60s; the trimmer took it to the 45s floor; the
+   * anatomical-adaptation phase then applied its own deliberate -15s and
+   * landed on 30 — the very number Ashley reported. Two floors, each correct
+   * on its own, spending the same 15 seconds twice. Against the UNBUDGETED
+   * baseline the same case floors at min(60-15, 45) = 45 and stays there,
+   * while a metabolic block that genuinely prescribes 40s keeps its 40.
+   */
+  unbudgetedSeconds: number,
+  /** The main lift's own floor, already resolved from the goal policy. Only consulted for a main lift or a promoted anchor. */
+  mainFloorSeconds = 0,
+): number {
+  if (tier === 'tier_1_primary' || mainFloorSeconds > 0) return Math.max(mainFloorSeconds, REST_FLOOR_BY_TIER.tier_1_primary)
+  return Math.min(unbudgetedSeconds, REST_FLOOR_BY_TIER[tier] ?? 0)
+}
+
+/**
+ * The style's own rest for this exercise's tier, before any time pressure —
+ * the one number `restFloorFor` needs and no caller should re-derive. Cardio
+ * and anything with no catalogue entry return null: their rest is set by the
+ * interval or the bout, not by the tier table, and every caller exempts them.
+ */
+export function unbudgetedRestSeconds(
+  entry: ExerciseEntry | undefined,
+  style: TrainingStyle,
+  phaseShiftSeconds = 0,
+): number | null {
+  if (!entry || entry.mechanics_tier === 'cardio') return null
+  const table = STYLE_CONFIGS[style].restSeconds
+  const base = entry.mechanics_tier === 'tier1_compound' ? table.tier1
+    : entry.mechanics_tier === 'tier2_compound' ? table.tier2
+    : entry.mechanics_tier === 'tier3_isolation' ? table.tier3
+    : REST_FLOOR_BY_TIER.tier_0_primer
+  return Math.max(0, base + phaseShiftSeconds)
+}
+
 function stageTimeCap(
   dayExercises: { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[],
   budgetSeconds: number,
@@ -1154,10 +1242,17 @@ function stageTimeCap(
   })()
   for (let i = 0; i < dayExercises.length; i++) {
     if (dayExercises[i].entry.mechanics_tier === 'cardio') continue
-    // Math.max, not an early `continue`: for everything that is not a main
-    // lift the floor stays 30 and the expression is byte-identical to what
-    // shipped before, so this change cannot move an accessory's rest.
-    const floor = Math.max(30, mainLiftRestFloor(dayExercises[i].entry, policy, i === promotedIdx))
+    // ONE FLOOR FUNCTION, NOT A 30 WRITTEN HERE AND AGAIN IN
+    // trimWeekRestForBudget. The old expression floored every non-main lift
+    // at a flat 30s, which is what put a 75s-prescribed lat pulldown on a
+    // 30-second gap. restFloorFor asks what the exercise needs and never
+    // raises a rest the style deliberately set lower — see its header for
+    // Ashley's ruling of 18 Sep 2026 and the measurement behind it.
+    const floor = restFloorFor(
+      mapTier(dayExercises[i].entry.mechanics_tier),
+      unbudgetedRestSeconds(dayExercises[i].entry, style) ?? dayExercises[i].restSeconds,
+      mainLiftRestFloor(dayExercises[i].entry, policy, i === promotedIdx),
+    )
     const newRest = Math.max(floor, dayExercises[i].restSeconds - 15)
     dayExercises[i] = { ...dayExercises[i], restSeconds: newRest, rest: `${newRest}s` }
   }
@@ -4162,6 +4257,7 @@ export function settleWeekBalance(week: MesocycleWeek, profile: UserProfile): Ba
     getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
     undefined,
     policy.minLoadedMainLiftRestSeconds,
+    profile.training_style || 'hybrid',
   )
 
   const changes: BalanceSettlement['changes'] = []
@@ -5437,6 +5533,13 @@ function trimWeekRestForBudget(
    * straight back to 60. Undefined keeps the historical 60s.
    */
   loadedMainLiftFloorSeconds?: number,
+  /**
+   * The trainee's style, so the accessory floor can be read off the SAME
+   * table that prescribed the rest in the first place. Required in practice —
+   * defaulted only so a caller that genuinely has no profile (none today)
+   * degrades to the most common style rather than to a hardcoded number.
+   */
+  style: TrainingStyle = 'hybrid',
 ): void {
   for (const day of days) {
     if (day.exercises.length === 0) continue
@@ -5491,7 +5594,19 @@ function trimWeekRestForBudget(
         const mainFloor = isRealMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
           ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loadedMainLiftFloorSeconds)
           : MAIN_LIFT_REST_FLOOR_SECONDS
-        const floor = isMain ? mainFloor : 30
+        // The same floor the generation-time pass uses. These two held
+        // separate copies of a flat 30 and therefore STACKED their cuts —
+        // 75 -> 60 -> 45 -> 30 down the passes. `ex.tier` is already the
+        // normalized vocabulary restFloorFor takes.
+        // Against the UNBUDGETED prescription, never against the value the
+        // earlier pass already cut — see restFloorFor's second parameter for
+        // the measurement that forced that distinction.
+        const floor = isMain
+          ? mainFloor
+          : restFloorFor(
+              ex.tier ?? 'tier_3_isolation',
+              unbudgetedRestSeconds(findEntry(ex.name), style) ?? restSeconds,
+            )
         if (restSeconds <= floor) continue
         const newRest = Math.max(floor, restSeconds - 15)
         day.exercises[i] = { ...ex, rest: `${newRest}s` }
@@ -5733,7 +5848,7 @@ export function shortenDayTo(
   // but the exercises it did not touch are the caller's own objects — the
   // trap settle-week.ts's header records paying for on 13 Sep.
   const shortened: WorkoutDay = { ...sized, exercises: sized.exercises.map(e => ({ ...e })) }
-  trimWeekRestForBudget([shortened], budgetSeconds, undefined, policy.minLoadedMainLiftRestSeconds)
+  trimWeekRestForBudget([shortened], budgetSeconds, undefined, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
 
   const keptBefore = new Map(day.exercises.map(ex => [ex.name, ex.sets]))
   const droppedExercises = day.exercises.filter(ex => !shortened.exercises.some(e => e.name === ex.name)).map(ex => ex.name)
@@ -6680,6 +6795,33 @@ export function generateMesocycle(
             }
           }
 
+          // AND THE SAME ONE-WAY RULE FOR EVERYTHING THAT IS NOT THE MAIN
+          // LIFT — Ashley's ruling, 18 Sep 2026. This was the path that
+          // actually produced the 30-second lat pulldown she reported, and it
+          // produced it out of two correct decisions: the budget trimmer took
+          // a 60s isolation slot down to its 45s floor, and THEN the
+          // anatomical-adaptation phase applied its own deliberate -15s. Two
+          // floors, each right on its own, spending the same fifteen seconds
+          // twice.
+          //
+          // The floor here is read off the phase-shifted UNBUDGETED
+          // prescription, so a phase that genuinely wants short rest keeps it
+          // — a metabolic block's -20s still lands a hybrid isolation slot on
+          // 40s — while budget pressure can no longer compound with it.
+          // Cardio, intervals and steady-state are excluded by
+          // unbudgetedRestSeconds returning null: their rest is the bout, not
+          // the tier.
+          {
+            const unbudgeted = unbudgetedRestSeconds(dbEntry, profile.training_style || 'hybrid', restShift)
+            if (unbudgeted != null && dbEntry && dbEntry.mechanics_tier !== 'tier1_compound' && ex !== promotedAnchor) {
+              const floor = restFloorFor(mapTier(dbEntry.mechanics_tier), unbudgeted)
+              const current = parseRestSeconds(restForWeek)
+              if (floor > 0 && current > 0 && current < floor) {
+                restForWeek = `${floor}s`
+              }
+            }
+          }
+
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
           // RPE or a load that scales with the block.
@@ -7397,7 +7539,7 @@ export function generateMesocycle(
         // after this (rest already at floor) has nothing under-budget for
         // the filler to fill either, so the two never fight over the same
         // day.
-        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds)
+        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
         applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
         // Runs last, after rotation, periodization and duration-budget
         // trimming have all had their say — see enforceWeeklyPatternBalance's
@@ -7430,6 +7572,7 @@ export function generateMesocycle(
           getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
           trimLog,
           policy.minLoadedMainLiftRestSeconds,
+          profile.training_style || 'hybrid',
         )
       }
 
@@ -7457,6 +7600,31 @@ export function generateMesocycle(
       // progression and the rest trimmer. Reconciling at each of them is the
       // three-copies-of-one-rule failure this file keeps finding; reconciling
       // here holds for writers that do not exist yet.
+      // THE LAST HONEST COST CHECK, and the one this week has never had.
+      //
+      // Every pass above sizes a day against BASE reps. The per-week rep ramp
+      // then grows the work inside it — 13-15 becomes 14-16 becomes 16-18 by
+      // week 11 — so a day sized to fit in week 1 costs two minutes more in
+      // week 11 and nothing ever asked again. That overrun used to be
+      // invisible because the rest trimmers were quietly absorbing it; with
+      // rest floored to what the exercise needs (Ashley's ruling, 18 Sep
+      // 2026) it surfaced as 17 sessions running past the 45 minutes their
+      // trainee said they had. The slack was never a fix, only a cover.
+      //
+      // So: cost THIS week's day exactly as the screen will draw it, and if
+      // it runs past the top of the range they chose, shed work — the same
+      // priority order every other budget pass uses. Against the MAXIMUM, not
+      // the midpoint, so it only bites a day that is genuinely over and never
+      // undoes the duration filler's deliberate top-up.
+      {
+        const sessionMaxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
+        const flagged = getFlaggedJoints(profile.injuries ?? [])
+        for (let i = 0; i < days.length; i++) {
+          if (days[i].exercises.length === 0) continue
+          days[i] = enforceDayDurationBudget(days[i], sessionMaxSeconds, flagged)
+        }
+      }
+
       reconcilePerSetLoads(days)
       weeks.push({
         week_number: weekCounter,

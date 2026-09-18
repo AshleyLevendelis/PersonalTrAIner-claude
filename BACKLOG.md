@@ -2,6 +2,71 @@
 
 Newest first. One line each.
 
+- [x] **REST THAT SUITS THE EXERCISE — her 30-second lat pulldown, and the two
+  older things under it.** Ashley from the gym floor, 17 Sep: *"The rest breaks
+  between the lat pulldown seem very short 30s, check that is correct."*
+  Measured across 1,728 profiles: **49.2% of every exercise in a week rested 30
+  seconds or less**, and 29.1% of second-tier compounds — the lat pulldown's
+  class, prescribed 75s by the style's own table — were at or under 30. Nothing
+  was miscalculating. The session did not fit and the generator paid for the
+  overrun out of rest, down to a flat 30 written in two independent places.
+
+  **Her ruling, 18 Sep 2026, from four options: PROTECT THE REST, DO LESS.**
+  Every exercise keeps a rest that suits it; the session sheds an accessory or
+  a set instead. She rejected keeping the work at short rests (the behaviour at
+  the time), a flat one-minute middle floor, and being told to train longer.
+  Her reason, in the option she picked: *30 seconds on a lat pulldown isn't a
+  short rest, it's a different exercise, and you can't hit the reps it's asking
+  for.*
+
+  **After, on the same sample**: 20.1% of exercises at or under 30s, and
+  **0.0% of second-tier compounds** — minimum 45s, median 60s, up from 0s and
+  45s. Isolation median 27s → 45s. Exercises per day unchanged at a median of
+  7. Read off a real phone screen: 120s on the squat, 60s on the carry, 45s on
+  the accessories, 20s on the primer.
+
+  **THE PLAN SAID TWO PLACES HELD THE 30; THERE WERE THREE.** Wiring the two
+  known ones barely moved isolation (71.0% → 68.7%). The third is the per-week
+  phase shift: the trimmer took a 60s slot to its new 45s floor and the
+  adaptation phase then applied its own deliberate -15s. Two floors, each
+  correct alone, spending the same fifteen seconds twice. **A floor has to be
+  read off the UNBUDGETED prescription, never the live value** — against the
+  live value it can only ratchet downward and locks in whatever an earlier pass
+  already cut. Recorded in CLAUDE.md as a general rule; anything clamped at
+  more than one stage has this shape.
+
+  **AND PROTECTING REST EXPOSED A DEFECT THE CUTS HAD BEEN HIDING FOR AS LONG
+  AS THEY HAVE EXISTED.** 17 of 576 sessions in the tightest bucket started
+  running past the time their trainee had set aside — not because of the
+  floors, but because every pass sizes a day against BASE reps while the
+  per-week ramp grows the work inside it (13-15 becomes 16-18 by week 11) and
+  nothing ever asked again. The rest trimmers had been quietly absorbing it.
+  Closed by costing each week's day exactly as the screen will draw it, at the
+  point where reps and rest are both final. All three buckets now report zero
+  overruns and the "too short" counts are unchanged, so it sheds only what is
+  genuinely over.
+
+  **TWO CHECKS HAD TO BE CORRECTED, AND THE WORSE ONE WAS MINE.**
+  `test:today-only` asserted that an impossible target squeezes REST as well as
+  sets — true until her ruling, and left standing it would have made the ruling
+  un-implementable on the "just today" path. And `test:rest-floors`, the new
+  gate, **was written unseeded: it passed, then failed on its very next run
+  against identical code**, because plan generation rolls dice unless a caller
+  seeds it. Worse than a flake — the six mutations run against that version
+  were worthless, and three of them were MISSED once it was deterministic. It
+  now seeds every plan, samples a deliberately SQUEEZED profile (the trimmers
+  only run on a day that is over budget, so comfortable fixtures never reach
+  the code the gate exists to hold), and reads the style table column by column.
+
+  **Verified**: 20 source gates green including `session-length`,
+  `main-lift-rest`, `cardio-share-score`, `frozen-weeks`, `block-phases` and
+  `edit-keeps-the-bar`; `npx tsc --noEmit` clean; the card read on a real
+  390x844 screen. New gate `test:rest-floors` (22 checks), **6 mutations tried,
+  6 caught** — the earlier round of 6 is reported as VOID, not as passing.
+  Plan and measurements: `docs/plans/rest-that-suits-the-exercise.md`.
+  **Not done at the time of writing**: the 9,216-profile quality sweep is still
+  running; its before/after numbers go in the next entry. No deploy needed.
+
 - [x] **THE FULL SWEEP, AND THE FOUR THINGS IT CAUGHT THAT THE AFFECTED-GATE RUN
   COULD NOT.** 201 gates and 47 browser drivers run, 242 of the 248 pass.
   **TWO CORRECTIONS TO THE FIRST VERSION OF THIS ENTRY, both my own:** it said

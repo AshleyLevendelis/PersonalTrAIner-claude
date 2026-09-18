@@ -187,16 +187,27 @@ const SNAPSHOT = JSON.stringify(DAY)
   check('an impossible target still returns a real day', tooFar.changed, tooFar.refusal)
   check('...reporting a time it did not reach, rather than the one asked for', tooFar.achievedMinutes > 5, tooFar.achievedMinutes)
 
-  // THE REST TRIM IS HALF THE PAIR, and this is the only case that proves it.
-  // On a target the sets alone can reach, dropping the trim changes nothing
-  // measurable — mutation testing showed exactly that. Pushed past what sets
-  // can do, the trim is what is left, and its signature is every remaining
-  // rest sitting on a floor rather than at its prescribed value.
+  // REPLACED 18 Sep 2026 — THE CHECK WAS ENFORCING THE THING ASHLEY RULED
+  // AGAINST. It asserted that an impossible target squeezes REST as well as
+  // sets, which was true and was the design until her ruling that day (from
+  // four options): protect the rest, do less. What survives is the half that
+  // still matters — asked for a time it cannot reach, the day still shrinks
+  // rather than silently returning the full session — and the new half, that
+  // what it shed was WORK.
+  //
+  // This is the shape CLAUDE.md keeps recording: a mechanism-pinned check
+  // does not merely fail to catch a drift, it can BLOCK the correction. Left
+  // standing, this one would have made her ruling un-implementable on the
+  // "just today" path.
   const tooFarDay = tooFar.week.days.find(d => d.day === DAY.day)!
-  const restsBefore = DAY.exercises.map(e => e.rest)
-  const restsAfter = tooFarDay.exercises.map(e => e.rest)
-  check('...and rest has been squeezed too, not only sets',
-    restsAfter.some((r2, i) => r2 !== restsBefore[i]), { before: restsBefore, after: restsAfter })
+  const restsBefore = new Map(DAY.exercises.map(e => [e.name, e.rest]))
+  const workBefore = DAY.exercises.reduce((n, e) => n + e.sets, 0)
+  const workAfter = tooFarDay.exercises.reduce((n, e) => n + e.sets, 0)
+  check('...and it is WORK that was shed, not rest',
+    workAfter < workBefore, { before: workBefore, after: workAfter })
+  check('...with every exercise that survived keeping the rest it had',
+    tooFarDay.exercises.every(e => !restsBefore.has(e.name) || restsBefore.get(e.name) === e.rest),
+    tooFarDay.exercises.map(e => ({ name: e.name, was: restsBefore.get(e.name), now: e.rest })))
 }
 
 // ---------------------------------------------------------------------------

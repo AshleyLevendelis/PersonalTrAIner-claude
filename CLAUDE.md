@@ -36,6 +36,21 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
+- **Rest suits the exercise, and the time budget is paid for in WORK** — since
+  18 Sep 2026. Ashley, from the gym floor: *"The rest breaks between the lat
+  pulldown seem very short 30s, check that is correct."* It was not: measured
+  across 1,728 profiles, 49.2% of every exercise in a week rested 30 seconds
+  or less and 29.1% of second-tier compounds — a class prescribed 75s by the
+  style's own table — were at or under 30. Nothing was miscalculating; the
+  session did not fit and the generator paid for it out of rest.
+  **Her ruling that day, from four options: protect the rest, do less.** Every
+  exercise keeps a rest that suits it and the session sheds an accessory or a
+  set instead. She rejected keeping the work at short rests, a flat one-minute
+  middle floor, and being told to train longer. Her reason, in her own words:
+  30 seconds on a lat pulldown is not a short rest, it is a different exercise,
+  and the reps printed beside it stop being reachable.
+  Now 0.0% of second-tier compounds rest 30s or less, minimum 45s, median 60s.
+  `rest-floors` (22 checks, 6 mutations), `session-length`, `today-only`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:
@@ -911,6 +926,35 @@ old — the commands were right and the context was missing.
   So: for a function, require `name(`; for render order, anchor on the rendered
   block; and prove the detector on something that should FAIL it, in the gate
   itself, so it cannot go vacuous later.
+- **A FLOOR MUST BE READ OFF THE UNBUDGETED PRESCRIPTION, NEVER OFF THE LIVE
+  VALUE.** 18 Sep 2026. Three independent passes cut a rest — the day-level
+  time cap, the per-block trimmer, the phase's own shift — and each floored
+  what it found. Against the LIVE value a floor can only ratchet downward: the
+  trimmer took a 60s slot to its 45s floor, the adaptation phase then applied
+  its deliberate -15s, and the result was the 30s Ashley reported. Two floors,
+  each correct alone, spending the same fifteen seconds twice. Read off the
+  style's own number plus the phase's own shift instead, the same case holds at
+  45 while a block that genuinely wants 40s still gets 40. **Any clamp applied
+  at more than one stage has this shape** — ask what the value would be with no
+  pressure at all, and clamp against that.
+- **SLACK IS NOT A FIX, IT IS A COVER, and removing it is how you find what it
+  was hiding.** The same day: protecting rest made 17 sessions run past the
+  time their trainee had set aside. The cause was years older than the change —
+  every pass sizes a day against BASE reps while the per-week ramp grows the
+  work inside it, and nothing ever asked again. The rest cuts had been silently
+  absorbing that overrun for as long as it existed. **When a change makes a
+  long-standing defect visible, the defect is the finding**, and the honest
+  move is to fix it rather than restore the slack.
+- **A GATE THAT GENERATES ITS OWN SUBJECT MUST SEED IT, AND MUST INCLUDE A CASE
+  THAT IS ACTUALLY UNDER PRESSURE.** `test:rest-floors` was written unseeded,
+  passed, and failed on its very next run against identical code, because plan
+  generation picks exercises through `Math.random` unless a caller says
+  otherwise. Worse than the flake: the six mutations run against it were
+  worthless — three were MISSED once it was made deterministic, so a green
+  mutation round had proved nothing. And the three it missed were missed for a
+  second reason: the trimmers only run on a day that is OVER budget, and every
+  profile the gate sampled was comfortable. **A gate built from comfortable
+  fixtures never reaches the code it exists to hold.**
 - **A CONTROL THAT WRITES AND DOES NOT REDRAW IS A DEAD CONTROL, and no gate
   and no type can see it.** 17 Sep 2026: "Add Set" wrote the new row into the
   stored session record correctly, and no pixel moved — nothing subscribes to

@@ -113,3 +113,76 @@ the way her ruling wants. **This is a change to one rule, not a new pass.**
   before and after numbers side by side.
 - A real phone-sized screen: the lat pulldown's rest read off the card.
 - BACKLOG + CLAUDE.md for the ruling; this document for the measurement.
+
+
+---
+
+## What the build found, 18 Sep 2026
+
+### The measurement, before and after, on the same 1,728-profile sample
+
+| | before | after |
+|---|---|---|
+| every exercise resting 30s or less | 49.2% | **20.1%** |
+| second-tier compounds at or under 30s (the lat pulldown's class) | 29.1% | **0.0%** |
+| second-tier compound rest, min / median | 0s / 45s | **45s / 60s** |
+| isolation at or under 30s | 71.0% | 16.7% |
+| isolation rest, min / median | 0s / 27s | **30s / 45s** |
+| exercises per training day, median | 7 | 7 |
+
+The remaining sub-30s isolation slots are where a style or a phase genuinely
+prescribes it (combat's 45s minus an adaptation phase's 15s) and the primers,
+which are 20s by design. **Her reported case is now impossible**: no second-tier
+compound rests 30 seconds or less in any week of any plan.
+
+Read off a real 390x844 screen: main lift 120s, carry 60s, accessories 45s,
+primer 20s.
+
+### THE PLAN SAID TWO PLACES HELD THE 30. THERE WERE THREE, AND THE THIRD WAS
+### THE ONE THAT PRODUCED HER NUMBER.
+
+Wiring the two known sites moved second-tier compounds from 29.1% to 11.6% and
+isolation from 71.0% to 68.7% — barely. The third path is the per-week phase
+shift: the trimmer took a 60s isolation slot to its new 45s floor, and THEN the
+anatomical-adaptation phase applied its own deliberate -15s. Two floors, each
+correct alone, spending the same fifteen seconds twice.
+
+**That forced the design change that matters most here: a floor must be read
+off the UNBUDGETED prescription, never off the live value.** Against the live
+value a floor can only ratchet downward, locking in whatever an earlier pass
+already cut. Against the style's own number plus the phase's own shift, a
+metabolic block that genuinely wants 40s keeps 40s and budget pressure cannot
+compound with it.
+
+### A fourth thing, which the rest cuts had been hiding
+
+Protecting rest made 17 of 576 sessions in the 30-45 bucket run past the 45
+minutes their trainee had said they had. The cause was not the floors: every
+pass sizes a day against BASE reps, and the per-week rep ramp then grows the
+work inside it — 13-15 becomes 16-18 by week 11 — with nothing asking again.
+The rest trimmers had been quietly absorbing that overrun for as long as it has
+existed. **The slack was never a fix, only a cover.**
+
+Closed by costing each week's day exactly as the screen will draw it, at the
+finalisation point where reps and rest are both final, and shedding work if it
+runs past the top of the range chosen. All three buckets now report zero
+overruns, and the "below the minimum" counts are unchanged (4 / 28 / 14), so it
+sheds only what is genuinely over.
+
+### Two checks had to be corrected, and one of them was my own
+
+- `test:today-only` asserted that an impossible target squeezes REST as well as
+  sets. True until her ruling, and left standing it would have made the ruling
+  un-implementable on the "just today" path. Re-anchored on what was shed.
+- **`test:rest-floors` was written unseeded and passed, then failed on its very
+  next run against identical code.** `generateMesocycle` picks exercises
+  through `Math.random` unless a caller seeds it. Worse, the six mutations run
+  against that unseeded gate were worthless: three of them were MISSED once it
+  was made deterministic. It now seeds every plan, samples a deliberately
+  SQUEEZED profile (the trimmers only run on a day that is over budget, so a
+  gate built from comfortable profiles never reaches the code it exists to
+  hold), and checks the style table column by column — a case no generated plan
+  can distinguish wherever the floor happens to dominate.
+
+**Mutations: 6 tried, 6 caught**, all re-run after the gate was made
+deterministic. The first round of 6 is reported as void, not as passing.
