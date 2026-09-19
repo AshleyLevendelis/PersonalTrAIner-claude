@@ -7307,7 +7307,15 @@ export function generateMesocycle(
             // would make a lift look like it had dropped rather than frozen.
             // Base reps every time, whatever we have added on top.
             const naturalKg = load.starting_weight_kg
-            naturalHold = load.hold ?? undefined
+            // ...and when prescribeLoad reports no hold of its own, the
+            // affordability decision made further up is the hold. It is the
+            // commonest reason a weight stands still in this app and it used
+            // to leave no trace at all, so `atPrescribedCeiling` could not see
+            // it and the card had nothing to say on 236 of the 241
+            // unexplained repeated weeks measured on 19 Sep 2026.
+            // `??`, not an override: 'ceiling' and 'implement' are more
+            // specific claims about the same weight and must win.
+            naturalHold = load.hold ?? (loadStepUnaffordable ? 'unaffordable_step' : undefined)
             if (naturalKg != null) {
               const already = thisWeekPreCoherenceKg.get(dbEntry.name)
               // One lift can hold two slots in a week at two loads; take the

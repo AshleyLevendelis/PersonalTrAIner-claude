@@ -2,6 +2,84 @@
 
 Newest first. One line each.
 
+- [x] **"NEXT WEIGHT UP IS TOO BIG A JUMP" — the commonest reason a weight
+  stands still finally has somewhere to be recorded, and something to say.**
+  19 Sep 2026, straight off the audit above.
+  **Ashley's ruling, from three options: its own line, because it is
+  temporary** — over reusing "as heavy as this gets" (one sentence for all
+  three reasons, but it sounds permanent when this one is not) and over leaving
+  it silent. Her reason is the whole design: of the three ways a weight can
+  stop, this is the only one that resolves itself. A bar at the estimate's
+  ceiling needs a logged set; a full backpack is simply as heavy as a backpack
+  gets; a 7.5kg raise held because 2kg is 27% of it starts moving again as soon
+  as the trainee can afford the notch.
+  **Nothing prescribed changed** — no weight, rep, set or rest — and that is
+  measured, not asserted: the same seeded 1,024-plan run reports the same 2,480
+  frozen pairs out of the same 186,146 slot pairs before and after. `load_hold`
+  has exactly one behavioural reader in the app, so the blast radius is the
+  card's line and the coach's note.
+  **Built**, `docs/plans/when-the-next-dumbbell-is-too-big.md`:
+  1. a `load_hold` of its own for the affordability decision — it had codes for
+     ceiling, implement, floor and matched, and the commonest reason was not
+     among them, which is why nothing downstream could say it;
+  2. a `band` refusal counts as a lever spent, because from the trainee's side
+     a rep that is not there is a rep that is not there;
+  3. a third wording on the card and a third note for the coach, so the two
+     surfaces cannot disagree.
+  **Measured before and after, same seeded sample**: frozen pairs the app
+  labels 2,239 (90.3%) -> **2,302 (92.8%)**; pairs that say nothing 241 ->
+  **178**; plans carrying a silent one 149 (14.6%) -> **109 (10.6%)**.
+  **THE PLAN DOC PREDICTED 241 -> ~31 AND THE ANSWER IS 178. The gap is the
+  finding, and it is the audit's own lesson repeated one section later.** §6c
+  of the report asks whether one real notch WOULD have been affordable — a
+  property of the dumbbell — and 97.9% of silent pairs failed it. I read that
+  as the app's own flag. It is not: the app only consults affordability for a
+  load-ramping candidate, and a non-compound accessory under a goal whose
+  progression emphasis is `reps` or `maintain` never gets that far, because
+  load was never that goal's lever. So the fix landed exactly where it could —
+  hypertrophy 60->23 and fat loss 45->19, both load-emphasis goals — and moved
+  functional (104) and conditioning (32) not at all, which is what a correct
+  fix aimed at a load-ramp decision should do. **Two measurements that look
+  like one question and have different denominators, again.**
+  **STILL SILENT, named rather than folded in**: 136 pairs where load was never
+  the goal's lever (a functional trainee's rear delt flye does not chase load
+  by design; saying "the next weight up is too big a jump" there would be
+  false, because it might not be) — **that needs a fourth sentence and a fourth
+  sentence is Ashley's**; 28 where the rep target was matched to the same
+  lift's other slot, which may well be progressing; 14 unexplained.
+  **NOT taken, deliberately**: a third progression lever. The textbook move —
+  take the 10kg, drop to the bottom of the range — is refused by a backstop
+  aimed at contaminated anchors carried through a rotation, not at deliberate
+  jumps; separating those changes what people are prescribed and needs its own
+  five-question review. Adding a set when a lift is capped was option (a) on
+  5 Sep and Ashley declined it.
+  **A FIX THE MEASUREMENT KILLED BEFORE IT WAS WRITTEN**: the audit proposed
+  "carry a recorded ceiling forward once a rep has been bought against it".
+  Cross-tabulating showed the affordability stamp already covers all 70 of
+  those, so it would have been a new mechanism in the generator for at most 5
+  pairs. Not built.
+  Verified: `test:frozen-weeks` §9, **19 new checks, 10 mutations, 10 caught,
+  0 missed, 0 invalid**, every mutant run executing all 69 checks — including
+  an end-to-end pass over eight generated plans (423 stamped slots, 877 loaded
+  slots with no hold at all so the stamp is not unconditional, and every
+  stamped slot's notch DERIVED from `getLoadIncrementKg` rather than compared
+  against a copy of the 12% constant). New browser driver
+  **`verify:ceiling-label`, 9 checks, 3 mutations, 3 caught** — a real Chromium
+  at 390x844 walking the app's OWN generated plan (13 weeks, 52 days, 341
+  exercise rows, no fixture of any kind) until it finds the line, then checking
+  the row carries neither of the other two wordings, that no weight explainer
+  was opened to reveal it, and that it sits beside the weight. Found on week
+  14, Sunday: *Front Raises · ~6kg per hand · suggested · next weight up is too
+  big a jump*, read off a screenshot.
+  **THREE THINGS THE DRIVER TAUGHT, all the harness's standing lessons met
+  again**: `element.click()` on the day row opened and shut it in one tick
+  (a real dispatched mouse click works); the browse surface keeps ONE day and
+  ONE exercise row expanded, so "open every day" opened exactly one per week
+  and read 60 rows as 15; and wrapping checks 3-8 in `if (found)` made a broken
+  label print 3 checks instead of 9, which the mutation harness refused to
+  score as a catch — correctly, because a short run is a crash, not a finding.
+  Ships with the frontend on merge. No migration, no function deploy.
+
 - [x] **THE PROGRESSIVE-OVERLOAD AUDIT: the app is RIGHT about 97.9% of the
   weeks it repeats, and says nothing about a tenth of them.** 19 Sep 2026.
   Measurement only — no weight, rep, set or rest moved.

@@ -43,6 +43,7 @@ import { scorePlan } from '../src/lib/quality-score'
 import { atPrescribedCeiling } from '../src/lib/progression-ceiling'
 import { categorize, getLoadIncrementKg } from '../src/lib/load-prescription'
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { getGoalPolicy } from '../src/lib/goal-policies'
 import { buildProfile, comboKey, generateAllCombinations } from './quality-grid'
 import { sweepFrozen, causeOf, type SlotPair } from './frozen-pairs'
 import type { MesocycleWeek, Exercise } from '../src/lib/types'
@@ -119,6 +120,8 @@ const anyLever = new Map<string, number>()
 const frozenByWeek = new Map<string, number>()
 const silentBackstory = new Map<string, number>()
 const silentAffordability = new Map<string, number>()
+const silentCrossTab = new Map<string, number>()
+const silentLever = new Map<string, number>()
 const catalogue = new Map(EXERCISE_DATABASE.map(e => [e.name, e]))
 // exercise-plan.ts's own threshold: when one real notch is more than this
 // share of the current load, the weight holds flat and reps ramp instead.
@@ -222,10 +225,24 @@ sampled.forEach((combo, i) => {
       else {
         const step = getLoadIncrementKg(entry, categorize(entry), kg)
         const share = step / kg
+        bump(silentCrossTab, `${share > STEP_UNAFFORDABLE_ABOVE ? 'notch too big' : 'notch affordable'}  x  ${story}`)
         bump(silentAffordability, share > STEP_UNAFFORDABLE_ABOVE
-          ? `one notch is ${(100 * STEP_UNAFFORDABLE_ABOVE).toFixed(0)}%+ of the load — the weight is HELD BY DESIGN`
-          : 'one notch is affordable — the weight stopped for another reason')
+          ? `one notch would be ${(100 * STEP_UNAFFORDABLE_ABOVE).toFixed(0)}%+ of the load`
+          : 'one notch would have been affordable')
       }
+      // WHY THE WEIGHT WAS NOT GOING UP, which is not the same question as
+      // whether a step would have been affordable — and mistaking the second
+      // for the first cost this audit a wrong prediction. The affordability
+      // rule is only CONSULTED for a load-ramping candidate: a non-compound
+      // accessory under a 'reps' or 'maintain' goal never reaches it, because
+      // that goal's lever was never load in the first place.
+      const emphasis = getGoalPolicy(combo.goal).progressionEmphasis
+      const mainCompound = entry?.mechanics_tier === 'tier1_compound'
+      bump(silentLever, slot.exB.load_hold === 'unaffordable_step'
+        ? 'the app recorded it: one real notch is too big a jump'
+        : emphasis === 'load' || mainCompound
+          ? `load IS this goal's lever (${emphasis}) and the weight still stopped — unexplained`
+          : `load was never this goal's lever (${emphasis}) — reps are, and the reps stopped too`)
       if (backstoryExamples.length < 10)
         backstoryExamples.push(`${story.slice(0, 26).padEnd(28)}${slot.exA.name} [${combo.equipment}/${combo.experience}] block ${block}: `
           + earlier.concat([{ week: slot.weekB, block, hold: slot.exB.load_hold, bump: slot.exB.rep_bump, kg: slot.exB.suggested_load_kg ?? null }])
@@ -308,8 +325,15 @@ table(silentBackstory, silent, 48)
 console.log('\n  traces:')
 for (const e of backstoryExamples) console.log(`    ${e}`)
 
-rule('6c. Could the weight have taken one real step at all?')
+rule('6c. Would one real step have been affordable? (a property of the weight,')
+console.log("    NOT the app's own flag — see 6e, which is the question that matters)")
 table(silentAffordability, silent, 62)
+
+rule('6d. The two cut together — which single record would cover which cases')
+table(silentCrossTab, silent, 70)
+
+rule('6e. Why the weight was not going up')
+table(silentLever, silent, 68)
 
 rule('7. Mirror check against quality-score\'s own scorer')
 console.log(`  ${crossChecked} plans scored both ways; mismatches: ${mismatches}${mismatches === 0 ? ' — the rule above is the gate\'s rule' : '  <<< THIS REPORT DESCRIBES A DIFFERENT RULE FROM THE GATE'}`)

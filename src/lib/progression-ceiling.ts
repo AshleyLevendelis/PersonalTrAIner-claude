@@ -36,9 +36,18 @@ import type { Exercise } from './types'
  * bar has not run out of room, and one lowered to match the same lift's other
  * slot this week is a coherence decision about presentation — neither says
  * "this is as far as the app can take you".
+ *
+ * 'unaffordable_step' IS here, added 19 Sep 2026, and it is the commonest of
+ * the three. It is technically a decision rather than a limit — the app could
+ * put the next dumbbell on — but it is not a decision the trainee can argue
+ * with this week, and a weight that is not going up is a weight that is not
+ * going up. Measured: 236 of the 241 repeated weeks that carried no
+ * explanation at all were this.
  */
 function weightCannotMove(ex: Exercise): boolean {
-  return ex.load_hold === 'ceiling' || ex.load_hold === 'implement'
+  return ex.load_hold === 'ceiling'
+    || ex.load_hold === 'implement'
+    || ex.load_hold === 'unaffordable_step'
 }
 
 /**
@@ -49,7 +58,11 @@ function weightCannotMove(ex: Exercise): boolean {
  * records what the bump did rather than just whether it ran.
  */
 function noLeverLeft(ex: Exercise): boolean {
-  if (ex.rep_bump === 'capped' || ex.rep_bump === 'range_fixed') return true
+  // 'band' added 19 Sep 2026. The 25% divergence backstop refusing the next
+  // rep bump is a different KIND of no from a cap — the lever exists and the
+  // app declined to pull it — but from the trainee's side a rep that is not
+  // there is a rep that is not there, and the week is identical either way.
+  if (ex.rep_bump === 'capped' || ex.rep_bump === 'range_fixed' || ex.rep_bump === 'band') return true
   if (ex.distance_bump === 'capped') return true
   return false
 }
@@ -68,14 +81,21 @@ export function atPrescribedCeiling(ex: Exercise): boolean {
  *
  * Deliberately short — this sits on a phone row next to a weight chip, and the
  * full explanation is one tap away in load_guidance, which already says it
- * properly. Two wordings because the two causes are genuinely different
- * claims: a barbell is at a GUESS about this person's strength and a logged
- * set can move it; a backpack is at the heaviest a backpack goes, and no
- * amount of logging changes that.
+ * properly. THREE wordings because the three causes are genuinely different
+ * claims, and Ashley ruled on 19 Sep 2026 (from three options) that the third
+ * gets its own line rather than borrowing one of the others: a barbell is at a
+ * GUESS about this person's strength and a logged set can move it; a backpack
+ * is at the heaviest a backpack goes, and no amount of logging changes that;
+ * and a 7.5kg raise whose next notch is 27% heavier is the hopeful one — it
+ * starts moving again on its own as soon as the trainee can afford the jump.
+ * Calling that "as heavy as this gets" would be the small lie this module
+ * exists to remove.
  */
 export function ceilingLabel(ex: Exercise): string | null {
   if (!atPrescribedCeiling(ex)) return null
-  return ex.load_hold === 'implement' ? 'as heavy as this gets' : "at your estimate's ceiling"
+  if (ex.load_hold === 'implement') return 'as heavy as this gets'
+  if (ex.load_hold === 'unaffordable_step') return 'next weight up is too big a jump'
+  return "at your estimate's ceiling"
 }
 
 /**
@@ -89,7 +109,9 @@ export function ceilingLabel(ex: Exercise): string | null {
  */
 export function ceilingNoteForCoach(ex: Exercise): string | null {
   if (!atPrescribedCeiling(ex)) return null
-  return ex.load_hold === 'implement'
-    ? 'this is the heaviest the implement goes, so the weight will not rise again — do not present it as progression'
-    : 'this has reached the estimate ceiling and cannot rise until a set is logged — do not present it as progression, and it is a good moment to ask for one logged set'
+  if (ex.load_hold === 'implement')
+    return 'this is the heaviest the implement goes, so the weight will not rise again — do not present it as progression'
+  if (ex.load_hold === 'unaffordable_step')
+    return 'the next weight up would be a jump of more than a tenth, so the weight is held on purpose and the reps are the lever — do not present it as progression, and say it is temporary if it comes up'
+  return 'this has reached the estimate ceiling and cannot rise until a set is logged — do not present it as progression, and it is a good moment to ask for one logged set'
 }

@@ -351,10 +351,20 @@ export interface Exercise {
    *   'floor'      rounded up to the bar / the lightest pair
    *   'matched'    lowered by enforceOneWeightPerPrescription to match the
    *                same lift's other slot this week
+   *   'unaffordable_step'
+   *                one real notch of this implement is more than 12% of the
+   *                current load (2kg is 27% of a 7.5kg lateral raise), so
+   *                exercise-plan.ts holds the weight flat and ramps reps
+   *                instead — its `loadStepUnaffordable`. A DECISION, not a
+   *                limit, and the right one; it had nowhere to be recorded
+   *                until 19 Sep 2026, which is why it was the commonest
+   *                reason a weight stopped moving and the one thing no
+   *                screen could explain. Measured that day: 236 of the 241
+   *                unexplained repeated weeks in a 1,024-plan sweep.
    * The load_guidance sentence says the first three in words; this is the
    * same fact in a form a measurement can read. Absent otherwise.
    */
-  load_hold?: 'ceiling' | 'implement' | 'floor' | 'matched'
+  load_hold?: 'ceiling' | 'implement' | 'floor' | 'matched' | 'unaffordable_step'
   /**
    * What the frozen-load rep bump did this week, when it ran at all (the
    * weight did not move from last week and the lift is eligible):

@@ -218,3 +218,58 @@ what it says, is a decision about what the app tells people.
 - The 5 Sep figure of **41.6% of plans / 626 pairs** has drifted to **42.3% /
   2,480 on a four-times-larger sample**. Same magnitude; the old number was not
   stale, only smaller-sampled.
+
+---
+
+## 8. What the build changed, and the prediction it falsified
+
+Ashley ruled the same day, from three options, that the too-big-a-jump case
+gets **its own line, because it is temporary** — over reusing "as heavy as this
+gets" and over leaving it silent. Built:
+`docs/plans/when-the-next-dumbbell-is-too-big.md`.
+
+**Measured on the same seeded 1,024-plan sample, before and after:**
+
+| | before | after |
+|---|---|---|
+| frozen pairs the app labels | 2,239 (90.3%) | **2,302 (92.8%)** |
+| frozen pairs that say nothing | 241 (9.7%) | **178 (7.2%)** |
+| plans carrying a silent one | 149 (14.6%) | **109 (10.6%)** |
+
+**The prediction in the plan doc was 241 → about 31. The answer is 178, and the
+gap is the finding.** §6c of the report asks whether one real notch *would have
+been* affordable at the displayed weight — a property of the dumbbell — and
+97.9% of the silent pairs failed it. I read that as the app's own
+`loadStepUnaffordable` flag. It is not. The app only *consults* affordability
+for a load-ramping candidate, and a non-compound accessory under a goal whose
+progression emphasis is `reps` or `maintain` never gets that far: load was
+never that goal's lever.
+
+That is the same mistake this audit's own section 1 is about — **two
+measurements that look like the same question and have different
+denominators** — made one section later, by me, while writing it up.
+
+A new cut, §6e, now asks the question that matters, and the residue is:
+
+| why the weight was not going up | pairs | |
+|---|---|---|
+| load was never this goal's lever (`maintain` — functional) | 104 | 58.4% |
+| load was never this goal's lever (`reps` — conditioning) | 32 | 18.0% |
+| the app recorded it, but the rep target was matched to a sibling slot | 28 | 15.7% |
+| load IS the goal's lever and the weight stopped anyway | 14 | 7.9% |
+
+So the fix landed exactly on the population it could reach — hypertrophy 60→23
+and fat loss 45→19, both `load`-emphasis goals — and touched neither functional
+(104, unchanged) nor conditioning (32, unchanged), which is what a correct fix
+aimed at a load-ramp decision should do.
+
+**The 136 remaining are a fourth reason, and the app is right about those too.**
+A functional trainee's rear delt flye does not chase load by design; reps are
+the lever, and they usually climb. It only looks frozen on the weeks the rep
+bump is refused as well. Saying "the next weight up is too big a jump" there
+would be false — the next weight might be perfectly affordable; it is simply
+not what this goal moves. **That case needs a fourth sentence, and a fourth
+sentence is Ashley's to approve, not mine to invent.** Named, not built.
+
+The 28 matched-to-a-sibling and the 14 unexplained stay as they were, for the
+reasons in the plan doc.

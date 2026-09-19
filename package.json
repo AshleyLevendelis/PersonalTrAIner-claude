@@ -258,6 +258,7 @@
     "verify:planned-activity": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-activity.mjs",
     "verify:cardio-session": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-session.mjs",
     "verify:program-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/program-move.mjs",
+    "verify:ceiling-label": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/ceiling-label.mjs",
     "verify:meal-move": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-move.mjs",
     "verify:meal-refit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-refit.mjs",
     "verify:meal-food-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-food-edit.mjs",

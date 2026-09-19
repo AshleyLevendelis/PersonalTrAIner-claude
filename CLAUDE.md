@@ -1267,6 +1267,19 @@ old — the commands were right and the context was missing.
   constructed input already in the failing state — deterministic, instant,
   guaranteed under pressure. The constructed case proves the mechanism; the
   measured offender proves it matters in a real plan.
+- **A DRIVER'S CHECK COUNT IS CONSTANT, OR ITS MUTATIONS ARE WORTHLESS — and
+  "open everything" is a lie on a surface that keeps ONE thing open.** Three
+  browser-driver lessons from one afternoon, 19 Sep 2026, all of them the
+  harness's standing rules met again. (1) Wrapping the detail checks in
+  `if (found)` meant a broken feature printed 3 checks instead of 9, and the
+  mutation harness refused to score it as a catch — correctly: a short run is a
+  crash, not a finding. Every check runs every time, with a null-safe subject.
+  (2) `element.click()` on a day row opened and shut it within one tick; a
+  dispatched mouse click at the row's centre works. (3) The browse surface
+  keeps one day and one exercise row expanded, so a loop that "opens every day"
+  opens exactly one per screen — 60 days read as 15. **Before believing a
+  driver walked something, print how many things it actually opened and assert
+  the number is bigger than the number of screens.**
 - **A CONTROL THAT WRITES AND DOES NOT REDRAW IS A DEAD CONTROL, and no gate
   and no type can see it.** 17 Sep 2026: "Add Set" wrote the new row into the
   stored session record correctly, and no pixel moved — nothing subscribes to
