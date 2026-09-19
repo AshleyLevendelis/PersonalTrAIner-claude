@@ -1172,6 +1172,44 @@ old — the commands were right and the context was missing.
   **When a new number and an existing one disagree wildly about the same
   question, suspect the denominators before the code**, and make the new one
   reproduce the old one's guards before reading anything into the gap.
+- **A "HOW MANY CONTAIN ONE" COUNT IS NOT A RATE, AND THE NAME NEVER SAYS
+  WHICH IT IS.** 19 Sep 2026: `frozen_week` fires on 44.1% of plans, which had
+  been read and re-quoted for weeks as "nearly half of all generated weeks
+  repeat themselves". Measured from one run: 42.3% of PLANS carry one somewhere
+  in sixteen weeks and the RATE is **1.3%** — one slot pair in seventy-five.
+  Both numbers are true; they differ by the number of chances each plan gets,
+  which for a per-plan scorer rule is every slot in every week. **Any rule that
+  fires once per plan reports a probability of occurrence, not a frequency**,
+  and the two get further apart the bigger the plan. Report both from the same
+  run, with the denominator printed beside each, so the next reader cannot pick
+  the wrong one. Same family as "a new measurement is not comparable to an old
+  one until it makes the same exclusions", one level up: here the exclusions
+  matched and the DENOMINATOR was a different thing entirely.
+- **A DETECTOR THAT CANNOT FIRE AND A THING THAT NEVER HAPPENS PRINT THE SAME
+  ZERO — so run the detector over the SUPERSET first.** The same day, measuring
+  whether a frozen lift was secretly progressing by some other lever: sets,
+  tempo, added load and machine assistance all came back zero on all 2,480
+  frozen pairs, which is either a real and important finding or four broken
+  field reads. Running the identical detectors across all 186,146 slot pairs
+  settled it in the same pass — sets moved on 304, tempo on 516, assistance on
+  978, so three of the four demonstrably work and the zero is real. The fourth,
+  added load, moved nowhere at all, so it is still unproven and the report says
+  so rather than counting it as evidence. This is the measurement twin of the
+  gates' "prove the detector on something that should FAIL it": **a zero is
+  only a finding once you have shown the same code producing a non-zero.**
+- **THE THING THE APP DOES RIGHT CAN BE THE THING THAT LOOKS BROKEN, AND
+  REASONING ABOUT WHY WILL FIND THE WRONG CAUSE.** The same audit: 241 weeks
+  repeated with no explanation on the card, and I had written up a two-part fix
+  covering 70 of them, having REASONED about why the other 145 carried no
+  recorded reason. Asking it numerically instead — what would one real notch of
+  weight have cost, as a share of the load? — returned **97.9%**, because
+  `exercise-plan.ts` deliberately holds load flat when a notch is over 12% of
+  the current weight, and says in its own comment that this is correct. The
+  defect was never the held weight; it was that the app's commonest reason for
+  holding one has no field to be recorded in, so nothing downstream can say it.
+  **When a measurement finds a population with "no recorded reason", the first
+  question is whether the reason exists and is unrecorded, not whether the
+  behaviour is wrong.**
 - **A FLOOR MUST BE READ OFF THE UNBUDGETED PRESCRIPTION, NEVER OFF THE LIVE
   VALUE.** 18 Sep 2026. Three independent passes cut a rest — the day-level
   time cap, the per-block trimmer, the phase's own shift — and each floored

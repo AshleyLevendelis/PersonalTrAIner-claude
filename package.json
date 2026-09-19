@@ -270,6 +270,8 @@
     "verify:six": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/six-from-her-phone.mjs",
     "verify:reveal": "vite build --config .tw-harness/vite.config.ts && node .tw-harness/measure.mjs",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",
+    "report:frozen-exercises": "tsx scripts/measure-frozen-exercises.ts",
+    "report:progression-levers": "tsx scripts/measure-progression-levers.ts",
     "report:timefit-recovery": "tsx scripts/report-timefit-recovery.ts",
     "report:rehab-coverage": "tsx scripts/report-rehab-coverage.ts",
     "report:trim-magnitude": "tsx scripts/run-trim-magnitude-report.ts",

@@ -2,6 +2,83 @@
 
 Newest first. One line each.
 
+- [x] **THE PROGRESSIVE-OVERLOAD AUDIT: the app is RIGHT about 97.9% of the
+  weeks it repeats, and says nothing about a tenth of them.** 19 Sep 2026.
+  Measurement only — no weight, rep, set or rest moved.
+  **What the lead said** (BACKLOG, 18 Sep, corrected in place above):
+  *"`frozen_week`, 4,060 plans (44.1%) … some of that is deliberate (deload,
+  calibration) … needs splitting by phase."*
+  **What is true**, from `npm run report:progression-levers` over 1,024 of the
+  9,216 plans and 186,146 week-to-week slot pairs, seeded, with every 101st
+  plan re-scored by `quality-score` itself (0 mismatches):
+  - 42.3% of PLANS carry one; **the RATE is 1.3%**. Both numbers were always
+    true and they are different questions. **A per-plan "contains at least one"
+    count is not a rate, and nothing in the name `frozen_week` says which it
+    is.**
+  - **Deloads were never in the count** (the rule excludes them) and
+    **calibration weeks contribute ZERO** — the `week 1 -> 2` transition does
+    not appear once in the distribution. Both suspected innocent explanations
+    are empty.
+  - **90.3% the app already labels** — "at your estimate's ceiling" / "as heavy
+    as this gets", Ashley's 5 Sep ruling doing its job.
+  - **9.7% (241 pairs, 149 of 1,024 plans) say nothing.**
+  - **ZERO frozen pairs were secretly progressing.** Sets, tempo and assistance
+    move on 304, 516 and 978 slot pairs elsewhere, so the detectors fire; they
+    never rescue a lift whose load and reps have stopped. RPE moves on 29.4%
+    and rest on 1.0% and neither is counted as progression — a different effort
+    LABEL on an identical prescription is the same session, and rest moves
+    because the time-cap trimmer moved it.
+  **THE FINDING, and it is not the one I went looking for: 236 of the 241
+  silent pairs (97.9%) are a weight the app is deliberately holding still, and
+  it is right to.** `exercise-plan.ts` holds load flat when one real notch is
+  more than 12% of the current load — 2kg on a 7.5kg lateral raise is 27% — and
+  ramps reps instead. Its own comment says *"that's correct, not a bug"*, and
+  as a CSCS call it is: nobody puts a quarter on a raise because the week
+  turned over. Then the rep lever runs out too (the 25% divergence backstop
+  refuses the next bump) and the card goes quiet.
+  **Three independent reasons the honest sentence cannot appear, each
+  sufficient on its own** — so fixing any one changes nothing, the same shape
+  as the six exclusions that hid bodyweight personal bests:
+  1. the affordability decision leaves NO record — `load_hold` has codes for
+     ceiling, implement, floor and matched, and the commonest reason a weight
+     stops is not among them;
+  2. where a ceiling WAS recorded, buying a rep erases it — `load_hold` is
+     re-read at this week's rep range and extra reps lower the estimate, so the
+     lift ends up above its ceiling with the field empty (70 pairs);
+  3. `band` is not in `atPrescribedCeiling`'s list of exhausted levers.
+  **CSCS verdict: the prescription is right and the silence is not.** The fix
+  is honesty, not programming — record the affordability hold, keep a ceiling
+  once a rep is bought against it, count a `band` refusal as a lever spent.
+  **ONE QUESTION IS ASHLEY'S**: there are now three reasons and two wordings,
+  and a weight held because the next dumbbell is too big a jump is the most
+  hopeful of the three — it ends on its own. Whether it gets its own sentence
+  is a decision about what the app says.
+  **NOT taken, deliberately**: a third lever. The textbook move (take the 10kg,
+  drop to the bottom of the range) is refused by a backstop that exists to
+  catch contaminated anchors, not deliberate jumps; separating those is a
+  prescription change needing its own five-question review. Adding a set when a
+  lift is capped was option (a) on 5 Sep and Ashley declined it.
+  **Also built, because two measurements of one question must not drift**:
+  `scripts/frozen-pairs.ts` now holds ONE copy of the frozen-week rule and
+  `measure-frozen-exercises.ts` imports it and `quality-grid.ts` instead of its
+  own field-for-field copies of both — proven output-identical at stride 37
+  (byte for byte, bar elapsed-time lines). Both reports are registered:
+  `report:frozen-exercises`, `report:progression-levers`. This file complained
+  on 5 Sep that `measure-frozen-exercises.ts` "sits in the repo for exactly
+  this purpose" and was not run; it was not runnable by name.
+  **MY OWN FIRST DRAFT OF THIS AUDIT WAS WRONG AND THE CORRECTION IS THE
+  USEFUL PART.** I had written the fix as two mechanical halves covering 70 of
+  241, having reasoned about why the other 145 had no recorded hold instead of
+  measuring it. The affordability rule was sitting in `exercise-plan.ts` with a
+  comment explaining itself. Asking the question numerically — what would one
+  notch have cost? — returned 97.9%, which is not near where the reasoning was
+  heading.
+  Verified: `test:frozen-weeks` 50, `test:calibration-search` 68,
+  `test:primer-load` 37, `test:exercise-today` 75, `test:added-load` 36,
+  `test:load-display` 27, `test:tempo-prescription` 23, `test:no-dead-code` 8 —
+  all exit 0; `npx tsc --noEmit` clean. No new gate: nothing in the app changed.
+  `docs/audits/progressive-overload-2026-09-19.md`.
+
 - [x] **A HEART ON THE MEAL ROW — and the table it writes to had been there
   since July with only the chat able to reach it.** 19 Sep 2026. Ashley's
   ruling, from four options: **a heart, the app never asks.** She rejected
@@ -800,6 +877,9 @@ Newest first. One line each.
   re-measure; then the progressive-overload audit (`frozen_week`, 4,060 —
   split deliberate deload and calibration weeks from genuinely stalled ones
   before treating any of it as a defect).
+  **AUDIT DONE 19 Sep 2026, and the split this line asked for does not exist:
+  deloads were never counted and calibration weeks contribute ZERO.** See the
+  entry at the top of this file and `docs/audits/progressive-overload-2026-09-19.md`.
 
 - [x] **EVERY CHANGE NOW GETS A CSCS REVIEW — and its first outing found a
   floor I had silently redefined an hour earlier.** Ashley, 18 Sep 2026,
@@ -857,6 +937,12 @@ Newest first. One line each.
      calibration); the share that is not is a progressive-overload failure,
      which is the single most important principle in the file. Needs splitting
      by phase before anyone acts on it.
+     **CORRECTED 19 Sep 2026, measured.** Every clause after the number is
+     wrong. 44.1% is a share of PLANS containing one anywhere in sixteen weeks,
+     not of weeks — the RATE is 1.3%. None of it is deload (excluded by the
+     rule) and none is calibration (zero, measured). 90.3% is already labelled
+     on the card. And the signal is in block POSITION, not phase: 44% of it is
+     weeks 13→15. `npm run report:progression-levers`.
   3. **`push_pull_imbalance`, 575 plans (6.2%)** — mostly pull-heavy
      (0.57, 0.40 in the printed examples), which is the safer direction but
      still outside the band the app sets itself.
