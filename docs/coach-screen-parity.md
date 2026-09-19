@@ -48,6 +48,7 @@ it is wrong.
 | `propose_meal_food_remove` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_food_replace` | SCREEN | The food row's menu, since 12 Sep 2026. |
 | `propose_meal_food_resize` | SCREEN | The food row's menu, since 12 Sep 2026. |
+| favourite a meal | BOTH, since 19 Sep 2026 | The coach has written `favorite_meals` since July and the screen could not add to it — the coach knew your favourites and the Nutrition tab had no way to name one. A heart on the meal row now marks it, through the same `markFavourite` the coach calls, so the two cannot drift. A favourite survives a regenerate, like a meal asked for by name. |
 | `propose_meal_move` | SCREEN | The meal row's Move control, since 14 Sep 2026. Same day only on BOTH surfaces alike: no screen renders another day's meals, so a cross-day move would change something nobody can see. |
 | `propose_meal_refit` | SCREEN | Nutrition → the "Resize them" offer above the meal list, since 17 Sep 2026. Ashley's two rulings that day: tell her and offer to refit, and stay quiet until the drift is real. **The strongest parity row in this table, and by construction rather than by inspection**: App computes the verdict ONCE and hands the same object to the Nutrition tab and to the coach, and both confirm through one function. The coach cannot offer a resize the screen would not offer, cannot state a number the screen would not state, and cannot write by a different path — there is one answer and one write, read twice. |
 | `propose_meal_swap` | SCREEN | The meal row's swap control. |

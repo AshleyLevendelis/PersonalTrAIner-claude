@@ -34,7 +34,7 @@ import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
-import { getPools, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
+import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
 
 export const MIN_COVERAGE = 0.8
 export const DEFAULT_POOL_SIZE = 5
@@ -748,6 +748,25 @@ async function appendPools(
  * nothing, a delete that fails inserts nothing, and an insert that fails puts
  * the old pool back exactly as it was.
  */
+/**
+ * Does this stored meal survive "Regenerate all"?
+ *
+ * KEPT: meals asked for by name, and meals hearted. Both are the user saying
+ * "this one stays", and regeneration replaces what the APP suggested — Ashley,
+ * 3 Sep 2026, after asking the coach for steak and watching a regenerate take
+ * it away.
+ *
+ * A FUNCTION RATHER THAN A CONDITION INSIDE THE LOOP, because a gate needs to
+ * ask this and reading a filter body with a regex is how three checks ended up
+ * pinned to one line of JSX earlier the same day. The two tags stay separate:
+ * "I asked for this by name" and "I like this" are different facts, and one
+ * tag meaning both makes either impossible to count later.
+ */
+export function survivesRegeneration(tags: string[] | null | undefined): boolean {
+  const list = tags ?? []
+  return list.includes(USER_REQUESTED_TAG) || list.includes(FAVOURITE_TAG)
+}
+
 async function persistPools(profileId: string, accepted: Partial<Record<MealSlotName, PoolOption[]>>): Promise<void> {
   for (const [slot, options] of Object.entries(accepted) as [MealSlotName, PoolOption[]][]) {
     if (options.length === 0) continue
@@ -782,7 +801,7 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       continue
     }
     const previous = (keepRows ?? []) as PoolRowSnapshot[]
-    const keep = previous.filter(row => (row.tags ?? []).includes(USER_REQUESTED_TAG))
+    const keep = previous.filter(row => survivesRegeneration(row.tags))
 
     const { error: deleteError } = await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot)
     if (deleteError) {

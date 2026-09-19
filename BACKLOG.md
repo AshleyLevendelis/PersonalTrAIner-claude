@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **A HEART ON THE MEAL ROW — and the table it writes to had been there
+  since July with only the chat able to reach it.** 19 Sep 2026. Ashley's
+  ruling, from four options: **a heart, the app never asks.** She rejected
+  asking after every meal, asking once a day, and inferring it from what got
+  logged — the last because not logging a meal usually means a busy evening,
+  not a bad dinner, and an app drawing conclusions from silence will be
+  confidently wrong.
+
+  **THE GAP WAS OLDER AND LARGER THAN THE FEATURE.** `favorite_meals` has
+  existed since 4 July, carries a `times_used` counter, and is read into the
+  coach's context as `favorites_summary` on every single turn. So **the coach
+  has always known your favourites and the screen has never been able to name
+  one** — a coach-only capability that was not on the written exceptions list
+  and had never been counted. Found by going to look at where a rating would be
+  stored, not by auditing parity.
+
+  **ONE WRITE PATH, BECAUSE TWO WAS THE OBVIOUS MISTAKE.** The only writer was
+  a closure inside `ChatAssistant`. A heart could very easily have become a
+  second, subtly different upsert of the same table — a different name for the
+  same dish, a `times_used` counting something else — and the two would have
+  drifted with nothing noticing. `src/lib/favourite-meals.ts` is now the only
+  thing that touches the table, and both surfaces call it; the gate asserts
+  that neither component reaches it directly.
+
+  **THE TAP HAS A CONSEQUENCE, so it is not a bookmark.** A hearted meal is
+  kept when everything else is regenerated — the protection a meal the coach
+  was asked for by name has had since Ashley lost her steak on 3 Sep. Its tag
+  is SEPARATE from `user-requested`: "I asked for this" and "I like this" are
+  different facts, and one tag meaning both makes either impossible to count
+  later. The keep rule is now an exported predicate rather than a condition
+  inside a filter, **for the reason this file learned the hard way earlier the
+  same day**: three gates had ended up pinned to one line of JSX because the
+  rule they needed to ask about was not something they could call.
+
+  **Care taken on the failure paths**, each with its own answer rather than one
+  blanket rule: a failed WRITE leaves the heart where it was, because moving it
+  would be the app claiming something it did not do; a failed READ shows
+  unfilled hearts rather than every meal marked, because the opposite would
+  have someone un-hearting meals they never chose; and the pool-tag write is
+  allowed to fail QUIETLY, because by then the favourite is already saved and
+  "couldn't save your favourite" would be a lie about what happened.
+
+  **VERIFIED**: `test:meal-favourite` (29 checks), **13 mutations, 13 caught**;
+  `verify:meal-favourite` drives the real Nutrition screen at 390x844 and taps
+  the heart twice — on, then off — checking the spoken label names the meal,
+  the pressed state matches what the eye sees, and the control clears the 44px
+  floor. A row in `docs/coach-screen-parity.md` records it as BOTH, and the
+  gate fails if that row goes back to claiming coach-only.
+
+  **No migration** — the table and every column it needs already existed.
+
 - [x] **COOK ONCE, EAT TWICE — and a screenshot caught it serving the same
   dish twice in one day.** 19 Sep 2026. Ashley's ruling, from four options: **a
   setting, on by default.** Plan: `docs/plans/cook-once-eat-twice.md`.

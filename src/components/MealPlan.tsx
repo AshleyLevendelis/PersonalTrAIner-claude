@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ShieldAlert,
   Plus,
+  Heart,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
@@ -23,6 +24,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext } from './nutrition/MealMoveSheet'
 import { COOK_ONCE } from '@/lib/coach-voice'
+import { readFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -133,6 +135,35 @@ export function MealPlan({
     const option = chosen[slot]
     if (option) restrictionBySlot[slot] = checkMealAgainstRestrictions(option.name, option.ingredients, dietaryPreferences, avoidFoods)
   }
+  // FAVOURITES LIVE ON THE PARENT so every row shows the same answer and one
+  // read serves the whole card. The set is the NAMES, because that is how the
+  // favourites table, the meal picks and the pool all identify a meal.
+  const [favouriteNames, setFavouriteNames] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!profileId) { setFavouriteNames(new Set()); return }
+    let live = true
+    void readFavouriteNames(profileId).then(names => { if (live) setFavouriteNames(names) })
+    return () => { live = false }
+  }, [profileId])
+
+  const toggleFavourite = async (option: PoolOption, next: boolean): Promise<boolean | null> => {
+    if (!profileId) return null
+    const ok = next
+      ? await markFavourite(profileId, favouriteInputFromOption(option))
+      : await unmarkFavourite(profileId, option.name)
+    // A FAILED WRITE LEAVES THE HEART WHERE IT WAS. The module has already
+    // logged why; moving the heart anyway would be the app claiming a write it
+    // did not make, which is the one thing every other control here refuses.
+    if (!ok) return null
+    setFavouriteNames(prev => {
+      const copy = new Set(prev)
+      if (next) copy.add(option.name)
+      else copy.delete(option.name)
+      return copy
+    })
+    return next
+  }
+
   const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
 
   // Which meals are already logged eaten today, keyed by slot — reuses
@@ -347,6 +378,9 @@ export function MealPlan({
         {activeSlots.map((slot, idx) => (
           <MealSlotRow
             key={slot}
+            profileId={profileId}
+            isFavourite={favouriteNames.has((chosen[slot] ?? { name: '' }).name)}
+            onToggleFavourite={toggleFavourite}
             slot={slot}
             isFirst={idx === 0}
             option={chosen[slot] ?? null}
@@ -503,6 +537,9 @@ function formatIngredient(ing: { name: string; quantity: number; unit: string })
 }
 
 function MealSlotRow({
+  profileId,
+  isFavourite,
+  onToggleFavourite,
   slot,
   isFirst,
   option,
@@ -521,6 +558,11 @@ function MealSlotRow({
   moveContext,
   onMealPickApplied,
 }: {
+  profileId: string | undefined
+  /** Whether this meal is already hearted — owned by the parent so every row agrees. */
+  isFavourite: boolean
+  /** Returns the new state, or null when the write failed and the heart should not move. */
+  onToggleFavourite: (option: PoolOption, next: boolean) => Promise<boolean | null>
   slot: MealSlotName
   isFirst: boolean
   option: PoolOption | null
@@ -553,6 +595,7 @@ function MealSlotRow({
   onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
 }) {
   const [busy, setBusy] = useState(false)
+  const [favouriteBusy, setFavouriteBusy] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -585,6 +628,20 @@ function MealSlotRow({
       setSwapOpen(false)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const handleFavouriteToggle = async () => {
+    if (!option || favouriteBusy) return
+    setFavouriteBusy(true)
+    try {
+      // THE HEART DOES NOT MOVE UNTIL THE WRITE LANDS. Every other control on
+      // this card reports a failed write rather than showing the change
+      // anyway, and a heart is the easiest thing in the app to flip
+      // optimistically and quietly lose.
+      await onToggleFavourite(option, !isFavourite)
+    } finally {
+      setFavouriteBusy(false)
     }
   }
 
@@ -893,6 +950,32 @@ function MealSlotRow({
                 ? <><Check className="size-3.5" /> {duplicated ? `Clear ${loggedEvents.length} logs` : 'Logged'}</>
                 : 'Log this meal'}
             </button>
+            {/* THE HEART — Ashley, 19 Sep 2026, from four options. The app never
+                asks whether a meal was any good; she says so when she wants to.
+                She rejected asking after every meal, asking once a day, and
+                inferring it from what got logged.
+
+                IT IS NOT A BOOKMARK. A hearted meal is kept when everything
+                else is regenerated, the same protection a meal the coach was
+                asked for by name already gets — so the tap has a consequence
+                on the next screen rather than only in a table. It also reaches
+                the coach, which the favourites list has always done and the
+                screen has never been able to add to. */}
+            {profileId && (
+              <button
+                type="button"
+                onClick={() => void handleFavouriteToggle()}
+                disabled={favouriteBusy}
+                aria-pressed={isFavourite}
+                aria-label={isFavourite ? `Remove ${option.name} from your favourites` : `Save ${option.name} as a favourite`}
+                title={isFavourite ? 'A favourite — kept when you regenerate' : 'Save as a favourite'}
+                className="flex min-h-[44px] items-center px-1.5"
+                data-meal-favourite={option.name}
+                data-meal-favourite-on={isFavourite ? 'yes' : 'no'}
+              >
+                <Heart className={`size-4 ${isFavourite ? 'fill-current text-primary' : 'text-muted-foreground'}`} />
+              </button>
+            )}
             <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             </Button>

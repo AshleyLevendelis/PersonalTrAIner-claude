@@ -540,6 +540,14 @@ export async function getEatenProteinByDate(
 export const USER_REQUESTED_TAG = 'user-requested'
 
 /**
+ * A meal the user hearted. Kept across a regenerate for the same reason
+ * USER_REQUESTED_TAG is, and kept SEPARATE from it on purpose: "I asked for
+ * this by name" and "I like this" are different facts, and one tag meaning
+ * both would make either impossible to count later.
+ */
+export const FAVOURITE_TAG = 'favourite'
+
+/**
  * The pools, AND whether the read actually worked.
  *
  * getPools below returns only the pools and answers a failed read with `{}` —
