@@ -430,6 +430,34 @@ export const WEEK_NOT_LOADED = "I can't see this week on your plan just now — 
  * changed locally is knowable from the receipt's own `landed` list, so the
  * surface that has that list says it, and this sentence does not guess.
  */
+/**
+ * HOW TO TRAIN A SUPERSET, said once under the pair rather than on each row.
+ *
+ * The first half has always been there. The SECOND half is Ashley's handoff,
+ * 19 Sep 2026: when a member of the pair has a build-up, the footnote says so
+ * — because the alternation instruction, read literally, tells somebody to
+ * alternate their warm-up sets with the other exercise, and that is not how
+ * a superset is run. You ramp the loaded lift on its own, then start pairing.
+ *
+ * DECIDED HERE UNDER THE CSCS DELEGATION, and the basis rather than the
+ * assertion: a build-up exists to prepare ONE movement's tissue and groove
+ * its pattern at rising load. Alternating it with an unrelated exercise adds
+ * fatigue and time between the very steps that are meant to run close
+ * together, and the second exercise gets a warm-up it did not need. The
+ * pairing begins once the ramp has done its job.
+ *
+ * Empty string when nothing ramps, so the caller renders one line rather
+ * than a line with a trailing separator — the shape `couldNot` uses below.
+ */
+export function supersetAlternation(rampedLabels: string[] = []): string {
+  const base = 'alternate — no rest between'
+  if (rampedLabels.length === 0) return base
+  const names = rampedLabels.length === 1
+    ? rampedLabels[0]
+    : `${rampedLabels.slice(0, -1).join(', ')} and ${rampedLabels[rampedLabels.length - 1]}`
+  return `${base} · ramp ${names} first, then start the pairing`
+}
+
 export function didNotSave(thing: string): string {
   return `${thing} didn't save. Check your connection and give it another go.`
 }

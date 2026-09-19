@@ -7,7 +7,7 @@ import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary, setProgress } from '@/lib/session-derive'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
-import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
+import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel, takesPlateCalculator } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { AddedLoadChip } from './AddedLoadChip'
 import { CalibrationCue } from './CalibrationCue'
@@ -350,7 +350,11 @@ export function ExerciseRow({
                   genuinely in play — including a bodyweight movement she is
                   adding load to, which is why this reads the load statement
                   rather than the catalogue alone. */}
-              {(carriesExternalLoad || hasLoadStatement) && (
+              {/* ONE RULE, BOTH PLACES. The row's own calculator button obeys
+                  takesPlateCalculator too; a link here that a cable row's
+                  button no longer offers would be the same claim made twice
+                  and answered differently. */}
+              {(carriesExternalLoad || hasLoadStatement) && takesPlateCalculator(catalogEntry) && (
                 <div className="mt-1.5 flex items-center gap-3.5">
                   <button
                     type="button"

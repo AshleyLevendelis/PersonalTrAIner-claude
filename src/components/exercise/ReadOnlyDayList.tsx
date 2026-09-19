@@ -7,7 +7,7 @@ import { getExerciseId } from '@/lib/exercise-db'
 import { RampStrip } from './RampStrip'
 import { LoadChip, type LoadSource } from './LoadChip'
 import { ExerciseLine, SectionLabel, sectionLabelFor } from './ExerciseLine'
-import { SupersetShell } from './SupersetGroup'
+import { SupersetShell, rampedMemberLabels } from './SupersetGroup'
 import type { Exercise, WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -220,6 +220,12 @@ export function ReadOnlyDayList({
               <SupersetShell
                 label={g.label}
                 count={g.members.length}
+                // THE SAME FUNCTION TODAY'S CARD CALLS, not a second reading
+                // of the same fact. This file's own header is about a peeked
+                // superset having silently lost the alternation line; a
+                // second copy of "does this pair ramp?" is how the clause
+                // would go the same way.
+                ramped={rampedMemberLabels(g.label, g.members.map(m => m.ex))}
                 renderMember={(idx, memberLabel) => renderRow(g.members[idx].ex, g.members[idx].exIndex, memberLabel)}
               />
             )}

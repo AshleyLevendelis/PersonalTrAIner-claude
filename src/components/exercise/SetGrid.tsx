@@ -24,7 +24,7 @@ import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropS
 import { lastTime, loggedSetReading } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
 import type { UserProfile } from '@/lib/types'
 
@@ -903,7 +903,12 @@ export function SetGrid({
                 dead one. The handler is threaded there now — and the button
                 only renders where one exists, so the same gap cannot draw a
                 dead control again. */}
-            {onOpenPlateCalc && (
+            {/* AND NOT ON A CABLE, since 19 Sep 2026. The pin IS the weight
+                there, so a button offering to work out the plates describes a
+                machine that is not in front of her — see
+                takesPlateCalculator, which has the measurement for why this
+                is cable rather than every stack. */}
+            {onOpenPlateCalc && takesPlateCalculator(catalogEntry) && (
               <Button
                 variant="ghost"
                 size="icon-xs"

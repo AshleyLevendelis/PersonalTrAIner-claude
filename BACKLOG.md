@@ -2,6 +2,58 @@
 
 Newest first. One line each.
 
+- [x] **A SUPERSET WITH A BUILD-UP IN IT WAS GIVING ADVICE NOBODY SHOULD
+  FOLLOW.** 19 Sep 2026, screen 3a of Ashley's handoff. The line under a paired
+  group said "alternate — no rest between" whatever the pair contained. Read
+  literally by somebody whose A1 has a four-step ramp, that says to alternate
+  the WARM-UP sets with the other exercise, which is not how a superset is run
+  and is not what the app meant.
+  **The clause is conditional and the CSCS basis is recorded rather than
+  asserted**: a build-up prepares ONE movement's tissue and grooves its pattern
+  at rising load, so putting an unrelated exercise between its steps adds
+  fatigue and time exactly where they should be close together, and gives the
+  second exercise a warm-up it never needed. The pairing starts once the ramp
+  has done its job. A pair with no build-up keeps its one short line.
+  The sentence lives in the phrasebook with every other card lead, so
+  `test:coach-voice` and the coach exam can grade it; which members ramp is one
+  shared function both surfaces call, because this component's own header
+  exists because a peeked superset silently lost this very line once.
+  **AND NO PLATE CALCULATOR ON A CABLE MACHINE** — the same handoff. On a
+  selectorised stack the pin IS the weight: a button offering to work out which
+  plates to load describes a machine that is not in front of her. It is the
+  app's standing "never offer what is not there" rule met on a ROW rather than
+  on a tab.
+  **MEASURED, WHICH IS WHY IT IS CABLE AND NOT `loadingMode === 'stack'`.**
+  149 of the catalogue's 201 entries fall through to 'stack' — every push-up,
+  band, pull-up bar and machine among them — and some of those machines (leg
+  press, belt squat) genuinely ARE plate-loaded. Hiding the calculator from all
+  149 would be the same defect pointing the other way. 16 entries name a cable
+  machine and every one is pin-loaded. Dumbbells are deliberately left alone
+  and the question is Ashley's: a fixed bell has nothing to calculate, an
+  adjustable pair does, and the catalogue cannot tell them apart.
+  **STILL IMPRECISE, AND NAMED RATHER THAN HIDDEN**: a pin-loaded machine whose
+  equipment says only "machine" (Machine Shrug, Machine Preacher Curl) keeps
+  the button. Separating those from the plate-loaded ones needs a catalogue
+  field that does not exist.
+  Verified: `test:load-display` +7 checks and `test:ramp-visibility` +15, every
+  one CALLING the two functions rather than grepping for them — **12 mutations,
+  12 caught**, every run at full check count. Read on a real screen at 390x844:
+  Cable Lateral Raises renders zero plate-calculator controls while Dumbbell
+  Rows, Machine Shrug and Machine Preacher Curl each keep theirs, and a
+  non-ramping pair still reads "alternate — no rest between" and nothing more.
+  **ONE OF THE NEW CHECKS BROKE THIS FILE'S OWN RULE ON ITS FIRST RUN** —
+  asserting the old hard-coded sentence was ABSENT from the component, and
+  finding it in the component's header comment explaining its removal. Comments
+  stripped before the assertion now, which is the rule written down three
+  sections up in CLAUDE.md.
+  **AND A BROWSER DRIVER WAS FOUND RED FROM THIS MORNING'S COMMIT.**
+  `verify:calibration-search` pins the ramp caption by its words; the group
+  headers built earlier today replaced that sentence, and no amount of
+  grepping the changed source file could have found a driver that names
+  something on SCREEN. It is the second half of the standing derivation rule,
+  met in practice rather than in theory. Re-anchored on the property (the
+  header says what the group is AND what it costs) and green.
+
 - [x] **A BROWSER FOUND A WRITE BUG THAT WOULD HAVE BROKEN EVERY SET SAVE THE
   DAY THE MIGRATION LANDED.** 19 Sep 2026, building drop-set rows from Ashley's
   handoff. Thirty-five source checks, a clean typecheck and a green
