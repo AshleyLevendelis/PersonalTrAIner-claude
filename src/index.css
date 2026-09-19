@@ -38,6 +38,10 @@
   --color-role-ai-bg: var(--role-ai-bg);
   --color-role-ai-border: var(--role-ai-border);
   --color-role-ai-text: var(--role-ai-text);
+  --color-ramp: var(--ramp);
+  --color-ramp-label: var(--ramp-label);
+  --color-ramp-rail: var(--ramp-rail);
+  --color-ramp-on: var(--ramp-on);
   --color-role-warn: var(--role-warn);
   --color-role-warn-bg: var(--role-warn-bg);
   --color-role-warn-border: var(--role-warn-border);
@@ -92,6 +96,34 @@
    * The bg/border/text trio is defined per theme now; only the hue stays. */
   --role-ai: #8B7BFF;
   --role-warn: #FFB454;
+
+  /* THE RAMP FAMILY — what a set COUNTS AS, never what it is grouped with.
+   *
+   * Ashley's handoff, 19 Sep 2026: "a rail means grouping, a colour means what
+   * a set counts as." Violet is the ramp: logged, and excluded from volume,
+   * personal bests and next week's weights. Mint (--primary) is a working set.
+   *
+   * AMBER IS RETIRED FROM THE RAMP. The old RampStrip used --role-warn, and a
+   * warning colour on a correct, prescribed part of the session said the wrong
+   * thing — a build-up is not a problem. Violet is the app's existing
+   * secondary role colour and reads as "a different kind of thing".
+   *
+   * DERIVED FROM --role-ai RATHER THAN SPELT OUT, so there is one hue to
+   * change and no second per-theme block to keep in sync. --role-ai follows
+   * the chosen accent axis, so the ramp stays a distinct role on every theme
+   * rather than being violet on one and invisible on another. */
+  --ramp: var(--role-ai);
+  --ramp-label: color-mix(in srgb, var(--role-ai) 62%, white);
+  --ramp-rail: color-mix(in srgb, var(--role-ai) 55%, transparent);
+  --ramp-track-done: color-mix(in srgb, var(--role-ai) 85%, transparent);
+  --ramp-track-pending: color-mix(in srgb, var(--role-ai) 28%, transparent);
+  --ramp-button: linear-gradient(180deg, color-mix(in srgb, var(--role-ai) 78%, white), var(--role-ai));
+  --ramp-on: color-mix(in srgb, var(--role-ai) 22%, black);
+
+  /* The working-set twin, so the two sit beside each other and a reader can
+   * see they are the same idea in two colours. */
+  --working-track-done: var(--primary);
+  --working-track-pending: color-mix(in srgb, var(--primary) 22%, transparent);
   --role-warn-bg: rgba(255, 180, 84, .09);
   --role-warn-border: rgba(255, 180, 84, .3);
   --role-warn-text: #FFD9A6;

@@ -260,6 +260,46 @@ export type RampDisplay =
  * equipment's real loadable minimum so "0% of working weight" never
  * displays as an unsafe 0kg.
  */
+/**
+ * The two counters the progress track draws, from ONE derivation.
+ *
+ * Ashley's handoff, 19 Sep 2026: a continuous row of segments — N violet for
+ * the ramp, a gap, M mint for the working sets — with "RAMP n/N" and
+ * "WORKING n/M" beneath it. The header inside each group states the same
+ * numbers, so they are computed here once and read twice rather than counted
+ * in two places that can disagree. Same reason the meal refit computes its
+ * verdict once and hands the object to both surfaces.
+ *
+ * TOTALS ARE THE LARGER OF PRESCRIBED AND DONE. A lifter who adds a fourth
+ * working set has done 4 of 4, not 4 of 3 — a track that overflows its own
+ * width is the app telling someone their extra effort was a mistake.
+ */
+export interface SetProgress {
+  rampDone: number
+  rampTotal: number
+  workingDone: number
+  workingTotal: number
+}
+
+export function setProgress(
+  logs: ExerciseSetLog[],
+  exerciseId: string,
+  exerciseName: string | undefined,
+  prescribedRamp: number,
+  prescribedWorking: number,
+): SetProgress {
+  const rampDone = filterWarmupSets(logs, exerciseId, exerciseName).length
+  // Drops are excluded here because filterLoggableSets excludes them: the
+  // track counts SETS, and a drop is part of the set above it.
+  const workingDone = filterLoggableSets(logs, exerciseId, exerciseName).length
+  return {
+    rampDone,
+    rampTotal: Math.max(prescribedRamp, rampDone),
+    workingDone,
+    workingTotal: Math.max(prescribedWorking, workingDone),
+  }
+}
+
 export function formatRampSets(ex: Exercise): RampDisplay | null {
   if (!ex.ramp_up) return null
   if (ex.ramp_up.exercise !== ex.name) return { kind: 'stale' }

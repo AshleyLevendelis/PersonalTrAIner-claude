@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreVertical, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
-import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
+import { formatRampSets, formatCompletedSummary, setProgress } from '@/lib/session-derive'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
 import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
@@ -84,12 +84,20 @@ export function ExerciseRow({
   canMoveDown,
   profile,
 }: ExerciseRowProps) {
-  const { setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
+  const { logs, setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
   const allSetsLogged = completedSets >= ex.sets
+  // ONE DERIVATION, READ TWICE — the track here and the group headers in
+  // SetGrid. Counting in both places is how two parts of one card end up
+  // disagreeing about how far through the lifter is.
   const ramp = formatRampSets(ex)
+  const rampProgress = setProgress(
+    logs, exerciseId, ex.name,
+    ramp && ramp.kind !== 'stale' ? ramp.sets.length : 0,
+    ex.sets,
+  )
   // DOES THIS MOVEMENT CARRY EXTERNAL LOAD AT ALL — the same predicate
   // SetGrid already uses for its weight column, read from the catalogue rather
   // than inferred from a null weight, because "no number yet" and "no number
@@ -147,13 +155,12 @@ export function ExerciseRow({
           : `rounded-[10px] space-y-2 ${allSetsLogged ? 'opacity-70' : ''}`
       }
     >
-      {expanded && (
-        <span
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-px glow-sweep"
-          style={{ background: 'linear-gradient(90deg, rgba(var(--glow-rgb),0), rgba(var(--glow-rgb),.9), rgba(var(--glow-rgb),0))' }}
-        />
-      )}
+      {/* THE SWEEP HAIRLINE IS GONE, 19 Sep 2026. An animated mint line across
+          the top of every expanded row competed with the progress track below
+          it and with the two group rails — three moving or coloured things
+          saying "look here" on one card. The handoff removes it by name; the
+          `.glow-sweep` keyframes stay in index.css for the surfaces that still
+          use them. */}
       {/* A plain div, not a <button> — LoadChip renders its own interactive
           "why this weight" button below, and a button can't legally contain
           another button (the browser silently splits/corrupts the DOM when
@@ -172,8 +179,42 @@ export function ExerciseRow({
         allSetsLogged={allSetsLogged}
         loggedSummary={formatCompletedSummary(loggedSets)}
       />
-      {expanded && completedSets > 0 && !allSetsLogged && (
-        <span className="font-mono text-[0.625rem] text-muted-foreground">{completedSets}/{ex.sets} sets</span>
+      {/* ONE CONTINUOUS TRACK, RAMP THEN WORKING — the handoff's progress row.
+          It replaces a bare "2/3 sets" that counted working sets only, so a
+          lifter three ramp steps into a session saw no progress at all.
+          A rail means grouping and a colour means what a set counts as: the
+          violet segments are the build-up, the mint ones are the work, and the
+          gap between them is the only separator needed. */}
+      {expanded && (rampProgress.rampTotal > 0 || rampProgress.workingTotal > 0) && (
+        <div data-testid="set-progress-track">
+          <div className="flex items-center gap-[3px]">
+            {Array.from({ length: rampProgress.rampTotal }, (_, i) => (
+              <span
+                key={`r${i}`}
+                className="h-1 flex-1 rounded-full"
+                style={{ background: i < rampProgress.rampDone ? 'var(--ramp-track-done)' : 'var(--ramp-track-pending)' }}
+              />
+            ))}
+            {rampProgress.rampTotal > 0 && rampProgress.workingTotal > 0 && <span className="w-2.5 shrink-0" />}
+            {Array.from({ length: rampProgress.workingTotal }, (_, i) => (
+              <span
+                key={`w${i}`}
+                className="h-1 flex-1 rounded-full"
+                style={{ background: i < rampProgress.workingDone ? 'var(--working-track-done)' : 'var(--working-track-pending)' }}
+              />
+            ))}
+          </div>
+          <div className="mt-1 flex items-center justify-between">
+            {rampProgress.rampTotal > 0 ? (
+              <span className="ds-label-compact whitespace-nowrap text-[color:var(--ramp-label)]" data-testid="ramp-counter">
+                Ramp {rampProgress.rampDone}/{rampProgress.rampTotal}
+              </span>
+            ) : <span />}
+            <span className="ds-label-compact whitespace-nowrap text-muted-foreground" data-testid="working-counter">
+              Working {rampProgress.workingDone}/{rampProgress.workingTotal}
+            </span>
+          </div>
+        </div>
       )}
 
       {expanded && (
