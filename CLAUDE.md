@@ -1083,6 +1083,32 @@ old — the commands were right and the context was missing.
   actually changed, and assert the run executed as many checks as the baseline.
   Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
   meaningless" print identically.
+- **A FIXTURE MUST BE A PLAUSIBLE WHOLE, NOT A SET OF PLAUSIBLE PARTS.** 19 Sep
+  2026: a browser fixture's meals were each a sensible dish and the DAY was
+  339g of protein against a 160g target. Nothing was ever inside the tolerance
+  bands, so every tolerance-gated behaviour switched off at once — the variety
+  sort never applied, the same dinner won every day, the new feature yielded
+  every time, and the screen showed nothing. The tell is exactly that: several
+  unrelated behaviours downstream of one band all going quiet together. Check
+  the fixture's TOTALS against the targets it will be searched against, not
+  just that each part looks real.
+- **A GATE'S CHECK COUNT SHOULD BE THE SAME NUMBER EVERY RUN.** The same day: a
+  gate wrapped three checks in `if (thingExists)` and a `for` over a possibly
+  empty list, so switching the feature off made those checks VANISH rather than
+  fail — 37 of 42 ran, which is indistinguishable from a crash and defeats the
+  "compare how many RAN" habit this file already relies on. Give the dependent
+  checks a null-safe value and let them fail, rather than skipping them.
+  The mutation harness needs the matching rule: **a run that executed fewer
+  checks than the baseline is a crash, not a catch, even when something
+  failed.** One mutation ran 7 of 40, failed 5, and was counted as caught.
+- **TWO MECHANISMS FOR ONE PROPERTY: MEASURE WHICH ONE WORKS BEFORE KEEPING
+  BOTH.** Also 19 Sep: a preference nudge and a hard fallback were built for the
+  same rule. A mutation removing the nudge came back MISSED, which sent me to
+  measure rather than to write a check for it — with it in and out, across a
+  200-profile grid and the gate's own fixtures, not one outcome changed. It was
+  inert because it was a sort key inside a band, and the days needing help were
+  outside that band. Deleted. **A MISSED mutation on a belt-and-braces
+  mechanism is a question about the mechanism, not only about the check.**
 - **WHEN THREE GATES GREP THE SAME EXPRESSION, THE EXPRESSION SHOULD BE A
   FUNCTION.** 19 Sep 2026: `test:calibration-search`, `test:primer-load` and
   `verify:one-number` each pinned one line of JSX deciding whether the per-set

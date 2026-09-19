@@ -24,6 +24,7 @@ import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MacroTargets } from '@/lib/types'
 import { getSessionDateContext } from '@/lib/dev-clock'
+import type { MealShape } from '@/lib/meal-rotation'
 
 interface GroceryListProps {
   profileId?: string
@@ -33,6 +34,8 @@ interface GroceryListProps {
   /** Today's actual picks, swaps included (audit §5.1) — without these the list shops for the meal the user replaced. */
   todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
   targets: MacroTargets | null
+  /** Same object App gives the meal rotation — see GenerateGroceryListInput. */
+  mealShape: MealShape
   /** Bumped externally (e.g. after a chat-added item) to force a reload without remounting. */
   refreshToken?: number
 }
@@ -87,7 +90,7 @@ function formatShoppingQuantity(item: GroceryItemRow): { primary: string; exact:
  */
 const MAX_GROCERY_QUANTITY = 100_000
 
-export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, refreshToken }: GroceryListProps) {
+export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, refreshToken, mealShape}: GroceryListProps) {
   const [items, setItems] = useState<GroceryItemRow[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -122,7 +125,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       // generateGroceryList reads the current merged view then enqueues local
       // writes (it doesn't await the network) — reload picks up the merged
       // pending state immediately, no round-trip wait.
-      await generateGroceryList({ profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks, startDate: getSessionDateContext(profileId).date })
+      await generateGroceryList({ profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks, mealShape, startDate: getSessionDateContext(profileId).date })
       await reload()
     } finally {
       setGenerating(false)

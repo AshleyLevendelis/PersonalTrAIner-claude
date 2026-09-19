@@ -122,6 +122,25 @@ export interface PoolOption {
    * is honest; a wrong one would not be.
    */
   prep?: string
+  /**
+   * Set when this option is a portion of another slot's meal — today's lunch
+   * being last night's dinner, under the batch-cooking preference.
+   *
+   * NEVER PERSISTED, and that is deliberate rather than an omission: a
+   * leftover is derived fresh from the rotation on every render, exactly as
+   * the rest of the assembled day is, so storing one would create a second
+   * copy that could disagree with the dinner it came from. It exists so the
+   * card can SAY where the meal came from — a repeat the app cannot explain
+   * is indistinguishable from the repeat bug fixed the same morning.
+   */
+  leftoverFrom?: MealSlotName
+  /**
+   * Set on tonight's dinner when tomorrow's lunch is going to be a portion of
+   * it, so the card can promise the repeat BEFORE it happens rather than
+   * explaining it afterwards. Derived, never persisted, for the same reason
+   * `leftoverFrom` is.
+   */
+  reusedTomorrow?: boolean
 }
 
 export interface RawProposal {

@@ -3,6 +3,7 @@ import { GroceryList } from '@/components/GroceryList'
 import type { MacroTargets } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
+import type { MealShape } from '@/lib/meal-rotation'
 
 // ---------------------------------------------------------------------------
 // THE SHOPPING LIST, FULL SCREEN — design handoff 2b ›, 12 Sep 2026.
@@ -24,6 +25,7 @@ export function GroceryScreen({
   targets,
   softLikedFoods,
   todaysPicks,
+  mealShape,
   onClose,
 }: {
   profileId?: string
@@ -31,6 +33,7 @@ export function GroceryScreen({
   targets: MacroTargets | null
   softLikedFoods: string[]
   todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
+  mealShape: MealShape
   onClose: () => void
 }) {
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
@@ -76,6 +79,7 @@ export function GroceryScreen({
         targets={targets}
         softLikedFoods={softLikedFoods}
         todaysPicks={todaysPicks}
+        mealShape={mealShape}
       />
     </div>
   )

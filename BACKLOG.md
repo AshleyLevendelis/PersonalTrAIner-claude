@@ -2,6 +2,89 @@
 
 Newest first. One line each.
 
+- [x] **COOK ONCE, EAT TWICE — and a screenshot caught it serving the same
+  dish twice in one day.** 19 Sep 2026. Ashley's ruling, from four options: **a
+  setting, on by default.** Plan: `docs/plans/cook-once-eat-twice.md`.
+
+  **THE COLLISION I FLAGGED, MEASURED AWAY.** Leftovers deliberately repeat a
+  meal, which is exactly what the variety fix shipped hours earlier works to
+  avoid — the shape CLAUDE.md says to put in front of her rather than resolve
+  quietly. Measured over 400 profiles BEFORE building: holding lunch to last
+  night's dinner costs **4.58 → 4.45 distinct days a week**. An eighth of a
+  day, because breakfast and dinner keep varying around the held slot. Real in
+  principle, almost absent in practice.
+
+  **THE FINDING IS THE ONE THE SCREENSHOT MADE.** The build passed 40 source
+  checks and a browser driver, and the picture showed a roast chicken tray bake
+  for LUNCH and a roast chicken tray bake for DINNER, four hours apart — under
+  a feature whose whole promise is that it saves you cooking, not that it feeds
+  you one plate all day. Nothing in the data or the source says that; it is
+  obvious in one frame. **A browser driver is not the last step after the gates
+  pass — it is the step that finds the defect**, and this is the third time
+  that line has earned itself.
+  Fixed by the LEFTOVER yielding: a day whose dinner would repeat its lunch
+  gives the leftover back and cooks lunch fresh, because "you are eating this
+  twice today" is a worse day than "you cook one extra lunch this week".
+  Tolerance stays absolute; no preference buys an out-of-tolerance day.
+
+  **A SECOND MECHANISM WAS BUILT, MEASURED AND DELETED.** I also added the
+  leftover's name to the dinner slot's recent list so the variety sort would
+  steer away from it. It reads well and does nothing: variety is a sort key
+  INSIDE tolerance, so it cannot help on the days that need help. A mutation
+  removing it came back MISSED against every check, which is what sent me to
+  measure — with it in and out, across a 200-profile grid and the gate's own
+  fixtures, **not one day changed**. Deleted. Two mechanisms for one property,
+  one of them inert, is worse than one.
+
+  **THE FIXTURE LESSON, WHICH IS THE REUSABLE ONE.** The browser run first
+  showed nothing at all, and the cause was that my harness day was **339g of
+  protein against a 160g target**. Every dish was plausible; the DAY was not.
+  With nothing ever inside the tolerance bands, every tolerance-gated behaviour
+  silently switched off — the variety sort never applied, the same dinner won
+  every day, the leftover yielded every time, and the feature looked broken.
+  **A fixture has to be a plausible WHOLE, not a set of plausible parts**, and
+  the tell is that everything downstream of a band quietly stops working at
+  once.
+
+  **WHAT I CANNOT CLAIM.** The headline "93.3% of dinners can serve as next
+  day's lunch" came from a fixture shaped differently from the one above; a
+  later 200-profile grid with a different dish shape produced ZERO, because the
+  lunch protein floor is strict and a rescale landing a gram short is refused.
+  Both numbers are real about their own fixtures and neither is a statement
+  about real pools, which need a live database to measure. **How often batch
+  cooking actually fires for a real profile is NOT KNOWN** and is recorded here
+  as unknown rather than quoted from the friendlier run.
+
+  **BUILT**: `batch_cooking` (migration `20260919140000_add_batch_cooking`,
+  DEFAULT true, named in App's column-by-column onboarding insert), the
+  placement in `buildRotation`, a Profile row to turn it off, and two sentences
+  in the shared phrasebook — the dinner promises the repeat before it happens,
+  the lunch names where it came from. Without the second, a deliberate repeat
+  is indistinguishable from the bug fixed that morning.
+
+  **VERIFIED**: `test:leftovers` (43 checks), `verify:leftovers` on the real
+  Nutrition screen at 390x844. **19 mutations, 19 caught.** Three gate holes
+  came out of the first round: a check that threw instead of failing and took
+  30 others with it; conditional blocks that made checks VANISH rather than
+  fail (37 of 42 ran, which is indistinguishable from a crash — **a gate's
+  check count should be the same number every run**); and the mutation harness
+  itself, which counted a crash as a catch and now treats any short run as
+  invalid.
+
+  **TWO MORE OF MY OWN CHECKS PINNED A CALL'S TEXT AND BROKE WITHIN A DAY** —
+  `test:meal-variety` and `test:soft-preferences`, both written that morning,
+  both asserting a literal argument list that grew an argument by the evening.
+  Re-anchored on the property. The habit is easy to preach and apparently easy
+  to forget while writing the check.
+  **And the first-paint ceiling crossed at 420 of 420** — the one named that
+  same morning as sitting 1 kB from the line and deliberately not raised,
+  because a ceiling should move when something crosses it and says why.
+  Something did, hours later. Raised to 428 over a value measured today.
+
+  **NEEDS**: a SECOND migration before this frontend reaches the app —
+  `npm run db:push-both` again — on the same "database first, then merge" rule
+  as the meal-method column.
+
 - [x] **THREE GATES WERE GREPPING ONE LINE OF JSX, AND ALL THREE WENT RED AT
   CORRECT CODE.** 19 Sep 2026, found by the first full sweep since the 18 Sep
   work — 266 gates, 261 pass, 5 fail.

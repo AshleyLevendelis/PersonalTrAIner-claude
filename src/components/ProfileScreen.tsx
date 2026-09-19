@@ -1129,6 +1129,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 {profile.include_snacks ? 'Yes' : 'No'}
               </Button>
             </Row>
+            {/* COOK ONCE, EAT TWICE. On by default (Ashley, 19 Sep 2026), so an
+                absent value reads as Yes rather than as off — the same
+                convention include_snacks uses one row above. Turning it off
+                frees lunch to be its own dish again from the next day. */}
+            <Row label="Batch cook lunches">
+              <Button size="sm" variant={(profile.batch_cooking ?? true) ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ batch_cooking: !(profile.batch_cooking ?? true) })}>
+                {(profile.batch_cooking ?? true) ? 'Yes' : 'No'}
+              </Button>
+            </Row>
             {/* WHICH DAY SHE SHOPS — design handoff 2d. The Home card is
                 driven by it, and a card that appears on a day the app chose
                 for her with no way to move it is the app being confidently

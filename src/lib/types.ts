@@ -176,6 +176,12 @@ export interface UserProfile {
    */
   meals_per_day?: number
   include_snacks?: boolean
+  /**
+   * Cook once, eat twice: tomorrow's lunch is tonight's dinner, resized to the
+   * lunch budget. Ashley, 19 Sep 2026 — a setting, on by default, so undefined
+   * reads as TRUE everywhere rather than as off.
+   */
+  batch_cooking?: boolean
   cooking_time_preference?: CookingTimePreference
   /**
    * Meal-realism round: onboarding's optional (skippable) food-preference

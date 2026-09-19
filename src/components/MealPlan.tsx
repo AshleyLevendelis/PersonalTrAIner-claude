@@ -22,6 +22,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // day they were added — the honest fix is to defer them, not to raise the
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext } from './nutrition/MealMoveSheet'
+import { COOK_ONCE } from '@/lib/coach-voice'
 const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -782,6 +783,18 @@ function MealSlotRow({
               </div>
               {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}. Your day has been re-fitted around it.</p>}
             </div>
+          )}
+
+          {/* COOK ONCE, EAT TWICE — both halves of the pair, from the shared
+              phrasebook. The lunch line is the important one: without it a
+              repeated dish is indistinguishable from the day-to-day repeat
+              defect fixed the same morning, and the app would look broken to
+              exactly the person most likely to notice. */}
+          {option.leftoverFrom === 'dinner' && (
+            <p className="text-[0.71875rem] text-muted-foreground" data-meal-leftover={option.name}>{COOK_ONCE.lunch}</p>
+          )}
+          {option.reusedTomorrow === true && (
+            <p className="text-[0.71875rem] text-muted-foreground" data-meal-cook-extra={option.name}>{COOK_ONCE.dinner}</p>
           )}
 
           {/* HOW TO COOK IT. The generator has always written a method and the

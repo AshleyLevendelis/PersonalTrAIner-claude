@@ -306,7 +306,9 @@
     "measure:meal-variety": "tsx scripts/measure-meal-variety.ts",
     "test:meal-variety": "tsx scripts/test-meal-variety.ts",
     "test:meal-method": "tsx scripts/test-meal-method.ts",
-    "verify:meal-method": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-method.mjs"
+    "verify:meal-method": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-method.mjs",
+    "test:leftovers": "tsx scripts/test-leftovers.ts",
+    "verify:leftovers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/leftovers.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

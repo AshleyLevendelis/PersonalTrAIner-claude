@@ -334,6 +334,27 @@ export function loggedSetReading(log: {
  * There is exactly one training style on a profile, so "your training style"
  * points at it without ambiguity.
  */
+/**
+ * COOK ONCE, EAT TWICE — the two sentences that keep a deliberate repeat from
+ * reading as an accidental one.
+ *
+ * On 19 Sep 2026 the app was fixed to stop serving the same meals every day.
+ * Hours later it was taught to serve tonight's dinner again at lunch, on
+ * purpose. From the outside those are the same thing, so each side of the pair
+ * has to say which it is: the dinner promises the repeat before it happens,
+ * and the lunch names where it came from. A repeat the app cannot explain is
+ * indistinguishable from the bug.
+ *
+ * Both are here rather than inline so test:coach-voice and the coach exam can
+ * grade them alongside every other sentence the app writes.
+ */
+export const COOK_ONCE = {
+  /** On the dinner that will be cooked in double. */
+  dinner: 'Cook both portions together — tomorrow\'s lunch is this.',
+  /** On the lunch that came out of last night's pan. */
+  lunch: 'Last night\'s dinner.',
+} as const
+
 export const OUTSIDE_YOUR_STYLE = 'Outside your training style'
 
 export const BEST_SET_QUALIFIER = 'best set'
