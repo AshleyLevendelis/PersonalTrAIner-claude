@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **A GATE I DID NOT RUN WENT RED FOR A DAY, AND IT WAS GUARDING A MEAL
+  SHE ASKED FOR BY NAME.** 19 Sep 2026, caught by the pre-merge sweep.
+  `test:dashboard` reads `meal-generation.ts`; the heart-on-the-meal-row commit
+  changed `meal-generation.ts`; I ran thirteen meal gates after it and **that
+  was not one of them**. Red at the branch head from that commit until the
+  sweep. Main was never affected.
+  **The behaviour was correct and had got BETTER.** The check pinned a LITERAL:
+  `persist.indexOf('USER_REQUESTED_TAG') < persist.indexOf('.delete()')`, inside
+  `persistPools`. The heart work moved that decision into a shared
+  `survivesRegeneration`, so a favourited meal survives a regeneration for the
+  same reason a requested one does — and the literal left the function. The
+  grep went stale, exactly the shape this file warns about twice ("when a check
+  blocks a fix, suspect the check"; "when three gates grep the same expression,
+  the expression should be a function" — I made it a function and forgot it was
+  grepped).
+  **AND IT WOULD HAVE PASSED VACUOUSLY THE OTHER WAY.** `indexOf` returned -1,
+  and -1 is less than every position, so the ORDER half was satisfied by the
+  anchor being missing; only the `includes` half failed. The lesson added to
+  CLAUDE.md this morning, met the same afternoon by a check written weeks ago.
+  **RE-ANCHORED on the property, in four parts** rather than one comparison,
+  because a single position cannot tell "the decision moved after the delete"
+  from "the decision no longer keeps anything": both anchors must be FOUND
+  before being ordered; the decision must sit before the delete; it must
+  CALL the shared rule (`name(`, not a bare name, so an import cannot satisfy
+  it); and the shared rule itself must still keep both a meal asked for by name
+  and a favourited one. **4 mutations, 4 caught** — decision moved after the
+  delete, rule bypassed by a hand-rolled expression, rule stops keeping a
+  requested meal, rule stops keeping a favourite.
+  Verified: `test:dashboard` 58 checks green (was 52 + 6), and every one of the
+  20 gates that read `meal-generation.ts` re-run green — dashboard, meal-variety
+  42, meal-method 31, leftovers 43, meal-favourite 29, meal-refit 91,
+  meal-roundtrip 78, meal-swap-rotation 28, custom-meal 28, grocery 39,
+  no-dead-code 8, enforcement-gaps 41, meal-addition 96, meal-food-edit 69,
+  meal-log 35, meal-move 49, memory 26, onboarding-handover 51,
+  replace-without-losing 31, soft-preferences 33.
+  **THE PROCESS FIX IS THE POINT, and it is mechanical**: the gates to re-run
+  after a change are the ones that READ the files it touched, and that set is
+  derivable — `grep -rln <file> scripts/*.ts` named all twenty in one command.
+  Picking them by what the work felt like about is how this one was missed.
+
 - [x] **"NEXT WEIGHT UP IS TOO BIG A JUMP" — the commonest reason a weight
   stands still finally has somewhere to be recorded, and something to say.**
   19 Sep 2026, straight off the audit above.

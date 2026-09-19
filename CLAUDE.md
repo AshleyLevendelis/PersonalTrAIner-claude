@@ -1377,6 +1377,15 @@ old — the commands were right and the context was missing.
   reported missing. Use `(['"`])((?:(?!\1).)*)\1`.
 - New check → register it in `package.json` → mutation-test it → say in the
   report how many mutations were tried and how many were caught.
+- **THE GATES TO RE-RUN ARE THE ONES THAT READ THE FILES YOU TOUCHED, AND THAT
+  SET IS DERIVABLE — DERIVE IT, DO NOT RECALL IT.** 19 Sep 2026: a commit
+  changed `meal-generation.ts`; I ran thirteen gates chosen by what the work
+  felt like it was about, and `test:dashboard` — which reads that file — was not
+  among them. It sat red at the branch head for a day and was found by the
+  pre-merge sweep. `grep -rln <file> scripts/*.ts` named all twenty readers in
+  one command, and every one of them ran green in a minute. **Picking the
+  affected gates from memory is how a red one hides; one grep is the whole
+  cost.**
 - **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
   2026: yesterday's sweep found two real failures, both were fixed, and the
   sweep was reported clean without being re-run. One of those fixes — pulling a
