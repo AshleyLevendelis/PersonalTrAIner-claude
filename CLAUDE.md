@@ -143,10 +143,46 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   when the SHAPE held and the SIZE moved**; a goal change regenerates instead.
   `meal-refit` (91 checks, 16 mutations), `verify:meal-refit` (25 checks, 5
   mutations), `coach-parity`. Needs the `chat-gemini` deploy for chat
-- Meals hit targets from real foods, varied, dislikes honoured, allergens
+- Meals hit targets from real foods, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`
-- Grocery list follows the meals — `grocery`
+- **And a different day tomorrow** — since 19 Sep 2026, on Ashley's "fix the
+  variety". CORRECTED, measured: this line said "varied" and nothing had ever
+  counted. **1.11 distinct days in a seven-day week; 89.4% of profiles ate the
+  identical day every day.** The variety preference existed, was documented and
+  was tested — and was a `0.01` penalty added to a macro-distance score against
+  a median gap of `0.033`, so it could only win an almost exact tie. **An
+  argument that is not passed and an argument that does nothing look identical
+  from the call site**, and I reported the first before checking the second.
+  Now a SORT KEY rather than a penalty, applied only among combinations already
+  inside the tolerance bands — the app's own definition of a correct day — so
+  variety costs nothing real and can never buy a day that misses its targets.
+  Outside tolerance nothing changed. 3.98-4.51 distinct days after, and days
+  inside tolerance went UP (86.2%→95.3% on the loosest fixture), because
+  fit-first could previously prefer a combination that scored well overall
+  while busting one band. "Yesterday" comes from the DATE, not from what was
+  logged, so somebody who never logs still gets a different dinner.
+  `meal-variety` (42 checks, 16 mutations), `measure:meal-variety`
+- Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
+  the ones the tab will actually SHOW: both surfaces and the resize trial read
+  one rotation from one pure builder, so the list cannot shop for a week the
+  screen will not serve. Parity by construction, the `meal-refit` pattern.
+  CORRECTED: this file and the module's own header credited the list with
+  "realistic variety" it never had — it threaded the history forward correctly
+  and got the same day seven times, like everything else
+- **How to cook it** — since 19 Sep 2026, `screen only` and honestly so.
+  `generate-meals` had always asked the model for a method and always received
+  one; it was read twice (is this too heavy for breakfast, is it quick or
+  standard) and then thrown away, with no field on the option and no column in
+  the table. **The interesting half is refusing a wrong one**: the app rescales
+  every proposal by up to 2.5x, so a method naming an amount describes food the
+  ingredient list may no longer contain — a number the app never verified,
+  printed beside numbers it did. The prompt asks for technique with no amounts;
+  anything still naming a mass or volume is dropped WHOLE, and the rule runs
+  again at display time for the same reason the dietary re-check does.
+  `meal-method` (31 checks, 19 mutations), `verify:meal-method`. Needs the
+  `generate-meals` deploy; until then new meals arrive with no method, which is
+  the honest empty state
 - A measured floor for meals — `meal-quality` exists but needs a live
   database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
 
@@ -1047,6 +1083,30 @@ old — the commands were right and the context was missing.
   actually changed, and assert the run executed as many checks as the baseline.
   Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
   meaningless" print identically.
+- **AN ARGUMENT THAT IS NOT PASSED AND AN ARGUMENT THAT DOES NOTHING LOOK
+  IDENTICAL FROM THE CALL SITE.** 19 Sep 2026: the meal assembler took a
+  day-to-day variety history, the Nutrition tab passed it `{}`, and I reported
+  that as the defect and the fix as one line. Measured, the preference behind
+  the argument was a `0.01` penalty in the same units as the macro-distance
+  score it competed with, against a median gap of `0.033` — passing the
+  argument would have moved 1.00 distinct days a week to 1.11. **Before
+  reporting an unpassed argument as the bug, go and read what the code behind
+  it would do if you passed it.**
+  The mechanism half generalises further: **a preference expressed as a small
+  constant added to the score of the thing it competes with can only ever win
+  a tie.** If it is meant to decide, it is a sort KEY, gated on whatever makes
+  the choice free — here, the tolerance bands the app already calls correct.
+  Raising the constant is the wrong fix, because any number big enough to buy
+  the preference is big enough to buy a wrong answer.
+- **A CHECK COMPARED AGAINST THE CONSTANT THAT DRIVES IT CAN ONLY AGREE WITH
+  ITSELF.** The same day, found by mutation: `history.length <= RECENT_WINDOW`
+  passed happily when `RECENT_WINDOW` was cut from 3 to 1. A behavioural bound
+  needs at least one LITERAL side — here "remembers more than just yesterday",
+  written as 2 — or the check moves with the defect.
+- **TWO `indexOf` RESULTS COMPARED WITHOUT ASKING WHETHER EITHER WAS FOUND.**
+  Also found by mutation, also 19 Sep: an ordering check read `a < b`, a
+  mutation renamed `a`'s anchor, `indexOf` returned -1, and -1 is less than
+  everything. Assert both anchors exist before comparing their positions.
 - **ASKING A QUESTION OF EVIDENCE YOU JUST CREATED.** The same shape, twice in
   one day: grepping a file for an identifier to see whether it was imported,
   AFTER inserting a line that used it — the only hit was the new code, and the

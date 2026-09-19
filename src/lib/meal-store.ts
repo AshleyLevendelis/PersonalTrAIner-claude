@@ -553,7 +553,7 @@ export const USER_REQUESTED_TAG = 'user-requested'
 export async function readPools(profileId: string): Promise<{ pools: Partial<Record<MealSlotName, PoolOption[]>>; failed: boolean }> {
   const { data, error } = await supabase
     .from('meal_plan_slots')
-    .select('slot, pool_index, name, ingredients, macros, tags')
+    .select('slot, pool_index, name, ingredients, macros, tags, prep')
     .eq('profile_id', profileId)
     .order('pool_index', { ascending: true })
 
@@ -575,6 +575,9 @@ export async function readPools(profileId: string): Promise<{ pools: Partial<Rec
       ingredients: row.ingredients ?? [],
       macros: { calories: macros.kcal ?? 0, protein: macros.protein ?? 0, carbs: macros.carbs ?? 0, fat: macros.fat ?? 0 },
       tags: row.tags ?? [],
+      // Empty for every pool stored before the column existed, which renders
+      // as no method rather than as a wrong one.
+      prep: row.prep ?? '',
     }
     if (!grouped[slot]) grouped[slot] = []
     grouped[slot]!.push(option)

@@ -13,7 +13,7 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
-import type { PoolOption } from '@/lib/meal-generation'
+import { methodSafeToShow, type PoolOption } from '@/lib/meal-generation'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
@@ -781,6 +781,31 @@ function MealSlotRow({
                 })}
               </div>
               {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}. Your day has been re-fitted around it.</p>}
+            </div>
+          )}
+
+          {/* HOW TO COOK IT. The generator has always written a method and the
+              app has always thrown it away — no field on the option, no column
+              in the table — so a meal arrived as a name and a list of weighed
+              ingredients with no instructions. Rendered UNDER the ingredients
+              on purpose: the amounts are the ingredients' job, and the method
+              never carries any.
+
+              RE-CHECKED ON DISPLAY, not only at generation. Verification is
+              where a method naming an amount is supposed to be dropped, but
+              that is a check at the write boundary and this is the surface
+              where being wrong actually costs something — the same reason the
+              dietary re-check runs here rather than trusting what was stored.
+              A row written by any future path, or by hand, cannot put an
+              unverified number on the screen.
+              Absent on every pool generated before the column existed, and on
+              custom meals and edited meals, which genuinely have no method. */}
+          {methodSafeToShow(option.prep).length > 0 && (
+            <div className="flex flex-col gap-1.5" data-meal-method={option.name}>
+              <span className="ds-label-compact">Method</span>
+              <p className="whitespace-pre-line text-xs leading-relaxed text-[color:var(--text-tertiary)]">
+                {methodSafeToShow(option.prep)}
+              </p>
             </div>
           )}
 

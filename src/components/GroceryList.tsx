@@ -23,6 +23,7 @@ import { lookupIngredient } from '@/lib/food-db'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MacroTargets } from '@/lib/types'
+import { getSessionDateContext } from '@/lib/dev-clock'
 
 interface GroceryListProps {
   profileId?: string
@@ -121,7 +122,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       // generateGroceryList reads the current merged view then enqueues local
       // writes (it doesn't await the network) — reload picks up the merged
       // pending state immediately, no round-trip wait.
-      await generateGroceryList({ profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks })
+      await generateGroceryList({ profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks, startDate: getSessionDateContext(profileId).date })
       await reload()
     } finally {
       setGenerating(false)

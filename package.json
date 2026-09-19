@@ -302,7 +302,11 @@
     "test:last-time": "tsx scripts/test-last-time.ts",
     "test:working-sets": "tsx scripts/test-working-sets.ts",
     "report:rest-floors": "tsx scripts/measure-rest-floors.ts",
-    "test:rest-floors": "tsx scripts/test-rest-floors.ts"
+    "test:rest-floors": "tsx scripts/test-rest-floors.ts",
+    "measure:meal-variety": "tsx scripts/measure-meal-variety.ts",
+    "test:meal-variety": "tsx scripts/test-meal-variety.ts",
+    "test:meal-method": "tsx scripts/test-meal-method.ts",
+    "verify:meal-method": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-method.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

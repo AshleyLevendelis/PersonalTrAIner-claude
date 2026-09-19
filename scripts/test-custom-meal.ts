@@ -20,6 +20,20 @@ import { buildCustomMealProposal } from '../src/lib/custom-meal'
 import { assembleDay, type PoolOption } from '../src/lib/meal-generation'
 import type { MacroTargets } from '../src/lib/types'
 
+/**
+ * The source between two markers. Used so a check can ask about one
+ * declaration rather than about the whole file, without pinning the exact
+ * text of the lines in between — which is what made the previous version of
+ * the pinned-meals check fail on a correct change.
+ */
+function sliceBetween(src: string, from: string, to: string): string {
+  const a = src.indexOf(from)
+  if (a < 0) return ''
+  const b = src.indexOf(to, a + from.length)
+  return b < 0 ? src.slice(a) : src.slice(a, b)
+}
+
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const strip = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
@@ -156,8 +170,20 @@ console.log('\n5. The chain is wired, end to end')
   check('the client builds it through buildCustomMealProposal', /buildCustomMealProposal/.test(ui))
   check('confirm reuses the addition executor — one write path', /'propose_meal_addition' \|\| row\.kind === 'propose_custom_meal'/.test(ui))
   const app = read('src/App.tsx')
+  // THE PROPERTY, NOT THE CALL'S EXACT TEXT. This used to assert the literal
+  // argument list `assembleDay(mealPools, macros, {}, ...)` — including the
+  // `{}` that turned out to be the day-to-day variety history nobody was
+  // passing. When that was fixed on 19 Sep 2026 this check went red at a
+  // change that made the app strictly better: a mechanism-pinned check
+  // ENFORCING the defect, exactly the shape CLAUDE.md warns about. What must
+  // hold is that the pins are an INPUT to the day's assembly and are not
+  // patched onto its result afterwards.
+  const assemblyDecl = sliceBetween(app, 'const assembledMeals', 'const chosenMeals')
   check('manual picks are PINNED into assembly, not overlaid after',
-    /assembleDay\(mealPools, macros, \{\}, compiledSoftFoodPreferences, pinnedMeals\)/.test(app))
+    /\bpinnedMeals\b/.test(assemblyDecl), assemblyDecl.slice(0, 120))
+  const afterAssembly = sliceBetween(app, 'const chosenMeals', 'const mealTotals')
+  check('...and nothing patches a pick onto the assembled day afterwards',
+    !/manualMealPicks|pinnedMeals/.test(afterAssembly), afterAssembly)
   const panel = read('src/components/MealPlan.tsx')
   check('the swap panel re-checks every alternative against current restrictions', /checkAlternative\(alt\)/.test(panel))
   check('...disabling a blocked one with the reason shown', /disabled=\{busy \|\| !verdict\.ok\}/.test(panel))

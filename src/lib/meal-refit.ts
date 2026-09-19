@@ -96,6 +96,17 @@ export interface RefitOptions {
   /** Slots the user pinned. Their portions are facts and are never resized. */
   pinned?: Partial<Record<MealSlotName, PoolOption>>
   softLikedFoods?: string[]
+  /**
+   * What the rotation counts as recently eaten for the day being judged.
+   *
+   * NOT OPTIONAL GARNISH. assembleDay picks a different day depending on this,
+   * so a trial run without it judges the rotation's day 0 while the screen is
+   * showing some other day — quoting before/after numbers for meals that are
+   * not in front of the user, and potentially offering to resize a day that
+   * already fits. Same class of bug as withholding softLikedFoods from the
+   * shopping list.
+   */
+  recentNames?: Partial<Record<MealSlotName, string[]>>
 }
 
 /**
@@ -108,9 +119,9 @@ export function checkMealRefit(
   targets: MacroTargets,
   opts: RefitOptions = {},
 ): MealRefit {
-  const { mealsPerDay, includeSnacks, pinned = {}, softLikedFoods = [] } = opts
+  const { mealsPerDay, includeSnacks, pinned = {}, softLikedFoods = [], recentNames = {} } = opts
 
-  const before = assembleDay(pools, targets, {}, softLikedFoods, pinned)
+  const before = assembleDay(pools, targets, recentNames, softLikedFoods, pinned)
   const emptyResult = (reason: string | null): MealRefit => ({
     needed: false,
     before: { totals: before.totals, withinTolerance: before.withinTolerance },
@@ -172,7 +183,7 @@ export function checkMealRefit(
     })
   }
 
-  const after = assembleDay(next, targets, {}, softLikedFoods, pinned)
+  const after = assembleDay(next, targets, recentNames, softLikedFoods, pinned)
 
   const resized: SlotResize[] = []
   for (const slot of Object.keys(after.chosen) as MealSlotName[]) {

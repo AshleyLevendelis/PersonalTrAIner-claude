@@ -2,6 +2,127 @@
 
 Newest first. One line each.
 
+- [x] **THE SAME THREE MEALS EVERY DAY, AND A COOKING METHOD THE APP PAID FOR
+  AND BINNED.** 19 Sep 2026, on Ashley's *"fix the variety and keep the cooking
+  steps"*. Plan: `docs/plans/meals-that-change-and-tell-you-how-to-cook.md`.
+  Proposal that led to it: `docs/proposals/meal-engagement-2026-09-19.md`.
+
+  **THE CORRECTION COMES FIRST, BECAUSE MY OWN FINDING FROM THE DAY BEFORE WAS
+  HALF WRONG AND MY RECOMMENDED FIX WOULD NOT HAVE WORKED.** I reported that
+  the day-to-day variety rule was "wired, tested, and fed an empty history by
+  the Nutrition tab", that turning it on was a one-line fix, and that the
+  shopping list meanwhile shopped for a varied week the tab never showed.
+  Measured over 500 profiles, threading the history in exactly as
+  `assembleHorizon` already does: **1.11 distinct days in a seven-day week,
+  89.4% of profiles eating the identical day every day, 96.4% of days after day
+  0 identical to day 0.** So the shopping list's week is the same day seven
+  times too — the two surfaces never disagreed, they were both stuck — and
+  passing the argument would have moved 1.00 to about 1.11.
+  **Why: the preference was a `0.01` penalty added to a macro-distance score,
+  against a median gap of `0.033` to the best fully-different day.** It could
+  only ever win an almost exact tie. Swept across carb/fat spread ±5%→±40% and
+  per-meal protein overshoot +10%→+40%; the best case any fixture produced was
+  1.66, so the result is not the fixture's opinion.
+  **The shape of the error, which is the reusable part: I read the call site,
+  saw `{}` where a variety argument belonged, and reported a defect without
+  asking whether the mechanism behind the argument could do the job. An
+  argument that is not passed and an argument that does nothing look identical
+  from the call site.** Caught one turn later only because I went to build it.
+
+  **WHAT CHANGED — VARIETY.** It stops being a tiebreak and becomes a sort key,
+  applied only among combinations already INSIDE the tolerance bands, which is
+  the app's own definition of a correct day. Order: in tolerance (hard), then
+  fewest slots repeating a name from the last three days, then macro fit as
+  scored today. Outside tolerance nothing changed at all — the single fit score
+  still decides, with variety back to the old `0.01`, so a day the app cannot
+  get right spends everything on getting it close rather than being chosen for
+  its novelty.
+  Measured after, same grid: **1.10–1.64 → 3.98–4.51 distinct days out of 7**,
+  and weeks that are one repeated day 47.5–90.3% → 0–8.5%.
+  **It also made the app hit its targets MORE often, not less** — chosen days
+  inside tolerance went 93.7%→96.0% and 86.2%→95.3% on the two loosest
+  fixtures, because fit-first could previously prefer a combination that scored
+  well overall while busting one band. The cost is that the day shown is no
+  longer the single closest fit: mean weighted macro distance rises by
+  0.013–0.033, 90th-percentile worsening 0.057, and every day chosen this way
+  is still inside every band. `npm run measure:meal-variety` re-runs all of it.
+
+  **ONE THING I TRIED AND BACKED OUT, recorded because the gate caught me.** I
+  also promoted "the day includes something you said you liked" to a key above
+  macro fit. That makes a stated like ABSOLUTE within tolerance, contradicting
+  that penalty's own recorded position — *"a soft preference is a tiebreak
+  between days that fit equally well, never a reason to ship a worse-fitting
+  day"* — and `test:soft-preferences` pins the boundary that says so. Variety
+  was the measured defect; a calibrated decision about somebody's food
+  preferences is not something to redefine in passing while fixing it. Backed
+  out, the like sits exactly where it always sat.
+
+  **WHERE "YESTERDAY" COMES FROM.** Nothing persists which meals were shown on
+  which day. Logged meals were the honest source and would have given no
+  variety to anyone who does not log, which is most people early on — so the
+  rotation is derived from the DATE: seven days walked from a clean history,
+  today is `epoch-day mod 7`. **Parity is by construction rather than by
+  inspection**: the Nutrition tab, the shopping list and the resize trial all
+  call one pure builder with the same inputs, so the list cannot shop for a
+  week the tab will not show. Date arithmetic is UTC on the parsed components —
+  measured, the naive local-midnight division REPEATS a day on 30 March and
+  SKIPS one on 26 October under Europe/London, and the gate asserts both.
+
+  **A CONSEQUENCE WORTH WATCHING, recorded rather than discovered later**: the
+  resize offer fires off `withinTolerance`, so choosing in-tolerance days more
+  reliably means it will fire LESS often. Correct — if the meals you have can
+  be combined to fit, the app should serve that rather than offer to re-portion
+  — but it is a change to when a user-visible offer appears.
+
+  **WHAT CHANGED — THE COOKING METHOD.** `generate-meals` has always asked for
+  and received a `prep` field; it was read to judge slot-appropriateness and to
+  tag a dish quick/standard, then discarded. Now stored (`prep` column,
+  migration `20260919120000_add_meal_prep_method`, `NOT NULL DEFAULT ''` so no
+  backfill) and rendered under the ingredients. A meal added by name through
+  the coach already forwarded the model's method and lights up for free.
+  **The interesting half is refusing a wrong one.** The app rescales every
+  proposal by up to 2.5x, so "fry the 200g of chicken" can describe an amount
+  the ingredient list no longer contains — the app printing a number it never
+  verified beside numbers it did. The prompt now asks for technique with no
+  amounts, and a method still naming a mass or volume is DROPPED WHOLE (not
+  sentence-by-sentence: a method missing a step is worse than none). Times and
+  oven temperatures are explicitly kept. **Re-applied at display time as well
+  as at verification**, the same reasoning as the dietary re-check already on
+  that screen: verification is the write boundary, the screen is where being
+  wrong costs something.
+
+  **A GATE THAT WAS ENFORCING THE DEFECT.** `test:custom-meal` and
+  `test:soft-preferences` both asserted the literal call text
+  `assembleDay(mealPools, macros, {}, ...)` — including the empty history that
+  turned out to be half the bug — so the fix reddened two checks at a change
+  that made the app strictly better. Re-anchored on the property (the pins are
+  an input to assembly and are not overlaid onto its result) with the reason
+  written beside them.
+
+  **VERIFIED.** `test:meal-variety` (42 checks) and `test:meal-method` (31),
+  both new; `verify:meal-method`, a real Chromium at 390x844 on the real
+  Nutrition screen, reading three stored inputs — a clean method, one naming
+  180g of chicken, and none — and confirming what reaches the card. Screenshot
+  read, not just a build that exited 0. **35 mutations, 35 caught** (16 variety,
+  19 method), every run executing the full baseline check count.
+  **FIVE MUTATIONS WERE MISSED ON THE FIRST ROUND and each was a real hole**: a
+  window check compared against the very constant being mutated (a check can
+  only ever agree with itself that way); the pinned-meal fixture pinned the
+  dinner the rotation was going to serve anyway, so it passed whether or not
+  the pin was honoured; nothing forced tolerance to outrank variety, so
+  deleting that key changed nothing measurable; a date check was satisfied by
+  the memo's DEPENDENCY ARRAY rather than the call's arguments, the
+  "a mention is not a use" shape again; and an ordering check compared two
+  `indexOf` results without asserting either was found, so renaming its anchor
+  made it -1 and the comparison passed for free.
+
+  **NEEDS, IN THIS ORDER**: the migration on Ashley's machine
+  (`npm run db:push-both`) BEFORE the frontend merges — the app writes the new
+  column, so merging first breaks every meal write. Then merge to `main` for
+  Vercel. Then `npm run deploy:functions:prod -- generate-meals` for the prompt
+  change; until that lands, new meals simply arrive with no method, which is
+  the honest empty state rather than a broken one.
+
 - [x] **MUSCLES GETTING NEAR-ZERO WORK — MEASURED, AND THREE OF THE FIVE
   HEADLINE GAPS WERE MY MEASUREMENT'S FAULT.** 18 Sep 2026, on Ashley's ask.
   Full table in `docs/audits/weekly-volume-2026-09-18.md` §3b.

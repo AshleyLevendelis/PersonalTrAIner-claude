@@ -29,7 +29,8 @@ import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
 import { GroceryScreen } from '@/components/GroceryScreen'
-import { generateMealPools, assembleDay, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
+import { generateMealPools, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
+import { buildRotation, assembleRotationDay, rotationIndexFor } from '@/lib/meal-rotation'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -278,7 +279,10 @@ function App() {
   // Declared above assembleDay rather than beside the other compilers further
   // down, because the assembled day is derived on this line and a const
   // declared later would be a use-before-define.
-  const compiledSoftFoodPreferences = compileSoftFoodPreferences(memoryFacts)
+  // MEMOISED, and not as a micro-optimisation: it is an input to the meal
+  // rotation's memo below, and a fresh array every render would rebuild the
+  // whole week's assembly on every keystroke anywhere in the app.
+  const compiledSoftFoodPreferences = useMemo(() => compileSoftFoodPreferences(memoryFacts), [memoryFacts])
 
   // THE TWO COMPILERS THAT WERE WRITTEN, DOCUMENTED, AND NEVER CALLED.
   //
@@ -320,12 +324,42 @@ function App() {
   // whatever the user pinned ("plan the rest of my meals" — Ashley, 1 Sep
   // 2026). A pick naming an option that no longer exists in the pool simply
   // doesn't pin, same as the old overlay's find-or-skip.
-  const pinnedMeals: Partial<Record<MealSlotName, PoolOption>> = {}
-  for (const [slot, name] of Object.entries(manualMealPicks) as [MealSlotName, string][]) {
-    const pick = mealPools[slot]?.find(o => o.name === name)
-    if (pick) pinnedMeals[slot] = pick
-  }
-  const assembledMeals = macros ? assembleDay(mealPools, macros, {}, compiledSoftFoodPreferences, pinnedMeals) : null
+  const pinnedMeals: Partial<Record<MealSlotName, PoolOption>> = useMemo(() => {
+    const out: Partial<Record<MealSlotName, PoolOption>> = {}
+    for (const [slot, name] of Object.entries(manualMealPicks) as [MealSlotName, string][]) {
+      const pick = mealPools[slot]?.find(o => o.name === name)
+      if (pick) out[slot] = pick
+    }
+    return out
+  }, [manualMealPicks, mealPools])
+
+  // THE DAY IS NOW A DAY OF THE WEEK, NOT THE ONE BEST DAY.
+  //
+  // assembleDay has always taken a "what did you eat recently" argument and
+  // this call has always passed it nothing, so the same single best-fitting
+  // combination won every day for ever. Measured before this change: 1.11
+  // distinct days in a seven-day week, and 89.4% of profiles eating the
+  // identical day all week (`npm run measure:meal-variety`).
+  //
+  // Fixing the argument alone would not have fixed the behaviour — the
+  // preference behind it was a 0.01 penalty against a gap three times that
+  // size, see rankCombo in meal-generation.ts. Both halves changed together.
+  //
+  // The rotation is derived from the DATE rather than from what was logged,
+  // so somebody who never logs a meal still gets a different dinner tomorrow,
+  // and the shopping list builds itself from the same seven days by calling
+  // the same pure builder with the same inputs.
+  const mealRotationDate = getSessionDateContext(profile?.id).date
+  const mealRotation = useMemo(
+    () => (macros ? buildRotation(mealPools, macros, compiledSoftFoodPreferences) : null),
+    [mealPools, macros, compiledSoftFoodPreferences],
+  )
+  const assembledMeals = useMemo(
+    () => (macros && mealRotation
+      ? assembleRotationDay(mealRotation, mealRotationDate, mealPools, macros, compiledSoftFoodPreferences, pinnedMeals)
+      : null),
+    [mealRotation, mealRotationDate, mealPools, macros, compiledSoftFoodPreferences, pinnedMeals],
+  )
   const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
   const mealTotals: MacroTargets = Object.values(chosenMeals).reduce(
     (acc, o) => ({
@@ -360,6 +394,11 @@ function App() {
         includeSnacks: profile?.include_snacks,
         pinned: pinnedMeals,
         softLikedFoods: compiledSoftFoodPreferences,
+        // THE SAME DAY THE SCREEN IS SHOWING. Without this the trial
+        // assembles the rotation's day 0 while the tab shows day 4, so the
+        // offer would quote before/after numbers for meals that are not on
+        // the screen — and could offer to resize a day that already fits.
+        recentNames: mealRotation?.historyFor(rotationIndexFor(mealRotationDate)),
       })
       : null
   // Keyed on the TARGETS, so a decline covers the numbers she saw and nothing

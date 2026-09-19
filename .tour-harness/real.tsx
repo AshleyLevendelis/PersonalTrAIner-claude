@@ -660,12 +660,24 @@ if (ABSURD) {
 
 // Real meals, shaped like generate-meals' output, so the `meals` stop has
 // something with real height under it rather than an empty-state card.
-const meal = (slot: string, name: string, kcal: number) => ({
+const meal = (slot: string, name: string, kcal: number, prep = '') => ({
   slot, name,
   ingredients: [{ name: 'chicken breast', quantity: 180, unit: 'g' }, { name: 'basmati rice', quantity: 120, unit: 'g' }],
   macros: { calories: kcal, protein: 45, carbs: 60, fat: 12 },
   tags: [],
+  prep,
 })
+
+// THE METHOD, AS THREE INPUTS AND NOTHING ELSE.
+//
+// The fixture chooses what is STORED against each meal and stops there: a
+// clean method, a method that names an amount, and no method at all. Whether
+// each one reaches the screen, and where, is the app's decision and the thing
+// verify:meal-method is measuring. Assembling the rendered output here — for
+// instance by pre-stripping the middle one — would be the harness testing
+// itself, which is how verify:prep-weight spent weeks proving nothing.
+const CLEAN_METHOD = 'Season the chicken and sear it skin-side down until golden, then finish it in the oven while the rice steams. Rest it before slicing.'
+const METHOD_WITH_AN_AMOUNT = 'Fry the 180g chicken breast until golden, then stir through the rice.'
 // ?ate=1 — ROADMAP ITEM 9. Two things a preference change must not do to a
 // meal already eaten. Breakfast contains almond butter and the profile below
 // turns on nut-free, so the re-check trips on a meal that is ALREADY LOGGED
@@ -681,8 +693,8 @@ const nuttyBreakfast = {
   tags: [],
 }
 const chosen = (REFIT ? refitChosen : {
-  breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480),
-  lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720),
+  breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
+  lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720, METHOD_WITH_AN_AMOUNT),
   dinner: meal('dinner', 'Salmon, new potatoes and green beans', 780),
 }) as never
 const pools = (REFIT
@@ -699,12 +711,13 @@ const pools = (REFIT
  * halves go through meal-store against this database. A screen whose meals
  * live only in a prop cannot be edited by the code that ships.
  */
-for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number } }>)) {
+for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
   db.meal_plan_slots.push({
     profile_id: PROFILE_ID, slot, pool_index: 0, name: option.name,
     ingredients: option.ingredients,
     macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
     tags: [],
+    prep: option.prep ?? '',
   })
 }
 
