@@ -927,6 +927,23 @@ export interface ExerciseSetLog {
   unit?: 'reps' | 'seconds' | 'meters'
   rpe?: number | null
   is_warmup?: boolean
+  /**
+   * 0 (or absent) = a set in its own right. 1, 2, ... = a DROP hanging off the
+   * set with the same `set_number` — the continuation you do straight after it
+   * with less weight and no rest.
+   *
+   * Ashley's ruling, 19 Sep 2026, from three options: a drop gets a proper
+   * marker, over being stored as an ordinary extra set. The rejected option is
+   * why the column is worth its migration — with drops numbered 4 and 5, every
+   * reader outside the exercise screen would have counted five sets where
+   * three were performed.
+   *
+   * WHAT IT COUNTS TOWARD: volume, yes. The set count, a personal best, and
+   * the weight next week anchors to, no — a drop is done in a deliberately
+   * fatigued state with no rest, so it is the easier half of one effort rather
+   * than a fresh attempt. See docs/plans/ramp-and-working-sets.md.
+   */
+  drop_index?: number
   completed_at?: string
   /**
    * Assistance used (kg), for an assistance-loaded exercise (today, only
