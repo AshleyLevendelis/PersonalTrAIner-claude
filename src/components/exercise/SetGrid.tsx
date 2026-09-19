@@ -602,7 +602,7 @@ export function SetGrid({
     // store's natural key, so deleting one with the other's kind tombstones
     // the wrong set — which is what every caller of this function did until
     // the parameter was made required.
-    deleteSet({ userId: profileId, date: today, exerciseId, setNumber: ref.setNumber, isWarmup: isWarm(ref) })
+    deleteSet({ userId: profileId, date: today, exerciseId, setNumber: ref.setNumber, isWarmup: isWarm(ref), dropIndex: ref.dropIndex ?? 0 })
     // deleteSet is the raw store function — refresh() is what makes the row
     // (and every other surface reading activeSession.logs) actually update.
     refresh()

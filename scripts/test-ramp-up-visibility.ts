@@ -213,8 +213,19 @@ async function main() {
     check('...the grid draws a labelled build-up row', /data-testid={warm \? 'warmup-row' : 'working-row'}/.test(gridSrc))
     check('...labelled by the shared function, with no third case', /\{setLabel\(ref\)\}/.test(gridSrc))
     check('...and a build-up row is SAVED as one', /isWarmup: warm,/.test(gridSrc))
-    check('...and DELETED as one — the natural key includes the kind, so the wrong kind tombstones the other row',
-      /deleteSet\(\{ userId: profileId, date: today, exerciseId, setNumber: ref\.setNumber, isWarmup: isWarm\(ref\) \}\)/.test(gridSrc))
+    // RE-ANCHORED 19 Sep 2026. This pinned the delete call's exact text and went
+    // red the moment the call gained a third coordinate — drop_index — which is
+    // the same key growing for the same reason. The PROPERTY is that every
+    // coordinate of the natural key is read off the ROW rather than defaulted:
+    // a literal there tombstones a different row than the one tapped.
+    const del = gridSrc.slice(gridSrc.indexOf('deleteSet({ userId: profileId'))
+    const delCall = del.slice(0, del.indexOf('})') + 2)
+    check('the delete call was located (sanity check on this check)', delCall.length > 60 && delCall.length < 400, delCall.length)
+    check('...and DELETED as one — the kind comes off the row, not a default',
+      /isWarmup: isWarm\(ref\)/.test(delCall), delCall)
+    check('...and so does which drop it is, for the same reason one column along',
+      /dropIndex: ref\.dropIndex/.test(delCall), delCall)
+    check('...with no literal standing in for either', !/isWarmup: (true|false)/.test(delCall) && !/dropIndex: \d/.test(delCall), delCall)
     // WHAT THIS FILE CANNOT PROVE, said out loud rather than left implied:
     // every check here reads SOURCE. Deleting the warm-up refs from the row
     // list leaves all of this green while the rows vanish from the screen —

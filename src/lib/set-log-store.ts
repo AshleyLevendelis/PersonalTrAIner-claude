@@ -47,6 +47,11 @@ export interface SaveSetInput {
   unit?: SetUnit
   isBodyweight?: boolean
   isWarmup?: boolean
+  /**
+   * 0 (or absent) = a set in its own right; 1, 2, ... = a drop hanging off the
+   * set with the same `setNumber`. See ExerciseSetLog.drop_index.
+   */
+  dropIndex?: number
   /** Weight added to bodyweight (dip belt, backpack) — see ExerciseSetLog.added_load_kg. Absent on every ordinary set. */
   addedLoadKg?: number | null
 }
@@ -66,6 +71,7 @@ interface PendingSet {
   unit: SetUnit
   isBodyweight: boolean
   isWarmup: boolean
+  dropIndex: number
   addedLoadKg: number | null
   completedAt: string
   attempts: number
@@ -78,6 +84,7 @@ interface PendingDelete {
   exerciseId: string
   setNumber: number
   isWarmup: boolean
+  dropIndex: number
   attempts: number
 }
 
@@ -172,14 +179,19 @@ function saveRegistry(reg: Record<string, SessionRegistryEntry>): void {
   localStorage.setItem(SESSION_REGISTRY_KEY, JSON.stringify(reg))
 }
 
-function naturalKey(userId: string, date: string, exerciseId: string, setNumber: number, isWarmup: boolean): string {
-  return [userId, date, exerciseId, setNumber, isWarmup ? 'w' : 's'].join('|')
+// THE DROP INDEX IS PART OF THE KEY, exactly as it is part of the database's
+// own unique constraint. A drop shares its parent's set number by design, so
+// without it here the second drop on set 3 would coalesce over the first in
+// the pending queue and the lifter would watch a row they just saved vanish —
+// the client-side twin of the collision the migration's comment describes.
+function naturalKey(userId: string, date: string, exerciseId: string, setNumber: number, isWarmup: boolean, dropIndex = 0): string {
+  return [userId, date, exerciseId, setNumber, isWarmup ? 'w' : 's', dropIndex].join('|')
 }
 
 function opNaturalKey(op: PendingOp): string {
   return op.kind === 'upsert'
-    ? naturalKey(op.set.userId, op.set.date, op.set.exerciseId, op.set.setNumber, op.set.isWarmup)
-    : naturalKey(op.del.userId, op.del.date, op.del.exerciseId, op.del.setNumber, op.del.isWarmup)
+    ? naturalKey(op.set.userId, op.set.date, op.set.exerciseId, op.set.setNumber, op.set.isWarmup, op.set.dropIndex)
+    : naturalKey(op.del.userId, op.del.date, op.del.exerciseId, op.del.setNumber, op.del.isWarmup, op.del.dropIndex)
 }
 
 function clientIdOf(op: PendingOp): string {
@@ -317,6 +329,7 @@ function toView(set: PendingSet): ExerciseSetLog {
     reps_completed: set.repsCompleted,
     is_bodyweight: set.isBodyweight,
     is_warmup: set.isWarmup,
+    drop_index: set.dropIndex,
     unit: set.unit,
     rpe: set.rpe,
     added_load_kg: set.addedLoadKg,
@@ -368,6 +381,7 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog | null {
     unit: input.unit ?? 'reps',
     isBodyweight: input.isBodyweight ?? false,
     isWarmup: input.isWarmup ?? false,
+    dropIndex: input.dropIndex ?? 0,
     addedLoadKg: input.addedLoadKg ?? null,
     // Dev-clock aware (C0 fix #8) — a real wall-clock timestamp under a
     // simulated date would satisfy getLastSessionSets's strictly-before-
@@ -393,7 +407,7 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog | null {
 
   // Coalesce: a re-save of the same logical set replaces its pending
   // predecessor (and cancels any pending delete for the key).
-  const key = naturalKey(set.userId, set.date, set.exerciseId, set.setNumber, set.isWarmup)
+  const key = naturalKey(set.userId, set.date, set.exerciseId, set.setNumber, set.isWarmup, set.dropIndex)
   const ops = loadPending().filter(op => opNaturalKey(op) !== key)
   ops.push({ kind: 'upsert', set })
   savePending(ops)
@@ -417,6 +431,12 @@ export function updateSet(input: SaveSetInput): ExerciseSetLog | null {
  * the natural key includes the kind, so deleting warm-up 2 would tombstone
  * WORKING set 2 instead. Requiring it turns four silent wrong answers into
  * four compile errors, which is the only version of this that stays fixed.
+ *
+ * `dropIndex` IS REQUIRED FOR THE SAME REASON, 19 Sep 2026. It is also in the
+ * natural key, so a default of 0 would mean deleting the first drop of set 3
+ * tombstones SET 3 — the identical failure, one column along. The argument
+ * above is the whole argument; leaving this one optional because "the drop UI
+ * will always pass it" is exactly what was true of isWarmup's four callers.
  */
 export function deleteSet(params: {
   userId: string
@@ -424,6 +444,7 @@ export function deleteSet(params: {
   exerciseId: string
   setNumber: number
   isWarmup: boolean
+  dropIndex: number
 }): void {
   const del: PendingDelete = {
     clientId: generateClientId(),
@@ -432,9 +453,10 @@ export function deleteSet(params: {
     exerciseId: params.exerciseId,
     setNumber: params.setNumber,
     isWarmup: params.isWarmup ?? false,
+    dropIndex: params.dropIndex,
     attempts: 0,
   }
-  const key = naturalKey(del.userId, del.date, del.exerciseId, del.setNumber, del.isWarmup)
+  const key = naturalKey(del.userId, del.date, del.exerciseId, del.setNumber, del.isWarmup, del.dropIndex)
   const ops = loadPending().filter(op => opNaturalKey(op) !== key)
   ops.push({ kind: 'delete', del })
   savePending(ops)
@@ -787,7 +809,12 @@ function serverRowToView(row: ServerSetRow, date: string): ExerciseSetLog {
 function mergePendingForDate(userId: string, date: string, base: ExerciseSetLog[]): ExerciseSetLog[] {
   const byKey = new Map<string, ExerciseSetLog>()
   for (const log of base) {
-    byKey.set(naturalKey(userId, date, log.exercise_id ?? log.exercise_name, log.set_number, log.is_warmup ?? false), log)
+    // THE DROP INDEX BELONGS HERE TOO. Without it a server-side drop row and
+    // its parent share a key and the merge keeps only one of them — a set the
+    // lifter logged, present in the database, missing from the screen. Caught
+    // by test:drop-sets §9, which exists because the same omission in
+    // naturalKey itself was a MISSED mutation.
+    byKey.set(naturalKey(userId, date, log.exercise_id ?? log.exercise_name, log.set_number, log.is_warmup ?? false, log.drop_index ?? 0), log)
   }
   for (const op of loadPending()) {
     if (op.kind === 'upsert') {

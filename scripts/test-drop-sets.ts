@@ -126,5 +126,25 @@ check('filterLoggableSets was located (sanity check on this check)', loggable.le
 check('...and it refuses drops itself rather than taking an option', /if \(isDropRow\(l\)\) return false/.test(loggable))
 check('...and takes no flag that would change what a count means', !/include|opts|options|withDrops/i.test(loggable.split('\n').filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*')).join('\n')))
 
+console.log('\n9. The CLIENT key grows with the database key')
+// FOUND BY A MISSED MUTATION, 19 Sep 2026: removing drop_index from
+// set-log-store's naturalKey was caught by nothing. The database constraint
+// would still have refused the collision, but the local pending queue coalesces
+// on this key BEFORE anything reaches the server — so the second drop on a set
+// would replace the first in the queue and the lifter would watch a row they
+// just saved disappear, with no error anywhere.
+const store = readFileSync(join(ROOT, 'src/lib/set-log-store.ts'), 'utf8')
+const keyFn = store.slice(store.indexOf('function naturalKey('), store.indexOf('function opNaturalKey('))
+check('the key function was located (sanity check on this check)', keyFn.length > 80 && keyFn.length < 1600, keyFn.length)
+check('...and the drop index is part of the key it returns', /\[[^\]]*dropIndex[^\]]*\]\.join/.test(keyFn), keyFn.match(/return \[[^\]]*\]/)?.[0])
+// AND EVERY CALLER PASSES IT. A key that can take the coordinate and callers
+// that omit it is the same bug with an extra step — which is exactly how
+// isWarmup's four callers defaulted to false for weeks.
+const calls = store.match(/naturalKey\([^)]*\)/g) ?? []
+check(`every naturalKey call was found (sanity check on this check) (${calls.length})`, calls.length >= 4, calls.length)
+check('...and not one of them omits the drop index',
+  calls.filter(c => !/function/.test(c)).every(c => /dropIndex|drop_index/.test(c)),
+  calls.filter(c => !/dropIndex|drop_index/.test(c)))
+
 if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
 console.log('\nA drop is a continuation, not a set.\n')

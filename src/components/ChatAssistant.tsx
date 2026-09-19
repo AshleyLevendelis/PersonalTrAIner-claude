@@ -4280,8 +4280,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         exerciseId: key.exerciseId,
         setNumber: key.setNumber,
         // Carried from the row being corrected, not assumed — the executor
-        // reads it off the log it is replacing.
+        // reads it off the log it is replacing. Same for the drop index: a
+        // correction to the first drop of set 3 must tombstone that drop and
+        // not set 3.
         isWarmup: key.isWarmup,
+        dropIndex: key.dropIndex,
       }),
     })
     onLogsUpdated?.()
@@ -5865,7 +5868,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // writer hard-codes is_warmup false (chat-gemini/index.ts). If it ever
         // gains a way to log a build-up, the token has to carry the kind and
         // this line has to read it — the type now forces that conversation.
-        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false })
+        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false, dropIndex: 0 })
       }
       for (const pre of replaced) activeSession.logSet(pre)
       // deleteSet is the raw store function (unlike logSet, which already
