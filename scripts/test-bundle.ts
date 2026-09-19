@@ -117,8 +117,20 @@ console.log('\n1. The libraries are cached separately from the app')
   //
   // Treat the stated headroom as a lead, not a fact: it decays silently, and
   // the app-chunk budget below is doing the same thing right now (918 of 920).
-  headroom('a deploy re-downloads', appGzip, 264, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 264, appGzip)
+  //
+  // 19 Sep 2026, THE FIFTH TIME, and the printed headroom line added on 17 Sep
+  // is what made it a two-minute question instead of a hunt. The meal-variety
+  // and cooking-method work measured 264 against a 264 ceiling. Baseline on a
+  // clean worktree of the commit before it: 263 — one kilobyte left, exactly
+  // the state the paragraph above describes and warns about. So that change
+  // was again the last straw rather than the cause; between 15 and 19 Sep the
+  // app quietly ate the 8 kB this number was raised to give it, and only the
+  // crossing said so.
+  // 272 is 8 kB over a value MEASURED TODAY (264), same as every move before
+  // it, and the margin is printed on every run so the next erosion is visible
+  // before it is a failure rather than after.
+  headroom('a deploy re-downloads', appGzip, 272, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 272, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -257,7 +269,19 @@ console.log('\n3. Nothing has crept back up')
   // this one. That is 411 kB gzipped against 483 before the coach was deferred,
   // and it has its own check. This budget is a proxy for it and a brake on
   // drift, not the user-facing measurement.
-  const APP_CHUNK_BUDGET_KB = 940
+  //
+  // 18 Sep 2026: 940 -> 960. MEASURED ON THIS BRANCH, both figures from a
+  // build run minutes apart: 940 kB without the "last time" marker, 941 kB
+  // with it. The marker itself is about a kilobyte; the ceiling had ZERO room
+  // and a one-kilobyte feature tipped it, which is the 15 and 17 Sep notes
+  // above happening for the fourth and fifth time.
+  //
+  // It is Ashley's 15 Sep ruling applied rather than a new decision — raise it
+  // with room to grow, over trimming on every commit — so the only new thing
+  // here is the measurement: 19 kB of real headroom above a measured 941,
+  // which the line printed by `headroom` above will now show eroding on every
+  // run rather than only when it is crossed.
+  const APP_CHUNK_BUDGET_KB = 960
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

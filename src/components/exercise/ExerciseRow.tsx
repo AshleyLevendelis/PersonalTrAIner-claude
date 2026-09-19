@@ -3,12 +3,11 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreVertical, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { getExerciseId } from '@/lib/exercise-db'
+import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary } from '@/lib/session-derive'
-import { RampStrip } from './RampStrip'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
-import { isUnverifiedLoadSource, splitLoadDisplay } from '@/lib/load-prescription'
+import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { AddedLoadChip } from './AddedLoadChip'
 import { CalibrationCue } from './CalibrationCue'
@@ -85,12 +84,21 @@ export function ExerciseRow({
   canMoveDown,
   profile,
 }: ExerciseRowProps) {
-  const { setsFor, requestedSetFocus, clearSetFocusRequest, rampTicksFor, toggleRampTick } = useActiveSession()
+  const { setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
   const allSetsLogged = completedSets >= ex.sets
   const ramp = formatRampSets(ex)
+  // DOES THIS MOVEMENT CARRY EXTERNAL LOAD AT ALL — the same predicate
+  // SetGrid already uses for its weight column, read from the catalogue rather
+  // than inferred from a null weight, because "no number yet" and "no number
+  // ever" are different things and only one of them is worth saying.
+  const catalogEntry = getExerciseEntry(ex.name)
+  const carriesExternalLoad = catalogEntry ? isExternallyLoaded(catalogEntry) : true
+  const hasLoadStatement = ex.suggested_load_kg != null || ex.suggested_assistance_kg != null || ex.suggested_added_load_kg != null
+  // "Bodyweight" or "Band" — the word this movement's own equipment earns.
+  const unloadedLabel = catalogEntry && !hasLoadStatement ? unloadedLoadLabel(catalogEntry) : null
   const [explainedLoadChip, setExplainedLoadChip] = useState(false)
   const [explainedPick, setExplainedPick] = useState(false)
 
@@ -172,26 +180,16 @@ export function ExerciseRow({
         <>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              {/* THE RAMP COMES FIRST, SO IT IS DRAWN FIRST. It used to sit
-                  below the working-set chips, which is the order you would
-                  read it in if it were something you did after them. It is
-                  the warm-up to set 1 — its last rung lands just under the
-                  start weight — and the screen's order now says so without
-                  a tooltip (Ashley, 10 Sep 2026).
-                  TICKABLE HERE, AND ONLY HERE. This is today's session, so a
-                  tick means "I have done that one"; the browse and peek
-                  surfaces render the same component with no handler and get
-                  plain text, because a tick there would be marking a set on a
-                  day that is not today. Nothing is written to the database —
-                  see RampStrip's header for why recording warm-ups would
-                  change no number the app shows back. */}
-              {completedSets === 0 && ramp && (
-                <RampStrip
-                  ramp={ramp}
-                  ticked={rampTicksFor(exerciseId)}
-                  onToggle={n => toggleRampTick(exerciseId, n)}
-                />
-              )}
+              {/* THE STRIP IS GONE FROM TODAY'S CARD, 17 Sep 2026, and the
+                  grid below has the build-up as real rows instead — Ashley's
+                  ruling from three options, reversing her 7 Sep "tick them
+                  off, don't record them". Ticking was not enough once she was
+                  standing there with a bar in front of her: the strip also
+                  DISAPPEARED the moment the first working set was logged
+                  (`completedSets === 0`), so a build-up half done left her
+                  looking at a grid with no rows and no instruction.
+                  RampStrip itself survives, read-only, on browse and peek —
+                  a tick there would mark a set on a day that is not today. */}
               {/* The unit comes from the plan's own formatted string, split
                   into parts so the number can stay large and the unit small.
                   Hard-coding "kg" here printed a per-hand number as though it
@@ -209,6 +207,24 @@ export function ExerciseRow({
                 <div className="flex items-end gap-2">
                   <span className="tabular-mono ds-num-lg leading-none">{ex.suggested_assistance_kg}</span>
                   <span className="text-xs text-text-tertiary pb-0.5">kg assist</span>
+                </div>
+              )}
+              {/* "BODYWEIGHT" IS A PRESCRIPTION, AND ABSENCE IS NOT.
+                  Ashley, 17 Sep 2026: she swapped a loaded leg curl for a
+                  slider curl mid-session, and where every other card on the
+                  page carried a weight this one carried nothing — so the right
+                  answer looked like a failed one, and she reported it as a bug.
+                  The standing rule is that the KIND travels with the value and
+                  the renderer has no default branch (the personalBest union,
+                  same week); a card that states sets and rest but withholds the
+                  load statement for one class of movement is that defect one
+                  step further on — the kind is "no external load" and the
+                  screen was rendering it as silence.
+                  ProgramBrowse already prints "· bodyweight" off exactly this
+                  data, so this is the today card catching up with its sibling. */}
+              {unloadedLabel && (
+                <div className="flex items-end gap-2" data-testid="bodyweight-load">
+                  <span className="ds-num-lg leading-none">{unloadedLabel}</span>
                 </div>
               )}
               {ex.suggested_load_kg != null && loadSourceLabel(loadSource, isCalibrationWeek) && (
@@ -285,15 +301,24 @@ export function ExerciseRow({
                   would cost taps in exactly the moment that matters. The line
                   the ruling draws is "changes to the plan go in the menu", not
                   "links go in the menu". */}
-              <div className="mt-1.5 flex items-center gap-3.5">
-                <button
-                  type="button"
-                  className="hit-slop-44 text-xs text-muted-foreground"
-                  onClick={() => onOpenPlateCalc(ex.suggested_load_kg ?? 0)}
-                >
-                  Plate calculator
-                </button>
-              </div>
+              {/* AND NO PLATE CALCULATOR FOR A MOVEMENT WITH NO PLATES.
+                  It sat on the slider-curl card beside a weight box showing 0,
+                  which is the row quietly promising a kind of work this
+                  exercise does not involve. It stays wherever a weight is
+                  genuinely in play — including a bodyweight movement she is
+                  adding load to, which is why this reads the load statement
+                  rather than the catalogue alone. */}
+              {(carriesExternalLoad || hasLoadStatement) && (
+                <div className="mt-1.5 flex items-center gap-3.5">
+                  <button
+                    type="button"
+                    className="hit-slop-44 text-xs text-muted-foreground"
+                    onClick={() => onOpenPlateCalc(ex.suggested_load_kg ?? 0)}
+                  >
+                    Plate calculator
+                  </button>
+                </div>
+              )}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -366,6 +391,12 @@ export function ExerciseRow({
             loadUnitLabel={(ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null)?.unit}
             perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
             loadIsEstimate={loadIsUnverified}
+            // Derived ONCE, above, and passed down: formatRampSets is the one
+            // place percentages become kilos, and it re-derives off the CURRENT
+            // working weight every render. A second copy inside the grid is
+            // where two numbers start to disagree.
+            rampSets={ramp && ramp.kind !== 'stale' ? ramp.sets.map(r => ({ setNumber: r.setNumber, kg: 'kg' in r ? r.kg : undefined, reps: r.reps })) : undefined}
+            rampKind={ramp?.kind}
             calibration={isCalibrationWeek}
             profile={profile}
             onOpenPlateCalc={onOpenPlateCalc}

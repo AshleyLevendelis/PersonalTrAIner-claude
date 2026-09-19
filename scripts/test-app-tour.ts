@@ -316,9 +316,13 @@ console.log('\nTHE SET STOP\'S PROMISE HAS TO BE KEEPABLE')
   check('the set stop still promises blank fields work', promisesBlank, setStep.copy)
 
   if (promisesBlank) {
+    // RE-ANCHORED 17 Sep 2026: the helper takes the ROW now, because a build-up
+    // row's reps come from its own prescribed step and not from the working
+    // range. The tour's promise is unchanged — a blank box logs the number the
+    // app asked for — so the check follows the promise, not the signature.
     check('...and reps has a prescribed fallback to make that true',
-      /const defaultRepsFor = \(\)/.test(grid) &&
-      /input\.reps \|\| \(ghost \? String\(ghost\.reps_completed\) : defaultRepsFor\(\)\)/.test(grid))
+      /const defaultRepsFor = \(\w+: SetRef\)/.test(grid) &&
+      /input\.reps \|\| \(ghost \? String\(ghost\.reps_completed\) : defaultRepsFor\((\w+)\)\)/.test(grid))
     check('...and the reps box no longer suggests the value the save refuses',
       !/placeholder=\{ghost \? String\(ghost\.reps_completed\) : '0'\}/.test(grid))
   }
@@ -341,7 +345,7 @@ console.log('\nTHE SET STOP\'S PROMISE HAS TO BE KEEPABLE')
   // so erring high hands someone heavier weights off a set the app invented.
   // The regex is read out of the source rather than restated, then run
   // against the shapes the generator actually emits.
-  const src = /const defaultRepsFor = \(\): string => \/(.+?)\/\.exec/.exec(grid)?.[1]
+  const src = /return \/(.+?)\/\.exec\(prescribedReps/.exec(grid)?.[1]
   check('the fallback parses a number out of the prescription', !!src, src)
   if (src) {
     const re = new RegExp(src)

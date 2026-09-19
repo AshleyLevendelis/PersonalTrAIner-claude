@@ -22,6 +22,7 @@
 import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
 import { assembleDay, type PoolOption } from './meal-generation'
+import { buildRotation, rotationIndexFor } from './meal-rotation'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
 
@@ -628,8 +629,23 @@ function assembleHorizon(
   days: number,
   softLikedFoods: string[],
   todaysPicks: Partial<Record<MealSlotName, PoolOption>>,
+  /**
+   * The app's own date for day 0, so this list walks the SAME rotation the
+   * Nutrition tab is showing rather than starting a private one at day 0.
+   *
+   * Before the rotation existed this function threaded `recentNames` forward
+   * from nothing and was documented as producing "realistic variety". It was
+   * not: measured over 500 profiles it produced 1.11 distinct days in seven,
+   * because the preference it leaned on was a 0.01 penalty against a gap
+   * three times that size. The tab and this list did not disagree — both were
+   * stuck on one repeated day. Now both call buildRotation with the same
+   * pools, targets and likes, so they cannot diverge.
+   */
+  startDate: string,
 ): { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
-  const recentNames: Partial<Record<MealSlotName, string[]>> = {}
+  const startIndex = rotationIndexFor(startDate)
+  const recentNames: Partial<Record<MealSlotName, string[]>> =
+    { ...buildRotation(pools, targets, softLikedFoods).historyFor(startIndex) }
   const out: { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] = []
   for (let day = 0; day < days; day++) {
     const { chosen } = assembleDay(pools, targets, recentNames, softLikedFoods)
@@ -684,6 +700,13 @@ export interface GenerateGroceryListInput {
    * shops for the meal they replaced.
    */
   todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
+  /**
+   * The app's date for day 0 (`YYYY-MM-DD`, from dev-clock so the browser
+   * harness can fix it). REQUIRED, not defaulted: a default would silently
+   * shop for a different week than the tab shows, which is the exact defect
+   * the rotation exists to close, and a missing value would fail silently.
+   */
+  startDate: string
 }
 
 export interface GenerateGroceryListResult {
@@ -706,7 +729,7 @@ export interface GenerateGroceryListResult {
  */
 export async function generateGroceryList(input: GenerateGroceryListInput): Promise<GenerateGroceryListResult> {
   const days = Math.max(1, Math.min(MAX_HORIZON_DAYS, input.days ?? DEFAULT_HORIZON_DAYS))
-  const horizon = assembleHorizon(input.mealPools, input.targets, days, input.softLikedFoods ?? [], input.todaysPicks ?? {})
+  const horizon = assembleHorizon(input.mealPools, input.targets, days, input.softLikedFoods ?? [], input.todaysPicks ?? {}, input.startDate)
 
   const aggregate = new Map<string, AggregatedIngredient>()
   for (const { day, chosen } of horizon) {

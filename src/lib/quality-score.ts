@@ -296,6 +296,36 @@ function scoreStructure(mesocycle: MesocycleWeek[], profile: UserProfile): Dimen
         const entry = dbEntry(day.exercises[i].name)
         if (!entry) continue
         const isCoreOrFinisher = entry.movement_pattern === 'core' || entry.movement_pattern === 'carry' || day.exercises[i].tier === 'tier_4_finisher'
+        // CORRECTIVE WORK FOR A FLAGGED JOINT, IN THE PREP BLOCK, IS NOT A
+        // SEQUENCING FAULT — it is what a coach does. The generator places it
+        // deliberately ("straight after the warm-up, before the working sets:
+        // rehab is prep", exercise-plan.ts), and low-intensity work for an
+        // injured area before that area is loaded is correct practice.
+        //
+        // MEASURED 18 Sep 2026: this rule fired on 725 of 9,216 plans and the
+        // named examples were all the rehab slot — Side Plank before Pull-Ups
+        // and Bird Dog before Chin-Ups, for a lower-back trainee, both
+        // `isIndicatedFor` that flagged joint. The plans were right and the
+        // measurement was wrong, and the asymmetry was visible one rule above:
+        // `primer_not_first` has carried this exact exemption all along and
+        // this rule never got it.
+        //
+        // ASHLEY'S RULING, 18 Sep 2026, from three options: exempt it in the
+        // PREP BLOCK ONLY. She rejected exempting it anywhere before the main
+        // lift, which would stop the app noticing corrective work that drifted
+        // into the middle of the heavy work — a real problem when it happens —
+        // and rejected leaving the score alone. So the exemption needs BOTH
+        // halves, exactly as the primer rule does: indicated for a flagged
+        // joint, AND nothing but warm-up or other corrective work before it.
+        //
+        // THIS CHANGES WHAT THE METRIC MEASURES. Structure rises and scores
+        // from this commit on are not comparable with earlier ones. Hers to
+        // decide for that reason, and she did.
+        const onlyPrepBefore = day.exercises.slice(0, i).every(e => {
+          const before = dbEntry(e.name)
+          return !!before && (before.mechanics_tier === 'primer' || isIndicatedFor(before, flaggedJoints))
+        })
+        if (isCoreOrFinisher && onlyPrepBefore && isIndicatedFor(entry, flaggedJoints)) continue
         if (isCoreOrFinisher) {
           violatedRules.add('core_before_main')
           deductions.push({

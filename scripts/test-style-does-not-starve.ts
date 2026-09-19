@@ -218,8 +218,24 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   // is what keeps it honest when a movement genuinely has few alternatives.
   const dialog = readFileSync(join(ROOT, 'src/components/exercise/SwapDialog.tsx'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  check('a short suggestion list says why it is short',
-    /replacements\.length < INITIAL_SHOWN && \(/.test(dialog) && /equipment, injuries, style and skill level/.test(dialog))
+  // RE-ANCHORED 18 Sep 2026, and the old version is the lesson. It pinned the
+  // literal sentence "equipment, injuries, style and skill level" — a
+  // MECHANISM, not the property. On Ashley's ruling that day the swap list
+  // stopped removing options for training style and began showing them marked,
+  // so that sentence had to stop naming style as a filter. The check then went
+  // red on the CORRECTED copy and would have enforced the lie, which is
+  // exactly what `test:chat-app-reality` did to the coach prompt over the
+  // grocery list on 13 Sep.
+  //
+  // The property is: a short list renders an explanation, and that explanation
+  // names the things that really do remove options — equipment, injuries and
+  // skill — and does not claim style is one of them.
+  check('a short suggestion list renders an explanation',
+    /replacements\.length < INITIAL_SHOWN && \(/.test(dialog) && /data-testid="swap-short-list-reason"/.test(dialog))
+  check('...naming the three constraints that actually remove options',
+    /equipment, injuries and skill level/.test(dialog))
+  check('...and not blaming training style, which no longer removes any',
+    !/equipment, injuries, style/.test(dialog))
 }
 
 console.log('\n3. A movement family is listed whole, or not at all')

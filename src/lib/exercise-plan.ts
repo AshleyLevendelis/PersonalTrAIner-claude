@@ -9,7 +9,7 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
-import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup } from './warmup'
+import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
@@ -288,7 +288,12 @@ interface StyleConfig {
   requiresPatterns?: MovementPattern[]
 }
 
-const STYLE_CONFIGS: Record<TrainingStyle, StyleConfig> = {
+/**
+ * Exported since 18 Sep 2026 for the same reason PHASE_CONFIGS was: a gate that
+ * must know the lowest rest a style may legitimately ask for has to read the
+ * style's own row, not a number measured once and left to go stale. Data only.
+ */
+export const STYLE_CONFIGS: Record<TrainingStyle, StyleConfig> = {
   bodybuilding: {
     setRange: { tier1: 4, tier2: 3, tier3: 3 },
     repRange: { tier1: '6-8', tier2: '8-12', tier3: '12-15' },
@@ -951,6 +956,66 @@ function isSupersetEligible(entry: ExerciseEntry): boolean {
   return entry.mechanics_tier === 'tier3_isolation'
 }
 
+/**
+ * Where the day's main lift sits, or -1 on a day that has none.
+ *
+ * Deliberately the FIRST tier1_compound and nothing cleverer. The promoted
+ * anchor (dayAnchorExercise) cannot be used here: it excludes superset
+ * members by design, so asking it which exercise is the anchor while
+ * DECIDING the supersets is circular. A day with no tier-1 has no main lift
+ * to protect at this stage — promotion happens later, and it already refuses
+ * to land on a paired movement.
+ *
+ * Same notion quality-score.ts's core_before_main rule reads
+ * (`ex.tier === 'tier_1_primary'`), so the guard below and the measurement
+ * that caught the defect are asking one question, not two.
+ */
+export function mainLiftIndexOf(entries: readonly (ExerciseEntry | null | undefined)[]): number {
+  return entries.findIndex(e => e?.mechanics_tier === 'tier1_compound')
+}
+
+/**
+ * A SUPERSET MAY NOT STRADDLE THE DAY'S MAIN LIFT.
+ *
+ * Pairing is only half of a superset; the other half is making the pair
+ * ADJACENT, which buildSupersetPairs does by pulling the A2 partner up to sit
+ * immediately behind its A1. When A1 sits before the main lift and A2 after
+ * it, that pull drags a working exercise in FRONT of the main lift.
+ *
+ * MEASURED 18 Sep 2026, and this is the whole of the residual
+ * `core_before_main` finding: 148 of 9,216 plans. Every one had the same
+ * shape — an injured trainee's corrective slot sits at position 2 by design
+ * ("rehab is prep, so it belongs where the joint is still fresh"), it is
+ * core-patterned, core's antagonist in the table is `carry`, and so a loaded
+ * Farmer's Walk was pulled up to position 3 and the barbell bench press
+ * pushed to position 4. Nothing was mis-tiered: the selector's own output was
+ * correctly sorted tier1 -> tier2 -> tier3 and this pass reordered it.
+ *
+ * THE CSCS CALL (18 Sep 2026, under Ashley's standing delegation): the day's
+ * main lift is the day's priority by definition — it is the movement with the
+ * highest neural and technical demand and the one the block's progression is
+ * written on, so it goes first, after prep. A loaded carry ahead of it spends
+ * grip, trunk and postural endurance on the exercise that needs them least.
+ * The carry still gets done; it gets done afterwards, which is where a
+ * grip-limited postural task belongs. The corrective drill goes back to being
+ * unhurried prep instead of half of a couplet.
+ *
+ * Refusing the pair is the only honest lever. Keeping the label without the
+ * reorder recreates the defect the adjacency pass exists to fix ("Farmer's
+ * Walk is tagged [A1] and Dead Bug [A2], but they're separated by four other
+ * exercises. Nobody can execute that superset as written"), and pushing A1
+ * down to meet A2 would move the corrective slot AFTER the main lift, which
+ * is the placement the generator deliberately avoids.
+ *
+ * Read by BOTH passes that pair — stageTimeCap's rest-halving and
+ * buildSupersetPairs' labelling — because they already share
+ * isSupersetEligible and a pair that is compressed by one and refused by the
+ * other prints a halved rest under no superset at all.
+ */
+export function pairCrossesMainLift(mainIdx: number, i: number, j: number): boolean {
+  return mainIdx >= 0 && i < mainIdx && j >= mainIdx
+}
+
 function estimateSessionDuration(exercises: { entry: ExerciseEntry; sets: number; reps: string; restSeconds: number }[]): number {
   return estimateSlotsSeconds(exercises)
 }
@@ -960,7 +1025,7 @@ interface SupersetLabel {
   label: string
 }
 
-function buildSupersetPairs(
+export function buildSupersetPairs(
   exercises: Exercise[],
   pool: ExerciseEntry[],
   duration: SessionDuration,
@@ -974,6 +1039,11 @@ function buildSupersetPairs(
   const paired = new Set<number>()
   let labelCounter = 0
 
+  // Read once, off the order this pass was handed: the reorder below only
+  // ever moves an A2 EARLIER, so no pairing can change where the main lift
+  // sits relative to an exercise that started in front of it.
+  const mainIdx = mainLiftIndexOf(result.map(ex => pool.find(e => e.name === ex.name)))
+
   for (let i = 0; i < result.length; i++) {
     if (paired.has(i)) continue
     const entryA = pool.find(e => e.name === result[i].name)
@@ -984,6 +1054,7 @@ function buildSupersetPairs(
 
     for (let j = i + 1; j < result.length; j++) {
       if (paired.has(j)) continue
+      if (pairCrossesMainLift(mainIdx, i, j)) continue
       const entryB = pool.find(e => e.name === result[j].name)
       if (!entryB || !isSupersetEligible(entryB)) continue
 
@@ -1074,6 +1145,94 @@ function mainLiftRestFloor(
     : MAIN_LIFT_REST_FLOOR_SECONDS
 }
 
+/**
+ * THE SHORTEST REST THAT LEAVES THE EXERCISE THE EXERCISE IT IS.
+ *
+ * Ashley, from the gym floor 17 Sep 2026: *"The rest breaks between the lat
+ * pulldown seem very short 30s, check that is correct."* Measured the next
+ * day across 1,728 profiles: 49.2% of every exercise in a week rested 30
+ * seconds or less, and 29.1% of SECOND-TIER COMPOUNDS — the lat pulldown's
+ * class, prescribed 75s by the hybrid style's own table — sat at or under 30.
+ * Nothing was miscalculating. The session did not fit, and the generator paid
+ * for the overrun by taking rest off everything but the main lift, down to a
+ * flat 30 written in two independent places that therefore STACKED.
+ *
+ * Her ruling, 18 Sep 2026, from four options: PROTECT THE REST, DO LESS.
+ * Every exercise keeps a rest that suits it and the session sheds an
+ * accessory or a set instead. She rejected today's behaviour (keep the work,
+ * shrink the gaps), a flat one-minute middle floor, and being told to train
+ * longer. Her reason, in her own option: 30 seconds on a lat pulldown is not
+ * a short rest, it is a different exercise, and the reps printed beside it
+ * stop being reachable.
+ *
+ * THE `Math.min` IS THE HALF THAT MATTERS, and it is why this is a floor
+ * rather than a table. A floor must never RAISE a rest: combat style
+ * deliberately prescribes 60s/45s for its second-tier and isolation work, a
+ * primer is 20s on purpose, and some slots are prescribed 0. Taking the tier
+ * number as an absolute would quietly rewrite those styles' own density in
+ * the name of protecting them. What this stops is the TRIMMER going below
+ * what the style asked for.
+ *
+ * One function, two callers — stageTimeCap at generation time and
+ * trimWeekRestForBudget per block. They held separate copies of the 30, which
+ * is the shape this file has already recorded going wrong twice ("a
+ * constraint asserted at three paths, missed at the fourth").
+ */
+export const REST_FLOOR_BY_TIER: Record<ExerciseTier, number> = {
+  tier_0_primer: 20,
+  tier_1_primary: MAIN_LIFT_REST_FLOOR_SECONDS,
+  tier_2_secondary: 60,
+  tier_3_isolation: 45,
+  // Never reached: every caller exempts cardio before asking, because cutting
+  // an interval's rest changes what the exercise IS. Present so the record is
+  // total and a new caller cannot get `undefined` and fall through to zero.
+  tier_4_finisher: 0,
+}
+
+export function restFloorFor(
+  tier: ExerciseTier,
+  /**
+   * What the PLAN would prescribe for this exercise with no time pressure at
+   * all — the style's own number for this tier, plus the phase's deliberate
+   * shift. NOT the value currently on the exercise.
+   *
+   * MEASURED, and the reason this parameter is what it is: passing the
+   * current value made the floor useless one step later. A hybrid isolation
+   * slot is prescribed 60s; the trimmer took it to the 45s floor; the
+   * anatomical-adaptation phase then applied its own deliberate -15s and
+   * landed on 30 — the very number Ashley reported. Two floors, each correct
+   * on its own, spending the same 15 seconds twice. Against the UNBUDGETED
+   * baseline the same case floors at min(60-15, 45) = 45 and stays there,
+   * while a metabolic block that genuinely prescribes 40s keeps its 40.
+   */
+  unbudgetedSeconds: number,
+  /** The main lift's own floor, already resolved from the goal policy. Only consulted for a main lift or a promoted anchor. */
+  mainFloorSeconds = 0,
+): number {
+  if (tier === 'tier_1_primary' || mainFloorSeconds > 0) return Math.max(mainFloorSeconds, REST_FLOOR_BY_TIER.tier_1_primary)
+  return Math.min(unbudgetedSeconds, REST_FLOOR_BY_TIER[tier] ?? 0)
+}
+
+/**
+ * The style's own rest for this exercise's tier, before any time pressure —
+ * the one number `restFloorFor` needs and no caller should re-derive. Cardio
+ * and anything with no catalogue entry return null: their rest is set by the
+ * interval or the bout, not by the tier table, and every caller exempts them.
+ */
+export function unbudgetedRestSeconds(
+  entry: ExerciseEntry | undefined,
+  style: TrainingStyle,
+  phaseShiftSeconds = 0,
+): number | null {
+  if (!entry || entry.mechanics_tier === 'cardio') return null
+  const table = STYLE_CONFIGS[style].restSeconds
+  const base = entry.mechanics_tier === 'tier1_compound' ? table.tier1
+    : entry.mechanics_tier === 'tier2_compound' ? table.tier2
+    : entry.mechanics_tier === 'tier3_isolation' ? table.tier3
+    : REST_FLOOR_BY_TIER.tier_0_primer
+  return Math.max(0, base + phaseShiftSeconds)
+}
+
 function stageTimeCap(
   dayExercises: { entry: ExerciseEntry; sets: number; reps: string; rest: string; restSeconds: number }[],
   budgetSeconds: number,
@@ -1098,6 +1257,7 @@ function stageTimeCap(
   // keep full rest even under time pressure; only isolation/core/carry work
   // gets compressed here.
   const paired = new Set<number>()
+  const mainIdxForPairing = mainLiftIndexOf(dayExercises.map(e => e.entry))
   for (let i = 0; i < dayExercises.length; i++) {
     if (paired.has(i)) continue
     if (!isSupersetEligible(dayExercises[i].entry)) continue
@@ -1105,6 +1265,11 @@ function stageTimeCap(
     if (!opposing) continue
     for (let j = i + 1; j < dayExercises.length; j++) {
       if (paired.has(j)) continue
+      // The same refusal buildSupersetPairs makes, off the same helper —
+      // this pass halves the rest and that one prints the label, and a pair
+      // only one of them believes in shows a compressed rest under no
+      // superset at all.
+      if (pairCrossesMainLift(mainIdxForPairing, i, j)) continue
       if (!isSupersetEligible(dayExercises[j].entry)) continue
       if (dayExercises[j].entry.movement_pattern === opposing) {
         dayExercises[j] = { ...dayExercises[j], restSeconds: Math.round(dayExercises[j].restSeconds * 0.5), rest: `${Math.round(dayExercises[j].restSeconds * 0.5)}s` }
@@ -1154,10 +1319,17 @@ function stageTimeCap(
   })()
   for (let i = 0; i < dayExercises.length; i++) {
     if (dayExercises[i].entry.mechanics_tier === 'cardio') continue
-    // Math.max, not an early `continue`: for everything that is not a main
-    // lift the floor stays 30 and the expression is byte-identical to what
-    // shipped before, so this change cannot move an accessory's rest.
-    const floor = Math.max(30, mainLiftRestFloor(dayExercises[i].entry, policy, i === promotedIdx))
+    // ONE FLOOR FUNCTION, NOT A 30 WRITTEN HERE AND AGAIN IN
+    // trimWeekRestForBudget. The old expression floored every non-main lift
+    // at a flat 30s, which is what put a 75s-prescribed lat pulldown on a
+    // 30-second gap. restFloorFor asks what the exercise needs and never
+    // raises a rest the style deliberately set lower — see its header for
+    // Ashley's ruling of 18 Sep 2026 and the measurement behind it.
+    const floor = restFloorFor(
+      mapTier(dayExercises[i].entry.mechanics_tier),
+      unbudgetedRestSeconds(dayExercises[i].entry, style) ?? dayExercises[i].restSeconds,
+      mainLiftRestFloor(dayExercises[i].entry, policy, i === promotedIdx),
+    )
     const newRest = Math.max(floor, dayExercises[i].restSeconds - 15)
     dayExercises[i] = { ...dayExercises[i], restSeconds: newRest, rest: `${newRest}s` }
   }
@@ -1190,10 +1362,19 @@ function stageTimeCap(
   // silently undo the "never silently drop the slot" promise one stage
   // later; those exercises can still lose sets in Phase 5, just not
   // disappear outright.
-  while (estimated > budgetSeconds && dayExercises.length > 3) {
+  while (estimated > budgetSeconds && trainingSlotCount(dayExercises.map(e => e.entry)) > 3) {
+    // Re-derived each pass: the array shrinks below, so "last carrier of this
+    // pattern" is a question about the CURRENT day, not the one we started on.
+    const entriesNow = dayExercises.map(e => e.entry)
     let removeIdx = dayExercises.length - 1
-    while (removeIdx >= 0 && (dayExercises[removeIdx].entry.mechanics_tier === 'cardio' || protectedNames.has(dayExercises[removeIdx].entry.name))) removeIdx--
-    if (removeIdx < 0 || dayExercises.length <= 3) break
+    while (
+      removeIdx >= 0 && (
+        dayExercises[removeIdx].entry.mechanics_tier === 'cardio' ||
+        protectedNames.has(dayExercises[removeIdx].entry.name) ||
+        isStructuralSlot(entriesNow, removeIdx)
+      )
+    ) removeIdx--
+    if (removeIdx < 0 || trainingSlotCount(entriesNow) <= 3) break
     const removed = dayExercises.splice(removeIdx, 1)[0]
     trace.time_cap_adjusted.push({
       exercise: removed.entry.name,
@@ -2111,7 +2292,7 @@ function selectExercisesForTrack(
       findForSlot(slot.patterns, slot.tier, false) ??
       findForSlot(slot.patterns, null, true) ??
       findForSlot(slot.patterns, null, false)
-    if (pick) {
+    if (pick && !wouldBeSecondMainLift(pick)) {
       selected.push(pick)
       usedGroups.add(getMovementFamily(pick))
       if (slot.required) requiredNames.add(pick.name)
@@ -2120,7 +2301,7 @@ function selectExercisesForTrack(
     if (!slot.required) return
     const nearest = slot.patterns.flatMap(p => NEAREST_PATTERN_FALLBACK[p] ?? [])
     const substitute = nearest.length > 0 ? (findForSlot(nearest, null, true) ?? findForSlot(nearest, null, false)) : null
-    if (substitute) {
+    if (substitute && !wouldBeSecondMainLift(substitute)) {
       selected.push(substitute)
       usedGroups.add(getMovementFamily(substitute))
       requiredNames.add(substitute.name)
@@ -2138,10 +2319,18 @@ function selectExercisesForTrack(
   }
   for (const slot of track.slots) fillSlot(slot)
 
+  // A function DECLARATION, not a const arrow: fillSlot runs before the point
+  // where a const would be initialised, and the temporal dead zone turns that
+  // into a crash rather than a missed guard. Hoisting is the whole reason.
+  function wouldBeSecondMainLift(e: ExerciseEntry): boolean {
+    return isSecondMainLift(selected, e)
+  }
+
   function pickFromTier(tier: string, count: number, patterns: MovementPattern[]) {
     const candidates = orderCandidates(
       trackPool.filter(e =>
         e.mechanics_tier === tier &&
+        !wouldBeSecondMainLift(e) &&
         patterns.includes(e.movement_pattern) &&
         !weeklyUsed.has(e.name) &&
         !selected.some(s => s.name === e.name) &&
@@ -2160,6 +2349,10 @@ function selectExercisesForTrack(
       // otherwise slip through — which is how Chest Dips and Tricep Dips
       // (both family 'dip') ended up in the same session.
       if (usedGroups.has(getMovementFamily(c.e))) continue
+      // And the main-lift re-check, for exactly the reason above: `candidates`
+      // is evaluated once, so the day's FIRST tier-1 — claimed by this very
+      // loop a moment ago — is invisible to the filter that built the list.
+      if (wouldBeSecondMainLift(c.e)) continue
       selected.push(c.e)
       usedGroups.add(getMovementFamily(c.e))
       // Runner-up is the next entry in this same ranked list — the real
@@ -2291,6 +2484,7 @@ function selectExercisesForTrack(
         trackPool.filter(e =>
           e.mechanics_tier !== 'primer' &&
           e.mechanics_tier !== 'cardio' &&
+          !wouldBeSecondMainLift(e) &&
           !selected.some(s => s.name === e.name) &&
           (!respectFamilies || !usedGroups.has(getMovementFamily(e))) &&
           (!respectWeeklyCap || !weeklyAppearanceCount || (weeklyAppearanceCount.get(e.name) ?? 0) < WEEKLY_APPEARANCE_CAP)
@@ -2327,6 +2521,7 @@ function selectExercisesForTrack(
     if (!selected.some(e => e.movement_pattern === reqPattern)) {
       const fill = trackPool.find(e =>
         e.movement_pattern === reqPattern &&
+        !wouldBeSecondMainLift(e) &&
         !selected.some(s => s.name === e.name) &&
         !usedGroups.has(getMovementFamily(e))
       )
@@ -2345,6 +2540,7 @@ function selectExercisesForTrack(
         // PASS 1: Strict search (respect all constraints)
         const fill = pool.find(e =>
           e.movement_pattern === reqPattern &&
+          !wouldBeSecondMainLift(e) &&
           !selected.some(s => s.name === e.name) &&
           !forbidden.has(e.movement_pattern) &&
           !usedGroups.has(getMovementFamily(e))
@@ -2357,6 +2553,7 @@ function selectExercisesForTrack(
           // PASS 2: Relaxed search (allow reusing substitution groups)
           const relaxedFill = pool.find(e =>
             e.movement_pattern === reqPattern &&
+            !wouldBeSecondMainLift(e) &&
             !selected.some(s => s.name === e.name) &&
             !forbidden.has(e.movement_pattern)
           )
@@ -3300,10 +3497,11 @@ function rebuildExerciseForSwap(
     intensity,
     prescription_type: newEntry.prescription_type,
     load_guidance: isPrimer ? oldExercise.load_guidance : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
-    suggested_load: isPrimer ? 'Light' : load.display,
-    suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-    load_source: isPrimer ? undefined : load.load_source,
-    per_set_load: isPrimer ? null : load.per_set,
+    // THE FOURTH SITE, and it was found by the gate rather than by reading.
+    // The rotation path rebuilds a slot the same way the two generation sites
+    // do, and a rule applied at three of four places is the shape that put a
+    // silent primer in front of Ashley in the first place.
+    ...resolveLoadFields(newEntry, isPrimer, load),
     // Old exercise's assistance fields (spread above) must not leak through
     // a swap into a non-assistance exercise — explicit undefined here always
     // wins over the spread, mirroring how suggested_load_kg already
@@ -3453,10 +3651,12 @@ function balanceWeeklyStructure(
       intensity,
       prescription_type: entry.prescription_type,
       load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
-      suggested_load: isPrimer ? 'Light' : load.display,
-      suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-      load_source: isPrimer ? undefined : load.load_source,
-      per_set_load: isPrimer ? null : load.per_set,
+      // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling,
+      // 18 Sep 2026, and "kept light" is half the working weight since the
+      // day after. `resolveLoadFields` carries the whole reason, and carries
+      // it ONCE — the guidance and the intensity above stay the same on both
+      // branches, which is the other half of that ruling.
+      ...resolveLoadFields(entry, isPrimer, load),
       suggested_assistance_kg: assistance?.assistance_kg,
       assistance_ready_to_graduate: assistance?.ready_to_graduate,
     })
@@ -4162,6 +4362,7 @@ export function settleWeekBalance(week: MesocycleWeek, profile: UserProfile): Ba
     getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
     undefined,
     policy.minLoadedMainLiftRestSeconds,
+    profile.training_style || 'hybrid',
   )
 
   const changes: BalanceSettlement['changes'] = []
@@ -4527,7 +4728,27 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
  * actually be given. Periodization needs this so a rotated variation cannot
  * escape the equipment, injury and skill constraints.
  */
-export function getConstrainedPool(profile: UserProfile, exclusions: string[] = []): ExerciseEntry[] {
+export function getConstrainedPool(
+  profile: UserProfile,
+  exclusions: string[] = [],
+  /**
+   * `skipStyle` runs every stage BUT the style one. Generation never passes
+   * it; the swap shortlist does, on Ashley's ruling of 18 Sep 2026 (show
+   * off-style options, below the ones that match, with a line saying so).
+   *
+   * Style is the only one of the four stages that can be relaxed, and the
+   * reason is already written at `stageStyleFilter`: *"style is a preference,
+   * not a safety constraint — unlike equipment (you physically don't have the
+   * kit) or injury (it will hurt you)"*. Skill stays because a novice offered
+   * an advanced movement is the same kind of harm as the injury one.
+   *
+   * It is an OPTION on this function rather than a second pipeline next to it
+   * so the two can never drift — the mistake `getExerciseCompatibilityWarnings`
+   * records, where a hand-rolled equipment test quietly disagreed with the
+   * real filter for weeks.
+   */
+  opts: { skipStyle?: boolean } = {},
+): ExerciseEntry[] {
   const throwaway: ConstraintTrace = {
     equipment_filtered: [], injury_filtered: [], style_filtered: [], skill_filtered: [],
     time_cap_adjusted: [], exclusion_filtered: [], structure_adjusted: [],
@@ -4538,7 +4759,9 @@ export function getConstrainedPool(profile: UserProfile, exclusions: string[] = 
   )
   pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
-  pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+  if (!opts.skipStyle) {
+    pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+  }
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
   return pool
 }
@@ -4795,10 +5018,12 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
         load_guidance: isPrimer
           ? 'Stay light and controlled. This is preparation, not a working set.'
           : (assistance ? assistanceGuidance(assistance) : `${experience.load_guidance} ${load.basis}`),
-        suggested_load: isPrimer ? 'Light' : load.display,
-        suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-        load_source: isPrimer ? undefined : load.load_source,
-        per_set_load: isPrimer ? null : load.per_set,
+        // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling,
+        // 18 Sep 2026, and "kept light" is half the working weight since the
+        // day after. `resolveLoadFields` carries the whole reason, and carries
+        // it ONCE — the guidance and the intensity above stay the same on both
+        // branches, which is the other half of that ruling.
+        ...resolveLoadFields(slot.entry, isPrimer, load),
         suggested_assistance_kg: assistance?.assistance_kg,
         assistance_ready_to_graduate: assistance?.ready_to_graduate,
         selection_note: selectionNotes.get(slot.entry.name),
@@ -5110,6 +5335,146 @@ export function mapMovementPattern(pattern: MovementPattern): MesocycleMovementP
     cardio: 'isolation',
   }
   return mapping[pattern] || 'isolation'
+}
+
+/**
+ * The four fundamental movement patterns. A week that loses one of these
+ * entirely is not a lighter week — it is a different programme, and a
+ * needs-analysis that covered push, pull, hinge and squat no longer does.
+ *
+ * So a time-cap trimmer may shed an accessory, but never the DAY'S LAST
+ * carrier of one of these. Per-day is enough to protect the WEEK without any
+ * cross-day plumbing: a pattern the week holds is held on some day, and on
+ * that day it is the last carrier once its siblings are gone.
+ *
+ * Isolation, core, carry and cardio are deliberately absent. Accessory volume
+ * is the adjustable part — which is the position stageTimeCap's own Phase 5
+ * already states in prose ("a short session should mean fewer sets, not a
+ * session missing whole movement patterns"). Phase 4, one loop above it,
+ * simply never honoured it, and `sizeBlockToRestBudget`'s Phase B inherited
+ * the same gap by being written to match it.
+ */
+const FUNDAMENTAL_PATTERNS: ReadonlySet<MesocycleMovementPattern> = new Set([
+  'push', 'pull', 'hinge', 'squat',
+])
+
+/**
+ * True when removing `index` would take the last push / pull / hinge / squat
+ * exercise out of this day. Takes the resolved entries rather than names so
+ * both trimmers — one holding `ExerciseEntry` directly, one resolving from a
+ * name — ask the same question of the same data.
+ */
+/**
+ * WHAT A TIME-CAP TRIMMER MAY NOT SHED AT ALL.
+ *
+ * Two things, and the second was learned by measuring the first.
+ *
+ * MEASURED 18 Sep 2026, over the full 9,216-profile grid, with the pattern
+ * guard switched off and on:
+ *     guard off -> 22 weeks with no squat pattern, 16 with a prep-less day
+ *     guard on  ->  0 weeks with no squat pattern, 102 with a prep-less day
+ * Protecting the patterns did not create room; it aimed the trimmer at
+ * whatever was left, and what was left was the movement-prep slot at the front
+ * of the day. Eighty-six warm-ups spent to save twenty-two squats is a worse
+ * trade than the one it replaced, and it is the kind a gate that only counts
+ * what a change BOUGHT would never show.
+ *
+ * So movement prep is protected on the same footing, for the same reason: it
+ * is not adjustable volume. A short session means fewer SETS — which is
+ * exactly what Ashley's "protect the rest, do less" ruling says one level up,
+ * and what Phase 5 already does once Phase 4 runs out of things it may remove.
+ * A day that still will not fit at every set floor is a day that does not fit,
+ * and the app says so rather than quietly deleting the warm-up.
+ */
+/**
+ * HOW MANY TRAINING EXERCISES A DAY IS LEFT HOLDING — prep does not count.
+ *
+ * Found 18 Sep 2026 by the CSCS review's question 4 ("does this quietly
+ * redefine an existing floor?"), against a change committed an hour earlier.
+ * Both trimmers stop at `length > 3`, and once the movement-prep slot became
+ * unremovable that three started COUNTING it: a constructed day at an 8-minute
+ * budget bottomed out as [Wall Slides, Bench, Squat] — three slots, two
+ * exercises. Before the prep protection the same floor left three real ones.
+ *
+ * Nothing failed. The number three had not changed; what it meant had. That is
+ * the shape the question exists to catch, and it is invisible to every gate
+ * that asserts the floor is three.
+ *
+ * A warm-up is preparation FOR the session, not content OF it, so the floor
+ * counts what is left to train. The day keeps its prep either way.
+ */
+export function trainingSlotCount(entries: readonly (ExerciseEntry | null | undefined)[]): number {
+  return entries.filter(e => e && e.mechanics_tier !== 'primer').length
+}
+
+export function isStructuralSlot(
+  entries: readonly (ExerciseEntry | null | undefined)[],
+  index: number,
+): boolean {
+  const self = entries[index]
+  if (!self) return false
+  if (self.mechanics_tier === 'primer') return true
+  return isLastCarrierOfPattern(entries, index)
+}
+
+export function isLastCarrierOfPattern(
+  entries: readonly (ExerciseEntry | null | undefined)[],
+  index: number,
+): boolean {
+  const self = entries[index]
+  if (!self) return false
+  const pattern = mapMovementPattern(self.movement_pattern)
+  if (!FUNDAMENTAL_PATTERNS.has(pattern)) return false
+  return !entries.some(
+    (other, i) => i !== index && other && mapMovementPattern(other.movement_pattern) === pattern,
+  )
+}
+
+/**
+ * ONE MAIN LIFT PER DAY — the question every path that fills a day must ask.
+ *
+ * `getExerciseCountForDuration` returns `tier1: 1` for all four session
+ * lengths, so exactly one flagship lift per day is the design and not a
+ * coincidence; the goal-alignment scorer counts main-compound SLOTS, so a day
+ * holding two reads as a different kind of day than it is.
+ *
+ * MEASURED 18 Sep 2026 (docs/audits/weekly-volume-2026-09-18.md), 9,216
+ * profiles x 16 weeks: 49,988 of 589,824 days carried a second tier-1, across
+ * 2,477 profiles (26.9%). The commonest shape was `Pull-Ups + Chin-Ups` on one
+ * day, both at five or six sets — the same movement twice, as two separate main
+ * lifts. On a full-gym functional beginner it was `Deadlifts + Barbell Squats`,
+ * every week of the block.
+ *
+ * THE CONSTRAINT WAS ASSERTED AT TWO PATHS AND MISSED AT FOUR, which reads
+ * backwards from how the code looks. `ensurePatternPresent` excludes
+ * tier1_compound outright with a comment giving the exact reason ("silently
+ * doubled a day's main-compound count"), and both weekly-coverage fills exclude
+ * it too — while `refill` and the two required-pattern fills, which are what
+ * actually run on a normal day, did not. Same family as the rest-floor bug: a
+ * rule stated at several sites and forgotten at one more.
+ *
+ * NOT "never add a main lift here". A day whose tier-1 slot came up empty — no
+ * barbell, or an injury ruling every press out — SHOULD be given one by a
+ * fallback; that is the fallback doing its job. What may never happen is a
+ * SECOND.
+ *
+ * THE CSCS READ, recorded rather than asserted (mine under Ashley's 18 Sep
+ * delegation): two maximal-demand compounds in one session means the second is
+ * performed already fatigued, so it takes the same prescribed load at a worse
+ * stimulus and degrades everything after it. One flagship lift at high intent
+ * and then accessory work is the reason a session has a shape at all. Squat and
+ * deadlift together for a beginner is the version a coach would refuse outright;
+ * pull-ups beside chin-ups is not two exercises, it is one exercise twice.
+ *
+ * Pure and exported so the gate can hand it states directly — a predicate only
+ * reachable through a 400-line selector is one nothing can pin.
+ */
+export function isSecondMainLift(
+  selected: readonly ExerciseEntry[],
+  candidate: ExerciseEntry,
+): boolean {
+  if (candidate.mechanics_tier !== 'tier1_compound') return false
+  return selected.some(e => e.mechanics_tier === 'tier1_compound')
 }
 
 export function mapTier(mechanicsTier: string): ExerciseTier {
@@ -5437,6 +5802,13 @@ function trimWeekRestForBudget(
    * straight back to 60. Undefined keeps the historical 60s.
    */
   loadedMainLiftFloorSeconds?: number,
+  /**
+   * The trainee's style, so the accessory floor can be read off the SAME
+   * table that prescribed the rest in the first place. Required in practice —
+   * defaulted only so a caller that genuinely has no profile (none today)
+   * degrades to the most common style rather than to a hardcoded number.
+   */
+  style: TrainingStyle = 'hybrid',
 ): void {
   for (const day of days) {
     if (day.exercises.length === 0) continue
@@ -5491,7 +5863,19 @@ function trimWeekRestForBudget(
         const mainFloor = isRealMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
           ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loadedMainLiftFloorSeconds)
           : MAIN_LIFT_REST_FLOOR_SECONDS
-        const floor = isMain ? mainFloor : 30
+        // The same floor the generation-time pass uses. These two held
+        // separate copies of a flat 30 and therefore STACKED their cuts —
+        // 75 -> 60 -> 45 -> 30 down the passes. `ex.tier` is already the
+        // normalized vocabulary restFloorFor takes.
+        // Against the UNBUDGETED prescription, never against the value the
+        // earlier pass already cut — see restFloorFor's second parameter for
+        // the measurement that forced that distinction.
+        const floor = isMain
+          ? mainFloor
+          : restFloorFor(
+              ex.tier ?? 'tier_3_isolation',
+              unbudgetedRestSeconds(findEntry(ex.name), style) ?? restSeconds,
+            )
         if (restSeconds <= floor) continue
         const newRest = Math.max(floor, restSeconds - 15)
         day.exercises[i] = { ...ex, rest: `${newRest}s` }
@@ -5627,11 +6011,21 @@ export function sizeBlockToRestBudget(
     // of the array is lowest-tier; required-slot and cardio exercises
     // never removed; floor of 3 exercises remaining, matching
     // stageTimeCap's own floor).
-    for (let guard = 0; guard < 10 && estimate(exercises) > totalBudgetSeconds && exercises.length > 3; guard++) {
+    for (
+      let guard = 0;
+      guard < 10 && estimate(exercises) > totalBudgetSeconds
+        && trainingSlotCount(exercises.map(e => findEntry(e.name))) > 3;
+      guard++
+    ) {
+      const entriesNow = exercises.map(ex => findEntry(ex.name))
       let removeIdx = exercises.length - 1
       while (removeIdx >= 0) {
-        const entry = findEntry(exercises[removeIdx].name)
-        if (entry && entry.mechanics_tier !== 'cardio' && !protectedNames.has(exercises[removeIdx].name)) break
+        const entry = entriesNow[removeIdx]
+        if (
+          entry && entry.mechanics_tier !== 'cardio' &&
+          !protectedNames.has(exercises[removeIdx].name) &&
+          !isStructuralSlot(entriesNow, removeIdx)
+        ) break
         removeIdx--
       }
       if (removeIdx < 0) break
@@ -5733,7 +6127,7 @@ export function shortenDayTo(
   // but the exercises it did not touch are the caller's own objects — the
   // trap settle-week.ts's header records paying for on 13 Sep.
   const shortened: WorkoutDay = { ...sized, exercises: sized.exercises.map(e => ({ ...e })) }
-  trimWeekRestForBudget([shortened], budgetSeconds, undefined, policy.minLoadedMainLiftRestSeconds)
+  trimWeekRestForBudget([shortened], budgetSeconds, undefined, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
 
   const keptBefore = new Map(day.exercises.map(ex => [ex.name, ex.sets]))
   const droppedExercises = day.exercises.filter(ex => !shortened.exercises.some(e => e.name === ex.name)).map(ex => ex.name)
@@ -6451,7 +6845,7 @@ export function generateMesocycle(
           // more room in sets either — the rep target absorbs the rest of
           // the reduction instead (see repShift below).
           const floorDeloadSets = Math.max(2, Math.round(goalAdjustedBaseSets * 0.25))
-          const deloadNeedsRepCut = deloadAtFloor && floorDeloadSets === standardDeloadSets
+
           // Main >= accessory >= isolation, every loading week. Deload is
           // exempt — its whole point is going below these ranges — but every
           // non-deload set count is clamped to its role's floor/ceiling
@@ -6470,18 +6864,57 @@ export function generateMesocycle(
           // budget: the estimate used at selection time correctly assumed
           // 1 set, but the per-week sets computation was unconditionally
           // overriding it to 4 for every exercise, cardio included.
+          // What a LOADING week of this block gives this slot. Hoisted out of
+          // the expression below because the deload needs to compare against
+          // it: "did cutting sets actually buy anything this week?" cannot be
+          // answered by looking at the deload formula alone.
+          // + the once-per-block duration top-up (see computeDurationTopUp) —
+          // a fixed per-slot amount, so this holds sets flat across weeks 1-3
+          // despite being duration-driven.
+          const loadingWeekSets = clampToVolumeRole(
+            Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx],
+            volumeRole,
+            (profile.session_duration_preference || '45-60') === '90+',
+          )
+          const deloadSets = deloadAtFloor ? floorDeloadSets : standardDeloadSets
+
+          /**
+           * THE LOAD LEVER IS NOT AVAILABLE TO EVERY EXERCISE, and the deload
+           * used to assume it was.
+           *
+           * A deload's default move is to drop the weight ~30% and let the reps
+           * ease UP (+2) — "lighter bar, comfortable reps". That is right for a
+           * loaded lift and meaningless for a press-up: there is no weight to
+           * take off, so the +2 is the only thing that changes and the
+           * "recovery week" comes back HARDER than the week before it.
+           *
+           * MEASURED 18 Sep 2026, 9,216 profiles x 16 weeks: 252 of 36,864
+           * blocks ran a deload lighter in NOTHING — not sets, not load, not
+           * reps. They cluster almost perfectly: bodyweight equipment, low
+           * recovery. No load to shed; low recovery already scales base sets
+           * down so `Math.max(2, ...)` binds on the loading weeks too and sets
+           * have nowhere to go; and the rep cut that exists for exactly this
+           * situation was gated on `deloadAtFloor`, which needs an equipment
+           * floor and so can never be true for a bodyweight movement.
+           *
+           * The branch was written for a loaded lift at the bar's floor and
+           * never generalised to the other case with the same problem. Same
+           * recorded shape as the rest-floor and one-main-lift bugs: a rule
+           * that holds at the site it was written for and nowhere else.
+           */
+          const deloadLoadLeverDead = isDeload && dbEntry
+            ? deloadAtFloor || !isExternallyLoaded(dbEntry)
+            : false
+          // And reps only take the reduction OUTRIGHT when sets gave nothing.
+          // Compared against the loading week rather than against the other
+          // deload formula, which is what the old proxy did.
+          const deloadNeedsRepCut = deloadLoadLeverDead && deloadSets >= loadingWeekSets
+
           const sets = dbEntry?.prescription_type === 'steady_state'
             ? 1
             : isDeload
-              ? (deloadAtFloor ? floorDeloadSets : standardDeloadSets)
-              // + the once-per-block duration top-up (see computeDurationTopUp)
-              // — a fixed per-slot amount, so this still holds sets flat
-              // across weeks 1-3 despite being duration-driven.
-              : clampToVolumeRole(
-                  Math.max(2, Math.round(goalAdjustedBaseSets * phaseConfig.sets_multiplier)) + blockExtraSets[dayIdx][exIdx],
-                  volumeRole,
-                  (profile.session_duration_preference || '45-60') === '90+',
-                )
+              ? deloadSets
+              : loadingWeekSets
 
           // No externally loaded weight to ramp (true bodyweight movement, or
           // one prescribeLoad can't categorize) — progress these via reps
@@ -6599,12 +7032,12 @@ export function generateMesocycle(
           // beginner's block is renamed alongside so the heading stays true.
           // docs/plans/consolidation-and-the-capped-bar.md.
           const phaseRepShift = isDeload
-            ? (deloadAtFloor
-                // Weight held flat (can't drop further) — reps carry the
-                // recovery reduction instead of the usual +2 "back off"
-                // bump, which would INCREASE volume here, the opposite of
-                // the point. If sets also had no room to cut, reps drop
-                // outright rather than just holding flat.
+            ? (deloadLoadLeverDead
+                // No weight to take off — at the bar's floor, or an exercise
+                // that never carried one. Reps carry the recovery reduction
+                // instead of the usual +2 "back off" bump, which would
+                // INCREASE the work here, the opposite of the point. If sets
+                // also gave nothing, reps drop outright rather than hold flat.
                 ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
                 : phaseConfig.rep_shift + 2)
             : phaseConfig.rep_shift
@@ -6677,6 +7110,33 @@ export function generateMesocycle(
             // follow — new information may raise a prescription, never cut it.
             if (floor > 0 && current > 0 && current < floor) {
               restForWeek = `${floor}s`
+            }
+          }
+
+          // AND THE SAME ONE-WAY RULE FOR EVERYTHING THAT IS NOT THE MAIN
+          // LIFT — Ashley's ruling, 18 Sep 2026. This was the path that
+          // actually produced the 30-second lat pulldown she reported, and it
+          // produced it out of two correct decisions: the budget trimmer took
+          // a 60s isolation slot down to its 45s floor, and THEN the
+          // anatomical-adaptation phase applied its own deliberate -15s. Two
+          // floors, each right on its own, spending the same fifteen seconds
+          // twice.
+          //
+          // The floor here is read off the phase-shifted UNBUDGETED
+          // prescription, so a phase that genuinely wants short rest keeps it
+          // — a metabolic block's -20s still lands a hybrid isolation slot on
+          // 40s — while budget pressure can no longer compound with it.
+          // Cardio, intervals and steady-state are excluded by
+          // unbudgetedRestSeconds returning null: their rest is the bout, not
+          // the tier.
+          {
+            const unbudgeted = unbudgetedRestSeconds(dbEntry, profile.training_style || 'hybrid', restShift)
+            if (unbudgeted != null && dbEntry && dbEntry.mechanics_tier !== 'tier1_compound' && ex !== promotedAnchor) {
+              const floor = restFloorFor(mapTier(dbEntry.mechanics_tier), unbudgeted)
+              const current = parseRestSeconds(restForWeek)
+              if (floor > 0 && current > 0 && current < floor) {
+                restForWeek = `${floor}s`
+              }
             }
           }
 
@@ -7397,7 +7857,7 @@ export function generateMesocycle(
         // after this (rest already at floor) has nothing under-budget for
         // the filler to fill either, so the two never fight over the same
         // day.
-        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds)
+        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
         applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
         // Runs last, after rotation, periodization and duration-budget
         // trimming have all had their say — see enforceWeeklyPatternBalance's
@@ -7430,6 +7890,7 @@ export function generateMesocycle(
           getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),
           trimLog,
           policy.minLoadedMainLiftRestSeconds,
+          profile.training_style || 'hybrid',
         )
       }
 
@@ -7457,6 +7918,31 @@ export function generateMesocycle(
       // progression and the rest trimmer. Reconciling at each of them is the
       // three-copies-of-one-rule failure this file keeps finding; reconciling
       // here holds for writers that do not exist yet.
+      // THE LAST HONEST COST CHECK, and the one this week has never had.
+      //
+      // Every pass above sizes a day against BASE reps. The per-week rep ramp
+      // then grows the work inside it — 13-15 becomes 14-16 becomes 16-18 by
+      // week 11 — so a day sized to fit in week 1 costs two minutes more in
+      // week 11 and nothing ever asked again. That overrun used to be
+      // invisible because the rest trimmers were quietly absorbing it; with
+      // rest floored to what the exercise needs (Ashley's ruling, 18 Sep
+      // 2026) it surfaced as 17 sessions running past the 45 minutes their
+      // trainee said they had. The slack was never a fix, only a cover.
+      //
+      // So: cost THIS week's day exactly as the screen will draw it, and if
+      // it runs past the top of the range they chose, shed work — the same
+      // priority order every other budget pass uses. Against the MAXIMUM, not
+      // the midpoint, so it only bites a day that is genuinely over and never
+      // undoes the duration filler's deliberate top-up.
+      {
+        const sessionMaxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
+        const flagged = getFlaggedJoints(profile.injuries ?? [])
+        for (let i = 0; i < days.length; i++) {
+          if (days[i].exercises.length === 0) continue
+          days[i] = enforceDayDurationBudget(days[i], sessionMaxSeconds, flagged)
+        }
+      }
+
       reconcilePerSetLoads(days)
       weeks.push({
         week_number: weekCounter,

@@ -407,13 +407,23 @@ export function updateSet(input: SaveSetInput): ExerciseSetLog | null {
   return saveSet(input)
 }
 
-/** Tombstones a set locally (hidden from reads immediately), then deletes server-side in the background. */
+/**
+ * Tombstones a set locally (hidden from reads immediately), then deletes
+ * server-side in the background.
+ *
+ * `isWarmup` IS REQUIRED, and that is the fix rather than a tidy-up. It was
+ * optional, defaulting to false, and all four callers omitted it — harmless
+ * while no warm-up row could exist, and a data-loss bug the moment one could:
+ * the natural key includes the kind, so deleting warm-up 2 would tombstone
+ * WORKING set 2 instead. Requiring it turns four silent wrong answers into
+ * four compile errors, which is the only version of this that stays fixed.
+ */
 export function deleteSet(params: {
   userId: string
   date: string
   exerciseId: string
   setNumber: number
-  isWarmup?: boolean
+  isWarmup: boolean
 }): void {
   const del: PendingDelete = {
     clientId: generateClientId(),

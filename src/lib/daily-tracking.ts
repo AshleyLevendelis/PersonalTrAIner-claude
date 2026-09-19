@@ -363,8 +363,37 @@ export interface WeeklyDashboardDay {
   nutrition: DailyNutritionTarget | null
   session: WorkoutSession | null
   exercises: WorkoutExerciseRow[]
-  workoutLogs: ExerciseSetLog[]
+  /**
+   * WORKING sets only. RENAMED FROM `workoutLogs`, 17 Sep 2026, and the rename
+   * IS the fix: once a build-up can be a real row, "the workout logs for this
+   * day" is a question with two answers, and the week strip was reading the
+   * ambiguous one. Tick three warm-up boxes on a deadlift and walk out and the
+   * week said you part-trained. A rename forces every reader to say which it
+   * meant instead of inheriting the old answer.
+   */
+  workingLogs: ExerciseSetLog[]
+  /** The build-up rows, kept rather than dropped — they are real history and the diary shows them. They just do not count as having trained. */
+  warmupLogs: ExerciseSetLog[]
   cardioLogs: CardioLog[]
+}
+
+/**
+ * ONE DAY'S ROWS, SPLIT BY WHAT THEY ARE. Exported and pure so a gate can
+ * reach it: the split used to be an inline filter pair, and a mutation that
+ * collapsed it — putting every row back into `workingLogs` — passed every
+ * check, because the week-strip gate builds its own fixtures and never
+ * exercised the partition itself. The behaviour was guarded and the thing
+ * PRODUCING it was not.
+ */
+export function partitionLogsByKind(
+  logs: (ExerciseSetLog & { date?: string })[],
+  dateStr: string,
+): { workingLogs: ExerciseSetLog[]; warmupLogs: ExerciseSetLog[] } {
+  const onDay = logs.filter(l => l.date === dateStr)
+  return {
+    workingLogs: onDay.filter(l => !l.is_warmup),
+    warmupLogs: onDay.filter(l => !!l.is_warmup),
+  }
 }
 
 export async function getWeeklyDashboard(
@@ -437,7 +466,7 @@ export async function getWeeklyDashboard(
       ? allExercises.filter(e => e.workout_session_id === sess.id)
       : []
 
-    days.push({ date: dateStr, metric, nutrition: nut, session: sess, exercises: exs, workoutLogs: allLogs.filter(l => l.date === dateStr), cardioLogs: allCardio.filter(c => c.date === dateStr) })
+    days.push({ date: dateStr, metric, nutrition: nut, session: sess, exercises: exs, ...partitionLogsByKind(allLogs, dateStr), cardioLogs: allCardio.filter(c => c.date === dateStr) })
     current.setDate(current.getDate() + 1)
   }
 

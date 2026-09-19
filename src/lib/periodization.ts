@@ -80,7 +80,15 @@ export interface PhaseConfig {
   coach_note_loadless: string
 }
 
-const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
+/**
+ * Exported since 18 Sep 2026 so `test:rest-floors` can DERIVE the lowest rest a
+ * phase may legitimately ask for, instead of pinning a number measured once.
+ * That gate shipped asserting a flat 45s floor for second-tier compounds; a
+ * combat conditioning block's -20s phase takes them to 40s by design, and the
+ * gate was red at the commit that introduced it. Data only — nothing about the
+ * export changes how a plan is built.
+ */
+export const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
   anatomical_adaptation: {
     phase: 'anatomical_adaptation',
     label: 'Anatomical Adaptation',

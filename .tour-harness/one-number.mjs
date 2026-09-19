@@ -80,7 +80,7 @@ if (!target) {
 }
 console.log(`  ${target.name}: the plan says ${target.planKg}kg, the log says ${target.liftedKg}kg was lifted`)
 
-// Expand the row, the same way ramp-ticks does.
+// Expand the row, the same way ramp-readonly does.
 const NAME = JSON.stringify(target.name)
 await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${NAME});
  if(!n) return false; let p=n; for(let i=0;i<6&&p.parentElement;i++){p=p.parentElement; if(p.tagName==='BUTTON'||p.getAttribute('role')==='button'){p.click();return true}} return false})()`)
@@ -170,6 +170,142 @@ check('7. across the headline, the chips, the note and the boxes there is ONE we
   distinct.length === 1 && distinct[0] === lifted, { distinct, lifted })
 
 // ---------------------------------------------------------------------------
+// 8. WHOSE NUMBERS ARE THOSE — read off the same screen, one day later.
+//
+// Ashley, 18 Sep 2026, on her dumbbell rows: "Last sets prescribed were sets
+// of 11 reps. Is thay correct at the end of a exercise?" Nothing prescribed
+// 11. The faint figures in the boxes were her own last session, drawn in the
+// identical grey the app uses for a suggestion on a row with no history.
+//
+// Her ruling, from three options: mark them "last time" — the numbers stay in
+// the boxes where her thumb is, and a small marker says when they are history.
+//
+// WHY A BROWSER. test:last-time proves the sentence and proves the guard is in
+// the source. It cannot prove the marker lands on the RIGHT ROW: the marker
+// and the row are siblings in one flat grid, so a caption, a warning line or
+// an extra set can put it under the wrong one, and every source check still
+// passes. Reading the DOM in document order is the only way to see it.
+// ---------------------------------------------------------------------------
+const MARKERS = `(() => {
+  const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent.trim() === ${NAME})
+  if (!leaf) return { found: false }
+  let card = leaf
+  for (let i = 0; i < 12 && card.parentElement; i++) {
+    card = card.parentElement
+    if (card.querySelector('input') && /kg/i.test(card.innerText)) break
+  }
+  const anyRow = card.querySelector('[data-testid="working-row"]')
+  if (!anyRow) return { found: true, grid: false }
+  const kids = [...anyRow.parentElement.children]
+  const isRow = el => { const t = el.getAttribute('data-testid'); return t === 'warmup-row' || t === 'working-row' }
+  const rows = []
+  for (let i = 0; i < kids.length; i++) {
+    if (!isRow(kids[i])) continue
+    // Everything between this row and the next one belongs to this row.
+    let marker = null
+    for (let j = i + 1; j < kids.length && !isRow(kids[j]); j++) {
+      const m = kids[j].matches('[data-testid="last-time"]') ? kids[j] : kids[j].querySelector('[data-testid="last-time"]')
+      if (m) { marker = (m.textContent || '').trim(); break }
+    }
+    const boxes = [...kids[i].querySelectorAll('input')].map(inp => (inp.value || inp.placeholder || '').trim())
+    rows.push({ kind: kids[i].getAttribute('data-testid'), marker, boxes })
+  }
+  return { found: true, grid: true, rows }
+})()`
+
+const marked = await ev(MARKERS)
+check('8a. the set grid is readable row by row', marked.found === true && marked.grid === true && marked.rows.length > 0, marked)
+
+if (marked.grid) {
+  const working = marked.rows.filter(r => r.kind === 'working-row')
+  const warmups = marked.rows.filter(r => r.kind === 'warmup-row')
+
+  // THE FIXTURE MUST BE UNDER PRESSURE. ?logged=1 seeds a real prior session
+  // on this lift, so every working row here IS history-driven. A run where
+  // none of them carried a marker would otherwise read as a quiet pass.
+  check('8b. every working row on a lift with a logged session says "last time"',
+    working.length > 0 && working.every(r => r.marker && r.marker.startsWith('last time')),
+    working)
+
+  // The whole harm, inverted: a marker that names figures the boxes do not
+  // show is a second prescription, which is what she was reading in the first
+  // place. Every number in the marker must be in that row's own boxes.
+  const mismatched = working.filter(r => {
+    if (!r.marker) return true
+    const nums = (r.marker.match(/[0-9]+(?:[.][0-9]+)?/g) || [])
+    return !nums.every(n => r.boxes.some(b => parseFloat(b) === parseFloat(n)))
+  })
+  check('8c. ...and every figure it names is a figure in that row’s own boxes',
+    working.length > 0 && mismatched.length === 0, mismatched)
+
+  // A build-up number comes from the prescription and nowhere else, so a
+  // marker there would be a plain lie. This lift ramps, so there are rows to
+  // check; when there are none that is reported rather than folded into a pass.
+  //
+  // MEASURED, not assumed: this fixture's logged lift is a tier-2 under 60kg,
+  // and `needsRampUp` skips those — so the card arrives with no build-up rows
+  // at all and this check had nothing to read. Rather than move the fixture,
+  // the driver makes one the way she would, with "+ Add warm-up" on this very
+  // card. That is the stronger read anyway: a row created at runtime is
+  // exactly the row no source check can see.
+  let warmRows = warmups
+  if (warmRows.length === 0) {
+    const added = await ev(`(() => {
+      const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent.trim() === ${NAME})
+      if (!leaf) return 'no leaf'
+      let card = leaf
+      for (let i = 0; i < 12 && card.parentElement; i++) {
+        card = card.parentElement
+        if (card.querySelector('input') && /kg/i.test(card.innerText)) break
+      }
+      const btn = card.querySelector('[data-testid="add-warmup-set"]')
+      if (!btn) return 'no button'
+      btn.click()
+      return 'clicked'
+    })()`)
+    await wait(1200)
+    const after = await ev(MARKERS)
+    warmRows = (after.rows ?? []).filter(r => r.kind === 'warmup-row')
+    check('8d. "+ Add warm-up" really adds a build-up row to this card',
+      added === 'clicked' && warmRows.length > 0, { added, rows: (after.rows ?? []).map(r => r.kind) })
+  }
+  check('8e. no build-up row claims to be showing last time',
+    warmRows.length > 0 && warmRows.every(r => r.marker === null), warmRows)
+
+  // AND IT IS NOT SIMPLY ALWAYS ON. Every other exercise on this day has no
+  // history behind it, so its boxes hold the app's own suggestion and must
+  // say nothing. Without this the marker could be unconditional and 8b-8c
+  // would still be green.
+  const elsewhere = await ev(`(() => {
+    const grids = [...document.querySelectorAll('[data-testid="working-row"]')].map(r => r.parentElement)
+    const seen = new Set()
+    const out = []
+    for (const g of grids) {
+      if (seen.has(g)) continue
+      seen.add(g)
+      const rows = [...g.children].filter(c => c.getAttribute('data-testid') === 'working-row')
+      const boxes = rows.flatMap(r => [...r.querySelectorAll('input')].map(i => (i.value || i.placeholder || '').trim()))
+      out.push({ markers: g.querySelectorAll('[data-testid="last-time"]').length, rows: rows.length, boxes: boxes.slice(0, 4) })
+    }
+    return out
+  })()`)
+  const unmarked = elsewhere.filter(g => g.markers === 0)
+  check('8f. a set grid with no session behind it shows no marker at all',
+    elsewhere.length > 1 && unmarked.length > 0, elsewhere)
+
+  // Framed on the grid itself, not the card heading: the thing to look at is
+  // a marker sitting under its own row, small enough to ignore and legible
+  // enough to answer "whose numbers are these?" without tapping anything.
+  await ev(`(() => {
+    const row = document.querySelector('[data-testid="last-time"]')
+    if (row) row.scrollIntoView({ block: 'center' })
+  })()`)
+  await wait(600)
+  const shot8 = await send('Page.captureScreenshot', { format: 'png' })
+  writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/one-number-lasttime.png', Buffer.from(shot8.result.data, 'base64'))
+}
+
+// ---------------------------------------------------------------------------
 // 9. THE COUNT, not just the numbers — every row on one day's screen.
 //
 // Ashley's second report from the same training session: a card reading "3
@@ -223,12 +359,41 @@ const rows = await ev(`(() => {
   return out
 })()`)
 
+// THE SUBJECT OF THIS SECTION CHANGED, and re-anchoring it was the fix.
+//
+// It used to demand that every row render one weight chip per set. Ashley's
+// ruling of 18 Sep 2026 — *"a ladder that does not climb should not look like
+// one"* — means a row whose sets all carry the SAME weight now renders no
+// chips at all, because the big number above them has already said it. That
+// is most rows: measured 19 Sep over a 96-plan spread, only 1,352 of 17,293
+// per-set ladders actually climb. So the old demand was asking the screen to
+// break her rule, and it went red on correct code.
+//
+// WHICH HALF THIS PROVES. The screen can see chips and set counts, not the
+// underlying loads, so what it holds is the invariant: a row shows either
+// nothing or one chip per set, never a partial ladder. The other half — that
+// a CLIMBING ladder shows and a flat one does not — is decided by
+// perSetChipsWorthShowing and is called directly by test:calibration-search,
+// because no session this harness generates happens to contain a climbing row.
 const withChips = rows.filter(r => r.chips > 0)
-check(`9a. the ${MONDAY} session shows rows that state a set count AND render chips`,
-  rows.length > 1 && withChips.length > 0, { opened, rows: rows.length, withChips: withChips.length, sample: rows.slice(0, 3) })
-check('9b. every row shows exactly as many weight chips as the sets it claims',
-  withChips.length > 0 && withChips.every(r => r.chips === r.sets),
-  withChips.filter(r => r.chips !== r.sets))
+const flatRows = rows.filter(r => r.chips === 0)
+check(`9a. the ${MONDAY} session shows rows that state a set count`,
+  rows.length > 1, { opened, rows: rows.length, sample: rows.slice(0, 3) })
+check('9b. no row shows a partial ladder — each shows either nothing or one chip per set',
+  rows.every(r => r.chips === 0 || r.chips === r.sets),
+  rows.filter(r => r.chips !== 0 && r.chips !== r.sets))
+// SCOPED TO ROWS THAT CARRY A WEIGHT, and the scoping is the whole check.
+// "Some row shows no chips" is satisfied by a band or bodyweight exercise,
+// which has no ladder to hide and proves nothing — measured: with the rule
+// deliberately broken so every flat ladder rendered chips, an unscoped
+// version still passed off a Pallof Press. A LOADED row showing no chips is
+// the ruling actually happening.
+const loadedRows = rows.filter(r => /\d+(\.\d+)?\s*kg/.test(r.name))
+check('9c. the screen has rows that carry a weight at all, so 9d has a subject',
+  loadedRows.length > 0, rows.slice(0, 3).map(r => r.name))
+check('9d. ...and at least one of them states its weight once and shows no ladder beneath it',
+  loadedRows.some(r => r.chips === 0),
+  loadedRows.map(r => ({ chips: r.chips, sets: r.sets, name: r.name.slice(0, 60) })))
 
 // Frame the screenshot on a row that shows BOTH halves — the chips and the
 // count line beneath them — so the picture is evidence and not just a page.

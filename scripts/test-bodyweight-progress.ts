@@ -372,5 +372,37 @@ console.log('\n11. A best the ESTIMATE found shows the set, never a lower bare w
     readingForMoment({ ...moment, metric: 'reps', reps: 14 }).kind === 'reps')
 }
 
+console.log('\n[8] A build-up set is never a personal best')
+{
+  // Added 17 Sep 2026, when Ashley's ruling made warm-up rows REAL rows for the
+  // first time. Until then `is_warmup` was false on every row in the app, so
+  // every PR path was accidentally safe and none of them was actually guarded.
+  //
+  // THE BODYWEIGHT RECORD IS THE ONE THAT WOULD HAVE BROKEN FIRST. Her ruling
+  // of 16 Sep made "most reps in one set" the record when there is no weight —
+  // and a build-up set is, by design, the highest-rep set of the session. A
+  // 15-rep opener would have taken the record from a hard 12.
+  const logs = [
+    { set_number: 1, weight_kg: 0, reps_completed: 15, is_bodyweight: true, is_warmup: true },
+    { set_number: 1, weight_kg: 0, reps_completed: 12, is_bodyweight: true, is_warmup: false },
+    { set_number: 2, weight_kg: 0, reps_completed: 11, is_bodyweight: true, is_warmup: false },
+  ] as never[]
+  const sets = toSessionSets(logs)
+  check('the build-up row does not reach the PR comparison at all', sets.length === 2, sets.length)
+  check('...so the best set of the session is the hard 12, not the easy 15',
+    Math.max(...sets.map(s => s.reps)) === 12, sets.map(s => s.reps))
+
+  // And the loaded case, where it would have handed out a maximum nobody lifted.
+  const loaded = [
+    { set_number: 1, weight_kg: 20, reps_completed: 10, is_bodyweight: false, is_warmup: true },
+    { set_number: 1, weight_kg: 95, reps_completed: 8, is_bodyweight: false, is_warmup: false },
+  ] as never[]
+  const loadedSets = toSessionSets(loaded)
+  check('a loaded build-up is dropped too', loadedSets.length === 1, loadedSets.length)
+  // PROOF IT STILL LETS WORK THROUGH — without this, deleting everything would
+  // pass both checks above.
+  check('...and the working set survives', loadedSets[0]?.weight === 95 && loadedSets[0]?.reps === 8, loadedSets)
+}
+
 console.log(failures === 0 ? '\nAll bodyweight-progress checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

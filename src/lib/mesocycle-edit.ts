@@ -1,7 +1,8 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
 import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
-import { prescribeLoad, type LoadPrescription, isExternallyLoaded} from './load-prescription'
+import { prescribeLoad, type LoadPrescription, isExternallyLoaded } from './load-prescription'
+import { resolveLoadFields } from './warmup'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
 // module-evaluation time. That's fine in the real (Vite) app, but it means
@@ -22,6 +23,14 @@ import { prescribeLoad, type LoadPrescription, isExternallyLoaded} from './load-
 // saveMesocycleWeek/saveMesocycle (src/lib/mesocycle-persistence.ts).
 
 export type SwapScope = 'today' | 'permanent'
+
+/**
+ * A ranked swap option. `offStyle` is true when the exercise survives every
+ * constraint EXCEPT the trainee's training style — shown, below the ones that
+ * match, per Ashley's 18 Sep 2026 ruling. It is a fact about the option, not a
+ * sentence: the words belong to the screen and live in the phrasebook.
+ */
+export type ReplacementCandidate = { exercise: ExerciseEntry; note: string; offStyle: boolean }
 
 /** Constraint-filtered, ranked candidates for swapping OUT `exerciseName` — the same pool equipment/injury/style/skill filtering that generation itself uses. */
 /**
@@ -45,13 +54,34 @@ export function getReplacementCandidates(
   profile: UserProfile,
   exclusions: string[],
   soft?: { liked: string[]; disliked: string[] },
-): { exercise: ExerciseEntry; note: string }[] {
+): ReplacementCandidate[] {
+  // TWO POOLS, AND THE STRICT ONE IS WHAT "MATCHES YOUR STYLE" MEANS.
+  //
+  // Ashley, 18 Sep 2026, standing next to a leg-curl machine on a functional
+  // plan: the shortlist was two sliders and a band, because all three machine
+  // leg curls are tagged bodybuilding and nothing functional. Measured that
+  // day — 31 of the catalogue's 45 machine and cable entries carry no
+  // functional tag — so this was never one movement being mislabelled.
+  //
+  // Her ruling, from three options: SHOW THEM, LOWER DOWN. Options matching
+  // her style stay at the top, the rest sit below with a line saying so, and
+  // nothing about anyone's PLAN changes. She rejected retagging the machines
+  // (which would start prescribing them to every functional trainee) and
+  // leaving it (which left the search box as the only route to a machine).
+  //
+  // MEMBERSHIP OF THE STRICT POOL IS THE TEST, rather than reading
+  // `style_tags` here. `stageStyleFilter` is not a tag lookup — it exempts
+  // rehab movements for a flagged joint and holds a per-pattern floor — so a
+  // local re-implementation would disagree with it exactly the way
+  // `getExerciseCompatibilityWarnings`'s hand-rolled equipment test once did.
   const pool = getConstrainedPool(profile, exclusions)
+  const wide = getConstrainedPool(profile, exclusions, { skipStyle: true })
+  const onStyle = new Set(pool.map(e => e.name))
   // The flagged joints ride along for the NOTE only — getConstrainedPool has
   // already done every bit of filtering. Without them a cross-training
   // suggestion ("a squat, instead of your bench press") arrives unexplained.
   const restingJoints = [...getFlaggedJoints(profile.injuries ?? [])]
-  const ranked = getSmartReplacements(exerciseName, pool, profile.training_experience || 'novice', exclusions, restingJoints)
+  const ranked = getSmartReplacements(exerciseName, wide, profile.training_experience || 'novice', exclusions, restingJoints)
 
   // IMPROVISED KIT SINKS, IT DOES NOT VANISH. getSmartReplacements ranks on
   // tier, joint stress and muscle overlap and has no equipment term at all, so
@@ -101,24 +131,67 @@ export function getReplacementCandidates(
   // someone wants the slider, just not offered ahead of the machine.
   const outgoing = getExerciseEntry(exerciseName)
   const outgoingIsLoaded = outgoing ? isExternallyLoaded(outgoing) : false
-  const candidates = !outgoingIsLoaded
-    ? equipmentSorted
-    : equipmentSorted
-        .map((c, i) => ({ c, i, u: isExternallyLoaded(c.exercise) ? 0 : 1 }))
-        .sort((a, b) => a.u - b.u || a.i - b.i)
-        .map(x => x.c)
 
-  if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return candidates
   // Stable partition, never a filter: a disliked movement stays offered — it
   // is a lean, and someone who asks for a swap may still want it. Order is
   // preserved within each band so the ranker underneath still decides.
-  const liked = new Set(soft.liked)
-  const disliked = new Set(soft.disliked)
-  const rank = (name: string) => (liked.has(name) ? 0 : disliked.has(name) ? 2 : 1)
-  return candidates
-    .map((c, i) => ({ c, i, r: rank(c.exercise.name) }))
-    .sort((a, b) => a.r - b.r || a.i - b.i)
+  const bySoftPreference = <T extends { exercise: ExerciseEntry }>(list: T[]): T[] => {
+    if (!soft || (soft.liked.length === 0 && soft.disliked.length === 0)) return list
+    const liked = new Set(soft.liked)
+    const disliked = new Set(soft.disliked)
+    const rank = (name: string) => (liked.has(name) ? 0 : disliked.has(name) ? 2 : 1)
+    return list
+      .map((c, i) => ({ c, i, r: rank(c.exercise.name) }))
+      .sort((a, b) => a.r - b.r || a.i - b.i)
+      .map(x => x.c)
+  }
+
+  // Style sinks an option; it never removes one. Within each band the order
+  // everything above produced is preserved exactly.
+  const byStyle = (list: { exercise: ExerciseEntry; note: string }[]): ReplacementCandidate[] =>
+    list
+      .map((c, i) => ({ c, i, s: onStyle.has(c.exercise.name) ? 0 : 1 }))
+      .sort((a, b) => a.s - b.s || a.i - b.i)
+      .map(x => ({ ...x.c, offStyle: x.s === 1 }))
+
+  // WEIGHT IS THE OUTERMOST KEY, AND THAT IS ASHLEY'S RULING OF 18 Sep 2026,
+  // from three options, made to settle a collision between two of her own.
+  //
+  // Widening the list for style (above) handed her 10 Sep rule the very
+  // problem it was written for: a slider that matched her style landed above
+  // a machine that did not, so a loaded lift was again offered bodyweight
+  // replacements first. Measured — 8 movements in the hybrid catalogue alone,
+  // among them the lateral raise and the shrug.
+  //
+  // Her ruling: WEIGHT ALWAYS WINS. For a lift that carries a number, every
+  // loaded alternative comes first whatever its style, each marked; the
+  // unloaded ones follow. She rejected keeping style outermost (it re-creates
+  // the 10 Sep report with a sentence of explanation attached) and a narrow
+  // override that fired only where her style offered nothing loaded (two
+  // different orderings depending on the catalogue is not a rule anyone can
+  // hold in their head).
+  //
+  // So the sort keys, outermost first: a STATED like, then loaded, then style,
+  // then implement quality, then the ranker.
+  //
+  // A STATED LIKE STAYS ON TOP OF ALL OF IT, and that is a deliberate limit on
+  // her ruling rather than an oversight. She was asked about style against
+  // weight and ruled on exactly that; the 10 Sep rule this restores order to
+  // says a loaded lift is not replaced by an unloaded one BY DEFAULT, and
+  // "I like push-ups" is not the default — it is an instruction. Found by
+  // `test:soft-preferences` going red when this ordering was first built with
+  // weight above everything: liking the one off-style bodyweight option no
+  // longer brought it to the front, which is behaviour nobody asked to change.
+  //
+  // The loaded key is the only conditional one — replacing a plank with a
+  // slider is not a downgrade, so an unloaded outgoing lift has no loaded band
+  // at all and style leads inside each preference band.
+  const styled = byStyle(equipmentSorted)
+  const weighted = !outgoingIsLoaded ? styled : styled
+    .map((c, i) => ({ c, i, u: isExternallyLoaded(c.exercise) ? 0 : 1 }))
+    .sort((a, b) => a.u - b.u || a.i - b.i)
     .map(x => x.c)
+  return bySoftPreference(weighted)
 }
 
 function parseRepsHigh(reps: string): number | null {
@@ -195,6 +268,7 @@ export async function recomputeLoad(
  */
 export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription, sessionDurationPreference?: UserProfile['session_duration_preference']): Exercise {
   const isPrimer = entry.mechanics_tier === 'primer'
+  const loadFields = resolveLoadFields(entry, isPrimer, load)
 
   // A slot's prescription UNITS belong to the exercise in it, not to whatever
   // was there before. Inheriting them is the same defect class as inheriting
@@ -226,9 +300,18 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
     prescription_type: entry.prescription_type,
     ...(fixedUnits ? { sets: fixedUnits.sets, reps: fixedUnits.reps, rest: fixedUnits.rest } : {}),
     intensity: isPrimer ? 'Light — movement prep' : slot.intensity,
-    suggested_load: isPrimer ? 'Light' : load.display,
-    suggested_load_kg: isPrimer ? null : load.starting_weight_kg,
-    per_set_load: isPrimer ? null : load.per_set,
+    // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling, 18 Sep
+    // 2026, after swapping in Kettlebell Swings and being shown nothing.
+    // Generation does the same thing at its own two sites; this stays in step
+    // with them deliberately, because a swap must leave the plan in the state
+    // generation would have produced. The intensity and the guidance above
+    // are unchanged on both branches.
+    // Only these three of resolveLoadFields' four: this site has never written
+    // load_source, and spreading the whole object would quietly add a field
+    // the swap path does not own.
+    suggested_load: loadFields.suggested_load,
+    suggested_load_kg: loadFields.suggested_load_kg,
+    per_set_load: loadFields.per_set_load,
     load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : load.basis,
     movement_pattern: mapMovementPattern(entry.movement_pattern),
     tier: mapTier(entry.mechanics_tier),

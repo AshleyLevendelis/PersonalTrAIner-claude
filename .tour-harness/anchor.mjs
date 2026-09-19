@@ -3,7 +3,7 @@
 //
 // WHY THIS EXISTS, measured 14 Sep 2026. Eight browser drivers were red on the
 // 13th. On the 14th, three of them were green — same commit, same machine, no
-// code change: `ramp-ticks`, `coach-week-move`, `program-move`. Proven rather
+// code change: `ramp-readonly`, `coach-week-move`, `program-move`. Proven rather
 // than guessed, by running one driver twice on one machine under two timezones
 // that fall on different calendar days:
 //

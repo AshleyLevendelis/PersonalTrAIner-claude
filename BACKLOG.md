@@ -2,6 +2,1700 @@
 
 Newest first. One line each.
 
+- [x] **THREE GATES WERE GREPPING ONE LINE OF JSX, AND ALL THREE WENT RED AT
+  CORRECT CODE.** 19 Sep 2026, found by the first full sweep since the 18 Sep
+  work — 266 gates, 261 pass, 5 fail.
+
+  Three of the five are the usual environmental trio (`meal-quality`,
+  `schema-parity`, `verify:rls`), confirmed from each one's OWN output carrying
+  the *"Host not in allowlist"* sentence rather than from ticking names off a
+  list. The other two — `test:calibration-search` and `verify:one-number` —
+  were real and **failed identically on the commit before the meal work**, so
+  they were not caused by it. They were left red on 18 Sep by `52dc430`, and
+  nothing noticed because the affected gates were run and the sweep was not.
+
+  **THE CODE WAS RIGHT.** Ashley's ruling that day — *"a ladder that does not
+  climb should not look like one"* — added a second condition beside the
+  existing calibration rule, so per-set weight chips now render only when the
+  loads actually differ. Both gates asserted the OLD condition **by its literal
+  source text**. `test:primer-load` §6a pinned the same expression and broke
+  too, the moment the expression moved; that makes **three separate gates
+  reading one line of JSX with a regex.**
+
+  **MEASURED BEFORE DECIDING ANYTHING**, because "the chips never render" and
+  "the chips are dead code" look identical from a failing driver: across a
+  96-plan spread of the 9,216-profile grid, **1,352 of 17,293 per-set ladders
+  genuinely climb** (7.8%) — Deadlifts 50 / 52.5 / 57.5, Bench 25 / 27.5 / 30.
+  The branch is alive and the chips earn their place; only the gates were
+  stale.
+
+  **THE FIX IS THE SHAPE, NOT THE THREE EDITS.** The decision moved out of the
+  JSX into `perSetChipsWorthShowing(perSet, calibration)`, a type predicate the
+  gates now CALL. A rule three checks need to ask about should be something
+  they can ask, not something they have to read. All three re-anchored;
+  `verify:one-number` §9 was *replaced* rather than re-anchored, the
+  `verify:ramp-ticks` precedent — its old demand (every row shows one chip per
+  set) now contradicts the ruling, so it holds what the screen can actually
+  prove: no row shows a PARTIAL ladder, and at least one row that carries a
+  weight shows none.
+
+  **7 mutations, 7 caught.** Two lessons from them. A first version of
+  `verify:one-number` §9c asked whether ANY row showed no chips — satisfied by
+  a Pallof Press, which has no ladder to hide and proves nothing; scoped to
+  rows that state a weight, it bites. And one mutation came back MISSED
+  correctly: removing `perSet.length === 0` creates no defect, because
+  `new Set([]).size > 1` is already false. That guard is for the reader, and
+  the code now says so rather than leaving the next person to re-derive it.
+
+  **Also**: `test:bundle`'s re-download ceiling crossed at 264 of 264. Baseline
+  on a clean worktree of the previous commit: 263, one kilobyte left — fifth
+  occurrence of the silent-erosion pattern, raised to 272 over a value measured
+  today. First paint now sits at 419 of 420 and is named, not pre-emptively
+  moved.
+
+- [x] **THE SAME THREE MEALS EVERY DAY, AND A COOKING METHOD THE APP PAID FOR
+  AND BINNED.** 19 Sep 2026, on Ashley's *"fix the variety and keep the cooking
+  steps"*. Plan: `docs/plans/meals-that-change-and-tell-you-how-to-cook.md`.
+  Proposal that led to it: `docs/proposals/meal-engagement-2026-09-19.md`.
+
+  **THE CORRECTION COMES FIRST, BECAUSE MY OWN FINDING FROM THE DAY BEFORE WAS
+  HALF WRONG AND MY RECOMMENDED FIX WOULD NOT HAVE WORKED.** I reported that
+  the day-to-day variety rule was "wired, tested, and fed an empty history by
+  the Nutrition tab", that turning it on was a one-line fix, and that the
+  shopping list meanwhile shopped for a varied week the tab never showed.
+  Measured over 500 profiles, threading the history in exactly as
+  `assembleHorizon` already does: **1.11 distinct days in a seven-day week,
+  89.4% of profiles eating the identical day every day, 96.4% of days after day
+  0 identical to day 0.** So the shopping list's week is the same day seven
+  times too — the two surfaces never disagreed, they were both stuck — and
+  passing the argument would have moved 1.00 to about 1.11.
+  **Why: the preference was a `0.01` penalty added to a macro-distance score,
+  against a median gap of `0.033` to the best fully-different day.** It could
+  only ever win an almost exact tie. Swept across carb/fat spread ±5%→±40% and
+  per-meal protein overshoot +10%→+40%; the best case any fixture produced was
+  1.66, so the result is not the fixture's opinion.
+  **The shape of the error, which is the reusable part: I read the call site,
+  saw `{}` where a variety argument belonged, and reported a defect without
+  asking whether the mechanism behind the argument could do the job. An
+  argument that is not passed and an argument that does nothing look identical
+  from the call site.** Caught one turn later only because I went to build it.
+
+  **WHAT CHANGED — VARIETY.** It stops being a tiebreak and becomes a sort key,
+  applied only among combinations already INSIDE the tolerance bands, which is
+  the app's own definition of a correct day. Order: in tolerance (hard), then
+  fewest slots repeating a name from the last three days, then macro fit as
+  scored today. Outside tolerance nothing changed at all — the single fit score
+  still decides, with variety back to the old `0.01`, so a day the app cannot
+  get right spends everything on getting it close rather than being chosen for
+  its novelty.
+  Measured after, same grid: **1.10–1.64 → 3.98–4.51 distinct days out of 7**,
+  and weeks that are one repeated day 47.5–90.3% → 0–8.5%.
+  **It also made the app hit its targets MORE often, not less** — chosen days
+  inside tolerance went 93.7%→96.0% and 86.2%→95.3% on the two loosest
+  fixtures, because fit-first could previously prefer a combination that scored
+  well overall while busting one band. The cost is that the day shown is no
+  longer the single closest fit: mean weighted macro distance rises by
+  0.013–0.033, 90th-percentile worsening 0.057, and every day chosen this way
+  is still inside every band. `npm run measure:meal-variety` re-runs all of it.
+
+  **ONE THING I TRIED AND BACKED OUT, recorded because the gate caught me.** I
+  also promoted "the day includes something you said you liked" to a key above
+  macro fit. That makes a stated like ABSOLUTE within tolerance, contradicting
+  that penalty's own recorded position — *"a soft preference is a tiebreak
+  between days that fit equally well, never a reason to ship a worse-fitting
+  day"* — and `test:soft-preferences` pins the boundary that says so. Variety
+  was the measured defect; a calibrated decision about somebody's food
+  preferences is not something to redefine in passing while fixing it. Backed
+  out, the like sits exactly where it always sat.
+
+  **WHERE "YESTERDAY" COMES FROM.** Nothing persists which meals were shown on
+  which day. Logged meals were the honest source and would have given no
+  variety to anyone who does not log, which is most people early on — so the
+  rotation is derived from the DATE: seven days walked from a clean history,
+  today is `epoch-day mod 7`. **Parity is by construction rather than by
+  inspection**: the Nutrition tab, the shopping list and the resize trial all
+  call one pure builder with the same inputs, so the list cannot shop for a
+  week the tab will not show. Date arithmetic is UTC on the parsed components —
+  measured, the naive local-midnight division REPEATS a day on 30 March and
+  SKIPS one on 26 October under Europe/London, and the gate asserts both.
+
+  **A CONSEQUENCE WORTH WATCHING, recorded rather than discovered later**: the
+  resize offer fires off `withinTolerance`, so choosing in-tolerance days more
+  reliably means it will fire LESS often. Correct — if the meals you have can
+  be combined to fit, the app should serve that rather than offer to re-portion
+  — but it is a change to when a user-visible offer appears.
+
+  **WHAT CHANGED — THE COOKING METHOD.** `generate-meals` has always asked for
+  and received a `prep` field; it was read to judge slot-appropriateness and to
+  tag a dish quick/standard, then discarded. Now stored (`prep` column,
+  migration `20260919120000_add_meal_prep_method`, `NOT NULL DEFAULT ''` so no
+  backfill) and rendered under the ingredients. A meal added by name through
+  the coach already forwarded the model's method and lights up for free.
+  **The interesting half is refusing a wrong one.** The app rescales every
+  proposal by up to 2.5x, so "fry the 200g of chicken" can describe an amount
+  the ingredient list no longer contains — the app printing a number it never
+  verified beside numbers it did. The prompt now asks for technique with no
+  amounts, and a method still naming a mass or volume is DROPPED WHOLE (not
+  sentence-by-sentence: a method missing a step is worse than none). Times and
+  oven temperatures are explicitly kept. **Re-applied at display time as well
+  as at verification**, the same reasoning as the dietary re-check already on
+  that screen: verification is the write boundary, the screen is where being
+  wrong costs something.
+
+  **A GATE THAT WAS ENFORCING THE DEFECT.** `test:custom-meal` and
+  `test:soft-preferences` both asserted the literal call text
+  `assembleDay(mealPools, macros, {}, ...)` — including the empty history that
+  turned out to be half the bug — so the fix reddened two checks at a change
+  that made the app strictly better. Re-anchored on the property (the pins are
+  an input to assembly and are not overlaid onto its result) with the reason
+  written beside them.
+
+  **VERIFIED.** `test:meal-variety` (42 checks) and `test:meal-method` (31),
+  both new; `verify:meal-method`, a real Chromium at 390x844 on the real
+  Nutrition screen, reading three stored inputs — a clean method, one naming
+  180g of chicken, and none — and confirming what reaches the card. Screenshot
+  read, not just a build that exited 0. **35 mutations, 35 caught** (16 variety,
+  19 method), every run executing the full baseline check count.
+  **FIVE MUTATIONS WERE MISSED ON THE FIRST ROUND and each was a real hole**: a
+  window check compared against the very constant being mutated (a check can
+  only ever agree with itself that way); the pinned-meal fixture pinned the
+  dinner the rotation was going to serve anyway, so it passed whether or not
+  the pin was honoured; nothing forced tolerance to outrank variety, so
+  deleting that key changed nothing measurable; a date check was satisfied by
+  the memo's DEPENDENCY ARRAY rather than the call's arguments, the
+  "a mention is not a use" shape again; and an ordering check compared two
+  `indexOf` results without asserting either was found, so renaming its anchor
+  made it -1 and the comparison passed for free.
+
+  **THE BUNDLE CEILING TIPPED, FOR THE FIFTH TIME, AND THE 17 SEP FIX EARNED
+  ITS KEEP.** `test:bundle`'s re-download budget failed at 264 of 264. Baseline
+  measured on a clean worktree of the commit before this one: **263 — one
+  kilobyte left.** So this change was the last straw, not the cause; between 15
+  and 19 Sep the app quietly ate the 8 kB that number was last raised to give
+  it, and nothing said so. Raised to 272, which is 8 kB over a value measured
+  TODAY rather than one inherited from the note. **The printed-margin line
+  added on 17 Sep turned this from a hunt into a two-minute question** — and it
+  is already showing the next one: **first paint sits at 419 of 420, 1 kB
+  left.** Not raised, because a ceiling should move when something crosses it
+  and says why, not pre-emptively; named here so the next person to cross it
+  knows it was already at the line.
+
+  **NEEDS, IN THIS ORDER**: the migration on Ashley's machine
+  (`npm run db:push-both`) BEFORE the frontend merges — the app writes the new
+  column, so merging first breaks every meal write. Then merge to `main` for
+  Vercel. Then `npm run deploy:functions:prod -- generate-meals` for the prompt
+  change; until that lands, new meals simply arrive with no method, which is
+  the honest empty state rather than a broken one.
+
+- [x] **MUSCLES GETTING NEAR-ZERO WORK — MEASURED, AND THREE OF THE FIVE
+  HEADLINE GAPS WERE MY MEASUREMENT'S FAULT.** 18 Sep 2026, on Ashley's ask.
+  Full table in `docs/audits/weekly-volume-2026-09-18.md` §3b.
+
+  The unguarded reading said chest 1,024 profiles at zero, triceps 832,
+  shoulders 800, calves 1,197. Split on whether the trainee's own CONSTRAINED
+  POOL held anything for that muscle — the same guard pattern coverage already
+  uses, read off `getConstrainedPool` — **chest, back and triceps all go to
+  ZERO**. Every one was a constraint the app was right to enforce.
+
+  **AND THE GUARD ITSELF NEEDED CORRECTING, which is the part worth keeping.**
+  My first version counted PRIMERS as "the pool could have supplied this" and
+  reported 768 shoulder-injured bodyweight profiles with a chest gap. Reproduced
+  one: their pool holds exactly one chest-capable movement, Scapular Push-Ups,
+  and it is a warm-up drill. They get it as a warm-up and get no chest working
+  sets, because every press is contraindicated for that shoulder and they own no
+  kit. `weeklySetsByMuscle` excludes primers from volume, so a guard that counts
+  them asks a different question from the column it guards.
+  **THIRD TIME IN ONE SESSION a first reading came out too big for the same
+  reason** — after the 2,966-block deload and the 832 push-less weeks before it.
+  The pattern is now unmistakable: **a measurement that does not make the app's
+  own exclusions will always over-report, and the size of the over-report tells
+  you nothing about whether anything is wrong.** Check the guard against the
+  counter before believing either.
+
+  **What survives**: calves 1,188 (12.9%), biceps 192, erectors 108, shoulders
+  32. Assessed as a CSCS under Ashley's delegation, and none is worth building
+  for yet:
+  - **Calves** cluster on 30-45 minute sessions (771 of 1,188) and combat style
+    (626). On a four-to-six-slot session, a calf raise instead of a squat, hinge
+    or press is the wrong trade for every goal, and calves already load on every
+    standing and stepping movement. Six long-session hypertrophy zero-calf cases
+    were checked and ALL were combat — a style whose tracks carry no calf slot,
+    which is right for a fighter. **The one arguable subset is bodybuilding
+    style, 424 profiles**; zero direct calf work in a physique plan is the
+    version a coach would query. Named for its own look, not built.
+  - **Biceps 192** are all bodyweight + bodybuilding + shoulder-injured: they
+    get biceps from rows and pulls and no curl exists without equipment.
+  - **Erectors 108**, with 2,390 under five, is attribution rather than absence
+    — every hinge, squat, carry and plank loads them.
+
+  **Nothing built. The measurement's value was negative**, which is a legitimate
+  result and the reason it was worth doing before touching the generator.
+
+- [x] **A DELOAD WITH NO LEVER LEFT TO PULL — AND MY OWN FINDING WAS 12x TOO
+  BIG BEFORE I FIXED ANYTHING.** 18 Sep 2026, on Ashley's "fix the deload week
+  next".
+
+  **FIRST, THE CORRECTION, because the number she asked me to act on was
+  mine and it was wrong.** The volume audit reported "a deload week that is not
+  lighter — 2,966 of 36,864 blocks (8.0%)". That measurement asked ONE question,
+  about SETS. Reproducing its named offender
+  (`full_gym|wrists|30-45|bodybuilding|beginner|hypertrophy|low|love`) showed a
+  perfectly good deload: main lifts 15kg -> 10kg, reps 15-17 -> 13-15, tonnage
+  362 -> 270. Its sets held only because every row was already at the two-set
+  floor and there was nowhere further down. **A one-lever question about a
+  three-lever mechanism is not a measurement.** Re-asked properly — lighter in
+  sets, OR load, OR reps, against the last loading week of the same block — the
+  real figure is **252 of 36,864 (0.68%)**.
+
+  **The 252 are real, and they are one corner**: bodyweight equipment, low
+  recovery. Three levers, all dead at once. No external load, so weight cannot
+  move. Low recovery already scales base sets down, so `Math.max(2, ...)` binds
+  on the LOADING weeks too and the deload's 0.5x cut buys nothing. And the rep
+  cut that exists for exactly this dead end was gated on `deloadAtFloor`, which
+  needs an equipment floor and therefore can never be true of a press-up.
+  So the deload fell to the default branch — reps **+2**, the "lighter bar,
+  easier reps" move — which is meaningless without a bar.
+
+  **MEASURED, NOT ASSUMED, and my prediction was wrong**: I expected the +2 to
+  make the deload HARDER. On the pinned fixture it produced a week IDENTICAL to
+  week 3, rep for rep (2x15-17 both weeks), because the +2 bump exactly
+  cancelled the two ramp steps the deload does not take. The defect was a
+  carbon copy of the hardest week, labelled "Deload week — volume steps back so
+  you arrive at the next block recovered". After: 2x11-13, total reps 609 ->
+  473.
+
+  **The fix**: `deloadLoadLeverDead = deloadAtFloor || !isExternallyLoaded(...)`
+  — reps carry the reduction whenever there is no weight to take off, not only
+  when the bar is at its floor. And `deloadNeedsRepCut` now compares the
+  deload's set count against the LOADING week's (`deloadSets >=
+  loadingWeekSets`) instead of against the other deload formula, so reps only
+  drop outright when sets genuinely gave nothing. Same recorded shape as the
+  rest-floor and one-main-lift bugs: a rule that holds at the site it was
+  written for and nowhere else.
+
+  **CSCS basis** (mine under her delegation): a deload exists to shed fatigue
+  while keeping the movement pattern. It has three levers and needs to pull at
+  least one; which one depends on what the trainee has. A barbell trainee sheds
+  weight and keeps reps comfortable; somebody training on the floor with no kit
+  has only reps and sets, and once sets hit the floor, reps are the whole
+  lever. The existing code already said this for the bar-floor case — it simply
+  never generalised.
+
+  **TWO WRONG ASSERTIONS IN MY OWN GATE, both caught by running it, both kept
+  in the file.** (1) Comparing TOTAL reps (sets x target) went red because the
+  deload halves sets, so the total falls even while the rep RANGE eases up —
+  the metric conflated two levers. (2) Asserting every loaded lift drops weight
+  went red on a 2kg Rear Delt Flye, which is already the lightest thing in the
+  gym: `deloadAtFloor` correctly holds its weight and takes the cut elsewhere.
+  Checked against the pre-fix engine in a worktree before believing either
+  failure — those rows are identical on both sides, so the assertions were
+  wrong, not the code.
+
+  **Verified**: new `test:deload-lighter`, 14 checks — the measured offenders,
+  a fixture assertion that they really are the dead-end case, the ordinary
+  loaded deload still using the bar lever, unloaded rows in the SAME plan
+  taking the rep cut, and three source properties with a detector proof.
+  **9 mutations tried, 9 caught**, all applied, all running the full 14. Plus
+  20 affected gates green (frozen-weeks, block-phases, week-load-consistency,
+  ramp-arrived, main-lift-rest, session-length, block-rest-sizing,
+  muscle-balance, training-week, cardio-share-score, block-review,
+  block-consistency, day-coverage, load-suggestions, added-load,
+  tempo-prescription, interval-prescription, rehab-order, one-main-lift) and
+  `npx tsc --noEmit` clean.
+
+  **GRID CONFIRMED: 252 -> 0** of 36,864 blocks, across the full 9,216-profile
+  re-measure. **And only the rep lever moved**, which is the check that the fix
+  did what it said and nothing more: deloads lighter in SETS held at 34,944 and
+  lighter in LOAD at 35,553 — both identical to the pre-fix run — while lighter
+  in REPS went 35,831 -> 36,763. Nothing was taken from anyone who already had
+  a working deload.
+
+- [x] **ONE MAIN LIFT PER DAY — CONFIRMED, AND MY FIRST FIX WAS AIMED AT THE
+  WRONG PATHS.** 18 Sep 2026. The entry below measured 2,477 of 9,216 profiles
+  (26.9%) carrying a second tier-1 compound on a day, and named `refill` as the
+  probable cause, explicitly as a lead. **The lead was wrong, and the gate is
+  what said so.**
+
+  `getExerciseCountForDuration` returns `tier1: 1` for all four session lengths,
+  so one flagship lift per day is the design, not a coincidence.
+
+  **What actually produces `Pull-Ups + Chin-Ups`**: `fillSlot` claims the
+  track's own tier-1 slot, and then `pickFromTier('tier1_compound', ...)` claims
+  another — the ordinary path every single day runs, not a fallback at all. I
+  reasoned from the one comment in the file that already mentioned the rule
+  (`ensurePatternPresent`, which excludes tier-1 outright and says why), guarded
+  the four FALLBACK paths, and the gate's generated-plan section came straight
+  back holding the same pair. **A source-shaped check written from the same
+  reasoning would have passed and shipped the defect.** That is the argument for
+  §3 existing in the form it does.
+
+  Now one shared predicate, `isSecondMainLift(selected, candidate)`, pure and
+  exported, asked by every path that can put an exercise in a day: the
+  track-slot fill (both its pick and its nearest-pattern substitute), the tier
+  pass (twice — the candidate list is built once, so its filter cannot see a
+  main lift the same loop claims a moment later, exactly why the family
+  re-check already sits beside it), the refill fallback, and both
+  required-pattern fills. **Never "no main lift here"**: a day whose tier-1 slot
+  came up empty — no barbell, an injury ruling every press out — should still be
+  given one, and 1d pins that.
+
+  **A MEASURED BENEFIT I DID NOT EXPECT**: `test:day-coverage` went RED, because
+  the fix emptied its subject. That grid dropped 12 named isolation slots
+  (all side-delt) before and drops **0** after — refusing the second main lift
+  frees the slot, and a lateral raise now fills it. The check asserted
+  `shoulder > tricep`, which needs the loss to still be happening, so it failed
+  on the commit that removed it. Re-anchored on the property it actually holds
+  ("IF a slot is lost it is the side delt, not the triceps"), which passes
+  honestly at zero and still fails if triceps become dominant — verified both
+  ways against the pre-fix engine in a worktree, and the count is printed every
+  run so a zero reads as a zero rather than as silence.
+
+  **CSCS basis** (mine under her 18 Sep delegation): two maximal-demand
+  compounds in one session means the second is performed already fatigued, so it
+  takes the same prescribed load at a worse stimulus and degrades everything
+  after it. One flagship lift at high intent and then accessory work is why a
+  session has a shape. Squat and deadlift together for a beginner is the version
+  a coach would refuse outright; pull-ups beside chin-ups is not two exercises,
+  it is one exercise twice.
+
+  **Verified**: new `test:one-main-lift`, 20 checks — the predicate as a unit,
+  a per-path source property, the real offenders the 9,216-profile run named by
+  key, and a detector proof. **11 mutations tried, 11 caught**, all confirmed
+  applied and all running the full 20. Plus 21 affected gates green and
+  `npx tsc --noEmit` clean.
+
+  **THREE THINGS THE MUTATION ROUND FOUND THAT READING COULD NOT**, all worth
+  more than the fix. (1) A COUNT OF GUARD CALLS IS NOT A CHECK THAT EVERY PATH
+  GUARDS: `>= 7` passed with any single site unguarded, because the guards
+  overlap — strip one and another still catches it. Four mutations MISSED with
+  every check running. Counting pushes per region and requiring one ask each is
+  the same property said precisely. (2) MY OWN HOISTED `function
+  wouldBeSecondMainLift(` DECLARATION COUNTED AS A CALL, giving its region a
+  spare guard — the "your own edit satisfied the search" shape, in a gate this
+  time; fixed with a negative lookbehind. (3) **A CHECK I BELIEVED EXISTED HAD
+  BEEN DROPPED BY ONE OF MY OWN REWRITES** and nothing said so until breaking
+  the code it covered came back MISSED. A check is not present because you
+  remember writing it.
+
+  **COST MEASURED, pre-fix worktree against post-fix working tree, same script
+  and same 9,216 combinations — no env switch in shipped code.** The before half
+  reproduced the figures exactly (49,988 / 2,477), which is what makes the pair
+  comparable.
+  **Bought**: two-main days 49,988 -> **0**, profiles 2,477 -> **0**, dropped
+  side-delt slots 12 -> **0**.
+  **Cost, session length: none.** Exercises per session identical on every
+  statistic (median 6, p90 10, p99 12, max 15) — the freed slot is taken by a
+  tier-2 or tier-3, which was the open question and the main risk.
+  **Cost, movement coverage: none.** Push, pull, hinge, squat and the
+  movement-prep slot all at 0 weeks uncovered on both sides. This was the bigger
+  risk, and the weekly-balance backfill (which already excludes tier-1) absorbs
+  it.
+  **Working sets**: median/p90/p99/max unchanged; sessions over 20 go 139,002 ->
+  137,980. Removing a five-set duplicate from ~50,000 days and putting a
+  three-to-four-set accessory in its place is exactly that size.
+  **Per muscle, down where the duplicate did the work**: biceps p99 29 -> 25 and
+  max 42 -> 32 (the chin-up duplicate), core p99 69 -> 64 and max 91 -> 80.
+  **AND ONE REAL COST, named**: profiles whose chest gets under five sets in
+  their peak week rise 1,485 -> 1,653 (+168, ~1.8%), erectors under five 2,337
+  -> 2,390. The duplicate was contributing those sets. The count at ZERO chest
+  does not move (1,024 either way), so nobody loses chest work entirely — a thin
+  week gets thinner for a small group. Correct trade, still a cost, and it
+  points at the same gap the audit's section 4 already names: nothing notices a
+  muscle running thin.
+  Full write-up in `docs/audits/weekly-volume-2026-09-18.md`, which also
+  CORRECTS ITS OWN wrong cause in place rather than tidying it away — the
+  reasoning that produced it would have produced a passing source check too.
+
+  **QUALITY, scored on the same 9,216 profiles, pre-fix worktree against
+  post-fix tree: 11.60/12 either way, 0 below the 7.2 floor either way,
+  Structure 2.00 either way.** Score-neutral at the top line. Underneath it
+  moves four rules: push:pull imbalance 579 -> **431**, recovery volume not
+  reduced 724 -> **625**, fat-loss structure reduced 33 -> **11**, and against
+  those, worse-implement-than-available 1,312 -> **1,476** (+164, +1.8%). With
+  the duplicate gone the freed slot is sometimes filled by a movement the app
+  judges a poorer implement choice — almost certainly the same ~1.8% of profiles
+  whose chest week thins, a lesser accessory in place of a second barbell press.
+  A real regression in one selection sub-rule, against three improvements, an
+  unchanged overall, and 49,988 days that no longer prescribe two main lifts.
+  Named for its own look; not a reason to hold this.
+
+  **AND IT CLOSES THE CARRY DEBT.** `core_before_main` appears nowhere in
+  either run's rule table. This morning's carry-placement fix took it from 148
+  to 0 — measured then, but the confirming sweep died silently (a `nohup` run
+  reaped when the harness marked its launching call complete) and was never
+  re-run. It is confirmed now.
+
+- [x] **MEASURED THE VOLUME CEILING BEFORE BUILDING IT, AND THE MEASUREMENT
+  FOUND SOMETHING ELSE.** 18 Sep 2026, on Ashley's instruction, against a
+  relayed proposal to cap working sets per workout at 20-24.
+  Full write-up: `docs/audits/weekly-volume-2026-09-18.md`. Script:
+  `scripts/measure-volume.ts` (`npm run measure:volume`), 9,216 profiles x 16
+  weeks = 589,824 training days.
+
+  **The proposal's own question, answered**: a 20-set cap WOULD fire — 23.6% of
+  sessions are over 20 working sets, 14.1% over 24, 6.1% over 30, median 15,
+  max 53. So it is not theatre. But 552 of the 678 highest-volume profiles are
+  90+ minute sessions, and a 90-minute advanced session at 27 working sets is a
+  session rather than a defect. And the per-muscle numbers a ceiling would have
+  to be calibrated against are inflated by the app's own counting convention
+  (one set credits EVERY muscle its exercise names as primary — glutes median
+  is 23 because every squat, lunge and hinge counts). **Building it now means
+  picking a threshold nothing justifies**, so: not first.
+
+  **WHAT THE RUN ACTUALLY FOUND — TWO MAIN LIFTS IN ONE SESSION, 2,477 of
+  9,216 profiles (26.9%), 49,988 of 589,824 days.** The commonest shape is
+  `Pull-Ups + Chin-Ups` on one day, both tier-1, five or six sets each — the
+  same movement twice as two separate main lifts. On a full-gym functional
+  beginner it is `Deadlifts + Barbell Squats`, every week of the block. Neither
+  is a session a qualified coach would sign: the reason a day has one flagship
+  lift is that everything after it is accessory work.
+  **Probable cause, read off the code and recorded as a LEAD, not a fact**: the
+  app forbids this at three places and misses it at a fourth. Both
+  weekly-coverage fills (`exercise-plan.ts:3726`, `:3847`) and the day-label
+  pattern fill exclude `tier1_compound` explicitly, the last with a comment
+  saying why ("Filling with another main lift here silently doubled a day's
+  main-compound count"). `refill` (`:2473-2477`) excludes primers and cardio and
+  nothing else. Same recorded shape as the rest-floor bug — a constraint
+  asserted at three paths, missed at the fourth. Confirm by mutation before
+  acting.
+
+  **AND TWO SMALLER ONES, both counted in the same run because a ceiling aims
+  pressure at whatever is left**: a deload week that is not lighter than its own
+  block's peak in 2,966 of 36,864 blocks (8.0%; the median block does drop 17
+  sets, so the mechanism works and has a hole); and muscles getting nothing at
+  all in the peak week — calves 0 sets in 1,197 profiles and under 5 in 4,295
+  (47%), chest 0 in 1,024, triceps 0 in 832, shoulders 0 in 800. The zero counts
+  need the same pool guard pattern coverage already uses before any of them is
+  called a defect — a week cannot hold what its equipment and injuries forbid.
+
+  **CORRECTION TO MY OWN FRAMING, measured**: the script header said "volume
+  ramps inside a block, so week 1 understates every plan". False for most plans
+  — week 1 carries the heaviest TOTAL set count for 6,709 of 9,216 profiles
+  (73%). Reading the peak is still right, for a different reason: different
+  muscles peak in different weeks. Corrected in the script rather than quietly.
+
+  **ONE GRID, NOT TWO.** `scripts/quality-grid.ts` is lifted out of
+  run-quality-score.ts unchanged and imported by both sweeps, because a copied
+  enumeration is how two readings of one question end up with different
+  denominators — which has already happened here once, with pattern coverage.
+  Proven identical rather than assumed: both versions emit the same 9,216 keys
+  with the same SHA-256.
+
+  **TWO PROCESS NOTES worth more than the numbers.** (1) A background run
+  launched with `nohup` from a tool call the harness then marked complete was
+  REAPED — the log stopped mid-run and looked exactly like a run still in
+  progress, which is the recorded "a killed sweep's log is indistinguishable
+  from a running one" trap arriving by a new route. Launch long runs through the
+  harness's own background mode. (2) My wait condition was
+  `until [ -f volume-report.txt ]` and it returned instantly, satisfied by the
+  8-profile report a smoke test had written minutes earlier — "asking a question
+  of evidence you just created", one level up from the code version of it
+  already recorded here. Wait on the PROCESS, and clear the artefact first.
+
+- [x] **THE RESIDUE WAS REAL, AND IT WAS A LOADED CARRY IN FRONT OF THE BENCH
+  PRESS.** 18 Sep 2026. Exempting the rehab slot (entry below) took
+  `core_before_main` from 725 plans to 148. Those 148 were a different defect
+  and a genuine one: **a Farmer's Walk running before the day's barbell main
+  lift**, for 30-45 minute combat-style trainees with a flagged joint.
+
+  **Root cause — the selector was innocent.** Traced by printing each track's
+  own output: `selectExercisesForTrack` returned
+  `Barbell Bench Press (tier1) | Landmine Press | Farmer's Walk | ...`, sorted
+  tier1 -> tier2 -> tier3 exactly as its comment says. The day that reached the
+  screen read `warm-up | Bird Dog | Farmer's Walk | Barbell Bench Press`. **The
+  superset pass reordered a correctly sorted day.** `core` and `carry` are
+  antagonists in the pairing table; the corrective slot is core-patterned and
+  sits at position 2 by design ("rehab is prep, so it belongs where the joint is
+  still fresh"); so the A1/A2 adjacency reorder — which exists for a good reason
+  and was added after an earlier review caught a superset whose halves were four
+  exercises apart — pulled the carry up to sit beside it and pushed the bench to
+  fourth.
+
+  **A SORT CAN BE CORRECT AND THE ORDER STILL WRONG.** Worth keeping as a shape:
+  three separate ordering rules each held (tier sort, rehab-first, supersets
+  adjacent) and the composition of them did not. Every gate was green and
+  nothing in any one function looked wrong.
+
+  **The fix: a superset may not straddle the day's main lift.** One shared
+  helper, read by BOTH passes that pair — `stageTimeCap`'s rest-halving and
+  `buildSupersetPairs`' labelling — because they already share
+  `isSupersetEligible`, and a pair that one compresses and the other refuses
+  prints a halved rest under no superset at all.
+
+  **CSCS basis** (mine under Ashley's 18 Sep delegation, recorded rather than
+  asserted): the main lift is the day's priority by definition — highest neural
+  and technical demand, and the movement the block's progression is written on
+  — so it goes first, after prep. A loaded carry ahead of it spends grip, trunk
+  and postural endurance on the exercise that needs them least. The carry still
+  gets done, afterwards, which is where a grip-limited postural task belongs.
+  Refusing the pair is the only honest lever: keeping the label without the
+  reorder recreates the unexecutable superset, and pushing the corrective slot
+  down to meet its partner puts rehab behind the heavy work, which is the
+  placement the generator deliberately avoids.
+
+  **The five-question review, answered.** (1) Training effect: the main lift
+  arrives with an unfatigued trunk and grip; the carry is done fatigued, which
+  is the correct trade because the tier-1 is the day's priority. (2) What it
+  takes away: a superset pairing, i.e. rest compression — measured on the full
+  grid with the guard switched off and on, see the numbers below. (3)
+  Fundamentals: nothing is removed, so pattern coverage, overload and recovery
+  are untouched; specificity improves. (4) Redefined floors: none — no number
+  changes, and `core_before_main` still asks exactly the question it asked
+  yesterday, so these readings ARE comparable with the 148. (5) Scope: exercise
+  order, squarely inside the delegation.
+
+  **Not done, and named rather than smuggled in: `['core', 'carry']` is not an
+  antagonist pair.** A loaded carry is a maximal anti-lateral-flexion, grip and
+  postural trunk task; a plank or a dead bug is the same demand. They are
+  synergists, so a superset of the two gives neither the rest the halving
+  assumes. On days with no tier-1 the guard does not apply and this pairing
+  still happens. Removing the pair would take a real time lever off short and
+  combat sessions, so it needs its own measurement rather than riding along
+  with this one. Also noticed and parked: a PROMOTED anchor (the main lift on a
+  day with no tier-1) can be superset-eligible when it is a carry, which gives
+  it a halved rest the promoted-anchor floor says it should not have.
+
+  **Verified**: `test:rehab-order` extended from 6 checks to 27 — the rule as a
+  unit, a source property that every function consulting `isSupersetEligible`
+  also consults the guard (so a third pairing pass fails here rather than
+  silently reintroducing this), the real pass driven on a constructed day of the
+  exact failing shape, a detector proof that the pass still reorders when there
+  is no main lift to protect, and the measured offender generated end to end.
+  **8 mutations tried, 8 caught**, every one confirmed to have applied and every
+  run confirmed to have executed all 27 checks. Plus 16 affected gates green
+  (rest-floors, pattern-floor, session-edit, edit-keeps-the-bar, session-length,
+  session-shortfall, main-lift-rest, block-rest-sizing, chosen-not-shuffled,
+  primer-load, session-derive, muscle-balance, today-only, session-rebuild,
+  cardio-share-score) and `npx tsc --noEmit` clean.
+
+  **MEASUREMENT PENDING IN THIS COMMIT.** The 9,216-profile grid is running A/B
+  behind a temporary switch (guard off, then on) so the cost can be attributed
+  rather than reasoned about. Numbers land in the next commit; if they are not
+  there, this line is the evidence they were never taken.
+
+- [x] **"CORE BEFORE THE MAIN LIFT" IS NOT A SEQUENCING DEFECT — IT IS THE
+  REHAB SLOT, AND THE SCORER CANNOT SEE IT.** Investigated 18 Sep 2026 after
+  Ashley relayed a second opinion (Gemini) ranking it the highest-priority fix
+  and directing an immediate ordering change. **Measured first, and the finding
+  inverts: there is nothing to fix in the plan, and making the change as
+  directed would have harmed exactly the people it was meant to protect.**
+
+  The ranking and the reasoning were sound in general terms — a fatigued trunk
+  before a heavy compound is a bracing problem, and multi-joint work comes
+  first while the nervous system is fresh. That is the right rule. It is just
+  not what these 725 plans are doing.
+
+  **What they are actually doing**, reproduced from the exact combination the
+  report names (`bodyweight / lower_back / 90+ / hybrid / intermediate /
+  fat_loss`): the day reads **Arm Circles (warm-up) → Side Plank → Pull-Ups**,
+  and Side Plank is `isIndicatedFor` the flagged lower back. Friday is the same
+  shape with Bird Dog before Chin-Ups. That is the app's REHAB slot, placed by
+  a branch whose own comment says *"Straight after the warm-up, before the
+  working sets: rehab is prep"*. Low-intensity corrective work for an injured
+  area, before the area gets loaded, is correct practice — not a defect.
+
+  **ONE HYPOTHESIS OF MINE WAS WRONG AND IS RECORDED AS SUCH.** I expected these
+  to be activation drills tagged as primers, and said so before measuring:
+  **zero** core or carry movements in the catalogue carry the `primer` tier, so
+  that was not it. The exemption these need runs off the injury flag, not the
+  tier — which is what `primer_not_first` already uses one rule above
+  (`allPrimersBefore && isIndicatedFor(entry, flaggedJoints)`). The core rule
+  simply never got the same clause. **The asymmetry between two neighbouring
+  rules is the whole finding.**
+
+  **SO THE DEFECT IS IN THE MEASUREMENT, NOT THE PLAN**, and the cost is real:
+  725 plans have been marked down on Structure for doing the right thing by an
+  injured trainee, which drags a dimension the app holds itself to.
+
+  **NOT CHANGED, AND DELIBERATELY SO.** Fixing the scorer changes what a metric
+  MEASURES — Structure would rise and today's 11.57 would stop being comparable
+  with yesterday's. `CLAUDE.md` names that as stop-and-wait regardless of the
+  CSCS delegation, so the coaching call is mine (rehab before the main lift is
+  correct; no plan change) and the metric call is Ashley's. Put to her with
+  three options.
+  **HER RULING, 18 Sep 2026, from three options: exempt it in the PREP BLOCK
+  ONLY.** She rejected exempting corrective work anywhere before the main lift
+  — which would stop the app noticing work that drifted into the middle of the
+  heavy sets, a real problem when it happens — and rejected leaving the score
+  alone. So the exemption needs BOTH halves, exactly as `primer_not_first` has
+  always had them: indicated for a flagged joint, AND nothing but warm-up or
+  other corrective work in front of it.
+  **Built**, in `quality-score.ts`, with the reasoning and her ruling in the
+  comment. New gate `test:rehab-order` (6 checks), **4 mutations tried, 4
+  caught** — including one that widens the exemption to the option she
+  rejected, and one that drops the injury requirement so core is always
+  forgiven. Both go red.
+  **TWO FIXTURE MISTAKES OF MINE, both caught before they became findings.**
+  I expected these exercises to be tagged as primers and said so before
+  measuring — zero core or carry movements carry that tier, so the exemption
+  had to run off the injury flag instead. And the drift fixture spliced the
+  corrective exercise out and back in at `mainIdx`, which by then had shifted
+  down one, so it landed AFTER the main lift and correctly did not fire: the
+  fixture was wrong, not the code, and it read exactly like the exemption being
+  too broad. Both recorded in the gate beside the checks they nearly broke.
+  **THIS CHANGES WHAT THE METRIC MEASURES.** Structure rises, and scores from
+  this commit on are not comparable with any earlier run — including the 11.57
+  recorded above. Quote them with that said.
+  **THE RE-SCORE, and the residue is NOT zero.** 9,216 profiles: overall
+  **11.59 / 12** (was 11.57, and **not comparable** — this is the metric change
+  she approved), Structure **1.97 → 1.99**, 0 below the floor.
+  `core_before_main` **725 → 148**. So **577 were the corrective slot, correctly
+  placed, and 148 are real.**
+
+  **WHAT THE 148 ARE, found by scanning until four turned up (292 combinations)
+  rather than by reasoning**: every one is the same shape, and it is not core
+  at all — it is a **loaded carry before the main lift**.
+      `full_gym | lower_back | 30-45 | combat | beginner | hypertrophy`
+      Tuesday: Scapular Push-Ups → Bird Dog → **Farmer's Walk** → Barbell Bench
+      Press → Landmine Press → Machine Lateral Raise
+  A loaded carry taxes grip and trunk bracing, and it belongs after the day's
+  main lift, not in front of it. **This is the genuine version of the reported
+  defect** — an eighth the size, and about carries rather than core.
+
+  **NOT FIXED, and named rather than half-done.** The cause is not the day
+  template: `Squat & Carry`'s own slot list already puts its carry after the
+  tier-1 knee-dominant slot, and the day-ordering sort ranks tier2 behind
+  tier1. So a carry is reaching a PUSH day ahead of the bench by some route
+  other than that sort — most likely the weekly `required_patterns: ['carry']`
+  coverage placing it without re-sorting. Root-causing that means working in
+  the selection engine, which is the heart of the app, and the CSCS review's
+  own question 2 ("what does it take away?") needs a measurement pass before
+  anything moves. Starting that at the end of a long session is how the next
+  entry gets written about a regression.
+  **Next session, in order**: root-cause the carry placement, fix, gate,
+  re-measure; then the progressive-overload audit (`frozen_week`, 4,060 —
+  split deliberate deload and calibration weeks from genuinely stalled ones
+  before treating any of it as a defect).
+
+- [x] **EVERY CHANGE NOW GETS A CSCS REVIEW — and its first outing found a
+  floor I had silently redefined an hour earlier.** Ashley, 18 Sep 2026,
+  widening the morning's delegation: *"All changes shoukd be viewed through the
+  lens of a certified cscs coach."*
+
+  **What changed in the rules.** The morning's instruction delegated the
+  DECISIONS; this one makes the coaching read a standing review of every change
+  that touches a prescription, including changes that raise no question at all.
+  It is now step 0 of "what finished means" in `CLAUDE.md`, ahead of the gates,
+  because it is the only step that asks whether the change is right for the
+  person training rather than whether the code is right. Five questions, and
+  the report has to answer them: what it does to the TRAINING EFFECT rather
+  than the number; what it takes AWAY; whether the fundamentals survive
+  (pattern coverage, progressive overload, recovery, specificity); whether it
+  quietly redefines an existing floor or ceiling; and whether it is in scope.
+
+  **QUESTION 4 PAID FOR ITSELF IMMEDIATELY.** Both time-cap trimmers stop at
+  "more than three exercises left". When the movement-prep slot became
+  unremovable earlier the same day, that three started COUNTING it — so the
+  tightest days bottomed out at **two training exercises plus a warm-up** where
+  they had held three. Measured with a constructed day at an 8-minute budget:
+  `[Wall Slides, Bench, Squat]`, three slots, two exercises. **Nothing failed.
+  The number three had not changed; what it meant had**, which is exactly the
+  class of defect no gate asserting "the floor is three" can see.
+  The CSCS answer is that a warm-up is preparation FOR a session, not content
+  OF it, so a floor on training content counts training content.
+  `trainingSlotCount` now backs both loops and the same day floors at three
+  real exercises with its prep intact.
+
+  **AND A MUTATION FOUND THE LIMIT OF THE NEW CHECK.** `stageTimeCap` is
+  module-private, so no constructed input can drive it: reverting ITS floor to
+  a raw array length was MISSED while the identical revert in the exported
+  trimmer was caught. §5f covers both on the property — neither loop may
+  express the floor as a count of slots — with §5g proving the detector on the
+  expression it forbids.
+
+  **Verified**: `test:pattern-floor` 29 checks, **13 mutations tried across
+  three rounds, 13 caught** (P12 only after §5f was added; before that it was
+  an honest MISSED and is recorded as one). `npx tsc --noEmit` clean.
+  **Not done at the time of writing**: the coverage re-measurement and the
+  plan-quality re-score for THIS change are still running. It makes the
+  tightest days hold one more exercise, so `time_fit` is the number to watch
+  and it is the one I would expect to move. Named, not assumed.
+
+  **THREE THINGS THE LENS FLAGS THAT I HAVE NOT TOUCHED**, ranked, from the
+  same quality report rather than from opinion — recorded here so they are
+  leads for a future session rather than background noise in a rule table:
+  1. **`core_before_main`, 725 plans (7.9%)** — core or finisher work placed
+     BEFORE the day's main lift. A fatigued trunk before a heavy compound is a
+     bracing and safety problem, not a preference; this is the one a coach
+     would fix first.
+  2. **`frozen_week`, 4,060 plans (44.1%)** — a week where load and reps both
+     hold and only the RPE label moves. Some of that is deliberate (deload,
+     calibration); the share that is not is a progressive-overload failure,
+     which is the single most important principle in the file. Needs splitting
+     by phase before anyone acts on it.
+  3. **`push_pull_imbalance`, 575 plans (6.2%)** — mostly pull-heavy
+     (0.57, 0.40 in the printed examples), which is the safer direction but
+     still outside the band the app sets itself.
+
+- [x] **TRAINING QUESTIONS STOP COMING TO ASHLEY — and the first two she gets
+  back were both already sitting in this file marked "hers to weigh".**
+  Ashley, 18 Sep 2026: *"Ask the questions you ask me regarding how the app
+  should act should be answered from a cscs perspective. So with that in mind
+  you should be able to answer them as a cscs coach would"*.
+
+  **What changed in the rules** (`CLAUDE.md`, *Asking*). The old line sent
+  every "what should a coach do here?" to her. Programming decisions now stay
+  here and get recorded with their basis: exercise selection and substitution;
+  sets, reps, load, rest and every floor on them; what gets protected when a
+  session is cut; warm-up and movement prep; movement-pattern coverage,
+  push:pull and volume; periodisation, deloads and progression; what counts as
+  a personal best; how other sport counts as load; and performance nutrition at
+  the population level the app already works at.
+  **Three things deliberately did NOT move.** What the app SAYS and how often
+  (voice, nagging, how much it asks before acting) is hers — "ask every time or
+  only when she sounds definite" is a question about her app's character, not
+  about training. What the app may CLAIM is hers. And a CSCS does not diagnose,
+  treat or write clinical nutrition, so the red-flag rule — sharp, one-sided or
+  worsening names a professional and changes NOTHING — stays exactly as it is
+  and is not mine to reopen.
+  **AND IT CHANGES NOTHING ABOUT RULE 5.** Deciding as a CSCS makes a decision
+  defensible; it does not make the coach's advice good. The coach exam still
+  has never run against the current coach, and "best-in-class advice" is still
+  asserted, not known.
+
+  **FIRST DECISION — a trimmed session loses sets, never a movement pattern.**
+  The rest work's own sweep showed squat-less weeks going 4 → 22 of 9,216, and
+  this file recorded it as "a consequence of her ruling, small, and hers to
+  weigh". It is not a preference: a microcycle containing no knee-dominant work
+  is an incomplete needs analysis, and push/pull/hinge/squat are the patterns a
+  programme is built from while accessory volume is the adjustable part. So it
+  is a defect and it is fixed.
+  **THE APP ALREADY HELD THE POSITION AND ONE LOOP DID NOT READ IT.**
+  `stageTimeCap`'s Phase 5 says in its own comment *"a short session should
+  mean fewer sets, not a session missing whole movement patterns"*. Phase 4 —
+  the loop immediately above it — removed whole exercises with no such guard,
+  and `sizeBlockToRestBudget`'s Phase B was written to match Phase 4 and
+  inherited the gap. Both now refuse to drop the day's LAST carrier of a
+  fundamental pattern. Per-day is enough to protect the week and needs no
+  cross-day plumbing: a pattern the week holds is held on some day, and on that
+  day it is the last carrier once its siblings are gone.
+  **A MEASUREMENT I HAD BEEN QUOTING WAS A LEAD, NOT A FACT**, and the report
+  artifact it came from no longer existed — so `scripts/measure-pattern-coverage.ts`
+  now re-derives it over the same 9,216-combination grid the quality sweep
+  uses, seeded per combination so a before/after is not measuring the dice.
+  ON THE WAY, TWO WRONG THINGS I DID NOT PUBLISH, both caught by checking
+  before asserting:
+  1. My first hypothesis was that the scorer asks the question in two different
+     vocabularies (the pool check reads `knee_dominant`, the week scan reads
+     `squat`) and that the 22 was an artifact. MEASURED AND WRONG —
+     `mapMovementPattern` coarsens one into the other and the scorer is
+     self-consistent. The loss is real.
+  2. The measurement's FIRST run reported **832 push-less weeks (9.03%)**,
+     which reads like a defect forty times larger than the one being fixed.
+     It was the measurement. Some injury combinations remove every pressing
+     movement from the pool, and a week cannot hold a pattern its own
+     constraints forbid — the scorer has always guarded exactly this
+     (`poolHasPush && pushSets === 0`), which is why its own report showed
+     nothing. **A NEW MEASUREMENT IS NOT COMPARABLE TO AN OLD ONE UNTIL IT
+     MAKES THE SAME EXCLUSIONS**, and the tell was that the two disagreed by
+     two orders of magnitude on a question they both claim to answer. Guarded,
+     and the number re-derived.
+
+  **SECOND DECISION — "kept light" is half the working weight.** Her 17 Sep
+  ruling gave a loaded prep move a starting weight; the residue named that day
+  was that the number shown was the movement's own WORKING weight, printed
+  under the word "Light". A specific warm-up set is submaximal by definition,
+  and the conventional first rung of a build-up is about half the working load.
+  **The app did not need telling.** `RAMP_SCHEMES` already starts every
+  experience level's build-up at 50% and the abbreviated scheme agrees, so the
+  prep weight is READ OFF the ladder printed on the same card rather than
+  written down again — change the ladder and it follows, and no number is
+  invented, which `load-prescription.ts`'s own header forbids.
+  **One decision, not four.** The four call sites each held their own copy of a
+  four-way ternary, which is exactly the shape that produced the personal-best
+  defect the day before and how the original 64-of-64 primer bug survived. They
+  now all call `resolveLoadFields`.
+  **AND A GATE WENT RED ON THE IMPROVEMENT.** `test:primer-load` §3 counted
+  occurrences of `primerCarriesWeight(` at the call sites — a MECHANISM — so
+  collapsing four copies into one shared decision took the count to zero and
+  the gate argued for keeping the duplication. Re-anchored on the property
+  ("one decision, reached from every site") plus a new §3d forbidding any
+  caller from re-deriving the branch, which is strictly stronger than what it
+  replaced. Same family as the grocery-list bullet on 13 Sep.
+  **AND A LINE NO MUTATION COULD KILL WAS DELETED.** `prepLoadKg` was written
+  with its own `Math.max(getEquipmentFloorKg(entry), ...)`; removing it changed
+  no value, because `roundToPlate` already floors on all five of its modes
+  against the same table. It was dead, it read as if the floor lived there, and
+  the gate now asserts the property one layer down where it actually is.
+
+  **Verified**: new gate `test:pattern-floor` (11 checks), **6 mutations tried,
+  6 caught**; `test:primer-load` extended to 36 checks, **8 mutations tried, 8
+  caught** (one re-aimed after a MISSED turned out to be the dead line above,
+  not a gap). `npx tsc --noEmit` clean. Plans and decisions:
+  `docs/plans/a-prep-move-that-needs-a-bell.md`.
+  **THE RE-MEASUREMENT LANDED, and the gate got stronger because of it.**
+  Guarded, over all 9,216 profiles: **push 0, pull 0, hinge 0, squat 0** — no
+  week is missing a fundamental pattern its own equipment and injuries could
+  have supplied. Squat-less weeks are 22 → 0.
+  **AND SECTION 3 OF THE NEW GATE WAS VACUOUS UNTIL THIS.** Measured: disabling
+  the guard entirely left all six of my hand-picked "obviously tight" profiles
+  passing, so only the unit checks were catching anything and the integration
+  section was decoration. Switching the defect back on behind an env flag and
+  re-running the real grid named four genuine offenders in minutes — **every
+  one a combat profile on a 30-45 minute session**, the style whose own rest
+  table asks the longest rests meeting the smallest budget, which is not a
+  combination I would have guessed. Those four are now pinned in §3 with the
+  same seed key the measurement used, and a new §4 hands the exported trimmer a
+  constructed day whose only squat sits last — deterministic, instant, and
+  guaranteed to be under pressure. With the guard removed §4 now shows the
+  defect exactly: the day keeps a lateral raise and loses its squat.
+  **Verified, final**: `test:pattern-floor` 15 checks, **6 mutations tried, 6
+  caught**, and unlike the first round the integration sections catch them too.
+  **AND THE BROWSER DRIVER WAS MEASURING THE FIXTURE, NOT THE APP** — the
+  third thing this build found about its own checks, and the worst of them.
+  `verify:prep-weight`'s `?prep=1` fixture hand-wrote `load.display`,
+  `load.starting_weight_kg` and `load.per_set` straight onto the slot, so the
+  prep weight never went through the primer branch AT ALL. Every green run of
+  that driver, including the ones reported yesterday, proved the fixture's own
+  number reached the screen and nothing about the app's decision.
+  **Found by mutation, not by reading**: doubling the log box's placeholder in
+  `SetGrid` changed no pixel, because the fixture was still supplying a per-set
+  ladder that a real primer no longer carries, so the row never reached the
+  line being broken. A MISSED mutation was the only visible symptom.
+  The fixture now calls `resolveLoadFields` — the one function generation and
+  the swap path both call — so it IS the app. New browser check 8, the one
+  thing no source gate can see: the number on the card and the number the log
+  box offers are read off one real screen and must be equal, which is the
+  "value right, two pixels disagree" shape this repo keeps finding. With the
+  fixture corrected the mutation is CAUGHT (card 12, box 24). And the driver's
+  own limit is written beside it: it proves the two pixels agree, not that the
+  number is half — break the halving and both would read 24 together. The
+  arithmetic belongs to `test:primer-load` §8; the pixels belong here.
+  On a real 390x844 screen the card reads **12kg against a 24kg working
+  weight** — the ruling, visible.
+  **AND THE FIX HAD A COST THAT WAS BIGGER THAN THE DEFECT, which is the whole
+  reason the measurement counts both sides.** The quality re-score came back
+  11.56/12 with 0 below the floor and `missing_squat_pattern` /
+  `missing_hinge_pattern` gone from the rule table entirely — and
+  `primerFit/primer_absent` up 14 → 102 in the same report. The committed
+  baseline artifact is two days old and covers the rest work too, so it could
+  not say whose those 88 plans were. **Attributed by measurement rather than by
+  reasoning**, running the same 9,216 grid twice with the guard switched off
+  and on:
+      guard off → squat-less 22, prep-less 16
+      guard on  → squat-less  0, prep-less 102
+  Mine. **Eighty-six warm-ups spent to save twenty-two squats**, and the cause
+  is structural rather than incidental: protecting something inside a trimmer
+  does not create room, it aims the trimmer at whatever is left — and what was
+  left was the movement-prep slot at the front of the day.
+  **Decided, same delegation, no ask**: movement prep is not adjustable volume
+  either. A short session means fewer SETS, which is what Ashley's "protect the
+  rest, do less" ruling already says one level up and what Phase 5 does once
+  Phase 4 runs out of things it may remove. A day that will not fit at every
+  set floor is a day that does not fit, and the app says so rather than quietly
+  deleting the warm-up. `isLastCarrierOfPattern` became `isStructuralSlot` and
+  both trimmers ask the wider question; §2c forbids either from asking the
+  narrower one again, because that state is exactly what this replaced.
+  **THE GENERAL LESSON, and it is worth more than the fix**: a measurement that
+  counts only what a change BOUGHT is half a measurement. This one bought 22
+  and spent 86, and nothing in a green gate would have said so.
+  `test:pattern-floor` is now 21 checks.
+  **THE COVERAGE RE-MEASUREMENT WITH BOTH PROTECTIONS, over all 9,216: push 0,
+  pull 0, hinge 0, squat 0, prep-less days 0.** Better than the state before
+  any of this week's work, which had 16 — so those 16 were trimmer removals
+  too, and nobody had looked.
+  **AND §3 CAN NOW SEE IT.** Three real prep-loss cases from the guard-on run
+  are pinned beside the four squat cases, and §3c asks the prep question of
+  every generated day. Proven: with the primer branch removed, §3c goes red and
+  names four combat profiles by combination — so the integration section
+  catches this one, not just the unit check. The same discipline as the squat
+  half: **let the broken code name the fixture.**
+  `test:pattern-floor` is 22 checks; **10 mutations tried across the two
+  rounds, 10 caught**, and both the pattern half and the prep half are now
+  caught at the integration level as well as the unit level.
+  **THE FINAL PLAN-QUALITY RE-SCORE, both protections, 9,216 profiles:
+  11.57 / 12, 0 below the 7.2 floor** — the first time the overall average has
+  moved off 11.56 all week, and it moved UP. Per dimension: time fit 1.94,
+  structure 1.97, progression 1.82, selection 1.90, goal alignment 1.94,
+  primer fit 2.00. `missing_squat_pattern`, `missing_hinge_pattern` and
+  `primer_absent` are all absent from the rule table.
+  **AND THE FEARED TRADE-OFF DID NOT HAPPEN.** The worry was that protecting
+  both patterns and prep leaves a squeezed day with nothing it may remove, so
+  the overrun would come back: `timeFit/time_fit` is **339, identical to the
+  patterns-only run** and still far below the 403 this week started from. The
+  pressure fell through to SETS, which is where the house ruling says it
+  belongs, and the set floors absorbed it. Nothing to put to Ashley: the
+  question only needed asking if the number had moved.
+  So against the state before this week's work: squat-less weeks 4 → 0,
+  prep-less days 16 → 0, time-budget violations 403 → 339, overall 11.56 →
+  11.57, and 0 plans below the floor throughout.
+  **Re-run after this second fix** (a fix made in response to a measurement is
+  not covered by that measurement): `block-rest-sizing`, `rest-floors`,
+  `session-length`, `session-shortfall`, `main-lift-rest`, `cardio-share-score`,
+  `edit-keeps-the-bar`, `session-edit`, `block-phases`, `frozen-weeks`,
+  `primer-load`, `pattern-floor` and `audit` — all green. `npx tsc --noEmit`
+  clean.
+  **THE TRACKED MEASUREMENT ARTIFACTS ARE STALE AND ARE LEFT THAT WAY ON
+  PURPOSE, which is worth naming so nobody reads them as current.**
+  `quality-report.txt` is the 16 Sep snapshot and now disagrees with the app on
+  three numbers this entry cites: it says overall 11.56 (now 11.57), time fit
+  1.93 (now 1.94) and `missing_squat_pattern` 4 (now absent). I staged a
+  refresh and the pre-commit hook refused it; on reflection the hook is right
+  and so is the standing rule. Refreshing a baseline is a deliberate act that
+  belongs in its own commit — doing it as a side effect of a feature change is
+  exactly how a stale baseline gets believed — and I would have refreshed two
+  of the three, leaving the set inconsistent by date, which is a new hazard
+  rather than a fix. The numbers above are the record; the artifacts are not.
+  No deploy needed; frontend ships on merge.
+
+- [x] **FIVE FROM THE GYM FLOOR, AND TWO OF THEM WERE ALREADY FIXED AND
+  UNMERGED.** Ashley, 18 Sep 2026, mid-session, five reports. Triaged by
+  reading her phone's code (`origin/main`) against the branch rather than
+  assuming:
+
+  **Already fixed, waiting on the merge (2 and 3).** *"Ramp up weights didnt
+  show input fields"* and *"after logging first set ramp up weights were no
+  longer shown"*. Measured: `origin/main`'s set grid has no warm-up rows at all
+  and still renders the tickable strip on today's card; the branch replaces it
+  with a box per set. **The harm was live while she trained**: with no build-up
+  boxes she typed the first ramp step (20kg x 10) into working set 1, and the
+  app fired a PERSONAL BEST for it. That is the contamination the branch's
+  `workingSetsOf` fix exists to prevent, happening in the gap between building
+  it and merging it.
+
+  **1. A prep move that needs a bell now gets a weight.** Her kettlebell swings
+  sat in the prep slot with no weight anywhere on the card and a box offering
+  0; she put 24kg on the bell and logged it. MEASURED: `prescribeLoad` had
+  already worked out a number for that slot and **four** call sites discarded
+  it for every primer — and across a generated mesocycle 64 of 64 primers
+  carried none. The swap was faithfully reproducing generation, so this was
+  never a swap bug. **Her ruling, from three options: a starting weight, kept
+  light**, over "say Light, no number" and over asking her once and
+  remembering. A prep move needing no kit still shows no number.
+  **The gate found the fourth site.** The build started from three and §3c went
+  red on a rotation path nobody had listed — a rule applied at three of four
+  places, which is the shape of the original defect.
+  **AND A CORRECTION TO MY OWN PLAN, measured before shipping.** It claimed the
+  number "is computed as prep" because the primer's RPE label is passed to
+  `prescribeLoad`. It is not: same movement, same profile, three labels, 10kg
+  every time. So the card shows the MOVEMENT's own conservative starting
+  weight, not a reduced one — honest, and better than a blank card, but only
+  half of "kept light". Named as a residue in the plan: the real fix takes the
+  fraction from the warm-up ladder the app already builds, and that is its own
+  change with its own measurement.
+
+  **A second defect on the same card**: with nothing prescribed the weight box
+  defaulted to `0`, so a blank tap logged 0kg. A default is a prescription, and
+  `load-prescription.ts:12` forbids the app inventing one. It now says *type
+  it* where the movement needs a weight, and keeps 0 only where 0 is the
+  honest record.
+
+  **4. The logging column says what it is counting, and in what.** *"says
+  distance 40 but it's not clear if that's feet meters etc."* The unit was in
+  the prescription ("3x40m") the whole time and thrown away on the way to the
+  screen. Now "Distance · m", "Hold · s", "Duration · min" — read off the
+  prescription, never guessed, and `Reps` stays plain because the word is the
+  unit. The standing no-number-without-its-unit rule, one column across.
+
+  **5. A row of identical chips stops pretending to be a ladder.** *"there's no
+  ramp up sets which is fine but the ui makes it seem as if there is because
+  the numbers are also at the top."* S1 18kg, S2 18kg, S3 18kg sat in the exact
+  position and shape of a build-up strip, saying nothing the big number above
+  had not. They now render only where the loads actually differ — the same
+  reasoning the calibration-week rule beside them already used, generalised:
+  the chips earn their place by disagreeing.
+
+  **Verified**: new gate `test:primer-load` (24 checks), **9 mutations tried, 9
+  caught**, all applied, all ran the full 24. New driver `verify:prep-weight`
+  (6 checks) on a new `?prep=1` fixture — the generator will not produce a
+  loaded primer on its own, so the fixture puts the bell in the slot the way
+  she did. **The driver corrected a check of mine on its first run**: I asserted
+  the full prep sentence was on the card and it is not — that string is the
+  slot's guidance and lives one tap away; what the card carries beside the
+  number is "Light — movement prep". Recorded as it is, not as I hoped.
+  21 source gates green, `test:audit` clean, `npx tsc --noEmit` clean.
+  **THE QUALITY SWEEP THIS ENTRY OWED, now finished and recorded here rather
+  than in a later entry.** 9,216 profiles: overall **11.56 / 12**, **0 below
+  the 7.2 floor**, primer fit **2.00**, time fit 1.94. Those are identical to
+  the figures the rest-floor entry below already recorded, to two decimal
+  places on every dimension — so giving a loaded prep move a weight changed
+  nothing measurable about plan quality, which is what I hoped and had not
+  proven. The tracked baseline it was diffed against is the 16 Sep artifact, so
+  the 1.93 → 1.94 in that diff is the rest work, already attributed below and
+  **not claimable twice by this change**.
+
+- [x] **THE PRE-MERGE SWEEP: four real failures, and the worst one was a gate
+  that had never been green.** 257 gates and drivers run before merging.
+  Three failures were environmental (`meal-quality`, `schema-parity`, and
+  `verify:rls` — all need a live database this machine cannot reach) and two
+  more were MY SWEEP HARNESS, not the code: `test:audit` and
+  `test:injury-adaptation-safety` print megabytes of trace, and the runner's
+  1MB output buffer turned both into a thrown error. Both exit 0 when run
+  directly. **The tell was `checks=0` in a column I only have because
+  CLAUDE.md already says to compare how many checks RAN.**
+
+  **1. `test:rest-floors` was RED AT THE COMMIT THAT INTRODUCED IT**, and I
+  reported it green with "22 checks, 6 mutations, 6 caught". Proven by checking
+  out that commit in a throwaway worktree and running it there: identical
+  failure. It asserted a flat 45s floor for second-tier compounds — the lowest
+  value in the 1,728-profile sample behind the entry below. Combat's own table
+  asks 60s of that tier, a conditioning block's adaptation phase shifts rest by
+  -20s, and the floor deliberately returns the smaller of the two so a block
+  that genuinely wants 40s gets 40s. **The app was right; the number was a
+  measurement dressed as a rule.** The floor is now derived in the gate from
+  the style's rest row and the deepest phase shift, printed on every run, with
+  her actual report kept beside it as an absolute: no second-tier compound at
+  30s or less, whatever the tables say. 24 checks, 4 mutations tried, 4 caught
+  — including one that halves the shared cap, which only the absolute catches.
+
+  **2 and 3. Two gates my change broke that were nowhere near my affected
+  set.** `test:soft-preferences` — putting weight above everything meant a
+  stated LIKE no longer brought its movement to the front. That is a limit on
+  her ruling rather than an oversight: she was asked about style against
+  weight, and the 10 Sep rule says a loaded lift is not replaced by an unloaded
+  one BY DEFAULT — "I like push-ups" is not the default, it is an instruction.
+  The keys are now, outermost first: a stated like, then loaded, then style,
+  then implement quality, then the ranker. And `test:style-starve` pinned the
+  literal sentence "equipment, injuries, style and skill level", which my
+  change had to correct because style no longer filters — so the check went red
+  on the CORRECTED copy and would have enforced the lie. Same shape as the
+  coach prompt and the grocery list on 13 Sep. Re-anchored on the property.
+
+  **Nothing here would have been found by the gates I derived as affected.**
+  That is the third time this month the sweep has earned its hour, and the
+  second time a gate reported green at the commit that introduced it.
+  All four fixed. **NOT a second full sweep** — 17 source gates and 4 browser
+  drivers covering everything the fixes touched, re-run green after them, which
+  is what the "a fix made in response to a sweep is not covered by that sweep"
+  rule asks for and is the honest description of what was done.
+  Final: 249 of 257 pass; the 8 are 3 environmental, 2 harness, 3 fixed.
+
+- [x] **THE SWAP OPTIONS HER TRAINING STYLE WAS HIDING — and the collision
+  that showing them caused.** Ashley, 18 Sep, standing next to a leg-curl
+  machine on a functional plan: every alternative the app offered was a slider,
+  a band or a bodyweight curl. All three machine leg curls are tagged
+  bodybuilding and the style stage of the filter removed them outright.
+
+  **MEASURED TWICE, and the second measurement corrected the first.** 31 of the
+  catalogue's 45 machine and cable entries carry no functional tag — a
+  convention, not a slip, so retagging them would change what every functional
+  trainee is PRESCRIBED. And the all-unloaded list needs the outgoing lift to
+  be the Dumbbell Leg Curl, the only loaded option her style allows; swap a
+  machine and the dumbbell version is still offered. The note carried over from
+  14 Sep said "functional and combat produce an all-unloaded list" and never
+  named that condition.
+
+  **Her ruling, from three options: SHOW THEM, MARKED.** Over retagging the
+  machines, and over leaving the search box as the only route to one. Style is
+  the only one of the four filter stages that may be relaxed, and the filter's
+  own comment already said why — *"style is a preference, not a safety
+  constraint"*. Equipment, injuries and skill still remove, all three gated.
+
+  **THEN IT BROKE AN EARLIER RULING OF HERS, AND THE GATE CAUGHT IT.** Sinking
+  off-style options put a matching SLIDER above a non-matching MACHINE — a
+  loaded lift offered bodyweight replacements first, which is the exact report
+  behind her 10 Sep rule. Measured at 8 movements in the hybrid catalogue
+  alone, among them the lateral raise and the shrug. **Her second ruling, from
+  three options: WEIGHT ALWAYS WINS.** For a lift carrying a number every
+  loaded alternative comes first whatever its style, each marked on its own
+  row; the unloaded ones follow. She rejected keeping style outermost (it
+  re-creates the 10 Sep report with an explanation attached) and a narrow
+  override firing only where her style offered nothing loaded.
+
+  That second ruling changed the SHAPE of what had just been built, not only
+  its order: a "matching group, then the rest" layout cannot draw a loaded
+  off-style option above an unloaded matching one, so the heading over a group
+  became a marker on each row. Live on a real 390x844 screen: *Cable Shrug*
+  under an outline badge reading **Outside your training style**, third in a
+  list whose first two are the loaded options that match.
+
+  **NO PARITY GAP, and the check is the useful part.** The coach's swap
+  resolves the incoming name from the whole catalogue, never from the filtered
+  pool — so it could ALREADY swap in an off-style machine while the screen
+  could not. This closes the gap from the narrow side rather than opening one.
+  (The coach's ADD path does use the strict pool; that is a different verb with
+  its own ruling and is untouched.)
+
+  **Verified**: new gate `test:swap-style` (28 checks, **14 mutations tried, 14
+  caught**, all applied, all ran the full 28) — it holds the two sort keys
+  separately, because "off-style never above on-style" is now false by design
+  and checking them as one rule is what produced the wrong build first time.
+  Four new browser checks in `verify:session-edit` §8 off a new full-gym
+  functional fixture. `test:single-implement` is what caught the collision.
+  20 source gates and 3 browser drivers green; `npx tsc --noEmit` clean.
+
+  **TWO THINGS THE BROWSER FOUND THAT NO SOURCE CHECK COULD**, both while the
+  grouped version still existed: a geometry check comparing option rectangles
+  read a correctly-painted screen as interleaved, because the matching list is
+  a 320px scrolling box and the fourth row's rect extends past the box it is
+  clipped inside — the comparison has to be against the BOX; and a backtick
+  inside a comment inside an injected template literal killed the whole driver
+  with a syntax error, which CLAUDE.md already records from 17 Sep.
+  No deploy needed; frontend ships on merge.
+
+- [x] **WHOSE NUMBERS ARE IN THE BOXES — the faint figures now say "last time".**
+  Ashley, 18 Sep, reading her own dumbbell rows: *"Last sets prescribed were
+  sets of 11 reps. Is thay correct at the end of a exercise?"* Nothing had
+  prescribed 11. The faint 9, 11, 11 in the boxes were her OWN last session,
+  drawn in exactly the grey the app uses for a suggestion on a row with no
+  history. Two different things, one appearance, and nothing on screen telling
+  them apart — she read her history as a prescription, and it was the only
+  reading the screen supported.
+
+  **Her ruling, 18 Sep 2026, from three options: MARK THEM "last time".** The
+  numbers stay in the boxes where her thumb is, and a small marker sits on the
+  row whenever they are history. She rejected moving them out of the boxes to a
+  line above the sets (it costs the one-tap repeat) and emptying the boxes
+  entirely (it costs the repeat outright).
+
+  Live on a real 390x844 screen: *last time 9kg × 1* under each working row, in
+  the dimmest grey on the card, and nothing at all under the build-up row above
+  them or under any lift with no session behind it.
+
+  **THE SENTENCE CARRIES THE KIND OF QUANTITY, NOT JUST THE NUMBER** — the
+  17 Sep personal-best rule, one screen along. "last time 9" beside a weight
+  box reads as 9kg. So the phrasebook takes one reading over a three-case union
+  (loaded / bodyweight / belted) and there is no default branch; a belted dip
+  reads *+12kg × 5* and an unweighted row never prints "0kg". And the
+  ternary that turns a stored row into that reading is in the phrasebook too,
+  not at the JSX — it is the same shape that put "12 kg" on a reps record from
+  three call sites, two of which got it wrong.
+
+  **THE BRANCH ORDER IS THE WHOLE CONTENT OF THAT FUNCTION.** A belted set
+  carries the bodyweight flag AND an added load, so added load has to be tested
+  first or the belt is silently lost; and a row with no weight is a bodyweight
+  row whether or not the flag is set, because the flag arrived after the rows
+  did. Both are gated.
+
+  **Verified**: new gate `test:last-time` (29 checks), **10 mutations tried, 10
+  caught**, every one confirmed to have applied and to have run the full 29.
+  Six new browser checks in `verify:one-number` — the driver already loads a
+  real logged session on today's lift, which is the same screen and the same
+  confusion — **5 mutations tried, 5 caught**, and the mutant bundle rebuilt
+  away afterwards. One of the six had nothing to read at first: this fixture's
+  logged lift is a tier-2 under 60kg and the generator prescribes it no
+  build-up, so the driver now taps "+ Add warm-up" and reads the row it makes,
+  which is the stronger check anyway — a row created at runtime is exactly what
+  no source check can see. 20 source gates and 4 browser drivers re-run green;
+  `npx tsc --noEmit` clean.
+
+  **THE BUNDLE CEILING HAD ZERO ROOM AND A ONE-KILOBYTE FEATURE TIPPED IT.**
+  Measured on this branch minutes apart: 940 kB without the marker, 941 with
+  it, against a 940 budget. Raised to 960 — Ashley's 15 Sep ruling applied
+  (raise with room to grow, over trimming on every commit), not a new decision,
+  and the measured 941 is recorded beside it rather than the note's inherited
+  figure. **Two more ceilings are now within 2 kB of their line** (the deploy
+  re-download at 263 of 264, first paint at 418 of 420) and will trip on
+  whatever lands next. They are named here rather than pre-emptively raised:
+  they are not crossed, and the headroom line prints them on every run.
+
+  **THE QUALITY SWEEP OWED BY THE ENTRY BELOW, now finished.** Protecting rest
+  cost nothing measurable: 9,216 profiles, overall 11.56/12 before and after,
+  **0 below the 7.2 floor** either way, and time fit up 1.93 → 1.94 with 40
+  more plans in the top band. Time-budget violations fell 403 → 339, which is
+  the overrun fix the rest work exposed. **One rule moved the wrong way and is
+  a real cost of "do less": plans with no squat pattern at all went 4 → 22 of
+  9,216** (0.04% → 0.24%). Shedding an accessory to pay for rest can take the
+  week's only squat with it when the day's main lift is something else. Not
+  fixed — it is a consequence of her ruling, small, and hers to weigh.
+  No deploy needed; frontend ships on merge.
+
+- [x] **REST THAT SUITS THE EXERCISE — her 30-second lat pulldown, and the two
+  older things under it.** Ashley from the gym floor, 17 Sep: *"The rest breaks
+  between the lat pulldown seem very short 30s, check that is correct."*
+  Measured across 1,728 profiles: **49.2% of every exercise in a week rested 30
+  seconds or less**, and 29.1% of second-tier compounds — the lat pulldown's
+  class, prescribed 75s by the style's own table — were at or under 30. Nothing
+  was miscalculating. The session did not fit and the generator paid for the
+  overrun out of rest, down to a flat 30 written in two independent places.
+
+  **Her ruling, 18 Sep 2026, from four options: PROTECT THE REST, DO LESS.**
+  Every exercise keeps a rest that suits it; the session sheds an accessory or
+  a set instead. She rejected keeping the work at short rests (the behaviour at
+  the time), a flat one-minute middle floor, and being told to train longer.
+  Her reason, in the option she picked: *30 seconds on a lat pulldown isn't a
+  short rest, it's a different exercise, and you can't hit the reps it's asking
+  for.*
+
+  **After, on the same sample**: 20.1% of exercises at or under 30s, and
+  **0.0% of second-tier compounds** — minimum 45s, median 60s, up from 0s and
+  45s. Isolation median 27s → 45s. Exercises per day unchanged at a median of
+  7. Read off a real phone screen: 120s on the squat, 60s on the carry, 45s on
+  the accessories, 20s on the primer.
+
+  **THE PLAN SAID TWO PLACES HELD THE 30; THERE WERE THREE.** Wiring the two
+  known ones barely moved isolation (71.0% → 68.7%). The third is the per-week
+  phase shift: the trimmer took a 60s slot to its new 45s floor and the
+  adaptation phase then applied its own deliberate -15s. Two floors, each
+  correct alone, spending the same fifteen seconds twice. **A floor has to be
+  read off the UNBUDGETED prescription, never the live value** — against the
+  live value it can only ratchet downward and locks in whatever an earlier pass
+  already cut. Recorded in CLAUDE.md as a general rule; anything clamped at
+  more than one stage has this shape.
+
+  **AND PROTECTING REST EXPOSED A DEFECT THE CUTS HAD BEEN HIDING FOR AS LONG
+  AS THEY HAVE EXISTED.** 17 of 576 sessions in the tightest bucket started
+  running past the time their trainee had set aside — not because of the
+  floors, but because every pass sizes a day against BASE reps while the
+  per-week ramp grows the work inside it (13-15 becomes 16-18 by week 11) and
+  nothing ever asked again. The rest trimmers had been quietly absorbing it.
+  Closed by costing each week's day exactly as the screen will draw it, at the
+  point where reps and rest are both final. All three buckets now report zero
+  overruns and the "too short" counts are unchanged, so it sheds only what is
+  genuinely over.
+
+  **TWO CHECKS HAD TO BE CORRECTED, AND THE WORSE ONE WAS MINE.**
+  `test:today-only` asserted that an impossible target squeezes REST as well as
+  sets — true until her ruling, and left standing it would have made the ruling
+  un-implementable on the "just today" path. And `test:rest-floors`, the new
+  gate, **was written unseeded: it passed, then failed on its very next run
+  against identical code**, because plan generation rolls dice unless a caller
+  seeds it. Worse than a flake — the six mutations run against that version
+  were worthless, and three of them were MISSED once it was deterministic. It
+  now seeds every plan, samples a deliberately SQUEEZED profile (the trimmers
+  only run on a day that is over budget, so comfortable fixtures never reach
+  the code the gate exists to hold), and reads the style table column by column.
+
+  **Verified**: 20 source gates green including `session-length`,
+  `main-lift-rest`, `cardio-share-score`, `frozen-weeks`, `block-phases` and
+  `edit-keeps-the-bar`; `npx tsc --noEmit` clean; the card read on a real
+  390x844 screen. New gate `test:rest-floors` (22 checks), **6 mutations tried,
+  6 caught** — the earlier round of 6 is reported as VOID, not as passing.
+  Plan and measurements: `docs/plans/rest-that-suits-the-exercise.md`.
+  **Not done at the time of writing**: the 9,216-profile quality sweep is still
+  running; its before/after numbers go in the next entry. No deploy needed.
+  RESOLVED: it finished and its numbers are in the bundle-ceilings entry above
+  — 11.56/12, 0 below the floor, time fit 1.93 → 1.94, and the one real cost,
+  squat-less weeks 4 → 22 of 9,216. Pointer added because a "goes in the next
+  entry" line with nothing linking to it gets read as still open.
+
+- [x] **THE FULL SWEEP, AND THE FOUR THINGS IT CAUGHT THAT THE AFFECTED-GATE RUN
+  COULD NOT.** 201 gates and 47 browser drivers run, 242 of the 248 pass.
+  **TWO CORRECTIONS TO THE FIRST VERSION OF THIS ENTRY, both my own:** it said
+  "248 checks", which is wrong by a factor of about twenty — 248 is the count
+  of gates and drivers, each holding anything from one check to 170. And it
+  said both environmental failures were confirmed by their own "Host not in
+  allowlist" line. Only `test:meal-quality` prints that. `test:schema-parity`
+  prints *"Failed to link to TEST … Nothing was run against it"* — the same
+  cause, an unreachable database, said in different words, and it refuses to
+  report a verdict rather than passing over a link it never made, which is the
+  behaviour to want. The correction matters because the rule this file already
+  carries is to read each failure's OWN output rather than tick names off a
+  list, and I wrote the summary sentence before doing that for the second one.
+  The other four were real, all from part 1 of the set-boxes work, and none of
+  them could have been in the affected set I derived:
+
+  1. **Two gates had been CRASHING, not failing.** `test:what-happened` and
+     `test:session-move` built their day fixtures with the field name a day
+     carried before it had two kinds of set. The reader throws on `undefined`,
+     the module dies at import, and **193 checks across the two files ran zero
+     times** while printing what looks like an ordinary failure. Fixed, and
+     mutation-proved they assert something again.
+     **This is the "compare the checks that RAN, not just the failures" rule
+     paying for itself**, and the reason the affected-gate run missed them is
+     worth keeping: I derived that set from the files I had edited in part 2,
+     and these two read a file edited in part 1. A sweep is the only thing that
+     asks every gate.
+  2. **A driver was typing into a box that no longer existed.** The absurd-weight
+     driver asked for the row ending `-2`; rows are `-s2` (working) and `-w2`
+     (build-up) now, so the weight went nowhere, the save was refused for an
+     EMPTY box, and the driver reported that the over-ceiling warning had
+     disappeared. **A failing check's name is not its finding** — the warning
+     was fine; the typing was not.
+  3. **A driver was still testing the retired ticks.** `verify:six` — the one
+     that replays Ashley's own six reports — drove the tick strip her 17 Sep
+     ruling removed. Its block now drives the boxes instead, keeping the two
+     properties that mattered under either design: what is logged survives a
+     trip to another tab, and a build-up never moves the working-set counter.
+  4. **A MUTATION HARNESS THAT REBUILDS A BUNDLE MUST REBUILD AFTER RESTORING
+     TOO.** Restoring the source file leaves the MUTANT bundle on disk, so the
+     next driver run measures the break that was just undone. It cost one
+     false alarm here: a clean tree "failed" a check it had passed ten minutes
+     earlier, and the finding was the harness, not the app. Same family as
+     "the harness is not the app", one level down.
+
+  Net: 4 gate files and 2 drivers fixed, 4 mutations tried and 4 caught
+  (one of which had to be redone — the first version broke a filter the
+  counter does not read, which applies, runs, and creates no defect).
+
+- [x] **A BOX FOR EVERY SET, part 2: the rows, and the seven things drawing them
+  found.** Her 17 Sep ruling rendered. Today's card shows **W1 W2 W3 W4** with
+  their prescribed weights in real boxes, under *"Warm-up · doesn't count
+  toward your weight going up"*, then **1 2 3** at the working weight — one
+  grid, one weight column, so it reads as a single build down the card. "+ Add
+  warm-up" sits beside "+ Add Set". Read on a real 390x844 screen, not inferred
+  from a build that succeeded.
+
+  **The tickable ramp strip is GONE from today's card**, which is what her
+  ruling means: the build-up is logged like any other work now. The strip
+  survives read-only on browse and peek, where a tick would have marked a set
+  on a day nobody is training.
+
+  **SEVEN FINDINGS, five of them defects nothing would have caught.** Listed
+  because each is a different shape:
+
+  1. **"Add Set" was a dead control, and had been since it was written.** The
+     new row went into the stored record correctly and no pixel moved until
+     something unrelated re-rendered the card — nothing subscribes to that
+     store. Measured in the browser: one keystroke in a weight box brought in
+     two missing rows at once. Fixed by mirroring the rows in React state, the
+     pattern the ramp ticks had already proved, with the record still the
+     durable copy for a reload mid-session. **A control that writes and does
+     not redraw is a dead control** — invisible from the source, invisible
+     from the data.
+  2. **Two rows shared one spoken name.** The tick button said "Save set 2" on
+     both warm-up 2 and working set 2 — the same words for a screen reader and
+     for every driver. `verify:calibration-search` proved it by logging the
+     WARM-UP when it meant set 1, which made the next-weight chips and the
+     empty-box refusal both look broken when neither was. `setLabelLong` had
+     been imported for exactly this and never wired: declared, not rendered.
+  3. **Two row-state writes were missed in the re-keying.** `rowErrors` and
+     `inputs` are string-keyed records, so `[setNumber]` compiles, type-checks
+     and files the value under "2" where "w2" and "s2" are read: a red error
+     cleared a key nothing reads, and the just-logged numbers went where the
+     boxes never look. `tsc` clean, every gate green. Gated now.
+  4. **The calibration next-weight chips were being offered on build-up rows.**
+     They climb off the previous WORKING set, so warm-up 2 would have proposed
+     a weight derived from working set 1. Scoped and gated.
+  5. **A gate would have kept dead code alive.** Fourteen checks pinned the
+     tick toggle's `onClick`, its `aria-pressed`, its border-before-tap and
+     four pieces of `rampTicks` state. Deleting the machinery her ruling
+     retired would have turned them red — so the gate would have been
+     ENFORCING code nothing renders. CLAUDE.md warns a mechanism-pinned check
+     can enforce a drift; this is the strongest form of it yet seen here.
+  6. **A driver whose subject is deliberately deleted is replaced, not
+     re-anchored.** `verify:ramp-ticks` measured the tickable strip on today's
+     card. It is now `verify:ramp-readonly`, holding the OPPOSITE property on
+     the surfaces that still show the strip: nothing in the block may be
+     tappable on a day that is not today. The "→ then set 1" line rendered
+     only on the tickable surface, so removing the ticks would have silently
+     taken the sentence stating the ORDER off the only screen still showing
+     it — her 10 Sep ruling, undone by a deletion. It is unconditional now.
+  7. **The plate calculator renders only where there is a plate to load**, so a
+     `verify:session-edit` check went red for a good reason: it asked whether
+     ANY row carried one, and the open row was a band warm-up. Her 14 Sep
+     ruling is untouched — changes to the exercise live in the ⋮, the plate
+     calculator stays on the row — and the check now opens a row with a weight,
+     plus the opposite case.
+
+  **Verified**: 25 source gates and 7 browser drivers green, `npx tsc --noEmit`
+  clean, the card read off a real phone-sized screen. **33 mutations tried, 33
+  caught** — three checks were rewritten because their first version missed (a
+  `return`-within-160-characters window a later `return` satisfied; a guard
+  check that passed with `{false && …}` in front of it; and a revert that left
+  the `setState` in place, so the re-render still happened and the defect was
+  never created). New gate `verify:warmup-rows` (26 checks) proves what no
+  source check can: that the rows are actually on the screen.
+  **Not done**: the full sweep, and the merge to `main` — both need her word.
+  Nothing here needs an edge-function deploy.
+
+- [x] **A BOX FOR EVERY SET, part 1: the half that had to land first.** Ashley's
+  ruling, 17 Sep 2026, from three options — *"A box for every set, labelled —
+  Warm-up 1, 2, 3 then Set 1, 2, 3. Warm-up boxes are marked as warm-ups so
+  they never count toward your weight going up."* **This reverses her 7 Sep
+  ruling** ("tick them off, don't record them"), which was made about a strip
+  of chips before anyone had watched a real lifter run out of rows. She was
+  told it was a reversal and chose it anyway.
+  **THE ROWS ARE NOT DRAWN YET. This is everything that would have been WRONG
+  the moment they were** — built first deliberately, because a rendering change
+  that ships a data bug is worse than no rendering change. Six readers and four
+  writers had never had to think about a warm-up row, because until today none
+  could exist.
+
+  **A SET'S IDENTITY IS A KIND AND A NUMBER, NOT A NUMBER.** Two namespaces
+  (warm-up 1 and working 1 are different rows), which is FORCED by four
+  mechanisms that already exist rather than chosen: the database unique
+  constraint, the local natural key which already spells the kind 'w'/'s', the
+  session dedupe key, and the renumbering group key. So no migration and no
+  renumbering — but every place the SCREEN used a bare number as an identity
+  became a collision the moment both can exist.
+
+  **THE WORST OF THEM: `deleteSet` took the kind as OPTIONAL, defaulting to
+  false, and all four callers omitted it.** Deleting warm-up 2 would have
+  tombstoned WORKING set 2. It is REQUIRED now, which turned four silent wrong
+  answers into four compile errors — the only version of this that stays fixed.
+  One caller had the right value three lines away and was not passing it: the
+  chat correction path already writes a pre-image carrying `isWarmup`, then
+  deleted without it.
+
+  **THE WEEK STRIP WOULD HAVE SAID SHE TRAINED.** Tick three build-up boxes,
+  walk out, and `workoutLogs.length > 0` read as "partial" — and the same field
+  satisfied the guard written FOR her Thursday, the session marked complete
+  with nothing in it. Fixed by a RENAME rather than a filter: `workoutLogs`
+  becomes `workingLogs` + `warmupLogs`, so every reader has to say which it
+  meant instead of inheriting the old answer. The build-up rows are kept, not
+  dropped — they are real history.
+  **A BUILD-UP IS NOT A PERSONAL BEST.** Filtered structurally in
+  `toSessionSets` rather than at each caller. The bodyweight record would have
+  broken first: her 16 Sep ruling made "most reps in one set" the record when
+  there is no weight, and a build-up set is by design the highest-rep set of
+  the session — a 15-rep opener would have taken the record from a hard 12.
+  **AND A BUILD-UP IS NOT "ADDITIONAL WORK"** — that loop never skipped
+  warm-ups while its sibling twenty lines away always has.
+
+  **THE GUESS NOW RETIRES ITSELF.** `workingSetsOf` (yesterday's read-time
+  unfreeze) exists only because nothing could mark a warm-up. From the moment a
+  session carries one real build-up row the app KNOWS, and a heuristic that
+  kept running would start throwing away genuine light work — a back-off set,
+  a deliberately easy last set. It now stands down when told.
+
+  `working-sets` (31), `training-week` (50, was 39), `bodyweight-progress`
+  (78, was 74). 7 mutations tried, 7 caught.
+  **TWO THINGS FOUND BY MUTATING, AND BOTH WERE MINE.** The first version of
+  the week-strip mutations was "caught" by CRASHING the gate at 8 checks of 50
+  — the fixtures had no warm-up field, so a reader touching it threw rather
+  than failing an assertion. Every fixture carries one now, and the same
+  mutations fail cleanly with all 50 running. And **a mutation collapsing the
+  partition passed every check**, because the gate builds its own fixtures and
+  never exercised the code producing them — the behaviour was guarded and the
+  thing PRODUCING it was not. The partition is an exported pure function now,
+  checked directly.
+  **AND I REINTRODUCED, BY HAND, THE DEFECT I FIXED THIS MORNING.** My two new
+  sections landed BELOW `test:training-week`'s `process.exit(1)`, so they
+  printed FAIL and the gate exited 0 — the identical hole found in
+  `test:slot-replacement` a few hours earlier. Appending to a gate is exactly
+  when this happens. One exit, at the bottom, in both files now. A `grep` for
+  gates missing the same thing produced twenty false positives (they use
+  `process.exit(failures === 0 ? 0 : 1)`), which is its own reminder to read
+  before believing a search.
+
+- [x] **HER DEADLIFT WAS FROZEN AT 95kg AND HER ROWS AT 20kg, AND SHE DID NOT
+  REPORT EITHER.** 17 Sep 2026. She reported the missing boxes: *"Only the ramp
+  up sets input fields were visible until I clicked add set."* The missing boxes
+  were the symptom. **THE DAMAGE WAS IN HER RECORD.**
+  `is_warmup` exists, is filtered by twelve readers, and NOTHING IN THE APP HAS
+  EVER BEEN ABLE TO SET IT. So her build-up is stored as working sets, and
+  `getDoubleProgressionRecommendation` asks `every(reps >= 8)`, sees her 50kg x
+  5, and holds the weight. Her card reads *"Held at 95kg — didn't hit 8 reps on
+  every set last time"* and would have read that every week for ever: three
+  perfect top sets can never clear it while one build-up row sits beside them.
+  Same for her rows at 20kg. **She cannot lift her way out of it.**
+
+  **A SECOND FREEZE NOBODY HAD NOTICED**, from the same cause and in the same
+  file. `checkDoubleProgression` takes the first N rows BY ORDER; her first
+  three rows were the build-up, so her three real 95kg sets at positions 4-6
+  were never looked at and the same-session bump could not fire for her at all.
+
+  **AND A HARM WORSE THAN THE FREEZE, one step from what she hit.** She pressed
+  "Add Set" four times. **Had she not**, the heaviest row would have been 70kg;
+  the screen stores the recommendation whether or not it progressed, so the
+  card would print 70kg as her working weight — and the ramp steps are scaled
+  FROM that number, so the next build-up is computed off 70, logged, and
+  becomes the next anchor. **Contamination does not only freeze the weight.
+  Left alone it walks the prescription DOWN.**
+
+  **FIXED AT READ TIME, which is the decision worth recording.** Every
+  already-logged session is reinterpreted on the next frontend deploy: no
+  migration, no rewrite of her diary, nothing that could lose a row — and it
+  holds whatever the set grid ends up looking like, so it does not wait on her
+  row ruling. **AND THAT CORRECTS SOMETHING SHE WAS TOLD.** When the three row
+  options were put to her, option A was described as "the only one that also
+  fixes the sets you have already logged wrongly". That was wrong; the repair
+  is independent of the row design. Worse, the repair the claim ASSUMED —
+  marking the old rows — is the one that is NOT available, because `is_warmup`
+  is part of the row's identity in both the local natural key and the upsert
+  conflict target, so flipping it inserts a second row instead of updating one.
+  How the wrong claim was reached: the row design and the repair were assumed
+  to share a mechanism, and the assumption was never checked before it went in
+  front of her. Her ruling is unaffected; only that reason for it was wrong.
+
+  **THE RULE IS A CONJUNCTION AND IT HAS TO BE.** A weight threshold alone
+  cannot work: `RAMP_SCHEMES` prescribes a BUILD-UP step at 85% of the top set
+  and `RAMP_PERCENT_TABLE` prescribes a ramped WORKING set at 85% of the top
+  set. Same number, opposite meaning; only the REPS separate them (2 versus the
+  bottom of the range). And the floor is DERIVED from the person's own
+  prescription rather than chosen, so a session prescribed [75, 85, 92, 96,
+  100] can never lose its 75% set to a number somebody typed — with a tolerance
+  under it, because plate rounding puts a set prescribed AT the floor a kilo
+  below it. Bodyweight is untouched by construction, not by a guard.
+
+  **THE GATE FOUND A HOLE THE DESIGN DID NOT.** An abandoned warm-up does not
+  collapse to nothing — it collapses to its heaviest BUILD-UP row, which is
+  that session's own top set. Filtering alone would still have handed the card
+  70kg. So the engine also refuses to judge a session containing fewer working
+  sets than it prescribed: the honest answer to "I have no complete session
+  here" is to leave the plan's own number standing.
+
+  `working-sets` (27 checks). 11 mutations tried, 10 caught. **ONE MISS WAS
+  REAL AND ONE WAS NOT, and the difference is the point.** Real: a mutation
+  stripping the prescription from ONE of two call sites ran green, because a
+  bare name match was still satisfied by the other — the check now derives the
+  call list and requires every one. Not real: removing the bodyweight
+  short-circuit changed no behaviour at all, because with a top set of zero
+  every comparison against a lighter weight is already false. The guard is
+  redundant and the comment claiming "by construction, not by a guard" is
+  literally true — the mutation proved the claim rather than exposing a gap.
+  Also caught by the gate on its own first run: a regex using `[^)]*` to grab a
+  call stopped at the first bracket INSIDE it, so every call looked
+  context-less. Ships with the frontend; no deploy, no migration.
+
+- [x] **"WHEN YOU SWAP AN EXERCISE FOR A NEW ONE NO WEIGHT IS PRESCRIBED."**
+  Ashley, 17 Sep 2026, mid-session. **THE APP WAS RIGHT AND THE SCREEN WAS
+  SILENT, which is why she read a correct answer as a failure.** She swapped a
+  loaded leg curl for a slider curl; a slider curl has no external load, so
+  there is genuinely no weight to prescribe. The card then showed her NOTHING
+  where every other card on the page carried a number — no load word, no effort
+  target — while still offering a plate calculator and a weight box holding 0.
+  The swap itself prescribes correctly, on both surfaces, from the same
+  function. There is no parity defect and no missing prescription.
+  **THIS IS THE CASE NO SOURCE CHECK CATCHES.** Every branch involved was
+  already correct in isolation: the load chip deliberately renders nothing when
+  there is no load to explain, and the weight header is guarded on a null
+  weight. The defect is what the COMPOSITION of two correct branches leaves on
+  a screen, and an absence is only visible in a screenshot.
+  Three fixes, all from the standing rule that the KIND travels with the value
+  and the renderer has no default branch: the card states its load where the
+  weight would be; the effort target survives, because on a movement with no
+  weight the RPE IS the prescription and it was falling out of the screen
+  alongside the chip that was meant to suppress it; and there is no plate
+  calculator on a movement with no plates.
+  **AND THE OBVIOUS WORD WOULD HAVE BEEN A SECOND, SMALLER LIE.** The first
+  version printed "Bodyweight" — which is wrong for the 22 catalogue entries
+  that use a resistance band, whose own partition comment already says a band's
+  resistance "is real but is not expressible in kilos". Found by driving it:
+  today's first card is Band Pull-Aparts. It says **Band**. The check asserts
+  the WORD, not just that a label exists, because a label that exists and is
+  wrong is worse than none.
+  `verify:bodyweight-progress` §3 (29 checks). 4 mutations tried, 4 caught, all
+  applied, all ran the full count — including one that puts the effort target
+  back inside the chip's early return, which is the original defect exactly.
+  Two things found on the way and worth keeping: the teeth check needed a
+  LOADED card opened, because only the first card on a day is expanded and the
+  first version reported "no loaded card on the default fixture" against a week
+  with five of them; and a variable-name clash crashed the driver to ZERO
+  checks, which reads as a pass if you only count failures.
+
+- [x] **"IT WAS 6 PM AND THE APP WAS ASKING IF I WAS GOING TO HIT MY MORNING
+  SESSION."** Ashley, 17 Sep 2026, phone clock reading 17:58, three turns
+  running. **THE OBVIOUS DIAGNOSIS WAS WRONG, and that is the useful part:
+  the coach WAS told the correct local time all along.** Her own clock reaches
+  the model. Three other things were the problem, and they compounded.
+
+  **1. THE APP INVENTED A FACT ABOUT HER AND THEN REASONED FROM IT.** Every
+  account is stamped "trains mornings" at sign-up — a setup question that was
+  DELETED after being measured to make no difference to the plan, whose column
+  is NOT NULL, so it was quietly defaulted rather than left empty. Nobody has
+  ever asked Ashley when she trains. That invented value reached the deployed
+  coach in THREE places: as a claim about her under her profile, on the context
+  line right beside the correct clock, and inside the only time-of-day
+  reasoning rule the prompt has. So the coach was told, in effect, "it is 5:58
+  PM; she is a morning trainer" — and "morning" was the only time-word attached
+  to HER, while "evening" was merely a description of a clock.
+  **THE IN-FILE COMMENT SAID THE OPPOSITE AND HAD BEEN WRONG FOR WEEKS**: "its
+  only consumer is a chat greeting… Nothing reads it to decide when a session
+  happens." Three readers in the deployed prompt say otherwise. Same family as
+  the walking plan and the goal — machinery that looks, to a reader, like proof
+  of how the app behaves.
+
+  **2. THE SECTION HEADED "TEMPORAL AWARENESS" WAS THE ONE THAT WAS WRONG.** It
+  gave the time only as a raw UTC instant — an hour behind her clock in British
+  summer, with no timezone note and no time-of-day word anywhere in it. The two
+  correct statements lived elsewhere and were quieter than the two assertions
+  that she trains mornings. It now leads with her own clock and the part of the
+  day in words, from the same one place the plan header uses; the UTC instant
+  survives, labelled for arithmetic and explicitly not for time of day.
+
+  **3. ONE WRONG "MORNING" BECAME THE WHOLE DAY'S, and this is why it repeated
+  three times.** Chat history is restored with no date filter and sent as bare
+  role-and-text, so the coach's own 8am turn containing "this morning" sat in
+  the window looking exactly like the sentence before this one. Turn 2 mirrored
+  turn 1; turn 3 mirrored turn 2. Every message has carried the time it was
+  sent all along, and the app already reads that field twenty lines away for
+  something else. Turns older than 90 minutes now say when they were said. A
+  live back-and-forth is left alone, because stamping every line is noise.
+
+  **DECIDED WITHOUT ASKING, and the reason is a standing rule rather than my
+  taste:** the app must not assert a fact it never collected. That is the same
+  class as the load-prescription rule forbidding invented numbers shown as
+  measured, and the same shape as the "assumed body" work. There was no
+  trade-off to put to her. **WHAT IS HER CALL, and is queued**: whether to ASK
+  her when she trains (one question on Profile), learn it from her logged
+  sessions, or never claim it at all — which is where today's stopgap leaves it.
+
+  **THE COACH EXAM COULD NEVER HAVE CAUGHT THIS, and now says so out loud.**
+  Every one of its 20 cases is set at 9:15 AM, so a coach that says "this
+  morning" at every hour of the day scores perfectly. That blindness is now a
+  CHECK in `coach-clock` §4 rather than a fact somebody has to notice — and it
+  fails if the fixture is moved to the afternoon, which is how it was proven.
+
+  `coach-clock` (35 checks). 9 mutations tried, 9 caught, all applied, all ran
+  the full count. **ONE WAS MISSED FIRST TIME AND THE MISS WAS REAL**: the
+  part-of-day consistency loop stamped every hour against a `now` on the NEXT
+  day, so all six cases went through the other-day branch and the same-day
+  branch was never exercised — a mutation giving that branch its own opinion
+  about when evening begins ran green across all 29 checks. The fixture, not
+  the check, was wrong. Both branches are covered now.
+  **Needs the `chat-gemini` deploy** for parts 1 and 2 — the prompt is inside
+  the deployed function. Part 3 is client-side and ships on merge, deliberately:
+  the function replays each turn's text verbatim, which is the same lever the
+  plan header uses to reach her phone without a deploy.
+
+- [x] **SIX THINGS ASHLEY HIT WHILE ACTUALLY TRAINING, 17 Sep 2026 — all six
+  real, one of them worse than she reported.** She sent six issues and five
+  screenshots from a live session. Each was traced end to end and then attacked
+  by three independent checks — refute the mechanism, re-read the screen,
+  check the judgement against her own past rulings — before anything was
+  believed. None survived as "working as designed". Two came back with
+  corrections that changed what to do, and both corrections were about
+  JUDGEMENT rather than mechanism; they are recorded on their own entries.
+  **THIS ENTRY COVERS THE SWAP SCREEN. The others follow separately.**
+
+  **THE SEARCH BOX COULD NOT FIND WHAT SHE TYPED.** *"Iso lateral leg curl
+  isn't available as a swap"*. It is in the catalogue, and so are the lying and
+  seated machine versions. MEASURED: typing her exact words returned "No
+  matching exercise found", because the matcher wanted ONE CONTIGUOUS SUBSTRING
+  and the entry is called "Iso-Lateral Kneeling Leg Curl" — her hyphen missing
+  and the word "Kneeling" sitting in the middle. Even "iso-lateral leg curl"
+  failed. Only the bare fragment "iso-lateral" worked.
+  **AND IT WAS NEVER ABOUT ONE EXERCISE: 49 of the 200 live entries could not
+  be found by typing their OWN NAME without punctuation** — every Push-Ups
+  variant, T-Bar Rows, Chest-Supported Row, every Neutral-Grip anything. A
+  quarter of the catalogue. Now 0.
+  **WHY THIS IS A BUG AND NOT A PREFERENCE**: that box is the escape hatch she
+  RULED FOR on 13 Sep 2026 ("show everything, warn me" — the shortlist is
+  constrained, the search reaches the whole catalogue). A search that cannot
+  find her own words makes her ruling untrue in practice, so there was no
+  decision to re-take here.
+  **THE FIX IS SHAPED BY WHAT ELSE USES IT, and that is the part worth
+  keeping.** The obvious move — widen the matcher — would have been wrong.
+  Its other two callers are RESOLVERS, not pickers: one turns a typed phrase
+  into a hard exercise BAN over every name it returns, the other keys on
+  "exactly one match" to decide a logged set is unambiguous. More recall there
+  silently bans more than she named. A picker's false positive costs one line
+  of reading; a resolver's changes her plan or her diary. **One function was
+  serving two opposite requirements, and that was the actual defect.** So the
+  difference is now named, the picker's search is built by CALLING the strict
+  one and appending a looser tier, and a gate fails if a future tidy-up
+  unifies them.
+
+  **THE SENTENCE EXPLAINING A SHORT LIST WAS RENDERED WHERE NOBODY READS IT.**
+  She was offered three unloaded leg curls while standing next to a machine,
+  with nothing saying her TRAINING STYLE was the filter. That sentence existed
+  and was correct — it sat INSIDE the list's own scrolling box, below the
+  option cards, so reading it meant scrolling past the very options it was
+  meant to frame. Moved above the list, which also puts it in the right reading
+  order: what this list is, then the list.
+  **NO `test:` GATE COULD HAVE CAUGHT THIS.** The string was in the file, the
+  branch was reached, the node was in the DOM. Only geometry on a real screen
+  tells you a true sentence was rendered somewhere invisible. The browser check
+  measures POSITION, and the mutation that puts it back where it was reports
+  not merely "below" but OUTSIDE THE VISIBLE DIALOG — which is what she
+  experienced.
+  **A FIXTURE FOUND, NOT ASSUMED**: the first attempt measured the default
+  full-gym week, which hands the dialog four options — where the sentence is
+  not supposed to render at all — so every check would have passed by being
+  vacuous. The teeth-first check caught that on the first run, which is why it
+  is written before the property that depends on it.
+
+  **AND THE GATE THAT OWNS THIS AREA COULD PRINT FAIL AND EXIT 0.** Found on
+  the way in: `test:slot-replacement`'s only `process.exit(1)` sat ABOVE its
+  section [6], so every check below it was decorative. PROVEN by breaking one
+  on purpose — it printed "FAIL: the query still finds the live sibling", then
+  "All slot-replacement hygiene checks passed", then exited 0. That section had
+  been ornamental since the day it was written. Moved to the bottom; CLAUDE.md's
+  rule (a gate has exactly ONE exit) now holds here.
+  5 source mutations tried, 5 caught, all applied, all ran 26/26 checks — one
+  of them is the exit fix itself. 2 browser mutations tried, 2 caught, both ran
+  47/47. `slot-replacement` §7, `verify:session-edit` §7.
+  **STILL OPEN AND NOT FIXED HERE**: the three machine leg curls are hidden
+  from her shortlist because they are tagged "bodybuilding" and her style is
+  "functional". MEASURED across 7 styles x 3 experience levels — only
+  "functional" and "combat" produce an all-unloaded leg-curl list; every other
+  style puts the machines at the top. That is NOT a tagging slip: 31 of 44
+  machine entries lack the "functional" tag, so it is a deliberate convention,
+  and changing it changes what every functional trainee is prescribed. It is
+  Ashley's ruling to make and is queued for her.
+
 - [x] **THE FOURTH TIME A SIZE CEILING QUOTED ROOM IT NO LONGER HAD — so this
   time the ceilings report themselves.** 17 Sep 2026. The full sweep came back
   with two real failures, both mine and both in the checks rather than the app.

@@ -32,10 +32,45 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   lighter than the week before — `block-phases`, `frozen-weeks`,
   `calibration-search`, `starting-out`
 - Every loaded lift has a weight, in its implement's unit, under a ceiling
-  that warns before it clamps — `load-ceilings`, `load-ceiling-units`,
+  that warns before it clamps — and a movement-prep move that needs an
+  implement gets one too, at **half the working load**, read off the app's own
+  warm-up ladder rather than invented (18 Sep 2026, CSCS delegation; her 17 Sep
+  ruling gave it a number, this is the "kept light" half) — `primer-load`,
+  `load-ceilings`, `load-ceiling-units`,
   `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
+- **Rest suits the exercise, and the time budget is paid for in WORK** — since
+  18 Sep 2026. Ashley, from the gym floor: *"The rest breaks between the lat
+  pulldown seem very short 30s, check that is correct."* It was not: measured
+  across 1,728 profiles, 49.2% of every exercise in a week rested 30 seconds
+  or less and 29.1% of second-tier compounds — a class prescribed 75s by the
+  style's own table — were at or under 30. Nothing was miscalculating; the
+  session did not fit and the generator paid for it out of rest.
+  **Her ruling that day, from four options: protect the rest, do less.** Every
+  exercise keeps a rest that suits it and the session sheds an accessory or a
+  set instead — but **never the last exercise covering a movement pattern**,
+  decided 18 Sep 2026 under her CSCS delegation once the cost of "do less"
+  turned out to include weeks holding no squat pattern at all (22 of 9,216, now
+  0). A shorter session is fewer sets, not a missing pattern: push, pull, hinge
+  and squat are protected, accessory volume is the adjustable part.
+  `pattern-floor`. She rejected keeping the work at short rests, a flat one-minute
+  middle floor, and being told to train longer. Her reason, in her own words:
+  30 seconds on a lat pulldown is not a short rest, it is a different exercise,
+  and the reps printed beside it stop being reachable.
+  Now 0.0% of second-tier compounds rest 30s or less, median 60s.
+  CORRECTED 18 Sep 2026: this said "minimum 45s", and the gate asserted it.
+  Both were wrong, and the gate was RED AT THE COMMIT THAT INTRODUCED IT while
+  being reported green. 45s was the lowest value in a 1,728-profile sample;
+  combat's own table asks 60s of a second-tier compound and a conditioning
+  block's adaptation phase shifts rest by -20s, so 40s is what that block
+  deliberately wants — and `restFloorFor` returns `min(unbudgeted, tierFloor)`
+  precisely so it gets 40. The app was right and the number was a measurement.
+  **The floor is now DERIVED in the gate from the style's own rest row and the
+  deepest phase shift, and printed on every run**, with her report kept beside
+  it as an absolute: no second-tier compound at 30s or less, whatever the
+  tables say. `rest-floors` (24 checks, 4 mutations), `session-length`,
+  `today-only`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:
@@ -108,10 +143,46 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   when the SHAPE held and the SIZE moved**; a goal change regenerates instead.
   `meal-refit` (91 checks, 16 mutations), `verify:meal-refit` (25 checks, 5
   mutations), `coach-parity`. Needs the `chat-gemini` deploy for chat
-- Meals hit targets from real foods, varied, dislikes honoured, allergens
+- Meals hit targets from real foods, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`
-- Grocery list follows the meals — `grocery`
+- **And a different day tomorrow** — since 19 Sep 2026, on Ashley's "fix the
+  variety". CORRECTED, measured: this line said "varied" and nothing had ever
+  counted. **1.11 distinct days in a seven-day week; 89.4% of profiles ate the
+  identical day every day.** The variety preference existed, was documented and
+  was tested — and was a `0.01` penalty added to a macro-distance score against
+  a median gap of `0.033`, so it could only win an almost exact tie. **An
+  argument that is not passed and an argument that does nothing look identical
+  from the call site**, and I reported the first before checking the second.
+  Now a SORT KEY rather than a penalty, applied only among combinations already
+  inside the tolerance bands — the app's own definition of a correct day — so
+  variety costs nothing real and can never buy a day that misses its targets.
+  Outside tolerance nothing changed. 3.98-4.51 distinct days after, and days
+  inside tolerance went UP (86.2%→95.3% on the loosest fixture), because
+  fit-first could previously prefer a combination that scored well overall
+  while busting one band. "Yesterday" comes from the DATE, not from what was
+  logged, so somebody who never logs still gets a different dinner.
+  `meal-variety` (42 checks, 16 mutations), `measure:meal-variety`
+- Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
+  the ones the tab will actually SHOW: both surfaces and the resize trial read
+  one rotation from one pure builder, so the list cannot shop for a week the
+  screen will not serve. Parity by construction, the `meal-refit` pattern.
+  CORRECTED: this file and the module's own header credited the list with
+  "realistic variety" it never had — it threaded the history forward correctly
+  and got the same day seven times, like everything else
+- **How to cook it** — since 19 Sep 2026, `screen only` and honestly so.
+  `generate-meals` had always asked the model for a method and always received
+  one; it was read twice (is this too heavy for breakfast, is it quick or
+  standard) and then thrown away, with no field on the option and no column in
+  the table. **The interesting half is refusing a wrong one**: the app rescales
+  every proposal by up to 2.5x, so a method naming an amount describes food the
+  ingredient list may no longer contain — a number the app never verified,
+  printed beside numbers it did. The prompt asks for technique with no amounts;
+  anything still naming a mass or volume is dropped WHOLE, and the rule runs
+  again at display time for the same reason the dietary re-check does.
+  `meal-method` (31 checks, 19 mutations), `verify:meal-method`. Needs the
+  `generate-meals` deploy; until then new meals arrive with no method, which is
+  the honest empty state
 - A measured floor for meals — `meal-quality` exists but needs a live
   database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
 
@@ -120,6 +191,28 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   equipment; a loaded lift never replaced by an unloaded one by default —
   both surfaces; `swap-target`, `slot-replacement`,
   `single-implement`, `verify:swap-request`
+- **And the shortlist no longer hides an option for TRAINING STYLE** — since
+  18 Sep 2026. Ashley, next to a leg-curl machine on a functional plan, was
+  offered two sliders and a band: all three machine leg curls are tagged
+  bodybuilding, and the style stage of the pool filter removed them outright.
+  Measured that day: 31 of the catalogue's 45 machine and cable entries carry
+  no functional tag, so it is a convention and not a slip — retagging them
+  would change what every functional trainee is PRESCRIBED.
+  **Her ruling, from three options: show them, marked**, over retagging the
+  machines and over leaving the search box as the only route to one. Style is
+  the only one of the four filter stages that may be relaxed, and
+  `stageStyleFilter`'s own comment says why: *"style is a preference, not a
+  safety constraint"*. Equipment, injuries and skill still remove.
+  **AND HER SECOND RULING THE SAME DAY, because the first broke an earlier one
+  of hers.** Sinking off-style options put a matching SLIDER above a
+  non-matching MACHINE — a loaded lift offered bodyweight replacements first,
+  which is exactly what her 10 Sep rule exists to prevent (measured: 8
+  movements in the hybrid catalogue). From three options: **weight always
+  wins.** For a lift carrying a number, every loaded alternative comes first
+  whatever its style, each marked on its own row; the unloaded ones follow.
+  So the sort keys, outermost first: loaded, style, stated likes, implement
+  quality, the ranker. `swap-style` (28 checks, 14 mutations),
+  `verify:session-edit` §8, `single-implement`
 - Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
   `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
   and quoted the decline "NOT WIRED UP YET… point the user at the ban button"
@@ -148,6 +241,29 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   nothing else. It does now, through the shared tail
 - Change its sets, reps or weight for today — via logging only (extra sets,
   typed numbers); the plan itself is not edited
+- **Log the build-up as well as the working sets** — `screen only`, since
+  17 Sep 2026. Ashley's ruling that day, from three options, standing in the
+  gym: **a box for every set, labelled** — Warm-up 1, 2, 3 then Set 1, 2, 3,
+  the build-up marked so it never counts toward the weight going up. **It
+  REVERSES her 7 Sep ruling** ("tick them off, don't record them"), which was
+  made about a strip of chips before anyone had watched a real lifter run out
+  of rows; she was told it was a reversal and chose it anyway. The tickable
+  strip is gone from today's card and survives read-only on browse and peek.
+  A warm-up row is filtered out of volume, personal bests, progression and
+  history by construction, so logging one changes no number the app shows
+  back. `working-sets`, `ramp-visibility`, `set-plausibility`,
+  `verify:warmup-rows`, `verify:ramp-readonly`
+- **The faint numbers in the boxes say whose they are** — `screen only`, since
+  18 Sep 2026. Ashley, reading her own dumbbell rows: *"Last sets prescribed
+  were sets of 11 reps. Is thay correct at the end of a exercise?"* Nothing had
+  prescribed 11. The 9, 11, 11 were her OWN last session, drawn in exactly the
+  grey the app uses for a suggestion on a row with no history — two different
+  things, one appearance. **Her ruling that day, from three options: mark them
+  "last time"**, over moving them out of the boxes to a line above the sets and
+  over emptying the boxes; both of those cost the one-tap repeat, which is the
+  reason the numbers are there. The marker is on the row, only where history is
+  actually driving the boxes, never once the row is saved and never on a
+  build-up row. `last-time`, `verify:one-number` §8
 
 **Every change to an exercise lives in one menu** — her ruling, 14 Sep 2026,
 from three options, after reporting that swapping sat outside the "⋮" while
@@ -671,6 +787,26 @@ menu" stays true when a copy is also left outside it.
   the same case wrong. `bodyweight-progress` (74 checks, 8 mutations).
   NOT browser-driven: the case needs a loaded lift on today's card and the
   harness's today is all bodyweight
+- **A NEW RULING CAN BREAK AN OLD ONE, AND THE COLLISION IS THE FINDING.**
+  18 Sep 2026: Ashley ruled that swap options outside her training style should
+  be shown below the ones that match. Building it re-created the report that
+  produced her 10 Sep ruling — an unloaded option above a loaded one for a
+  lift that carries weight — because the new key was outermost and the old one
+  was not. A gate caught it, which is the argument for gating a ruling rather
+  than only obeying it. **Do not resolve it by picking the newer one: put both
+  in front of her, say which broke, and let her order them.** She chose the
+  older rule and the newer one moved inward, which also changed the SHAPE of
+  what had just been built — a grouped layout could no longer express the
+  order, so the marker moved onto the row.
+- **A HINT AND A RECORD MUST NOT LOOK ALIKE.** 18 Sep 2026, one screen along
+  from the rule below and the same family: a box's placeholder is the app's
+  suggestion on a row with no history and the person's own last session
+  wherever they have one, drawn identically, and the reader has no way to tell.
+  A prescription read as history is harmless; history read as a prescription is
+  the app appearing to ask for something it never asked for. **Anywhere one
+  slot can hold either, the screen says which** — and the marker goes where the
+  numbers are, because moving them somewhere safer costs whatever the placement
+  was for.
 - **A NUMBER NEVER REACHES A SCREEN WITHOUT ITS UNIT**, and this generalises
   past PRs. Three renderers printed `${value}kg` with no branch, so a
   bodyweight best showed "0 kg" and a 12-rep best would have shown "12kg" —
@@ -732,7 +868,72 @@ menu" stays true when a copy is also left outside it.
 ## Asking
 
 - Work autonomously by default. When a decision genuinely is Ashley's to make, ask her directly in the conversation — don't guess and don't wait for it to arrive secondhand.
-- ASK when the decision is about how the app behaves: what a coach should do in a situation, what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours, or anything safety-adjacent (allergens, injuries, medical, mental health).
+- **EVERY CHANGE IS VIEWED THROUGH THE LENS OF A CERTIFIED CSCS COACH, and
+  training questions are ANSWERED here rather than brought to her.** Ashley,
+  18 Sep 2026, twice: *"Ask the questions you ask me regarding how the app
+  should act should be answered from a cscs perspective. So with that in mind
+  you should be able to answer them as a cscs coach would"*, and then, widening
+  it: *"All changes shoukd be viewed through the lens of a certified cscs
+  coach."*
+  The second sentence is the bigger one. The first delegated the DECISIONS; the
+  second makes the coaching read a standing review of every change, including
+  the ones that raise no question at all — a refactor, a bug fix, a gate. The
+  test is not "is this correct?" but **"would a qualified coach sign the plan
+  this produces, for this person?"**
+  - MINE now, decided and recorded, never asked: exercise selection and what is
+    an acceptable substitute for what; sets, reps, load, rest, tempo and every
+    floor or ceiling on them; exercise order and what gets protected when a
+    session is cut; warm-up and movement prep; weekly structure — movement
+    pattern coverage, push:pull, volume distribution, frequency; periodisation,
+    blocks, phases, deloads, progression, calibration and re-anchoring; what
+    counts as a personal best and how progress is measured; how other sport
+    counts as training load; and general performance nutrition at the
+    population level the app already works at — protein targets, deficit rate,
+    macro split logic, meal timing.
+  - STILL HERS, because the training science is neutral and the question is
+    what her app is like: what the app SAYS and how it sounds; when it speaks
+    and how often; how much it asks before doing something; what it is allowed
+    to CLAIM about itself; anything reaching live users, money or data. "Ask
+    every time or only when she sounds definite" is hers. "Sixty seconds or
+    forty-five between sets" is mine.
+  - NEITHER, and this is a real professional boundary rather than caution: a
+    CSCS does not diagnose, treat, rehabilitate, or write clinical nutrition.
+    The app's existing red-flag rule — sharp, one-sided or worsening names a
+    professional and changes NOTHING — is itself the CSCS answer and stays
+    exactly as it is. Deciding to have the app prescribe rehab, interpret a
+    symptom, or write a diet for a medical condition is outside the delegation
+    and is not mine to take.
+  - **RECORD THE BASIS, not just the choice.** A CSCS decision goes in BACKLOG
+    with what the standards say and why this case falls where it does — the
+    same bar as every other decision here. "A coach would do X" with nothing
+    behind it is an assertion, and this file's whole habit is that assertions
+    get marked as such.
+  - **AND IT IS STILL ASSERTION, NOT MEASUREMENT.** Reasoning as a CSCS makes a
+    decision defensible; it does not make the coach's advice good. That is what
+    the coach exam is for, it has never run against the current coach, and this
+    delegation does not move that line one inch — rule 5 stands.
+  - **THE REVIEW, so "through a CSCS lens" is a step and not a sentiment.**
+    Before any change that touches what somebody is PRESCRIBED — exercise,
+    load, sets, reps, rest, order, frequency, or what survives a cut — ask
+    these five, and say the answers in the report:
+      1. **What does it do to the training effect**, not to the number? A value
+         can be correct and the stimulus still wrong.
+      2. **What does it take AWAY?** Protecting one thing inside a pass aims
+         that pass at whatever is left. Count the cost in the same run.
+      3. **Do the fundamentals survive** — movement-pattern coverage,
+         progressive overload, recovery, and specificity to the stated goal?
+      4. **Does it quietly redefine an existing floor or ceiling?** A number
+         that still reads the same while meaning something else is the worst
+         kind, because nothing fails.
+      5. **Is it inside scope** — not diagnosis, rehab or clinical nutrition?
+    **FOUND BY QUESTION 4 ON ITS FIRST OUTING, 18 Sep 2026**, against work
+    committed an hour earlier: protecting the movement-prep slot from the
+    time-cap trimmer left the "never below three exercises" floor counting that
+    slot, so the tightest days bottomed out at TWO training exercises plus a
+    warm-up where they had held three. Every gate was green and the number
+    three had not changed. Measured with a constructed over-budget day, not
+    reasoned about.
+- ASK when the decision is about how the app behaves in the ways left to her above: what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours where the training science does not pick a winner, or anything in the medical/clinical band (allergens, diagnosis, mental health).
 - PROCEED WITHOUT ASKING on anything mechanical: bugs, tests, refactors, measurement, data consistency, performance — anything that has a right answer.
 - How to ask, which matters as much as when:
   - Ashley is non-technical. Never ask about a function, field, or file.
@@ -882,6 +1083,40 @@ old — the commands were right and the context was missing.
   actually changed, and assert the run executed as many checks as the baseline.
   Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
   meaningless" print identically.
+- **WHEN THREE GATES GREP THE SAME EXPRESSION, THE EXPRESSION SHOULD BE A
+  FUNCTION.** 19 Sep 2026: `test:calibration-search`, `test:primer-load` and
+  `verify:one-number` each pinned one line of JSX deciding whether the per-set
+  weight chips render. A ruling of Ashley's added a second condition to it on
+  18 Sep, and all three went red at correct code — one of them silently, until
+  the first full sweep a day later. Extracting the decision into a predicate
+  the gates CALL fixed all three permanently and cannot go stale the same way.
+  **A rule several checks need to ask about should be something they can ask,
+  not something they have to read.** The repeat count is the signal: one
+  mechanism-pinned check is a smell, three on the same line is a design note.
+- **AN ARGUMENT THAT IS NOT PASSED AND AN ARGUMENT THAT DOES NOTHING LOOK
+  IDENTICAL FROM THE CALL SITE.** 19 Sep 2026: the meal assembler took a
+  day-to-day variety history, the Nutrition tab passed it `{}`, and I reported
+  that as the defect and the fix as one line. Measured, the preference behind
+  the argument was a `0.01` penalty in the same units as the macro-distance
+  score it competed with, against a median gap of `0.033` — passing the
+  argument would have moved 1.00 distinct days a week to 1.11. **Before
+  reporting an unpassed argument as the bug, go and read what the code behind
+  it would do if you passed it.**
+  The mechanism half generalises further: **a preference expressed as a small
+  constant added to the score of the thing it competes with can only ever win
+  a tie.** If it is meant to decide, it is a sort KEY, gated on whatever makes
+  the choice free — here, the tolerance bands the app already calls correct.
+  Raising the constant is the wrong fix, because any number big enough to buy
+  the preference is big enough to buy a wrong answer.
+- **A CHECK COMPARED AGAINST THE CONSTANT THAT DRIVES IT CAN ONLY AGREE WITH
+  ITSELF.** The same day, found by mutation: `history.length <= RECENT_WINDOW`
+  passed happily when `RECENT_WINDOW` was cut from 3 to 1. A behavioural bound
+  needs at least one LITERAL side — here "remembers more than just yesterday",
+  written as 2 — or the check moves with the defect.
+- **TWO `indexOf` RESULTS COMPARED WITHOUT ASKING WHETHER EITHER WAS FOUND.**
+  Also found by mutation, also 19 Sep: an ordering check read `a < b`, a
+  mutation renamed `a`'s anchor, `indexOf` returned -1, and -1 is less than
+  everything. Assert both anchors exist before comparing their positions.
 - **ASKING A QUESTION OF EVIDENCE YOU JUST CREATED.** The same shape, twice in
   one day: grepping a file for an identifier to see whether it was imported,
   AFTER inserting a line that used it — the only hit was the new code, and the
@@ -899,6 +1134,100 @@ old — the commands were right and the context was missing.
   So: for a function, require `name(`; for render order, anchor on the rendered
   block; and prove the detector on something that should FAIL it, in the gate
   itself, so it cannot go vacuous later.
+- **A NEW MEASUREMENT IS NOT COMPARABLE TO AN OLD ONE UNTIL IT MAKES THE SAME
+  EXCLUSIONS — and disagreeing by two orders of magnitude is the tell, not the
+  finding.** 18 Sep 2026: a fresh script counting weeks that hold no pushing
+  movement reported 832 of 9,216 (9.03%), which reads like a defect forty times
+  larger than the one being fixed. The scorer's own report showed nothing,
+  because it has always asked the narrower question — a week is only missing a
+  pattern its equipment and injuries could actually have supplied
+  (`poolHasPush && pushSets === 0`). Some injury combinations remove every
+  press from the pool, and a week cannot hold what its own constraints forbid.
+  **When a new number and an existing one disagree wildly about the same
+  question, suspect the denominators before the code**, and make the new one
+  reproduce the old one's guards before reading anything into the gap.
+- **A FLOOR MUST BE READ OFF THE UNBUDGETED PRESCRIPTION, NEVER OFF THE LIVE
+  VALUE.** 18 Sep 2026. Three independent passes cut a rest — the day-level
+  time cap, the per-block trimmer, the phase's own shift — and each floored
+  what it found. Against the LIVE value a floor can only ratchet downward: the
+  trimmer took a 60s slot to its 45s floor, the adaptation phase then applied
+  its deliberate -15s, and the result was the 30s Ashley reported. Two floors,
+  each correct alone, spending the same fifteen seconds twice. Read off the
+  style's own number plus the phase's own shift instead, the same case holds at
+  45 while a block that genuinely wants 40s still gets 40. **Any clamp applied
+  at more than one stage has this shape** — ask what the value would be with no
+  pressure at all, and clamp against that.
+- **PROTECTING SOMETHING INSIDE A TRIMMER DOES NOT CREATE ROOM — IT AIMS THE
+  TRIMMER AT WHATEVER IS LEFT. A measurement that counts only what a change
+  BOUGHT is half a measurement.** 18 Sep 2026: stopping the time-cap trimmer
+  deleting the week's last squat took squat-less weeks from 22 of 9,216 to 0,
+  and every gate was green. The same run's `primer_absent` went 14 → 102 —
+  eighty-six warm-ups spent to save twenty-two squats, a worse trade than the
+  one it replaced. The tracked baseline was two days stale and could not
+  attribute it, so it was attributed by running the same grid twice with the
+  guard switched off and on behind an env flag.
+  So, whenever a pass is taught to refuse: **ask what it will remove instead,
+  and count that in the same run.** The fix was to protect movement prep on the
+  same footing and let the pressure fall through to SETS, which is where the
+  house ruling already says it belongs — but the point is that the second
+  number had to exist before the trade could be seen at all.
+- **SLACK IS NOT A FIX, IT IS A COVER, and removing it is how you find what it
+  was hiding.** The same day: protecting rest made 17 sessions run past the
+  time their trainee had set aside. The cause was years older than the change —
+  every pass sizes a day against BASE reps while the per-week ramp grows the
+  work inside it, and nothing ever asked again. The rest cuts had been silently
+  absorbing that overrun for as long as it existed. **When a change makes a
+  long-standing defect visible, the defect is the finding**, and the honest
+  move is to fix it rather than restore the slack.
+- **A GATE THAT GENERATES ITS OWN SUBJECT MUST SEED IT, AND MUST INCLUDE A CASE
+  THAT IS ACTUALLY UNDER PRESSURE.** `test:rest-floors` was written unseeded,
+  passed, and failed on its very next run against identical code, because plan
+  generation picks exercises through `Math.random` unless a caller says
+  otherwise. Worse than the flake: the six mutations run against it were
+  worthless — three were MISSED once it was made deterministic, so a green
+  mutation round had proved nothing. And the three it missed were missed for a
+  second reason: the trimmers only run on a day that is OVER budget, and every
+  profile the gate sampled was comfortable. **A gate built from comfortable
+  fixtures never reaches the code it exists to hold.**
+  **AND THE ONLY HONEST WAY TO FIND A FIXTURE THAT IS UNDER PRESSURE IS TO LET
+  THE BROKEN CODE NAME IT.** 18 Sep 2026, `test:pattern-floor`: six profiles I
+  picked as obviously tight ALL PASSED with the guard switched off, so the
+  integration section proved nothing and only the unit checks were doing any
+  work — invisible from reading it, visible the moment a mutation was run.
+  Putting the defect back behind an env switch and running the real
+  9,216-profile grid named four genuine offenders in minutes, every one a
+  combat profile on the shortest session: the style whose own table asks the
+  LONGEST rests meeting the smallest budget, which is not a combination anyone
+  would guess. Pin those, seeded with the same key the measurement used.
+  **The cheap companion, and do both**: where the pass is exported, hand it a
+  constructed input already in the failing state — deterministic, instant,
+  guaranteed under pressure. The constructed case proves the mechanism; the
+  measured offender proves it matters in a real plan.
+- **A CONTROL THAT WRITES AND DOES NOT REDRAW IS A DEAD CONTROL, and no gate
+  and no type can see it.** 17 Sep 2026: "Add Set" wrote the new row into the
+  stored session record correctly, and no pixel moved — nothing subscribes to
+  that store, so the box appeared later, whenever something unrelated
+  re-rendered the card. It had behaved that way since it was written. The
+  write succeeded, the value was right, the source read fine, and on a phone
+  the button was dead. Found by tapping it in a browser and counting rows.
+  **Anything stored outside React that a screen must react to needs a state
+  mirror beside the durable copy** — and the way to find the next one is to
+  tap the control and look, not to read the handler.
+- **TWO ROWS MUST NOT SHARE ONE SPOKEN NAME.** The same day: the tick button
+  said "Save set 2" on both the warm-up row and the working row, because its
+  label keyed on the number alone. Identical for a screen reader, and
+  identical to every driver — one of them logged the wrong row and made three
+  unrelated checks look broken. **When a list gains a second kind, every label
+  keyed on position becomes ambiguous**, including the ones only a screen
+  reader hears.
+- **A DRIVER WHOSE SUBJECT IS DELIBERATELY DELETED IS REPLACED, NOT
+  RE-ANCHORED.** `verify:ramp-ticks` measured a control Ashley's ruling
+  removed. Re-anchoring it would have meant inventing a subject; deleting it
+  would have dropped the coverage. It became `verify:ramp-readonly`, holding
+  the OPPOSITE property on the surface that still shows the block. And the
+  fourteen source checks behind it were the strongest case yet of the rule
+  above: left standing, they would have made the dead code impossible to
+  delete — a gate ENFORCING what nothing renders.
 - **A BROWSER DRIVER FINDS THINGS NO `test:` GATE CAN, AND THEY ARE NOT SMALL.**
   15 Sep 2026, two in one run, both on a card that every source check passed:
   a new control was on the wrong component (`RestDayCard` renders only when the
@@ -926,6 +1255,32 @@ old — the commands were right and the context was missing.
   `App.tsx`. Write which half you have next to the checks, and **never make the
   harness render a copy of the app's chrome to satisfy a check** — that
   measures the copy.
+- **A HARNESS FIXTURE THAT HAND-BUILDS THE THING UNDER TEST IS TESTING ITSELF.**
+  18 Sep 2026, the sharpest version of "the harness is not the app" yet. The
+  `?prep=1` fixture wrote `load.display`, `load.starting_weight_kg` and
+  `load.per_set` straight onto a slot instead of calling the function
+  generation calls — so `verify:prep-weight` had never once exercised the
+  primer branch, and every green run proved the FIXTURE's number reached the
+  screen. Nothing about it looked wrong: the values came from a real
+  `prescribeLoad`, the card rendered, the checks passed.
+  **The only symptom was a MISSED mutation** — doubling the log box's
+  placeholder changed no pixel, because the fixture was supplying a per-set
+  ladder the real path no longer produces, so the row never reached the broken
+  line. Reading the fixture would not have shown it; mutating the code it
+  claims to cover did.
+  So: **a fixture may choose the INPUT but must never assemble the OUTPUT.**
+  Put the bell in the slot by name, then let the app decide what that slot
+  carries. And when a driver's mutation comes back MISSED, suspect the fixture
+  before the check.
+- **A MUTATION HARNESS THAT REBUILDS A BUNDLE MUST REBUILD AFTER RESTORING
+  TOO.** 17 Sep 2026: the browser mutation runner restored the source file in
+  its `finally` and left the MUTANT bundle sitting in `.tour-harness/dist`. The
+  next driver run measured the break that had just been undone — a clean tree
+  failing a check it passed ten minutes earlier, with the source visibly
+  correct. It reads exactly like a real regression and is worth ten minutes of
+  hunting before anyone thinks of the bundle. Same family as "the harness is
+  not the app", one level down: **the thing a driver measures is the last
+  build, not the working tree.**
 - **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
   beyond "did not apply" and "crashed", and the harness cannot see it: on
   15 Sep a mutation to the walking plan's day builder read MISSED because the
@@ -999,6 +1354,16 @@ old — the commands were right and the context was missing.
   check the process is alive on every poll and say so when it is not.
   This is the "a crash reads as a pass" rule one level up: there, zero
   failures looked like success; here, a dead run looked like a live one.
+  **AND THE PROCESS CHECK ITSELF CAN BE WRONG, IN THE OTHER DIRECTION.** 18 Sep
+  2026: a watcher reported "PROCESSES GONE — the run died" while the sweep was
+  sitting at 99.7% CPU with three of four shards already written. The cause was
+  one character: `pgrep -f "quality-score\|run-audit"` — pgrep takes an ERE,
+  where alternation is `|` and `\|` is a literal backslash, so the pattern
+  matched nothing and "no match" was read as "no process". It failed safe this
+  time, but a false death report is still a false report, and the next one
+  could be a false green. **Before believing a watcher, prove its own detector
+  finds the thing while it is definitely running** — the same "prove the
+  detector on something that should fail" habit the gates already use.
 - **THREE checks ALWAYS fail in a cloud session and are not your problem:**
   `test:meal-quality`, `test:schema-parity` and `verify:rls`. All three need a
   live database this machine cannot reach; each prints the same cause verbatim
@@ -1054,6 +1419,10 @@ same six files. Sizes are why it matters: these are not files to read whole.
 Not done until all of it is true. A piece of work that stops early is worse
 than one not started, because it looks finished in the log.
 
+0. **The CSCS review above has been done on anything that changes a
+   prescription, and its answers are in the report.** It is first because it is
+   the one step that asks whether the change is right for the person training,
+   rather than whether the code is right.
 1. The affected checks pass, and any NEW check has been mutation-tested.
 2. `npx tsc --noEmit` is clean, and a full sweep has run before a merge.
 3. Anything visible has been driven in a real browser at phone size — a

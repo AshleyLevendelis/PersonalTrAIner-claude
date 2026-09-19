@@ -73,24 +73,10 @@ export interface ActiveSessionRecord {
    */
   drafts?: Record<string, { weight: string; reps: string; isBodyweight: boolean }>
   extraSets?: Record<string, number[]>
-  /**
-   * Which ramp-up steps have been ticked, exercise id -> ramp set numbers.
-   *
-   * Ashley, 7 Sep 2026: "theres no way to log the ramp up weights." The card
-   * prints five of them with weights and reps and offered no way to mark any
-   * of it, so a warm-up you were halfway through looked identical to one you
-   * had not started.
-   *
-   * A PLACE-KEEPER, NOT A LOG, on her ruling once the options were put to
-   * her. Ramp sets are deliberately excluded from volume, PRs, progression
-   * and history everywhere in this app (every read filters is_warmup), so
-   * recording them would change no number she can see — it would be typing
-   * into a drawer that does not open. This lives here, beside the set drafts,
-   * for exactly one reason: a tick that vanished when she glanced at another
-   * tab would be useless on a gym floor. It is date-keyed like everything
-   * else in this record, so it expires on its own.
-   */
-  rampTicks?: Record<string, number[]>
+  // A RECORD PERSISTED BEFORE 17 Sep 2026 MAY CARRY A `rampTicks` KEY. Nothing
+  // reads it: the tickable ramp was replaced that day by a box per build-up
+  // set, logged like any other. Unknown keys are carried forward harmlessly by
+  // the spread in patchRecord, so there is nothing to migrate.
   /**
    * Areas she said felt tight before this session, for the extra mobility
    * drills the warm-up shows.

@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { classifyDay, countsTowardWeekTally, type DayGlyphState } from '../src/hooks/useTrainingWeek'
+import { partitionLogsByKind } from '../src/lib/daily-tracking'
 import type { WorkoutDay } from '../src/lib/types'
 
 let failures = 0
@@ -54,12 +55,12 @@ console.log('\n2. The guard must not over-fire — a real skip is still a skip')
 
 console.log('\n3. Logged work always wins over any date reasoning')
 {
-  const completed = { session: { is_completed: true }, workoutLogs: [{ id: 'x' }] } as never
-  const partial = { session: null, workoutLogs: [{ id: 'x' }] } as never
+  const completed = { session: { is_completed: true }, workingLogs: [{ id: 'x' }], warmupLogs: [] } as never
+  const partial = { session: null, workingLogs: [{ id: 'x' }], warmupLogs: [] } as never
   // A completed flag with nothing logged — Start and Finish with no set
   // between — is not a session, and must not outrank a chosen rest day.
-  const emptyCompleted = { session: { is_completed: true }, workoutLogs: [] } as never
-  const emptyCompletedRest = { session: { is_completed: true, deliberate_rest: true }, workoutLogs: [] } as never
+  const emptyCompleted = { session: { is_completed: true }, workingLogs: [], warmupLogs: [] } as never
+  const emptyCompletedRest = { session: { is_completed: true, deliberate_rest: true }, workingLogs: [], warmupLogs: [] } as never
   // A session logged on a day that predates the plan is still real work. The
   // pre-plan check deliberately sits AFTER these, or the display would erase
   // what someone actually did to keep the calendar tidy.
@@ -92,7 +93,7 @@ console.log('\n6. A day swapped for something else is not a day you failed')
   // next morning and the Muay Thai was recorded nowhere. Same shape as the
   // pre-plan bug above: the reward for telling the app was being told you
   // failed.
-  const swapped = { session: { swapped_for_activity: 'Muay Thai' }, workoutLogs: [] } as never
+  const swapped = { session: { swapped_for_activity: 'Muay Thai' }, workingLogs: [], warmupLogs: [] } as never
   check('a past swapped day reads swapped, not missed',
     classifyDay('Monday', MON, TODAY, PLAN, swapped, undefined) === 'swapped')
   check('...and it drops out of the tally rather than counting against you',
@@ -101,12 +102,12 @@ console.log('\n6. A day swapped for something else is not a day you failed')
   // Logged work still outranks everything, exactly as it outranks before_plan.
   // Someone who announced a swap and then trained anyway has earned the tick.
   const swappedButTrained = {
-    session: { swapped_for_activity: 'Muay Thai', is_completed: true }, workoutLogs: [{ id: 'x' }],
+    session: { swapped_for_activity: 'Muay Thai', is_completed: true }, workingLogs: [{ id: 'x' }], warmupLogs: [],
   } as never
   check('a swapped day they trained anyway reads done, not swapped',
     classifyDay('Monday', MON, TODAY, PLAN, swappedButTrained, undefined) === 'done')
   const swappedPartLogged = {
-    session: { swapped_for_activity: 'Muay Thai' }, workoutLogs: [{}],
+    session: { swapped_for_activity: 'Muay Thai' }, workingLogs: [{}], warmupLogs: [],
   } as never
   check('a swapped day with sets logged reads partial, not swapped',
     classifyDay('Monday', MON, TODAY, PLAN, swappedPartLogged, undefined) === 'partial')
@@ -127,7 +128,7 @@ console.log('\n6b. A rest day you chose is not a missed one')
   // and resting is the answer with no activity in it. So the day would have
   // shown MISSED the next morning, which is the app telling her off for a
   // decision she made deliberately and announced at the time.
-  const rested = { session: { deliberate_rest: true }, workoutLogs: [] } as never
+  const rested = { session: { deliberate_rest: true }, workingLogs: [], warmupLogs: [] } as never
   check('a past chosen rest day reads rest_chosen, not missed',
     classifyDay('Monday', MON, TODAY, PLAN, rested, undefined) === 'rest_chosen')
   check('...and it drops out of the tally rather than counting against you',
@@ -148,15 +149,15 @@ console.log('\n6b. A rest day you chose is not a missed one')
     classifyDay('Sunday', '2026-08-16', TODAY, PLAN, undefined, undefined) === 'recovery')
 
   // Logged work still outranks it, exactly as it outranks a swap.
-  const restedButTrained = { session: { deliberate_rest: true, is_completed: true }, workoutLogs: [{ id: 'x' }] } as never
+  const restedButTrained = { session: { deliberate_rest: true, is_completed: true }, workingLogs: [{ id: 'x' }], warmupLogs: [] } as never
   check('a rest day they trained anyway reads done, not rest_chosen',
     classifyDay('Monday', MON, TODAY, PLAN, restedButTrained, undefined) === 'done')
-  const restedPartLogged = { session: { deliberate_rest: true }, workoutLogs: [{}] } as never
+  const restedPartLogged = { session: { deliberate_rest: true }, workingLogs: [{}], warmupLogs: [] } as never
   check('a rest day with sets logged reads partial, not rest_chosen',
     classifyDay('Monday', MON, TODAY, PLAN, restedPartLogged, undefined) === 'partial')
 
   // A swap and a rest are different facts and must not shadow each other.
-  const both = { session: { deliberate_rest: true, swapped_for_activity: 'Muay Thai' }, workoutLogs: [] } as never
+  const both = { session: { deliberate_rest: true, swapped_for_activity: 'Muay Thai' }, workingLogs: [], warmupLogs: [] } as never
   check('a day that is both reads swapped — work happened, and that outranks rest',
     classifyDay('Monday', MON, TODAY, PLAN, both, undefined) === 'swapped')
 
@@ -172,6 +173,59 @@ const counted: DayGlyphState[] = ['done', 'partial', 'due', 'missed']
 const skipped: DayGlyphState[] = ['rest', 'recovery', 'before_plan', 'swapped', 'rest_chosen']
 for (const s of counted) check(`'${s}' counts`, countsTowardWeekTally(s))
 for (const s of skipped) check(`'${s}' does not count`, !countsTowardWeekTally(s))
+
+// The bail-out lives at the BOTTOM of this file, not here. Two sections were
+// appended below it on 17 Sep 2026 and printed FAIL while the gate exited 0 —
+// the identical defect found in test:slot-replacement the same day, made again
+// by hand a few hours later. Appending to a gate is exactly when this happens,
+// so there is one exit and everything runs before it.
+console.log('\n8. A build-up is not training')
+{
+  // Ashley's 17 Sep 2026 ruling made warm-up rows REAL rows. This is the week
+  // strip's half of that: tick three build-up boxes on a deadlift, walk out,
+  // and the week must not say you trained. Before the split, `workoutLogs`
+  // answered "every row logged today" and this guard — the one written FOR
+  // Ashley's Thursday, a session marked complete with nothing in it — would
+  // have been satisfied by a warm-up.
+  //
+  // THE RENAME IS THE FIX. These fixtures are cast `as never`, so TypeScript
+  // could not have caught a reader left on the old field; a field that no
+  // longer exists makes the gate CRASH instead, which is how this was found.
+  const warmupOnly = { session: null, workingLogs: [], warmupLogs: [{ id: 'w1' }, { id: 'w2' }, { id: 'w3' }] } as never
+  check('three build-up rows and nothing else is not "partial"', classifyDay('Monday', MON, TODAY, PLAN, warmupOnly, PLAN_START) !== 'partial', classifyDay('Monday', MON, TODAY, PLAN, warmupOnly, PLAN_START))
+
+  const warmupThenWork = { session: null, workingLogs: [{ id: 's1' }], warmupLogs: [{ id: 'w1' }] } as never
+  check('...but a working set after them IS', classifyDay('Monday', MON, TODAY, PLAN, warmupThenWork, PLAN_START) === 'partial', classifyDay('Monday', MON, TODAY, PLAN, warmupThenWork, PLAN_START))
+
+  // The other half of Ashley's Thursday: a session FLAGGED complete with only
+  // a build-up in it must not read as done either.
+  const completedWarmupOnly = { session: { is_completed: true }, workingLogs: [], warmupLogs: [{ id: 'w1' }] } as never
+  check('a session marked complete with only a build-up in it is not "done"',
+    classifyDay('Monday', MON, TODAY, PLAN, completedWarmupOnly, PLAN_START) !== 'done', classifyDay('Monday', MON, TODAY, PLAN, completedWarmupOnly, PLAN_START))
+}
+
+console.log('\n9. The split that feeds it, checked directly')
+{
+  // A MUTATION COLLAPSING THE PARTITION PASSED SECTION 7 ENTIRELY, because
+  // section 7 builds its own fixtures and never exercises the code that
+  // produces them. The behaviour was guarded and the thing producing it was
+  // not — so the partition is now an exported pure function and checked here.
+  const rows = [
+    { date: '2026-09-17', is_warmup: true, set_number: 1 },
+    { date: '2026-09-17', is_warmup: false, set_number: 1 },
+    { date: '2026-09-17', is_warmup: false, set_number: 2 },
+    { date: '2026-09-16', is_warmup: false, set_number: 1 },
+  ] as never[]
+  const split = partitionLogsByKind(rows, '2026-09-17')
+  check('the day\'s working sets are kept', split.workingLogs.length === 2, String(split.workingLogs.length))
+  check('...its build-up rows are kept SEPARATELY, not dropped', split.warmupLogs.length === 1, String(split.warmupLogs.length))
+  check('...and another day\'s rows are in neither', split.workingLogs.length + split.warmupLogs.length === 3)
+  // Proof it can still tell them apart: a day with no warm-ups must give an
+  // empty second list rather than a copy of the first.
+  const noWarmups = partitionLogsByKind(rows, '2026-09-16')
+  check('a day with no build-up gives an empty list, not a duplicate',
+    noWarmups.workingLogs.length === 1 && noWarmups.warmupLogs.length === 0)
+}
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`)

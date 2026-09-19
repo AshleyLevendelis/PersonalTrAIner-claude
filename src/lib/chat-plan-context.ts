@@ -201,10 +201,53 @@ export interface CoachToday {
   movedFrom?: { dayName: string } | null
 }
 
-function partOfDay(hour: number): string {
+/**
+ * ONE PLACE DECIDES WHAT PART OF THE DAY IT IS. Exported 17 Sep 2026 so the
+ * coach's own CONTEXT line reads from the same three thresholds this header
+ * does — two copies of "when does the evening start" is exactly the shape
+ * that lets the app say two different things about one moment.
+ */
+export function partOfDay(hour: number): string {
   if (hour < 12) return 'morning'
   if (hour < 17) return 'afternoon'
   return 'evening'
+}
+
+/**
+ * A CONVERSATION IS NOT A FLAT LIST OF SENTENCES SAID JUST NOW.
+ *
+ * Ashley, 17 Sep 2026, at 17:58: the coach asked her three turns running
+ * whether she was going to train "this morning". The clock reaching the model
+ * was correct. What was not is that her chat history is restored with NO DATE
+ * FILTER and sent as bare {role, content} — so a turn the coach itself wrote
+ * at 8am, containing the words "this morning", sat in the window looking
+ * exactly like the sentence before this one. Turn 2 mirrored turn 1, turn 3
+ * mirrored turn 2, and one wrong reading of the clock became the whole day's.
+ *
+ * So each turn carries WHEN IT WAS SAID, from `created_at`, which the app has
+ * held all along and already reads twenty lines away. Only turns that could be
+ * misread are stamped — the last hour and a half of a live conversation is
+ * left alone, because stamping every line would be noise and would change how
+ * the model reads a normal back-and-forth.
+ *
+ * DELIBERATELY CLIENT-SIDE. The edge function replays each turn's `content`
+ * verbatim, so this reaches the coach on a frontend push with no function
+ * deploy — the same lever `buildTodayHeader` uses.
+ */
+export const STAMP_AFTER_MINUTES = 90
+
+export function stampTurnTime(content: string, createdAt: string | null | undefined, now: Date): string {
+  if (!createdAt) return content
+  const said = new Date(createdAt)
+  if (Number.isNaN(said.getTime())) return content
+  const sameDay = said.getFullYear() === now.getFullYear() && said.getMonth() === now.getMonth() && said.getDate() === now.getDate()
+  const clock = said.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  if (!sameDay) {
+    const day = said.toLocaleDateString('en-US', { weekday: 'long' })
+    return `[said on ${day} ${partOfDay(said.getHours())}, ${clock}] ${content}`
+  }
+  if (now.getTime() - said.getTime() < STAMP_AFTER_MINUTES * 60_000) return content
+  return `[said earlier today, ${partOfDay(said.getHours())}, ${clock}] ${content}`
 }
 
 /**
