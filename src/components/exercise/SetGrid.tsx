@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Check, Dumbbell, Plus, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
-import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
+import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
 import { lastTime, loggedSetReading } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
@@ -197,6 +197,32 @@ export function SetGrid({
   // the value goes to its own column rather than being reinterpreted.
   const takesAddedLoad = catalogEntry?.accepts_added_load === true
 
+  /**
+   * WHAT A DROP DROPS TO — a quarter off the row above, snapped to what can
+   * actually be loaded.
+   *
+   * 25% is the middle of the 20-30% a drop set conventionally takes off, and
+   * it is a STARTING NUMBER in a box, never a prescription: nothing in the
+   * plan asked for this set, so the app's job is to save typing, not to tell
+   * anyone how heavy to go.
+   *
+   * FORCED AT LEAST ONE STEP BELOW THE BASE, which is the calibration
+   * ladder's rule in the other direction and for the same measured reason: on
+   * a 20kg dumbbell with a 2kg step, 25% rounds straight back to 20 and the
+   * "drop" offers the weight just lifted. Never below one step, so it can
+   * never offer 0 on a lift that needs a weight.
+   */
+  const dropWeightFrom = (baseKg: number): number => {
+    const mode = catalogEntry ? loadingMode(catalogEntry) : 'stack'
+    const step = plateStepKg(mode)
+    const snapped = roundToPlate(baseKg * 0.75, mode)
+    return Math.max(step, Math.min(snapped, baseKg - step))
+  }
+  /** The row a drop steps down FROM: the drop above it where there is one, the parent set otherwise. */
+  const rowAboveDrop = (ref: SetRef) => ((ref.dropIndex ?? 0) > 1
+    ? dropLogs.find(l => l.set_number === ref.setNumber && (l.drop_index ?? 0) === (ref.dropIndex ?? 0) - 1)
+    : existingLogs.find(l => l.set_number === ref.setNumber))
+
   const existingLogs = setsFor(exerciseId, exerciseName)
   const ghostValues = ghosts(exerciseId)
   const loggedSetNumbers = existingLogs.map(l => l.set_number)
@@ -229,11 +255,45 @@ export function SetGrid({
   const extraWarmupNumbers = extraSetsFor(`${exerciseId}#warmup`)
   const warmupRowNumbers = Array.from(new Set([...prescribedWarmupNumbers, ...loggedWarmupNumbers, ...extraWarmupNumbers])).sort((a, b) => a - b)
   const workingRowNumbers = computeSetRowNumbers(totalSets, loggedSetNumbers, extraSetNumbers)
+
+  // -------------------------------------------------------------------
+  // DROPS — a continuation of the set above, not a set of its own.
+  //
+  // MEASURED BEFORE BUILDING, and it changes what this is: NOTHING IN THE
+  // PLAN PRESCRIBES A DROP. `Exercise` has no field for one and the
+  // generator emits none, so the handoff's "pre-drawn when prescribed"
+  // branch has nothing to draw from — every drop row on this screen is one
+  // the lifter asked for. Adding a prescription field is a data-model
+  // change beyond what was scoped, so it is named rather than assumed.
+  //
+  // A drawn-but-unlogged drop lives in the SAME durable extras record the
+  // warm-up rows use, namespaced per parent set — no new persistence
+  // concept, and a reload between sets still finds the row on screen.
+  // -------------------------------------------------------------------
+  const dropLogs = filterDropSets(logs, exerciseId, exerciseName)
+  const dropExtrasKey = (setNumber: number) => `${exerciseId}#drop${setNumber}`
+  const dropIndicesFor = (setNumber: number): number[] => Array.from(new Set([
+    ...dropLogs.filter(l => l.set_number === setNumber).map(l => l.drop_index ?? 0),
+    ...extraSetsFor(dropExtrasKey(setNumber)),
+  ])).sort((a, b) => a - b)
+
   const rowRefs: SetRef[] = [
     ...warmupRowNumbers.map(n => ({ kind: 'warmup' as const, setNumber: n })),
-    ...workingRowNumbers.map(n => ({ kind: 'working' as const, setNumber: n })),
+    // INTERLEAVED, NOT GROUPED AT THE END. The card has to read 3, 3·1, 3·2,
+    // 4 — the order the work was done in. A drops block underneath would be
+    // a second table again, the thing the two-groups layout exists to avoid.
+    ...workingRowNumbers.flatMap(n => [
+      { kind: 'working' as const, setNumber: n },
+      ...dropIndicesFor(n).map(d => ({ kind: 'working' as const, setNumber: n, dropIndex: d })),
+    ]),
   ]
   const isWarm = (ref: SetRef) => ref.kind === 'warmup'
+  const isDrop = (ref: SetRef) => (ref.dropIndex ?? 0) > 0
+  /** The last logged working set, and the last ROW belonging to it — where the one "add a drop" link sits. */
+  const lastLoggedSetNumber = loggedSetNumbers.length ? Math.max(...loggedSetNumbers) : null
+  const lastRowIndexOfLastLoggedSet = lastLoggedSetNumber == null
+    ? -1
+    : rowRefs.reduce((last, r, i) => (r.kind === 'working' && r.setNumber === lastLoggedSetNumber ? i : last), -1)
   // "+ Add warm-up" wherever a build-up makes sense — any externally loaded
   // lift, not only the ones the generator chose to ramp. `needsRampUp` skips
   // tier-2 lifts under 60kg, and those are exactly the rows Ashley filled with
@@ -242,9 +302,24 @@ export function SetGrid({
   // actually reported.
   const showWarmupControls = catalogEntryIsLoaded
   /** The exercise id a row's DRAFT is filed under. Namespaced for warm-ups so logging working set 1 cannot sweep away a typed-but-unsaved warm-up 3 (clearSetDrafts matches on the id prefix). */
-  const draftIdFor = (ref: SetRef) => (isWarm(ref) ? `${exerciseId}#warmup` : exerciseId)
-  const logsFor = (ref: SetRef) => (isWarm(ref) ? warmupLogs : existingLogs)
-  const loggedNumbersFor = (ref: SetRef) => (isWarm(ref) ? loggedWarmupNumbers : loggedSetNumbers)
+  const draftIdFor = (ref: SetRef) => (
+    isWarm(ref) ? `${exerciseId}#warmup` : isDrop(ref) ? `${exerciseId}#drop${ref.dropIndex}` : exerciseId
+  )
+  /**
+   * The stored row this ref names, or undefined.
+   *
+   * ONE RESOLVER FOR ALL THREE KINDS, replacing a pair of helpers that handed
+   * back a LIST for the caller to search by set number. That shape cannot
+   * express a drop — 3 and 3·1 share a set number — and the two call sites
+   * would each have had to remember the second coordinate.
+   */
+  const loggedRowFor = (ref: SetRef) => (
+    isWarm(ref)
+      ? warmupLogs.find(l => l.set_number === ref.setNumber)
+      : isDrop(ref)
+        ? dropLogs.find(l => l.set_number === ref.setNumber && (l.drop_index ?? 0) === ref.dropIndex)
+        : existingLogs.find(l => l.set_number === ref.setNumber)
+  )
 
   const [inputs, setInputs] = useState<Record<string, SetInputState>>({})
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
@@ -278,7 +353,7 @@ export function SetGrid({
   const inputFor = (ref: SetRef): SetInputState => {
     const k = rowKey(ref)
     if (inputs[k]) return inputs[k]
-    const existing = logsFor(ref).find(l => l.set_number === ref.setNumber)
+    const existing = loggedRowFor(ref)
     if (existing) {
       return { weight: String(existing.weight_kg), reps: String(existing.reps_completed), isBodyweight: existing.is_bodyweight }
     }
@@ -298,7 +373,11 @@ export function SetGrid({
    * 95kg as a build-up. A build-up's number comes from the prescription and
    * nowhere else.
    */
-  const ghostFor = (ref: SetRef) => (isWarm(ref) ? undefined : ghostValues.find(g => g.set_number === ref.setNumber))
+  // AND NOT ON A DROP EITHER, for a second reason on top of the one above: a
+  // ghost is keyed on the set NUMBER alone, so every drop of set 3 would be
+  // offered set 3's weight from last week — the full working load, which is
+  // the one number a drop is definitely not.
+  const ghostFor = (ref: SetRef) => (isWarm(ref) || isDrop(ref) ? undefined : ghostValues.find(g => g.set_number === ref.setNumber))
   const updateInput = (ref: SetRef, field: 'weight' | 'reps', value: string) => {
     const setNumber = ref.setNumber
     const k = rowKey(ref)
@@ -335,6 +414,16 @@ export function SetGrid({
       if (rampKind === 'bodyweight') return '0'
       const step = (rampSets ?? []).find(r => r.setNumber === setNumber)
       return step?.kg != null ? String(step.kg) : ''
+    }
+    // A DROP'S NUMBER COMES FROM WHAT WAS JUST LIFTED, not from the
+    // prescription — the prescription describes the working set, and a drop
+    // is the thing that happens after it. Blank until the row above is
+    // actually logged: there is no honest number to offer before then, and a
+    // blank box refuses the tick rather than inventing one.
+    if (isDrop(ref)) {
+      const above = rowAboveDrop(ref)
+      if (!above || above.is_bodyweight || !(Number(above.weight_kg) > 0)) return ''
+      return String(dropWeightFrom(Number(above.weight_kg)))
     }
     // CALIBRATION, SETS 2+: NO DEFAULT. This is the one deliberate exception
     // to "a blank box logs the prescribed number". In week one the prescribed
@@ -395,6 +484,12 @@ export function SetGrid({
       const step = (rampSets ?? []).find(r => r.setNumber === ref.setNumber)
       return step ? String(step.reps) : ''
     }
+    // BLANK ON A DROP, and deliberately so. The working range describes the
+    // working set; a drop is taken to whatever came out, so defaulting to the
+    // bottom of that range would record reps nobody did — the exact harm the
+    // rule above this one exists to prevent, from the other side. With no
+    // fallback the save refuses until a real number is typed.
+    if (isDrop(ref)) return ''
     return /\d+/.exec(prescribedReps ?? '')?.[0] ?? ''
   }
 
@@ -403,6 +498,14 @@ export function SetGrid({
     const setNumber = ref.setNumber
     const k = rowKey(ref)
     const warm = isWarm(ref)
+    // A DROP IS WORKING VOLUME AND NOTHING ELSE — Ashley's ruling, 19 Sep
+    // 2026, and the CSCS reading recorded with it. It counts toward the work
+    // done; it is not a personal best (performed already fatigued, with no
+    // rest, as the easier half of one effort) and it never re-anchors next
+    // week's weight, which would drop the prescription every time somebody
+    // trained harder. Each of those three is switched off below, at the call
+    // site, because two of them take loose values and cannot see the row.
+    const drop = isDrop(ref)
     const input = inputFor(ref)
     const ghost = ghostFor(ref)
 
@@ -432,7 +535,7 @@ export function SetGrid({
     // lift an empty weight would otherwise resolve to "bodyweight" and be
     // logged as a set she never did. The message names the probe so the
     // refusal reads as the design, not a fault.
-    if (calibrationProbe && !warm && setNumber > 1 && !input.isBodyweight && !input.weight.trim() && !ghost) {
+    if (calibrationProbe && !warm && !drop && setNumber > 1 && !input.isBodyweight && !input.weight.trim() && !ghost) {
       setRowErrors(prev => ({ ...prev, [k]: 'Type the weight you lifted — set 1 was the probe' }))
       return
     }
@@ -533,6 +636,10 @@ export function SetGrid({
       // app had ever been able to set it, so every build-up she logged was
       // filed as a working set and froze her weight.
       isWarmup: warm,
+      // 0 for a set, 1+ for its drops. Part of the store's natural key and
+      // the database's unique constraint, so a drop that arrives without it
+      // does not sit beside its parent — it overwrites it.
+      dropIndex: ref.dropIndex ?? 0,
     })
 
     // The typed value has become a real row. Leaving the draft behind would
@@ -560,7 +667,7 @@ export function SetGrid({
     // animation, and the DB-derived cache then quietly drops it on the next
     // refresh — a flicker, which is harder to notice and harder to report
     // than a wrong record that stays put.
-    const pr = warm ? null : checkForPR(profileId, exerciseName, {
+    const pr = warm || drop ? null : checkForPR(profileId, exerciseName, {
       weightKg: storedWeightKg,
       reps,
       isBodyweight: storedIsBodyweight,
@@ -573,18 +680,20 @@ export function SetGrid({
     // Re-evaluate against the updated log set (existingLogs will include
     // this save on the next render via setsFor; use the just-saved value
     // for this row so the PR badge doesn't lag a render).
-    const projectedLogs = warm ? existingLogs : [
+    const projectedLogs = warm || drop ? existingLogs : [
       ...existingLogs.filter(l => l.set_number !== setNumber),
       { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: storedWeightKg, reps_completed: reps, is_bodyweight: storedIsBodyweight, added_load_kg: addedLoadKg },
     ]
-    const topPR = warm ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs))
+    const topPR = warm || drop ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs))
     setPrBadgeSet(topPR ? { rowKey: rowKey({ kind: 'working', setNumber: topPR.setNumber }), result: topPR.result } : null)
 
     // THE REST TIMER AND THE SAME-SESSION TOAST BELONG TO WORKING SETS. A
     // build-up is followed by the next build-up, not by two minutes; and the
     // "you earned a bump" check reads today's working sets, which a warm-up
     // is not one of.
-    if (!warm && onSetCompleted && prescribedReps) {
+    // AND NO REST TIMER AFTER A DROP — "drop · no rest" is what the header
+    // says, and starting a two-minute clock would contradict the screen.
+    if (!warm && !drop && onSetCompleted && prescribedReps) {
       onSetCompleted(exerciseName, setNumber, weight, reps, restTime || '60s', totalSets, prescribedReps, tier)
     }
   }
@@ -616,6 +725,21 @@ export function SetGrid({
     setExtraSets(`${exerciseId}#warmup`, [...extraWarmupNumbers, next])
   }
 
+  /**
+   * "+ Add a drop" — one more continuation row under the set just logged.
+   *
+   * Never pre-drawn, because nothing prescribed it (see the derivation
+   * above). The row appears only where somebody asked for it, which also
+   * means the grid never shows an empty drop box to a person who does not
+   * use them.
+   */
+  const handleAddDrop = (setNumber: number) => {
+    const drawn = extraSetsFor(dropExtrasKey(setNumber))
+    const existing = dropIndicesFor(setNumber)
+    const next = (existing.length ? Math.max(...existing) : 0) + 1
+    setExtraSets(dropExtrasKey(setNumber), [...drawn, next])
+  }
+
   const handleAddExtraSet = () => {
     const next = nextExtraSetNumber(totalSets, loggedSetNumbers, extraSetNumbers)
     setExtraSets(exerciseId, [...extraSetNumbers, next])
@@ -645,7 +769,8 @@ export function SetGrid({
         const setNumber = ref.setNumber
         const k = rowKey(ref)
         const warm = isWarm(ref)
-        const isSaved = loggedNumbersFor(ref).includes(setNumber)
+        const drop = isDrop(ref)
+        const isSaved = !!loggedRowFor(ref)
         const input = inputFor(ref)
         const isBW = input.isBodyweight
         const isPRSet = prBadgeSet?.rowKey === k
@@ -663,15 +788,37 @@ export function SetGrid({
         // so both blocks stay inside one grid and the weight column runs
         // unbroken down the card — the layout half of her 17 Sep ruling.
         const railed = !insideSuperset
-        const startsWorking = warm === false && rowIndex > 0 && rowRefs[rowIndex - 1].kind === 'warmup'
+        const startsWorking = warm === false && !drop && rowIndex > 0 && rowRefs[rowIndex - 1].kind === 'warmup'
         const groupHead = rowIndex === 0 && warm
           ? { left: 'Ramp up', right: 'not counted' }
           : startsWorking
             ? { left: `Working sets · ${totalSets} × ${prescribedReps ?? ''}`.trim().replace(/ ×\s*$/, ''), right: restTime ? `saved · rest ${restTime}` : 'saved' }
             : null
+        // THE DROP HEADER, above the FIRST drop of a set only — a second one
+        // between 3·1 and 3·2 would be announcing the same thing twice about
+        // one continuous effort. "No rest" is not decoration: it is the whole
+        // difference between a drop and another set, and this row is the only
+        // place on the card where the rest figure in the working header above
+        // does not apply.
+        const startsDrops = drop && rowIndex > 0 && !isDrop(rowRefs[rowIndex - 1])
+        // The one "add a drop" link: under the last row of the last logged
+        // set, and only once that row is actually saved. Offering it under an
+        // empty box would be asking for a continuation of a set that has not
+        // happened.
+        const showAddDrop = rowIndex === lastRowIndexOfLastLoggedSet && isSaved
+        const padClass = railed
+          ? (drop ? 'pl-5 pr-1' : 'pl-2 pr-1')
+          : (drop ? 'pl-4 pr-1 rounded-l-[8px]' : 'px-1 rounded-l-[8px]')
 
         return (
           <React.Fragment key={k}>
+          {startsDrops && (
+            <div className="flex items-baseline gap-2 pl-5 pr-1 pt-1" data-testid="drop-caption">
+              <span className="text-[0.625rem] uppercase tracking-[.12em] whitespace-nowrap text-primary-text">
+                Drop · no rest
+              </span>
+            </div>
+          )}
           {groupHead && (
             <div
               className={`flex items-baseline justify-between gap-2 pl-2.5 pr-1 ${rowIndex === 0 ? '' : 'pt-3'}`}
@@ -684,7 +831,7 @@ export function SetGrid({
             </div>
           )}
           <div
-            data-testid={warm ? 'warmup-row' : 'working-row'}
+            data-testid={warm ? 'warmup-row' : drop ? 'drop-row' : 'working-row'}
             // A RAIL MEANS GROUPING, A COLOUR MEANS WHAT A SET COUNTS AS —
             // the rule the whole handoff rests on. The rail is drawn per row
             // rather than as a wrapper because both groups share one grid, so
@@ -694,11 +841,29 @@ export function SetGrid({
             // INSIDE A SUPERSET IT IS DROPPED: that rail already means
             // grouping, and two rails would fight. There the ramp is signalled
             // by the violet label and save button alone.
+            //
+            // A DROP KEEPS THE WORKING RAIL, and that follows from her rule
+            // rather than from taste: the rail says what belongs with what,
+            // and a drop belongs with the working sets. Its own subordination
+            // is carried by the indent and the tether below — position, not
+            // colour, because colour here already means "this counts as
+            // working volume", which a drop does.
             style={railed ? { borderLeft: `2px solid ${warm ? 'var(--ramp-rail)' : 'color-mix(in srgb, var(--primary) 55%, transparent)'}` } : undefined}
-            className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-r-[8px] py-0.5 transition-colors ${railed ? 'pl-2 pr-1' : 'px-1 rounded-l-[8px]'} ${
+            className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-r-[8px] py-0.5 transition-colors ${drop ? 'relative' : ''} ${padClass} ${
               isSaved ? (warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : ''
             }`}
           >
+            {/* The tether — an elbow from the row above into this one, so a
+                drop reads as hanging off its set rather than sitting beside
+                it. Decorative and hidden from a screen reader, which gets the
+                same fact from the row's spoken name ("Set 3, drop 1"). */}
+            {drop && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-1.5 top-0 h-1/2 w-[9px] rounded-bl-[6px] border-b-2 border-l-2"
+                style={{ borderColor: 'color-mix(in srgb, var(--primary) 30%, transparent)' }}
+              />
+            )}
             {/* THE KIND IS IN THE LABEL, NOT ONLY IN THE DATA. A caption
                 scrolls off the top of a phone; the row prefix does not. W1
                 or 1, and no third case. */}
@@ -813,14 +978,22 @@ export function SetGrid({
               </Button>
             </div>
           </div>
+          {/* THE RECEIPT NAMES THE ROW IT IS FOR. It read the WORKING logs by
+              set number and printed "Set 3", so two things were wrong at once:
+              a drop showed its PARENT's numbers under it, and a saved ramp row
+              showed the working set of the same number — R2's receipt reading
+              out working set 2. A logged ramp row now gets its own receipt and
+              its own delete, which it had neither of before. Both halves are
+              the standing rule ("two rows must not share one spoken name")
+              meeting the rows this screen has gained since it was written. */}
           {isSaved && (() => {
-            const logged = existingLogs.find(l => l.set_number === setNumber)
+            const logged = loggedRowFor(ref)
             if (!logged) return null
             const armed = confirmDeleteSet === k
             return (
-              <div className="flex items-center justify-between gap-2 px-1 -mt-0.5">
+              <div className={`flex items-center justify-between gap-2 -mt-0.5 ${drop ? 'pl-5 pr-1' : 'px-1'}`}>
                 <p className="text-[0.625rem] text-primary-text">
-                  Set {setNumber}: {logged.is_bodyweight
+                  {setLabelLong(ref)}: {logged.is_bodyweight
                     ? `${logged.reps_completed} reps · Bodyweight`
                     : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
                 </p>
@@ -828,12 +1001,40 @@ export function SetGrid({
                   type="button"
                   onClick={() => handleDeleteSet(ref)}
                   className={`flex shrink-0 items-center gap-1 text-[0.625rem] ${armed ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
-                  aria-label={armed ? `Confirm delete set ${setNumber}` : `Delete set ${setNumber}`}
+                  aria-label={armed ? `Confirm delete ${setLabelLong(ref).toLowerCase()}` : `Delete ${setLabelLong(ref).toLowerCase()}`}
                 >
                   <Trash2 className="size-2.5" />
                   {armed ? 'Tap to confirm' : 'Delete'}
                 </button>
               </div>
+            )
+          })()}
+          {/* "+ ADD A DROP" — one link, under the last row of the last logged
+              set. The handoff labelled it "−25%"; it says the KILOS it will
+              put in the box instead, which is the same deviation the
+              calibration chips two blocks down already make and for the
+              measured reason recorded there: a percentage that snaps to a
+              plate step names a weight the app will not actually offer. At a
+              27.5kg base, "−25%" lands on 20kg, which is −27%. The number on
+              the control is the number in the box. */}
+          {showAddDrop && (() => {
+            const above = loggedRowFor(ref)
+            const target = above && !above.is_bodyweight && Number(above.weight_kg) > 0
+              ? dropWeightFrom(Number(above.weight_kg))
+              : null
+            return (
+              <button
+                type="button"
+                data-testid="add-drop"
+                onClick={() => handleAddDrop(setNumber)}
+                className="hit-slop-44 flex items-center gap-1 text-[0.6875rem] text-primary-text pl-[34px] -mt-0.5"
+                aria-label={target != null
+                  ? `Add a drop after set ${setNumber}, starting at ${target}kg`
+                  : `Add a drop after set ${setNumber}`}
+              >
+                <Plus className="size-3" />
+                {target != null ? `Add a drop · ${target}kg` : 'Add a drop'}
+              </button>
             )
           })()}
           {/* THE NEXT WEIGHT, OFF THE LAST ONE LIFTED. Only in calibration
@@ -856,7 +1057,7 @@ export function SetGrid({
               set, so on warm-up 2 they would offer a next weight derived from
               working set 1 — a ladder built from the wrong lift entirely. A
               build-up step already has its number from the prescription. */}
-          {calibrationProbe && !warm && setNumber > 1 && !isSaved && (() => {
+          {calibrationProbe && !warm && !drop && setNumber > 1 && !isSaved && (() => {
             const prev = existingLogs.find(l => l.set_number === setNumber - 1)
             if (!prev || prev.is_bodyweight || !(Number(prev.weight_kg) > 0)) return null
             const mode = catalogEntry ? loadingMode(catalogEntry) : 'stack'
@@ -879,7 +1080,7 @@ export function SetGrid({
                   <button
                     key={o.label}
                     type="button"
-                    className="hit-slop-44 rounded border border-[color:var(--role-warn)]/50 bg-[color:var(--role-warn)]/10 px-1.5 py-0.5 text-[0.625rem] text-[color:var(--role-warn-text)]"
+                    className="hit-slop-44 rounded border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[0.625rem] text-primary-text"
                     onClick={() => updateInput(ref, 'weight', String(o.kg))}
                     aria-label={`Set ${setNumber} at ${o.kg}kg (${o.kg === base ? 'same as set ' + (setNumber - 1) : o.label.slice(1) + 'kg more'})`}
                   >
@@ -922,11 +1123,16 @@ export function SetGrid({
           set — but a second generic "Add Set" between the blocks would be the
           exact thing Ashley's ruling is against: a button offering to record
           work the app itself asked for. */}
+      {/* VIOLET, NOT AMBER, SINCE 19 Sep 2026 — this button adds a RAMP row, so
+          it wears the ramp colour like everything else that means "ramp". The
+          amber it used to wear is the app's caution colour and meant nothing
+          here; the only amber left on this screen is the weight warning below,
+          which genuinely is a caution and would be a lie in violet. */}
       {showWarmupControls && (
         <Button
           variant="ghost"
           size="sm"
-          className="w-full text-xs text-[color:var(--role-warn-text)] h-6 mt-0.5"
+          className="w-full text-xs text-[color:var(--ramp-label)] h-6 mt-0.5"
           onClick={handleAddWarmupSet}
           data-testid="add-warmup-set"
         >

@@ -210,7 +210,11 @@ async function main() {
     check('today\'s card no longer renders the tickable strip — the grid has the rows',
       !/<RampStrip[\s\S]{0,200}onToggle=/.test(row), row.match(/<RampStrip[\s\S]{0,120}/)?.[0])
     const gridSrc = readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8')
-    check('...the grid draws a labelled build-up row', /data-testid={warm \? 'warmup-row' : 'working-row'}/.test(gridSrc))
+    // RE-ANCHORED 19 Sep 2026 — the row testid gained a third value for drop
+    // rows. The property is that a build-up row is distinguishable from a
+    // working one, not the shape of the ternary that decides it.
+    check('...the grid draws a labelled build-up row',
+      /data-testid={warm \? 'warmup-row'/.test(gridSrc) && /'working-row'/.test(gridSrc))
     check('...labelled by the shared function, with no third case', /\{setLabel\(ref\)\}/.test(gridSrc))
     check('...and a build-up row is SAVED as one', /isWarmup: warm,/.test(gridSrc))
     // RE-ANCHORED 19 Sep 2026. This pinned the delete call's exact text and went
@@ -232,10 +236,10 @@ async function main() {
     // measured, by doing exactly that. Only a browser can see a row that is
     // not there, which is verify:warmup-rows' job.
     // The half that makes it safe rather than merely visible.
-    check('...while a build-up never fires a personal best', /const pr = warm \? null : checkForPR\(/.test(gridSrc))
-    check('...and never starts the rest timer or the same-session bump', /if \(!warm && onSetCompleted && prescribedReps\)/.test(gridSrc))
+    check('...while a build-up never fires a personal best', /const pr = warm[^:]*\? null : checkForPR\(/.test(gridSrc))
+    check('...and never starts the rest timer or the same-session bump', /if \(!warm &&[^)]*onSetCompleted && prescribedReps\)/.test(gridSrc))
     check('...and never takes last week\'s WORKING weight as its ghost',
-      /const ghostFor = \(ref: SetRef\) => \(isWarm\(ref\) \? undefined :/.test(gridSrc))
+      /const ghostFor = \(ref: SetRef\) => \(isWarm\(ref\)[^?]*\? undefined :/.test(gridSrc))
 
 
     // THE STRIP IS READ-ONLY EVERYWHERE NOW, AND THE MACHINERY IS GONE WITH IT.

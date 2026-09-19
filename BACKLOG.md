@@ -2,6 +2,102 @@
 
 Newest first. One line each.
 
+- [x] **A BROWSER FOUND A WRITE BUG THAT WOULD HAVE BROKEN EVERY SET SAVE THE
+  DAY THE MIGRATION LANDED.** 19 Sep 2026, building drop-set rows from Ashley's
+  handoff. Thirty-five source checks, a clean typecheck and a green
+  `test:drop-sets` all passed over it; tapping the tick in a real Chromium found
+  it in one run.
+  **What the screen showed**: saving a drop wrote the drop's numbers over its
+  PARENT SET's row. Set 1 of 8 reps at 47.5kg became 6 reps at 35kg, and the
+  drop itself vanished. The cause was the upsert's conflict target — the five
+  columns of the OLD unique constraint — so the database (and the harness's
+  fake) treated the drop as the same row as its parent.
+  **The worse half is the one nobody was going to see coming.** Migration
+  `20260919160000` REPLACES that constraint with one including `drop_index`. The
+  moment it is applied, an upsert naming the old five columns matches no unique
+  index and Postgres rejects it with 42P10 — so **every set save in the app would
+  have failed**, not just drops. There is no deploy order that avoids it, because
+  the migration is run by hand on another machine. Fixed by trying the new target
+  and falling back to the old one on 42P10 alone: one extra round trip before the
+  migration, none after, correct on both sides of it and self-healing.
+  **FOUR MORE GAPS ON THE SAME PATH, found by looking for the set rather than
+  stopping at the first cause** — the habit this file already records from the
+  six bodyweight-PR exclusions. (1) The flush payload never sent `drop_index` at
+  all. (2) `ServerSetRow` did not carry it, so a synced drop read back as an
+  ordinary set — rejoining the working count and becoming a candidate personal
+  best. (3) The delete's `.match` omitted it, so deleting a drop would take its
+  parent with it. (4) `getLastSessionSets` dedupes on set number alone, so last
+  week's `3·1` would win the key from last week's `3` and offer the DROP's weight
+  as this week's suggestion — ratcheting the lift DOWN every session somebody
+  used one. Each is one line; any one alone left the feature broken.
+  **What shipped on screen**: a drop is a continuation row under its parent —
+  `3·1`, `3·2` — indented with a tether, under a "DROP · NO REST" header, with
+  the parent's own rail because a rail means grouping and a drop belongs with the
+  working sets. Its weight box is pre-filled a quarter below the row above it,
+  snapped to the implement's real plate step and forced at least one step down;
+  its reps box is blank, because nothing prescribed it and a default would be the
+  app recording reps nobody did. The "+ Add a drop" link appears once, under the
+  last logged set only.
+  **MEASURED BEFORE BUILDING, and it changed the scope**: NOTHING IN THE PLAN
+  PRESCRIBES A DROP. `Exercise` has no field for one and the generator emits
+  none, so the handoff's "pre-drawn when prescribed" branch has nothing to draw
+  from. Adding a prescription field is a data-model change beyond what Ashley
+  scoped ("ask before changing the data model beyond the README's State
+  section"), so it is named here rather than assumed — every drop row on the
+  screen today is one the lifter asked for.
+  **THREE DEVIATIONS FROM THE HANDOFF, each with its reason.** (a) The link says
+  the KILOS it will put in the box, not "−25%" — the same deviation the
+  calibration chips already make, for the measured reason recorded there: a
+  percentage that snaps to a plate step names a weight the app will not actually
+  offer (at 27.5kg, "−25%" lands on 20kg, which is −27%). (b) The child rows keep
+  44px boxes rather than shrinking to 40px. Ashley chose 44 on 9 Sep 2026 from
+  three options having seen the before and after, about boxes used mid-workout;
+  a drop is typed under fatigue, which is the worst case for a small target.
+  Subordination is carried by the indent, the tether and the label instead. Say
+  the word and they shrink. (c) Amber is retired from the ramp — today's card,
+  `RampStrip` on browse and peek, the "Add warm-up" control and the calibration
+  cue — but NOT from the weight-plausibility warning, which is a genuine caution
+  and would be a lie in violet.
+  **THE CSCS REVIEW** (nothing prescribed changes, so most of it is short). 1.
+  Training effect: unchanged — no set, weight, rest or exercise moves; work that
+  was untrackable becomes loggable, so the volume figure gets more accurate, not
+  different. 2. What it takes away: nothing; no row loses a field. 3.
+  Fundamentals: overload, coverage and recovery untouched — and the two
+  exclusions PROTECT overload, since a drop entering personal bests or
+  re-anchoring would lower next week's prescription every time somebody trained
+  harder. 4. Does it redefine a floor or ceiling? This is the one with teeth and
+  it is why the marker is a column: the set COUNT and the volume TOTAL now answer
+  two different questions and neither changed meaning. Proven on a real screen —
+  the card still says three working sets with a drop saved under set 1. 5. Scope:
+  presentation and logging, not diagnosis, rehab or clinical nutrition.
+  **SIX GATES WERE MECHANISM-PINNED AND BROKE ON CORRECT CODE**, all the same
+  shape — an exact expression that legitimately gained a coordinate.
+  Re-anchored on the property and WIDENED rather than merely loosened, so each
+  now also names the new row kind: the probe refusal and the calibration chips
+  (`test:calibration-search`), the ghost exclusion (`test:last-time`,
+  `test:ramp-visibility`), the draft namespace (`test:session-continuity`), the
+  row testid and the PR/rest-timer guards (`test:ramp-visibility`).
+  **AND ONE OF THEM WAS PASSING VACUOUSLY.** `test:session-continuity` compared
+  two `indexOf` results without asking whether either was found; the first anchor
+  had been gone since `logsFor` was replaced, `indexOf` returned -1, and -1 is
+  less than everything. The standing rule, met for the second time in two days,
+  in a gate written weeks ago. Both ends are asserted present now.
+  Verified: **`verify:drop-sets`, 32 browser checks at 390x844 on the real
+  screen** — the offer is absent before anything is logged, appears under the
+  logged set and nowhere else, the promised weight IS the weight in the box, the
+  row is labelled and spoken as a continuation, and the working-set count is
+  unchanged both when the row appears and after it is written. Screenshot read,
+  not just a green exit. Plus every gate that reads a touched file: app-tour,
+  bounds-and-boundaries, calibration-search, exercise-today, last-time,
+  load-display, pending-actions, primer-load, ramp-visibility (157),
+  session-continuity, set-plausibility, drop-sets, local-dates, no-forked-state,
+  queue-listeners, exercise-history, session-derive, a11y, appearance,
+  coach-opener, onboarding-style, overlay-artifacts, timer-field.
+  **Needs the migration on Ashley's machine** (`npm run db:push-both`) before a
+  drop can sync; until then it is saved on the device, shown on the card, and
+  held in the queue rather than written over its parent — and it says so in the
+  console rather than failing silently.
+
 - [x] **A GATE I DID NOT RUN WENT RED FOR A DAY, AND IT WAS GUARDING A MEAL
   SHE ASKED FOR BY NAME.** 19 Sep 2026, caught by the pre-merge sweep.
   `test:dashboard` reads `meal-generation.ts`; the heart-on-the-meal-row commit

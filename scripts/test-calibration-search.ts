@@ -174,13 +174,29 @@ check('the confirm path refuses an empty box in a calibration week instead of wr
 // AND NEVER ON A BUILD-UP ROW. Its number comes from the prescription, so a
 // blank box there is not a missing probe — refusing it would block the warm-up
 // of every calibration-week lift.
+// RE-ANCHORED 19 Sep 2026, and widened at the same time. This pinned the
+// guard's exact text and went red when it gained a third exemption (drop
+// rows), which is the same shape as the delete-call pin two gates over. The
+// PROPERTY is "the probe refusal applies to working sets only", so both
+// exemptions are now named and the condition's spelling is not.
 check('...and a build-up row is exempt: its weight was never the guess being replaced',
-  /if \(calibrationProbe && !warm && setNumber > 1/.test(save))
+  /if \(calibrationProbe &&[^)]*!warm[^)]*setNumber > 1/.test(save))
+// AND A DROP ROW TOO, for a different reason worth having written down: a
+// drop's box is filled from the set ABOVE IT, which is a weight actually
+// lifted rather than the week's guess. Refusing it would block the one row
+// whose default was never a guess at all.
+check('...and so is a drop, whose weight comes from a set that really happened',
+  /if \(calibrationProbe &&[^)]*!drop[^)]*setNumber > 1/.test(save))
 check('...before the weight is derived, so the fallback never runs', save.length > 0 && /!input\.weight\.trim\(\)/.test(save))
 check('...and the refusal names the probe, so it reads as the design', /set 1 was the probe/.test(save))
 check('the empty box asks to be typed into', /const d = defaultWeightFor\(\w+\)\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
 
-const cascadeStart = grid.indexOf('{calibrationProbe && !warm && setNumber > 1 && !isSaved && (() => {')
+// ANCHORED ON THE BLOCK'S OWN TESTID, not on the condition that renders it.
+// The old anchor was the full condition text and broke the moment that
+// condition gained `!drop` — and because indexOf returns -1 rather than
+// failing, the slice below would have silently become the whole component.
+const cascadeMarker = grid.indexOf('data-testid="calibration-cascade"')
+const cascadeStart = cascadeMarker < 0 ? -1 : grid.lastIndexOf('{calibrationProbe', cascadeMarker)
 const cascadeEnd = grid.indexOf('{rowErrors[k] && (')
 // A SLICE THAT MISSED ITS END STILL SLICES. indexOf returning -1 quietly cuts
 // one character off the file instead of failing, so the checks below would have
@@ -192,7 +208,13 @@ check('...computed off the previous LOGGED set', /existingLogs\.find\(l => l\.se
 check('...never off the prescription', !/suggestedLoadKg|perSetLoadKg|defaultWeightFor/.test(cascade))
 check('...snapped to the implement\'s real plate step', /roundToPlate\(target, mode\)/.test(cascade) && /plateStepKg\(mode\)/.test(cascade))
 check('...and a tap FILLS the box; it does not log the set', /updateInput\(\w+, 'weight', String\(o\.kg\)\)/.test(cascade) && !/handleSaveSet/.test(cascade))
-check('...and the chips are never offered on a build-up row', /calibrationProbe && !warm && setNumber > 1 && !isSaved/.test(grid))
+// The same re-anchoring as the refusal above, and it wants both exclusions:
+// a build-up's number comes from the prescription, and a DROP's comes from the
+// set above it, so on neither row is there a guess for a ladder to climb off.
+check('...and the chips are never offered on a build-up row',
+  /calibrationProbe &&[^)]*!warm[^)]*setNumber > 1 && !isSaved/.test(grid))
+check('...nor on a drop, whose weight is read off the set above it',
+  /calibrationProbe &&[^)]*!drop[^)]*setNumber > 1 && !isSaved/.test(grid))
 
 // THE RUNGS MUST BE THREE DIFFERENT WEIGHTS. Measured in the browser at
 // 27.5kg on a barbell (10 Sep 2026): 5% and 10% of it both snap to 30kg, so

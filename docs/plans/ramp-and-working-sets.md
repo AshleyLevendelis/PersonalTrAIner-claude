@@ -132,3 +132,40 @@ volume, not warm-up, and says nothing about records or progression.
 - `npx tsc --noEmit`, then the gates that READ each touched file, derived with
   `grep -rln <file> scripts/*.ts` rather than chosen from memory — the habit
   this session added after two gates went red for exactly that reason.
+
+---
+
+## What actually shipped, 19 Sep 2026 — and what did not
+
+Written after the build, because three things turned out differently from the
+plan above and the differences are the useful part.
+
+**Nothing in the plan prescribes a drop.** `Exercise` has no field for one and
+the generator emits none, so scope item 6's "pre-drawn when prescribed" branch
+has no prescription to read. Adding one is a data-model change beyond what was
+scoped, so it is named rather than assumed: every drop row on the screen today
+is one the lifter asked for, and the pre-drawn half is NOT BUILT.
+
+**The write path was broken in five places and the browser found it.** The
+upsert's conflict target, the flush payload, the server row type, the delete's
+match clause and the ghost dedupe all predated `drop_index` and none of them
+had a reason to know about it. The conflict target is the one with teeth:
+migration `20260919160000` REPLACES the unique constraint, so the day it is
+applied an upsert naming the old five columns matches no unique index and
+**every set save in the app fails**, drops or not. Fixed with a two-target
+ladder (try the new, fall back on 42P10) that is correct on both sides of a
+migration this code cannot know the timing of. Recorded in CLAUDE.md as a
+standing rule, because any future constraint change has the same shape.
+
+**Three deviations from the handoff**, each flagged to Ashley rather than taken
+quietly:
+
+| Handoff | Shipped | Why |
+|---|---|---|
+| "+ Add a drop · −25%" | "+ Add a drop · 35kg" | A percentage that snaps to a plate step names a weight the app will not offer. Same deviation the calibration chips already make, for the same measured reason. |
+| 40px child rows | 44px, as their parent | Her 9 Sep ruling, chosen from three options with the before and after in front of her, about boxes used mid-workout. A drop is typed under fatigue. Subordination comes from the indent, the tether and the label instead. |
+| "Retire amber from this screen" | Retired from the ramp, kept on the weight warning | Amber is the app's caution colour; the plausibility warning IS a caution and would be a lie in violet. The ramp's amber (today's card, `RampStrip`, "Add warm-up", the calibration cue) is gone. |
+
+**Still to build from this handoff**: screen 3a (`SupersetGroup` — A1/A2, rails
+dropped inside, the alternation footnote with its conditional ramp clause) and
+the target-weight block from §4.

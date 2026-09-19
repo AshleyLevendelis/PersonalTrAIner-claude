@@ -119,6 +119,12 @@
   --ramp-track-pending: color-mix(in srgb, var(--role-ai) 28%, transparent);
   --ramp-button: linear-gradient(180deg, color-mix(in srgb, var(--role-ai) 78%, white), var(--role-ai));
   --ramp-on: color-mix(in srgb, var(--role-ai) 22%, black);
+  /* The quiet pair, for a ramp block that is being READ rather than filled in
+   * — RampStrip on browse and peek. They exist so that surface can retire
+   * amber without hand-mixing the colour in a component: a colour that means
+   * "ramp" cannot mean it on today's card and something else one tab over. */
+  --ramp-bg: color-mix(in srgb, var(--role-ai) 9%, transparent);
+  --ramp-border: color-mix(in srgb, var(--role-ai) 30%, transparent);
 
   /* The working-set twin, so the two sit beside each other and a reader can
    * see they are the same idea in two colours. */

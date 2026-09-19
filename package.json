@@ -246,6 +246,7 @@
     "verify:prep-weight": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/prep-weight.mjs",
     "verify:ramp-readonly": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/ramp-readonly.mjs",
     "verify:warmup-rows": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/warmup-rows.mjs",
+    "verify:drop-sets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/drop-sets.mjs",
     "verify:calibration-search": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/calibration-search.mjs",
     "verify:what-happened": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/what-happened.mjs",
     "verify:session-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-edit.mjs",

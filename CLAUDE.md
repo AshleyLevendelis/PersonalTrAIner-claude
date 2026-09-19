@@ -1083,6 +1083,55 @@ old — the commands were right and the context was missing.
   actually changed, and assert the run executed as many checks as the baseline.
   Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
   meaningless" print identically.
+- **A MUTATION HARNESS THAT COUNTS ONLY THE PASSES READS EVERY CATCH AS A
+  CRASH.** 19 Sep 2026, in the harness this file's own "compare how many checks
+  RAN" rule asks for. It counted lines matching `ok:` — but a caught mutation
+  turns an `ok:` line into a `FAIL:` line, so every genuine catch came back
+  "only 31 of 34 checks ran; not a catch". Nine of twelve mutations were
+  written off that way, and the three that printed MISSED were the only ones
+  read as real. **Checks RAN is passes PLUS failures**, and where a gate prints
+  its own "N checks ran" line, use that — a `verify:` driver's output also
+  carries vite's `✓ built in 8s`, which a bare tick-counter happily counts.
+  Same shape as the pgrep watcher: before believing a harness, prove its
+  detector on a run whose answer you already know.
+- **A MUTATION HARNESS KILLED MID-RUN LEAVES THE MUTATION IN THE TREE, AND THE
+  SOURCE STILL LOOKS RIGHT.** 19 Sep 2026: I stopped a run with `pkill`, the
+  `finally` that restores the file never executed, and the next browser run
+  measured a defect I had already fixed — a drop overwriting its parent set,
+  on a tree whose `git diff` I had read. **The grep that reassured me was the
+  liar**: `grep -c "dropIndex: ref.dropIndex"` returned 1 and I read that as
+  "present", when the same expression appears on TWO lines (the save and the
+  delete) and the count should have been 2. Forty minutes went to re-deriving a
+  bug from first principles. Two rules out of it: a harness that edits files
+  restores on SIGINT/SIGTERM as well as in `finally`; and after any interrupted
+  run, `git diff` the mutated file before believing anything it produces — a
+  COUNT from grep is only evidence when you know what the count should be.
+- **A ROW COUNT IS NOT A SET COUNT, AND THE INTERESTING CLAIM IS USUALLY THE
+  COUNT.** The same day: a mutation letting drop rows back into
+  `filterLoggableSets` came back MISSED, because the screen still drew three
+  working rows — the row list is built from the PRESCRIPTION, not from the
+  logs. What changed was the number the card computes and prints ("Working
+  2/3" became 3/3). A driver that counts elements is asking how many boxes were
+  laid out; the thing a ruling is about is nearly always the figure the app
+  derives. Read the figure.
+- **ONE CANDIDATE CANNOT TEST A CHOICE.** Also that day: "the offer appears
+  under the LAST logged set" was checked with exactly one set logged, where it
+  is indistinguishable from "under every logged set" — a mutation to precisely
+  that came back MISSED. Any check on which of N things something attaches to
+  needs N greater than one, and the wrong answers have to be present on screen
+  at the time.
+- **A UNIQUE-CONSTRAINT MIGRATION IS A CLIENT DEPENDENCY, AND THE CLIENT MUST
+  WORK ON BOTH SIDES OF IT.** 19 Sep 2026. An upsert names its conflict target
+  by column list; Postgres rejects one that matches no unique index (42P10).
+  So a migration that REPLACES a unique constraint breaks every write naming
+  the old columns the instant it is applied — and here the migration is run by
+  hand, on another machine, at a time this code cannot know. There is no deploy
+  order that closes the gap. The pattern that does: try the new target, fall
+  back to the old one on 42P10 alone. One extra round trip before the
+  migration, none after, self-healing. The existing `added_load_kg` handling is
+  the same idea for a missing COLUMN and was the model for it — but a column
+  can be omitted from a payload and a conflict target cannot, so the constraint
+  case needs the retry rather than the omission.
 - **A FIXTURE MUST BE A PLAUSIBLE WHOLE, NOT A SET OF PLAUSIBLE PARTS.** 19 Sep
   2026: a browser fixture's meals were each a sensible dish and the DAY was
   339g of protein against a 160g target. Nothing was ever inside the tolerance

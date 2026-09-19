@@ -110,8 +110,19 @@ const buildUp = await ev(`(() => { const sec = ${SECTION}; if (!sec) return null
 check('1. the build-up is drawn ABOVE the working sets, in the same grid',
   !!buildUp && buildUp.capTop != null && buildUp.firstWorkingTop != null && buildUp.capTop < buildUp.firstWorkingTop
   && (buildUp.order || []).indexOf('working-row') > (buildUp.order || []).lastIndexOf('warmup-row'), buildUp)
+// RE-ANCHORED 19 Sep 2026, and it had been RED SINCE THAT MORNING'S COMMIT
+// without anyone noticing — the group-header build replaced the sentence
+// "Warm-up · doesn't count toward your weight going up" with a two-part
+// header, and this driver names a sentence on screen rather than a source
+// file, so the `grep scripts/ for the file you changed` derivation could not
+// have found it. That is the second half of the standing rule, met in
+// practice: grep the scripts, AND run the drivers for the screen.
+// The property, not the wording: the header says what the group IS and what
+// it COSTS. Either half alone is the regression — naming the group without
+// the cost re-creates the ambiguity the whole design exists to remove.
 check('2. ...and says what it is for, on screen',
-  /doesn.t count toward your weight going up/i.test(buildUp?.caption || ''), buildUp?.caption)
+  /ramp|warm.?up/i.test(buildUp?.caption || '') && /not counted|doesn.t count/i.test(buildUp?.caption || ''),
+  buildUp?.caption)
 check('3. the number is labelled START HERE', (await ev(`(() => { const sec = ${SECTION}; return sec ? /start here/i.test(sec.innerText) : false })()`)) === true)
 const probe = await ev(`(() => { const sec = ${SECTION}; const c = sec && sec.querySelector('[data-testid="probe-chip"]'); return c ? c.textContent.trim() : null })()`)
 check('4. one probe line, not three identical set chips', /Set 1 · probe at ~?[\d.]+kg/.test(probe || '') && (await ev(`(() => { const sec = ${SECTION}; return sec ? /\\bS1: \\d/.test(sec.innerText) : true })()`)) === false, probe)
