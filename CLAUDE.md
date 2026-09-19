@@ -1083,6 +1083,16 @@ old — the commands were right and the context was missing.
   actually changed, and assert the run executed as many checks as the baseline.
   Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
   meaningless" print identically.
+- **WHEN THREE GATES GREP THE SAME EXPRESSION, THE EXPRESSION SHOULD BE A
+  FUNCTION.** 19 Sep 2026: `test:calibration-search`, `test:primer-load` and
+  `verify:one-number` each pinned one line of JSX deciding whether the per-set
+  weight chips render. A ruling of Ashley's added a second condition to it on
+  18 Sep, and all three went red at correct code — one of them silently, until
+  the first full sweep a day later. Extracting the decision into a predicate
+  the gates CALL fixed all three permanently and cannot go stale the same way.
+  **A rule several checks need to ask about should be something they can ask,
+  not something they have to read.** The repeat count is the signal: one
+  mechanism-pinned check is a smell, three on the same line is a design note.
 - **AN ARGUMENT THAT IS NOT PASSED AND AN ARGUMENT THAT DOES NOTHING LOOK
   IDENTICAL FROM THE CALL SITE.** 19 Sep 2026: the meal assembler took a
   day-to-day variety history, the Nutrition tab passed it `{}`, and I reported

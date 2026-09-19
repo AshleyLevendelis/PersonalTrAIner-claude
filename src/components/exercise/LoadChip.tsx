@@ -68,6 +68,52 @@ export function loadSourceLabel(source: LoadSource | undefined, calibration = fa
   return null
 }
 
+type PerSetLoad = { set_number: number; load_kg: number | null }
+
+/**
+ * Do the per-set chips earn their place on this row?
+ *
+ * TWO RULES OF ASHLEY'S, IN ONE PREDICATE, and it is a function rather than a
+ * condition inline in the JSX for a reason worth keeping. Both rules were
+ * enforced inline and two gates read them with a regex over this file's
+ * source; when the second rule was added on 18 Sep 2026 the regex stopped
+ * matching, `test:calibration-search` went red at correct code, and
+ * `verify:one-number` went red because the screen it drives has no row the
+ * rule lets through. A decision a gate needs to ask about should be something
+ * it can CALL.
+ *
+ *   - NOT IN A CALIBRATION WEEK. Three identical chips are the loudest "this
+ *     is fixed" signal on the screen, directly above a cue asking her to
+ *     climb. That week's number is a probe for set one and nothing else.
+ *   - AND NOT WHEN THEY ALL SAY THE SAME THING — 18 Sep 2026, on her suitcase
+ *     carry: *"there's no ramp up sets which is fine but the ui makes it seem
+ *     as if there is because the numbers are also at the top where the ramp up
+ *     sets usually are."* S1 18kg, S2 18kg, S3 18kg is a row of chips in the
+ *     exact position and shape of a build-up ladder, saying nothing the big
+ *     number above has not already said. A ladder that does not climb should
+ *     not look like one.
+ *
+ * Declared as a type predicate rather than a plain boolean so the JSX that
+ * asks it keeps its narrowing and does not need a second null check that could
+ * drift away from this one.
+ *
+ * Where the loads genuinely differ the chips are the only place that shows it,
+ * so they stay — and they do differ in real plans: measured 19 Sep 2026 across
+ * a 96-plan spread of the generation grid, 1,352 of 17,293 per-set ladders
+ * (7.8%) climb, e.g. Deadlifts at 50 / 52.5 / 57.5.
+ */
+export function perSetChipsWorthShowing(
+  perSet: PerSetLoad[] | null | undefined,
+  calibration: boolean,
+): perSet is PerSetLoad[] {
+  if (calibration) return false
+  // The length check is redundant against the Set below (an empty ladder gives
+  // a size of 0, which is not > 1) and is kept for the reader, not the result:
+  // a mutation removing it on 19 Sep 2026 correctly came back MISSED.
+  if (!perSet || perSet.length === 0) return false
+  return new Set(perSet.map(s => s.load_kg)).size > 1
+}
+
 function explainerFor(source: LoadSource | undefined, loadGuidance?: string, calibration = false): string | null {
   // Week one, before a single set has been logged: the number is deliberately
   // under half the standards estimate, so "find your real weight" is not a
@@ -189,8 +235,7 @@ export function LoadChip({
             one. Where the loads genuinely differ the chips are the only place
             that shows it, so they stay. Same reasoning as the calibration rule
             above, generalised: the chips earn their place by disagreeing. */}
-        {ex.per_set_load && ex.per_set_load.length > 0 && !calibration
-          && new Set(ex.per_set_load.map(s => s.load_kg)).size > 1 ? (
+        {perSetChipsWorthShowing(ex.per_set_load, calibration) ? (
           <>
             <Dumbbell className="size-2.5 text-muted-foreground shrink-0" />
             {ex.per_set_load.map(s => (

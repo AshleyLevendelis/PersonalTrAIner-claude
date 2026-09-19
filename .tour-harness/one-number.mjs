@@ -359,12 +359,41 @@ const rows = await ev(`(() => {
   return out
 })()`)
 
+// THE SUBJECT OF THIS SECTION CHANGED, and re-anchoring it was the fix.
+//
+// It used to demand that every row render one weight chip per set. Ashley's
+// ruling of 18 Sep 2026 — *"a ladder that does not climb should not look like
+// one"* — means a row whose sets all carry the SAME weight now renders no
+// chips at all, because the big number above them has already said it. That
+// is most rows: measured 19 Sep over a 96-plan spread, only 1,352 of 17,293
+// per-set ladders actually climb. So the old demand was asking the screen to
+// break her rule, and it went red on correct code.
+//
+// WHICH HALF THIS PROVES. The screen can see chips and set counts, not the
+// underlying loads, so what it holds is the invariant: a row shows either
+// nothing or one chip per set, never a partial ladder. The other half — that
+// a CLIMBING ladder shows and a flat one does not — is decided by
+// perSetChipsWorthShowing and is called directly by test:calibration-search,
+// because no session this harness generates happens to contain a climbing row.
 const withChips = rows.filter(r => r.chips > 0)
-check(`9a. the ${MONDAY} session shows rows that state a set count AND render chips`,
-  rows.length > 1 && withChips.length > 0, { opened, rows: rows.length, withChips: withChips.length, sample: rows.slice(0, 3) })
-check('9b. every row shows exactly as many weight chips as the sets it claims',
-  withChips.length > 0 && withChips.every(r => r.chips === r.sets),
-  withChips.filter(r => r.chips !== r.sets))
+const flatRows = rows.filter(r => r.chips === 0)
+check(`9a. the ${MONDAY} session shows rows that state a set count`,
+  rows.length > 1, { opened, rows: rows.length, sample: rows.slice(0, 3) })
+check('9b. no row shows a partial ladder — each shows either nothing or one chip per set',
+  rows.every(r => r.chips === 0 || r.chips === r.sets),
+  rows.filter(r => r.chips !== 0 && r.chips !== r.sets))
+// SCOPED TO ROWS THAT CARRY A WEIGHT, and the scoping is the whole check.
+// "Some row shows no chips" is satisfied by a band or bodyweight exercise,
+// which has no ladder to hide and proves nothing — measured: with the rule
+// deliberately broken so every flat ladder rendered chips, an unscoped
+// version still passed off a Pallof Press. A LOADED row showing no chips is
+// the ruling actually happening.
+const loadedRows = rows.filter(r => /\d+(\.\d+)?\s*kg/.test(r.name))
+check('9c. the screen has rows that carry a weight at all, so 9d has a subject',
+  loadedRows.length > 0, rows.slice(0, 3).map(r => r.name))
+check('9d. ...and at least one of them states its weight once and shows no ladder beneath it',
+  loadedRows.some(r => r.chips === 0),
+  loadedRows.map(r => ({ chips: r.chips, sets: r.sets, name: r.name.slice(0, 60) })))
 
 // Frame the screenshot on a row that shows BOTH halves — the chips and the
 // count line beneath them — so the picture is evidence and not just a page.

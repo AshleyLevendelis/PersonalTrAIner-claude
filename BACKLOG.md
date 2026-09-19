@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **THREE GATES WERE GREPPING ONE LINE OF JSX, AND ALL THREE WENT RED AT
+  CORRECT CODE.** 19 Sep 2026, found by the first full sweep since the 18 Sep
+  work — 266 gates, 261 pass, 5 fail.
+
+  Three of the five are the usual environmental trio (`meal-quality`,
+  `schema-parity`, `verify:rls`), confirmed from each one's OWN output carrying
+  the *"Host not in allowlist"* sentence rather than from ticking names off a
+  list. The other two — `test:calibration-search` and `verify:one-number` —
+  were real and **failed identically on the commit before the meal work**, so
+  they were not caused by it. They were left red on 18 Sep by `52dc430`, and
+  nothing noticed because the affected gates were run and the sweep was not.
+
+  **THE CODE WAS RIGHT.** Ashley's ruling that day — *"a ladder that does not
+  climb should not look like one"* — added a second condition beside the
+  existing calibration rule, so per-set weight chips now render only when the
+  loads actually differ. Both gates asserted the OLD condition **by its literal
+  source text**. `test:primer-load` §6a pinned the same expression and broke
+  too, the moment the expression moved; that makes **three separate gates
+  reading one line of JSX with a regex.**
+
+  **MEASURED BEFORE DECIDING ANYTHING**, because "the chips never render" and
+  "the chips are dead code" look identical from a failing driver: across a
+  96-plan spread of the 9,216-profile grid, **1,352 of 17,293 per-set ladders
+  genuinely climb** (7.8%) — Deadlifts 50 / 52.5 / 57.5, Bench 25 / 27.5 / 30.
+  The branch is alive and the chips earn their place; only the gates were
+  stale.
+
+  **THE FIX IS THE SHAPE, NOT THE THREE EDITS.** The decision moved out of the
+  JSX into `perSetChipsWorthShowing(perSet, calibration)`, a type predicate the
+  gates now CALL. A rule three checks need to ask about should be something
+  they can ask, not something they have to read. All three re-anchored;
+  `verify:one-number` §9 was *replaced* rather than re-anchored, the
+  `verify:ramp-ticks` precedent — its old demand (every row shows one chip per
+  set) now contradicts the ruling, so it holds what the screen can actually
+  prove: no row shows a PARTIAL ladder, and at least one row that carries a
+  weight shows none.
+
+  **7 mutations, 7 caught.** Two lessons from them. A first version of
+  `verify:one-number` §9c asked whether ANY row showed no chips — satisfied by
+  a Pallof Press, which has no ladder to hide and proves nothing; scoped to
+  rows that state a weight, it bites. And one mutation came back MISSED
+  correctly: removing `perSet.length === 0` creates no defect, because
+  `new Set([]).size > 1` is already false. That guard is for the reader, and
+  the code now says so rather than leaving the next person to re-derive it.
+
+  **Also**: `test:bundle`'s re-download ceiling crossed at 264 of 264. Baseline
+  on a clean worktree of the previous commit: 263, one kilobyte left — fifth
+  occurrence of the silent-erosion pattern, raised to 272 over a value measured
+  today. First paint now sits at 419 of 420 and is named, not pre-emptively
+  moved.
+
 - [x] **THE SAME THREE MEALS EVERY DAY, AND A COOKING METHOD THE APP PAID FOR
   AND BINNED.** 19 Sep 2026, on Ashley's *"fix the variety and keep the cooking
   steps"*. Plan: `docs/plans/meals-that-change-and-tell-you-how-to-cook.md`.

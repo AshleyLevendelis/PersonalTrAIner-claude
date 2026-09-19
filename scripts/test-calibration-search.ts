@@ -33,6 +33,7 @@ import { calibrationAnchorsFor, planCalibrationAnchors, calibrationAnchorMessage
 import { getExerciseEntry, getExerciseId } from '../src/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, DELOAD_LOAD_FRACTION } from '../src/lib/load-prescription'
 import type { UserProfile, ExerciseSetLog } from '../src/lib/types'
+import { perSetChipsWorthShowing } from '../src/components/exercise/LoadChip'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -218,7 +219,40 @@ check('the plate step is a real one for every implement',
 console.log('\n3. The screen: ramp first, START HERE, one probe line')
 // ---------------------------------------------------------------------------
 const chip = strip(read('src/components/exercise/LoadChip.tsx'))
-check('the three identical per-set chips are hidden in a calibration week', /ex\.per_set_load\.length > 0 && !calibration \?/.test(chip))
+// CALLED, NOT GREPPED. This asserted a regex over LoadChip.tsx's JSX —
+// `ex.per_set_load.length > 0 && !calibration ?` — and on 18 Sep 2026 Ashley's
+// second rule was added beside the first ("a ladder that does not climb should
+// not look like one"). The condition grew, the regex stopped matching, and
+// this check went red at correct code while the behaviour it names still held.
+// The decision now lives in a predicate the gate can call.
+const uniform = [
+  { set_number: 1, load_kg: 18 },
+  { set_number: 2, load_kg: 18 },
+  { set_number: 3, load_kg: 18 },
+]
+const climbing = [
+  { set_number: 1, load_kg: 50 },
+  { set_number: 2, load_kg: 52.5 },
+  { set_number: 3, load_kg: 57.5 },
+]
+check('the three identical per-set chips are hidden in a calibration week',
+  perSetChipsWorthShowing(uniform, true) === false)
+check('...and a climbing ladder is hidden in a calibration week too — the probe is set one only',
+  perSetChipsWorthShowing(climbing, true) === false)
+check('three identical chips are hidden in an ordinary week as well — a ladder that does not climb should not look like one',
+  perSetChipsWorthShowing(uniform, false) === false)
+check('...while a ladder that DOES climb still shows, because nothing else on the row says so',
+  perSetChipsWorthShowing(climbing, false) === true)
+check('no ladder at all shows nothing, rather than throwing',
+  perSetChipsWorthShowing(null, false) === false && perSetChipsWorthShowing([], false) === false)
+// The climbing case is not hypothetical: measured 19 Sep 2026 over a 96-plan
+// spread of the generation grid, 1,352 of 17,293 per-set ladders climb. If
+// that ever stops being true the chips are dead code and this section is
+// measuring an unreachable branch, so the fact is recorded next to the check
+// rather than left to be rediscovered.
+check('the JSX asks the predicate rather than re-deriving the rule beside it',
+  /perSetChipsWorthShowing\(ex\.per_set_load, calibration\)/.test(read('src/components/exercise/LoadChip.tsx'))
+  && !/new Set\(ex\.per_set_load/.test(strip(read('src/components/exercise/LoadChip.tsx'))))
 check('...and one probe line takes their place', /Set 1 · probe at \$\{ex\.suggested_load\}/.test(chip))
 check('...under a label that names the action', /source === 'estimate' && calibration\) return 'start here'/.test(chip))
 const row = strip(read('src/components/exercise/ExerciseRow.tsx'))

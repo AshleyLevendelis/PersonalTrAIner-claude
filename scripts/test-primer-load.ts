@@ -33,6 +33,7 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/li
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getRepsColumnLabel } from '../src/components/exercise/SetGrid'
 import type { UserProfile } from '../src/lib/types'
+import { perSetChipsWorthShowing } from '../src/components/exercise/LoadChip'
 
 const ROOT = join(import.meta.dirname, '..')
 let failures = 0
@@ -194,10 +195,18 @@ console.log('\n[6] A row of identical chips does not pretend to be a ladder')
 // ---------------------------------------------------------------------------
 const chip = stripComments(readFileSync(join(ROOT, 'src/components/exercise/LoadChip.tsx'), 'utf8'))
 {
+  // CALLED, NOT GREPPED — the THIRD gate to pin this one JSX expression by its
+  // text. test:calibration-search and verify:one-number pinned it too, and all
+  // three went red on 18 Sep 2026 when Ashley's flat-ladder rule was added
+  // beside the calibration one and the expression grew. The rule now lives in
+  // perSetChipsWorthShowing, which a gate can ask instead of reading.
   check('6a. the per-set chips render only where the loads actually differ',
-    /new Set\(ex\.per_set_load\.map\(s => s\.load_kg\)\)\.size > 1/.test(chip))
+    perSetChipsWorthShowing([{ set_number: 1, load_kg: 20 }, { set_number: 2, load_kg: 20 }], false) === false
+    && perSetChipsWorthShowing([{ set_number: 1, load_kg: 20 }, { set_number: 2, load_kg: 25 }], false) === true)
   // Teeth: the chips must still EXIST for the case they are for.
   check('6b. ...and they still exist for a real ramp', /S\{s\.set_number\}/.test(chip))
+  check('6c. ...and the card asks the predicate rather than re-deriving it',
+    /perSetChipsWorthShowing\(ex\.per_set_load, calibration\)/.test(chip))
 }
 
 // ---------------------------------------------------------------------------
