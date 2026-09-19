@@ -116,6 +116,19 @@ Newest first. One line each.
   `indexOf` results without asserting either was found, so renaming its anchor
   made it -1 and the comparison passed for free.
 
+  **THE BUNDLE CEILING TIPPED, FOR THE FIFTH TIME, AND THE 17 SEP FIX EARNED
+  ITS KEEP.** `test:bundle`'s re-download budget failed at 264 of 264. Baseline
+  measured on a clean worktree of the commit before this one: **263 — one
+  kilobyte left.** So this change was the last straw, not the cause; between 15
+  and 19 Sep the app quietly ate the 8 kB that number was last raised to give
+  it, and nothing said so. Raised to 272, which is 8 kB over a value measured
+  TODAY rather than one inherited from the note. **The printed-margin line
+  added on 17 Sep turned this from a hunt into a two-minute question** — and it
+  is already showing the next one: **first paint sits at 419 of 420, 1 kB
+  left.** Not raised, because a ceiling should move when something crosses it
+  and says why, not pre-emptively; named here so the next person to cross it
+  knows it was already at the line.
+
   **NEEDS, IN THIS ORDER**: the migration on Ashley's machine
   (`npm run db:push-both`) BEFORE the frontend merges — the app writes the new
   column, so merging first breaks every meal write. Then merge to `main` for

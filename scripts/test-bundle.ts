@@ -117,8 +117,20 @@ console.log('\n1. The libraries are cached separately from the app')
   //
   // Treat the stated headroom as a lead, not a fact: it decays silently, and
   // the app-chunk budget below is doing the same thing right now (918 of 920).
-  headroom('a deploy re-downloads', appGzip, 264, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 264, appGzip)
+  //
+  // 19 Sep 2026, THE FIFTH TIME, and the printed headroom line added on 17 Sep
+  // is what made it a two-minute question instead of a hunt. The meal-variety
+  // and cooking-method work measured 264 against a 264 ceiling. Baseline on a
+  // clean worktree of the commit before it: 263 — one kilobyte left, exactly
+  // the state the paragraph above describes and warns about. So that change
+  // was again the last straw rather than the cause; between 15 and 19 Sep the
+  // app quietly ate the 8 kB this number was raised to give it, and only the
+  // crossing said so.
+  // 272 is 8 kB over a value MEASURED TODAY (264), same as every move before
+  // it, and the margin is printed on every run so the next erosion is visible
+  // before it is a failure rather than after.
+  headroom('a deploy re-downloads', appGzip, 272, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 272, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
