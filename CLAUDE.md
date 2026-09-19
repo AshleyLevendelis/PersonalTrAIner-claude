@@ -1429,6 +1429,33 @@ old — the commands were right and the context was missing.
 - So: run the handful of affected checks while working — they are instant —
   and the full sweep once, before a merge. Run it in the background and do
   something else; do not sit and watch it.
+- **NEVER RUN A FULL SWEEP AGAINST A TREE YOU ARE STILL EDITING — it measures
+  no single state, and its failures cannot be attributed.** 19 Sep 2026: a
+  sweep was started as the pre-merge check and then work continued for an hour
+  while it ran. Of its 8 failures, three were environmental, two were gates
+  already fixed before the sweep reached them, ONE was a real consequence of a
+  deliberate rename — and two were browser drivers that had built their bundle
+  during the ninety seconds `ExerciseRow.tsx` held a syntax error mid-edit.
+  Both passed on the next run against a settled tree. **Every `verify:` driver
+  builds from the working tree when it starts, so a sweep overlapping an edit
+  session is sampling a different codebase per gate**, and the log gives no way
+  to tell which. Start the sweep when the tree is finished and leave it alone,
+  or accept that what comes back is a list of leads rather than a result.
+- **AND THE LOG MUST BE ITS OWN FILE.** The same sweep appended to a path a
+  previous session had already used, so `grep -c PASS` counted both runs and I
+  reported 30 passed, then 95, from a log that was two runs deep. The
+  scratchpad survives between sessions; a run that appends is a run whose
+  numbers are unreadable. Write to a fresh, timestamped file, and read the
+  count back from the run's own SWEEP START line.
+- **A BROWSER DRIVER IS NOT FOUND BY GREPPING FOR THE FILE YOU CHANGED.** The
+  same day, one level down from the rule above: the habit of deriving affected
+  gates with `grep -rln <file> scripts/*.ts` missed every `.tour-harness/*.mjs`
+  driver, because a driver names what is ON SCREEN — a testid, a label, a
+  sentence — and never the source file that renders it. Renaming a row label
+  from `W1` to `R1` broke `verify:warmup-rows` and the derivation could not
+  have found it. **So the derivation has two halves: grep the scripts for the
+  file, and run the drivers for the SCREEN.** A change nobody can see needs
+  only the first.
 - **A KILLED SWEEP'S LOG IS INDISTINGUISHABLE FROM A RUNNING ONE. Check the
   PROCESS, not the file.** 15 Sep 2026: I reported a full sweep as "27 of 234
   done" against freshly merged code while nothing was running — the log
