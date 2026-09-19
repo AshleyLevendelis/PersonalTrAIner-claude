@@ -297,7 +297,8 @@ export function ExerciseRow({
               </p>
               {/* REST, as a number you can read before you have trained.
                   Until now ex.rest reached this component only as
-                  restTime={ex.rest} into SetGrid, where its one job is to
+                  restTime={ex.rest}
+            insideSuperset={!!supersetLabel} into SetGrid, where its one job is to
                   start the timer AFTER a set is logged — so the prescription
                   itself was on no screen anywhere in the app. Ashley's 3 Sep
                   2026 ruling (two minutes on a loaded main lift, conditioning

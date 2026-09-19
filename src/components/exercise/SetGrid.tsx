@@ -53,6 +53,17 @@ export interface SetGridProps {
   /** Drives the logging column's label — a distance carry logs meters, a hold logs seconds, an interval logs work seconds, never a generic "Reps". */
   prescriptionType?: string
   restTime?: string
+  /**
+   * True when this grid is rendered inside a superset, which already owns a
+   * rail of its own.
+   *
+   * A RAIL MEANS GROUPING AND NEVER MEANING (Ashley's handoff, 19 Sep 2026),
+   * so the phase rails are DROPPED here rather than nested — two rails side by
+   * side would both be claiming to say what belongs with what. The ramp is
+   * still marked, by the violet row label and the violet save button, because
+   * that is colour doing its own job: saying what a set counts as.
+   */
+  insideSuperset?: boolean
   tier?: string
   suggestedLoadKg?: number | null
   /**
@@ -129,6 +140,7 @@ export function SetGrid({
   prescribedReps,
   prescriptionType,
   restTime,
+  insideSuperset,
   tier,
   suggestedLoadKg,
   loadUnitLabel,
@@ -641,27 +653,60 @@ export function SetGrid({
         // The caption sits above the FIRST row of each block rather than
         // wrapping them, so both blocks stay inside one grid and the weight
         // column runs unbroken down the card.
-        const blockCaption = rowIndex === 0 && warm
-          ? "Warm-up · doesn't count toward your weight going up"
-          : (warm === false && rowIndex > 0 && rowRefs[rowIndex - 1].kind === 'warmup' ? 'Working sets' : null)
+        // THE GROUP HEADER, not a caption — Ashley's handoff, 19 Sep 2026.
+        // Two halves: what the group IS on the left, what it COSTS on the
+        // right. The right half is why the row label could shorten from
+        // "Warm-up 1" to "R1" without losing anything: "not counted" now says
+        // on the group what the long label used to say on every row.
+        //
+        // It sits above the first row of each block rather than wrapping it,
+        // so both blocks stay inside one grid and the weight column runs
+        // unbroken down the card — the layout half of her 17 Sep ruling.
+        const railed = !insideSuperset
+        const startsWorking = warm === false && rowIndex > 0 && rowRefs[rowIndex - 1].kind === 'warmup'
+        const groupHead = rowIndex === 0 && warm
+          ? { left: 'Ramp up', right: 'not counted' }
+          : startsWorking
+            ? { left: `Working sets · ${totalSets} × ${prescribedReps ?? ''}`.trim().replace(/ ×\s*$/, ''), right: restTime ? `saved · rest ${restTime}` : 'saved' }
+            : null
 
         return (
           <React.Fragment key={k}>
-          {blockCaption && (
-            <p className={`text-[0.625rem] uppercase tracking-[.08em] px-1 ${warm ? 'text-[color:var(--role-warn-text)]' : 'text-muted-foreground'} ${rowIndex === 0 ? '' : 'pt-1.5'}`} data-testid={warm ? 'warmup-caption' : 'working-caption'}>
-              {blockCaption}
-            </p>
+          {groupHead && (
+            <div
+              className={`flex items-baseline justify-between gap-2 pl-2.5 pr-1 ${rowIndex === 0 ? '' : 'pt-3'}`}
+              data-testid={warm ? 'warmup-caption' : 'working-caption'}
+            >
+              <span className={`text-[0.625rem] uppercase tracking-[.12em] whitespace-nowrap ${warm ? 'text-[color:var(--ramp-label)]' : 'text-primary-text'}`}>
+                {groupHead.left}
+              </span>
+              <span className="text-[0.625rem] text-muted-foreground whitespace-nowrap">{groupHead.right}</span>
+            </div>
           )}
           <div
             data-testid={warm ? 'warmup-row' : 'working-row'}
-            className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-[8px] px-1 py-0.5 transition-colors ${
-              isSaved ? (warm ? 'bg-[color:var(--role-warn-bg)]' : 'bg-primary/10') : ''
+            // A RAIL MEANS GROUPING, A COLOUR MEANS WHAT A SET COUNTS AS —
+            // the rule the whole handoff rests on. The rail is drawn per row
+            // rather than as a wrapper because both groups share one grid, so
+            // wrapping either would break the weight column that runs down
+            // the card. Adjacent rows with no gap read as one continuous bar.
+            //
+            // INSIDE A SUPERSET IT IS DROPPED: that rail already means
+            // grouping, and two rails would fight. There the ramp is signalled
+            // by the violet label and save button alone.
+            style={railed ? { borderLeft: `2px solid ${warm ? 'var(--ramp-rail)' : 'color-mix(in srgb, var(--primary) 55%, transparent)'}` } : undefined}
+            className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-r-[8px] py-0.5 transition-colors ${railed ? 'pl-2 pr-1' : 'px-1 rounded-l-[8px]'} ${
+              isSaved ? (warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : ''
             }`}
           >
             {/* THE KIND IS IN THE LABEL, NOT ONLY IN THE DATA. A caption
                 scrolls off the top of a phone; the row prefix does not. W1
                 or 1, and no third case. */}
-            <span className={`w-7 text-xs font-medium text-center ${isSaved ? (warm ? 'text-[color:var(--role-warn-text)]' : 'text-primary-text') : 'text-muted-foreground'}`}>
+            {/* R1 on screen, "Warm-up 1" out loud — see setLabel/setLabelLong.
+                The violet says what the row COUNTS AS and is the only colour
+                carrying that meaning; the rail beside it only says these rows
+                belong together. */}
+            <span className={`w-7 font-mono text-xs font-medium text-center ${warm ? 'text-[color:var(--ramp-label)]' : (isSaved ? 'text-primary-text' : 'text-muted-foreground')}`}>
               {setLabel(ref)}
             </span>
             {/* `max` is a hint the browser does not enforce (see
@@ -751,8 +796,11 @@ export function SetGrid({
                 data-tour={isSaved ? undefined : 'setrow'}
                 variant="ghost"
                 size="icon"
-                className={`size-7 shrink-0 ${isSaved ? 'text-primary-text' : 'text-[color:var(--primary-foreground)] glow-pulse'}`}
-                style={isSaved ? undefined : { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
+                className={`size-7 shrink-0 ${isSaved ? (warm ? 'text-[color:var(--ramp-label)]' : 'text-primary-text') : 'glow-pulse'}`}
+                style={isSaved ? undefined : {
+                  background: warm ? 'var(--ramp-button)' : 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))',
+                  color: warm ? 'var(--ramp-on)' : 'var(--primary-foreground)',
+                }}
                 onClick={() => handleSaveSet(ref)}
                 // THE KIND IS IN THE SPOKEN LABEL TOO. Warm-up 2 and working
                 // set 2 both read "Save set 2" until 17 Sep 2026, so a screen

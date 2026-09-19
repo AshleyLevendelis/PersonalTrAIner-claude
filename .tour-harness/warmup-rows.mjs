@@ -174,9 +174,23 @@ check('...so no build-up row and working row share a spoken name',
   new Set([...(loaded.warm ?? []), ...(loaded.work ?? [])].map(r => r.spoken)).size
     === (loaded.warm?.length ?? 0) + (loaded.work?.length ?? 0),
   { warm: loaded.warm?.map(r => r.spoken), work: loaded.work?.map(r => r.spoken) })
-check('the caption says it does not count toward the weight going up',
-  /warm-up/i.test(loaded.warmCaption ?? '') && /doesn.t count/i.test(loaded.warmCaption ?? '') && /going up/i.test(loaded.warmCaption ?? ''),
-  loaded.warmCaption)
+// RE-ANCHORED 19 Sep 2026. This pinned the old sentence, "Warm-up · doesn't
+// count toward your weight going up". The handoff replaces it with a two-part
+// group header — what the group IS on the left, what it COSTS on the right —
+// and that split is what let the row label shorten to R1 without losing
+// anything. Both halves are required, because either alone is the regression:
+// a header naming the group but not its cost re-creates the ambiguity the
+// whole design is about, and one naming the cost but not the group leaves the
+// R labels unexplained.
+check('the group header names the build-up',
+  /ramp/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
+check('...and says it does not count',
+  /not counted/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
+check('the working group names the prescription it is working toward',
+  /working sets/i.test(loaded.workCaption ?? '') && /\d/.test(loaded.workCaption ?? ''),
+  loaded.workCaption)
+check('...and says these are the ones that are kept',
+  /saved/i.test(loaded.workCaption ?? ''), loaded.workCaption)
 
 // ---- 2. The working sets, without pressing anything ----------------------
 console.log('\n  2. THE WORKING SETS — HER ACTUAL REPORT')
