@@ -561,5 +561,74 @@ console.log('\n8. A MOVED SESSION LEAVES THE WEEK')
   }
 }
 
+// ---------------------------------------------------------------------------
+// §7. THE COACH'S "WHAT DID YOU LAST LIFT?" MUST NOT ANSWER WITH A DROP
+//
+// Added 19 Sep 2026 with the drop_index column. A drop is logged immediately
+// after the working set it hangs off, so it is the most recent row by
+// completed_at — the exact thing this query orders on. Without an exclusion it
+// wins every time, and the coach answers "last time you did 35kg" about a lift
+// taken to 47.5, and resolves an unstated weight to the drop. Same class as
+// the coach quoting a different weight from the plan, which this app has
+// already had once.
+//
+// AND THE WRITE, which is the one a browser driver can never reach: the
+// coach's upsert names a conflict target by column list, and the migration
+// REPLACES that unique constraint. Named wrong, every set the coach logs fails
+// the moment the migration is applied — for everyone, with no drop set in
+// sight. The two-target ladder is what makes it correct on both sides.
+// ---------------------------------------------------------------------------
+console.log('\n7. The coach and the drop marker')
+{
+  const { readFileSync: read7 } = await import('fs')
+  const { join: join7, dirname: dir7 } = await import('path')
+  const { fileURLToPath: url7 } = await import('url')
+  const fn7 = read7(join7(dir7(url7(import.meta.url)), '..', 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+  const lastWeight = /getLastLoggedWeight[\s\S]*?\n}/.exec(fn7)?.[0] ?? ''
+  check('7a. the last-lifted lookup was found to inspect', lastWeight.length > 200)
+  check('7b. ...it still excludes warm-ups', /is_warmup=eq\.false/.test(lastWeight), lastWeight.slice(0, 120))
+  check('7c. ...and now excludes drops too',
+    /drop_index[^\n]*\?\? 0\) === 0/.test(lastWeight), lastWeight.match(/.{0,80}drop_index.{0,60}/)?.[0])
+  // CORRECTED THE SAME DAY IT WAS WRITTEN, and the correction is the check.
+  // The first version required the exclusion to be a PostgREST filter,
+  // `or=(drop_index.eq.0,drop_index.is.null)`, on the reasoning that the null
+  // half kept it legal before the migration. That is FALSE: PostgREST resolves
+  // column names against its schema cache at parse time, so naming an unknown
+  // column is rejected whichever operator follows it — and this lookup
+  // swallows a failure, so the coach would silently stop knowing anybody's
+  // last weight until somebody ran db:push-both. The filter belongs in JS, off
+  // `select=*`, and the property worth pinning is that the QUERY does not name
+  // the column at all.
+  const url = lastWeight.match(/rest\/v1[^`]*/)?.[0] ?? ''
+  check('7d. ...without naming the column in the query, so an unmigrated database still answers',
+    url.length > 40 && !/drop_index/.test(url), url.slice(0, 240))
+  // AND IT MUST READ PAST A DROP RATHER THAN STOPPING AT ONE. Filtering in JS
+  // only helps if more than one row came back: at limit=1 the drop is the only
+  // candidate and the filter returns nothing, which is the same silence the
+  // rejected query would have produced.
+  check('7d2. ...and it reads past a drop rather than stopping at one',
+    /limit=([2-9]|\d\d+)/.test(url), url.match(/limit=\d+/)?.[0])
+
+  const writer = /async function upsertSetRows[\s\S]*?\n}/.exec(fn7)?.[0]
+    ?? /on_conflict=\$\{conflict\}[\s\S]{0,1600}/.exec(fn7)?.[0] ?? ''
+  check('7e. the coach\'s set writer was found to inspect', /on_conflict/.test(writer), writer.slice(0, 120))
+  check('7f. it names the drop marker in its conflict target', /set_number,is_warmup,drop_index/.test(writer))
+  // RE-ANCHORED BY MUTATION. The first version accepted the mere PRESENCE of
+  // the fallback name, so setting it equal to the new target — which removes
+  // the fallback entirely while leaving every identifier in place — came back
+  // MISSED. The property is that the two targets are DIFFERENT, and that the
+  // fallback is the five-column form; read both literals and compare them.
+  const withDrop = /const WITH_DROP = "([^"]+)"/.exec(writer)?.[1] ?? ''
+  const beforeDrop = /const BEFORE_DROP = "([^"]+)"/.exec(writer)?.[1] ?? ''
+  check('7g. ...and keeps the old target as a fallback, so a database mid-migration still writes',
+    beforeDrop === 'user_id,session_id,exercise_id,set_number,is_warmup'
+      && withDrop !== '' && beforeDrop !== withDrop,
+    { withDrop, beforeDrop })
+  // 42P10 AND NOTHING ELSE. Retrying any failure into a second,
+  // differently-shaped write is how one bad row becomes two.
+  check('7h. ...falling back only on the missing-constraint error',
+    /42P10/.test(writer) && /resp\.status === 400/.test(writer), writer.match(/42P10[^;]{0,100}/)?.[0])
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nAll coach plan-context checks passed.\n')

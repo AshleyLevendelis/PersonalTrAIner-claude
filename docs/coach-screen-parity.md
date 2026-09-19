@@ -132,6 +132,21 @@ the difference.
   be unable to READ it back or correct it — a one-way door for the one surface
   whose whole job is conversation. Closing it means giving the coach the
   filtered-out half too, which is a bigger change than a flag.
+- **Logging a DROP set.** `screen only`, added 19 Sep 2026 the day the rows
+  were built, and written here by the person adding it rather than found later.
+  It is the build-up entry above with one extra reason on top.
+  The shared reason: the coach's `log_workout_set` writes a working set and has
+  no way to say a row was a continuation of the one before it. The extra one is
+  that a drop needs a PARENT — "I did a drop after squats" does not say after
+  which set, so a coach path needs a clarification round-trip the screen gets
+  for free by being tapped on the row itself.
+  **What was closed instead, because it was the part that could do harm:** the
+  coach's own "what did you last lift?" lookup took the most recent row by
+  time, and a drop is logged immediately after its working set — so it would
+  have won that query every time and had the coach answering "last time you did
+  35kg" about a lift taken to 47.5, and resolving an unstated weight to the
+  drop. That is the same class as the coach quoting a different weight from the
+  plan, which this app has had once already. Held by `coach-plan-context` §7.
 - **The calorie target itself.** On NEITHER surface, and not a gap that can be
   closed as written: there is no control because the number is derived by
   `computeTargets`, not stored as an intention. Changing "targets" means

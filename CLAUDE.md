@@ -1106,6 +1106,19 @@ old — the commands were right and the context was missing.
   restores on SIGINT/SIGTERM as well as in `finally`; and after any interrupted
   run, `git diff` the mutated file before believing anything it produces — a
   COUNT from grep is only evidence when you know what the count should be.
+- **A NEW COLUMN IS A CHANGE TO EVERY READER AND WRITER OF THAT TABLE, AND THE
+  ONES OUTSIDE `src/` ARE INVISIBLE TO EVERYTHING.** 19 Sep 2026: adding
+  `drop_index` was fixed in the browser client, driven in a real Chromium, and
+  the EDGE FUNCTION had its own independent copy of the same upsert — still
+  naming the old unique constraint, so every set the COACH logs would have
+  failed the moment the migration was applied, with no drop set in sight. Its
+  "what did you last lift?" lookup had the twin defect: ordered by time, and a
+  drop is logged straight after its parent, so it would win every time and have
+  the coach quoting the drop's weight back. Neither is reachable by a typecheck
+  (`tsconfig` covers `src`), a browser driver (the function is deployed), or the
+  file-grep derivation (nothing in `src/` mentions it). **The derivation that
+  finds them is "grep the TABLE NAME across the whole repo", not "grep the file
+  I changed"** — and it costs one command.
 - **A ROW COUNT IS NOT A SET COUNT, AND THE INTERESTING CLAIM IS USUALLY THE
   COUNT.** The same day: a mutation letting drop rows back into
   `filterLoggableSets` came back MISSED, because the screen still drew three

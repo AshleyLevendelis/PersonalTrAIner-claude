@@ -190,8 +190,26 @@ async function upsertUnifiedSets(
     is_warmup: false,
     completed_at: new Date().toISOString(),
   }));
-  const resp = await fetch(
-    `${supabaseUrl}/rest/v1/exercise_set_logs?on_conflict=user_id,session_id,exercise_id,set_number,is_warmup`,
+  // THE CONFLICT TARGET HAS TO MOVE WITH THE MIGRATION, AND THIS FUNCTION
+  // CANNOT KNOW WHEN THAT IS — the same problem the browser client has, in the
+  // one place a browser driver could never look.
+  //
+  // `20260919160000_add_drop_index_to_set_logs` REPLACES unique_set_per_session
+  // with one that includes drop_index. The moment it is applied, an upsert
+  // naming the old five columns matches no unique index and Postgres rejects
+  // it with 42P10 — so every set the COACH logs would fail, for everyone, with
+  // no drop set anywhere in sight. Before it is applied, naming the new six
+  // fails the same way. There is no deploy order that avoids the gap: the
+  // migration is run by hand and this function is deployed separately.
+  //
+  // So: try the new target, fall back to the old one on 42P10 alone. One extra
+  // round trip on a database that has not migrated, none after.
+  //
+  // The coach never writes a DROP (it has no way to say a set was one — see
+  // docs/coach-screen-parity.md), so the fallback here is always correct
+  // rather than merely tolerable: every row it writes is drop_index 0.
+  const post = (conflict: string) => fetch(
+    `${supabaseUrl}/rest/v1/exercise_set_logs?on_conflict=${conflict}`,
     {
       method: "POST",
       headers: {
@@ -203,8 +221,21 @@ async function upsertUnifiedSets(
       body: JSON.stringify(payload),
     },
   );
+  const WITH_DROP = "user_id,session_id,exercise_id,set_number,is_warmup,drop_index";
+  const BEFORE_DROP = "user_id,session_id,exercise_id,set_number,is_warmup";
+  let resp = await post(WITH_DROP);
   if (!resp.ok) {
     const errText = await resp.text();
+    // 42P10 — "no unique or exclusion constraint matching the ON CONFLICT
+    // specification". Only that: any other failure is a real one and must not
+    // be retried into a second, differently-wrong write.
+    if (resp.status === 400 && /42P10|no unique or exclusion constraint/i.test(errText)) {
+      resp = await post(BEFORE_DROP);
+      if (!resp.ok) {
+        throw new Error(`exercise_set_logs upsert failed (${resp.status}): ${await resp.text()}`);
+      }
+      return;
+    }
     throw new Error(`exercise_set_logs upsert failed (${resp.status}): ${errText}`);
   }
 }
@@ -219,7 +250,31 @@ async function upsertUnifiedSets(
 // asks the user for the weight instead.
 // ---------------------------------------------------------------------------
 
-/** Most recent logged working weight (weight_kg > 0, never a warmup) for this exercise — mirrors set-log-store.ts's getLastSessionSets base-weight semantics closely enough for a one-shot lookup. */
+/**
+ * Most recent logged working weight (weight_kg > 0, never a warmup, never a
+ * drop) for this exercise — mirrors set-log-store.ts's getLastSessionSets
+ * base-weight semantics closely enough for a one-shot lookup.
+ *
+ * `drop_index=eq.0` ADDED 19 Sep 2026 with the column, and it is not a tidying
+ * detail. A drop is logged immediately after its working set, so it is the
+ * MOST RECENT row by completed_at and would win this query every time — the
+ * coach would answer "last time you did 35kg" about a lift she took to 47.5,
+ * and resolve an unstated weight to the drop. That is the same class of defect
+ * as the coach quoting a different weight from the plan, which this app has
+ * already had once.
+ *
+ * CORRECTED BEFORE IT SHIPPED, and the correction is the useful part: the
+ * first version filtered in the QUERY, as `or=(drop_index.eq.0,drop_index.is.null)`,
+ * with a comment claiming the null half kept it legal on a database that has
+ * not run the migration. That is FALSE. PostgREST resolves column names
+ * against its schema cache at parse time, so naming an unknown column in a
+ * filter is rejected whichever operator follows it — and this function
+ * swallows a failed lookup (`if (!resp.ok) return null`), so the coach would
+ * have silently stopped knowing anybody's last weight until the migration ran.
+ * The filter is in JS instead, off `select=*`, which needs no column to exist:
+ * `drop_index` is undefined before the migration and 0 or more after, and
+ * `?? 0` reads both. The limit is raised so a drop cannot occupy the only slot.
+ */
 async function getLastLoggedWeight(
   supabaseUrl: string,
   serviceKey: string,
@@ -227,12 +282,14 @@ async function getLastLoggedWeight(
   exerciseSlug: string,
 ): Promise<number | null> {
   const resp = await fetch(
-    `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${profileId}&exercise_id=eq.${exerciseSlug}&is_warmup=eq.false&weight_kg=gt.0&order=completed_at.desc&limit=1&select=weight_kg`,
+    `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${profileId}&exercise_id=eq.${exerciseSlug}&is_warmup=eq.false&weight_kg=gt.0&order=completed_at.desc&limit=8&select=*`,
     { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } },
   );
   if (!resp.ok) return null;
   const rows = await resp.json();
-  return rows[0]?.weight_kg != null ? Number(rows[0].weight_kg) : null;
+  const working = (rows as Array<{ weight_kg?: number; drop_index?: number | null }>)
+    .find((r) => (r.drop_index ?? 0) === 0);
+  return working?.weight_kg != null ? Number(working.weight_kg) : null;
 }
 
 /** The current mesocycle's suggested_load_kg for this exercise name, searched across every persisted week (small, bounded per profile). */

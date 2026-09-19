@@ -170,7 +170,12 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
   // by the query, so there is one rule rather than two.
   const { data, error } = await supabase
     .from('exercise_set_logs')
-    .select('exercise_name, weight_kg, reps_completed, completed_at, is_bodyweight, added_load_kg')
+    // `*`, NOT A COLUMN LIST, so this keeps working on a database that has
+    // not run the drop migration. Naming `drop_index` here would be rejected
+    // outright before the column exists — and this function swallows the
+    // error (`if (error || !data) return`), so every personal best in the app
+    // would quietly vanish until somebody ran db:push-both.
+    .select('*')
     .eq('user_id', userId)
     .eq('is_warmup', false)
     .gt('reps_completed', 0)
@@ -179,6 +184,14 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
 
   const cache: Record<string, PRRecord> = {}
   for (const row of data) {
+    // A DROP IS NOT A PERSONAL BEST — Ashley's ruling, 19 Sep 2026, and the
+    // CSCS basis recorded with it: a drop is performed already fatigued,
+    // immediately after a working set, with no rest. It is the easier half of
+    // one effort, which is the same reasoning that already excludes warm-ups
+    // two lines up. This is the SEVENTH member of the exclusion family named
+    // in the comment above, and it is here rather than in the query for the
+    // reason that comment now gives.
+    if (((row as { drop_index?: number | null }).drop_index ?? 0) > 0) continue
     const shape: SetShape = {
       weightKg: Number(row.weight_kg),
       reps: row.reps_completed,

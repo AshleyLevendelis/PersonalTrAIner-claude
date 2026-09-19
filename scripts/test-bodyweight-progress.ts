@@ -96,8 +96,23 @@ console.log('\n1. The database query does not exclude bodyweight before logic ca
   check('...and it does not filter on weight_kg', !/\.(gt|gte|neq)\('weight_kg'/.test(query), query)
   check('...and it still requires reps, because a set with no reps is not a set',
     /\.gt\('reps_completed', 0\)/.test(query), query)
+  // RE-ANCHORED 19 Sep 2026: this pinned an explicit column list, and the
+  // query moved to `select('*')` — which brings back strictly MORE, including
+  // both of these. The reason for the move is the property this check should
+  // now also hold: naming a column that the drop migration has not created yet
+  // makes PostgREST reject the whole query, and this function swallows the
+  // error, so every personal best in the app would quietly vanish.
+  const selectsAll = /\.select\('\*'\)/.test(query)
   check('...and it asks for the two columns the decision needs',
-    /is_bodyweight/.test(query) && /added_load_kg/.test(query), query)
+    selectsAll || (/is_bodyweight/.test(query) && /added_load_kg/.test(query)), query)
+  // A DROP IS NOT A PERSONAL BEST — and the exclusion is in JS rather than the
+  // query, deliberately, for the reason above. Both halves are checked: that
+  // the drop is skipped, and that the query does NOT name the column.
+  const fn = /export async function refreshPRCacheFromDB[\s\S]*?\n}/.exec(body)?.[0] ?? ''
+  check('...and a drop never becomes a personal best',
+    /drop_index[^\n]*\?\? 0\) > 0\) continue/.test(fn), fn.match(/.{0,80}drop_index.{0,60}/)?.[0])
+  check('...excluded in code, not in the query, so an unmigrated database still has its records',
+    !/\.(eq|gt|is|or)\([^)]*drop_index/.test(query), query)
 }
 
 console.log('\n2. The classifier picks the right record for each kind of set')

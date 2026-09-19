@@ -443,7 +443,10 @@ export async function getLastLoggedWeight(
 ): Promise<{ weight_kg: number; reps_completed: number } | null> {
   let query = supabase
     .from('exercise_set_logs')
-    .select('weight_kg, reps_completed, is_bodyweight')
+    // `*` for the same reason the PR cache uses it: a column list naming
+    // `drop_index` is rejected before the migration runs, and this function
+    // discards the error, so progression would silently lose its anchor.
+    .select('*')
     .eq('user_id', userId)
     .eq('exercise_id', getExerciseId(exerciseName))
     .eq('is_warmup', false)
@@ -455,7 +458,15 @@ export async function getLastLoggedWeight(
   }
 
   const { data } = await query
-  const row = (data ?? []).find(r => !isMalformedZeroWeight({ weight_kg: Number(r.weight_kg), is_bodyweight: r.is_bodyweight }))
+  // A DROP NEVER RE-ANCHORS NEXT WEEK, and this is the sharpest case of the
+  // three: a drop is logged immediately after the set it hangs off, so it is
+  // the most recent row and would win this `order by completed_at desc` every
+  // time. The prescription would fall to the drop's weight — the app lowering
+  // next week's target every time somebody trained HARDER. Ashley's ruling,
+  // 19 Sep 2026.
+  const row = (data ?? [])
+    .filter(r => (((r as unknown) as { drop_index?: number | null }).drop_index ?? 0) === 0)
+    .find(r => !isMalformedZeroWeight({ weight_kg: Number(r.weight_kg), is_bodyweight: r.is_bodyweight }))
   if (!row) return null
   return { weight_kg: Number(row.weight_kg), reps_completed: row.reps_completed }
 }

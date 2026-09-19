@@ -2,6 +2,86 @@
 
 Newest first. One line each.
 
+- [x] **THE RULE I HAD JUST WRITTEN DOWN FOUND THREE MORE, AND CORRECTED ONE OF
+  MY OWN FIXES.** 19 Sep 2026, immediately after adding "a new column is a
+  change to every reader and writer of that table" to CLAUDE.md. Grepping the
+  TABLE NAME rather than the files I had touched returned sixteen readers.
+  Three were drop-blind in ways the ruling explicitly forbids:
+  - **The personal-best cache, re-derived from the database.** It excludes
+    warm-ups and would have taken a drop as a record — the app congratulating
+    somebody for the easier half of one effort.
+  - **Progression's "last logged weight".** The sharpest of the three: it is
+    ordered by time and a drop is logged immediately after its parent, so the
+    drop wins every time and **next week's prescription falls to it** — the app
+    lowering the target every time somebody trained harder. This is the exact
+    sentence the plan doc had already written as the reason to exclude drops
+    from progression, sitting beside code that did the opposite.
+  - **The coach's 14-day history.** A drop reads as an extra working set, so
+    the coach would say five sets of squats on a day the app counts three.
+  **AND IT CAUGHT MY OWN EDGE-FUNCTION FIX, BEFORE IT SHIPPED.** An hour
+  earlier I filtered drops out of the coach's last-weight lookup as a PostgREST
+  filter, `or=(drop_index.eq.0,drop_index.is.null)`, with a comment claiming
+  the null half kept the query legal on a database that has not run the
+  migration. **That is false.** PostgREST resolves column names against its
+  schema cache at parse time, so naming an unknown column is rejected whichever
+  operator follows it — and the lookup swallows a failure, so the coach would
+  have silently stopped knowing anybody's last weight until db:push-both ran.
+  Every one of these now filters in JS off `select('*')`, which needs no column
+  to exist: undefined before the migration, 0 or more after, and `?? 0` reads
+  both. The coach's lookup also had to stop taking one row, because filtering
+  in JS only helps if more than one came back.
+  **ONE THING MEASURED AND DELIBERATELY LEFT ALONE**, recorded in the code so
+  the next reader does not "fix" it: the weekly dashboard's log partition puts
+  a drop in its working bucket, and that is harmless. All five consumers ask
+  whether ANYTHING was logged that day — a length or a set of dates — and none
+  counts sets or sums volume; a day with a drop always has that drop's parent
+  too. Adding a third bucket would risk the opposite defect, a consumer wanting
+  VOLUME losing the drops, which the ruling says do count toward it.
+  Verified: `test:bodyweight-progress` +2, `test:coach-plan-context` +1 and two
+  re-anchored. **5 mutations, 5 caught**, each one checking BOTH halves — that
+  the drop is excluded, and that the query does not name the column. Every gate
+  reading the four touched files re-run green.
+
+- [x] **THE SAME WRITE BUG WAS IN THE COACH, WHERE NO BROWSER COULD SEE IT.**
+  19 Sep 2026, found by asking the mechanical question the drop column forces —
+  who else writes or reads this table? — rather than by a check.
+  **The coach's own set-logging upsert named the OLD unique constraint.** Fixed
+  in the browser client this morning; the edge function has an independent copy
+  of the same line, and it was still wrong. The consequence is not about drops
+  at all: the moment migration `20260919160000` is applied, that upsert matches
+  no unique index and Postgres rejects it — **every set the coach logs would
+  fail, for everyone**, with no drop set anywhere in sight. Same two-target
+  ladder as the client (try the new, fall back on 42P10 alone), so it is correct
+  on both sides of a migration run by hand on another machine.
+  **AND THE COACH'S "WHAT DID YOU LAST LIFT?" WOULD HAVE ANSWERED WITH A DROP.**
+  It takes the most recent row by time, excluding warm-ups — and a drop is
+  logged immediately after the set it hangs off, so it wins that query every
+  time. The coach would say "last time you did 35kg" about a lift taken to 47.5,
+  and resolve an unstated weight to the drop. Same class as the coach quoting a
+  different weight from the plan, which this app has already had once. The
+  filter tolerates a null as well as a zero so the lookup stays legal on a
+  database that has not run the migration — dropping that half is an easy
+  "tidy-up" that breaks the pre-migration case silently, so it is pinned.
+  **THE GENERAL SHAPE, worth more than either fix**: a new column is not a
+  change to one file, it is a change to every reader and writer of that table,
+  and the ones outside `src/` are invisible to a typecheck, a source gate and a
+  browser alike. The derivation that finds them is "grep the table name", not
+  "grep the file I changed".
+  **Logging a DROP is `screen only`**, written into the parity doc by the person
+  adding it rather than found later — the build-up entry's reason plus one more:
+  a drop needs a PARENT, and "I did a drop after squats" does not say after
+  which set, so the coach needs a clarification round-trip the screen gets free
+  by being tapped on the row.
+  Verified: `test:coach-plan-context` §7, 8 checks. **9 mutations, 9 caught**
+  after one re-anchor — the first version of the fallback check accepted the
+  mere PRESENCE of the fallback's name, so setting it equal to the new target
+  (which removes the fallback entirely while leaving every identifier in place)
+  came back MISSED. It now reads both literals and requires them to differ,
+  which is the "a declaration is not a value" rule met on my own check.
+  **Needs the `chat-gemini` deploy**, and it is now on that deploy's critical
+  path rather than being a nice-to-have: without it, the coach's set logging
+  breaks the moment the migration runs.
+
 - [x] **A SUPERSET WITH A BUILD-UP IN IT WAS GIVING ADVICE NOBODY SHOULD
   FOLLOW.** 19 Sep 2026, screen 3a of Ashley's handoff. The line under a paired
   group said "alternate — no rest between" whatever the pair contained. Read
