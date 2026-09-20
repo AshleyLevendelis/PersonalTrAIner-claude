@@ -2,6 +2,69 @@
 
 Newest first. One line each.
 
+- [x] **THE REST DAY ENDED IN THREE IDENTICAL LINKS FOR THREE DIFFERENT THINGS.**
+  20 Sep 2026, built from the `4a` handoff. `4b` and `4c` were rejected
+  explorations and were not built.
+  **The defect, in one sentence**: "Log a walk" writes one cardio row for today
+  and touches nothing else; "Make Sunday a cardio day" rewrites EVERY Sunday to
+  the end of the block. Both were 12px dotted underlines of identical weight,
+  and two of the three shared a line — rendering as
+  *"Make Sunday a cardio day →Train anyway →"*. That is the same collision
+  MovedDayCard's own comment already documented, still live one card over.
+  **What changed:**
+  - Logging is a control, not a blank form. Walk / Cycle / Swim write on one
+    tap; "Other" opens the existing two-input form unchanged. **The duration on
+    each chip is the person's own most recent one for that activity**, rounded
+    to five, falling back to 30 — read from the store rather than hardcoded,
+    because a one-tap write that invents a number is putting something in
+    somebody's record they did not choose. It is on the chip face before the
+    tap, which is what makes one tap honest rather than merely quick.
+  - The two plan changes sit under a "Change the plan" heading, each a 44px row
+    stating its own reach: *"today only"* against *"Every Thursday for the rest
+    of this block"*. Plural, because that is what the write actually is.
+  - The week tally became a segmented mint track; the recovery avatar and the
+    section label became violet.
+  **DECIDED WITHOUT ASKING, and flagged**: the cardio sheet used to render its
+  own dotted trigger. It keeps it for ActiveRecoveryCard, where the control is
+  an aside; RestDayCard now owns it as a row. The FORM is untouched — only the
+  thing that opens it moved. The three cards stay three cards.
+  **TWO FINDINGS ON THE WAY, both from the harness rather than the code:**
+  - **The driver was measuring the wrong card for an hour.** `isRestDay` is
+    literally `!workout` — a weekday the plan has NO ROW for — while the
+    harness's `__restDayTarget` finds a day with an EMPTY row, which renders
+    ActiveRecoveryCard. The screenshot looked plausible and was a different
+    component. The page now exposes `__noRowDay` and the driver asserts it
+    found one rather than quietly testing the sibling.
+  - **`test:bundle`'s total budget was ALREADY RED at HEAD**, and the rest-day
+    card did not do it. Measured on a separate worktree with nothing else
+    changed: everything together came to exactly 1,935 kB against a 1,935
+    budget, and the check is `<`. The budget had been consumed to the byte by
+    work that never touched it, and the next commit of any size was going to
+    trip it. Raised to 1,975 (34 kB above the measured 1,941) and the app chunk
+    to 985 (24 above 961), both from measurements taken today rather than
+    inherited from a note — which is the rule that file keeps relearning.
+    NAMED, not fixed: the two gzipped budgets now sit 2 kB and 3 kB from their
+    lines. Pre-existing, visible on the headroom line every run.
+  **AND I NEARLY SHIPPED A MUTATION.** Stashing to measure the bundle baseline
+  interrupted the mutation harness mid-run, its restore never executed, and the
+  stash captured a MUTATED file. I then read the resulting `git diff` backwards
+  and restored the wrong side. Caught by the grep whose count I knew should be
+  1 and was 0 — the exact "a COUNT from grep is only evidence when you know
+  what the count should be" note, used as intended for once. The real lesson is
+  one line earlier: do not stash a tree a background job is still writing.
+  Verified: `test:rest-day-card` (42 checks) and `verify:rest-day` (33 checks,
+  390x844, screenshots read). **13 mutations, 13 caught** — 10 source, 3
+  browser. One browser mutation, on the headline collision check, first came
+  back MISSED: making each row `inline-flex` still wrapped at phone width, so
+  the mutation applied, ran, and did not create the defect. Laying the GROUP
+  out as a flex row does, and that catches it — the third kind of invalid
+  mutation, met again.
+  12 source gates and 10 browser drivers green, typecheck clean.
+  NOT done, named: `--role-ai-text` resolves to `#DAD5FA` in the app where the
+  mock resolves `#B4A9FF`, so the violet reads paler on screen than in the
+  design. The handoff says tokens win over hex, so the token is what shipped;
+  moving it would recolour every coach surface and is Ashley's call.
+
 - [x] **KETO IS OFFERED, FILTERS FOOD, AND DOES NOT MOVE THE NUMBERS — SO THE
   APP NOW SAYS SO WHERE YOU PICK IT.** 20 Sep 2026.
   **What was measured first**, because the sentence is a claim about the app's

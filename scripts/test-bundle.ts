@@ -288,7 +288,16 @@ console.log('\n3. Nothing has crept back up')
   // here is the measurement: 19 kB of real headroom above a measured 941,
   // which the line printed by `headroom` above will now show eroding on every
   // run rather than only when it is crossed.
-  const APP_CHUNK_BUDGET_KB = 960
+  //
+  // 20 Sep 2026: 960 -> 985, and this time the baseline was measured on a
+  // SEPARATE WORKTREE of HEAD rather than guessed at, because the same note
+  // three paragraphs up records guessing wrong twice. Clean HEAD: app chunk
+  // 956 kB, 4 left. With the rest-day rebuild (design 4a — quick-log chips, a
+  // segmented week track, two plan-action rows): 961 kB. Five kilobytes of
+  // real UI on a card that previously ended in three text links, and the
+  // ceiling had four. Raised with room the way Ashley's 15 Sep ruling says,
+  // to 24 kB of measured headroom above 961.
+  const APP_CHUNK_BUDGET_KB = 985
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -420,7 +429,20 @@ console.log('\n3. Nothing has crept back up')
   // not another warning in a comment: every budget in this file now PRINTS its
   // remaining room on every run (see `headroom` at the top). Measured 17 Sep,
   // all four were within 5 kB of their ceiling and only one of them said so.
-  const TOTAL_BUDGET_KB = 1935
+  // 20 Sep 2026: 1,935 -> 1,975. THE FINDING HERE IS THAT THIS ONE WAS ALREADY
+  // FAILING, and it was not the rest-day rebuild that did it. Measured on a
+  // separate worktree of HEAD with nothing else changed: everything together
+  // came to exactly 1,935 kB against a 1,935 budget, and the check is `<`, so
+  // it was RED at HEAD — the budget had not merely run out of headroom, it had
+  // been consumed to the byte by work that never touched this line, and the
+  // next commit of any size was going to trip it whatever that commit was.
+  // The rest-day card then took it to 1,941.
+  // This is the "a budget with headroom silently spends it" note above meeting
+  // its own worst case, and the reason the fix is measured rather than nudged:
+  // 1,975 is 34 kB above the measured 1,941, and the headroom line prints the
+  // remainder every run so the next person sees it eroding rather than
+  // crossing.
+  const TOTAL_BUDGET_KB = 1975
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

@@ -1505,6 +1505,20 @@ old — the commands were right and the context was missing.
   hunting before anyone thinks of the bundle. Same family as "the harness is
   not the app", one level down: **the thing a driver measures is the last
   build, not the working tree.**
+- **NEVER `git stash` A TREE A BACKGROUND JOB IS STILL WRITING — and after any
+  interrupted mutation run, work out which side of the diff is the good one
+  before restoring either.** 20 Sep 2026, and it came within one command of
+  shipping a mutation. I stashed to measure a bundle baseline on a clean tree
+  while the mutation harness was still running; its `finally` never executed,
+  so the stash captured a MUTATED file and the working tree kept the restored
+  one. I then read `git diff stash@{0} -- <file>` backwards — in that form the
+  stash is the `-` side and the working tree is the `+` side — concluded the
+  stash held the good copy, and restored the mutation over the fix.
+  **What caught it was a grep whose expected count I knew**: the duration span
+  must appear exactly once, and it appeared zero times. That is the 19 Sep note
+  used as intended rather than relearned. Two rules: measure a baseline on a
+  separate `git worktree`, which touches nothing; and when a diff decides which
+  copy survives, name which side is which before acting on it.
 - **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
   beyond "did not apply" and "crashed", and the harness cannot see it: on
   15 Sep a mutation to the walking plan's day builder read MISSED because the

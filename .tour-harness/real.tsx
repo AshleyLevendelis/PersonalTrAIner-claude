@@ -452,6 +452,20 @@ const loggedTarget = (() => {
 // 2026. The screen control that makes a day a cardio day lives on the rest-day
 // card, so the driver needs a day that HAS one. Asked of the page rather than
 // named, for the reason the two targets above record: weekday names move.
+// A TRUE REST DAY IS A WEEKDAY THE PLAN HAS NO ROW FOR — TodayPanel's
+// `isRestDay` is literally `!workout`. __restDayTarget below finds a day with
+// an EMPTY row, which is a different card (ActiveRecoveryCard), and driving
+// the rest-day rebuild against it measured the wrong component for an hour.
+// This names the weekday the plan omits, or null when it omits none.
+;(window as unknown as { __noRowDay: unknown }).__noRowDay = (() => {
+  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan
+  const named = new Set(liveDays.map(d => d.day))
+  const missing = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].find(d => !named.has(d))
+  if (!missing) return null
+  return { day: missing, date: nearestAnchorDate(missing) }
+})()
+
 ;(window as unknown as { __restDayTarget: unknown }).__restDayTarget = (() => {
   const liveWeekForRest = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
   const liveDays = mesocycle.find(w => w.week_number === liveWeekForRest)?.days ?? exercisePlan
