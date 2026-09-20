@@ -23,6 +23,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync } from 'fs'
+import { groupSetsBySession } from '../src/lib/exercise-history'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
@@ -145,6 +146,51 @@ check(`every naturalKey call was found (sanity check on this check) (${calls.len
 check('...and not one of them omits the drop index',
   calls.filter(c => !/function/.test(c)).every(c => /dropIndex|drop_index/.test(c)),
   calls.filter(c => !/dropIndex|drop_index/.test(c)))
+
+console.log('\n10. A drop never becomes a personal best, on the history path too')
+// FOUND 20 Sep 2026 by re-running the "grep the TABLE NAME" derivation: this
+// was the EIGHTH place a drop had to be excluded, and it had been missed. It
+// matters more than the other seven because the harm is the app being WRONG
+// in the trainee's favour, on the one number Ashley's 17 Sep ruling is about.
+const hist = readFileSync(join(ROOT, 'src/lib/exercise-history.ts'), 'utf8')
+const fetchFn = hist.slice(hist.indexOf('export async function getExerciseHistory'), hist.indexOf('export function derivePRHistory'))
+check('getExerciseHistory was located (sanity check on this check)', fetchFn.length > 300, fetchFn.length)
+check('...and it drops the drops before grouping them',
+  /\.filter\([^)]*drop_index[^)]*\)[\s\S]{0,40}=== 0\)/.test(fetchFn) || /drop_index \?\? 0\) === 0/.test(fetchFn))
+// AND THE READ MUST SURVIVE A PENDING MIGRATION, or the filter is moot: the
+// whole history comes back empty and the screen shows nothing, with no error.
+check('...reading with no column list, so a database without the migration still answers',
+  /\.select\('\*'\)/.test(fetchFn) && !/\.select\('[^']*drop_index/.test(fetchFn) && !/\.select\('[^']*added_load_kg/.test(fetchFn))
+
+// PROVE THE HARM IS REAL, not assumed — and the first version of this check
+// FAILED, which is the useful part. I wrote it claiming a drop beats its
+// parent on estimated 1RM because Epley rewards reps. Measured: at the app's
+// own 75% drop a parent set of 100kg x 5 needs SEVENTEEN reps in the drop
+// before the estimate is beaten, and a heavy triple needs fifteen. Possible,
+// not typical — so that was the wrong metric to argue from.
+// THE CERTAIN CASE IS THE BODYWEIGHT REPS RECORD, which is the one Ashley
+// ruled on (16 Sep: the record at bodyweight is most reps in one set). A drop
+// on a bodyweight lift IS an easier variation, so it is higher-rep by
+// definition — twelve press-ups then a drop of twenty knee press-ups records
+// TWENTY as the best, every time, with no threshold to clear.
+const bwRow = (reps: number) => ({ session_id: 's1', date: '2026-09-20', set_number: 1, weight_kg: 0, reps_completed: reps, rpe: 9, is_bodyweight: true })
+const workingOnly = groupSetsBySession([bwRow(12)])
+const letThrough = groupSetsBySession([bwRow(12), bwRow(20)])
+check('the grouper records the working set as the reps best (sanity check on this check)',
+  workingOnly[0].topSetReps === 12, workingOnly[0].topSetReps)
+check('...and a drop reaching it WOULD take the record off it — which is why the filter above exists',
+  letThrough[0].topSetReps > workingOnly[0].topSetReps,
+  { working: workingOnly[0].topSetReps, withDropLetThrough: letThrough[0].topSetReps })
+// The loaded case is the marginal one, kept as a MEASURED bound rather than a
+// claim: at 75% a drop must run to 17 reps before it beats 100kg x 5. The
+// literal is on the assertion's own side so it cannot move with the formula.
+const heavy = (w: number, r: number) => ({ session_id: 's2', date: '2026-09-20', set_number: 1, weight_kg: w, reps_completed: r, rpe: 8, is_bodyweight: false })
+check('a loaded drop at a plausible rep count does NOT beat its parent, so the bodyweight case is the one that bites',
+  groupSetsBySession([heavy(100, 5), heavy(75, 12)])[0].topSetE1RM === groupSetsBySession([heavy(100, 5)])[0].topSetE1RM,
+  groupSetsBySession([heavy(100, 5), heavy(75, 12)])[0].topSetE1RM)
+check('...but it does at 17, which is why drops are excluded rather than judged',
+  groupSetsBySession([heavy(100, 5), heavy(75, 17)])[0].topSetE1RM > groupSetsBySession([heavy(100, 5)])[0].topSetE1RM,
+  groupSetsBySession([heavy(100, 5), heavy(75, 17)])[0].topSetE1RM)
 
 if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
 console.log('\nA drop is a continuation, not a set.\n')

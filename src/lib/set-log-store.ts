@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
 import type { ExerciseSetLog } from './types'
 import { isLoggableSetWeight, MAX_LOGGABLE_SET_KG } from './set-plausibility'
+import { isMissingColumnError } from './missing-column'
 
 // ---------------------------------------------------------------------------
 // set-log-store — THE single write path for logged sets (C0 Part 3).
@@ -567,11 +568,9 @@ export function flushPending(): Promise<void> {
  * second reading of the same fact, since the code has moved between
  * PostgREST versions before.
  */
-function isMissingColumnError(error: { code?: string; message?: string } | null, column: string): boolean {
-  if (!error) return false
-  const msg = String(error.message ?? '')
-  return error.code === 'PGRST204' || (msg.includes(column) && /column|schema cache/i.test(msg))
-}
+// isMissingColumnError moved to ./missing-column — meal persistence needs the
+// same predicate for the `prep` column, and two copies of an error-shape test
+// is exactly how one of them goes stale against a new PostgREST message.
 
 /**
  * The added-load key is included ONLY when it has a value, and that is a

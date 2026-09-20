@@ -150,8 +150,12 @@ console.log('\n4. A pool replace can fail without emptying the slot\n')
   // with `false` left the string in place and the check green, on a function
   // that no longer restores anything. The same dead-code trap two other gates
   // in this repo record. Found by mutation.
+  // RE-ANCHORED 20 Sep 2026, same reason as test:dashboard's sibling check: the
+  // pool writes went behind one function so a pending migration costs a cooking
+  // method rather than a meal. The guard and the restore are what this is
+  // about, so the write matches either spelling.
   check('an insert failure puts the old pool back',
-    /if \(error\) \{[\s\S]{0,300}?if \(previous\.length > 0\) \{[\s\S]{0,200}?\.insert\(/.test(body))
+    /if \(error\) \{[\s\S]{0,300}?if \(previous\.length > 0\) \{[\s\S]{0,200}?(?:\.insert|insertPoolRows)\(/.test(body))
   check('...with its original indexes', /pool_index: row\.pool_index/.test(body))
   check('...and says so if even that fails', /restoring the previous pool for slot/.test(body))
 }

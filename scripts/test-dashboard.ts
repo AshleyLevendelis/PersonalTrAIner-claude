@@ -431,9 +431,15 @@ async function main() {
     // stripped from the insert call — the variable was still declared just
     // above, doing nothing. Same shape as a check satisfied by its own
     // comment: presence is not use.
+    // RE-ANCHORED 20 Sep 2026: this matched `.insert(` literally, and the pool
+    // writes moved behind one function that retries without the prep column on
+    // a database that has not run its migration. The property is unchanged —
+    // the kept rows are in the list handed to the write, after the fresh ones —
+    // so the pattern accepts either spelling of the write rather than pinning
+    // the current one, which would only go stale the same way again.
     check('...and re-inserts them after the fresh options',
-      /\.insert\(\[\.\.\.rows, \.\.\.keptRows\]\)/.test(persist),
-      persist.match(/\.insert\([^)]*\)/g))
+      /(?:\.insert|insertPoolRows)\(\[\.\.\.rows, \.\.\.keptRows\]/.test(persist),
+      persist.match(/(?:\.insert|insertPoolRows)\([^)]*\)/g))
 
     // (d) A meal name you cannot read is one you cannot choose.
     const meal = fs.readFileSync('src/components/MealPlan.tsx', 'utf-8')

@@ -1119,6 +1119,49 @@ old — the commands were right and the context was missing.
   file-grep derivation (nothing in `src/` mentions it). **The derivation that
   finds them is "grep the TABLE NAME across the whole repo", not "grep the file
   I changed"** — and it costs one command.
+- **A COLUMN NAMED IN A `SELECT` IS AS MUCH A MIGRATION DEPENDENCY AS ONE
+  NAMED IN AN INSERT, AND THE READ IS THE DANGEROUS HALF.** 20 Sep 2026, the
+  "grep the TABLE NAME" rule re-run against the other two new columns. Six
+  places named `prep` unguarded, and the worst was a READ: PostgREST resolves
+  column names at parse time, so `select('a, b, prep')` is rejected outright
+  before the migration lands, and that particular read feeds the whole
+  Nutrition tab. A pending migration would not have cost a cooking method, it
+  would have cost **every meal, for everybody**, behind a "couldn't read your
+  meals" the migration is nowhere near. The write half had been solved a month
+  earlier in the same codebase (`added_load_kg`) and simply was not copied.
+  So the pattern, both halves: **reads use `select('*')` and default in JS**,
+  because `*` needs no column to exist and `row.x ?? fallback` is correct on
+  both sides; **writes go through one function that retries with the key
+  stripped** on a missing-column error, because a payload key IS a column name
+  and cannot be omitted the way a filter can. And the predicate that
+  recognises the error lives in ONE file — two copies of an error-shape test
+  is how one of them goes stale against a new PostgREST message.
+  The derivation that finds these is `grep -rn "select('[^*]" src/` — every
+  column list in the codebase, checked against the migrations of the last
+  fortnight. It costs one command and it found two more sites the same day.
+- **RE-RUN A DERIVATION AGAINST THE CASES IT WAS NOT WRITTEN FOR.** The same
+  day, and the reason the above was found at all. The table-name rule was
+  written on 19 Sep while fixing `drop_index` and was applied only to
+  `drop_index`. Run against the two OTHER columns added that week it found a
+  live defect in one of them — and then, pointed at a file it had no reason to
+  visit, an eighth place a drop set could take a personal best, after seven had
+  been found and the set declared closed. **A rule discovered while fixing one
+  case is not finished being useful when that case is fixed**; the cheap move
+  is to run it across every sibling before writing it down.
+- **MEASURE THE HARM BEFORE ARGUING FROM IT — AND LET THE GATE TELL YOU.** Also
+  20 Sep. Excluding drops from the personal-best path is right, and the reason
+  I wrote for it was wrong: "a drop beats its parent on estimated 1RM because
+  Epley rewards reps". Measured, at the app's own 75% drop, a parent of
+  100kg x 5 needs SEVENTEEN reps in the drop before the estimate is beaten.
+  The certain case was a different metric entirely — the bodyweight REPS
+  record, where a drop is an easier variation and therefore higher-rep by
+  definition, so it wins immediately and always.
+  **The check I wrote to prove the harm went red, and that is what caught it.**
+  Writing "prove the detector on something that should fail" into a gate does
+  not only protect the gate; when the failing case is the author's own
+  reasoning, it is the cheapest correction available. A fix can be correct
+  while its stated justification is false, and the justification is what the
+  next reader inherits.
 - **A ROW COUNT IS NOT A SET COUNT, AND THE INTERESTING CLAIM IS USUALLY THE
   COUNT.** The same day: a mutation letting drop rows back into
   `filterLoggableSets` came back MISSED, because the screen still drew three

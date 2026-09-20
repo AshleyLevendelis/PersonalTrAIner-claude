@@ -2,6 +2,72 @@
 
 Newest first. One line each.
 
+- [x] **THE MIGRATION NOBODY HAS RUN, AND THE EIGHTH PLACE A DROP COULD SET A
+  RECORD.** 20 Sep 2026. Yesterday's rule — *a new column is a change to every
+  reader and writer of that table* — was re-run against the OTHER two new
+  columns rather than the one it was written for. `batch_cooking` came back
+  clean, gate and all. `prep` did not, and the finding is bigger than a
+  cooking method.
+  **SIX PLACES NAMED `prep` IN A SELECT OR AN INSERT, UNGUARDED, ON MAIN.**
+  PostgREST resolves column names at parse time, so every one of them is
+  rejected outright by a database that has not applied
+  `20260919120000_add_meal_prep_method` — and the handover document says in as
+  many words that whether it HAS been applied is unknown. The worst is
+  `readPools`: it feeds the whole Nutrition tab, and its failure branch shows
+  "couldn't read your meals". So a pending migration does not cost a cooking
+  method, **it costs every meal, for everybody, silently, until `db:push-both`
+  is typed on another machine.** The same file's own `added_load_kg` handling
+  had solved this a month earlier and was not copied.
+  Fixed the way the rule prescribes: reads use `select('*')` and default in JS
+  (`*` needs no column to exist); writes go through ONE function that retries
+  with the key stripped on a missing-column error, so a pending migration costs
+  the method and never the meal. **Omit-when-empty was considered and
+  measured out rather than kept beside it**: it only helps while generate-meals
+  is undeployed, and the live risk is the other order. One mechanism, the one
+  that works.
+  `isMissingColumnError` moved to `src/lib/missing-column.ts` and set logging
+  now imports it — two copies of an error-shape predicate is how one goes stale
+  against a new PostgREST message.
+  **THEN THE SAME DERIVATION FOUND THE EIGHTH DROP EXCLUSION, which yesterday's
+  seven missed.** `getExerciseHistory` feeds the personal-best graph and had
+  never heard of drops. **The claim I first wrote was wrong and my own gate
+  caught it**: I said a drop beats its parent on estimated 1RM because Epley
+  rewards reps. Measured — at the app's own 75% drop, a parent of 100kg x 5
+  needs SEVENTEEN reps in the drop before the estimate is beaten, and a heavy
+  triple needs fifteen. Possible, not typical.
+  **The certain case is the BODYWEIGHT REPS RECORD**, which is the one Ashley
+  ruled on (16 Sep: the record at bodyweight is most reps in one set). A drop
+  on a bodyweight lift IS an easier variation, so it is higher-rep by
+  definition: twelve press-ups then a drop of twenty knee press-ups records
+  **twenty** as the best, every time, no threshold. That is the app
+  congratulating somebody for the easier half of one effort — the exact
+  sentence of the 17 Sep fix, arriving by a route nobody had walked.
+  Drops are now filtered out of history before grouping, matching the seven
+  siblings; they still count toward volume, unchanged. The same read also
+  stopped naming `added_load_kg` and `drop_index` in its column list, so it
+  survives a pending migration too.
+  **DECIDED WITHOUT ASKING, and why**: this applies Ashley's existing 19 Sep
+  ruling (drops out of personal bests and progression) to a site that was
+  missed. It is not a new metric decision — `topSetReps` has always documented
+  itself as "most reps in one UNWEIGHTED bodyweight set", and a drop was never
+  that. Flagged because it does change what the number measures for anyone who
+  has logged a drop: no live users, so the new value simply stands.
+  NOT done, and named: the history screen still does not SHOW drops at all.
+  Showing them, marked, is a screen question and therefore Ashley's.
+  Verified: `test:meal-method` +11 checks (42 total), `test:drop-sets` +7 (42),
+  two mechanism-pinned checks re-anchored in `test:dashboard` and
+  `test:replace-without-losing` — both matched the literal `.insert(` text and
+  went red at correct code, neither property having moved.
+  **16 mutations, 16 caught**, check count constant on every run.
+  One of them, M8, was MISSED first time: the check grepped the source for
+  `PGRST204` and the file's own header comment says PGRST204, so deleting the
+  code left the gate green — the strip-comments rule, in its mirror form.
+  Replaced by CALLING the exported predicate, which a comment cannot satisfy.
+  21 derived source gates green (`test:beat-target-offer` was a false FAIL:
+  the script is `test:beat-target`, derived from the filename rather than from
+  package.json, which CLAUDE.md already records as a way to invent failures).
+  12 browser drivers green.
+
 - [x] **THE PRE-MERGE SWEEP: 273 GATES, 269 GREEN, ONE REAL FAILURE — AND IT
   WAS THE DERIVATION HABIT FAILING ON ITS LAST STEP.** 20 Sep 2026, run against
   a settled tree at `373b2a4`, in its own timestamped log.
