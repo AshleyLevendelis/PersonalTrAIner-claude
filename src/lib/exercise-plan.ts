@@ -523,7 +523,49 @@ export function hasBetterLoadingPeer(entry: ExerciseEntry, pool: ExerciseEntry[]
   return pool.some(o =>
     o.substitution_group === entry.substitution_group &&
     o.mechanics_tier === entry.mechanics_tier &&
-    bestEquipmentRank(o) === 'high')
+    bestEquipmentRank(o) === 'high' &&
+    carriesExternalLoad(o))
+}
+
+/**
+ * Apparatus you move your body ON, as opposed to resistance you add TO it.
+ *
+ * `bestEquipmentRank` answers "is this a real tool", and a pull-up bar truly
+ * is one. The implement preference reads that answer as "does this load the
+ * movement better", and for a bar you hang from it does not follow.
+ */
+const APPARATUS_NOT_LOAD = new Set([
+  'pull-up bar', 'dip bars', 'bodyweight', 'bench', 'incline bench',
+  'plyo box', 'squat rack', 'ab wheel', 'jump rope',
+])
+
+/**
+ * Can this exercise's resistance actually be increased?
+ *
+ * ADDED 20 Sep 2026, and it changes exactly four cases — measured, not
+ * assumed: a band lat pulldown (kneeling or standing, home gym or minimalist)
+ * whose only better-ranked peer is **Pull-Up Negatives**. 37 other flagged
+ * combinations have a loadable peer and are untouched.
+ *
+ * WHY THOSE FOUR ARE WRONG, as a coaching judgement rather than a code one.
+ * The app's own sentence is "has a better-LOADING option for the same pattern
+ * and tier", and for this pair it is false. Pull-Up Negatives carries no
+ * external load and cannot: the catalogue calls it "the lowering half of a
+ * pull-up, which is the half you are strongest in -- this is how most people
+ * earn their first one", with the form cue "stop the set when the lowering
+ * gets fast". That is a progression drill toward a pull-up, not a standing
+ * tier-2 compound: it is eccentric-only, so the concentric half of the
+ * movement is simply absent, and it cannot be progressed by either lever this
+ * app drives (load and reps) -- it progresses by tempo, and by eventually
+ * becoming a pull-up. Demoting a full-range band pulldown in its favour makes
+ * the session worse, not better.
+ *
+ * Eccentric overload IS a real modality and negatives ARE the right answer for
+ * somebody who cannot yet do a pull-up. That is a programming decision about a
+ * person, and this predicate is ranking implements — a different question.
+ */
+export function carriesExternalLoad(entry: ExerciseEntry): boolean {
+  return entry.equipment.some(eq => !APPARATUS_NOT_LOAD.has(eq))
 }
 
 /**
@@ -537,13 +579,21 @@ export function hasBetterLoadingPeer(entry: ExerciseEntry, pool: ExerciseEntry[]
  * a barbell, dumbbell, cable or machine option. So the reason for the narrow
  * scope does not apply there, and only there.
  *
- * home_gym and minimalist stay OUT until they are measured on their own. Their
- * flagged cases are vertical pulls whose only better-ranked peer is Pull-Up
- * Negatives — the catalogue's own words, "the lowering half of a pull-up" —
- * which carries no external load and cannot. That is a different question and
- * it gets its own measurement.
+ * home_gym JOINED IT 20 Sep 2026, once `carriesExternalLoad` had removed the
+ * one thing that made it unsafe. A home gym owns a barbell, dumbbells, a
+ * kettlebell, an EZ bar and a trap bar — measured from EQUIPMENT_SETS, not
+ * assumed — so that trainee is no more "a person whose kit is a backpack"
+ * than the full-gym one. What held it back was the band lat pulldown, whose
+ * only better-ranked peer was Pull-Up Negatives; asking pool-wide without the
+ * loadable test would have pushed a full-range pulldown aside for
+ * eccentric-only work.
+ *
+ * minimalist stays OUT, and only because it has not been measured yet — its
+ * shape now looks identical to home gym's. It is a separate change with a
+ * separate before/after, for the reason the 8 Sep entry records: two
+ * unmeasured changes shipped together cannot be attributed.
  */
-export const POOL_WIDE_IMPLEMENT_TIERS = new Set<EquipmentAccess>(['full_gym'])
+export const POOL_WIDE_IMPLEMENT_TIERS = new Set<EquipmentAccess>(['full_gym', 'home_gym'])
 
 // ---------------------------------------------------------------------------
 // Context-aware required patterns (adjusted for infeasible scenarios)
