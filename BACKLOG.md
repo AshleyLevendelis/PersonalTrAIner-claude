@@ -2,6 +2,50 @@
 
 Newest first. One line each.
 
+- [x] **THE GATE THAT MAKES RULE 5 ENFORCEABLE WAS ONE LIVE CHECK AND FOUR DEAD
+  BRANCHES.** 20 Sep 2026, hardening the coach exam before Ashley's run rather
+  than after it.
+  **The finding**: `test:coach-exam-fresh` exists to fail the sweep when the
+  coach has changed since the exam last ran. The repository has been in the
+  baseline-pending state since the exam was built, so the gate printed ONE
+  check, exited, and **the comparison it is named for had never executed
+  once**. The day the first scores land it switches to logic nobody has seen
+  run, whose failure mode is silence — a green tick meaning "I did not look".
+  Same family as this file's "a gate built from comfortable fixtures never
+  reaches the code it exists to hold", except the fixture here was the
+  repository's own state, which no amount of reading the gate would reveal.
+  **The fix**: the verdict is now a pure function and the gate runs it against
+  CONSTRUCTED scores files on every run — pending, fresh, stale, empty, and
+  stale-and-empty-at-once — before it looks at the real one. The strict path
+  therefore executes on every sweep whatever state the repository is in, and
+  the check count is constant, which the mutation harness depends on. 1 check
+  became 17.
+  **A SECOND CLASS OF DEFECT NOTHING COULD HAVE SEEN**, closed in the same
+  pass: the gate reads five fields the GRADER writes, in a different file.
+  Rename one there and every logic check stays green while staleness detection
+  silently stops working. The contract is now derived from the grader's source,
+  including the negative half — it must NOT write `baselinePending`, or the
+  first real run would land still wearing the banner.
+  **ONE EXIT.** The old version had three `process.exit` calls before the
+  bottom, one of them `exit(0)`. Harmless as written, and it is the exact shape
+  CLAUDE.md records from 16 Sep: a gate that can print FAIL and exit 0 is worse
+  than no gate, because the tick is now evidence.
+  **10 mutations, 10 caught.** Two were against the grader rather than the gate,
+  to prove the contract half. One catch was only possible because a weak check
+  of my own was strengthened first: it asserted the problem COUNT and not the
+  STATE, so collapsing stale-and-empty to "empty" would have passed — and
+  "empty" reads as "the run was botched" where the truth is "these scores are
+  for another coach".
+  **Also verified, because the handover asserted it**: `coach-exam-scores.json`
+  and the transcript directory are both committable, not gitignored, so the
+  instruction to commit the scores is one that can actually be followed. The
+  grader writes `floor: null` deliberately — the pass mark is set from the first
+  real run's numbers, not guessed beforehand.
+  Green and derived: `test:coach-exam-grader`, `test:coach-exam-runner`,
+  `test:coach-clock`, `npx tsc --noEmit`.
+  **STILL NOT MEASURED**: no conversation has been played against the real
+  model. This makes the run trustworthy; it does not substitute for it.
+
 - [x] **THE COACH EXAM WAS MEASURING A COACH THREE RULINGS OUT OF DATE, AND
   COULD NOT SEE WHICH CARD IT OFFERED.** 20 Sep 2026, preparing the run Ashley
   chose as the next piece of work.
