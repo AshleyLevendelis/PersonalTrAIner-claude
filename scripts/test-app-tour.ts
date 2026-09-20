@@ -548,7 +548,18 @@ console.log('\n8. The meals stop survives meals that have not arrived yet')
   // JSX tags only: the file also explains itself in a comment, and a comment
   // is not a spotlight.
   const tags = body.match(/<\w[^>]*\sdata-tour="meals"/g) ?? []
-  const returns = (body.match(/^\s*return \(/gm) ?? []).length
+  // A RENDER BRANCH RETURNS JSX. `return \(` also matches `return () => {...}`
+  // — an effect cleanup — and on 19 Sep 2026 a new useEffect in MealPlan added
+  // exactly one of those and reddened this check while every render branch was
+  // correctly tagged and nothing about the tour had changed. Counting the
+  // returns whose value actually opens a tag is the property; `return (` was
+  // the mechanism.
+  const jsxReturns = (src: string) => (src.match(/^[ \t]*return \(\s*</gm) ?? []).length
+  // Proven on a synthetic body so it cannot go vacuous later: one render
+  // branch and one cleanup must count as one.
+  check('the render-branch detector counts JSX and ignores an effect cleanup (proving this check)',
+    jsxReturns('  return (\n    <div />\n  )\n    return () => { live = false }\n') === 1)
+  const returns = jsxReturns(body)
   check(`MealPlan has more than one render branch, so this check has teeth (${returns})`, returns >= 2, returns)
   check('...and every one of them carries data-tour="meals"', tags.length >= returns, { tags: tags.length, returns })
 

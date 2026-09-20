@@ -30,7 +30,7 @@ import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
 import { GroceryScreen } from '@/components/GroceryScreen'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
-import { buildRotation, assembleRotationDay, rotationIndexFor } from '@/lib/meal-rotation'
+import { buildRotation, assembleRotationDay, rotationIndexFor, type MealShape } from '@/lib/meal-rotation'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -350,9 +350,17 @@ function App() {
   // and the shopping list builds itself from the same seven days by calling
   // the same pure builder with the same inputs.
   const mealRotationDate = getSessionDateContext(profile?.id).date
+  // ONE OBJECT, PASSED IDENTICALLY TO BOTH SURFACES. The shopping list builds
+  // its week from the same builder with the same shape; splitting these into
+  // separate arguments is how the two would quietly start disagreeing again.
+  const mealShape: MealShape = useMemo(() => ({
+    mealsPerDay: profile?.meals_per_day,
+    includeSnacks: profile?.include_snacks,
+    batchCooking: profile?.batch_cooking,
+  }), [profile?.meals_per_day, profile?.include_snacks, profile?.batch_cooking])
   const mealRotation = useMemo(
-    () => (macros ? buildRotation(mealPools, macros, compiledSoftFoodPreferences) : null),
-    [mealPools, macros, compiledSoftFoodPreferences],
+    () => (macros ? buildRotation(mealPools, macros, compiledSoftFoodPreferences, mealShape) : null),
+    [mealPools, macros, compiledSoftFoodPreferences, mealShape],
   )
   const assembledMeals = useMemo(
     () => (macros && mealRotation
@@ -747,6 +755,7 @@ function App() {
       start_preference: profileRow.start_preference ?? undefined,
       meals_per_day: profileRow.meals_per_day ?? 3,
       include_snacks: profileRow.include_snacks ?? true,
+      batch_cooking: profileRow.batch_cooking ?? true,
       cooking_time_preference: profileRow.cooking_time_preference || 'moderate',
       // Meal-realism round, part 3: onboarding's optional food-preference
       // answers — see the field docs on UserProfile in types.ts.
@@ -1377,6 +1386,10 @@ function App() {
         start_preference: enrichedProfile.start_preference ?? null,
         meals_per_day: enrichedProfile.meals_per_day ?? 3,
         include_snacks: enrichedProfile.include_snacks ?? true,
+        // NAMED HERE OR WRITTEN ONCE AND NEVER READ BACK — this insert is
+        // column by column, which is the trap CLAUDE.md names for every new
+        // profile column.
+        batch_cooking: enrichedProfile.batch_cooking ?? true,
         cooking_time_preference: enrichedProfile.cooking_time_preference ?? 'moderate',
         // Vision-architecture patch round, fix 2: injuries (body-part codes
         // from onboarding) and exercise_exclusions (exact exercise names
@@ -2864,6 +2877,7 @@ function App() {
                 softLikedFoods={compiledSoftFoodPreferences}
                 todaysPicks={chosenMeals}
                 onClose={() => { window.location.hash = tabHash('nutrition') }}
+                mealShape={mealShape}
               />
             ) : (
             <NutritionDisplay

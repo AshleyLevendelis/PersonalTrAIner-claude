@@ -125,7 +125,7 @@ export function groupSetsBySession(rows: RawHistoryRow[]): ExerciseHistorySessio
 export async function getExerciseHistory(userId: string, exerciseId: string, limit = 300): Promise<ExerciseHistorySession[]> {
   const { data, error } = await supabase
     .from('exercise_set_logs')
-    .select('session_id, completed_at, set_number, weight_kg, reps_completed, rpe, is_bodyweight, added_load_kg')
+    .select('*')
     .eq('user_id', userId)
     .eq('exercise_id', exerciseId)
     .eq('is_warmup', false)
@@ -134,6 +134,21 @@ export async function getExerciseHistory(userId: string, exerciseId: string, lim
   if (error || !data) return []
 
   const rows: RawHistoryRow[] = data
+    // THE EIGHTH PLACE A DROP HAD TO BE EXCLUDED, and the one with teeth.
+    // Ashley's 19 Sep ruling keeps drops out of personal bests and
+    // progression, and this function feeds both: groupSetsBySession derives
+    // topSetE1RM from every set it is handed. A drop is lighter AND higher
+    // rep, and the Epley estimate rewards reps — 80kg x 12 estimates a
+    // HIGHER one-rep max than 100kg x 5 — so a drop the app itself suggested
+    // would beat its own parent and fire a personal best on the easier half
+    // of one effort. That is the exact wording of the 17 Sep fix, arriving
+    // by a new route.
+    // Filtered here rather than in the query, and `select('*')` above rather
+    // than a column list, for the reason missing-column.ts sets out: naming
+    // `drop_index` (or `added_load_kg`) is rejected outright by a database
+    // that has not run the migration, and this read fails to an empty
+    // history with no error shown.
+    .filter((r: { drop_index?: number | null }) => (r.drop_index ?? 0) === 0)
     .filter((r: { weight_kg: number; is_bodyweight: boolean }) => !isMalformedZeroWeight(r))
     .map((r: { session_id: string; completed_at: string; set_number: number; weight_kg: number; reps_completed: number; rpe: number | null; is_bodyweight: boolean }) => ({
       session_id: r.session_id,

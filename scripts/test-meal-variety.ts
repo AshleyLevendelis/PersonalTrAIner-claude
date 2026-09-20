@@ -316,8 +316,12 @@ console.log('\n5. One rotation, both surfaces')
   check('...and the tab no longer assembles a day without a history',
     !/assembleDay\(mealPools/.test(strip(app)))
 
+  // PROPERTY, NOT THE CALL'S TEXT — and this check pinned the text and went
+  // red within a day, when buildRotation gained the meal-shape argument. The
+  // property is that the list gets its history from a rotation it BUILT, not
+  // from one it started itself.
   check('the shopping list seeds its week from the same rotation builder',
-    /buildRotation\(pools, targets, softLikedFoods\)[\s\S]{0,80}historyFor\(/.test(grocery))
+    /buildRotation\(/.test(grocery) && /rotation\.historyFor\(/.test(grocery))
   check('...starting at the date the caller is actually looking at',
     /rotationIndexFor\(startDate\)/.test(grocery) && /startDate: string/.test(grocery))
   check('...and its caller passes the app\'s date rather than defaulting one',

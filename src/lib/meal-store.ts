@@ -540,6 +540,14 @@ export async function getEatenProteinByDate(
 export const USER_REQUESTED_TAG = 'user-requested'
 
 /**
+ * A meal the user hearted. Kept across a regenerate for the same reason
+ * USER_REQUESTED_TAG is, and kept SEPARATE from it on purpose: "I asked for
+ * this by name" and "I like this" are different facts, and one tag meaning
+ * both would make either impossible to count later.
+ */
+export const FAVOURITE_TAG = 'favourite'
+
+/**
  * The pools, AND whether the read actually worked.
  *
  * getPools below returns only the pools and answers a failed read with `{}` —
@@ -553,7 +561,13 @@ export const USER_REQUESTED_TAG = 'user-requested'
 export async function readPools(profileId: string): Promise<{ pools: Partial<Record<MealSlotName, PoolOption[]>>; failed: boolean }> {
   const { data, error } = await supabase
     .from('meal_plan_slots')
-    .select('slot, pool_index, name, ingredients, macros, tags, prep')
+    // `*`, NOT A COLUMN LIST, AND THIS IS LOAD-BEARING. PostgREST resolves
+    // column names at parse time, so naming `prep` here fails outright on a
+    // database that has not run 20260919120000 — and this read feeds the
+    // whole Nutrition tab, so the failure would not be "no cooking method",
+    // it would be "no meals, for everybody, until db:push-both runs".
+    // `*` needs no column to exist; `row.prep ?? ''` reads both sides.
+    .select('*')
     .eq('profile_id', profileId)
     .order('pool_index', { ascending: true })
 

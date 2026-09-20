@@ -2,6 +2,828 @@
 
 Newest first. One line each.
 
+- [x] **MERGED TO MAIN — 20 Sep 2026, on Ashley's explicit "merge it".** Twenty
+  commits, from `a748e53` to the merge. The authorisation is the one CLAUDE.md
+  requires for `main` every time, and it was given in those words.
+  **Why it was needed at all**: Ashley reported *"I dont see it on the live
+  app"*. Nothing was broken — Vercel builds production from `main`, `vercel.json`
+  sets no branch override, and every commit of the last several days sat on the
+  working branch. The keto caveat, the rest-day rebuild, the goal change, the
+  meal refit and the migration-safety work were all real and all invisible for
+  exactly that reason. **A capability is not "shipped" because it is pushed**,
+  which is the deploy-shaped twin of this file's standing "a capability is not
+  had because the data exists".
+  **The pre-merge sweep, re-run against the settled tree at `4ac40bf`**:
+  275 gates declared, **275 RAN**, 272 passed. The RAN count is reported beside
+  the pass count deliberately — a crash or a gate's own early `return` prints
+  zero failures and reads as success, and only the ran count separates them.
+  The three failures are the standing environmental trio, and each was
+  confirmed **by reading its own output rather than by ticking its name off a
+  list**: `test:meal-quality` and `verify:rls` print *"Host not in allowlist:
+  …supabase.co"*; `test:schema-parity` prints something different —
+  *"Failed to link to TEST (…). Nothing was run against it."* — which is the
+  correction this file's own note already carries, re-confirmed here rather
+  than assumed.
+  The previous sweep (273 gates, 269 passed) had one REAL failure,
+  `test:bounds-and-boundaries`, fixed in `8d44366`; it is green in this run, so
+  the fix is covered by a sweep rather than by the sweep that found it — the
+  rule that exists because a fix made in response to a sweep is not covered by
+  it. Gate count rose 273 → 275: the rest-day rebuild added two.
+  **Not committed**: the sweep rewrites `audit-report.txt`, `quality-report.txt`
+  and `differentiation-audit-report.txt`, and `verify:session-rebuild` rewrites
+  four screenshots. All seven were reverted before the merge commit. A stop
+  hook asked for them to be committed and pushed; they are generated output,
+  not work, and the standing rule to revert them won.
+  **Still outstanding, on Ashley's machine only**: `npm run db:push-both` for
+  the two migrations this branch adds, then
+  `npm run deploy:functions:prod -- chat-gemini`. Both refuse a non-terminal
+  stdin by design, so no session here can run them. Order matters in one
+  direction: deploying the OLD coach function after the migration would fail
+  every set the coach logs. `docs/handoff-2026-09-20.md` carries the steps and
+  what proves each one worked.
+
+- [x] **THE REST DAY ENDED IN THREE IDENTICAL LINKS FOR THREE DIFFERENT THINGS.**
+  20 Sep 2026, built from the `4a` handoff. `4b` and `4c` were rejected
+  explorations and were not built.
+  **The defect, in one sentence**: "Log a walk" writes one cardio row for today
+  and touches nothing else; "Make Sunday a cardio day" rewrites EVERY Sunday to
+  the end of the block. Both were 12px dotted underlines of identical weight,
+  and two of the three shared a line — rendering as
+  *"Make Sunday a cardio day →Train anyway →"*. That is the same collision
+  MovedDayCard's own comment already documented, still live one card over.
+  **What changed:**
+  - Logging is a control, not a blank form. Walk / Cycle / Swim write on one
+    tap; "Other" opens the existing two-input form unchanged. **The duration on
+    each chip is the person's own most recent one for that activity**, rounded
+    to five, falling back to 30 — read from the store rather than hardcoded,
+    because a one-tap write that invents a number is putting something in
+    somebody's record they did not choose. It is on the chip face before the
+    tap, which is what makes one tap honest rather than merely quick.
+  - The two plan changes sit under a "Change the plan" heading, each a 44px row
+    stating its own reach: *"today only"* against *"Every Thursday for the rest
+    of this block"*. Plural, because that is what the write actually is.
+  - The week tally became a segmented mint track; the recovery avatar and the
+    section label became violet.
+  **DECIDED WITHOUT ASKING, and flagged**: the cardio sheet used to render its
+  own dotted trigger. It keeps it for ActiveRecoveryCard, where the control is
+  an aside; RestDayCard now owns it as a row. The FORM is untouched — only the
+  thing that opens it moved. The three cards stay three cards.
+  **TWO FINDINGS ON THE WAY, both from the harness rather than the code:**
+  - **The driver was measuring the wrong card for an hour.** `isRestDay` is
+    literally `!workout` — a weekday the plan has NO ROW for — while the
+    harness's `__restDayTarget` finds a day with an EMPTY row, which renders
+    ActiveRecoveryCard. The screenshot looked plausible and was a different
+    component. The page now exposes `__noRowDay` and the driver asserts it
+    found one rather than quietly testing the sibling.
+  - **`test:bundle`'s total budget was ALREADY RED at HEAD**, and the rest-day
+    card did not do it. Measured on a separate worktree with nothing else
+    changed: everything together came to exactly 1,935 kB against a 1,935
+    budget, and the check is `<`. The budget had been consumed to the byte by
+    work that never touched it, and the next commit of any size was going to
+    trip it. Raised to 1,975 (34 kB above the measured 1,941) and the app chunk
+    to 985 (24 above 961), both from measurements taken today rather than
+    inherited from a note — which is the rule that file keeps relearning.
+    NAMED, not fixed: the two gzipped budgets now sit 2 kB and 3 kB from their
+    lines. Pre-existing, visible on the headroom line every run.
+  **AND I NEARLY SHIPPED A MUTATION.** Stashing to measure the bundle baseline
+  interrupted the mutation harness mid-run, its restore never executed, and the
+  stash captured a MUTATED file. I then read the resulting `git diff` backwards
+  and restored the wrong side. Caught by the grep whose count I knew should be
+  1 and was 0 — the exact "a COUNT from grep is only evidence when you know
+  what the count should be" note, used as intended for once. The real lesson is
+  one line earlier: do not stash a tree a background job is still writing.
+  Verified: `test:rest-day-card` (42 checks) and `verify:rest-day` (33 checks,
+  390x844, screenshots read). **13 mutations, 13 caught** — 10 source, 3
+  browser. One browser mutation, on the headline collision check, first came
+  back MISSED: making each row `inline-flex` still wrapped at phone width, so
+  the mutation applied, ran, and did not create the defect. Laying the GROUP
+  out as a flex row does, and that catches it — the third kind of invalid
+  mutation, met again.
+  12 source gates and 10 browser drivers green, typecheck clean.
+  NOT done, named: `--role-ai-text` resolves to `#DAD5FA` in the app where the
+  mock resolves `#B4A9FF`, so the violet reads paler on screen than in the
+  design. The handoff says tokens win over hex, so the token is what shipped;
+  moving it would recolour every coach surface and is Ashley's call.
+
+- [x] **KETO IS OFFERED, FILTERS FOOD, AND DOES NOT MOVE THE NUMBERS — SO THE
+  APP NOW SAYS SO WHERE YOU PICK IT.** 20 Sep 2026.
+  **What was measured first**, because the sentence is a claim about the app's
+  own limits and a wrong word in it is worse than silence:
+  - Keto IS offered at setup and IS enforced as a food filter — bread, pasta,
+    rice, potatoes, oats, beans and added sugar are all refused, probed one by
+    one against `FORBIDDEN_TAGS` rather than assumed.
+  - Keto is deliberately NOT implemented in the macros, and `macro-calculator`
+    says so in its own comment. Carbs are the REMAINDER after protein and fat,
+    floored at 50g, and `FAT_PERCENT_RANGE` is capped at 0.35 precisely so the
+    split cannot be forced into a ketogenic shape through the wrong derivation
+    order. Measured: a keto profile's carb target is **150-370g, 25-57% of
+    energy**, against the under-50g/under-10% that ketosis means.
+  - The coach is already instructed to say this plainly. Nothing said it where
+    the choice is made — so you only learned it if you thought to ask.
+  **ASHLEY'S RULING, from four options: say it on the setup screen.** Over
+  building a real ketogenic derivation, over removing Keto from the list, and
+  over leaving it as it was.
+  Built as one sentence in the shared phrasebook, rendered under the picker on
+  BOTH surfaces — setup and Profile. Setup was what she asked for; Profile is
+  the other place the choice is made, and saying it once at onboarding then
+  going silent when somebody turns Keto on later would leave the app honest
+  only to people who chose it on day one. Flagged rather than asked again.
+  Live: *"Keto keeps bread, pasta, rice, potatoes, beans and added sugar out of
+  your meals — but not fresh fruit. Your daily carb target stays a standard
+  one, not a keto split."*
+  **TWO THINGS THE SENTENCE DELIBERATELY DOES NOT SAY**, both caught by
+  measuring before writing:
+  - Not "sugary fruit". The filter blocks DRIED fruit and lets fresh banana,
+    grapes and mango through — the three fruits the coach's own keto rule
+    names. Claiming them would be the app asserting a filter it lacks.
+  - Not "yet". "Not a keto split yet" promises to build one, and nobody has
+    decided to.
+  It appears only when Keto or Low-carb is selected. The other twenty diets
+  stay silent: they are honoured in full, and a standing warning under Vegan
+  or Nut-free would say otherwise — the same class of untruth pointing the
+  other way.
+  Verified: `test:coach-voice` +19 checks (70 total), including every food the
+  sentence names probed against the real filter and the carb target derived
+  rather than asserted; `verify:setup-answers` +10 browser checks at 390x844,
+  reading BOTH states — absent with no diet picked, present with Keto — because
+  with only the keto run "shows it" and "shows it always" are the same result.
+  Screenshot read, not just a green build.
+  **8 source mutations, 8 caught; 5 browser mutations.** Three source mutations
+  were MISSED first time and each was a real gap: the low-carb line could be
+  relabelled "a keto split" (the check read only the subject, not the split
+  name); the Profile guard could be replaced with `false` while the testid and
+  the call stayed in the file (an import is not a use, one level along); and
+  lowering `CARB_FLOOR_G` to 20 changed nothing the check could see, because
+  the profile it used takes carbs from the remainder and never touches the
+  floor — replaced with a profile where the floor genuinely engages.
+  36 derived source gates green, typecheck clean.
+  NOT done, named: a real ketogenic derivation is not built, and the keto food
+  filter is a low-carb filter shared with Low-carb — retagging fresh fruit
+  would change what every low-carb trainee is served, so it is a decision, not
+  a slip.
+
+- [x] **THE MIGRATION NOBODY HAS RUN, AND THE EIGHTH PLACE A DROP COULD SET A
+  RECORD.** 20 Sep 2026. Yesterday's rule — *a new column is a change to every
+  reader and writer of that table* — was re-run against the OTHER two new
+  columns rather than the one it was written for. `batch_cooking` came back
+  clean, gate and all. `prep` did not, and the finding is bigger than a
+  cooking method.
+  **SIX PLACES NAMED `prep` IN A SELECT OR AN INSERT, UNGUARDED, ON MAIN.**
+  PostgREST resolves column names at parse time, so every one of them is
+  rejected outright by a database that has not applied
+  `20260919120000_add_meal_prep_method` — and the handover document says in as
+  many words that whether it HAS been applied is unknown. The worst is
+  `readPools`: it feeds the whole Nutrition tab, and its failure branch shows
+  "couldn't read your meals". So a pending migration does not cost a cooking
+  method, **it costs every meal, for everybody, silently, until `db:push-both`
+  is typed on another machine.** The same file's own `added_load_kg` handling
+  had solved this a month earlier and was not copied.
+  Fixed the way the rule prescribes: reads use `select('*')` and default in JS
+  (`*` needs no column to exist); writes go through ONE function that retries
+  with the key stripped on a missing-column error, so a pending migration costs
+  the method and never the meal. **Omit-when-empty was considered and
+  measured out rather than kept beside it**: it only helps while generate-meals
+  is undeployed, and the live risk is the other order. One mechanism, the one
+  that works.
+  `isMissingColumnError` moved to `src/lib/missing-column.ts` and set logging
+  now imports it — two copies of an error-shape predicate is how one goes stale
+  against a new PostgREST message.
+  **THEN THE SAME DERIVATION FOUND THE EIGHTH DROP EXCLUSION, which yesterday's
+  seven missed.** `getExerciseHistory` feeds the personal-best graph and had
+  never heard of drops. **The claim I first wrote was wrong and my own gate
+  caught it**: I said a drop beats its parent on estimated 1RM because Epley
+  rewards reps. Measured — at the app's own 75% drop, a parent of 100kg x 5
+  needs SEVENTEEN reps in the drop before the estimate is beaten, and a heavy
+  triple needs fifteen. Possible, not typical.
+  **The certain case is the BODYWEIGHT REPS RECORD**, which is the one Ashley
+  ruled on (16 Sep: the record at bodyweight is most reps in one set). A drop
+  on a bodyweight lift IS an easier variation, so it is higher-rep by
+  definition: twelve press-ups then a drop of twenty knee press-ups records
+  **twenty** as the best, every time, no threshold. That is the app
+  congratulating somebody for the easier half of one effort — the exact
+  sentence of the 17 Sep fix, arriving by a route nobody had walked.
+  Drops are now filtered out of history before grouping, matching the seven
+  siblings; they still count toward volume, unchanged. The same read also
+  stopped naming `added_load_kg` and `drop_index` in its column list, so it
+  survives a pending migration too.
+  **DECIDED WITHOUT ASKING, and why**: this applies Ashley's existing 19 Sep
+  ruling (drops out of personal bests and progression) to a site that was
+  missed. It is not a new metric decision — `topSetReps` has always documented
+  itself as "most reps in one UNWEIGHTED bodyweight set", and a drop was never
+  that. Flagged because it does change what the number measures for anyone who
+  has logged a drop: no live users, so the new value simply stands.
+  NOT done, and named: the history screen still does not SHOW drops at all.
+  Showing them, marked, is a screen question and therefore Ashley's.
+  Verified: `test:meal-method` +11 checks (42 total), `test:drop-sets` +7 (42),
+  two mechanism-pinned checks re-anchored in `test:dashboard` and
+  `test:replace-without-losing` — both matched the literal `.insert(` text and
+  went red at correct code, neither property having moved.
+  **16 mutations, 16 caught**, check count constant on every run.
+  One of them, M8, was MISSED first time: the check grepped the source for
+  `PGRST204` and the file's own header comment says PGRST204, so deleting the
+  code left the gate green — the strip-comments rule, in its mirror form.
+  Replaced by CALLING the exported predicate, which a comment cannot satisfy.
+  21 derived source gates green (`test:beat-target-offer` was a false FAIL:
+  the script is `test:beat-target`, derived from the filename rather than from
+  package.json, which CLAUDE.md already records as a way to invent failures).
+  12 browser drivers green.
+
+- [x] **THE PRE-MERGE SWEEP: 273 GATES, 269 GREEN, ONE REAL FAILURE — AND IT
+  WAS THE DERIVATION HABIT FAILING ON ITS LAST STEP.** 20 Sep 2026, run against
+  a settled tree at `373b2a4`, in its own timestamped log.
+  Three failures were the known environmental set — `test:meal-quality`,
+  `test:schema-parity` and `verify:rls`, all needing a live database this
+  machine cannot reach. Each was confirmed by reading its OWN output rather
+  than by its name being on a list, which is how the correction below was
+  found.
+  **The real one: `test:bounds-and-boundaries`, red for an hour.** The check
+  "the plate-calculator button only renders where a handler exists" pinned the
+  condition's exact TEXT, `{onOpenPlateCalc && (`. The cable-machine work added
+  a second clause to it — strictly NARROWER, so the property never weakened for
+  a moment — and the mechanism pin went red at correct code. Re-anchored on two
+  properties instead: the guard OPENS with the handler (so a missing one
+  short-circuits before anything else in the condition can run) and the very
+  next thing rendered is the button. **3 mutations, 3 caught** — the handler
+  removed, the handler checked but not first, and the guard wrapped around
+  something other than the button.
+  **WHY IT WAS NOT CAUGHT EARLIER, which is the part worth keeping.** The habit
+  says derive the gates from the files you touched, and it worked: I derived
+  for `SetGrid.tsx` earlier in the session and ran its readers green. The next
+  commit touched five NEW files plus `SetGrid.tsx` again — and I derived for
+  the five. **Having already run a file's gates is not a property of the file;
+  it is a property of a version of it that no longer exists.** The derivation is
+  per COMMIT, over `git diff --name-only`. Added to CLAUDE.md.
+  **AND A CORRECTION TO CLAUDE.md'S OWN ENVIRONMENTAL-FAILURE LINE.** It said
+  all three print the same cause verbatim, *"Host not in allowlist"*. Two do;
+  `test:schema-parity` prints *"Failed to link to TEST (…). Nothing was run
+  against it."* That matters because the same line instructs the reader to
+  confirm by the OUTPUT rather than the name — so following it exactly would
+  have failed to find the sentence and made a genuine environmental failure
+  look real. Both wordings are the honest "I proved nothing" shape; the claim
+  that they are one string was wrong.
+  Verified after the fix: `test:bounds-and-boundaries` green (44 checks), and
+  the sweep's own artifacts (`audit-report.txt`, `quality-report.txt`,
+  `differentiation-audit-report.txt` and four harness screenshots) reverted
+  rather than committed, per the standing rule. The audit itself passed 17,423
+  of 17,423 combinations; the quality scorer ran clean.
+
+- [x] **THE RULE I HAD JUST WRITTEN DOWN FOUND THREE MORE, AND CORRECTED ONE OF
+  MY OWN FIXES.** 19 Sep 2026, immediately after adding "a new column is a
+  change to every reader and writer of that table" to CLAUDE.md. Grepping the
+  TABLE NAME rather than the files I had touched returned sixteen readers.
+  Three were drop-blind in ways the ruling explicitly forbids:
+  - **The personal-best cache, re-derived from the database.** It excludes
+    warm-ups and would have taken a drop as a record — the app congratulating
+    somebody for the easier half of one effort.
+  - **Progression's "last logged weight".** The sharpest of the three: it is
+    ordered by time and a drop is logged immediately after its parent, so the
+    drop wins every time and **next week's prescription falls to it** — the app
+    lowering the target every time somebody trained harder. This is the exact
+    sentence the plan doc had already written as the reason to exclude drops
+    from progression, sitting beside code that did the opposite.
+  - **The coach's 14-day history.** A drop reads as an extra working set, so
+    the coach would say five sets of squats on a day the app counts three.
+  **AND IT CAUGHT MY OWN EDGE-FUNCTION FIX, BEFORE IT SHIPPED.** An hour
+  earlier I filtered drops out of the coach's last-weight lookup as a PostgREST
+  filter, `or=(drop_index.eq.0,drop_index.is.null)`, with a comment claiming
+  the null half kept the query legal on a database that has not run the
+  migration. **That is false.** PostgREST resolves column names against its
+  schema cache at parse time, so naming an unknown column is rejected whichever
+  operator follows it — and the lookup swallows a failure, so the coach would
+  have silently stopped knowing anybody's last weight until db:push-both ran.
+  Every one of these now filters in JS off `select('*')`, which needs no column
+  to exist: undefined before the migration, 0 or more after, and `?? 0` reads
+  both. The coach's lookup also had to stop taking one row, because filtering
+  in JS only helps if more than one came back.
+  **ONE THING MEASURED AND DELIBERATELY LEFT ALONE**, recorded in the code so
+  the next reader does not "fix" it: the weekly dashboard's log partition puts
+  a drop in its working bucket, and that is harmless. All five consumers ask
+  whether ANYTHING was logged that day — a length or a set of dates — and none
+  counts sets or sums volume; a day with a drop always has that drop's parent
+  too. Adding a third bucket would risk the opposite defect, a consumer wanting
+  VOLUME losing the drops, which the ruling says do count toward it.
+  Verified: `test:bodyweight-progress` +2, `test:coach-plan-context` +1 and two
+  re-anchored. **5 mutations, 5 caught**, each one checking BOTH halves — that
+  the drop is excluded, and that the query does not name the column. Every gate
+  reading the four touched files re-run green.
+
+- [x] **THE SAME WRITE BUG WAS IN THE COACH, WHERE NO BROWSER COULD SEE IT.**
+  19 Sep 2026, found by asking the mechanical question the drop column forces —
+  who else writes or reads this table? — rather than by a check.
+  **The coach's own set-logging upsert named the OLD unique constraint.** Fixed
+  in the browser client this morning; the edge function has an independent copy
+  of the same line, and it was still wrong. The consequence is not about drops
+  at all: the moment migration `20260919160000` is applied, that upsert matches
+  no unique index and Postgres rejects it — **every set the coach logs would
+  fail, for everyone**, with no drop set anywhere in sight. Same two-target
+  ladder as the client (try the new, fall back on 42P10 alone), so it is correct
+  on both sides of a migration run by hand on another machine.
+  **AND THE COACH'S "WHAT DID YOU LAST LIFT?" WOULD HAVE ANSWERED WITH A DROP.**
+  It takes the most recent row by time, excluding warm-ups — and a drop is
+  logged immediately after the set it hangs off, so it wins that query every
+  time. The coach would say "last time you did 35kg" about a lift taken to 47.5,
+  and resolve an unstated weight to the drop. Same class as the coach quoting a
+  different weight from the plan, which this app has already had once. The
+  filter tolerates a null as well as a zero so the lookup stays legal on a
+  database that has not run the migration — dropping that half is an easy
+  "tidy-up" that breaks the pre-migration case silently, so it is pinned.
+  **THE GENERAL SHAPE, worth more than either fix**: a new column is not a
+  change to one file, it is a change to every reader and writer of that table,
+  and the ones outside `src/` are invisible to a typecheck, a source gate and a
+  browser alike. The derivation that finds them is "grep the table name", not
+  "grep the file I changed".
+  **Logging a DROP is `screen only`**, written into the parity doc by the person
+  adding it rather than found later — the build-up entry's reason plus one more:
+  a drop needs a PARENT, and "I did a drop after squats" does not say after
+  which set, so the coach needs a clarification round-trip the screen gets free
+  by being tapped on the row.
+  Verified: `test:coach-plan-context` §7, 8 checks. **9 mutations, 9 caught**
+  after one re-anchor — the first version of the fallback check accepted the
+  mere PRESENCE of the fallback's name, so setting it equal to the new target
+  (which removes the fallback entirely while leaving every identifier in place)
+  came back MISSED. It now reads both literals and requires them to differ,
+  which is the "a declaration is not a value" rule met on my own check.
+  **Needs the `chat-gemini` deploy**, and it is now on that deploy's critical
+  path rather than being a nice-to-have: without it, the coach's set logging
+  breaks the moment the migration runs.
+
+- [x] **A SUPERSET WITH A BUILD-UP IN IT WAS GIVING ADVICE NOBODY SHOULD
+  FOLLOW.** 19 Sep 2026, screen 3a of Ashley's handoff. The line under a paired
+  group said "alternate — no rest between" whatever the pair contained. Read
+  literally by somebody whose A1 has a four-step ramp, that says to alternate
+  the WARM-UP sets with the other exercise, which is not how a superset is run
+  and is not what the app meant.
+  **The clause is conditional and the CSCS basis is recorded rather than
+  asserted**: a build-up prepares ONE movement's tissue and grooves its pattern
+  at rising load, so putting an unrelated exercise between its steps adds
+  fatigue and time exactly where they should be close together, and gives the
+  second exercise a warm-up it never needed. The pairing starts once the ramp
+  has done its job. A pair with no build-up keeps its one short line.
+  The sentence lives in the phrasebook with every other card lead, so
+  `test:coach-voice` and the coach exam can grade it; which members ramp is one
+  shared function both surfaces call, because this component's own header
+  exists because a peeked superset silently lost this very line once.
+  **AND NO PLATE CALCULATOR ON A CABLE MACHINE** — the same handoff. On a
+  selectorised stack the pin IS the weight: a button offering to work out which
+  plates to load describes a machine that is not in front of her. It is the
+  app's standing "never offer what is not there" rule met on a ROW rather than
+  on a tab.
+  **MEASURED, WHICH IS WHY IT IS CABLE AND NOT `loadingMode === 'stack'`.**
+  149 of the catalogue's 201 entries fall through to 'stack' — every push-up,
+  band, pull-up bar and machine among them — and some of those machines (leg
+  press, belt squat) genuinely ARE plate-loaded. Hiding the calculator from all
+  149 would be the same defect pointing the other way. 16 entries name a cable
+  machine and every one is pin-loaded. Dumbbells are deliberately left alone
+  and the question is Ashley's: a fixed bell has nothing to calculate, an
+  adjustable pair does, and the catalogue cannot tell them apart.
+  **STILL IMPRECISE, AND NAMED RATHER THAN HIDDEN**: a pin-loaded machine whose
+  equipment says only "machine" (Machine Shrug, Machine Preacher Curl) keeps
+  the button. Separating those from the plate-loaded ones needs a catalogue
+  field that does not exist.
+  Verified: `test:load-display` +7 checks and `test:ramp-visibility` +15, every
+  one CALLING the two functions rather than grepping for them — **12 mutations,
+  12 caught**, every run at full check count. Read on a real screen at 390x844:
+  Cable Lateral Raises renders zero plate-calculator controls while Dumbbell
+  Rows, Machine Shrug and Machine Preacher Curl each keep theirs, and a
+  non-ramping pair still reads "alternate — no rest between" and nothing more.
+  **ONE OF THE NEW CHECKS BROKE THIS FILE'S OWN RULE ON ITS FIRST RUN** —
+  asserting the old hard-coded sentence was ABSENT from the component, and
+  finding it in the component's header comment explaining its removal. Comments
+  stripped before the assertion now, which is the rule written down three
+  sections up in CLAUDE.md.
+  **AND A BROWSER DRIVER WAS FOUND RED FROM THIS MORNING'S COMMIT.**
+  `verify:calibration-search` pins the ramp caption by its words; the group
+  headers built earlier today replaced that sentence, and no amount of
+  grepping the changed source file could have found a driver that names
+  something on SCREEN. It is the second half of the standing derivation rule,
+  met in practice rather than in theory. Re-anchored on the property (the
+  header says what the group is AND what it costs) and green.
+
+- [x] **A BROWSER FOUND A WRITE BUG THAT WOULD HAVE BROKEN EVERY SET SAVE THE
+  DAY THE MIGRATION LANDED.** 19 Sep 2026, building drop-set rows from Ashley's
+  handoff. Thirty-five source checks, a clean typecheck and a green
+  `test:drop-sets` all passed over it; tapping the tick in a real Chromium found
+  it in one run.
+  **What the screen showed**: saving a drop wrote the drop's numbers over its
+  PARENT SET's row. Set 1 of 8 reps at 47.5kg became 6 reps at 35kg, and the
+  drop itself vanished. The cause was the upsert's conflict target — the five
+  columns of the OLD unique constraint — so the database (and the harness's
+  fake) treated the drop as the same row as its parent.
+  **The worse half is the one nobody was going to see coming.** Migration
+  `20260919160000` REPLACES that constraint with one including `drop_index`. The
+  moment it is applied, an upsert naming the old five columns matches no unique
+  index and Postgres rejects it with 42P10 — so **every set save in the app would
+  have failed**, not just drops. There is no deploy order that avoids it, because
+  the migration is run by hand on another machine. Fixed by trying the new target
+  and falling back to the old one on 42P10 alone: one extra round trip before the
+  migration, none after, correct on both sides of it and self-healing.
+  **FOUR MORE GAPS ON THE SAME PATH, found by looking for the set rather than
+  stopping at the first cause** — the habit this file already records from the
+  six bodyweight-PR exclusions. (1) The flush payload never sent `drop_index` at
+  all. (2) `ServerSetRow` did not carry it, so a synced drop read back as an
+  ordinary set — rejoining the working count and becoming a candidate personal
+  best. (3) The delete's `.match` omitted it, so deleting a drop would take its
+  parent with it. (4) `getLastSessionSets` dedupes on set number alone, so last
+  week's `3·1` would win the key from last week's `3` and offer the DROP's weight
+  as this week's suggestion — ratcheting the lift DOWN every session somebody
+  used one. Each is one line; any one alone left the feature broken.
+  **What shipped on screen**: a drop is a continuation row under its parent —
+  `3·1`, `3·2` — indented with a tether, under a "DROP · NO REST" header, with
+  the parent's own rail because a rail means grouping and a drop belongs with the
+  working sets. Its weight box is pre-filled a quarter below the row above it,
+  snapped to the implement's real plate step and forced at least one step down;
+  its reps box is blank, because nothing prescribed it and a default would be the
+  app recording reps nobody did. The "+ Add a drop" link appears once, under the
+  last logged set only.
+  **MEASURED BEFORE BUILDING, and it changed the scope**: NOTHING IN THE PLAN
+  PRESCRIBES A DROP. `Exercise` has no field for one and the generator emits
+  none, so the handoff's "pre-drawn when prescribed" branch has nothing to draw
+  from. Adding a prescription field is a data-model change beyond what Ashley
+  scoped ("ask before changing the data model beyond the README's State
+  section"), so it is named here rather than assumed — every drop row on the
+  screen today is one the lifter asked for.
+  **THREE DEVIATIONS FROM THE HANDOFF, each with its reason.** (a) The link says
+  the KILOS it will put in the box, not "−25%" — the same deviation the
+  calibration chips already make, for the measured reason recorded there: a
+  percentage that snaps to a plate step names a weight the app will not actually
+  offer (at 27.5kg, "−25%" lands on 20kg, which is −27%). (b) The child rows keep
+  44px boxes rather than shrinking to 40px. Ashley chose 44 on 9 Sep 2026 from
+  three options having seen the before and after, about boxes used mid-workout;
+  a drop is typed under fatigue, which is the worst case for a small target.
+  Subordination is carried by the indent, the tether and the label instead. Say
+  the word and they shrink. (c) Amber is retired from the ramp — today's card,
+  `RampStrip` on browse and peek, the "Add warm-up" control and the calibration
+  cue — but NOT from the weight-plausibility warning, which is a genuine caution
+  and would be a lie in violet.
+  **THE CSCS REVIEW** (nothing prescribed changes, so most of it is short). 1.
+  Training effect: unchanged — no set, weight, rest or exercise moves; work that
+  was untrackable becomes loggable, so the volume figure gets more accurate, not
+  different. 2. What it takes away: nothing; no row loses a field. 3.
+  Fundamentals: overload, coverage and recovery untouched — and the two
+  exclusions PROTECT overload, since a drop entering personal bests or
+  re-anchoring would lower next week's prescription every time somebody trained
+  harder. 4. Does it redefine a floor or ceiling? This is the one with teeth and
+  it is why the marker is a column: the set COUNT and the volume TOTAL now answer
+  two different questions and neither changed meaning. Proven on a real screen —
+  the card still says three working sets with a drop saved under set 1. 5. Scope:
+  presentation and logging, not diagnosis, rehab or clinical nutrition.
+  **SIX GATES WERE MECHANISM-PINNED AND BROKE ON CORRECT CODE**, all the same
+  shape — an exact expression that legitimately gained a coordinate.
+  Re-anchored on the property and WIDENED rather than merely loosened, so each
+  now also names the new row kind: the probe refusal and the calibration chips
+  (`test:calibration-search`), the ghost exclusion (`test:last-time`,
+  `test:ramp-visibility`), the draft namespace (`test:session-continuity`), the
+  row testid and the PR/rest-timer guards (`test:ramp-visibility`).
+  **AND ONE OF THEM WAS PASSING VACUOUSLY.** `test:session-continuity` compared
+  two `indexOf` results without asking whether either was found; the first anchor
+  had been gone since `logsFor` was replaced, `indexOf` returned -1, and -1 is
+  less than everything. The standing rule, met for the second time in two days,
+  in a gate written weeks ago. Both ends are asserted present now.
+  Verified: **`verify:drop-sets`, 32 browser checks at 390x844 on the real
+  screen** — the offer is absent before anything is logged, appears under the
+  logged set and nowhere else, the promised weight IS the weight in the box, the
+  row is labelled and spoken as a continuation, and the working-set count is
+  unchanged both when the row appears and after it is written. Screenshot read,
+  not just a green exit. Plus every gate that reads a touched file: app-tour,
+  bounds-and-boundaries, calibration-search, exercise-today, last-time,
+  load-display, pending-actions, primer-load, ramp-visibility (157),
+  session-continuity, set-plausibility, drop-sets, local-dates, no-forked-state,
+  queue-listeners, exercise-history, session-derive, a11y, appearance,
+  coach-opener, onboarding-style, overlay-artifacts, timer-field.
+  **Needs the migration on Ashley's machine** (`npm run db:push-both`) before a
+  drop can sync; until then it is saved on the device, shown on the card, and
+  held in the queue rather than written over its parent — and it says so in the
+  console rather than failing silently.
+
+- [x] **A GATE I DID NOT RUN WENT RED FOR A DAY, AND IT WAS GUARDING A MEAL
+  SHE ASKED FOR BY NAME.** 19 Sep 2026, caught by the pre-merge sweep.
+  `test:dashboard` reads `meal-generation.ts`; the heart-on-the-meal-row commit
+  changed `meal-generation.ts`; I ran thirteen meal gates after it and **that
+  was not one of them**. Red at the branch head from that commit until the
+  sweep. Main was never affected.
+  **The behaviour was correct and had got BETTER.** The check pinned a LITERAL:
+  `persist.indexOf('USER_REQUESTED_TAG') < persist.indexOf('.delete()')`, inside
+  `persistPools`. The heart work moved that decision into a shared
+  `survivesRegeneration`, so a favourited meal survives a regeneration for the
+  same reason a requested one does — and the literal left the function. The
+  grep went stale, exactly the shape this file warns about twice ("when a check
+  blocks a fix, suspect the check"; "when three gates grep the same expression,
+  the expression should be a function" — I made it a function and forgot it was
+  grepped).
+  **AND IT WOULD HAVE PASSED VACUOUSLY THE OTHER WAY.** `indexOf` returned -1,
+  and -1 is less than every position, so the ORDER half was satisfied by the
+  anchor being missing; only the `includes` half failed. The lesson added to
+  CLAUDE.md this morning, met the same afternoon by a check written weeks ago.
+  **RE-ANCHORED on the property, in four parts** rather than one comparison,
+  because a single position cannot tell "the decision moved after the delete"
+  from "the decision no longer keeps anything": both anchors must be FOUND
+  before being ordered; the decision must sit before the delete; it must
+  CALL the shared rule (`name(`, not a bare name, so an import cannot satisfy
+  it); and the shared rule itself must still keep both a meal asked for by name
+  and a favourited one. **4 mutations, 4 caught** — decision moved after the
+  delete, rule bypassed by a hand-rolled expression, rule stops keeping a
+  requested meal, rule stops keeping a favourite.
+  Verified: `test:dashboard` 58 checks green (was 52 + 6), and every one of the
+  20 gates that read `meal-generation.ts` re-run green — dashboard, meal-variety
+  42, meal-method 31, leftovers 43, meal-favourite 29, meal-refit 91,
+  meal-roundtrip 78, meal-swap-rotation 28, custom-meal 28, grocery 39,
+  no-dead-code 8, enforcement-gaps 41, meal-addition 96, meal-food-edit 69,
+  meal-log 35, meal-move 49, memory 26, onboarding-handover 51,
+  replace-without-losing 31, soft-preferences 33.
+  **THE PROCESS FIX IS THE POINT, and it is mechanical**: the gates to re-run
+  after a change are the ones that READ the files it touched, and that set is
+  derivable — `grep -rln <file> scripts/*.ts` named all twenty in one command.
+  Picking them by what the work felt like about is how this one was missed.
+
+- [x] **"NEXT WEIGHT UP IS TOO BIG A JUMP" — the commonest reason a weight
+  stands still finally has somewhere to be recorded, and something to say.**
+  19 Sep 2026, straight off the audit above.
+  **Ashley's ruling, from three options: its own line, because it is
+  temporary** — over reusing "as heavy as this gets" (one sentence for all
+  three reasons, but it sounds permanent when this one is not) and over leaving
+  it silent. Her reason is the whole design: of the three ways a weight can
+  stop, this is the only one that resolves itself. A bar at the estimate's
+  ceiling needs a logged set; a full backpack is simply as heavy as a backpack
+  gets; a 7.5kg raise held because 2kg is 27% of it starts moving again as soon
+  as the trainee can afford the notch.
+  **Nothing prescribed changed** — no weight, rep, set or rest — and that is
+  measured, not asserted: the same seeded 1,024-plan run reports the same 2,480
+  frozen pairs out of the same 186,146 slot pairs before and after. `load_hold`
+  has exactly one behavioural reader in the app, so the blast radius is the
+  card's line and the coach's note.
+  **Built**, `docs/plans/when-the-next-dumbbell-is-too-big.md`:
+  1. a `load_hold` of its own for the affordability decision — it had codes for
+     ceiling, implement, floor and matched, and the commonest reason was not
+     among them, which is why nothing downstream could say it;
+  2. a `band` refusal counts as a lever spent, because from the trainee's side
+     a rep that is not there is a rep that is not there;
+  3. a third wording on the card and a third note for the coach, so the two
+     surfaces cannot disagree.
+  **Measured before and after, same seeded sample**: frozen pairs the app
+  labels 2,239 (90.3%) -> **2,302 (92.8%)**; pairs that say nothing 241 ->
+  **178**; plans carrying a silent one 149 (14.6%) -> **109 (10.6%)**.
+  **THE PLAN DOC PREDICTED 241 -> ~31 AND THE ANSWER IS 178. The gap is the
+  finding, and it is the audit's own lesson repeated one section later.** §6c
+  of the report asks whether one real notch WOULD have been affordable — a
+  property of the dumbbell — and 97.9% of silent pairs failed it. I read that
+  as the app's own flag. It is not: the app only consults affordability for a
+  load-ramping candidate, and a non-compound accessory under a goal whose
+  progression emphasis is `reps` or `maintain` never gets that far, because
+  load was never that goal's lever. So the fix landed exactly where it could —
+  hypertrophy 60->23 and fat loss 45->19, both load-emphasis goals — and moved
+  functional (104) and conditioning (32) not at all, which is what a correct
+  fix aimed at a load-ramp decision should do. **Two measurements that look
+  like one question and have different denominators, again.**
+  **STILL SILENT, named rather than folded in**: 136 pairs where load was never
+  the goal's lever (a functional trainee's rear delt flye does not chase load
+  by design; saying "the next weight up is too big a jump" there would be
+  false, because it might not be) — **that needs a fourth sentence and a fourth
+  sentence is Ashley's**; 28 where the rep target was matched to the same
+  lift's other slot, which may well be progressing; 14 unexplained.
+  **NOT taken, deliberately**: a third progression lever. The textbook move —
+  take the 10kg, drop to the bottom of the range — is refused by a backstop
+  aimed at contaminated anchors carried through a rotation, not at deliberate
+  jumps; separating those changes what people are prescribed and needs its own
+  five-question review. Adding a set when a lift is capped was option (a) on
+  5 Sep and Ashley declined it.
+  **A FIX THE MEASUREMENT KILLED BEFORE IT WAS WRITTEN**: the audit proposed
+  "carry a recorded ceiling forward once a rep has been bought against it".
+  Cross-tabulating showed the affordability stamp already covers all 70 of
+  those, so it would have been a new mechanism in the generator for at most 5
+  pairs. Not built.
+  Verified: `test:frozen-weeks` §9, **19 new checks, 10 mutations, 10 caught,
+  0 missed, 0 invalid**, every mutant run executing all 69 checks — including
+  an end-to-end pass over eight generated plans (423 stamped slots, 877 loaded
+  slots with no hold at all so the stamp is not unconditional, and every
+  stamped slot's notch DERIVED from `getLoadIncrementKg` rather than compared
+  against a copy of the 12% constant). New browser driver
+  **`verify:ceiling-label`, 9 checks, 3 mutations, 3 caught** — a real Chromium
+  at 390x844 walking the app's OWN generated plan (13 weeks, 52 days, 341
+  exercise rows, no fixture of any kind) until it finds the line, then checking
+  the row carries neither of the other two wordings, that no weight explainer
+  was opened to reveal it, and that it sits beside the weight. Found on week
+  14, Sunday: *Front Raises · ~6kg per hand · suggested · next weight up is too
+  big a jump*, read off a screenshot.
+  **THREE THINGS THE DRIVER TAUGHT, all the harness's standing lessons met
+  again**: `element.click()` on the day row opened and shut it in one tick
+  (a real dispatched mouse click works); the browse surface keeps ONE day and
+  ONE exercise row expanded, so "open every day" opened exactly one per week
+  and read 60 rows as 15; and wrapping checks 3-8 in `if (found)` made a broken
+  label print 3 checks instead of 9, which the mutation harness refused to
+  score as a catch — correctly, because a short run is a crash, not a finding.
+  Ships with the frontend on merge. No migration, no function deploy.
+
+- [x] **THE PROGRESSIVE-OVERLOAD AUDIT: the app is RIGHT about 97.9% of the
+  weeks it repeats, and says nothing about a tenth of them.** 19 Sep 2026.
+  Measurement only — no weight, rep, set or rest moved.
+  **What the lead said** (BACKLOG, 18 Sep, corrected in place above):
+  *"`frozen_week`, 4,060 plans (44.1%) … some of that is deliberate (deload,
+  calibration) … needs splitting by phase."*
+  **What is true**, from `npm run report:progression-levers` over 1,024 of the
+  9,216 plans and 186,146 week-to-week slot pairs, seeded, with every 101st
+  plan re-scored by `quality-score` itself (0 mismatches):
+  - 42.3% of PLANS carry one; **the RATE is 1.3%**. Both numbers were always
+    true and they are different questions. **A per-plan "contains at least one"
+    count is not a rate, and nothing in the name `frozen_week` says which it
+    is.**
+  - **Deloads were never in the count** (the rule excludes them) and
+    **calibration weeks contribute ZERO** — the `week 1 -> 2` transition does
+    not appear once in the distribution. Both suspected innocent explanations
+    are empty.
+  - **90.3% the app already labels** — "at your estimate's ceiling" / "as heavy
+    as this gets", Ashley's 5 Sep ruling doing its job.
+  - **9.7% (241 pairs, 149 of 1,024 plans) say nothing.**
+  - **ZERO frozen pairs were secretly progressing.** Sets, tempo and assistance
+    move on 304, 516 and 978 slot pairs elsewhere, so the detectors fire; they
+    never rescue a lift whose load and reps have stopped. RPE moves on 29.4%
+    and rest on 1.0% and neither is counted as progression — a different effort
+    LABEL on an identical prescription is the same session, and rest moves
+    because the time-cap trimmer moved it.
+  **THE FINDING, and it is not the one I went looking for: 236 of the 241
+  silent pairs (97.9%) are a weight the app is deliberately holding still, and
+  it is right to.** `exercise-plan.ts` holds load flat when one real notch is
+  more than 12% of the current load — 2kg on a 7.5kg lateral raise is 27% — and
+  ramps reps instead. Its own comment says *"that's correct, not a bug"*, and
+  as a CSCS call it is: nobody puts a quarter on a raise because the week
+  turned over. Then the rep lever runs out too (the 25% divergence backstop
+  refuses the next bump) and the card goes quiet.
+  **Three independent reasons the honest sentence cannot appear, each
+  sufficient on its own** — so fixing any one changes nothing, the same shape
+  as the six exclusions that hid bodyweight personal bests:
+  1. the affordability decision leaves NO record — `load_hold` has codes for
+     ceiling, implement, floor and matched, and the commonest reason a weight
+     stops is not among them;
+  2. where a ceiling WAS recorded, buying a rep erases it — `load_hold` is
+     re-read at this week's rep range and extra reps lower the estimate, so the
+     lift ends up above its ceiling with the field empty (70 pairs);
+  3. `band` is not in `atPrescribedCeiling`'s list of exhausted levers.
+  **CSCS verdict: the prescription is right and the silence is not.** The fix
+  is honesty, not programming — record the affordability hold, keep a ceiling
+  once a rep is bought against it, count a `band` refusal as a lever spent.
+  **ONE QUESTION IS ASHLEY'S**: there are now three reasons and two wordings,
+  and a weight held because the next dumbbell is too big a jump is the most
+  hopeful of the three — it ends on its own. Whether it gets its own sentence
+  is a decision about what the app says.
+  **NOT taken, deliberately**: a third lever. The textbook move (take the 10kg,
+  drop to the bottom of the range) is refused by a backstop that exists to
+  catch contaminated anchors, not deliberate jumps; separating those is a
+  prescription change needing its own five-question review. Adding a set when a
+  lift is capped was option (a) on 5 Sep and Ashley declined it.
+  **Also built, because two measurements of one question must not drift**:
+  `scripts/frozen-pairs.ts` now holds ONE copy of the frozen-week rule and
+  `measure-frozen-exercises.ts` imports it and `quality-grid.ts` instead of its
+  own field-for-field copies of both — proven output-identical at stride 37
+  (byte for byte, bar elapsed-time lines). Both reports are registered:
+  `report:frozen-exercises`, `report:progression-levers`. This file complained
+  on 5 Sep that `measure-frozen-exercises.ts` "sits in the repo for exactly
+  this purpose" and was not run; it was not runnable by name.
+  **MY OWN FIRST DRAFT OF THIS AUDIT WAS WRONG AND THE CORRECTION IS THE
+  USEFUL PART.** I had written the fix as two mechanical halves covering 70 of
+  241, having reasoned about why the other 145 had no recorded hold instead of
+  measuring it. The affordability rule was sitting in `exercise-plan.ts` with a
+  comment explaining itself. Asking the question numerically — what would one
+  notch have cost? — returned 97.9%, which is not near where the reasoning was
+  heading.
+  Verified: `test:frozen-weeks` 50, `test:calibration-search` 68,
+  `test:primer-load` 37, `test:exercise-today` 75, `test:added-load` 36,
+  `test:load-display` 27, `test:tempo-prescription` 23, `test:no-dead-code` 8 —
+  all exit 0; `npx tsc --noEmit` clean. No new gate: nothing in the app changed.
+  `docs/audits/progressive-overload-2026-09-19.md`.
+
+- [x] **A HEART ON THE MEAL ROW — and the table it writes to had been there
+  since July with only the chat able to reach it.** 19 Sep 2026. Ashley's
+  ruling, from four options: **a heart, the app never asks.** She rejected
+  asking after every meal, asking once a day, and inferring it from what got
+  logged — the last because not logging a meal usually means a busy evening,
+  not a bad dinner, and an app drawing conclusions from silence will be
+  confidently wrong.
+
+  **THE GAP WAS OLDER AND LARGER THAN THE FEATURE.** `favorite_meals` has
+  existed since 4 July, carries a `times_used` counter, and is read into the
+  coach's context as `favorites_summary` on every single turn. So **the coach
+  has always known your favourites and the screen has never been able to name
+  one** — a coach-only capability that was not on the written exceptions list
+  and had never been counted. Found by going to look at where a rating would be
+  stored, not by auditing parity.
+
+  **ONE WRITE PATH, BECAUSE TWO WAS THE OBVIOUS MISTAKE.** The only writer was
+  a closure inside `ChatAssistant`. A heart could very easily have become a
+  second, subtly different upsert of the same table — a different name for the
+  same dish, a `times_used` counting something else — and the two would have
+  drifted with nothing noticing. `src/lib/favourite-meals.ts` is now the only
+  thing that touches the table, and both surfaces call it; the gate asserts
+  that neither component reaches it directly.
+
+  **THE TAP HAS A CONSEQUENCE, so it is not a bookmark.** A hearted meal is
+  kept when everything else is regenerated — the protection a meal the coach
+  was asked for by name has had since Ashley lost her steak on 3 Sep. Its tag
+  is SEPARATE from `user-requested`: "I asked for this" and "I like this" are
+  different facts, and one tag meaning both makes either impossible to count
+  later. The keep rule is now an exported predicate rather than a condition
+  inside a filter, **for the reason this file learned the hard way earlier the
+  same day**: three gates had ended up pinned to one line of JSX because the
+  rule they needed to ask about was not something they could call.
+
+  **Care taken on the failure paths**, each with its own answer rather than one
+  blanket rule: a failed WRITE leaves the heart where it was, because moving it
+  would be the app claiming something it did not do; a failed READ shows
+  unfilled hearts rather than every meal marked, because the opposite would
+  have someone un-hearting meals they never chose; and the pool-tag write is
+  allowed to fail QUIETLY, because by then the favourite is already saved and
+  "couldn't save your favourite" would be a lie about what happened.
+
+  **VERIFIED**: `test:meal-favourite` (29 checks), **13 mutations, 13 caught**;
+  `verify:meal-favourite` drives the real Nutrition screen at 390x844 and taps
+  the heart twice — on, then off — checking the spoken label names the meal,
+  the pressed state matches what the eye sees, and the control clears the 44px
+  floor. A row in `docs/coach-screen-parity.md` records it as BOTH, and the
+  gate fails if that row goes back to claiming coach-only.
+
+  **No migration** — the table and every column it needs already existed.
+
+- [x] **COOK ONCE, EAT TWICE — and a screenshot caught it serving the same
+  dish twice in one day.** 19 Sep 2026. Ashley's ruling, from four options: **a
+  setting, on by default.** Plan: `docs/plans/cook-once-eat-twice.md`.
+
+  **THE COLLISION I FLAGGED, MEASURED AWAY.** Leftovers deliberately repeat a
+  meal, which is exactly what the variety fix shipped hours earlier works to
+  avoid — the shape CLAUDE.md says to put in front of her rather than resolve
+  quietly. Measured over 400 profiles BEFORE building: holding lunch to last
+  night's dinner costs **4.58 → 4.45 distinct days a week**. An eighth of a
+  day, because breakfast and dinner keep varying around the held slot. Real in
+  principle, almost absent in practice.
+
+  **THE FINDING IS THE ONE THE SCREENSHOT MADE.** The build passed 40 source
+  checks and a browser driver, and the picture showed a roast chicken tray bake
+  for LUNCH and a roast chicken tray bake for DINNER, four hours apart — under
+  a feature whose whole promise is that it saves you cooking, not that it feeds
+  you one plate all day. Nothing in the data or the source says that; it is
+  obvious in one frame. **A browser driver is not the last step after the gates
+  pass — it is the step that finds the defect**, and this is the third time
+  that line has earned itself.
+  Fixed by the LEFTOVER yielding: a day whose dinner would repeat its lunch
+  gives the leftover back and cooks lunch fresh, because "you are eating this
+  twice today" is a worse day than "you cook one extra lunch this week".
+  Tolerance stays absolute; no preference buys an out-of-tolerance day.
+
+  **A SECOND MECHANISM WAS BUILT, MEASURED AND DELETED.** I also added the
+  leftover's name to the dinner slot's recent list so the variety sort would
+  steer away from it. It reads well and does nothing: variety is a sort key
+  INSIDE tolerance, so it cannot help on the days that need help. A mutation
+  removing it came back MISSED against every check, which is what sent me to
+  measure — with it in and out, across a 200-profile grid and the gate's own
+  fixtures, **not one day changed**. Deleted. Two mechanisms for one property,
+  one of them inert, is worse than one.
+
+  **THE FIXTURE LESSON, WHICH IS THE REUSABLE ONE.** The browser run first
+  showed nothing at all, and the cause was that my harness day was **339g of
+  protein against a 160g target**. Every dish was plausible; the DAY was not.
+  With nothing ever inside the tolerance bands, every tolerance-gated behaviour
+  silently switched off — the variety sort never applied, the same dinner won
+  every day, the leftover yielded every time, and the feature looked broken.
+  **A fixture has to be a plausible WHOLE, not a set of plausible parts**, and
+  the tell is that everything downstream of a band quietly stops working at
+  once.
+
+  **WHAT I CANNOT CLAIM.** The headline "93.3% of dinners can serve as next
+  day's lunch" came from a fixture shaped differently from the one above; a
+  later 200-profile grid with a different dish shape produced ZERO, because the
+  lunch protein floor is strict and a rescale landing a gram short is refused.
+  Both numbers are real about their own fixtures and neither is a statement
+  about real pools, which need a live database to measure. **How often batch
+  cooking actually fires for a real profile is NOT KNOWN** and is recorded here
+  as unknown rather than quoted from the friendlier run.
+
+  **BUILT**: `batch_cooking` (migration `20260919140000_add_batch_cooking`,
+  DEFAULT true, named in App's column-by-column onboarding insert), the
+  placement in `buildRotation`, a Profile row to turn it off, and two sentences
+  in the shared phrasebook — the dinner promises the repeat before it happens,
+  the lunch names where it came from. Without the second, a deliberate repeat
+  is indistinguishable from the bug fixed that morning.
+
+  **VERIFIED**: `test:leftovers` (43 checks), `verify:leftovers` on the real
+  Nutrition screen at 390x844. **19 mutations, 19 caught.** Three gate holes
+  came out of the first round: a check that threw instead of failing and took
+  30 others with it; conditional blocks that made checks VANISH rather than
+  fail (37 of 42 ran, which is indistinguishable from a crash — **a gate's
+  check count should be the same number every run**); and the mutation harness
+  itself, which counted a crash as a catch and now treats any short run as
+  invalid.
+
+  **TWO MORE OF MY OWN CHECKS PINNED A CALL'S TEXT AND BROKE WITHIN A DAY** —
+  `test:meal-variety` and `test:soft-preferences`, both written that morning,
+  both asserting a literal argument list that grew an argument by the evening.
+  Re-anchored on the property. The habit is easy to preach and apparently easy
+  to forget while writing the check.
+  **And the first-paint ceiling crossed at 420 of 420** — the one named that
+  same morning as sitting 1 kB from the line and deliberately not raised,
+  because a ceiling should move when something crosses it and says why.
+  Something did, hours later. Raised to 428 over a value measured today.
+
+  **NEEDS**: a SECOND migration before this frontend reaches the app —
+  `npm run db:push-both` again — on the same "database first, then merge" rule
+  as the meal-method column.
+
 - [x] **THREE GATES WERE GREPPING ONE LINE OF JSX, AND ALL THREE WENT RED AT
   CORRECT CODE.** 19 Sep 2026, found by the first full sweep since the 18 Sep
   work — 266 gates, 261 pass, 5 fail.
@@ -666,6 +1488,9 @@ Newest first. One line each.
   re-measure; then the progressive-overload audit (`frozen_week`, 4,060 —
   split deliberate deload and calibration weeks from genuinely stalled ones
   before treating any of it as a defect).
+  **AUDIT DONE 19 Sep 2026, and the split this line asked for does not exist:
+  deloads were never counted and calibration weeks contribute ZERO.** See the
+  entry at the top of this file and `docs/audits/progressive-overload-2026-09-19.md`.
 
 - [x] **EVERY CHANGE NOW GETS A CSCS REVIEW — and its first outing found a
   floor I had silently redefined an hour earlier.** Ashley, 18 Sep 2026,
@@ -723,6 +1548,12 @@ Newest first. One line each.
      calibration); the share that is not is a progressive-overload failure,
      which is the single most important principle in the file. Needs splitting
      by phase before anyone acts on it.
+     **CORRECTED 19 Sep 2026, measured.** Every clause after the number is
+     wrong. 44.1% is a share of PLANS containing one anywhere in sixteen weeks,
+     not of weeks — the RATE is 1.3%. None of it is deload (excluded by the
+     rule) and none is calibration (zero, measured). 90.3% is already labelled
+     on the card. And the signal is in block POSITION, not phase: 44% of it is
+     weeks 13→15. `npm run report:progression-levers`.
   3. **`push_pull_imbalance`, 575 plans (6.2%)** — mostly pull-heavy
      (0.57, 0.40 in the printed examples), which is the safer direction but
      still outside the band the app sets itself.

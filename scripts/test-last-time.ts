@@ -178,7 +178,15 @@ console.log('\n[5] A build-up row can never carry one')
   // load-bearing for an older reason too: the ghosts come from last session's
   // WORKING sets, so a warm-up box offered one would show 95kg as a build-up.
   const ghostFor = /const ghostFor = \([^)]*\) =>([^\n]*)/.exec(grid)?.[1] ?? ''
-  check('5a. ghostFor hands a warm-up row nothing', /isWarm\([^)]*\)\s*\?\s*undefined/.test(ghostFor), ghostFor)
+  // RE-ANCHORED 19 Sep 2026: the test used to demand `isWarm(ref) ? undefined`
+  // with nothing between them, and a drop row joining the same exclusion broke
+  // it. The property is that a warm-up row yields no ghost, however many other
+  // kinds share that fate.
+  check('5a. ghostFor hands a warm-up row nothing', /isWarm\([^)]*\)[^?]*\?\s*undefined/.test(ghostFor), ghostFor)
+  // AND A DROP TOO, which is the same rule reaching a row that did not exist
+  // when it was written: ghosts are keyed on the set NUMBER, so last week's
+  // 3\u00b71 would be offered as this week's set 3.
+  check('5a2. ...and a drop row nothing either', /isDrop\([^)]*\)[^?]*\?\s*undefined|\|\|\s*isDrop\(/.test(ghostFor), ghostFor)
   check('5b. ...and it is the single source the marker reads',
     (grid.match(/\bghostFor\s*\(/g) ?? []).length >= 1 && !/ghostValues\.find/.test(block ?? ''), block?.slice(0, 200))
 }

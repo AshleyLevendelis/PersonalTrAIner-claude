@@ -895,6 +895,33 @@ export function plateStepKg(mode: LoadingMode): number {
   return PLATE_STEP_KG[mode]
 }
 
+/**
+ * IS THERE ANYTHING FOR A PLATE CALCULATOR TO WORK OUT?
+ *
+ * On a cable machine the number IS the weight: you move a pin to the plate
+ * that says 35 and you are done. A control offering to work out which plates
+ * to load is describing a machine that is not in front of you — the
+ * "never offer what is not there" rule, met on a row rather than on a tab.
+ * Ashley's handoff, 19 Sep 2026, scope item for the superset screen.
+ *
+ * CABLE, NOT `loadingMode === 'stack'`, AND THAT IS MEASURED RATHER THAN
+ * CAUTIOUS. 149 of the catalogue's 201 entries fall through to 'stack' —
+ * every push-up, band, pull-up bar and machine among them — and some of those
+ * machines (leg press, belt squat) really are plate-loaded. Hiding the
+ * calculator from all 149 would take it away from the plate-loaded ones,
+ * which is the same defect in the other direction. 16 entries name a cable
+ * machine and every one of them is pin-loaded.
+ *
+ * DUMBBELLS ARE DELIBERATELY LEFT ALONE and the question is Ashley's, not
+ * mine: you pick a fixed bell off a rack, so there is usually nothing to
+ * calculate — but an adjustable pair is plate-loaded and the catalogue cannot
+ * tell the two apart. The handoff said cable; this does cable.
+ */
+export function takesPlateCalculator(entry: ExerciseEntry | undefined): boolean {
+  if (!entry) return true
+  return !(entry.equipment ?? []).some(e => /cable/i.test(e))
+}
+
 /** Round to something actually loadable rather than a number like 43.7kg. */
 export function roundToPlate(kg: number, mode: LoadingMode): number {
   const floor = LOADING_FLOOR_KG[mode]

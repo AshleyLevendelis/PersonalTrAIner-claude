@@ -226,7 +226,11 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
   // Withhold the preferences from one and the two diverge — a list for meals
   // the app never serves.
   const grocery = readFileSync(join(ROOT, 'src/lib/grocery-store.ts'), 'utf8')
-  check('the grocery horizon passes them to assembleDay', /assembleDay\(pools, targets, recentNames, softLikedFoods\)/.test(grocery))
+  // Property, not the call's text: the horizon's assembly must be given the
+  // soft likes. Pinning the exact argument list broke the day the call gained
+  // a leftovers pin — the same re-anchoring as test:custom-meal above.
+  check('the grocery horizon passes them to assembleDay',
+    /assembleDay\((?:[^()]|\([^()]*\))*softLikedFoods/.test(grocery))
   check('...and they reach it from the caller', /assembleHorizon\(input\.mealPools, input\.targets, days, input\.softLikedFoods/.test(grocery))
   check('App gives the grocery tab the same value it gave assembleDay',
     /softLikedFoods=\{compiledSoftFoodPreferences\}/.test(app))

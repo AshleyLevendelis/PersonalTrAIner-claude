@@ -34,7 +34,8 @@ import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
-import { getPools, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
+import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
+import { isMissingColumnError } from './missing-column'
 
 export const MIN_COVERAGE = 0.8
 export const DEFAULT_POOL_SIZE = 5
@@ -122,6 +123,25 @@ export interface PoolOption {
    * is honest; a wrong one would not be.
    */
   prep?: string
+  /**
+   * Set when this option is a portion of another slot's meal — today's lunch
+   * being last night's dinner, under the batch-cooking preference.
+   *
+   * NEVER PERSISTED, and that is deliberate rather than an omission: a
+   * leftover is derived fresh from the rotation on every render, exactly as
+   * the rest of the assembled day is, so storing one would create a second
+   * copy that could disagree with the dinner it came from. It exists so the
+   * card can SAY where the meal came from — a repeat the app cannot explain
+   * is indistinguishable from the repeat bug fixed the same morning.
+   */
+  leftoverFrom?: MealSlotName
+  /**
+   * Set on tonight's dinner when tomorrow's lunch is going to be a portion of
+   * it, so the card can promise the repeat BEFORE it happens rather than
+   * explaining it afterwards. Derived, never persisted, for the same reason
+   * `leftoverFrom` is.
+   */
+  reusedTomorrow?: boolean
 }
 
 export interface RawProposal {
@@ -676,6 +696,51 @@ export async function generateMealPools(params: {
   return { accepted, rejectionLog, shortfalls, unrecognisedPreferences: [...unrecognisedPreferences].sort(), generatorReached }
 }
 
+/** A row as this module writes it. `prep` is the only key that can be absent from the database — see insertPoolRows. */
+type PoolRowInsert = {
+  profile_id: string
+  slot: string
+  pool_index: number
+  name: string
+  ingredients: unknown
+  macros: unknown
+  tags: unknown
+  prep: string
+}
+
+/**
+ * THE ONE PLACE THIS MODULE WRITES POOL ROWS, so a database that has not run
+ * 20260919120000 costs a cooking method and never a meal.
+ *
+ * PostgREST rejects the WHOLE statement when a payload names a column it does
+ * not know, so before the migration lands every one of these inserts fails —
+ * and the callers below treat a failed insert as "the slot could not be
+ * saved", which is exactly right and exactly what nobody wants to happen
+ * because of a text field.
+ *
+ * WHY A RETRY AND NOT `addedLoadPayload`'S OMIT-WHEN-EMPTY, measured rather
+ * than assumed: omitting an empty `prep` only helps while generate-meals has
+ * not been deployed, because a deployed generator fills the field on every
+ * option. The live risk is the other order — the function deployed, the
+ * migration pending — and omit-when-empty does nothing for it. So the retry
+ * is the mechanism that works and it is the only one kept (CLAUDE.md: two
+ * mechanisms for one property, measure which one works before keeping both).
+ *
+ * One extra round trip before the migration, none after, and it self-heals.
+ */
+async function insertPoolRows(rows: PoolRowInsert[], what: string): Promise<{ error: { code?: string; message?: string } | null }> {
+  const { error } = await supabase.from('meal_plan_slots').insert(rows)
+  if (!error || !isMissingColumnError(error, 'prep')) return { error }
+  console.warn(
+    `[Meals] the prep column is not present — ${what} was saved WITHOUT its cooking method. ` +
+    'Run `npm run db:push-both` to apply migration 20260919120000.'
+  )
+  const { error: retryError } = await supabase
+    .from('meal_plan_slots')
+    .insert(rows.map(({ prep: _prep, ...rest }) => rest))
+  return { error: retryError }
+}
+
 /** One stored pool row, as persistPools reads it back and may have to write it again unchanged. */
 interface PoolRowSnapshot {
   pool_index: number
@@ -711,7 +776,7 @@ async function appendPools(
       tags: opt.tags,
       prep: opt.prep ?? '',
     }))
-    const { error } = await supabase.from('meal_plan_slots').insert(rows)
+    const { error } = await insertPoolRows(rows, `the extra options for ${slot}`)
     if (error) console.error(`Failed to append pool options for slot ${slot}:`, error)
   }
 }
@@ -729,6 +794,25 @@ async function appendPools(
  * nothing, a delete that fails inserts nothing, and an insert that fails puts
  * the old pool back exactly as it was.
  */
+/**
+ * Does this stored meal survive "Regenerate all"?
+ *
+ * KEPT: meals asked for by name, and meals hearted. Both are the user saying
+ * "this one stays", and regeneration replaces what the APP suggested — Ashley,
+ * 3 Sep 2026, after asking the coach for steak and watching a regenerate take
+ * it away.
+ *
+ * A FUNCTION RATHER THAN A CONDITION INSIDE THE LOOP, because a gate needs to
+ * ask this and reading a filter body with a regex is how three checks ended up
+ * pinned to one line of JSX earlier the same day. The two tags stay separate:
+ * "I asked for this by name" and "I like this" are different facts, and one
+ * tag meaning both makes either impossible to count later.
+ */
+export function survivesRegeneration(tags: string[] | null | undefined): boolean {
+  const list = tags ?? []
+  return list.includes(USER_REQUESTED_TAG) || list.includes(FAVOURITE_TAG)
+}
+
 async function persistPools(profileId: string, accepted: Partial<Record<MealSlotName, PoolOption[]>>): Promise<void> {
   for (const [slot, options] of Object.entries(accepted) as [MealSlotName, PoolOption[]][]) {
     if (options.length === 0) continue
@@ -751,7 +835,12 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
     // every path already relies on.
     const { data: keepRows, error: readError } = await supabase
       .from('meal_plan_slots')
-      .select('pool_index, name, ingredients, macros, tags, prep')
+      // `*` rather than a column list — see missing-column.ts. Naming `prep`
+      // before the migration lands makes this read fail, and a failed read
+      // here means the slot is skipped entirely: regeneration would silently
+      // do nothing rather than lose a meal, which is the safe half of a
+      // failure nobody would have been told about.
+      .select('*')
       .eq('profile_id', profileId)
       .eq('slot', slot)
     // NOT a shrug-and-carry-on. This read is the only thing that knows which
@@ -763,7 +852,7 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       continue
     }
     const previous = (keepRows ?? []) as PoolRowSnapshot[]
-    const keep = previous.filter(row => (row.tags ?? []).includes(USER_REQUESTED_TAG))
+    const keep = previous.filter(row => survivesRegeneration(row.tags))
 
     const { error: deleteError } = await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot)
     if (deleteError) {
@@ -796,13 +885,13 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       tags: row.tags,
       prep: row.prep ?? '',
     }))
-    const { error } = await supabase.from('meal_plan_slots').insert([...rows, ...keptRows])
+    const { error } = await insertPoolRows([...rows, ...keptRows], `the new pool for ${slot}`)
     if (error) {
       console.error(`Failed to persist pool for slot ${slot}:`, error)
       // The delete already landed, so doing nothing here leaves the slot
       // empty. Put back exactly what was there, pool_index included.
       if (previous.length > 0) {
-        const { error: restoreError } = await supabase.from('meal_plan_slots').insert(
+        const { error: restoreError } = await insertPoolRows(
           previous.map(row => ({
             profile_id: profileId,
             slot,
@@ -813,6 +902,7 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
             tags: row.tags,
             prep: row.prep ?? '',
           })),
+          `the previous pool for ${slot}`,
         )
         if (restoreError) console.error(`...and restoring the previous pool for slot ${slot} failed too:`, restoreError)
       }

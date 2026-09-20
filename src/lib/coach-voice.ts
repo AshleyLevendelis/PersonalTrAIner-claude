@@ -334,6 +334,27 @@ export function loggedSetReading(log: {
  * There is exactly one training style on a profile, so "your training style"
  * points at it without ambiguity.
  */
+/**
+ * COOK ONCE, EAT TWICE — the two sentences that keep a deliberate repeat from
+ * reading as an accidental one.
+ *
+ * On 19 Sep 2026 the app was fixed to stop serving the same meals every day.
+ * Hours later it was taught to serve tonight's dinner again at lunch, on
+ * purpose. From the outside those are the same thing, so each side of the pair
+ * has to say which it is: the dinner promises the repeat before it happens,
+ * and the lunch names where it came from. A repeat the app cannot explain is
+ * indistinguishable from the bug.
+ *
+ * Both are here rather than inline so test:coach-voice and the coach exam can
+ * grade them alongside every other sentence the app writes.
+ */
+export const COOK_ONCE = {
+  /** On the dinner that will be cooked in double. */
+  dinner: 'Cook both portions together — tomorrow\'s lunch is this.',
+  /** On the lunch that came out of last night's pan. */
+  lunch: 'Last night\'s dinner.',
+} as const
+
 export const OUTSIDE_YOUR_STYLE = 'Outside your training style'
 
 export const BEST_SET_QUALIFIER = 'best set'
@@ -409,6 +430,34 @@ export const WEEK_NOT_LOADED = "I can't see this week on your plan just now — 
  * changed locally is knowable from the receipt's own `landed` list, so the
  * surface that has that list says it, and this sentence does not guess.
  */
+/**
+ * HOW TO TRAIN A SUPERSET, said once under the pair rather than on each row.
+ *
+ * The first half has always been there. The SECOND half is Ashley's handoff,
+ * 19 Sep 2026: when a member of the pair has a build-up, the footnote says so
+ * — because the alternation instruction, read literally, tells somebody to
+ * alternate their warm-up sets with the other exercise, and that is not how
+ * a superset is run. You ramp the loaded lift on its own, then start pairing.
+ *
+ * DECIDED HERE UNDER THE CSCS DELEGATION, and the basis rather than the
+ * assertion: a build-up exists to prepare ONE movement's tissue and groove
+ * its pattern at rising load. Alternating it with an unrelated exercise adds
+ * fatigue and time between the very steps that are meant to run close
+ * together, and the second exercise gets a warm-up it did not need. The
+ * pairing begins once the ramp has done its job.
+ *
+ * Empty string when nothing ramps, so the caller renders one line rather
+ * than a line with a trailing separator — the shape `couldNot` uses below.
+ */
+export function supersetAlternation(rampedLabels: string[] = []): string {
+  const base = 'alternate — no rest between'
+  if (rampedLabels.length === 0) return base
+  const names = rampedLabels.length === 1
+    ? rampedLabels[0]
+    : `${rampedLabels.slice(0, -1).join(', ')} and ${rampedLabels[rampedLabels.length - 1]}`
+  return `${base} · ramp ${names} first, then start the pairing`
+}
+
 export function didNotSave(thing: string): string {
   return `${thing} didn't save. Check your connection and give it another go.`
 }
@@ -572,3 +621,53 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
 // test:coach-voice §5 asserts this file holds no copy of the safety text at
 // all. That was always the real property; the re-export was a mechanism for it.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// WHAT PICKING KETO ACTUALLY BUYS — Ashley's ruling, 20 Sep 2026.
+//
+// Keto and Low-carb are offered at setup and DO filter food: bread, pasta,
+// rice, potatoes, oats, beans and added sugar are all refused by
+// `FORBIDDEN_TAGS`, measured rather than assumed. What they do NOT do is
+// change the daily numbers — `computeMacroSplitTargets` derives carbs as the
+// REMAINDER of calories after protein and fat, with a 50g floor, and
+// `FAT_PERCENT_RANGE` is deliberately capped at 0.35 so the split can never be
+// forced into a ketogenic shape through the wrong derivation order. Measured
+// the same day: a keto profile's carb target is 150-370g, i.e. 25-57% of
+// energy, against the under-50g/under-10% a ketogenic diet means.
+//
+// Her ruling, from four options — say it on the setup screen — over building a
+// real ketogenic derivation, over removing Keto from the list, and over
+// leaving it (where the coach tells the truth only when asked, and nothing
+// says it where the choice is made).
+//
+// TWO THINGS THIS SENTENCE DELIBERATELY DOES NOT CLAIM, both measured before
+// it was written:
+//   - It does not say "sugary fruit". The filter blocks DRIED fruit (raisins,
+//     dates, figs, dried apricots) and lets fresh banana, grapes and mango
+//     through — so the coach prompt's own keto rule names three fruits the
+//     code-level guard permits. Claiming them here would be the app asserting
+//     a filter it does not have.
+//   - It does not say "yet". "Not a keto split yet" is a promise to build one,
+//     and nobody has decided to.
+// ---------------------------------------------------------------------------
+
+/** The two diets the food filter honours and the daily targets do not. */
+const MACRO_BLIND_DIETS: Record<string, string> = { keto: 'Keto', 'low-carb': 'Low-carb' }
+
+/**
+ * The caveat for a dietary selection, or null when nothing selected needs one.
+ * Returns null for every other diet — vegan, the allergen lanes and the rest
+ * are enforced by the same ingredient filter AND need no target change, so
+ * they are honoured in full and must not carry a warning that implies
+ * otherwise.
+ */
+export function dietTargetCaveat(selected: readonly string[] = []): string | null {
+  const named = Object.keys(MACRO_BLIND_DIETS)
+    .filter(key => selected.includes(key))
+    .map(key => MACRO_BLIND_DIETS[key])
+  if (named.length === 0) return null
+  const subject = named.join(' and ')
+  const verb = named.length > 1 ? 'keep' : 'keeps'
+  const split = named.length > 1 || named[0] === 'Keto' ? 'a keto split' : 'a low-carb split'
+  return `${subject} ${verb} bread, pasta, rice, potatoes, beans and added sugar out of your meals — but not fresh fruit. Your daily carb target stays a standard one, not ${split}.`
+}

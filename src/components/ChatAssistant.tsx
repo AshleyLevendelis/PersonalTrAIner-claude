@@ -100,6 +100,7 @@ import {
   rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
   type NudgeInput, type NudgeStore,
 } from '@/lib/coach-nudge'
+import { markFavourite } from '@/lib/favourite-meals'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -1359,47 +1360,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const upsertFavorite = async (action: { new_item: string; meal_slot: string; protein: number; carbs: number; fat: number; portion_size?: string; prep?: string }) => {
     if (!profile.id) return
-
-    const calories = calculateCalories(action.protein, action.carbs, action.fat)
-
-    const { data: existing } = await supabase
-      .from('favorite_meals')
-      .select('id, times_used')
-      .eq('profile_id', profile.id)
-      .eq('name', action.new_item)
-      .maybeSingle()
-
-    if (existing) {
-      await supabase
-        .from('favorite_meals')
-        .update({
-          times_used: existing.times_used + 1,
-          last_used_at: new Date().toISOString(),
-          meal_slot: action.meal_slot,
-          calories,
-          protein: action.protein,
-          carbs: action.carbs,
-          fat: action.fat,
-          portion_size: action.portion_size || null,
-          prep: action.prep || null,
-        })
-        .eq('id', existing.id)
-    } else {
-      await supabase
-        .from('favorite_meals')
-        .insert({
-          profile_id: profile.id,
-          name: action.new_item,
-          meal_slot: action.meal_slot,
-          calories,
-          protein: action.protein,
-          carbs: action.carbs,
-          fat: action.fat,
-          portion_size: action.portion_size || null,
-          prep: action.prep || null,
-        })
-    }
-
+    // ONE WRITE PATH WITH THE MEAL CARD'S HEART. This used to be a private
+    // upsert living only here, so the screen had no way to name a favourite at
+    // all — the coach knew them and the Nutrition tab could not add one. When
+    // the heart was built on 19 Sep 2026 the obvious move was a second upsert
+    // beside this one, and two writers of one table drift. Both call
+    // markFavourite now.
+    await markFavourite(profile.id, {
+      name: action.new_item,
+      slot: action.meal_slot,
+      calories: calculateCalories(action.protein, action.carbs, action.fat),
+      protein: action.protein,
+      carbs: action.carbs,
+      fat: action.fat,
+      portionSize: action.portion_size,
+      prep: action.prep,
+    })
     loadFavorites()
   }
 
@@ -4304,8 +4280,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         exerciseId: key.exerciseId,
         setNumber: key.setNumber,
         // Carried from the row being corrected, not assumed — the executor
-        // reads it off the log it is replacing.
+        // reads it off the log it is replacing. Same for the drop index: a
+        // correction to the first drop of set 3 must tombstone that drop and
+        // not set 3.
         isWarmup: key.isWarmup,
+        dropIndex: key.dropIndex,
       }),
     })
     onLogsUpdated?.()
@@ -5889,7 +5868,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // writer hard-codes is_warmup false (chat-gemini/index.ts). If it ever
         // gains a way to log a build-up, the token has to carry the kind and
         // this line has to read it — the type now forces that conversation.
-        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false })
+        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false, dropIndex: 0 })
       }
       for (const pre of replaced) activeSession.logSet(pre)
       // deleteSet is the raw store function (unlike logSet, which already

@@ -327,6 +327,84 @@ export async function getCardioLogsForDateMerged(userId: string, date: string): 
   return [...pendingRows, ...serverRows.map(r => ({ ...r, syncStatus: 'synced' as const }))]
 }
 
+/**
+ * THE DEFAULT ON A ONE-TAP CHIP IS THE PERSON'S OWN LAST ANSWER, not 30.
+ *
+ * The rest-day card logs Walk / Cycle / Swim in a single tap, which means the
+ * duration is chosen FOR them — so it has to be a number they have actually
+ * done rather than a house average. Somebody whose walk is always fifty
+ * minutes should not have to correct the app every Sunday.
+ *
+ * Reads the pending queue as well as the server, for the same reason
+ * getCardioLogsForDateMerged does: a log written a moment ago has not synced,
+ * and a chip that forgets the tap you just made is worse than one that never
+ * remembered. Pending rows win when they are newer.
+ *
+ * `select('*')` rather than a column list, per missing-column.ts: naming a
+ * column is a migration dependency, and a failure here must cost the default
+ * rather than the screen. A throw is impossible — it falls back to whatever
+ * the local queue knows, and then to nothing.
+ *
+ * Matching is case-insensitive on the WHOLE name. It is deliberately not a
+ * substring or fuzzy match: "Walk" must not inherit the duration of "Walk the
+ * dog" or "Sled walk", which are different efforts. The chips write the same
+ * literals they read, so a chip always finds its own history.
+ */
+export async function getRecentActivityDurations(
+  userId: string,
+  activityNames: readonly string[],
+): Promise<Record<string, number>> {
+  const wanted = new Map(activityNames.map(n => [n.trim().toLowerCase(), n]))
+  /** name -> { minutes, at } for the newest entry seen so far. */
+  const best = new Map<string, { minutes: number; at: number }>()
+
+  const consider = (name: unknown, minutes: unknown, at: unknown) => {
+    const key = String(name ?? '').trim().toLowerCase()
+    if (!wanted.has(key)) return
+    const mins = Number(minutes)
+    if (!isPlausibleCardioDuration(mins)) return
+    const when = Date.parse(String(at ?? '')) || 0
+    const prev = best.get(key)
+    if (!prev || when >= prev.at) best.set(key, { minutes: mins, at: when })
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('cardio_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('completed_at', { ascending: false })
+      .limit(200)
+    if (error) throw error
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      consider(row.activity_name, row.duration_minutes, row.completed_at)
+    }
+  } catch {
+    // Offline or a transient failure — the local queue below still answers,
+    // and an unanswered chip simply shows the fallback.
+  }
+
+  for (const item of loadPending()) {
+    if (item.userId !== userId) continue
+    consider(item.activityName, item.durationMinutes, item.completedAt)
+  }
+
+  const out: Record<string, number> = {}
+  for (const [key, original] of wanted) {
+    const hit = best.get(key)
+    if (hit) out[original] = roundToNearestFive(hit.minutes)
+  }
+  return out
+}
+
+/** Nearest 5, never below 5 — a chip reading "37 min" looks like a bug, and 0 would be refused by the store anyway. */
+export function roundToNearestFive(minutes: number): number {
+  return Math.max(5, Math.round(minutes / 5) * 5)
+}
+
+/** What a chip offers when this person has never logged that activity. */
+export const DEFAULT_ACTIVITY_MINUTES = 30
+
 export function getPendingCardioFailures(): CardioLogView[] {
   return loadPending().filter(i => i.status === 'failed').map(pendingToView)
 }

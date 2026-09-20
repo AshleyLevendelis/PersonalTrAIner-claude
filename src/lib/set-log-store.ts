@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
 import type { ExerciseSetLog } from './types'
 import { isLoggableSetWeight, MAX_LOGGABLE_SET_KG } from './set-plausibility'
+import { isMissingColumnError } from './missing-column'
 
 // ---------------------------------------------------------------------------
 // set-log-store — THE single write path for logged sets (C0 Part 3).
@@ -47,6 +48,11 @@ export interface SaveSetInput {
   unit?: SetUnit
   isBodyweight?: boolean
   isWarmup?: boolean
+  /**
+   * 0 (or absent) = a set in its own right; 1, 2, ... = a drop hanging off the
+   * set with the same `setNumber`. See ExerciseSetLog.drop_index.
+   */
+  dropIndex?: number
   /** Weight added to bodyweight (dip belt, backpack) — see ExerciseSetLog.added_load_kg. Absent on every ordinary set. */
   addedLoadKg?: number | null
 }
@@ -66,6 +72,7 @@ interface PendingSet {
   unit: SetUnit
   isBodyweight: boolean
   isWarmup: boolean
+  dropIndex: number
   addedLoadKg: number | null
   completedAt: string
   attempts: number
@@ -78,6 +85,7 @@ interface PendingDelete {
   exerciseId: string
   setNumber: number
   isWarmup: boolean
+  dropIndex: number
   attempts: number
 }
 
@@ -172,14 +180,19 @@ function saveRegistry(reg: Record<string, SessionRegistryEntry>): void {
   localStorage.setItem(SESSION_REGISTRY_KEY, JSON.stringify(reg))
 }
 
-function naturalKey(userId: string, date: string, exerciseId: string, setNumber: number, isWarmup: boolean): string {
-  return [userId, date, exerciseId, setNumber, isWarmup ? 'w' : 's'].join('|')
+// THE DROP INDEX IS PART OF THE KEY, exactly as it is part of the database's
+// own unique constraint. A drop shares its parent's set number by design, so
+// without it here the second drop on set 3 would coalesce over the first in
+// the pending queue and the lifter would watch a row they just saved vanish —
+// the client-side twin of the collision the migration's comment describes.
+function naturalKey(userId: string, date: string, exerciseId: string, setNumber: number, isWarmup: boolean, dropIndex = 0): string {
+  return [userId, date, exerciseId, setNumber, isWarmup ? 'w' : 's', dropIndex].join('|')
 }
 
 function opNaturalKey(op: PendingOp): string {
   return op.kind === 'upsert'
-    ? naturalKey(op.set.userId, op.set.date, op.set.exerciseId, op.set.setNumber, op.set.isWarmup)
-    : naturalKey(op.del.userId, op.del.date, op.del.exerciseId, op.del.setNumber, op.del.isWarmup)
+    ? naturalKey(op.set.userId, op.set.date, op.set.exerciseId, op.set.setNumber, op.set.isWarmup, op.set.dropIndex)
+    : naturalKey(op.del.userId, op.del.date, op.del.exerciseId, op.del.setNumber, op.del.isWarmup, op.del.dropIndex)
 }
 
 function clientIdOf(op: PendingOp): string {
@@ -317,6 +330,7 @@ function toView(set: PendingSet): ExerciseSetLog {
     reps_completed: set.repsCompleted,
     is_bodyweight: set.isBodyweight,
     is_warmup: set.isWarmup,
+    drop_index: set.dropIndex,
     unit: set.unit,
     rpe: set.rpe,
     added_load_kg: set.addedLoadKg,
@@ -368,6 +382,7 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog | null {
     unit: input.unit ?? 'reps',
     isBodyweight: input.isBodyweight ?? false,
     isWarmup: input.isWarmup ?? false,
+    dropIndex: input.dropIndex ?? 0,
     addedLoadKg: input.addedLoadKg ?? null,
     // Dev-clock aware (C0 fix #8) — a real wall-clock timestamp under a
     // simulated date would satisfy getLastSessionSets's strictly-before-
@@ -393,7 +408,7 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog | null {
 
   // Coalesce: a re-save of the same logical set replaces its pending
   // predecessor (and cancels any pending delete for the key).
-  const key = naturalKey(set.userId, set.date, set.exerciseId, set.setNumber, set.isWarmup)
+  const key = naturalKey(set.userId, set.date, set.exerciseId, set.setNumber, set.isWarmup, set.dropIndex)
   const ops = loadPending().filter(op => opNaturalKey(op) !== key)
   ops.push({ kind: 'upsert', set })
   savePending(ops)
@@ -417,6 +432,12 @@ export function updateSet(input: SaveSetInput): ExerciseSetLog | null {
  * the natural key includes the kind, so deleting warm-up 2 would tombstone
  * WORKING set 2 instead. Requiring it turns four silent wrong answers into
  * four compile errors, which is the only version of this that stays fixed.
+ *
+ * `dropIndex` IS REQUIRED FOR THE SAME REASON, 19 Sep 2026. It is also in the
+ * natural key, so a default of 0 would mean deleting the first drop of set 3
+ * tombstones SET 3 — the identical failure, one column along. The argument
+ * above is the whole argument; leaving this one optional because "the drop UI
+ * will always pass it" is exactly what was true of isWarmup's four callers.
  */
 export function deleteSet(params: {
   userId: string
@@ -424,6 +445,7 @@ export function deleteSet(params: {
   exerciseId: string
   setNumber: number
   isWarmup: boolean
+  dropIndex: number
 }): void {
   const del: PendingDelete = {
     clientId: generateClientId(),
@@ -432,9 +454,10 @@ export function deleteSet(params: {
     exerciseId: params.exerciseId,
     setNumber: params.setNumber,
     isWarmup: params.isWarmup ?? false,
+    dropIndex: params.dropIndex,
     attempts: 0,
   }
-  const key = naturalKey(del.userId, del.date, del.exerciseId, del.setNumber, del.isWarmup)
+  const key = naturalKey(del.userId, del.date, del.exerciseId, del.setNumber, del.isWarmup, del.dropIndex)
   const ops = loadPending().filter(op => opNaturalKey(op) !== key)
   ops.push({ kind: 'delete', del })
   savePending(ops)
@@ -545,11 +568,9 @@ export function flushPending(): Promise<void> {
  * second reading of the same fact, since the code has moved between
  * PostgREST versions before.
  */
-function isMissingColumnError(error: { code?: string; message?: string } | null, column: string): boolean {
-  if (!error) return false
-  const msg = String(error.message ?? '')
-  return error.code === 'PGRST204' || (msg.includes(column) && /column|schema cache/i.test(msg))
-}
+// isMissingColumnError moved to ./missing-column — meal persistence needs the
+// same predicate for the `prep` column, and two copies of an error-shape test
+// is exactly how one of them goes stale against a new PostgREST message.
 
 /**
  * The added-load key is included ONLY when it has a value, and that is a
@@ -567,6 +588,44 @@ function addedLoadPayload(addedLoadKg: number | null): { added_load_kg?: number 
   return addedLoadKg == null ? {} : { added_load_kg: addedLoadKg }
 }
 
+/**
+ * The drop marker, on exactly the same terms as the added-load key above and
+ * for the same reason: an ordinary set's payload stays byte-identical to what
+ * shipped before the migration, so nothing about drops can break the 99.9% of
+ * logging that has nothing to do with them.
+ */
+function dropIndexPayload(dropIndex: number): { drop_index?: number } {
+  return dropIndex > 0 ? { drop_index: dropIndex } : {}
+}
+
+// ---------------------------------------------------------------------------
+// THE CONFLICT TARGET HAS TO MOVE WITH THE MIGRATION, AND THE APP CANNOT KNOW
+// WHEN THAT IS.
+//
+// `20260919160000_add_drop_index_to_set_logs` replaces unique_set_per_session
+// with one that includes drop_index. The moment it lands, an upsert naming the
+// OLD five columns matches no unique index and Postgres rejects it (42P10) —
+// so every set save would fail. Before it lands, an upsert naming the new six
+// fails the same way. There is no single target that is correct on both sides
+// and no deploy order that avoids the gap, because the migration is run by
+// hand on another machine.
+//
+// So: try the new target, fall back to the old one on 42P10 alone. One extra
+// round trip on a pre-migration database, none after, and correct throughout.
+// FOUND BY A BROWSER DRIVER, 19 Sep 2026 — the fake Supabase honours
+// onConflict, so tapping the drop's tick wrote the drop's numbers over the
+// PARENT SET's row on screen. Thirty-five source checks and a clean typecheck
+// saw nothing: every one of them stops at the local store.
+// ---------------------------------------------------------------------------
+const CONFLICT_WITH_DROP = 'user_id,session_id,exercise_id,set_number,is_warmup,drop_index'
+const CONFLICT_BEFORE_DROP = 'user_id,session_id,exercise_id,set_number,is_warmup'
+
+/** 42P10 — "there is no unique or exclusion constraint matching the ON CONFLICT specification". */
+function isUnmatchedConflictTargetError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return error.code === '42P10' || /no unique or exclusion constraint/i.test(String(error.message ?? ''))
+}
+
 async function upsertSetRow(sessionId: string, set: PendingSet): Promise<void> {
   const base = {
     session_id: sessionId,
@@ -582,14 +641,40 @@ async function upsertSetRow(sessionId: string, set: PendingSet): Promise<void> {
     unit: set.unit,
     is_bodyweight: set.isBodyweight,
     is_warmup: set.isWarmup,
+    ...dropIndexPayload(set.dropIndex),
     completed_at: set.completedAt,
     client_id: set.clientId,
   }
-  const conflict = { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' }
-  const { error } = await supabase
-    .from('exercise_set_logs')
-    .upsert({ ...base, ...addedLoadPayload(set.addedLoadKg) }, conflict)
+  /**
+   * One attempt, returning the error rather than throwing, so the ladder
+   * below reads as the three distinct situations it is: a database that has
+   * not run the drop migration, one that has not run the added-load
+   * migration, and a real failure.
+   */
+  const attempt = async (row: Record<string, unknown>, onConflict: string) =>
+    (await supabase.from('exercise_set_logs').upsert(row, { onConflict })).error
+
+  const full = { ...base, ...addedLoadPayload(set.addedLoadKg) }
+  let error = await attempt(full, CONFLICT_WITH_DROP)
   if (!error) return
+
+  // A DATABASE WITHOUT THE DROP MIGRATION. An ordinary set falls back to the
+  // old target and is written exactly as it always was. A DROP DOES NOT: the
+  // old target would make it collide with its parent and overwrite a set the
+  // lifter actually did. It stays in the pending queue instead, visible on
+  // screen, and syncs itself the moment db:push-both runs.
+  if (isUnmatchedConflictTargetError(error) || isMissingColumnError(error, 'drop_index')) {
+    if (set.dropIndex > 0) {
+      console.warn(
+        '[Set Log] the drop set is saved on this device but cannot sync yet — the database has not run ' +
+        'migration 20260919160000_add_drop_index_to_set_logs. It will sync itself once that migration is applied.'
+      )
+      throw error
+    }
+    error = await attempt(full, CONFLICT_BEFORE_DROP)
+    if (!error) return
+  }
+  const conflict = { onConflict: CONFLICT_BEFORE_DROP }
 
   // DEGRADE, NEVER LOSE THE SET. The trainee did the work; a pending
   // migration must not cost them the record of it. Retry once without the
@@ -661,7 +746,17 @@ async function syncDelete(del: PendingDelete): Promise<void> {
       exercise_id: del.exerciseId,
       set_number: del.setNumber,
       is_warmup: del.isWarmup,
+      // THE SAME COORDINATE THE WRITE USES. Without it, deleting a drop
+      // matches its parent too and takes a real set with it — the delete
+      // twin of the upsert bug above, and the reason `deleteSet` was made to
+      // REQUIRE dropIndex rather than default it.
+      ...dropIndexPayload(del.dropIndex),
     })
+  // A database without the migration has no column to match on, so a DROP's
+  // delete cannot be expressed there. It has nothing to delete either — the
+  // drop never synced (see upsertSetRow) — so the local tombstone is the
+  // whole truth and the op is complete.
+  if (error && del.dropIndex > 0 && isMissingColumnError(error, 'drop_index')) return
   if (error) throw error
 }
 
@@ -748,6 +843,8 @@ interface ServerSetRow {
   unit: SetUnit
   is_bodyweight: boolean
   is_warmup: boolean
+  /** Optional: absent from a database that has not run the drop_index migration yet, where every row is a set. */
+  drop_index?: number | null
   /** Optional: absent from a database that has not run the added_load_kg migration yet. */
   added_load_kg?: number | string | null
   completed_at: string
@@ -777,6 +874,11 @@ function serverRowToView(row: ServerSetRow, date: string): ExerciseSetLog {
     reps_completed: row.reps_completed,
     is_bodyweight: row.is_bodyweight,
     is_warmup: row.is_warmup,
+    // WITHOUT THIS A SYNCED DROP READS BACK AS A SET. Every reader downstream
+    // asks isDropRow, which asks this field — so a drop that round-tripped
+    // through the database would rejoin the working sets, be counted in
+    // "3 working sets", and become a candidate personal best.
+    drop_index: row.drop_index ?? 0,
     unit: row.unit,
     rpe: row.rpe,
     added_load_kg: row.added_load_kg == null ? null : Number(row.added_load_kg),
@@ -787,7 +889,12 @@ function serverRowToView(row: ServerSetRow, date: string): ExerciseSetLog {
 function mergePendingForDate(userId: string, date: string, base: ExerciseSetLog[]): ExerciseSetLog[] {
   const byKey = new Map<string, ExerciseSetLog>()
   for (const log of base) {
-    byKey.set(naturalKey(userId, date, log.exercise_id ?? log.exercise_name, log.set_number, log.is_warmup ?? false), log)
+    // THE DROP INDEX BELONGS HERE TOO. Without it a server-side drop row and
+    // its parent share a key and the merge keeps only one of them — a set the
+    // lifter logged, present in the database, missing from the screen. Caught
+    // by test:drop-sets §9, which exists because the same omission in
+    // naturalKey itself was a MISSED mutation.
+    byKey.set(naturalKey(userId, date, log.exercise_id ?? log.exercise_name, log.set_number, log.is_warmup ?? false, log.drop_index ?? 0), log)
   }
   for (const op of loadPending()) {
     if (op.kind === 'upsert') {
@@ -864,7 +971,12 @@ export async function getLastSessionSets(
     // a session that's entirely malformed (e.g. an old chat-logged 0kg entry)
     // must be skipped in favor of the last session with real data, not
     // returned as an empty/wrong "most recent" result.
-    serverRows = ((data || []) as ServerSetRow[]).filter(r => !isMalformedZeroWeight(r))
+    // AND NEVER A DROP. A ghost is "what you did on this set last week", and
+    // the dedupe below keys on set number alone — so last week's 3·1 would
+    // win the key from last week's 3 and offer the DROP's weight as this
+    // week's suggestion, ratcheting the lift down every session it is used.
+    serverRows = ((data || []) as ServerSetRow[])
+      .filter(r => !isMalformedZeroWeight(r) && (r.drop_index ?? 0) === 0)
   } catch {
     // Offline — pending-only view below.
   }
@@ -872,7 +984,7 @@ export async function getLastSessionSets(
   const pendingSets = loadPending()
     .filter((op): op is { kind: 'upsert'; set: PendingSet } => op.kind === 'upsert')
     .map(op => op.set)
-    .filter(s => s.userId === userId && s.exerciseId === exerciseId && !s.isWarmup)
+    .filter(s => s.userId === userId && s.exerciseId === exerciseId && !s.isWarmup && s.dropIndex === 0)
     .filter(s => s.completedAt < beforeDate)
     .filter(s => !isMalformedZeroWeight({ weight_kg: s.weightKg, is_bodyweight: s.isBodyweight }))
 
@@ -987,9 +1099,19 @@ export async function writeHistoricalSession(params: {
     completed_at: s.completedAt,
     ...addedLoadPayload(s.addedLoadKg ?? null),
   }))
+  // Same two-target ladder as the live path — seeding must keep working on a
+  // database that has not run the drop migration. Seeded rows are never drops,
+  // so the old target is exactly right there.
   const { error } = await supabase
     .from('exercise_set_logs')
-    .upsert(rows, { onConflict: 'user_id,session_id,exercise_id,set_number,is_warmup' })
+    .upsert(rows, { onConflict: CONFLICT_WITH_DROP })
+  if (error && isUnmatchedConflictTargetError(error)) {
+    const { error: legacyError } = await supabase
+      .from('exercise_set_logs')
+      .upsert(rows, { onConflict: CONFLICT_BEFORE_DROP })
+    if (legacyError) throw legacyError
+    return
+  }
   if (error) throw error
 }
 

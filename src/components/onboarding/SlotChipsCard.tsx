@@ -1,6 +1,7 @@
 import { OptionRow, OptionPill, OptionCell } from './OptionRow'
 import { Button } from '@/components/ui/button'
 import { getSlotDef, offeredOptionsFor, canDeclineSlot, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
+import { dietTargetCaveat } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
 // The REAL onboarding chips, rendered inside the conversational flow — driven
@@ -170,6 +171,20 @@ export function SlotChipsCard({
           These filters check ingredients we recognise. We can't check brands,
           preparation, or cross-contamination. If you have a food allergy,
           always check ingredients yourself.
+        </p>
+      )}
+      {/* KETO AND LOW-CARB SAY WHAT THEY ACTUALLY BUY — Ashley's ruling,
+          20 Sep 2026, from four options. Both filter food and neither moves
+          the daily carb target, and until now the only place that was said
+          was the coach, when asked. It appears the moment one of them is
+          selected rather than sitting under every dietary question: the
+          other twenty options are honoured in full, and a standing warning
+          would imply otherwise. The sentence is in the phrasebook so this
+          screen and Profile cannot drift apart, and so the gate can read
+          one copy. */}
+      {def.key === 'dietaryPreferences' && dietTargetCaveat(selectedMulti) && (
+        <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+          {dietTargetCaveat(selectedMulti)}
         </p>
       )}
       {/* A single-select the plan doesn't require needs a way to say no.

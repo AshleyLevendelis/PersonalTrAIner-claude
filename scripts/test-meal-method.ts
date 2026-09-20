@@ -22,6 +22,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { methodSafeToShow, verifyProposal, computeSlotBudgets } from '../src/lib/meal-generation'
+import { isMissingColumnError } from '../src/lib/missing-column'
 import type { MacroTargets } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -150,15 +151,72 @@ console.log('\n4. It survives the round trip to storage')
   const carried = gen.match(/prep: row\.prep \?\? ''/g) ?? []
   check('...and both row-preserving paths carry it too — the meals kept across a regenerate, and the restore after a failed insert',
     carried.length === 2, carried.length)
-  check('the read asks the database for the column',
-    /\.select\('slot, pool_index, name, ingredients, macros, tags, prep'\)/.test(store))
-  check('...and the delete-then-insert path reads it back before wiping the slot',
-    /\.select\('pool_index, name, ingredients, macros, tags, prep'\)/.test(gen))
+  // RE-ANCHORED 20 Sep 2026. These two pinned the exact column LIST each read
+  // asks for, and that is the mechanism, not the property. Naming `prep` in a
+  // select is in fact the WRONG mechanism: PostgREST resolves column names at
+  // parse time, so it fails outright against a database that has not run the
+  // migration — and for readPools that means the Nutrition tab shows a read
+  // error instead of meals, for everybody, until db:push-both is typed.
+  // The property is that the read makes the column available to the mapper
+  // WITHOUT requiring it to exist, which is `*` plus a defaulting read.
+  const poolRead = (src: string, marker: string) => {
+    const at = src.indexOf(marker)
+    return at === -1 ? '' : src.slice(at, at + 900)
+  }
+  const storeRead = poolRead(store, "export async function readPools")
+  check('the pool read does not name the column, so it survives a pending migration',
+    storeRead.includes(".select('*')") && !/\.select\('[^']*prep/.test(storeRead))
+  const genRead = poolRead(gen, 'const { data: keepRows')
+  check('...and the delete-then-insert path reads the slot back the same way, naming no column',
+    genRead.includes(".select('*')") && !/\.select\('[^']*prep/.test(genRead))
   check('a stored row with no method reads as no method, not as undefined',
     /prep: row\.prep \?\? ''/.test(store))
 
   check('the migration adds the column with a default, so existing rows stay valid',
     /ADD COLUMN IF NOT EXISTS prep text NOT NULL DEFAULT ''/.test(read('supabase/migrations/20260919120000_add_meal_prep_method.sql')))
+
+  // -------------------------------------------------------------------------
+  // BOTH SIDES OF THE MIGRATION (20 Sep 2026)
+  // -------------------------------------------------------------------------
+  // The migration is applied by hand on another machine, so there is no deploy
+  // order that guarantees the column exists when this code runs. A write that
+  // names it must degrade to a write that does not, and lose the method rather
+  // than the meal.
+  const writer = gen.slice(gen.indexOf('async function insertPoolRows'), gen.indexOf('interface PoolRowSnapshot'))
+  check('there is one pool writer, and it is the only direct insert left',
+    writer.length > 0 && (gen.match(/from\('meal_plan_slots'\)\.insert/g) ?? []).length === 1,
+    (gen.match(/from\('meal_plan_slots'\)\.insert/g) ?? []).length)
+  check('every pool insert goes through it',
+    (gen.match(/await insertPoolRows\(/g) ?? []).length === 3,
+    (gen.match(/await insertPoolRows\(/g) ?? []).length)
+  check('it recognises the missing column by the shared predicate, not a local copy',
+    /isMissingColumnError\(error, 'prep'\)/.test(writer) && /from '\.\/missing-column'/.test(gen))
+  check('...and retries with the key stripped, so the row still lands',
+    /insert\(rows\.map\(\(\{ prep: _prep, \.\.\.rest \}\) => rest\)\)/.test(writer))
+  check('it says which migration would fix it rather than failing silently',
+    /db:push-both/.test(writer) && /20260919120000/.test(writer))
+  check('a retry is only attempted for THIS column — any other error is returned untouched',
+    /if \(!error \|\| !isMissingColumnError\(error, 'prep'\)\) return \{ error \}/.test(writer))
+
+  // The predicate itself is shared rather than duplicated, and matches BOTH
+  // shapes PostgREST reports a missing column in — the code alone misses half.
+  // CALLED, not grepped: the first version of these two asserted the source
+  // contained 'PGRST204', and the file's own header comment says PGRST204, so
+  // deleting the check from the code left the gate green. A behavioural check
+  // cannot be satisfied by a comment.
+  check('the shared predicate matches the PostgREST code',
+    isMissingColumnError({ code: 'PGRST204', message: 'whatever' }, 'prep') === true)
+  check('...and the message form too, so an older path is not missed',
+    isMissingColumnError({ message: `column meal_plan_slots.prep does not exist` }, 'prep') === true)
+  check('...and says no to an error about a DIFFERENT column',
+    isMissingColumnError({ message: 'column meal_plan_slots.tags does not exist' }, 'prep') === false)
+  check('...and to an ordinary failure, so a real error is never swallowed as a retry',
+    isMissingColumnError({ code: '23505', message: 'duplicate key value violates unique constraint' }, 'prep') === false
+    && isMissingColumnError(null, 'prep') === false)
+  const setLog = read('src/lib/set-log-store.ts')
+  check('set logging uses the same one copy',
+    /import \{ isMissingColumnError \} from '\.\/missing-column'/.test(setLog) &&
+    !/function isMissingColumnError/.test(setLog))
 
   // A resize changes amounts, not technique — so it must not touch the column.
   const resize = gen.slice(gen.indexOf('export async function persistResizedPools'))

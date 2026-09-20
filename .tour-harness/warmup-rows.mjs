@@ -79,8 +79,16 @@ const readCard = async name => ev(`(() => {
   const readRow = row => {
     const inputs = [...row.querySelectorAll('input')]
     const label = row.querySelector('span')?.textContent?.trim() ?? null
+    // THE SPOKEN NAME, not just the printed one. The two are allowed to
+    // differ — the printed label got shorter on 19 Sep and the spoken one did
+    // not — but nothing here was reading it, so the visible label could change
+    // and no driver would have asked what a screen reader now hears.
+    const spoken = [...row.querySelectorAll('button')]
+      .map(b => b.getAttribute('aria-label') || '')
+      .find(a => /set|warm/i.test(a)) ?? null
     return {
       label,
+      spoken,
       inputs: inputs.length,
       weight: inputs[0] ? { placeholder: inputs[0].placeholder, value: inputs[0].value, disabled: inputs[0].disabled, ...box(inputs[0]) } : null,
       reps: inputs[1] ? { placeholder: inputs[1].placeholder, ...box(inputs[1]) } : null,
@@ -144,12 +152,45 @@ check('each build-up row carries its own weight box, visibly sized',
 check('...and its own reps box beside it',
   (loaded.warm ?? []).length > 0 && loaded.warm.every(r => r.reps && r.reps.w > 20),
   loaded.warm?.map(r => r.reps))
-check('every build-up row is labelled W and its number, in order',
-  (loaded.warm ?? []).every((r, i) => r.label === `W${i + 1}`),
+// R, NOT W, SINCE 19 Sep 2026 — Ashley's design handoff. The printed label
+// shortened because the new group header ("RAMP UP · not counted") took over
+// the job the longer word was doing. This check was pinned to the old letter
+// and went red on correct code, which is the expected cost of a deliberate
+// rename rather than a defect.
+check('every build-up row is labelled R and its number, in order',
+  (loaded.warm ?? []).every((r, i) => r.label === `R${i + 1}`),
   loaded.warm?.map(r => r.label))
-check('the caption says it does not count toward the weight going up',
-  /warm-up/i.test(loaded.warmCaption ?? '') && /doesn.t count/i.test(loaded.warmCaption ?? '') && /going up/i.test(loaded.warmCaption ?? ''),
-  loaded.warmCaption)
+// AND THE HALF THAT MUST NOT SHORTEN WITH IT. The standing rule — two rows
+// must not share one spoken name — was written after a tick button said "Save
+// set 2" on both a warm-up and a working row. A printed "R2" beside a spoken
+// "Set 2" would re-create it in a way no screenshot would show.
+check('...and a screen reader still hears which kind of row it is',
+  (loaded.warm ?? []).length > 0 && loaded.warm.every(r => /warm.?up/i.test(r.spoken ?? '')),
+  loaded.warm?.map(r => r.spoken))
+check('...while a working row says something different',
+  (loaded.work ?? []).length > 0 && loaded.work.every(r => r.spoken && !/warm.?up/i.test(r.spoken)),
+  loaded.work?.map(r => r.spoken))
+check('...so no build-up row and working row share a spoken name',
+  new Set([...(loaded.warm ?? []), ...(loaded.work ?? [])].map(r => r.spoken)).size
+    === (loaded.warm?.length ?? 0) + (loaded.work?.length ?? 0),
+  { warm: loaded.warm?.map(r => r.spoken), work: loaded.work?.map(r => r.spoken) })
+// RE-ANCHORED 19 Sep 2026. This pinned the old sentence, "Warm-up · doesn't
+// count toward your weight going up". The handoff replaces it with a two-part
+// group header — what the group IS on the left, what it COSTS on the right —
+// and that split is what let the row label shorten to R1 without losing
+// anything. Both halves are required, because either alone is the regression:
+// a header naming the group but not its cost re-creates the ambiguity the
+// whole design is about, and one naming the cost but not the group leaves the
+// R labels unexplained.
+check('the group header names the build-up',
+  /ramp/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
+check('...and says it does not count',
+  /not counted/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
+check('the working group names the prescription it is working toward',
+  /working sets/i.test(loaded.workCaption ?? '') && /\d/.test(loaded.workCaption ?? ''),
+  loaded.workCaption)
+check('...and says these are the ones that are kept',
+  /saved/i.test(loaded.workCaption ?? ''), loaded.workCaption)
 
 // ---- 2. The working sets, without pressing anything ----------------------
 console.log('\n  2. THE WORKING SETS — HER ACTUAL REPORT')
@@ -201,7 +242,7 @@ check('one more build-up row appears', (after.warm?.length ?? 0) === (loaded.war
 check('...and the working sets are untouched — a build-up step is not a set',
   (after.work?.length ?? 0) === (loaded.work?.length ?? 0), { before: loaded.work?.length, after: after.work?.length })
 check('the new row is labelled as the next build-up step',
-  after.warm?.[after.warm.length - 1]?.label === `W${after.warm.length}`, after.warm?.map(r => r.label))
+  after.warm?.[after.warm.length - 1]?.label === `R${after.warm.length}`, after.warm?.map(r => r.label))
 
 // A CONTROL THAT WRITES AND DOES NOT REDRAW IS A DEAD CONTROL. Found here on
 // 17 Sep 2026 and it was never about warm-ups: "Add Set" behaved the same

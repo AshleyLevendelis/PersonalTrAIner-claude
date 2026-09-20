@@ -23,6 +23,8 @@ import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import { isExternallyLoaded } from '../src/lib/load-prescription'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { formatRampSets } from '../src/lib/session-derive'
+import { supersetAlternation } from '../src/lib/coach-voice'
+import { rampedMemberLabels } from '../src/components/exercise/SupersetGroup'
 import type { UserProfile, WorkoutDay } from '../src/lib/types'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
@@ -210,21 +212,36 @@ async function main() {
     check('today\'s card no longer renders the tickable strip — the grid has the rows',
       !/<RampStrip[\s\S]{0,200}onToggle=/.test(row), row.match(/<RampStrip[\s\S]{0,120}/)?.[0])
     const gridSrc = readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8')
-    check('...the grid draws a labelled build-up row', /data-testid={warm \? 'warmup-row' : 'working-row'}/.test(gridSrc))
+    // RE-ANCHORED 19 Sep 2026 — the row testid gained a third value for drop
+    // rows. The property is that a build-up row is distinguishable from a
+    // working one, not the shape of the ternary that decides it.
+    check('...the grid draws a labelled build-up row',
+      /data-testid={warm \? 'warmup-row'/.test(gridSrc) && /'working-row'/.test(gridSrc))
     check('...labelled by the shared function, with no third case', /\{setLabel\(ref\)\}/.test(gridSrc))
     check('...and a build-up row is SAVED as one', /isWarmup: warm,/.test(gridSrc))
-    check('...and DELETED as one — the natural key includes the kind, so the wrong kind tombstones the other row',
-      /deleteSet\(\{ userId: profileId, date: today, exerciseId, setNumber: ref\.setNumber, isWarmup: isWarm\(ref\) \}\)/.test(gridSrc))
+    // RE-ANCHORED 19 Sep 2026. This pinned the delete call's exact text and went
+    // red the moment the call gained a third coordinate — drop_index — which is
+    // the same key growing for the same reason. The PROPERTY is that every
+    // coordinate of the natural key is read off the ROW rather than defaulted:
+    // a literal there tombstones a different row than the one tapped.
+    const del = gridSrc.slice(gridSrc.indexOf('deleteSet({ userId: profileId'))
+    const delCall = del.slice(0, del.indexOf('})') + 2)
+    check('the delete call was located (sanity check on this check)', delCall.length > 60 && delCall.length < 400, delCall.length)
+    check('...and DELETED as one — the kind comes off the row, not a default',
+      /isWarmup: isWarm\(ref\)/.test(delCall), delCall)
+    check('...and so does which drop it is, for the same reason one column along',
+      /dropIndex: ref\.dropIndex/.test(delCall), delCall)
+    check('...with no literal standing in for either', !/isWarmup: (true|false)/.test(delCall) && !/dropIndex: \d/.test(delCall), delCall)
     // WHAT THIS FILE CANNOT PROVE, said out loud rather than left implied:
     // every check here reads SOURCE. Deleting the warm-up refs from the row
     // list leaves all of this green while the rows vanish from the screen —
     // measured, by doing exactly that. Only a browser can see a row that is
     // not there, which is verify:warmup-rows' job.
     // The half that makes it safe rather than merely visible.
-    check('...while a build-up never fires a personal best', /const pr = warm \? null : checkForPR\(/.test(gridSrc))
-    check('...and never starts the rest timer or the same-session bump', /if \(!warm && onSetCompleted && prescribedReps\)/.test(gridSrc))
+    check('...while a build-up never fires a personal best', /const pr = warm[^:]*\? null : checkForPR\(/.test(gridSrc))
+    check('...and never starts the rest timer or the same-session bump', /if \(!warm &&[^)]*onSetCompleted && prescribedReps\)/.test(gridSrc))
     check('...and never takes last week\'s WORKING weight as its ghost',
-      /const ghostFor = \(ref: SetRef\) => \(isWarm\(ref\) \? undefined :/.test(gridSrc))
+      /const ghostFor = \(ref: SetRef\) => \(isWarm\(ref\)[^?]*\? undefined :/.test(gridSrc))
 
 
     // THE STRIP IS READ-ONLY EVERYWHERE NOW, AND THE MACHINERY IS GONE WITH IT.
@@ -255,6 +272,79 @@ async function main() {
     check('...and that set 1 follows it, on screen rather than in a title',
       /\{ramp\.kind === 'kg' && \(\s*\n?\s*<span[\s\S]{0,200}?→ then set 1/.test(stripCode), stripCode.match(/.{0,140}then set 1/)?.[0])
     check('...with no surviving notion of an interactive strip', !/interactive/.test(stripCode))
+  }
+
+  // -------------------------------------------------------------------
+  // A PAIR THAT RAMPS IS TOLD SO — Ashley's handoff, 19 Sep 2026.
+  //
+  // "alternate — no rest between", read literally by somebody with a
+  // build-up in front of them, says to alternate the WARM-UP sets with the
+  // other exercise. That is not how a superset is run and it is not what the
+  // app means. The clause appears only when a member actually ramps, so the
+  // common pair keeps its one short line.
+  //
+  // CALLED, NOT GREPPED, for both halves: the sentence comes from the
+  // phrasebook function and the "does this pair ramp?" answer from the
+  // shared one, so a check here cannot pass on an expression that is merely
+  // present in the file.
+  // -------------------------------------------------------------------
+  console.log('\n8. The alternation line, when one of the pair ramps')
+  {
+    check('a pair with no build-up says one thing and stops',
+      supersetAlternation([]) === 'alternate — no rest between', supersetAlternation([]))
+    const one = supersetAlternation(['A1'])
+    check('a pair where A1 ramps still says to alternate', /alternate/.test(one), one)
+    check('...and says to ramp A1 before the pairing starts', /ramp A1 first/.test(one), one)
+    check('...and names the pairing as what follows', /then start the pairing/.test(one), one)
+    const both = supersetAlternation(['A1', 'A2'])
+    check('both ramping names both, readably', /ramp A1 and A2 first/.test(both), both)
+    // The label is a parameter, not a constant: a B-group pair must not be
+    // told to ramp A1.
+    check('a B group is told about B1, not A1', /ramp B1 first/.test(supersetAlternation(['B1'])), supersetAlternation(['B1']))
+
+    // WHICH MEMBERS RAMP, answered by the shared function against real
+    // exercises rather than hand-built ones.
+    // Every day of the generated mesocycle, so the pair below comes from a
+    // plan the app actually produced rather than one written here.
+    const allDays = mesocycle.flatMap(w => w.days)
+    const rampedEx = allDays.flatMap(d => d.exercises).find(e => {
+      const r = formatRampSets(e)
+      return !!r && r.kind !== 'stale' && r.sets.length > 0
+    })
+    const plainEx = allDays.flatMap(d => d.exercises).find(e => !formatRampSets(e))
+    check('the fixture plan holds a ramped exercise and a plain one to pair',
+      !!rampedEx && !!plainEx, { ramped: rampedEx?.name, plain: plainEx?.name })
+    const labels = rampedEx && plainEx ? rampedMemberLabels('A', [rampedEx, plainEx]) : null
+    check('a pair of (ramped, plain) reports only the ramped member',
+      JSON.stringify(labels) === JSON.stringify(['A1']), labels)
+    const reversed = rampedEx && plainEx ? rampedMemberLabels('A', [plainEx, rampedEx]) : null
+    check('...by POSITION, so reversing the pair moves the label to A2',
+      JSON.stringify(reversed) === JSON.stringify(['A2']), reversed)
+    check('a pair with no build-up at all reports nothing',
+      plainEx ? rampedMemberLabels('A', [plainEx, plainEx]).length === 0 : false)
+    // A STALE RAMP NAMES AN EXERCISE THE SLOT NO LONGER HOLDS, so it
+    // prescribes nothing — and must not produce a clause telling somebody to
+    // ramp a lift that is not there.
+    const stale = rampedEx
+      ? { ...rampedEx, ramp_up: { ...(rampedEx.ramp_up as object), exercise: 'Something Else' } } as typeof rampedEx
+      : null
+    check('a stale build-up produces no clause',
+      stale ? rampedMemberLabels('A', [stale]).length === 0 : false,
+      stale ? formatRampSets(stale)?.kind : null)
+
+    // AND IT REACHES THE SCREEN — both of them, from one function.
+    // COMMENTS STRIPPED BEFORE ASSERTING THE SENTENCE IS ABSENT — the
+    // standing rule, and this check broke it on its first run: the file's own
+    // header explains what the old hard-coded line was, so a note about the
+    // removal satisfied the check that it was removed.
+    const noComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const shell = noComments(readFileSync(join(ROOT, 'src/components/exercise/SupersetGroup.tsx'), 'utf8'))
+    const peek = noComments(readFileSync(join(ROOT, 'src/components/exercise/ReadOnlyDayList.tsx'), 'utf8'))
+    check('the shell renders the phrasebook sentence rather than its own',
+      /\{supersetAlternation\(ramped\)\}/.test(shell) && !/alternate — no rest between/.test(shell), shell.match(/.{0,80}alternate.{0,60}/)?.[0])
+    check('today\'s card works out which members ramp', /ramped=\{rampedMemberLabels\(/.test(shell))
+    check('...and the read-only surfaces call the SAME function, not a copy',
+      /rampedMemberLabels\(/.test(peek) && /from '.\/SupersetGroup'/.test(peek))
   }
 
   if (failures > 0) {

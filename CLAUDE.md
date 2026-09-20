@@ -183,6 +183,23 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `meal-method` (31 checks, 19 mutations), `verify:meal-method`. Needs the
   `generate-meals` deploy; until then new meals arrive with no method, which is
   the honest empty state
+- **A diet that filters food but not the numbers SAYS SO where it is picked** —
+  since 20 Sep 2026. Keto and Low-carb are real food filters (bread, pasta,
+  rice, potatoes, oats, beans and added sugar are refused, probed one by one)
+  and they move NO target: carbs are the remainder after protein and fat,
+  floored at 50g, and `FAT_PERCENT_RANGE` is capped at 0.35 so the split cannot
+  be forced into a ketogenic shape through the wrong derivation order.
+  Measured: a keto profile's carb target is 150-370g, 25-57% of energy, against
+  the under-50g ketosis means.
+  **Ashley's ruling, from four options: say it on the setup screen** — over
+  building a real ketogenic derivation, over removing Keto from the list, and
+  over leaving it, where the coach told the truth only when asked. One sentence
+  in the phrasebook, rendered under the picker on setup AND Profile, and only
+  when one of those two is selected. `coach-voice` §8 (19 checks, 8 mutations),
+  `verify:setup-answers` §8 (10 checks, 5 mutations).
+  STILL TRUE AND NAMED: there is no ketogenic derivation, and the keto filter
+  is the low-carb filter — fresh banana, grapes and mango pass it, which the
+  sentence admits rather than hides
 - A measured floor for meals — `meal-quality` exists but needs a live
   database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
 
@@ -1083,6 +1100,162 @@ old — the commands were right and the context was missing.
   actually changed, and assert the run executed as many checks as the baseline.
   Without both, "10 mutations, 10 caught" and "10 mutations, 4 of them
   meaningless" print identically.
+- **A MUTATION HARNESS THAT COUNTS ONLY THE PASSES READS EVERY CATCH AS A
+  CRASH.** 19 Sep 2026, in the harness this file's own "compare how many checks
+  RAN" rule asks for. It counted lines matching `ok:` — but a caught mutation
+  turns an `ok:` line into a `FAIL:` line, so every genuine catch came back
+  "only 31 of 34 checks ran; not a catch". Nine of twelve mutations were
+  written off that way, and the three that printed MISSED were the only ones
+  read as real. **Checks RAN is passes PLUS failures**, and where a gate prints
+  its own "N checks ran" line, use that — a `verify:` driver's output also
+  carries vite's `✓ built in 8s`, which a bare tick-counter happily counts.
+  Same shape as the pgrep watcher: before believing a harness, prove its
+  detector on a run whose answer you already know.
+- **A MUTATION HARNESS KILLED MID-RUN LEAVES THE MUTATION IN THE TREE, AND THE
+  SOURCE STILL LOOKS RIGHT.** 19 Sep 2026: I stopped a run with `pkill`, the
+  `finally` that restores the file never executed, and the next browser run
+  measured a defect I had already fixed — a drop overwriting its parent set,
+  on a tree whose `git diff` I had read. **The grep that reassured me was the
+  liar**: `grep -c "dropIndex: ref.dropIndex"` returned 1 and I read that as
+  "present", when the same expression appears on TWO lines (the save and the
+  delete) and the count should have been 2. Forty minutes went to re-deriving a
+  bug from first principles. Two rules out of it: a harness that edits files
+  restores on SIGINT/SIGTERM as well as in `finally`; and after any interrupted
+  run, `git diff` the mutated file before believing anything it produces — a
+  COUNT from grep is only evidence when you know what the count should be.
+- **A NEW COLUMN IS A CHANGE TO EVERY READER AND WRITER OF THAT TABLE, AND THE
+  ONES OUTSIDE `src/` ARE INVISIBLE TO EVERYTHING.** 19 Sep 2026: adding
+  `drop_index` was fixed in the browser client, driven in a real Chromium, and
+  the EDGE FUNCTION had its own independent copy of the same upsert — still
+  naming the old unique constraint, so every set the COACH logs would have
+  failed the moment the migration was applied, with no drop set in sight. Its
+  "what did you last lift?" lookup had the twin defect: ordered by time, and a
+  drop is logged straight after its parent, so it would win every time and have
+  the coach quoting the drop's weight back. Neither is reachable by a typecheck
+  (`tsconfig` covers `src`), a browser driver (the function is deployed), or the
+  file-grep derivation (nothing in `src/` mentions it). **The derivation that
+  finds them is "grep the TABLE NAME across the whole repo", not "grep the file
+  I changed"** — and it costs one command.
+- **A COLUMN NAMED IN A `SELECT` IS AS MUCH A MIGRATION DEPENDENCY AS ONE
+  NAMED IN AN INSERT, AND THE READ IS THE DANGEROUS HALF.** 20 Sep 2026, the
+  "grep the TABLE NAME" rule re-run against the other two new columns. Six
+  places named `prep` unguarded, and the worst was a READ: PostgREST resolves
+  column names at parse time, so `select('a, b, prep')` is rejected outright
+  before the migration lands, and that particular read feeds the whole
+  Nutrition tab. A pending migration would not have cost a cooking method, it
+  would have cost **every meal, for everybody**, behind a "couldn't read your
+  meals" the migration is nowhere near. The write half had been solved a month
+  earlier in the same codebase (`added_load_kg`) and simply was not copied.
+  So the pattern, both halves: **reads use `select('*')` and default in JS**,
+  because `*` needs no column to exist and `row.x ?? fallback` is correct on
+  both sides; **writes go through one function that retries with the key
+  stripped** on a missing-column error, because a payload key IS a column name
+  and cannot be omitted the way a filter can. And the predicate that
+  recognises the error lives in ONE file — two copies of an error-shape test
+  is how one of them goes stale against a new PostgREST message.
+  The derivation that finds these is `grep -rn "select('[^*]" src/` — every
+  column list in the codebase, checked against the migrations of the last
+  fortnight. It costs one command and it found two more sites the same day.
+- **RE-RUN A DERIVATION AGAINST THE CASES IT WAS NOT WRITTEN FOR.** The same
+  day, and the reason the above was found at all. The table-name rule was
+  written on 19 Sep while fixing `drop_index` and was applied only to
+  `drop_index`. Run against the two OTHER columns added that week it found a
+  live defect in one of them — and then, pointed at a file it had no reason to
+  visit, an eighth place a drop set could take a personal best, after seven had
+  been found and the set declared closed. **A rule discovered while fixing one
+  case is not finished being useful when that case is fixed**; the cheap move
+  is to run it across every sibling before writing it down.
+- **A SENTENCE ABOUT THE APP'S OWN LIMITS IS A CLAIM, AND EVERY NOUN IN IT GETS
+  MEASURED BEFORE IT IS WRITTEN.** 20 Sep 2026, writing the keto caveat. The
+  natural phrasing — "keeps grains, potatoes and sugary fruit out of your
+  meals" — was FALSE on its last clause: the filter blocks DRIED fruit and
+  passes fresh banana, grapes and mango, which are the exact three the coach's
+  own keto prompt names. A caveat that overclaims is worse than no caveat,
+  because it is the app asserting a guard it does not have while appearing to
+  be candid. The gate now probes each food the sentence names against the real
+  filter, so the words and the code cannot drift apart.
+  Two smaller rules from the same sentence. **"Yet" is a promise** — "not a
+  keto split yet" commits the app to building one, and nobody had decided to;
+  the gate asserts the word is absent. And **a caveat appears only where it is
+  true**: under Keto and Low-carb, silent under the other twenty diets, because
+  a standing warning would say the app honours them less than it does — the
+  same class of untruth pointing the other way.
+- **A CHECK ON A CONSTANT MUST USE A CASE WHERE THE CONSTANT BINDS.** The same
+  day, found by a MISSED mutation: lowering the 50g carb floor to 20 changed
+  nothing my check could see, because the profile it used (75kg, 2200kcal)
+  takes carbs from the REMAINDER and never reaches the floor at all. The check
+  read the right number from the wrong person. Fixed by measuring a profile
+  where the floor genuinely engages — 100kg at 1500kcal, where protein and fat
+  eat the budget — and asserting the clamp actually fired as a sanity check
+  beside it. Same family as "a gate built from comfortable fixtures never
+  reaches the code it exists to hold", one level down: here the fixture was not
+  merely comfortable, it was outside the branch entirely.
+- **MEASURE THE HARM BEFORE ARGUING FROM IT — AND LET THE GATE TELL YOU.** Also
+  20 Sep. Excluding drops from the personal-best path is right, and the reason
+  I wrote for it was wrong: "a drop beats its parent on estimated 1RM because
+  Epley rewards reps". Measured, at the app's own 75% drop, a parent of
+  100kg x 5 needs SEVENTEEN reps in the drop before the estimate is beaten.
+  The certain case was a different metric entirely — the bodyweight REPS
+  record, where a drop is an easier variation and therefore higher-rep by
+  definition, so it wins immediately and always.
+  **The check I wrote to prove the harm went red, and that is what caught it.**
+  Writing "prove the detector on something that should fail" into a gate does
+  not only protect the gate; when the failing case is the author's own
+  reasoning, it is the cheapest correction available. A fix can be correct
+  while its stated justification is false, and the justification is what the
+  next reader inherits.
+- **A ROW COUNT IS NOT A SET COUNT, AND THE INTERESTING CLAIM IS USUALLY THE
+  COUNT.** The same day: a mutation letting drop rows back into
+  `filterLoggableSets` came back MISSED, because the screen still drew three
+  working rows — the row list is built from the PRESCRIPTION, not from the
+  logs. What changed was the number the card computes and prints ("Working
+  2/3" became 3/3). A driver that counts elements is asking how many boxes were
+  laid out; the thing a ruling is about is nearly always the figure the app
+  derives. Read the figure.
+- **ONE CANDIDATE CANNOT TEST A CHOICE.** Also that day: "the offer appears
+  under the LAST logged set" was checked with exactly one set logged, where it
+  is indistinguishable from "under every logged set" — a mutation to precisely
+  that came back MISSED. Any check on which of N things something attaches to
+  needs N greater than one, and the wrong answers have to be present on screen
+  at the time.
+- **A UNIQUE-CONSTRAINT MIGRATION IS A CLIENT DEPENDENCY, AND THE CLIENT MUST
+  WORK ON BOTH SIDES OF IT.** 19 Sep 2026. An upsert names its conflict target
+  by column list; Postgres rejects one that matches no unique index (42P10).
+  So a migration that REPLACES a unique constraint breaks every write naming
+  the old columns the instant it is applied — and here the migration is run by
+  hand, on another machine, at a time this code cannot know. There is no deploy
+  order that closes the gap. The pattern that does: try the new target, fall
+  back to the old one on 42P10 alone. One extra round trip before the
+  migration, none after, self-healing. The existing `added_load_kg` handling is
+  the same idea for a missing COLUMN and was the model for it — but a column
+  can be omitted from a payload and a conflict target cannot, so the constraint
+  case needs the retry rather than the omission.
+- **A FIXTURE MUST BE A PLAUSIBLE WHOLE, NOT A SET OF PLAUSIBLE PARTS.** 19 Sep
+  2026: a browser fixture's meals were each a sensible dish and the DAY was
+  339g of protein against a 160g target. Nothing was ever inside the tolerance
+  bands, so every tolerance-gated behaviour switched off at once — the variety
+  sort never applied, the same dinner won every day, the new feature yielded
+  every time, and the screen showed nothing. The tell is exactly that: several
+  unrelated behaviours downstream of one band all going quiet together. Check
+  the fixture's TOTALS against the targets it will be searched against, not
+  just that each part looks real.
+- **A GATE'S CHECK COUNT SHOULD BE THE SAME NUMBER EVERY RUN.** The same day: a
+  gate wrapped three checks in `if (thingExists)` and a `for` over a possibly
+  empty list, so switching the feature off made those checks VANISH rather than
+  fail — 37 of 42 ran, which is indistinguishable from a crash and defeats the
+  "compare how many RAN" habit this file already relies on. Give the dependent
+  checks a null-safe value and let them fail, rather than skipping them.
+  The mutation harness needs the matching rule: **a run that executed fewer
+  checks than the baseline is a crash, not a catch, even when something
+  failed.** One mutation ran 7 of 40, failed 5, and was counted as caught.
+- **TWO MECHANISMS FOR ONE PROPERTY: MEASURE WHICH ONE WORKS BEFORE KEEPING
+  BOTH.** Also 19 Sep: a preference nudge and a hard fallback were built for the
+  same rule. A mutation removing the nudge came back MISSED, which sent me to
+  measure rather than to write a check for it — with it in and out, across a
+  200-profile grid and the gate's own fixtures, not one outcome changed. It was
+  inert because it was a sort key inside a band, and the days needing help were
+  outside that band. Deleted. **A MISSED mutation on a belt-and-braces
+  mechanism is a question about the mechanism, not only about the check.**
 - **WHEN THREE GATES GREP THE SAME EXPRESSION, THE EXPRESSION SHOULD BE A
   FUNCTION.** 19 Sep 2026: `test:calibration-search`, `test:primer-load` and
   `verify:one-number` each pinned one line of JSX deciding whether the per-set
@@ -1146,6 +1319,44 @@ old — the commands were right and the context was missing.
   **When a new number and an existing one disagree wildly about the same
   question, suspect the denominators before the code**, and make the new one
   reproduce the old one's guards before reading anything into the gap.
+- **A "HOW MANY CONTAIN ONE" COUNT IS NOT A RATE, AND THE NAME NEVER SAYS
+  WHICH IT IS.** 19 Sep 2026: `frozen_week` fires on 44.1% of plans, which had
+  been read and re-quoted for weeks as "nearly half of all generated weeks
+  repeat themselves". Measured from one run: 42.3% of PLANS carry one somewhere
+  in sixteen weeks and the RATE is **1.3%** — one slot pair in seventy-five.
+  Both numbers are true; they differ by the number of chances each plan gets,
+  which for a per-plan scorer rule is every slot in every week. **Any rule that
+  fires once per plan reports a probability of occurrence, not a frequency**,
+  and the two get further apart the bigger the plan. Report both from the same
+  run, with the denominator printed beside each, so the next reader cannot pick
+  the wrong one. Same family as "a new measurement is not comparable to an old
+  one until it makes the same exclusions", one level up: here the exclusions
+  matched and the DENOMINATOR was a different thing entirely.
+- **A DETECTOR THAT CANNOT FIRE AND A THING THAT NEVER HAPPENS PRINT THE SAME
+  ZERO — so run the detector over the SUPERSET first.** The same day, measuring
+  whether a frozen lift was secretly progressing by some other lever: sets,
+  tempo, added load and machine assistance all came back zero on all 2,480
+  frozen pairs, which is either a real and important finding or four broken
+  field reads. Running the identical detectors across all 186,146 slot pairs
+  settled it in the same pass — sets moved on 304, tempo on 516, assistance on
+  978, so three of the four demonstrably work and the zero is real. The fourth,
+  added load, moved nowhere at all, so it is still unproven and the report says
+  so rather than counting it as evidence. This is the measurement twin of the
+  gates' "prove the detector on something that should FAIL it": **a zero is
+  only a finding once you have shown the same code producing a non-zero.**
+- **THE THING THE APP DOES RIGHT CAN BE THE THING THAT LOOKS BROKEN, AND
+  REASONING ABOUT WHY WILL FIND THE WRONG CAUSE.** The same audit: 241 weeks
+  repeated with no explanation on the card, and I had written up a two-part fix
+  covering 70 of them, having REASONED about why the other 145 carried no
+  recorded reason. Asking it numerically instead — what would one real notch of
+  weight have cost, as a share of the load? — returned **97.9%**, because
+  `exercise-plan.ts` deliberately holds load flat when a notch is over 12% of
+  the current weight, and says in its own comment that this is correct. The
+  defect was never the held weight; it was that the app's commonest reason for
+  holding one has no field to be recorded in, so nothing downstream can say it.
+  **When a measurement finds a population with "no recorded reason", the first
+  question is whether the reason exists and is unrecorded, not whether the
+  behaviour is wrong.**
 - **A FLOOR MUST BE READ OFF THE UNBUDGETED PRESCRIPTION, NEVER OFF THE LIVE
   VALUE.** 18 Sep 2026. Three independent passes cut a rest — the day-level
   time cap, the per-block trimmer, the phase's own shift — and each floored
@@ -1203,6 +1414,19 @@ old — the commands were right and the context was missing.
   constructed input already in the failing state — deterministic, instant,
   guaranteed under pressure. The constructed case proves the mechanism; the
   measured offender proves it matters in a real plan.
+- **A DRIVER'S CHECK COUNT IS CONSTANT, OR ITS MUTATIONS ARE WORTHLESS — and
+  "open everything" is a lie on a surface that keeps ONE thing open.** Three
+  browser-driver lessons from one afternoon, 19 Sep 2026, all of them the
+  harness's standing rules met again. (1) Wrapping the detail checks in
+  `if (found)` meant a broken feature printed 3 checks instead of 9, and the
+  mutation harness refused to score it as a catch — correctly: a short run is a
+  crash, not a finding. Every check runs every time, with a null-safe subject.
+  (2) `element.click()` on a day row opened and shut it within one tick; a
+  dispatched mouse click at the row's centre works. (3) The browse surface
+  keeps one day and one exercise row expanded, so a loop that "opens every day"
+  opens exactly one per screen — 60 days read as 15. **Before believing a
+  driver walked something, print how many things it actually opened and assert
+  the number is bigger than the number of screens.**
 - **A CONTROL THAT WRITES AND DOES NOT REDRAW IS A DEAD CONTROL, and no gate
   and no type can see it.** 17 Sep 2026: "Add Set" wrote the new row into the
   stored session record correctly, and no pixel moved — nothing subscribes to
@@ -1281,6 +1505,20 @@ old — the commands were right and the context was missing.
   hunting before anyone thinks of the bundle. Same family as "the harness is
   not the app", one level down: **the thing a driver measures is the last
   build, not the working tree.**
+- **NEVER `git stash` A TREE A BACKGROUND JOB IS STILL WRITING — and after any
+  interrupted mutation run, work out which side of the diff is the good one
+  before restoring either.** 20 Sep 2026, and it came within one command of
+  shipping a mutation. I stashed to measure a bundle baseline on a clean tree
+  while the mutation harness was still running; its `finally` never executed,
+  so the stash captured a MUTATED file and the working tree kept the restored
+  one. I then read `git diff stash@{0} -- <file>` backwards — in that form the
+  stash is the `-` side and the working tree is the `+` side — concluded the
+  stash held the good copy, and restored the mutation over the fix.
+  **What caught it was a grep whose expected count I knew**: the duration span
+  must appear exactly once, and it appeared zero times. That is the 19 Sep note
+  used as intended rather than relearned. Two rules: measure a baseline on a
+  separate `git worktree`, which touches nothing; and when a diff decides which
+  copy survives, name which side is which before acting on it.
 - **A MUTATION CAN APPLY, RUN, AND STILL NOT CREATE THE DEFECT.** A third kind
   beyond "did not apply" and "crashed", and the harness cannot see it: on
   15 Sep a mutation to the walking plan's day builder read MISSED because the
@@ -1300,6 +1538,27 @@ old — the commands were right and the context was missing.
   reported missing. Use `(['"`])((?:(?!\1).)*)\1`.
 - New check → register it in `package.json` → mutation-test it → say in the
   report how many mutations were tried and how many were caught.
+- **THE GATES TO RE-RUN ARE THE ONES THAT READ THE FILES YOU TOUCHED, AND THAT
+  SET IS DERIVABLE — DERIVE IT, DO NOT RECALL IT.** 19 Sep 2026: a commit
+  changed `meal-generation.ts`; I ran thirteen gates chosen by what the work
+  felt like it was about, and `test:dashboard` — which reads that file — was not
+  among them. It sat red at the branch head for a day and was found by the
+  pre-merge sweep. `grep -rln <file> scripts/*.ts` named all twenty readers in
+  one command, and every one of them ran green in a minute. **Picking the
+  affected gates from memory is how a red one hides; one grep is the whole
+  cost.**
+- **DERIVE THE GATES FROM EVERY FILE IN THE COMMIT, NOT ONLY THE ONES NEW TO
+  IT.** 20 Sep 2026, and the derivation habit worked right up to the last step.
+  A commit touched six files; I had already derived and run the gate set for
+  `SetGrid.tsx` earlier in the session, so when the commit added five more
+  files I derived for those five and re-ran their readers. `SetGrid.tsx` had
+  ALSO changed again in that same commit, and `test:bounds-and-boundaries` —
+  which reads it, and which I had run green an hour before — went red and
+  stayed red until the pre-merge sweep found it.
+  **The derivation is per COMMIT, over `git diff --name-only`, not per "what is
+  new since I last thought about this".** Having already run a file's gates is
+  not a property of the file; it is a property of a version of it that no
+  longer exists.
 - **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
   2026: yesterday's sweep found two real failures, both were fixed, and the
   sweep was reported clean without being re-run. One of those fixes — pulling a
@@ -1343,6 +1602,33 @@ old — the commands were right and the context was missing.
 - So: run the handful of affected checks while working — they are instant —
   and the full sweep once, before a merge. Run it in the background and do
   something else; do not sit and watch it.
+- **NEVER RUN A FULL SWEEP AGAINST A TREE YOU ARE STILL EDITING — it measures
+  no single state, and its failures cannot be attributed.** 19 Sep 2026: a
+  sweep was started as the pre-merge check and then work continued for an hour
+  while it ran. Of its 8 failures, three were environmental, two were gates
+  already fixed before the sweep reached them, ONE was a real consequence of a
+  deliberate rename — and two were browser drivers that had built their bundle
+  during the ninety seconds `ExerciseRow.tsx` held a syntax error mid-edit.
+  Both passed on the next run against a settled tree. **Every `verify:` driver
+  builds from the working tree when it starts, so a sweep overlapping an edit
+  session is sampling a different codebase per gate**, and the log gives no way
+  to tell which. Start the sweep when the tree is finished and leave it alone,
+  or accept that what comes back is a list of leads rather than a result.
+- **AND THE LOG MUST BE ITS OWN FILE.** The same sweep appended to a path a
+  previous session had already used, so `grep -c PASS` counted both runs and I
+  reported 30 passed, then 95, from a log that was two runs deep. The
+  scratchpad survives between sessions; a run that appends is a run whose
+  numbers are unreadable. Write to a fresh, timestamped file, and read the
+  count back from the run's own SWEEP START line.
+- **A BROWSER DRIVER IS NOT FOUND BY GREPPING FOR THE FILE YOU CHANGED.** The
+  same day, one level down from the rule above: the habit of deriving affected
+  gates with `grep -rln <file> scripts/*.ts` missed every `.tour-harness/*.mjs`
+  driver, because a driver names what is ON SCREEN — a testid, a label, a
+  sentence — and never the source file that renders it. Renaming a row label
+  from `W1` to `R1` broke `verify:warmup-rows` and the derivation could not
+  have found it. **So the derivation has two halves: grep the scripts for the
+  file, and run the drivers for the SCREEN.** A change nobody can see needs
+  only the first.
 - **A KILLED SWEEP'S LOG IS INDISTINGUISHABLE FROM A RUNNING ONE. Check the
   PROCESS, not the file.** 15 Sep 2026: I reported a full sweep as "27 of 234
   done" against freshly merged code while nothing was running — the log
@@ -1366,9 +1652,15 @@ old — the commands were right and the context was missing.
   detector on something that should fail" habit the gates already use.
 - **THREE checks ALWAYS fail in a cloud session and are not your problem:**
   `test:meal-quality`, `test:schema-parity` and `verify:rls`. All three need a
-  live database this machine cannot reach; each prints the same cause verbatim
-  — *"Host not in allowlist: …supabase.co"*. Report them as environmental
-  rather than investigating them from scratch every session.
+  live database this machine cannot reach. Report them as environmental rather
+  than investigating them from scratch every session.
+  CORRECTED 20 Sep 2026, measured: this said each prints the same cause
+  verbatim, *"Host not in allowlist: …supabase.co"*. Two do. `test:schema-parity`
+  does NOT — it prints *"Failed to link to TEST (…). Nothing was run against
+  it."* So a reader following this line's own instruction (read the output for
+  the allowlist sentence) would not find it, and could reasonably conclude the
+  failure was real. Both wordings are the honest "I proved nothing" shape; what
+  was wrong was claiming they are the same string.
   CORRECTED 17 Sep 2026, measured: this line said TWO for weeks and named only
   the first pair. `verify:rls` has the same cause and was simply never in a
   reported sweep here. **The shape is the one this file keeps relearning: a

@@ -32,7 +32,7 @@
 
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
-import { categorize, isExternallyLoaded } from '../src/lib/load-prescription'
+import { categorize, isExternallyLoaded, getLoadIncrementKg } from '../src/lib/load-prescription'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -750,6 +750,109 @@ console.log('\n8. A week that repeats itself SAYS so — Ashley\'s ruling, 5 Sep
   }
   check(`the sweep contains repeated weeks held by a ceiling (${heldAndFrozen}) — sanity check on this check`, heldAndFrozen > 0, String(heldAndFrozen))
   check(`every one of them is labelled (${labelled}/${heldAndFrozen})`, unlabelled.length === 0, unlabelled.slice(0, 3).join(' | '))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n9. ...including when the next dumbbell is simply too big — Ashley\'s ruling, 19 Sep 2026')
+// ---------------------------------------------------------------------------
+{
+  // §8 covers a weight held by a ceiling or a full implement. Measured on
+  // 19 Sep 2026 over 1,024 plans, those are NOT the commonest reason a weight
+  // stands still: 236 of the 241 repeated weeks that carried no explanation at
+  // all were a weight the app holds on purpose because one real notch is over
+  // 12% of it (2kg is 27% of a 7.5kg lateral raise). That decision is correct
+  // coaching and it had nowhere to be recorded, so nothing downstream could
+  // say it.
+  //
+  // Ashley chose its own wording over reusing either of the other two,
+  // because this is the only one of the three that ENDS ON ITS OWN — the
+  // trainee gets stronger and the notch becomes affordable. Calling it "as
+  // heavy as this gets" would be the small lie this module exists to remove.
+  const ex = (o: Partial<Exercise>): Exercise => ({
+    name: 'Lateral Raises', sets: 2, reps: '14-17', rest: '60s', ...o,
+  } as Exercise)
+
+  // --- the two new ways to be at a ceiling, and the false cases that keep
+  // each honest.
+  check('a weight held because the notch is too big, with the rep refused, IS at a ceiling',
+    atPrescribedCeiling(ex({ load_hold: 'unaffordable_step', rep_bump: 'band' })))
+  check('a BAR at its estimate ceiling with the rep refused is too — a refused rep is a spent lever',
+    atPrescribedCeiling(ex({ load_hold: 'ceiling', rep_bump: 'band' })))
+  check('...and the too-big notch also counts once the bump is capped',
+    atPrescribedCeiling(ex({ load_hold: 'unaffordable_step', rep_bump: 'capped' })))
+  // THE FALSE CASE IS THE POINT, same as §8: holding the weight and CLIMBING
+  // the reps is exactly what the affordability rule is for, and it is the
+  // normal, healthy state of every light accessory. Labelling that would put
+  // "too big a jump" on most of the isolation work in the app.
+  check('a too-big notch whose reps still climbed is NOT at a ceiling',
+    !atPrescribedCeiling(ex({ load_hold: 'unaffordable_step', rep_bump: 'bought' })))
+  check('...nor is one with no bump recorded at all',
+    !atPrescribedCeiling(ex({ load_hold: 'unaffordable_step' })))
+  check('...nor is a rep target merely matched to the same lift\'s other slot',
+    !atPrescribedCeiling(ex({ load_hold: 'unaffordable_step', rep_bump: 'matched' })))
+
+  // --- three wordings, all different, and each true of its own case.
+  const tooBig = ceilingLabel(ex({ load_hold: 'unaffordable_step', rep_bump: 'band' }))
+  const estimate = ceilingLabel(ex({ load_hold: 'ceiling', rep_bump: 'capped' }))
+  const implement = ceilingLabel(ex({ load_hold: 'implement', rep_bump: 'capped' }))
+  check('the too-big-a-jump case has its own words', !!tooBig && tooBig !== estimate && tooBig !== implement, String(tooBig))
+  check('...and they name the jump rather than a ceiling', /too big a jump/.test(tooBig ?? ''))
+  check('...and never claim this is as heavy as it gets', !/as heavy as this gets/.test(tooBig ?? ''))
+  check('...and never point at a logged set, which does not move this one',
+    !/log/i.test(tooBig ?? ''))
+
+  // --- the coach is told the same thing, in its own register, and told the
+  // part that makes this one different: it is temporary.
+  const note = ceilingNoteForCoach(ex({ load_hold: 'unaffordable_step', rep_bump: 'band' })) ?? ''
+  check('the coach gets a note for the too-big case', note.length > 0)
+  check('...telling it not to call the week progression', /do not present it as progression/.test(note))
+  check('...and that it is temporary', /temporary/.test(note))
+  check('...and NOT to ask for a logged set, which would not help here', !/logged set/.test(note))
+  check('the three coach notes are three different sentences', new Set([
+    note,
+    ceilingNoteForCoach(ex({ load_hold: 'ceiling', rep_bump: 'capped' })),
+    ceilingNoteForCoach(ex({ load_hold: 'implement', rep_bump: 'capped' })),
+  ]).size === 3)
+
+  // --- the generator records it, and a MORE SPECIFIC hold still wins. `??`
+  // rather than an override: a bar at the standards ceiling is a sharper claim
+  // about the same weight than "the notch is big", and swapping the two would
+  // silently retire §8's wording.
+  check('the generator stamps the affordability decision onto the exercise',
+    /naturalHold = load\.hold \?\? \(loadStepUnaffordable \? 'unaffordable_step' : undefined\)/.test(PLAN_SRC))
+
+  // --- END TO END on real plans, because a source check cannot tell whether
+  // the branch is ever REACHED, and because the property has to hold on the
+  // app's own numbers rather than on a hand-built Exercise.
+  let stamped = 0, loadedNoHold = 0, notchTooSmall = 0
+  const offenders: string[] = []
+  for (const equipment_access of EQUIP) {
+    for (const fitness_goal of ['hypertrophy', 'functional'] as const) {
+      const plan = meso(
+        buildProfile({ equipment_access, fitness_goal, training_experience: 'beginner', session_duration_preference: '45-60' }),
+        `frozen9:${equipment_access}:${fitness_goal}`,
+      )
+      for (const w of plan) for (const d of w.days) for (const e of d.exercises) {
+        const kg = e.suggested_load_kg
+        if (kg == null || kg <= 0) continue
+        if (e.load_hold == null) { loadedNoHold++; continue }
+        if (e.load_hold !== 'unaffordable_step') continue
+        stamped++
+        const entry = getExerciseEntry(e.name)
+        if (!entry) continue
+        // DERIVED, not restated: ask load-prescription what one real notch of
+        // this implement costs at this weight, and require it to be a big
+        // share of it. An assertion against a copy of the 12% constant would
+        // only ever agree with itself.
+        const share = getLoadIncrementKg(entry, categorize(entry), kg) / kg
+        if (share <= 0.12) { notchTooSmall++; offenders.push(`${e.name} ${kg}kg notch=${(100 * share).toFixed(1)}%`) }
+      }
+    }
+  }
+  check(`the stamp is reached on real plans (${stamped} slots) — sanity check on this check`, stamped > 0, String(stamped))
+  check(`...and is NOT unconditional: loaded slots with no hold at all (${loadedNoHold})`, loadedNoHold > 0, String(loadedNoHold))
+  check(`every stamped slot really could not afford a notch (${stamped - notchTooSmall}/${stamped})`,
+    notchTooSmall === 0, offenders.slice(0, 3).join(' | '))
 }
 
 console.log(failures === 0 ? '\nAll frozen-week checks passed.\n' : `\n${failures} FAILED\n`)

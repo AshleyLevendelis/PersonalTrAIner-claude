@@ -37,20 +37,20 @@ export function RampStrip({ ramp }: { ramp: RampDisplay }) {
 
   return (
     <div
-      className="flex items-center gap-1 flex-wrap mt-0.5 rounded-[10px] border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] px-1.5 py-1"
+      className="flex items-center gap-1 flex-wrap mt-0.5 rounded-[10px] border border-[color:var(--ramp-border)] bg-[color:var(--ramp-bg)] px-1.5 py-1"
       title="Ramp-up sets — build to your working weight before the sets below. These don't count toward working volume."
     >
-      <Thermometer className="size-2.5 text-[color:var(--role-warn)] shrink-0" />
+      <Thermometer className="size-2.5 text-[color:var(--ramp-label)] shrink-0" />
       {/* "Ramp up first", not "Ramp": the order is the instruction. Until
           10 Sep 2026 the only words saying this came before the working sets
           lived in a title attribute, which a phone never shows, and the block
           was drawn BELOW the working-set chips — so it read as something to
           do afterwards (Ashley: "do you do the prescribed weights and then
           ramp up or start ramp up from the start"). */}
-      <span className="ds-label-compact text-[color:var(--role-warn-text)]">Ramp up first:</span>
+      <span className="ds-label-compact text-[color:var(--ramp-label)]">Ramp up first:</span>
       {ramp.sets.map((s, i) => (
-        <span key={s.setNumber} className="text-[0.625rem] text-[color:var(--role-warn-text)]">
-          {i > 0 && <span className="text-[color:var(--role-warn)]">·</span>} {label(s)}
+        <span key={s.setNumber} className="text-[0.625rem] text-[color:var(--ramp-label)]">
+          {i > 0 && <span className="text-[color:var(--ramp)]">·</span>} {label(s)}
         </span>
       ))}
       {ramp.kind === 'bodyweight' && (
@@ -62,7 +62,7 @@ export function RampStrip({ ramp }: { ramp: RampDisplay }) {
           silently undoing Ashley's 10 Sep ruling that the order is said on
           screen and not in a tooltip. */}
       {ramp.kind === 'kg' && (
-        <span className="text-[0.5625rem] italic text-[color:var(--role-warn-text)]/70">→ then set 1</span>
+        <span className="text-[0.5625rem] italic text-[color:var(--ramp-label)]/70">→ then set 1</span>
       )}
     </div>
   )

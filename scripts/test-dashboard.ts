@@ -397,17 +397,49 @@ async function main() {
     const gen = fs.readFileSync('src/lib/meal-generation.ts', 'utf-8')
     const persist = gen.slice(gen.indexOf('async function persistPools'), gen.indexOf('// DAY ASSEMBLY'))
     check('persistPools exists to be checked (sanity check on this check)', persist.length > 400, persist.length)
-    check('...and reads the marked rows BEFORE deleting the slot',
-      persist.indexOf('USER_REQUESTED_TAG') < persist.indexOf(".delete()") && persist.includes('USER_REQUESTED_TAG'),
-      { marker: persist.indexOf('USER_REQUESTED_TAG'), del: persist.indexOf('.delete()') })
+    // RE-ANCHORED 19 Sep 2026, and the stale version is the lesson. This read
+    // `persist.indexOf('USER_REQUESTED_TAG') < persist.indexOf('.delete()')`,
+    // pinned to a LITERAL inside the function. The heart-on-the-meal-row work
+    // moved that decision into a shared `survivesRegeneration`, because a
+    // favourited meal must now survive a regeneration for the same reason a
+    // requested one does — the behaviour got BETTER and the grep went stale,
+    // exactly the shape this file already warns about twice.
+    // The property has three parts and each is asked separately, because a
+    // single position comparison cannot tell "the decision moved after the
+    // delete" from "the decision no longer keeps anything".
+    const keepIdx = persist.indexOf('const keep =')
+    const delIdx = persist.indexOf('.delete()')
+    // BOTH ANCHORS FOUND BEFORE COMPARING THEM. indexOf returns -1 and -1 is
+    // less than everything, so a renamed anchor would otherwise PASS this.
+    check('the kept-rows decision and the delete are both there to be ordered (sanity check on this check)',
+      keepIdx !== -1 && delIdx !== -1, { keepIdx, delIdx })
+    check('...and the decision is made BEFORE the slot is deleted',
+      keepIdx !== -1 && delIdx !== -1 && keepIdx < delIdx, { keepIdx, delIdx })
+    // A CALL, not a bare name: replacing it with a hand-rolled expression
+    // would leave an import satisfying any name-only check.
+    check('...and it defers to the one shared rule, rather than re-deciding here',
+      /survivesRegeneration\(/.test(persist))
+    // AND THE RULE ITSELF STILL KEEPS BOTH KINDS. Without this, the position
+    // checks above stay green while the shared function is gutted — the
+    // decision would be made in the right place and keep nothing.
+    const rule = gen.slice(gen.indexOf('export function survivesRegeneration'), gen.indexOf('async function persistPools'))
+    check('the shared rule exists to be checked (sanity check on this check)', rule.length > 80, rule.length)
+    check('...and a meal asked for by name survives', /USER_REQUESTED_TAG/.test(rule))
+    check('...and so does a favourited one', /FAVOURITE_TAG/.test(rule))
     // THE INSERT ITSELF, not the declaration. The first version tested
     // /keptRows/ over the whole function and passed with `...keptRows`
     // stripped from the insert call — the variable was still declared just
     // above, doing nothing. Same shape as a check satisfied by its own
     // comment: presence is not use.
+    // RE-ANCHORED 20 Sep 2026: this matched `.insert(` literally, and the pool
+    // writes moved behind one function that retries without the prep column on
+    // a database that has not run its migration. The property is unchanged —
+    // the kept rows are in the list handed to the write, after the fresh ones —
+    // so the pattern accepts either spelling of the write rather than pinning
+    // the current one, which would only go stale the same way again.
     check('...and re-inserts them after the fresh options',
-      /\.insert\(\[\.\.\.rows, \.\.\.keptRows\]\)/.test(persist),
-      persist.match(/\.insert\([^)]*\)/g))
+      /(?:\.insert|insertPoolRows)\(\[\.\.\.rows, \.\.\.keptRows\]/.test(persist),
+      persist.match(/(?:\.insert|insertPoolRows)\([^)]*\)/g))
 
     // (d) A meal name you cannot read is one you cannot choose.
     const meal = fs.readFileSync('src/components/MealPlan.tsx', 'utf-8')

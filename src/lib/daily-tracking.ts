@@ -385,6 +385,17 @@ export interface WeeklyDashboardDay {
  * exercised the partition itself. The behaviour was guarded and the thing
  * PRODUCING it was not.
  */
+/**
+ * MEASURED 19 Sep 2026 AND DELIBERATELY LEFT ALONE, so the next reader does
+ * not "fix" it: a drop lands in `workingLogs` here, and that is harmless.
+ * Every consumer of this bucket asks whether ANYTHING was logged that day —
+ * `length > 0`, or the dates mapped into a Set (useTrainingWeek:137,139;
+ * dashboard-data:348,409,413) — and none counts sets or sums volume. A day
+ * with a drop always has that drop's parent set too, so the answer is
+ * identical either way. Adding a third bucket would be churn, and would risk
+ * the opposite defect: a consumer that wanted VOLUME losing the drops, which
+ * the ruling says do count toward it.
+ */
 export function partitionLogsByKind(
   logs: (ExerciseSetLog & { date?: string })[],
   dateStr: string,
@@ -477,7 +488,21 @@ export async function getWeeklyDashboard(
 // Set WRITES live exclusively in set-log-store.ts (C0 Part 3) — the legacy
 // upsertWorkoutLog/getLogsForDate pair is gone with the workout_logs table.
 
-/** Recent working-set history from the unified store (chat/AI context). */
+/**
+ * Recent working-set history from the unified store (chat/AI context).
+ *
+ * DROPS EXCLUDED since 19 Sep 2026, and this is the coach's own view of what
+ * somebody did: a drop left in reads as an extra working set, so the coach
+ * would tell her she did five sets of squats on a day the app counts three,
+ * and coach off a number the screen contradicts. The set COUNT excludes drops
+ * everywhere else in the app (session-derive's filterLoggableSets); this is
+ * the same rule reaching the one reader that lives outside it.
+ *
+ * Filtered in JS rather than in the query, off the `select('*')` already
+ * there, so it works on both sides of the migration — naming `drop_index` in
+ * a PostgREST filter is rejected before the column exists, and this function
+ * THROWS on a query error, which would take the coach's whole context down.
+ */
 export async function getRecentLogs(
   userId: string,
   days: number = 14,
@@ -495,7 +520,9 @@ export async function getRecentLogs(
     .order('completed_at', { ascending: true })
 
   if (error) throw error
-  const rows = ((data || []) as (ExerciseSetLog & { session_id?: string })[]).map(row => ({
+  const rows = ((data || []) as (ExerciseSetLog & { session_id?: string })[])
+    .filter(row => (row.drop_index ?? 0) === 0)
+    .map(row => ({
     ...row,
     weight_kg: Number(row.weight_kg),
     date: row.date || (row.completed_at ?? '').slice(0, 10),

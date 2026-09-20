@@ -137,8 +137,15 @@ check('6. it says what it is instead', card.title.includes(want.activity), card.
 // THE FREE-TEXT FORM IS STILL THERE, and no longer pretending to be the
 // prescription. "Log a walk" underneath a prescribed walk is the same button
 // twice.
+// RE-ANCHORED 20 Sep 2026. This matched the old link's exact words, "log
+// something else you did". The rest-day rebuild (design 4a) replaced the blank
+// form with one-tap chips on all three cards, so the LINK is gone and the
+// capability is not: on a day that already prescribes something the section
+// asks "Did anything else?" and offers the same chips. The property is that
+// this day still has a way to log something beyond its prescription, which is
+// what the check below it depends on too.
 check('7. the blank form is still offered, for anything else you did',
-  /log something else you did/i.test(card.card), card.card.slice(0, 240))
+  /did anything else\?/i.test(card.card) && /\bwalk\b/i.test(card.card), card.card.slice(0, 240))
 check('8. ...and no longer offers to "log a walk" beside a prescribed walk',
   !/log a walk or other activity/i.test(card.card), card.card.slice(0, 240))
 
