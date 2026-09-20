@@ -206,8 +206,22 @@ console.log('\n2. Improvised kit never beats the real thing you own')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('an off-style candidate is ranked below an on-style one',
     /if \(ctx\.trainingStyle && !candidate\.style_tags\.includes\(ctx\.trainingStyle\)\) \{[\s\S]{0,80}?style_fit = -/.test(src))
-  check('...and the trainee\'s own style reaches the scorer',
-    /trainingStyle\b[\s\S]{0,200}?equipmentAccess, trainingStyle \}/.test(src) || /equipmentAccess, trainingStyle \}/.test(src))
+  // RE-ANCHORED 20 Sep 2026, on the PROPERTY rather than the closing brace.
+  // This pinned the literal text `equipmentAccess, trainingStyle }` — the end
+  // of the context object — and went red the moment a FIFTH field was added
+  // after it, at entirely correct code. CLAUDE.md's own case: "a
+  // mechanism-pinned check does not merely fail to catch a drift, it can
+  // ENFORCE it... when a check blocks a fix, suspect the check."
+  //
+  // The property is "every orderCandidates call site hands the scorer this
+  // trainee's style". Asserted per site, and the site COUNT is asserted too,
+  // so deleting a call site cannot quietly satisfy it — the old version passed
+  // on a single occurrence anywhere in a 7,000-line file.
+  const ctxLiterals = src.match(/\{ trackPatterns:[^}]*\}/g) ?? []
+  const withoutStyle = ctxLiterals.filter(l => !/\btrainingStyle\b/.test(l))
+  check('...and the trainee\'s own style reaches the scorer, at every call site',
+    ctxLiterals.length >= 4 && withoutStyle.length === 0,
+    { sites: ctxLiterals.length, missing: withoutStyle })
   check('the improvised penalty is decisive, not a tie-break',
     /IMPROVISED_OVER_REAL_PENALTY = ([2-9]\d*)/.test(src), src.match(/IMPROVISED_OVER_REAL_PENALTY = \d+/)?.[0])
   check('...and only when a better peer is on the same shortlist',

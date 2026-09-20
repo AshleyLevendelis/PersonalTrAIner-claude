@@ -495,14 +495,55 @@ export const EQUIPMENT_QUALITY_TIERS = new Set<EquipmentAccess>(['full_gym', 'ho
  */
 export function poolForRotation(pool: ExerciseEntry[], equipmentAccess?: EquipmentAccess): ExerciseEntry[] {
   if (!equipmentAccess || !EQUIPMENT_QUALITY_TIERS.has(equipmentAccess)) return pool
-  return pool.filter(e => {
-    if (isEquipmentQualityExempt(e) || bestEquipmentRank(e) !== 'low') return true
-    return !pool.some(o =>
-      o.substitution_group === e.substitution_group &&
-      o.mechanics_tier === e.mechanics_tier &&
-      bestEquipmentRank(o) === 'high')
-  })
+  return pool.filter(e => !hasBetterLoadingPeer(e, pool))
 }
+
+/**
+ * Does this person own a properly-loading equivalent of this exercise?
+ *
+ * ONE definition, because there were three and they disagreed — measured
+ * 20 Sep 2026. Rotation asked it on `substitution_group`, initial selection
+ * asked it on `movement_pattern` within one slot's shortlist, and the quality
+ * scorer asked it pool-wide on `movement_pattern`. A full-gym member could be
+ * handed a Backpack Curl while barbell, dumbbell, cable and machine curls sat
+ * in their pool, because the only predicate that would have caught it ran
+ * after the pick was already made.
+ *
+ * `substitution_group` rather than `movement_pattern`, following rotation:
+ * it is the tighter notion of "a genuine equivalent", and the catalogue
+ * already maintains it. Scapular Pull-Ups is `scapular_control`, not
+ * `vertical_pull` — the catalogue already records that it is not a substitute
+ * for a lat pulldown, and the two looser predicates could not see that.
+ *
+ * Exempt entries (core, rehab-indicated) are never "worse": the band is the
+ * point of a banded terminal knee extension.
+ */
+export function hasBetterLoadingPeer(entry: ExerciseEntry, pool: ExerciseEntry[]): boolean {
+  if (isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') return false
+  return pool.some(o =>
+    o.substitution_group === entry.substitution_group &&
+    o.mechanics_tier === entry.mechanics_tier &&
+    bestEquipmentRank(o) === 'high')
+}
+
+/**
+ * Tiers where initial selection asks the implement question POOL-WIDE rather
+ * than within one slot's shortlist.
+ *
+ * `full_gym` only, deliberately, and the scope is the whole safety argument.
+ * orderCandidates' slot-local scope exists to protect a trainee whose kit
+ * really is a backpack — asking pool-wide would demote the only thing they
+ * own. A full-gym member is by definition not that person: every pattern has
+ * a barbell, dumbbell, cable or machine option. So the reason for the narrow
+ * scope does not apply there, and only there.
+ *
+ * home_gym and minimalist stay OUT until they are measured on their own. Their
+ * flagged cases are vertical pulls whose only better-ranked peer is Pull-Up
+ * Negatives — the catalogue's own words, "the lowering half of a pull-up" —
+ * which carries no external load and cannot. That is a different question and
+ * it gets its own measurement.
+ */
+export const POOL_WIDE_IMPLEMENT_TIERS = new Set<EquipmentAccess>(['full_gym'])
 
 // ---------------------------------------------------------------------------
 // Context-aware required patterns (adjusted for infeasible scenarios)
@@ -1653,6 +1694,13 @@ export interface ScoreContext {
    * that cannot punish a trainee whose kit really is a backpack.
    */
   betterImplementInList?: Set<string>
+  /**
+   * The person's WHOLE constrained pool, when the implement question should be
+   * asked against it rather than against this one slot's shortlist. Set only
+   * for the tiers in POOL_WIDE_IMPLEMENT_TIERS; absent everywhere else, which
+   * keeps the slot-local behaviour byte-for-byte for every other trainee.
+   */
+  implementPeerPool?: ExerciseEntry[]
 }
 
 /**
@@ -1882,14 +1930,28 @@ export function orderCandidates(candidates: ExerciseEntry[], policy: GoalPolicy,
   // safe for a trainee whose whole kit is bands.
   // Same question, same scope, for the implement: which candidates here are
   // improvised while an equivalent better-loading one sits in the same list?
+  //
+  // WIDENED 20 Sep 2026, for full gyms only. The slot-local scope above is
+  // right for a trainee whose kit really is a backpack, and wrong for someone
+  // standing in a commercial gym: it asks "was a better tool shortlisted for
+  // this slot" when the honest question is "do they OWN a better tool". A
+  // Backpack Curl whose dumbbell equivalent was not in that slot's shortlist
+  // sailed through unpenalised, and rotation — which does ask pool-wide —
+  // cannot rescue a pick that has already been made.
   const betterImplementInList = new Set<string>()
-  for (const c of candidates) {
-    if (bestEquipmentRank(c) !== 'low' || isEquipmentQualityExempt(c)) continue
-    if (candidates.some(o =>
-      o.movement_pattern === c.movement_pattern &&
-      o.mechanics_tier === c.mechanics_tier &&
-      bestEquipmentRank(o) === 'high')) {
-      betterImplementInList.add(c.name)
+  if (ctx.implementPeerPool) {
+    for (const c of candidates) {
+      if (hasBetterLoadingPeer(c, ctx.implementPeerPool)) betterImplementInList.add(c.name)
+    }
+  } else {
+    for (const c of candidates) {
+      if (bestEquipmentRank(c) !== 'low' || isEquipmentQualityExempt(c)) continue
+      if (candidates.some(o =>
+        o.movement_pattern === c.movement_pattern &&
+        o.mechanics_tier === c.mechanics_tier &&
+        bestEquipmentRank(o) === 'high')) {
+        betterImplementInList.add(c.name)
+      }
     }
   }
   const scoped: ScoreContext = {
@@ -2180,6 +2242,11 @@ function selectExercisesForTrack(
     !forbidden.has(e.movement_pattern)
   )
 
+  // Computed once, from the WHOLE pool rather than trackPool: "do they own a
+  // better tool for this movement" is a question about their gym, not about
+  // what this track happens to cover.
+  const implementPeerPool = equipmentAccess && POOL_WIDE_IMPLEMENT_TIERS.has(equipmentAccess) ? pool : undefined
+
   // Every primer's own movement_pattern is 'activation' (see exercise-db.ts's
   // MovementPattern comment), so matching against it was a no-op — every
   // primer was equally eligible for every track. primer_pattern_affinity is
@@ -2270,7 +2337,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle, implementPeerPool },
     )
     const winner = candidates[0]
     if (winner) {
@@ -2338,7 +2405,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle, implementPeerPool },
     )
     for (let i = 0; i < candidates.length; i++) {
       const c = candidates[i]
@@ -2423,7 +2490,7 @@ function selectExercisesForTrack(
       ),
       policy,
       rawExperience,
-      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
+      { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle, implementPeerPool },
     )
     for (let i = 0; i < cardioCandidates.length; i++) {
       const c = cardioCandidates[i]
@@ -2491,7 +2558,7 @@ function selectExercisesForTrack(
         ),
         policy,
         rawExperience,
-        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle },
+        { trackPatterns: [...track.primary_patterns, ...track.secondary_patterns], selectedSoFar: selected, weeklyAppearanceCount, flaggedJoints, equipmentAccess, trainingStyle, implementPeerPool },
       )
 
       for (let i = 0; i < candidates.length; i++) {
