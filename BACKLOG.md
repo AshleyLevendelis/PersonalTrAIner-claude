@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **MERGED TO MAIN — 20 Sep 2026, on Ashley's explicit "merge it".** Twenty
+  commits, from `a748e53` to the merge. The authorisation is the one CLAUDE.md
+  requires for `main` every time, and it was given in those words.
+  **Why it was needed at all**: Ashley reported *"I dont see it on the live
+  app"*. Nothing was broken — Vercel builds production from `main`, `vercel.json`
+  sets no branch override, and every commit of the last several days sat on the
+  working branch. The keto caveat, the rest-day rebuild, the goal change, the
+  meal refit and the migration-safety work were all real and all invisible for
+  exactly that reason. **A capability is not "shipped" because it is pushed**,
+  which is the deploy-shaped twin of this file's standing "a capability is not
+  had because the data exists".
+  **The pre-merge sweep, re-run against the settled tree at `4ac40bf`**:
+  275 gates declared, **275 RAN**, 272 passed. The RAN count is reported beside
+  the pass count deliberately — a crash or a gate's own early `return` prints
+  zero failures and reads as success, and only the ran count separates them.
+  The three failures are the standing environmental trio, and each was
+  confirmed **by reading its own output rather than by ticking its name off a
+  list**: `test:meal-quality` and `verify:rls` print *"Host not in allowlist:
+  …supabase.co"*; `test:schema-parity` prints something different —
+  *"Failed to link to TEST (…). Nothing was run against it."* — which is the
+  correction this file's own note already carries, re-confirmed here rather
+  than assumed.
+  The previous sweep (273 gates, 269 passed) had one REAL failure,
+  `test:bounds-and-boundaries`, fixed in `8d44366`; it is green in this run, so
+  the fix is covered by a sweep rather than by the sweep that found it — the
+  rule that exists because a fix made in response to a sweep is not covered by
+  it. Gate count rose 273 → 275: the rest-day rebuild added two.
+  **Not committed**: the sweep rewrites `audit-report.txt`, `quality-report.txt`
+  and `differentiation-audit-report.txt`, and `verify:session-rebuild` rewrites
+  four screenshots. All seven were reverted before the merge commit. A stop
+  hook asked for them to be committed and pushed; they are generated output,
+  not work, and the standing rule to revert them won.
+  **Still outstanding, on Ashley's machine only**: `npm run db:push-both` for
+  the two migrations this branch adds, then
+  `npm run deploy:functions:prod -- chat-gemini`. Both refuse a non-terminal
+  stdin by design, so no session here can run them. Order matters in one
+  direction: deploying the OLD coach function after the migration would fail
+  every set the coach logs. `docs/handoff-2026-09-20.md` carries the steps and
+  what proves each one worked.
+
 - [x] **THE REST DAY ENDED IN THREE IDENTICAL LINKS FOR THREE DIFFERENT THINGS.**
   20 Sep 2026, built from the `4a` handoff. `4b` and `4c` were rejected
   explorations and were not built.
