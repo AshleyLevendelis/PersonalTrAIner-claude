@@ -2,6 +2,45 @@
 
 Newest first. One line each.
 
+- [x] **THE PRE-MERGE SWEEP: 273 GATES, 269 GREEN, ONE REAL FAILURE — AND IT
+  WAS THE DERIVATION HABIT FAILING ON ITS LAST STEP.** 20 Sep 2026, run against
+  a settled tree at `373b2a4`, in its own timestamped log.
+  Three failures were the known environmental set — `test:meal-quality`,
+  `test:schema-parity` and `verify:rls`, all needing a live database this
+  machine cannot reach. Each was confirmed by reading its OWN output rather
+  than by its name being on a list, which is how the correction below was
+  found.
+  **The real one: `test:bounds-and-boundaries`, red for an hour.** The check
+  "the plate-calculator button only renders where a handler exists" pinned the
+  condition's exact TEXT, `{onOpenPlateCalc && (`. The cable-machine work added
+  a second clause to it — strictly NARROWER, so the property never weakened for
+  a moment — and the mechanism pin went red at correct code. Re-anchored on two
+  properties instead: the guard OPENS with the handler (so a missing one
+  short-circuits before anything else in the condition can run) and the very
+  next thing rendered is the button. **3 mutations, 3 caught** — the handler
+  removed, the handler checked but not first, and the guard wrapped around
+  something other than the button.
+  **WHY IT WAS NOT CAUGHT EARLIER, which is the part worth keeping.** The habit
+  says derive the gates from the files you touched, and it worked: I derived
+  for `SetGrid.tsx` earlier in the session and ran its readers green. The next
+  commit touched five NEW files plus `SetGrid.tsx` again — and I derived for
+  the five. **Having already run a file's gates is not a property of the file;
+  it is a property of a version of it that no longer exists.** The derivation is
+  per COMMIT, over `git diff --name-only`. Added to CLAUDE.md.
+  **AND A CORRECTION TO CLAUDE.md'S OWN ENVIRONMENTAL-FAILURE LINE.** It said
+  all three print the same cause verbatim, *"Host not in allowlist"*. Two do;
+  `test:schema-parity` prints *"Failed to link to TEST (…). Nothing was run
+  against it."* That matters because the same line instructs the reader to
+  confirm by the OUTPUT rather than the name — so following it exactly would
+  have failed to find the sentence and made a genuine environmental failure
+  look real. Both wordings are the honest "I proved nothing" shape; the claim
+  that they are one string was wrong.
+  Verified after the fix: `test:bounds-and-boundaries` green (44 checks), and
+  the sweep's own artifacts (`audit-report.txt`, `quality-report.txt`,
+  `differentiation-audit-report.txt` and four harness screenshots) reverted
+  rather than committed, per the standing rule. The audit itself passed 17,423
+  of 17,423 combinations; the quality scorer ran clean.
+
 - [x] **THE RULE I HAD JUST WRITTEN DOWN FOUND THREE MORE, AND CORRECTED ONE OF
   MY OWN FIXES.** 19 Sep 2026, immediately after adding "a new column is a
   change to every reader and writer of that table" to CLAUDE.md. Grepping the

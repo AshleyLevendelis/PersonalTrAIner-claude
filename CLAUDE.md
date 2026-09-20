@@ -1448,6 +1448,18 @@ old — the commands were right and the context was missing.
   one command, and every one of them ran green in a minute. **Picking the
   affected gates from memory is how a red one hides; one grep is the whole
   cost.**
+- **DERIVE THE GATES FROM EVERY FILE IN THE COMMIT, NOT ONLY THE ONES NEW TO
+  IT.** 20 Sep 2026, and the derivation habit worked right up to the last step.
+  A commit touched six files; I had already derived and run the gate set for
+  `SetGrid.tsx` earlier in the session, so when the commit added five more
+  files I derived for those five and re-ran their readers. `SetGrid.tsx` had
+  ALSO changed again in that same commit, and `test:bounds-and-boundaries` —
+  which reads it, and which I had run green an hour before — went red and
+  stayed red until the pre-merge sweep found it.
+  **The derivation is per COMMIT, over `git diff --name-only`, not per "what is
+  new since I last thought about this".** Having already run a file's gates is
+  not a property of the file; it is a property of a version of it that no
+  longer exists.
 - **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
   2026: yesterday's sweep found two real failures, both were fixed, and the
   sweep was reported clean without being re-run. One of those fixes — pulling a
@@ -1541,9 +1553,15 @@ old — the commands were right and the context was missing.
   detector on something that should fail" habit the gates already use.
 - **THREE checks ALWAYS fail in a cloud session and are not your problem:**
   `test:meal-quality`, `test:schema-parity` and `verify:rls`. All three need a
-  live database this machine cannot reach; each prints the same cause verbatim
-  — *"Host not in allowlist: …supabase.co"*. Report them as environmental
-  rather than investigating them from scratch every session.
+  live database this machine cannot reach. Report them as environmental rather
+  than investigating them from scratch every session.
+  CORRECTED 20 Sep 2026, measured: this said each prints the same cause
+  verbatim, *"Host not in allowlist: …supabase.co"*. Two do. `test:schema-parity`
+  does NOT — it prints *"Failed to link to TEST (…). Nothing was run against
+  it."* So a reader following this line's own instruction (read the output for
+  the allowlist sentence) would not find it, and could reasonably conclude the
+  failure was real. Both wordings are the honest "I proved nothing" shape; what
+  was wrong was claiming they are the same string.
   CORRECTED 17 Sep 2026, measured: this line said TWO for weeks and named only
   the first pair. `verify:rls` has the same cause and was simply never in a
   reported sweep here. **The shape is the one this file keeps relearning: a
