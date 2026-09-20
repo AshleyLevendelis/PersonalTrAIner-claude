@@ -52,6 +52,17 @@ export interface ExamChecks {
    *  card has to appear. Declared per case rather than inferred, because only
    *  the case author knows whether the message was a request or a remark. */
   expectsProposal?: boolean
+  /** WHICH card, on WHICH turn. `expectsProposal` asks only whether the coach
+   *  offered something; this asks whether it reached the right tool, which is
+   *  a different question and the one that costs.
+   *
+   *  `oneOf: []` is the inverse and is not a formality: it asserts the turn
+   *  carries NO card, for the turns whose whole job is to ask first.
+   *
+   *  ALTERNATIVE TO `expectsProposal`, not an addition — a case setting both
+   *  would report one failure twice, since a turn with no card at all breaks
+   *  either. Cases here declare one or the other. */
+  expectsProposalKind?: { turn: number; oneOf: string[] }[]
 }
 export interface Violation {
   rule: string
@@ -323,11 +334,58 @@ function missingMention(t: Transcript): Violation[] {
   }]
 }
 
+// --- rule: wrong-proposal-kind ---------------------------------------------
+// A card appeared, so `missing-proposal` is satisfied — and it is the WRONG
+// card. The two requests this exists for are one word apart and the tools are
+// not, which is the coach's own prompt talking: "THE TIME SCOPE IS THE WHOLE
+// DISTINCTION, NEVER THE NUMBER ... one of them rebuilds the rest of their
+// block and the other does not touch tomorrow." A coach keying on the figure
+// rather than the scope offers a perfectly well-formed card that rewrites
+// somebody's block when they asked about one morning.
+//
+// AND THE INVERSE, WHICH IS WHY `oneOf` MAY BE EMPTY. §3g2 requires the cardio
+// offer to ASK on turn one — plain words and chips, no card — and only card on
+// turn two if they say yes. Ashley's ruling, 15 Sep 2026, from three options:
+// offer it only when she sounds definite. The client already refuses to build
+// a card from a HEDGE, off a written phrase list; what nothing can enforce is
+// the coach carding a definite statement on the turn that was supposed to ask.
+// That direction is model behaviour, it has no code to catch it, and this is
+// the only thing that grades it.
+//
+// A turn that failed in transport is skipped, for the same reason `silence`
+// skips one: no answer is not a wrong answer.
+function wrongProposalKind(t: Transcript): Violation[] {
+  const specs = t.checks?.expectsProposalKind ?? []
+  return specs.flatMap(spec => {
+    const turn = t.turns[spec.turn]
+    if (!turn || turn.error) return []
+    const got = turn.proposal?.kind ?? null
+    if (spec.oneOf.length === 0) {
+      return got === null ? [] : [{
+        rule: 'wrong-proposal-kind',
+        turn: spec.turn,
+        quote: `(card: ${got})`,
+        note: 'offered a card on a turn whose job was to ask first — in this app that question is the mechanism, because there is nothing to tap yet',
+      }]
+    }
+    if (got !== null && spec.oneOf.includes(got)) return []
+    return [{
+      rule: 'wrong-proposal-kind',
+      turn: spec.turn,
+      quote: got === null ? coachLine(turn).slice(0, 200) : `(card: ${got})`,
+      note: got === null
+        ? `offered no card; this turn had to reach ${spec.oneOf.join(' or ')}`
+        : `reached ${got}; this turn had to reach ${spec.oneOf.join(' or ')}`,
+    }]
+  })
+}
+
 /** Every hard rule, in report order. Any hit fails the case outright. */
 export function hardRuleViolations(t: Transcript, tabs: string[] = realTabNames()): Violation[] {
   return [
     ...silence(t),
     ...missingProposal(t),
+    ...wrongProposalKind(t),
     ...allergenVerdict(t),
     ...absentClaim(t),
     ...inventedFeature(t),

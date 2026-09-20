@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH EXAM WAS MEASURING A COACH THREE RULINGS OUT OF DATE, AND
+  COULD NOT SEE WHICH CARD IT OFFERED.** 20 Sep 2026, preparing the run Ashley
+  chose as the next piece of work.
+  **Why it was worth doing before the run and not after**: the exam costs money
+  and needs credentials no cloud session has, so a run that measured the
+  13 Sep surface would have had to be paid for twice.
+  **What was missing, measured rather than recalled**: the coach declares 42
+  tools today; the exam's 20 cases were written on 13 Sep and two more added on
+  16 Sep. Three rulings of Ashley's that arrived after that had nothing
+  grading them.
+  **The tenth hard rule — `wrong-proposal-kind`.** `expectsProposal` asked only
+  whether a card appeared. `expectsProposalKind` asks WHICH card, on WHICH
+  turn. The failure it exists for is not a broken card but a well-formed one
+  reaching the wrong tool: `propose_session_shorten` cuts today and never
+  touches tomorrow, `propose_session_length` rebuilds every remaining week, and
+  the requests are one word apart. The coach's own prompt says so twice.
+  **The inverse is the half nothing else could hold.** An empty `oneOf` asserts
+  a turn carries NO card. §3g2 requires the cardio offer to ask in plain words
+  on turn one and card only on the yes — Ashley's ruling of 15 Sep, from three
+  options, offer it only when she sounds definite. The client enforces ONE
+  direction of that, refusing to build a card from a hedge off a written phrase
+  list. The other direction — the coach carding a definite statement on the
+  turn that was supposed to ask — is model behaviour with no code behind it,
+  and this is now the only thing in the repository that can see it.
+  **Three cases added, each grading a ruling ALREADY given**, so nothing new
+  was decided in order to write them: `scope-today-not-forever` (the
+  session-length pair, with the figure deliberately IDENTICAL on both turns so
+  a coach keying on the number cannot pass by accident),
+  `cardio-asks-before-carding` (ask, then card on the yes), and
+  `goal-change-says-the-food-half` (17 Sep: training AND food, because somebody
+  training for muscle while still eating a fat-loss deficit is the worst of
+  both). Exam now 23 cases and 43 turns.
+  **Verified**: 12 new checks in `test:coach-exam-grader` (60 ran, was 48).
+  **10 mutations, 10 caught** — but only 8 of 9 on the first pass. The miss was
+  a convoluted edit that applied and did not create the defect; rewritten as a
+  one-token inversion it was caught with 2 failures. That is CLAUDE.md's own
+  "a mutation can apply, run, and still not create the defect" recurring, and
+  the tell was that the harness reported a full 60 checks RAN.
+  Restoration was verified against the BACKUP rather than against HEAD — a
+  `git diff` at that moment shows the new rule and says nothing about whether a
+  mutation survived.
+  Also green and derived rather than recalled, by grepping for every file
+  touched: `test:coach-exam-runner`, `test:coach-exam-fresh`, `test:coach-clock`,
+  `test:coach-promises`, `test:coach-parity`, `test:chat-actions`, and
+  `npx tsc --noEmit`. The runner's free `--dry` confirms all 23 cases load.
+  **NOT MEASURED, and this is the whole point of the work**: no conversation has
+  been played against the real model. The exam still needs one run from Ashley's
+  machine, AFTER the `chat-gemini` deploy, or it grades a coach that is not the
+  one live. Until then "the coach gives best-in-class advice" remains asserted.
+
 - [x] **MERGED TO MAIN — 20 Sep 2026, on Ashley's explicit "merge it".** Twenty
   commits, from `a748e53` to the merge. The authorisation is the one CLAUDE.md
   requires for `main` every time, and it was given in those words.

@@ -186,6 +186,85 @@ const declaring = readdirSync(join(ROOT, 'scripts/exam-cases'))
 if (declaring.length > 0) pass(`missing-proposal: ${declaring.length} exam case(s) declare expectsProposal (${declaring.map(f => f.replace('.json', '')).join(', ')})`)
 else fail('missing-proposal: no exam case declares expectsProposal, so the rule can never fire on a real run')
 
+console.log('\n[10b] wrong-proposal-kind — the RIGHT card, on the right turn')
+// THE SESSION-LENGTH PAIR. Both requests carry a figure in minutes and the
+// tools differ only on scope, so the failure mode is a perfectly well-formed
+// card that rebuilds a block when somebody was running late once.
+const todayThenForever = {
+  expectsProposalKind: [
+    { turn: 0, oneOf: ['propose_session_shorten'] },
+    { turn: 1, oneOf: ['propose_session_length'] },
+  ],
+}
+mustFire('today\'s request answered with the lasting tool', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', card: 'propose_session_length' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+mustFire('the lasting request answered with the today-only tool', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', card: 'propose_session_shorten' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_shorten' },
+], todayThenForever))
+mustNotFire('each turn reaching its own tool', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', card: 'propose_session_shorten' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+// NO CARD IS ALSO WRONG when a card was required — otherwise a coach could
+// pass by doing nothing, which is the exact shape missing-proposal exists for.
+mustFire('a required card that never appeared', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: 'Sure, keep it short today.' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+
+// THE INVERSE — oneOf: [] asserts the turn asks rather than cards. Ashley's
+// 15 Sep ruling; §3g2 requires the question first and nothing enforces it but
+// this, because the client only refuses to build a card from a HEDGE.
+const askThenCard = {
+  expectsProposalKind: [
+    { turn: 0, oneOf: [] },
+    { turn: 1, oneOf: ['propose_cardio_session'] },
+  ],
+}
+mustFire('carded on the turn that was supposed to ask', 'wrong-proposal-kind', t([
+  { user: 'I\'m doing a spin class Wednesday', reply: '', card: 'propose_cardio_session' },
+  { user: 'yeah go on', reply: '', card: 'propose_cardio_session' },
+], askThenCard))
+mustNotFire('asked first, then carded on the yes', 'wrong-proposal-kind', t([
+  { user: 'I\'m doing a spin class Wednesday', reply: "Wednesday's your cardio day — want me to put that in your plan?" },
+  { user: 'yeah go on', reply: '', card: 'propose_cardio_session' },
+], askThenCard))
+
+// A TURN THAT NEVER HAPPENED IS NOT A WRONG ANSWER — the distinction silence
+// and missing-proposal both draw, applied one level down, per turn.
+mustNotFire('the graded turn failed in transport', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', error: 'HTTP 503' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+// AND A CASE THAT DECLARES NOTHING IS NOT JUDGED, so the rule cannot leak onto
+// the twenty cases written before it existed.
+mustNotFire('a case that never declared expectsProposalKind', 'wrong-proposal-kind',
+  t([{ reply: '', card: 'propose_meal_swap' }]))
+
+// THE CASES THEMSELVES STILL DECLARE IT, and both SHAPES are still in use — a
+// derivation that only counted cases would go quiet if every `oneOf: []` were
+// dropped, which is the half no other rule covers.
+const kindCases = readdirSync(join(ROOT, 'scripts/exam-cases'))
+  .filter(f => f.endsWith('.json') && !f.startsWith('_'))
+  .map(f => JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases', f), 'utf8')))
+  .filter(c => Array.isArray(c.checks?.expectsProposalKind))
+const specs = kindCases.flatMap(c => c.checks.expectsProposalKind as { oneOf: string[] }[])
+if (kindCases.length > 0) pass(`wrong-proposal-kind: ${kindCases.length} exam case(s) declare expectsProposalKind (${kindCases.map(c => c.name).join(', ')})`)
+else fail('wrong-proposal-kind: no exam case declares expectsProposalKind, so the rule can never fire on a real run')
+if (specs.some(sp => sp.oneOf.length > 0)) pass('wrong-proposal-kind: at least one turn names the tool it must reach')
+else fail('wrong-proposal-kind: no turn names a required tool')
+if (specs.some(sp => sp.oneOf.length === 0)) pass('wrong-proposal-kind: at least one turn asserts NO card, which is the half only this rule holds')
+else fail('wrong-proposal-kind: nothing asserts a turn must ask rather than card')
+// AND EVERY NAMED TOOL IS A TOOL THE COACH ACTUALLY DECLARES. A case naming a
+// renamed or deleted tool would fail every run and read as a coach defect.
+const fnSrc = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+const unknown = [...new Set(specs.flatMap(sp => sp.oneOf))].filter(k => !fnSrc.includes(`name: "${k}"`))
+if (unknown.length === 0) pass('wrong-proposal-kind: every tool named by a case is one chat-gemini declares')
+else fail('wrong-proposal-kind: case names a tool the coach does not declare', unknown)
+
 console.log('\n[11] coachLine — what the report and the judge are shown for each turn')
 {
   const spoke = { user: 'q', reply: 'Give it two sessions before you judge it.', error: null }

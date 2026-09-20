@@ -730,8 +730,13 @@ menu" stays true when a copy is also left outside it.
   next day. So the 13 Sep scores measure a coach and a grader that both no
   longer exist, and the number to act on is the one from the first run AFTER
   the deploy. Keep the commit — it is the only record of what the exam said
-  before any of this was fixed, and the comparison is the point. 20 cases and
-  37 turns (`coach-exam:run`); NINE hard rules checked in code and five
+  before any of this was fixed, and the comparison is the point. **23 cases and
+  43 turns** since 20 Sep 2026, up from 20 and 37: the exam was written on
+  13 Sep and the coach has gained tools since, so it was measuring a surface
+  three rulings out of date. The three added each grade a ruling Ashley had
+  ALREADY given, so nothing new was decided to write them — the session-length
+  pair, the cardio ask-before-carding turn, and the goal change's food half.
+  **TEN hard rules** checked in code and five
   judged dimensions marked against `docs/coach-exam-rubric.md`
   (`coach-exam:grade`); and `coach-exam-fresh` in every sweep, which fails
   when the coach changes and the exam has not been re-run — that gate is what
@@ -763,6 +768,23 @@ menu" stays true when a copy is also left outside it.
   BEFORE IT RUNS, NOT AFTER.** The generalisation is not about this exam: it is
   that "tested in pieces" and "has ever run" are different claims, and the gap
   between them is invisible from the code.
+  **AND A TENTH RULE, 20 Sep 2026: WHICH CARD, NOT WHETHER A CARD.** The exam
+  could see that the coach offered something and not whether it offered the
+  RIGHT something, so a perfectly well-formed card reaching the wrong tool
+  passed. The pair that matters is the coach's own prompt talking — *"THE TIME
+  SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER ... one of them rebuilds the
+  rest of their block and the other does not touch tomorrow"* — and the exam
+  case makes the figure IDENTICAL on both turns so a coach keying on the number
+  cannot pass by accident. **The rule's inverse is the more valuable half**: an
+  empty `oneOf` asserts a turn carries NO card, which is the only thing that
+  grades §3g2's "ask first, card on the yes". Ashley's 15 Sep cardio ruling is
+  enforced in code in ONE direction only — the client refuses to build a card
+  from a hedge — and the direction with no code behind it is a coach carding a
+  DEFINITE statement on the turn that was supposed to ask. That is model
+  behaviour, and this is the only thing in the repository that can see it.
+  10 mutations, 10 caught — one of them only after being rewritten, because the
+  first attempt was a convoluted edit that applied and did not create the
+  defect, which reads exactly like a missed check.
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —
