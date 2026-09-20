@@ -48,6 +48,7 @@ import { describeActivity } from '@/lib/concurrent-activity'
 import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
+import { dietTargetCaveat } from '@/lib/coach-voice'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 
@@ -1089,6 +1090,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
+              {/* THE SAME SENTENCE AS SETUP, FROM THE SAME PHRASEBOOK — Ashley
+                  ruled it onto the setup screen (20 Sep 2026) and this is the
+                  other place the choice is made. Saying it once at setup and
+                  going silent when somebody turns Keto on here would leave the
+                  app honest only to people who chose it on day one. */}
+              {dietTargetCaveat(profile.dietary_preferences ?? []) && (
+                <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                  {dietTargetCaveat(profile.dietary_preferences ?? [])}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>

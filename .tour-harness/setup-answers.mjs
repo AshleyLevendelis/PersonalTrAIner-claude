@@ -88,6 +88,21 @@ const openYouGroup = async () => {
   return opened
 }
 
+// The dietary picker lives in the "Nutrition" group, not "You" — read off
+// ProfileScreen's own <Group label> rather than guessed, because the heading
+// above the picker says "Dietary & cooking" and matching THAT would find a
+// non-collapsible h3 and never open anything.
+const openDietaryGroup = async () => {
+  const opened = await ev(`(() => {
+    const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^Nutrition$/i.test((x.textContent || '').trim()))
+    if (!b) return 'no-button'
+    if (b.getAttribute('aria-expanded') !== 'true') b.click()
+    return 'ok'
+  })()`)
+  await wait(400)
+  return opened
+}
+
 // React controls these inputs, so setting .value directly is ignored — the
 // prototype setter plus an input event is what swap-request.mjs uses to drive
 // a controlled field. The COMMIT is onBlur (EditableTextField deliberately
@@ -542,6 +557,47 @@ check('4c. ...and the weight-cap rows are absent', !(await has('[data-testid="st
 check('4d. ...while the rest of the group is still there',
   await ev(`[...document.querySelectorAll('span')].some(s => /^Equipment$/.test((s.textContent||'').trim()))`))
 await shoot('setup-answers-3-fullgym')
+
+// --- 8. KETO SAYS WHAT IT ACTUALLY BUYS ------------------------------------
+// Ashley's ruling, 20 Sep 2026, from four options: say it on the setup screen.
+// `test:coach-voice` §8 holds the SENTENCE — that every food it names really
+// is filtered, that it does not claim fresh fruit, that it makes no promise.
+// This holds the half no source check can: that on a 390x844 screen the line
+// is actually rendered, and that it is NOT rendered for somebody who did not
+// pick keto.
+//
+// BOTH STATES ARE READ, and that is the point rather than thoroughness: with
+// only the keto run, "shows the caveat" and "shows the caveat always" are
+// indistinguishable — the one-candidate rule this repo already records.
+// The no-keto state is read FIRST, on the default fixture above, so a
+// mutation making the line unconditional has a run that can catch it.
+const CAVEAT = '[data-testid="diet-target-caveat"]'
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/` })
+await wait(3000)
+await dialogReady()
+const openedForPlain = (await openDietaryGroup()) === 'ok'
+check('8a. the dietary group opens on a profile with no diet picked', openedForPlain)
+check('8b. ...and no caveat is shown, because nothing was picked that needs one',
+  !(await has(CAVEAT)), await text(CAVEAT))
+
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?keto=1` })
+await wait(3000)
+await dialogReady()
+check('8c. the keto profile still shows Profile', await has('[data-slot="dialog-content"]'))
+const openedForKeto = (await openDietaryGroup()) === 'ok'
+check('8d. ...its dietary group opens', openedForKeto)
+const caveat = await until(() => text(CAVEAT), t => t.length > 0)
+check('8e. ...and the caveat is on the screen', caveat.length > 40, caveat)
+check('8f. ...naming Keto rather than some other diet', /^Keto\b/.test(caveat), caveat)
+check('8g. ...saying the daily carb target is not a keto split',
+  /daily carb target/i.test(caveat) && /not a keto split/i.test(caveat), caveat)
+check('8h. ...and admitting fresh fruit is not filtered', /not fresh fruit/i.test(caveat), caveat)
+check('8i. ...without promising to build one later', !/\byet\b/i.test(caveat), caveat)
+// LEGIBLE, not merely present — a zero-height node passes every check above.
+const caveatBox = await ev(`(() => { const n = document.querySelector('${CAVEAT}'); if (!n) return null; n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), inView: r.top >= 0 && r.bottom <= 844 } })()`)
+check('8j. ...rendered at a readable size inside the phone viewport',
+  !!caveatBox && caveatBox.w > 100 && caveatBox.h > 10 && caveatBox.inView, caveatBox)
+await shoot('setup-answers-7-keto-caveat')
 
 console.log(failures === 0 ? '\nAll setup-answer screen checks passed.\n' : `\n${failures} setup-answer screen check(s) failed.\n`)
 ws.close(); chrome.kill(); server.close()

@@ -621,3 +621,53 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
 // test:coach-voice §5 asserts this file holds no copy of the safety text at
 // all. That was always the real property; the re-export was a mechanism for it.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// WHAT PICKING KETO ACTUALLY BUYS — Ashley's ruling, 20 Sep 2026.
+//
+// Keto and Low-carb are offered at setup and DO filter food: bread, pasta,
+// rice, potatoes, oats, beans and added sugar are all refused by
+// `FORBIDDEN_TAGS`, measured rather than assumed. What they do NOT do is
+// change the daily numbers — `computeMacroSplitTargets` derives carbs as the
+// REMAINDER of calories after protein and fat, with a 50g floor, and
+// `FAT_PERCENT_RANGE` is deliberately capped at 0.35 so the split can never be
+// forced into a ketogenic shape through the wrong derivation order. Measured
+// the same day: a keto profile's carb target is 150-370g, i.e. 25-57% of
+// energy, against the under-50g/under-10% a ketogenic diet means.
+//
+// Her ruling, from four options — say it on the setup screen — over building a
+// real ketogenic derivation, over removing Keto from the list, and over
+// leaving it (where the coach tells the truth only when asked, and nothing
+// says it where the choice is made).
+//
+// TWO THINGS THIS SENTENCE DELIBERATELY DOES NOT CLAIM, both measured before
+// it was written:
+//   - It does not say "sugary fruit". The filter blocks DRIED fruit (raisins,
+//     dates, figs, dried apricots) and lets fresh banana, grapes and mango
+//     through — so the coach prompt's own keto rule names three fruits the
+//     code-level guard permits. Claiming them here would be the app asserting
+//     a filter it does not have.
+//   - It does not say "yet". "Not a keto split yet" is a promise to build one,
+//     and nobody has decided to.
+// ---------------------------------------------------------------------------
+
+/** The two diets the food filter honours and the daily targets do not. */
+const MACRO_BLIND_DIETS: Record<string, string> = { keto: 'Keto', 'low-carb': 'Low-carb' }
+
+/**
+ * The caveat for a dietary selection, or null when nothing selected needs one.
+ * Returns null for every other diet — vegan, the allergen lanes and the rest
+ * are enforced by the same ingredient filter AND need no target change, so
+ * they are honoured in full and must not carry a warning that implies
+ * otherwise.
+ */
+export function dietTargetCaveat(selected: readonly string[] = []): string | null {
+  const named = Object.keys(MACRO_BLIND_DIETS)
+    .filter(key => selected.includes(key))
+    .map(key => MACRO_BLIND_DIETS[key])
+  if (named.length === 0) return null
+  const subject = named.join(' and ')
+  const verb = named.length > 1 ? 'keep' : 'keeps'
+  const split = named.length > 1 || named[0] === 'Keto' ? 'a keto split' : 'a low-carb split'
+  return `${subject} ${verb} bread, pasta, rice, potatoes, beans and added sugar out of your meals — but not fresh fruit. Your daily carb target stays a standard one, not ${split}.`
+}

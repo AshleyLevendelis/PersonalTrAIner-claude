@@ -183,6 +183,23 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `meal-method` (31 checks, 19 mutations), `verify:meal-method`. Needs the
   `generate-meals` deploy; until then new meals arrive with no method, which is
   the honest empty state
+- **A diet that filters food but not the numbers SAYS SO where it is picked** —
+  since 20 Sep 2026. Keto and Low-carb are real food filters (bread, pasta,
+  rice, potatoes, oats, beans and added sugar are refused, probed one by one)
+  and they move NO target: carbs are the remainder after protein and fat,
+  floored at 50g, and `FAT_PERCENT_RANGE` is capped at 0.35 so the split cannot
+  be forced into a ketogenic shape through the wrong derivation order.
+  Measured: a keto profile's carb target is 150-370g, 25-57% of energy, against
+  the under-50g ketosis means.
+  **Ashley's ruling, from four options: say it on the setup screen** — over
+  building a real ketogenic derivation, over removing Keto from the list, and
+  over leaving it, where the coach told the truth only when asked. One sentence
+  in the phrasebook, rendered under the picker on setup AND Profile, and only
+  when one of those two is selected. `coach-voice` §8 (19 checks, 8 mutations),
+  `verify:setup-answers` §8 (10 checks, 5 mutations).
+  STILL TRUE AND NAMED: there is no ketogenic derivation, and the keto filter
+  is the low-carb filter — fresh banana, grapes and mango pass it, which the
+  sentence admits rather than hides
 - A measured floor for meals — `meal-quality` exists but needs a live
   database, so it NEVER runs in a cloud sweep: `UNGUARDED` in practice
 
@@ -1148,6 +1165,31 @@ old — the commands were right and the context was missing.
   been found and the set declared closed. **A rule discovered while fixing one
   case is not finished being useful when that case is fixed**; the cheap move
   is to run it across every sibling before writing it down.
+- **A SENTENCE ABOUT THE APP'S OWN LIMITS IS A CLAIM, AND EVERY NOUN IN IT GETS
+  MEASURED BEFORE IT IS WRITTEN.** 20 Sep 2026, writing the keto caveat. The
+  natural phrasing — "keeps grains, potatoes and sugary fruit out of your
+  meals" — was FALSE on its last clause: the filter blocks DRIED fruit and
+  passes fresh banana, grapes and mango, which are the exact three the coach's
+  own keto prompt names. A caveat that overclaims is worse than no caveat,
+  because it is the app asserting a guard it does not have while appearing to
+  be candid. The gate now probes each food the sentence names against the real
+  filter, so the words and the code cannot drift apart.
+  Two smaller rules from the same sentence. **"Yet" is a promise** — "not a
+  keto split yet" commits the app to building one, and nobody had decided to;
+  the gate asserts the word is absent. And **a caveat appears only where it is
+  true**: under Keto and Low-carb, silent under the other twenty diets, because
+  a standing warning would say the app honours them less than it does — the
+  same class of untruth pointing the other way.
+- **A CHECK ON A CONSTANT MUST USE A CASE WHERE THE CONSTANT BINDS.** The same
+  day, found by a MISSED mutation: lowering the 50g carb floor to 20 changed
+  nothing my check could see, because the profile it used (75kg, 2200kcal)
+  takes carbs from the REMAINDER and never reaches the floor at all. The check
+  read the right number from the wrong person. Fixed by measuring a profile
+  where the floor genuinely engages — 100kg at 1500kcal, where protein and fat
+  eat the budget — and asserting the clamp actually fired as a sanity check
+  beside it. Same family as "a gate built from comfortable fixtures never
+  reaches the code it exists to hold", one level down: here the fixture was not
+  merely comfortable, it was outside the branch entirely.
 - **MEASURE THE HARM BEFORE ARGUING FROM IT — AND LET THE GATE TELL YOU.** Also
   20 Sep. Excluding drops from the personal-best path is right, and the reason
   I wrote for it was wrong: "a drop beats its parent on estimated 1RM because

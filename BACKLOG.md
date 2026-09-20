@@ -2,6 +2,63 @@
 
 Newest first. One line each.
 
+- [x] **KETO IS OFFERED, FILTERS FOOD, AND DOES NOT MOVE THE NUMBERS — SO THE
+  APP NOW SAYS SO WHERE YOU PICK IT.** 20 Sep 2026.
+  **What was measured first**, because the sentence is a claim about the app's
+  own limits and a wrong word in it is worse than silence:
+  - Keto IS offered at setup and IS enforced as a food filter — bread, pasta,
+    rice, potatoes, oats, beans and added sugar are all refused, probed one by
+    one against `FORBIDDEN_TAGS` rather than assumed.
+  - Keto is deliberately NOT implemented in the macros, and `macro-calculator`
+    says so in its own comment. Carbs are the REMAINDER after protein and fat,
+    floored at 50g, and `FAT_PERCENT_RANGE` is capped at 0.35 precisely so the
+    split cannot be forced into a ketogenic shape through the wrong derivation
+    order. Measured: a keto profile's carb target is **150-370g, 25-57% of
+    energy**, against the under-50g/under-10% that ketosis means.
+  - The coach is already instructed to say this plainly. Nothing said it where
+    the choice is made — so you only learned it if you thought to ask.
+  **ASHLEY'S RULING, from four options: say it on the setup screen.** Over
+  building a real ketogenic derivation, over removing Keto from the list, and
+  over leaving it as it was.
+  Built as one sentence in the shared phrasebook, rendered under the picker on
+  BOTH surfaces — setup and Profile. Setup was what she asked for; Profile is
+  the other place the choice is made, and saying it once at onboarding then
+  going silent when somebody turns Keto on later would leave the app honest
+  only to people who chose it on day one. Flagged rather than asked again.
+  Live: *"Keto keeps bread, pasta, rice, potatoes, beans and added sugar out of
+  your meals — but not fresh fruit. Your daily carb target stays a standard
+  one, not a keto split."*
+  **TWO THINGS THE SENTENCE DELIBERATELY DOES NOT SAY**, both caught by
+  measuring before writing:
+  - Not "sugary fruit". The filter blocks DRIED fruit and lets fresh banana,
+    grapes and mango through — the three fruits the coach's own keto rule
+    names. Claiming them would be the app asserting a filter it lacks.
+  - Not "yet". "Not a keto split yet" promises to build one, and nobody has
+    decided to.
+  It appears only when Keto or Low-carb is selected. The other twenty diets
+  stay silent: they are honoured in full, and a standing warning under Vegan
+  or Nut-free would say otherwise — the same class of untruth pointing the
+  other way.
+  Verified: `test:coach-voice` +19 checks (70 total), including every food the
+  sentence names probed against the real filter and the carb target derived
+  rather than asserted; `verify:setup-answers` +10 browser checks at 390x844,
+  reading BOTH states — absent with no diet picked, present with Keto — because
+  with only the keto run "shows it" and "shows it always" are the same result.
+  Screenshot read, not just a green build.
+  **8 source mutations, 8 caught; 5 browser mutations.** Three source mutations
+  were MISSED first time and each was a real gap: the low-carb line could be
+  relabelled "a keto split" (the check read only the subject, not the split
+  name); the Profile guard could be replaced with `false` while the testid and
+  the call stayed in the file (an import is not a use, one level along); and
+  lowering `CARB_FLOOR_G` to 20 changed nothing the check could see, because
+  the profile it used takes carbs from the remainder and never touches the
+  floor — replaced with a profile where the floor genuinely engages.
+  36 derived source gates green, typecheck clean.
+  NOT done, named: a real ketogenic derivation is not built, and the keto food
+  filter is a low-carb filter shared with Low-carb — retagging fresh fruit
+  would change what every low-carb trainee is served, so it is a decision, not
+  a slip.
+
 - [x] **THE MIGRATION NOBODY HAS RUN, AND THE EIGHTH PLACE A DROP COULD SET A
   RECORD.** 20 Sep 2026. Yesterday's rule — *a new column is a change to every
   reader and writer of that table* — was re-run against the OTHER two new
