@@ -949,8 +949,25 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   // correctly scores clean. That is the same ordering guarantee the engine
   // relies on (filter first, prefer second) rather than a second opinion
   // about it.
-  const equipmentTier = profile.equipment_access || 'full_gym'
-  if (EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
+  // NO DEFAULT, 21 Sep 2026. This used to fall back to 'full_gym' — the
+  // STRICTEST tier this rule has — when equipment_access was absent, which is
+  // backwards: ScoreContext's own convention (exercise-plan.ts) is that an
+  // omitted equipment tier means the factor is OFF, not that the trainee is
+  // assumed to own everything. A missing tier now skips this rule exactly
+  // the way generation skips its own equipment_fit factor for one.
+  const equipmentTier = profile.equipment_access
+  if (equipmentTier && EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
+    // KNOWN GAP, NAMED RATHER THAN FIXED HERE: this pool is built with NO
+    // exclusions (`[]`), the same as every other peer-pool computation in
+    // this file (scoreProgression, scoreStructure, scoreSelection's own
+    // isolation check). A trainee who has personally banned every loaded
+    // option in a movement pattern can be scored down here for the band the
+    // app correctly gave them — measured nowhere yet. Fixing it needs
+    // exclusions threaded through scorePlan's own signature and every one of
+    // its call sites (test:quality, test:audit, edit-tradeoff.ts,
+    // ChatAssistant.tsx), which is bigger than this pass and shared by
+    // multiple rules, not just this one — a dedicated pass, not a side effect
+    // of closing the edit-time gap.
     const equipmentPool = getConstrainedPool(profile, [])
     // EVERY WEEK, not just week 1. Selection happens once and the later weeks
     // rotate off it — but rotation had no equipment term at all until 8 Sep

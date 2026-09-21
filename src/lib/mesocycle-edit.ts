@@ -1,6 +1,6 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
-import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
+import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded } from './load-prescription'
 import { resolveLoadFields } from './warmup'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
@@ -86,26 +86,30 @@ export function getReplacementCandidates(
   // IMPROVISED KIT SINKS, IT DOES NOT VANISH. getSmartReplacements ranks on
   // tier, joint stress and muscle overlap and has no equipment term at all, so
   // on 8 Sep 2026 all five lateral raises tied exactly and the order fell out
-  // of catalogue position. Reordering here rather than in exercise-db keeps
-  // the equipment-quality table in one module and avoids an import cycle.
+  // of catalogue position.
   //
-  // A stable partition, like the soft preferences below and for the same
-  // reason: someone whose gym is busy may genuinely want the backpack
-  // version, so it stays on the list — just not above the dumbbell one.
-  // Scoped to peers IN THIS LIST, so the only option never gets demoted below
-  // nothing.
+  // ONE DEFINITION, SHARED WITH THE ENGINE AND THE SCORER — 21 Sep 2026. This
+  // used to restate the question inline, on `movement_pattern` and with no
+  // test of whether the "better" peer could actually be loaded — the exact
+  // shape that let a full-gym ban of Lat Pulldown offer Pull-Ups (Assisted)
+  // above Band Lat Pulldown (an assistance machine REDUCES load, it does not
+  // add it) and let a band lat pulldown lose to Pull-Up Negatives (which
+  // cannot be loaded at all). Every edit path that reaches here — screen and
+  // coach swap, the replacement offered after a ban, session rebuild, and
+  // injury/profile adaptation — now asks the identical question generation
+  // and the quality scorer ask.
+  //
+  // SCOPE MATCHES GENERATION: pool-wide for the tiers in
+  // POOL_WIDE_IMPLEMENT_TIERS ("do they own a better tool", a question about
+  // their gym), scoped to this shortlist everywhere else — a trainee whose
+  // kit really is a backpack never has the only thing they own demoted for
+  // want of a peer that isn't even a real option.
   const equipment = profile.equipment_access
   const demoted = new Set<string>()
   if (equipment && EQUIPMENT_QUALITY_TIERS.has(equipment)) {
+    const peerPool = POOL_WIDE_IMPLEMENT_TIERS.has(equipment) ? pool : ranked.map(c => c.exercise)
     for (const c of ranked) {
-      const e = c.exercise
-      if (isEquipmentQualityExempt(e) || bestEquipmentRank(e) !== 'low') continue
-      if (ranked.some(o =>
-        o.exercise.movement_pattern === e.movement_pattern &&
-        o.exercise.mechanics_tier === e.mechanics_tier &&
-        bestEquipmentRank(o.exercise) === 'high')) {
-        demoted.add(e.name)
-      }
+      if (hasBetterLoadingPeer(c.exercise, peerPool)) demoted.add(c.exercise.name)
     }
   }
   const equipmentSorted = demoted.size === 0

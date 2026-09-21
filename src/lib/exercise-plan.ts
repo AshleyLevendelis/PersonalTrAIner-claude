@@ -388,6 +388,21 @@ const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
   'leg press machine': 'high',
   'hack squat machine': 'high',
   'assisted pull-up machine': 'high',
+  // ADDED 21 Sep 2026. These six strings arrived with the 12 Sep machine-floor
+  // catalogue expansion and were added to LOADED_EQUIPMENT (load-prescription.ts)
+  // the next day, but never copied here — the exact "a map went stale against
+  // a catalogue expansion" shape that fix was itself the model for. Left
+  // unranked, `bestEquipmentRank` returned null for them (not 'low'), so they
+  // silently could never be recognised as the better implement a band or
+  // backpack should be demoted in favour of, and a Smith Machine Squat or a
+  // Hip Thrust scored equipment_fit = 0 against a Leg Press's +1 for no reason
+  // a trainee could see.
+  'smith machine': 'high',
+  'belt squat machine': 'high',
+  'hip thrust machine': 'high',
+  'glute kickback machine': 'high',
+  'hip abduction machine': 'high',
+  'hip adduction machine': 'high',
   // 'dumbbells' (two implements, one per hand) and 'dumbbell' (ONE implement,
   // held centrally) are listed SEPARATELY and deliberately. They are not a
   // typo for each other: loadingMode() (load-prescription.ts:415) reads that
@@ -533,10 +548,21 @@ export function hasBetterLoadingPeer(entry: ExerciseEntry, pool: ExerciseEntry[]
  * `bestEquipmentRank` answers "is this a real tool", and a pull-up bar truly
  * is one. The implement preference reads that answer as "does this load the
  * movement better", and for a bar you hang from it does not follow.
+ *
+ * `'assisted pull-up machine'` ADDED 21 Sep 2026 for the same reason: it is a
+ * genuinely 'high'-rank tool in EQUIPMENT_QUALITY above, and it REDUCES the
+ * resistance rather than adding to it — `load-prescription.ts`'s
+ * `UNLOADED_EQUIPMENT` already classifies it this way, with the comment
+ * "subtracts weight rather than adding it and is prescribed through
+ * suggested_assistance_kg". Left out, a full-gym trainee who banned Lat
+ * Pulldown could have Band Lat Pulldown demoted in favour of Pull-Ups
+ * (Assisted) — a machine that makes the movement EASIER, not one that loads
+ * it — which is the identical error class Pull-Up Negatives was excluded for
+ * below, one catalogue entry to the left of it.
  */
 const APPARATUS_NOT_LOAD = new Set([
   'pull-up bar', 'dip bars', 'bodyweight', 'bench', 'incline bench',
-  'plyo box', 'squat rack', 'ab wheel', 'jump rope',
+  'plyo box', 'squat rack', 'ab wheel', 'jump rope', 'assisted pull-up machine',
 ])
 
 /**
@@ -588,12 +614,22 @@ export function carriesExternalLoad(entry: ExerciseEntry): boolean {
  * loadable test would have pushed a full-range pulldown aside for
  * eccentric-only work.
  *
- * minimalist stays OUT, and only because it has not been measured yet — its
- * shape now looks identical to home gym's. It is a separate change with a
- * separate before/after, for the reason the 8 Sep entry records: two
- * unmeasured changes shipped together cannot be attributed.
+ * minimalist JOINED 21 Sep 2026, measured rather than assumed. Before this,
+ * generation asked the implement question slot-locally for minimalist while
+ * the quality scorer (below) had always asked it pool-wide for all three
+ * tiers — two different scopes that could in principle disagree, the exact
+ * "one question, two definitions" shape this whole change exists to close.
+ * Measured across every style/experience combination on a real generated
+ * grid (5,312 prescribed slots): **0 disagreed.** A minimalist's pool is
+ * small enough, and the substitution-group/tier match narrow enough, that the
+ * slot-local and pool-wide scopes always happened to agree in practice — so
+ * widening changes no plan generated before this date, and closes the
+ * inconsistency rather than trading it for a new one. A minimalist owns a
+ * kettlebell and dumbbells — real 'high'-rank, loadable tools, the same fact
+ * that let home gym join below — so the reason for the narrow scope (protect
+ * a trainee whose kit really is a backpack) does not apply to them either.
  */
-export const POOL_WIDE_IMPLEMENT_TIERS = new Set<EquipmentAccess>(['full_gym', 'home_gym'])
+export const POOL_WIDE_IMPLEMENT_TIERS = new Set<EquipmentAccess>(['full_gym', 'home_gym', 'minimalist'])
 
 // ---------------------------------------------------------------------------
 // Context-aware required patterns (adjusted for infeasible scenarios)

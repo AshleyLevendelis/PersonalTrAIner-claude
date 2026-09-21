@@ -30,7 +30,9 @@ import { fileURLToPath } from 'url'
 import {
   getConstrainedPool, generateMesocycle, setRandomSource, resetRandomSource,
   bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS, poolForRotation,
+  hasBetterLoadingPeer,
 } from '../src/lib/exercise-plan'
+import { getExerciseEntry } from '../src/lib/exercise-db'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getReplacementCandidates } from '../src/lib/mesocycle-edit'
 import { EXERCISE_DATABASE, getMovementFamily } from '../src/lib/exercise-db'
@@ -156,8 +158,7 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   const fullPool = getConstrainedPool(hers, [])
   const noPeer = fullPool.filter(e =>
     bestEquipmentRank(e) === 'low' && !isEquipmentQualityExempt(e) &&
-    !fullPool.some(o => o.substitution_group === e.substitution_group &&
-      o.mechanics_tier === e.mechanics_tier && bestEquipmentRank(o) === 'high'))
+    !hasBetterLoadingPeer(e, fullPool))
   check('improvised kit with no better peer is KEPT, not swept up',
     noPeer.length > 0 && noPeer.every(e => rotation.some(r => r.name === e.name)),
     { checked: noPeer.length, missing: noPeer.filter(e => !rotation.some(r => r.name === e.name)).map(e => e.name) })
@@ -167,8 +168,7 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   const kept = poolForRotation(minimal, 'minimalist')
   for (const dropped of minimal.filter(e => !kept.includes(e))) {
     check(`only dropped where a better peer exists: ${dropped.name}`,
-      minimal.some(o => o.substitution_group === dropped.substitution_group &&
-        o.mechanics_tier === dropped.mechanics_tier && bestEquipmentRank(o) === 'high'))
+      hasBetterLoadingPeer(dropped, minimal))
   }
 
   // ALL WEEKS, which is the half no gate could see: quality-score's own
@@ -186,9 +186,8 @@ console.log('\n2. Improvised kit never beats the real thing you own')
         for (const day of week.days) {
           for (const ex of day.exercises) {
             const entry = p.find(e => e.name === ex.name)
-            if (!entry || isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') continue
-            if (p.some(o => o.substitution_group === entry.substitution_group &&
-              o.mechanics_tier === entry.mechanics_tier && bestEquipmentRank(o) === 'high')) {
+            if (!entry) continue
+            if (hasBetterLoadingPeer(entry, p)) {
               offenders.push(`${equipment}/${style} wk${week.week_number} ${day.day} ${ex.name}`)
             }
           }
@@ -198,6 +197,32 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   }
   check('no week of any plan reaches for improvised kit when a real peer was available',
     offenders.length === 0, offenders.slice(0, 10))
+
+  // THIS CHECK'S OWN GENERATION GRID NEVER REACHES THE CASE IT EXISTS FOR.
+  // Measured, not assumed: across this exact 4-equipment x 4-style x
+  // all-weeks sweep, Band Lat Pulldown / Kneeling Band Lat Pulldown appear
+  // ZERO times — so a green result above proves nothing about whether this
+  // rule still enforces the definition the engine deliberately abandoned
+  // (matching only on movement_pattern, with no test of whether the "better"
+  // peer can actually be loaded). Before 21 Sep 2026 this file restated that
+  // question three times, inline, and would have flagged a full-range band
+  // pulldown as an offender for losing to Pull-Up Negatives — an
+  // eccentric-only drill that cannot be loaded at all.
+  //
+  // Constructed, deterministic, no generation needed: call the real shared
+  // predicate directly on the two catalogue entries the fix was written for.
+  const bandPulldown = getExerciseEntry('Band Lat Pulldown')
+  const pullUpNegatives = getExerciseEntry('Pull-Up Negatives')
+  check('the catalogue still has both fixture entries this case needs',
+    !!bandPulldown && !!pullUpNegatives, { bandPulldown: !!bandPulldown, pullUpNegatives: !!pullUpNegatives })
+  if (bandPulldown && pullUpNegatives) {
+    check('Pull-Up Negatives is the theoretically-better-ranked peer, so a stale predicate WOULD have flagged this pair',
+      bestEquipmentRank(pullUpNegatives) === 'high' &&
+      pullUpNegatives.substitution_group === bandPulldown.substitution_group &&
+      pullUpNegatives.mechanics_tier === bandPulldown.mechanics_tier)
+    check('...and the real, current rule correctly does NOT flag it, because negatives cannot be loaded',
+      !hasBetterLoadingPeer(bandPulldown, [bandPulldown, pullUpNegatives]))
+  }
 
   // REINSTATED IS NOT UNFILTERED. The floor widens the choice; style_fit is
   // what stops it erasing the preference. Without the ranking half, a

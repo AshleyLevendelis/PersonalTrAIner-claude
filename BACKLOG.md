@@ -2,6 +2,140 @@
 
 Newest first. One line each.
 
+- [x] **"ONE DEFINITION IN ALL FOUR PLACES" WAS TRUE OF THE FOUR PLACES IT
+  COUNTED, AND FALSE OF THE PLACES THAT MATTER MOST.** 21 Sep 2026. Ashley
+  asked for 3 investigate-only checks on the just-landed implement-quality
+  unification (`hasBetterLoadingPeer`/`carriesExternalLoad`, 20-21 Sep); two
+  independent read-only reviews and a live gate-runner came back, and all
+  three needed re-verifying by hand first — see the correction below this
+  entry for why.
+  **What was actually still broken, confirmed by reading the real code and,
+  where possible, proving it live:**
+  1. **The FIFTH copy** — `mesocycle-edit.ts`'s `getReplacementCandidates`,
+     which is what EVERY edit-time path (screen swap, coach swap, the
+     replacement offered after a ban, session rebuild, injury/profile
+     adaptation) actually calls — had its own inline restatement, on
+     `movement_pattern` with no `carriesExternalLoad` test. A full-gym ban of
+     Lat Pulldown could offer Pull-Ups (Assisted) — a machine that REMOVES
+     resistance — above Band Lat Pulldown, and a home-gym swap could still
+     rank Pull-Up Negatives (which cannot be loaded at all) over a real band
+     pulldown. Generation had been fixed; every way of CHANGING a plan had
+     not.
+  2. **Adding an exercise had no equipment term at all.** Tied candidates fell
+     straight to alphabetical order — reproducing, on this one path nobody had
+     re-checked, the exact "Backpack Lateral Raise sorts to index 0" defect
+     this whole line of work exists to close. Driven on a real full-gym push
+     day: Band Tricep Kickback and Band Tricep Pushdown sorted ahead of Cable
+     Pushdown and Skull Crushers.
+  3. **Two standalone bugs in the shared predicate itself.** `EQUIPMENT_QUALITY`
+     never got the six machine strings (smith machine, belt squat, hip thrust,
+     glute kickback, hip abduction, hip adduction) the 12 Sep catalogue
+     expansion added — the exact "a map goes stale against a catalogue
+     expansion" shape `LOADED_EQUIPMENT` was itself the fix-and-model for, one
+     file over. And `carriesExternalLoad`'s deny-list did not exclude
+     'assisted pull-up machine' — the identical error class Pull-Up Negatives
+     was excluded for, one catalogue entry to the left of it.
+  4. **The safety-net gate for this whole class of defect was proven vacuous,
+     not just suspected.** `test:style-does-not-starve` still restated the OLD
+     definition three times and passed — measured, not assumed: its own
+     4-equipment x 4-style x all-weeks generation grid produces Band Lat
+     Pulldown / Kneeling Band Lat Pulldown **zero times**, so a green result
+     proved nothing about whether the stale copies would have caught a real
+     case. Confirmed both ways: reverting `hasBetterLoadingPeer` to the old
+     definition (mutation) left the gate green; a new CONSTRUCTED check,
+     calling the real predicate directly on the two catalogue entries the fix
+     was written for, correctly fails under that same mutation.
+  **Deliberately measured before deciding, not assumed**, per the CSCS review
+  below: whether `minimalist` should join `POOL_WIDE_IMPLEMENT_TIERS`
+  (generation had left it out 20 Sep, pending exactly this measurement). Across
+  every style x experience combination on a real generated grid, 5,312
+  prescribed slots: **0 disagreed** between the scope generation was already
+  using and the pool-wide scope the scorer had always used for minimalist. A
+  minimalist owns a kettlebell and dumbbells — real 'high'-rank, loadable
+  tools — so the reason for the narrow scope (protect a trainee whose kit
+  really is a backpack) never applied to them; widening changes no plan
+  generated before today and closes the inconsistency rather than trading it
+  for a new one. Joined.
+  **The CSCS review** (all five questions, since this touches what is
+  prescribed): (1) training effect — a genuinely loaded, progressable
+  substitute is now preferred consistently on every path a plan can change,
+  not just the moment it is first built; (2) what it takes away — nothing:
+  this is a scoring PREFERENCE, never a filter, and the "no genuine peer
+  survives unpenalised" guarantee is built into `hasBetterLoadingPeer` itself,
+  now applied uniformly; measured 0 real minimalist plans affected; (3)
+  fundamentals — untouched, this only re-ranks already-eligible same-
+  pattern/same-tier candidates; (4) does it redefine a floor — the
+  `worse_implement_than_available` rule now counts a narrower, more accurate
+  set (fewer false positives from the assisted-machine bug), which can only
+  RAISE a plan's score, never lower one below the existing 7.2 floor; the
+  floor itself was not re-derived, named rather than silently assumed; (5)
+  scope — pure exercise-selection logic, nothing clinical.
+  **NAMED, NOT FIXED, on purpose — bigger than this pass or not code that ships
+  on merge:**
+  - `quality-score.ts`'s peer pool ignores a trainee's own exercise bans
+    (`getConstrainedPool(profile, [])`, every call site in the file, not just
+    this rule) and would need `scorePlan`'s signature threaded with exclusions
+    through every caller (test:quality, test:audit, edit-tradeoff.ts,
+    ChatAssistant.tsx) — a dedicated pass, not a side effect of this one.
+  - The coach's own chat swap tool (`buildExerciseSwapProposal`) still has no
+    equipment-quality awareness — it resolves whatever name the model chose
+    with no ranking check at all. Not fixed here on purpose: the model always
+    names a SPECIFIC replacement, and the house rule for a direct request is
+    "you asked for it, you get it" (13 Sep), so this is a model-judgement gap,
+    not a missing filter — the right fix is a prompt rule, verified by the
+    coach exam, not a hard block in code. Bundled into the next `chat-gemini`
+    deploy work rather than guessed at here.
+  - `'farmer handles'` is also absent from `EQUIPMENT_QUALITY` — noticed, not
+    measured, not in today's scope.
+  **Gates**: `test:style-does-not-starve` gained 5 checks (44 total, was 39);
+  1 mutation (removing `carriesExternalLoad` from the shared predicate),
+  caught by exactly the new constructed check and nothing else — confirming
+  the natural-grid check alone still cannot see this case, which is the whole
+  reason the constructed one exists. 70 other gates reading the four changed
+  files re-run clean. `test:audit` and `test:quality` re-run as the pre-merge
+  check; results in the report this entry accompanies.
+  `npx tsc --noEmit` clean throughout.
+  **A REAL ENVIRONMENT DEFECT FOUND AND WORKED AROUND ON THE WAY, WORTH
+  RECORDING SEPARATELY**: this session's own working-tree branch pointer had
+  silently reverted to a commit from BEFORE all of today's and yesterday's
+  work, while the real, pushed branch on GitHub still had everything —
+  confirmed by fetching origin fresh and reading its actual tip. Caught before
+  a single edit was made, by the three background reviews describing functions
+  that a live grep of the (wrong) checked-out tree could not find at all. Fixed
+  by resetting the local branch to match origin exactly (working tree was
+  clean, nothing lost) and re-verifying every specific claim against the
+  restored, correct code before trusting any of it.
+
+- [x] **CORRECTION TO THE PARALLEL-REVIEW WORK ABOVE, MEASURED, NOT DEFERRED.**
+  21 Sep 2026. Two of the three background reviews behind the entry above
+  independently described `poolForRotation` as its OWN restated, pre-fix
+  predicate (no `carriesExternalLoad` term) — which would have been a real,
+  fourth undiscovered copy. Re-checked directly against the actual code after
+  the branch-pointer fix above: `poolForRotation` already calls
+  `hasBetterLoadingPeer` directly and always has, on the correct commit. The
+  discrepancy was mine, not theirs — my own first read of that function
+  happened while this session's tree was still on the stale, wrong commit
+  described above, before I had diagnosed it. Recorded so the same shape
+  (trusting a read taken before a known environment defect was fixed) isn't
+  repeated: after fixing a state-integrity problem, RE-READ everything you
+  concluded before the fix, don't just re-read what changed.
+
+- [x] **SETUP: THREE SUBAGENTS, A TYPECHECK HOOK, HOUSE RULES FOR PARALLEL
+  WORK.** 21 Sep 2026, mechanical infrastructure, no application code
+  touched. `engine-tracer` (read-only root-cause tracer, run BEFORE proposing
+  a fix for a non-obvious engine bug), `gate-runner` (verification runner,
+  derives affected gates from git diff, run AFTER an engine change),
+  `regression-reviewer` (read-only reviewer for two recurring defect shapes:
+  silent defaults, and fixtures that hold a value fixed and hide a branch) —
+  all three grounded in this repo's own real, previously-measured bug shapes
+  rather than generic checklists. A `PostToolUse` hook runs `npx tsc --noEmit`
+  after every Write/Edit — proven to fire with a live sentinel-file test, not
+  just written and assumed. New "Parallel work" section in this file: one
+  writer at a time in the main session, a worktree for any session editing
+  alongside another, the existing push-without-asking rule restated as it
+  actually stands (corrected from the task's own "commit-never-push" phrasing,
+  which does not match this file's real rule) rather than copied verbatim.
+
 - [x] **THE GATE THAT MAKES RULE 5 ENFORCEABLE WAS ONE LIVE CHECK AND FOUR DEAD
   BRANCHES.** 20 Sep 2026, hardening the coach exam before Ashley's run rather
   than after it.
