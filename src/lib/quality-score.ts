@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry} from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, TRACKS } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, hasBetterLoadingPeer, TRACKS } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -965,13 +965,21 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
         // Same exemptions the engine applies (rehab-indicated work, core) —
         // imported rather than restated so the harness can never start
         // penalising a pick the engine deliberately makes.
-        if (!entry || isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') continue
-        const betterAvailable = equipmentPool.some(p =>
-          p.movement_pattern === entry.movement_pattern &&
-          p.mechanics_tier === entry.mechanics_tier &&
-          bestEquipmentRank(p) === 'high'
-        )
-        if (!betterAvailable) continue
+        // ONE DEFINITION, SHARED WITH THE ENGINE — 21 Sep 2026, Ashley's call.
+        //
+        // This used to restate the question inline, on `movement_pattern` and
+        // with no test of whether the "better" peer could be loaded at all.
+        // The engine's predicate moved to `substitution_group` plus a loadable
+        // test, and leaving this one behind re-created the exact disagreement
+        // the work existed to remove — pointing the other way: the engine
+        // correctly kept a band lat pulldown and this rule went on calling it
+        // a defect.
+        //
+        // *** THE COUNT THIS RULE PRODUCES IS NOT COMPARABLE ACROSS THIS
+        // CHANGE. *** It now counts a narrower thing, so a drop is partly a
+        // change of definition and not only better plans. Any before/after
+        // quoting this rule must say which side of 21 Sep 2026 it came from.
+        if (!entry || !hasBetterLoadingPeer(entry, equipmentPool)) continue
         violatedRules.add('worse_implement_than_available')
         deductions.push({
           rule: 'worse_implement_than_available', day: day.day, weekNumber: week.week_number,
