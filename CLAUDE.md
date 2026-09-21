@@ -1026,6 +1026,33 @@ building phase. So just update the weight. No message."*
 - Do not trust or report "N commits ahead of origin" without verifying against origin — that line has been wrong repeatedly.
 - Frontend ships via push → Vercel. The Supabase edge functions (`chat-gemini`, `generate-meals`, `macro-calibration`, `onboarding-chat`) each need their own separate deploy: `npm run deploy:functions:prod -- <name>`, which asks for the `yes-production` phrase and names the target on the deploy itself. Note which is needed.
 
+## Parallel work
+
+- **One writer at a time in the main session.** Subagents (`investigator`,
+  `engine-tracer`, `gate-runner`, `regression-reviewer`) are for
+  investigation, verification and review — they read, trace and report, they
+  do not edit application code. The main session is the only writer, so two
+  edits can never land on the same file at once by accident.
+- **Use a worktree for any session that edits files alongside another** —
+  `isolation: worktree` (the `Agent` tool) or `claude --worktree` for a
+  second interactive session. Two sessions editing the same checkout at once
+  is how one silently clobbers the other's uncommitted work; a worktree gives
+  each its own files on its own branch.
+- **`engine-tracer` runs BEFORE proposing a fix** for any non-obvious bug in
+  plan generation, scoring, or prescription — this repo's own history (the
+  load-prescription clamp, the rest-floor mechanism, the "argument does
+  nothing" claim) is full of confident fixes aimed at the wrong cause because
+  nobody traced the whole call path first.
+- **`gate-runner` runs AFTER any engine change**, before reporting it done —
+  it runs the typecheck and the gates the diff actually touches (derived from
+  `git diff`, not guessed) and says what passed, what failed, and what it
+  couldn't reach.
+- **The push rule is unchanged for every agent, including a worktree
+  session**: push finished work to its own working branch without asking
+  (see "Git and deploy" above) — `main`, any production deploy, and any
+  migration still need Ashley's explicit word every time, whichever session
+  or worktree the change came from.
+
 ## Handing work to Ashley's machine
 
 Ashley runs Claude Code in VS Code against her local clone. Her ruling, 1 Sep
