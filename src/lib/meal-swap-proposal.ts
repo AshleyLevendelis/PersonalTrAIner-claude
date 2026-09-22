@@ -20,6 +20,7 @@ import { containsPhrase } from './meal-ingredients'
 import { validateMealAgainstDiet } from './diet-rules'
 import type { PoolOption } from './meal-generation'
 import type { ProposalDiff } from './pending-actions-store'
+import type { MacroTargets } from './types'
 
 const SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -30,8 +31,43 @@ export interface MealSwapArgs {
   reason?: unknown
 }
 
+/**
+ * WHY THE PAYLOAD CARRIES THE OPTION AS WELL AS ITS NAME.
+ *
+ * The executor only ever needed `chooseName` — swapPoolMeal looks the option
+ * up again by name. But the goal check (`assessMealEdit`) needs the NUMBERS,
+ * and it reads them off the built payload, deliberately: that is the one place
+ * every meal kind already puts its verified option, so a kind that supplies it
+ * is covered by construction rather than by remembering to wire it.
+ *
+ * Swapping a whole meal was the one meal change that never supplied it. It was
+ * listed in the coach's MEAL_KINDS map, so it LOOKED wired; `adviseMealEdit`
+ * bails on `!option?.macros` before reading the kind, so it returned null every
+ * time and the biggest single-tap macro change in the app was the only one
+ * never priced against the goal. Six of seven kinds carried `option`; this one
+ * carried a name.
+ *
+ * That is this codebase's signature defect — a declaration that is not a reach
+ * — and it survived because `test:meal-tradeoff` tests `kind: 'meal_swap'` and
+ * nothing else: every fixture exercised the one case production could not
+ * produce.
+ */
 export type MealSwapProposalResult =
-  | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: { slot: MealSlotName; currentName: string; chooseName: string }; diff: ProposalDiff }
+  | {
+      ok: true
+      scopeKey: string
+      preconditions: Record<string, unknown>
+      payload: {
+        slot: MealSlotName
+        currentName: string
+        chooseName: string
+        /** The option going in, so the change can be priced against the day's targets. */
+        option: { name: string; macros: MacroTargets }
+        /** A higher-protein option from this same pool, when one exists — the cheaper route the ask offers. */
+        higherProteinOption?: { name: string; protein: number }
+      }
+      diff: ProposalDiff
+    }
   /** `exhausted` marks the case Ashley's ruling covers: they have seen everything in the pool, so the honest next move is to OFFER to find new ones rather than to keep re-serving what they have already turned down. */
   | { ok: false; reason: string; exhausted?: { slot: MealSlotName; poolSize: number } }
 
@@ -42,6 +78,36 @@ function normaliseSlot(value: unknown): MealSlotName | null {
 
 const byName = (options: PoolOption[], name: unknown) =>
   options.find(o => o.name.toLowerCase() === String(name ?? '').trim().toLowerCase())
+
+/**
+ * The cheaper route, read off THEIR OWN POOL rather than invented.
+ *
+ * `assessMealEdit` has carried a `higherProteinOption` field since it was
+ * written, and its own comment says the alternative must come from the pool
+ * because "offering one would be the app promising food it cannot produce".
+ * Until now nothing passed it outside a test fixture, so the chip it builds —
+ * "Swap my dinner for X instead" — could never appear, and the closing
+ * sentence always fell back to the no-alternative wording.
+ *
+ * Excludes the meal they are LEAVING as well as the one going in: suggesting
+ * they swap to what they are already eating is not an alternative, and it is
+ * the obvious wrong answer when the current meal is the pool's protein leader.
+ * Strictly greater, so an equal-protein option is never dressed up as a fix.
+ */
+export function higherProteinAlternative(
+  allowed: PoolOption[],
+  chosen: PoolOption,
+  currentName: string,
+): { name: string; protein: number } | undefined {
+  const current = currentName.trim().toLowerCase()
+  const better = allowed
+    .filter(o =>
+      o.name !== chosen.name &&
+      o.name.toLowerCase() !== current &&
+      o.macros.protein > chosen.macros.protein)
+    .sort((a, b) => b.macros.protein - a.macros.protein)[0]
+  return better ? { name: better.name, protein: better.macros.protein } : undefined
+}
 
 export interface BuildMealSwapInput {
   rawArgs: MealSwapArgs
@@ -175,7 +241,14 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
     ok: true,
     scopeKey: `${input.profileId}:propose_meal_swap:${slot}`,
     preconditions: { slot, currentItemName: currentName },
-    payload: { slot, currentName, chooseName: chosen.name },
+    payload: {
+      slot,
+      currentName,
+      chooseName: chosen.name,
+      // The numbers, not just the name — see MealSwapProposalResult.
+      option: { name: chosen.name, macros: chosen.macros },
+      higherProteinOption: higherProteinAlternative(allowed, chosen, currentName),
+    },
     diff: {
       rows: [
         { field: 'Meal', before: currentName || slot, after: chosen.name },

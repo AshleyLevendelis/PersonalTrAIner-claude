@@ -361,7 +361,33 @@ menu" stays true when a copy is also left outside it.
   exercise twice), which is why this composes the SWAP path once per slot
 
 **Changing one meal** — mirrored from exercise, because meals are plans too
-- Replace it, regenerate it, ask for more — both; `meal-swap-rotation`
+- Replace it, regenerate it, ask for more — both; `meal-swap-rotation`.
+  **AND SINCE 22 Sep 2026 THE SWAP SAYS WHAT IT COSTS THE DAY**, which
+  completes her 14 Sep ask-then-allow ruling on the one kind that never
+  reached it. `assessMealEdit` judges seven meal kinds; `adviseMealEdit` reads
+  the trial off the built PAYLOAD and bails on `!option?.macros` before it
+  looks at the kind. Six builders supplied an option; **the swap supplied a
+  name**, so `propose_meal_swap` sat in the coach's `MEAL_KINDS` map, looked
+  wired to any reader, and returned null every time — the biggest single-tap
+  macro change in the app was the only one never priced. The screen was the
+  same: its swap list showed a per-row delta, which meal-tradeoff's own header
+  calls a readout, and a slot delta cannot answer "does the DAY still hit
+  protein".
+  **WHY NOTHING CAUGHT IT, and this is the part worth keeping**:
+  `test:meal-tradeoff` builds its contexts by hand and EVERY fixture in it uses
+  `kind: 'meal_swap'` — the one case production could not produce. The module
+  was proved correct and proved unreachable in the same run. "Tested in pieces"
+  and "has ever run" again, with the gate pointing at the hole.
+  **TWO FIELDS WERE DEAD IN THE SAME MODULE, and a dead field looks exactly
+  like wiring.** `higherProteinOption` — the "swap my dinner for X instead"
+  chip — was passed only by a test fixture, so it could never appear in the
+  app; it now comes off the person's own pool. `newFoodName` was never passed
+  AND never read, not even inside its own module, and is deleted rather than
+  filled. Before reporting an unpassed argument, read what the code behind it
+  would do; before filling one, check anything reads it.
+  `meal-swap-cost` (23 checks, 6 mutations), `verify:meal-swap-cost` (11
+  checks, 4 mutations, the screen), `verify:meal-tradeoff` §3 (7 checks, 3
+  mutations, the coach). Needs no deploy — both halves are client-side.
 - Add a food to it — both surfaces since 14 Sep 2026. The exception list said
   this needed free-text entry the screen does not have; that reason was too
   strong. The foods the app can COST are a known list, so the screen searches

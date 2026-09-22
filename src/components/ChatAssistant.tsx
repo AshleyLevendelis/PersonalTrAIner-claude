@@ -673,6 +673,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const slot = String((payload as { slot?: unknown }).slot ?? '').toLowerCase()
     const option = (payload as { option?: { macros?: MacroTargets } }).option
     if (!slot || !option?.macros) return null
+    // THE CHEAPER ROUTE, when the builder found one in their own pool. Only
+    // the swap can supply this today — it is the only kind whose alternatives
+    // are a list of ready meals for the same slot — but it is read off the
+    // payload like everything else here, so any future kind that supplies one
+    // is covered without touching this function.
+    const higherProteinOption = (payload as { higherProteinOption?: { name: string; protein: number } }).higherProteinOption
 
     const sum = (rows: { calories: number; protein: number; carbs: number; fat: number }[]) =>
       rows.reduce((a, r) => ({
@@ -709,6 +715,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       goal: (profile.fitness_goal ?? 'hypertrophy') as FitnessGoal,
       targets: macros, dayBefore, dayAfter, kind, slot, foodName,
       priorCostlyChangesThisBlock,
+      higherProteinOption,
     }
     return { verdict: assessMealEdit(ctx), key, scope: 'permanent' }
   }

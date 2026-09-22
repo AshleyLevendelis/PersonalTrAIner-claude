@@ -91,8 +91,12 @@ export interface MealEditContext {
   slot: string
   /** What is being removed, swapped out or resized, where there is one. */
   foodName?: string
-  /** What is going in, on a swap or replace. */
-  newFoodName?: string
+  // `newFoodName` stood here, declared for "what is going in, on a swap or
+  // replace". Nothing ever passed it and nothing ever read it — not even this
+  // module — so it was a field that looked like wiring. Deleted 22 Sep 2026
+  // rather than filled: the incoming meal's NUMBERS are what this judgement
+  // needs, and those arrive as dayAfter. A name would only have changed the
+  // sentence, and the sentence reads better about the slot.
   /**
    * How many goal-damaging meal changes this block already. The CALLER owns
    * this count, because it needs history a pure module must not fetch — the

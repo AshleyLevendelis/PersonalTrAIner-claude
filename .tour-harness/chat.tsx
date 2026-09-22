@@ -416,6 +416,45 @@ const db: Db = {
   chat_messages: seededRows, exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
+/**
+ * ?swappool=1 — A BREAKFAST POOL, so `propose_meal_swap` has somewhere to go.
+ *
+ * Every other run of this harness leaves `meal_plan_slots` empty, which is
+ * correct for them: the food-edit builders read the meal off the PROP, not the
+ * pool. The swap builder is the one that reads the pool, and with none it
+ * refuses with "I don't have any breakfast options saved" — a refusal is not
+ * the path under test.
+ *
+ * GATED so the other drivers on this page keep the fixture they were written
+ * against, and index 0 IS the meal already on the plan, because the rotation
+ * steps forward from where you are and can only do that if it can find you.
+ *
+ * INPUT ONLY. The two alternatives are ordinary breakfasts; whether either is
+ * worth asking about is the app's arithmetic against this profile's own
+ * targets, and nothing here asserts it. They sit either side of the answer on
+ * purpose — one strips the slot's protein, one beats it — so the run shows the
+ * app reading the meal rather than warning on everything.
+ */
+if (new URLSearchParams(location.search).get('swappool') === '1' && macros) {
+  const bf = mealPlan.find(m => m.meal === 'breakfast')?.items?.[0] as unknown as { name: string; calories: number; protein: number; carbs: number; fat: number } | undefined
+  if (bf) {
+    const poolRow = (i: number, name: string, kcal: number, protein: number, ingredients: { name: string; quantity: number; unit: string }[]) => ({
+      profile_id: PROFILE_ID, slot: 'breakfast', pool_index: i, name,
+      ingredients, macros: { kcal, protein, carbs: 40, fat: 12 }, tags: [], prep: '',
+    })
+    db.meal_plan_slots.push(
+      poolRow(0, bf.name, bf.calories, bf.protein, [
+        { name: 'greek yoghurt 0%', quantity: 250, unit: 'g' }, { name: 'oats', quantity: 60, unit: 'g' },
+      ]),
+      poolRow(1, 'Jam on toast', bf.calories, 5, [
+        { name: 'white bread', quantity: 80, unit: 'g' }, { name: 'strawberry jam', quantity: 40, unit: 'g' },
+      ]),
+      poolRow(2, 'Chicken omelette', bf.calories, bf.protein + 15, [
+        { name: 'egg', quantity: 3, unit: 'whole' }, { name: 'chicken breast', quantity: 120, unit: 'g' },
+      ]),
+    )
+  }
+}
 setSupabaseClient(makeFakeSupabase(db) as never)
 // The driver reads rows back to prove the nudge REACHED the database rather
 // than only React state — a message that exists in neither survives a reload

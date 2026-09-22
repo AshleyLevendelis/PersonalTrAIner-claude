@@ -76,6 +76,18 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   window.fetch = async (url, init) => {
     if (String(url).includes('chat-gemini')) {
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
+      // SWAPPING A WHOLE MEAL — the seventh kind of the same rule, and the one
+      // that reached none of this until 22 Sep 2026. No new_item: the app's own
+      // rotation picks, which is the live path.
+      if (/swap/i.test(said)) {
+        return new Response(JSON.stringify({
+          reply: '',
+          proposal: {
+            kind: 'propose_meal_swap',
+            rawArgs: { meal_slot: 'breakfast', old_item: window.__mealDay?.plan?.find(m => m.meal === 'breakfast')?.items?.[0]?.name },
+          },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
       if (!/take|remove|drop/i.test(said)) return new Response(JSON.stringify({ reply: 'Sure.' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       return new Response(JSON.stringify({
         reply: '',
@@ -89,7 +101,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   }
 ` })
 
-await send('Page.navigate', { url: `http://127.0.0.1:${port}/` })
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?swappool=1` })
 await wait(4000)
 
 const day = await ev('window.__mealDay ?? null')
@@ -117,6 +129,18 @@ const ask = async words => {
   await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (b && !b.disabled) b.click() })()`)
   await wait(4500)
 }
+
+/**
+ * HOW MANY CARDS ARE ON THE PAGE, not whether any is.
+ *
+ * The chat is a TRANSCRIPT. Phase 2 deliberately produces a card, and it is
+ * still there while phase 3 runs — so `hasCard` answers "has this conversation
+ * ever carded", which is true from that point on however phase 3 behaves. Read
+ * off a real run: check 3a failed on a correct app, and 3g would have PASSED
+ * without the swap producing anything at all. The property either check is
+ * really about is whether THIS TURN added one.
+ */
+const cardCount = () => ev(`(document.body.innerText.match(/Proposed change/gi) || []).length`)
 
 const READ = `(() => {
   const text = document.body.innerText
@@ -155,8 +179,47 @@ await shoot('meal-tradeoff-second-ask')
 check('2a. asked a second time, it stops asking and shows the card', second.hasCard === true, second)
 check('2b. ...so the change was never blocked, only slowed by one tap', second.hasApply === true, second)
 
+// --- 3. SWAPPING THE WHOLE MEAL, which reached none of this until 22 Sep ----
+//
+// THE DEFECT, IN THE PLACE IT LIVED. `adviseMealEdit` reads the trial's numbers
+// off the built payload and bails on `!option?.macros` before it looks at the
+// kind. Six builders supplied an option; the swap supplied a name, so
+// `propose_meal_swap` was listed in MEAL_KINDS, looked wired to any reader, and
+// returned null every time. Only a driver can tell "wired" from "reached" —
+// the meal step hangs off `if (!advice && built)`, and a source check reads
+// that line whether or not it ever runs.
+//
+// A FRESH KEY, so this is a first ask and not the card the salmon now gets:
+// the counter is per kind and per slot, and this is meal_swap on breakfast.
+const cardsBeforeSwap = await cardCount()
+await ask('swap my breakfast')
+const swap = await ev(READ)
+const cardsAfterSwap = await cardCount()
+await shoot('meal-tradeoff-swap-ask')
+
+check('3a. a whole-meal swap is asked about, and adds no card of its own',
+  cardsAfterSwap === cardsBeforeSwap, { cardsBeforeSwap, cardsAfterSwap, tail: swap.tail })
+check('3b. ...with a question', /\?/.test(swap.tail), swap.tail)
+check('3c. ...naming protein in grams, like the food edits do',
+  /protein/i.test(swap.tail) && /\d+\s*g/i.test(swap.tail), swap.tail)
+check('3d. ...and offers "Do it anyway"', swap.chips.some(c => /do it anyway/i.test(c)), swap.chips)
+// THE CHEAPER ROUTE THE POOL CAN ACTUALLY SERVE. `higherProteinOption` existed
+// in assessMealEdit from the day it was written and was passed only by a test
+// fixture, so this chip could never appear in the app.
+check('3e. ...and a higher-protein option off their own pool',
+  swap.chips.some(c => /higher-protein/i.test(c)), swap.chips)
+check('3f. ...never in the app\'s internal vocabulary',
+  !/score|tier|dimension/i.test(swap.tail), swap.tail)
+
+// Asked twice, it gets out of the way — the same allow-after-one-tap the
+// removal proves above, on the kind that never asked at all.
+await ask('swap my breakfast')
+const cardsAfterSecond = await cardCount()
+check('3g. asked again, it ADDS a card rather than asking twice',
+  cardsAfterSecond > cardsAfterSwap, { cardsAfterSwap, cardsAfterSecond })
+
 const err = await ev('window.__err ?? null')
-check('3. no uncaught error on the page', err === null, err)
+check('4. no uncaught error on the page', err === null, err)
 
 console.log(failures === 0 ? '\nA goal-damaging meal change is asked about, then allowed.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

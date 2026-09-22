@@ -2,6 +2,88 @@
 
 Newest first. One line each.
 
+- [x] **A meal swap says what it costs the day — the seventh kind of a rule
+  that only ever reached six.** 22 Sep 2026, on Ashley's "wire it up" after a
+  report she asked for: *"check if meals have the same gap exercises had"*.
+  **NOT A NEW RULING.** Her 14 Sep decision stands unchanged — a change working
+  against the goal is ASKED about once and then ALLOWED, with "do it anyway"
+  always one tap away. This is that ruling reaching the one path it never did.
+  No threshold moved: `PROTEIN_AGAINST_GOAL_FRACTION` (0.8),
+  `PROTEIN_WORTH_SAYING_FRACTION` (0.95) and `CALORIE_OVERSHOOT_FRACTION` (0.1)
+  are untouched. What changed is that an existing floor now BINDS where it
+  previously could not, so more asks fire than before — deliberately.
+  **WHAT WAS WRONG.** `assessMealEdit` judges seven meal edit kinds. The coach
+  reaches it through `adviseMealEdit`, which reads the trial's numbers off the
+  built PAYLOAD and bails on `!option?.macros` *before* it looks at the kind.
+  Six builders put a verified `option` in the payload; `buildMealSwapProposal`
+  put a NAME. So `propose_meal_swap` was listed in `MEAL_KINDS`, looked wired to
+  any reader, and returned null every single time. Swapping a whole meal — the
+  biggest single-tap macro change in the app — was the only meal change never
+  priced against the goal. The screen was the same in its own way: the swap
+  list carried a per-row delta ("+120 kcal, -22g P"), which meal-tradeoff's own
+  header calls a readout, and a slot delta cannot answer "does the DAY still
+  hit protein".
+  **WHY NOTHING CAUGHT IT, which is worth more than the fix.**
+  `test:meal-tradeoff` hand-builds its contexts and EVERY fixture in it uses
+  `kind: 'meal_swap'` — the one case production could not produce. The module
+  was proved correct and proved unreachable in the same run, with the gate
+  aimed squarely at the hole. "Tested in pieces" and "has ever run" are
+  different claims, again.
+  **TWO DEAD FIELDS IN THE SAME MODULE.** `higherProteinOption` — which builds
+  the "Swap my dinner for X instead" chip — was passed only by a test fixture,
+  so the chip could never appear in the app; it now comes off the person's own
+  pool, excluding the meal they are leaving (suggesting back what they are
+  already eating is not an alternative) and requiring strictly more protein so
+  an equal option is never dressed up as a fix. `newFoodName` was never passed
+  AND never read, not even inside its own module — DELETED rather than filled,
+  because what the judgement needs is the incoming meal's numbers and those
+  arrive as `dayAfter`.
+  **CSCS review** (required: this changes what somebody is told about their
+  food, not what they are prescribed). 1. *Training effect*: nothing about the
+  session changes; the effect is on adherence, and protein is the right thing
+  to defend — it is the macro that protects lean mass in a deficit and supports
+  hypertrophy, and the hardest to make up later in the day. 2. *What it takes
+  away*: friction, one sentence on a row and one question in chat, bounded by
+  once-per-block-per-thing and by the tier gates. 3. *Fundamentals*: untouched;
+  no exercise, load, set, rep, rest or frequency moves. 4. *Does it redefine a
+  floor?* No — and this is the question that mattered: the numbers are the same
+  ones, they simply now bind on a seventh path, which is a change in REACH and
+  is stated here rather than left to be discovered. 5. *Scope*: population-level
+  performance nutrition, not clinical.
+  **VERIFIED.** `test:meal-swap-cost` (23 checks, 6 mutations, 6 caught) drives
+  the real builder against a stubbed pool and feeds the payload through the
+  coach's own guard as a PREDICATE, because the guard is what was failing.
+  `verify:meal-swap-cost` (11 checks, 4 mutations, 4 caught) reads the screen at
+  390x844: two alternatives on screen, exactly ONE carrying a warning, and the
+  sentence naming the DAY's 100g rather than the meal's 10g — a check for "a
+  warning appeared" would pass on a slot readout in a new costume.
+  `verify:meal-tradeoff` §3 (7 checks, 3 mutations, 3 caught) drives the real
+  chat: *"That puts your day at 125g protein against a 160g target — enough
+  short that you'd feel it in how you recover from this week's sessions. Want a
+  higher-protein version, or shall I do it anyway?"*, with no card, and a card
+  on the second ask. 13 mutations tried across the three, 13 caught, every run
+  at the baseline check count.
+  **TWO THINGS THE RUN ITSELF CORRECTED.** The first version of the source gate
+  read `payload.option.macros` directly, so the most important mutation — the
+  original defect — THREW instead of failing and came back CRASH (0 of 23 ran);
+  null-safe now, and it is a catch. And two checks in the chat driver asked
+  "is there a card on the page" when the chat is a TRANSCRIPT and phase 2
+  deliberately leaves one: 3a failed on a correct app and 3g would have passed
+  with the swap doing nothing at all. Both now count cards before and after the
+  turn.
+  **MEASURED, NOT ASSUMED**: the app chunk grew 571 bytes raw / 80 gzipped,
+  compared against a build of HEAD in a separate `git worktree` (never a stash).
+  `test:bundle` passes with 24 kB of raw headroom; the re-download budget sits
+  at 2 kB, which was already true before this change.
+  **FOR ASHLEY, NOT CHANGED**: on the swap row the green "-60 kcal, -35g P"
+  now sits beside an amber warning, because that delta is coloured by CALORIES
+  alone. Green reads as good next to a sentence saying the opposite. What the
+  app says and how it looks is hers, so it is reported rather than altered.
+  `meal-swap-proposal.ts`, `meal-tradeoff.ts`, `ChatAssistant.tsx`,
+  `MealPlan.tsx`; harness fixtures gated behind `?swapalts=1` and `?swappool=1`
+  so the 52 drivers sharing those pages keep the fixture they were written
+  against. No deploy needed — both halves are client-side.
+
 - [x] **MERGED TO MAIN — 20 Sep 2026, on Ashley's explicit "merge it".** Twenty
   commits, from `a748e53` to the merge. The authorisation is the one CLAUDE.md
   requires for `main` every time, and it was given in those words.

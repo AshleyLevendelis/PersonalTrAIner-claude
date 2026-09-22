@@ -728,6 +728,46 @@ const pools = (REFIT
   ? { breakfast: [refitChosen.breakfast], lunch: [refitChosen.lunch], dinner: [refitChosen.dinner], snack: [refitChosen.snack] }
   : { breakfast: [(chosen as never as Record<string, unknown>).breakfast], lunch: [(chosen as never as Record<string, unknown>).lunch], dinner: [(chosen as never as Record<string, unknown>).dinner] }) as never
 
+/**
+ * ?swapalts=1 — A SECOND AND THIRD BREAKFAST, so the swap list has rows.
+ *
+ * GATED, and not out of timidity: every other driver on this page is written
+ * against a one-option pool, where "Swap · N options" does not render at all.
+ * Changing the shared pool is how seven green drivers go red at once for a
+ * reason none of them is about.
+ *
+ * THE FIXTURE CHOOSES THE INPUT AND NEVER THE OUTPUT. That is the rule the
+ * `?prep=1` fixture broke by writing a load onto a slot instead of letting the
+ * app price it, which left its driver proving the fixture's own number for
+ * weeks. These are two ordinary breakfasts. Whether either is worth a warning
+ * is computed by the screen from the day and the targets; nothing here states
+ * an expectation about it, and the driver reads what the app decided.
+ *
+ * THE TWO SIT ON OPPOSITE SIDES OF THE ANSWER, because a list where every row
+ * says the same thing cannot show that the app is reading the row it is on —
+ * one candidate cannot test a choice. Against this harness's day (1980 kcal
+ * and 135g protein planned, targets 3040 and 160g) and its 45g breakfast:
+ *   - Toast and jam at 10g would take the day to 100g of a 160g target
+ *   - Chicken omelette at 50g leaves it at 140g, which is nobody's emergency
+ */
+const SWAP_ALTS = new URLSearchParams(location.search).get('swapalts') === '1'
+if (SWAP_ALTS) {
+  const alt = (name: string, calories: number, protein: number, carbs: number, fat: number, ingredients: { name: string; quantity: number; unit: string }[]) => ({
+    slot: 'breakfast', name, ingredients,
+    macros: { calories, protein, carbs, fat }, tags: [] as string[], prep: '',
+  })
+  ;((pools as never as Record<string, unknown[]>).breakfast).push(
+    alt('Toast and jam', 420, 10, 80, 6, [
+      { name: 'white bread', quantity: 80, unit: 'g' },
+      { name: 'strawberry jam', quantity: 30, unit: 'g' },
+    ]),
+    alt('Chicken omelette', 520, 50, 8, 30, [
+      { name: 'egg', quantity: 3, unit: 'whole' },
+      { name: 'chicken breast', quantity: 100, unit: 'g' },
+    ]),
+  )
+}
+
 // The leftovers run needs a pool it can actually re-portion, so the dinner is
 // sized for a dinner and the lunch slot is left to the rotation. Quantities
 // only — every macro below is computed by the app from food-db.
@@ -795,6 +835,7 @@ for (const [slot, option] of Object.entries(chosen as Record<string, { name: str
     prep: option.prep ?? '',
   })
 }
+
 
 function Harness() {
   const { route } = useAppRoute()

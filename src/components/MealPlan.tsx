@@ -17,6 +17,12 @@ import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestr
 import { methodSafeToShow, type PoolOption } from '@/lib/meal-generation'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
+// The goal check, on the swap list. Both are pure and live in tradeoff-shape /
+// meal-tradeoff precisely so a nutrition screen can price a change without
+// dragging the exercise catalogue and the plan scorer into the main chunk —
+// see tradeoff-shape.ts's header for the bundle regression that split them.
+import { assessMealEdit } from '@/lib/meal-tradeoff'
+import { downgradeToCard } from '@/lib/tradeoff-shape'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
 // Add food, so paying for them on first paint is paying for a screen most
 // opens never reach. Caught by test:bundle going 11 kB over its ceiling the
@@ -1055,12 +1061,52 @@ function MealSlotRow({
           )}
           {moveNote && <p className="text-[0.71875rem] text-muted-foreground">{moveNote}. Both were resized to fit where they landed.</p>}
 
-          {swapOpen && (
+          {swapOpen && (() => {
+          /**
+           * WHAT THE SWAP COSTS THE GOAL, on the row, before the tap.
+           *
+           * This list showed a per-row DELTA — "+120 kcal, -22g P" — and the
+           * meal-tradeoff header calls that exactly what it is: a readout. It
+           * says the number moved and never what the number means, and a slot
+           * delta cannot answer "does the DAY still hit protein", which is the
+           * only question worth asking. Swapping a whole meal was the one meal
+           * change neither surface priced.
+           *
+           * DOWNGRADED, never asked: tapping a row here applies immediately —
+           * there is no confirm step to hang a question on — so a tier 2 shows
+           * its cost sentence like a tier 1. That is the same choice the food
+           * edit sheet already makes for the same reason, not a new one.
+           *
+           * Null whenever the day is not knowable (no targets, no goal, no
+           * totals): silence over a judgement invented from a day this screen
+           * cannot see, which is assessMealEdit's own rule.
+           */
+          const costCtx = editContextFor(option)
+          const costFor = (alt: PoolOption): string | null => {
+            if (!costCtx?.dayTotals || !costCtx.fitnessGoal || !costCtx.targets) return null
+            const d = costCtx.dayTotals
+            const m = costCtx.meal.macros
+            return downgradeToCard(assessMealEdit({
+              goal: costCtx.fitnessGoal,
+              targets: costCtx.targets,
+              dayBefore: d,
+              dayAfter: {
+                calories: d.calories - m.calories + alt.macros.calories,
+                protein: d.protein - m.protein + alt.macros.protein,
+                carbs: d.carbs - m.carbs + alt.macros.carbs,
+                fat: d.fat - m.fat + alt.macros.fat,
+              },
+              kind: 'meal_swap',
+              slot,
+            })).cost
+          }
+          return (
             <div className="flex flex-col gap-1">
               {otherOptions.map(alt => {
                 const calDelta = Math.round(alt.macros.calories - option.macros.calories)
                 const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
                 const verdict = checkAlternative(alt)
+                const cost = verdict.ok ? costFor(alt) : null
                 return (
                   <button
                     key={alt.name}
@@ -1078,6 +1124,16 @@ function MealSlotRow({
                         <p className="tabular-mono text-[0.65625rem] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
                       ) : (
                         <p className="text-[0.65625rem] text-[color:var(--role-warn)]">{verdict.message ?? "Clashes with what you've said you avoid"}</p>
+                      )}
+                      {/* The day, not the slot. Wraps rather than clamps: a
+                          cost you cannot read is a cost that was not stated. */}
+                      {cost && (
+                        <p
+                          className="mt-0.5 text-[0.65625rem] text-[color:var(--role-warn)]"
+                          data-meal-swap-cost={alt.name}
+                        >
+                          {cost}
+                        </p>
                       )}
                     </div>
                     {verdict.ok && (
@@ -1112,7 +1168,8 @@ function MealSlotRow({
               )}
               {findMoreNote && <p className="px-1 text-[0.65625rem] text-muted-foreground">{findMoreNote}</p>}
             </div>
-          )}
+          )
+          })()}
         </div>
       )}
     </div>
