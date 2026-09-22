@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **BUILT THE "WHICH EXERCISE" HALF OF THE COACH EXAM — NAMED TWICE, THIS
+  TIME BUILT RATHER THAN DEFERRED AGAIN.** 22 Sep 2026, closing the follow-up
+  from this morning's equipment-preference rule. `expectsProposalKind` can
+  grade WHICH TOOL the coach reached for; nothing could grade WHICH EXERCISE
+  it named as a swap's replacement, so the new equipment-quality rule had no
+  way to be checked even in principle — the exact "a check I cannot see fail
+  isn't a check" trap named this morning as the reason not to fake one.
+  **What it is.** A new hard rule, `wrong-swap-replacement`
+  (`coach-exam-hard-rules.ts`), Tier A (machine-decidable, no model, no
+  judgement in the loop) — the same tier `wrong-proposal-kind` lives in and
+  built the same way: a new `ExamChecks` field, `swapReplacementOneOf: {
+  turn, oneOf: string[] }[]`, declared PER CASE rather than derived from a
+  live pool. The case author (a human, or me writing one, reading the real
+  catalogue) decides up front which named exercises would satisfy the app's
+  own equipment preference for that exact scenario — the grader has no
+  profile, no exclusions, no injury filtering to rebuild the real pool with,
+  and re-deriving `hasBetterLoadingPeer` a second, worse way inside the
+  grader would be its own bug waiting to drift from the real one.
+  Only judges a turn carrying a `propose_exercise_swap` card — a missing or
+  wrong-kind card is `wrong-proposal-kind`'s job, not this one's — and a
+  direct, user-named request is out of scope by design (the rule it grades
+  only applies when the COACH is the one choosing).
+  **A real exam case now exists for it** — `swap-prefers-loaded-peer.json`,
+  the FIRST coach-exam case to exercise `propose_exercise_swap` at all.
+  Walking Lunges is already in the base fixture's Tuesday plan; measured
+  against the real catalogue and `EQUIPMENT_SETS.home_gym` directly (not
+  assumed), Bulgarian Split Squats is the one same-pattern, same-tier,
+  home-gym-real, genuinely loaded peer — Step-Ups was the obvious second
+  candidate and is WRONG for this profile specifically, because its
+  equipment (`['dumbbells','box']`, no alternatives flag) needs 'box',
+  which home_gym's set does not carry; would have shipped a case that failed
+  a correct coach. Caught by checking the tier set directly rather than
+  assuming the pattern-family peer list was interchangeable.
+  **Mutation-tested**: forced the rule to always return no violations
+  (`if (true) return []`); the one fixture written to prove it fires
+  correctly failed, exactly as it should; reverted.
+  **Gates**: `npx tsc --noEmit` clean. `test:coach-exam-grader` (extended
+  with 9 new fixture checks plus 2 derivation checks — a real case declares
+  the field, and every exercise it names is one the catalogue actually has,
+  the same shape as the existing "every tool a case names is one the coach
+  declares" check), `test:coach-exam-runner`, `test:coach-clock` and
+  `test:coach-exam-fresh` (the four gates that read either file, found by
+  grep) all re-run clean.
+  **Still true, and now narrower**: this can grade a TRANSCRIPT once one
+  exists. Running the case against the real, deployed coach still needs
+  credentials this session does not have — same standing limitation as
+  every coach-exam gate. What changed is that the grading half is no longer
+  the missing piece; when the exam next runs for real (Ashley's machine, per
+  the handoff), this case and this rule are ready to report a genuine
+  pass/fail rather than being silently unable to.
+
 - [x] **THE COACH'S PROMPT ALREADY CLAIMED TO REASON ABOUT "EXPERIENCE" IT WAS
   NEVER SENT.** 22 Sep 2026, the second half of the "same shape" gap named in
   today's equipment-access fix. `training_experience` was never in

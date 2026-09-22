@@ -1,0 +1,11 @@
+{
+  "name": "swap-prefers-loaded-peer",
+  "why": "The 22 Sep 2026 equipment-quality rule: when the COACH is the one picking a swap's replacement (nothing named), it must prefer a genuinely loaded option over a band or bodyweight-only one, when both are realistic for this person's equipment. This is the first coach-exam case to exercise propose_exercise_swap at all, and the first that can grade WHICH exercise a card names rather than only whether one appeared. Walking Lunges is already in the base fixture's Tuesday plan; Bulgarian Split Squats is its one same-pattern, same-tier, home-gym-real, genuinely loaded peer in the catalogue (checked directly against EQUIPMENT_SETS.home_gym, not assumed) — Split Squat (Bodyweight) and the rest of the single-leg group are the unloaded compromise this rule exists to stop the coach reaching for by default.",
+  "messages": [
+    "Swap the walking lunges for something else today, please."
+  ],
+  "checks": {
+    "expectsProposalKind": [{ "turn": 0, "oneOf": ["propose_exercise_swap"] }],
+    "swapReplacementOneOf": [{ "turn": 0, "oneOf": ["Bulgarian Split Squats"] }]
+  }
+}
