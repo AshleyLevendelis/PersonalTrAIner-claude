@@ -84,6 +84,7 @@ import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
+import { buildCoachInjuriesSummary } from '@/lib/injuries-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
@@ -1397,6 +1398,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // carried no prescribed weight while the Exercise tab showed that weight
     // on the next screen.
     const stepsSummary = buildCoachStepsSummary(todaySteps, profile)
+    const injuriesSummary = buildCoachInjuriesSummary(profile)
     // WHICH DAY IT IS, ANSWERED RATHER THAN IMPLIED. Ashley, 7 Sep 2026: the
     // coach called Tuesday's bench "today's", then offered a finished Monday
     // session as something to head in for "this morning" at 6:33 PM. Every
@@ -1585,6 +1587,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
       steps_summary: stepsSummary,
+      injuries_summary: injuriesSummary,
       phase_brief: phaseBrief,
       // Empty string when there is nothing to say — which is also what stops
       // the coach asking twice: once record_session_feel writes `felt`, the

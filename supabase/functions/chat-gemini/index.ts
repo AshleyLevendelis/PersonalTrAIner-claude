@@ -2349,6 +2349,7 @@ USER PROFILE:
 - Session Duration: ${context.session_duration_preference || '45-60'} minutes
 - Workout Split: ${context.workout_split_preference || 'ai_recommendation'}
 ${context.dietary_preferences && context.dietary_preferences.length > 0 ? `- Dietary Restrictions: ${context.dietary_preferences.join(", ")}` : ""}
+- Injuries: ${context.injuries_summary || 'No injuries or sore areas currently on file.'}
 
 SESSION DURATION SCALING (MANDATORY):
 The user has ${context.session_duration_preference || '45-60'} minutes per session. Scale your exercise recommendations accordingly:

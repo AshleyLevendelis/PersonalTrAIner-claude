@@ -2,6 +2,52 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAN NOW SAY WHAT IT IS ALREADY DOING ABOUT AN INJURY.** 22
+  Sep 2026, closing the injuries finding from the profile-field audit — put
+  to Ashley first because it's safety-adjacent, not wired through alone.
+  Her ruling: yes, let the coach see the current list.
+  **What it is, and isn't.** `injuries` reaches PLAN GENERATION (the
+  exercise list the coach already reads is filtered around them) but never
+  reached the CONVERSATION — asked "are you still working around my knee?"
+  the coach had nothing to check against. This is READ ONLY: no new tool, no
+  new write path, no change to what a plan generates, no change to the
+  existing pain-triage rules (§1c/§3a still decide everything about a NEW
+  report). It only lets the coach state a fact it is already acting on.
+  **Built as a shared function, not inline plumbing** — unlike the three
+  earlier finds today, this one is genuinely new logic (partitioning stored
+  values into what the plan acts on vs. legacy free text, picking a real
+  display label, wording that changes on count), so it got its own file
+  (`src/lib/injuries-context.ts`) and its own gate, the same shape
+  `steps-context.ts`/`test:coach-logs-steps` already use for steps. Calls
+  `partitionInjuries` (`onboarding-slots.ts`) — the SAME function the
+  Profile screen uses to turn stored injuries into what the plan engine
+  acts on — rather than a second copy of that logic.
+  **The safety property, stated and tested**: legacy free-text injuries that
+  don't map to the plan engine's eight known areas (`unrecognised`, from
+  `partitionInjuries`) are NEVER quoted back to the model — surfacing stale,
+  unstructured text as something "adjusted for" when nothing was would be
+  its own honesty defect. But their PRESENCE still changes the wording
+  (`'Nothing on file that the plan currently adjusts for automatically'`
+  rather than `'No injuries... on file'`) — claiming a flat absence when
+  something genuinely is stored, just not actionable, is the same overclaim
+  this codebase's honesty rules exist to catch, pointed the other way.
+  **CSCS review**: no prescription change — pure conversational honesty. (1)
+  Training effect — none. (2) Takes away — nothing; adds only the ability to
+  answer truthfully. (3) Fundamentals — untouched. (4) Floor/ceiling
+  redefinition — none. (5) Scope — this is the CSCS's own remit (what the
+  plan is already doing), not diagnosis: it never interprets a NEW symptom,
+  which is exactly what §1c/§3a still gate, untouched by this change.
+  **Gates**: new gate `test:coach-injuries-context`, 15 checks — the summary
+  function on its own (empty/one/many/messy-casing/unrecognised-only), that
+  it reaches `ChatAssistant.tsx`'s payload, and that the prompt reads it.
+  2 mutations run, 2 caught (dropped the singular/plural distinction;
+  dropped the unrecognised-presence wording change) — both restored after.
+  `npx tsc --noEmit` clean. Same 55 gates reading `ChatAssistant.tsx`/
+  `chat-gemini/index.ts` re-run clean.
+  **Same standing caveat as every prompt change today**: whether the coach
+  actually uses this correctly in its own words needs the `chat-gemini`
+  deploy and a real coach-exam run to know rather than assert.
+
 - [x] **SYSTEMATIC AUDIT: EVERY `UserProfile` FIELD AGAINST WHAT THE COACH
   ACTUALLY RECEIVES.** 22 Sep 2026, prompted by finding two dead fields
   (`equipment_access`, `training_experience`) ad hoc earlier the same day —
