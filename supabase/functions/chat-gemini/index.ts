@@ -2368,6 +2368,7 @@ NUTRITION TARGETS:
 - Protein: ${context.macros.protein}g | Carbs: ${context.macros.carbs}g | Fat: ${context.macros.fat}g
 
 STEPS: ${context.steps_summary || 'no step count available for today.'}
+WATER: ${context.water_summary || 'no water total available for today.'}
 
 CURRENT EXERCISE PLAN (this includes the PRESCRIBED WEIGHT for every movement — the "@" clause):
 How to read the "@" clause:

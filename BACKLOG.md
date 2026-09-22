@@ -2,6 +2,49 @@
 
 Newest first. One line each.
 
+- [x] **THE WATER GAP WAS REAL, NOT DELIBERATE — SAME SHAPE AS STEPS BEFORE 5
+  SEP, BUT NO WRITE-SIDE BUG TO GO WITH IT.** 22 Sep 2026, closing the
+  question raised (not answered) in the profile-field audit. Investigated
+  before building, per the ask: is `water_target_ml`'s missing read-back an
+  oversight or a deliberate scope line (the app-tour text frames water
+  TARGETS as Nutrition-tab-only)?
+  **Found the tell in the code's own comment.** `ChatAssistant.tsx`'s
+  `resolveAndSaveWater` already said, in a comment written before this fix
+  existed: "The coach quotes waterMl off proactiveData; without this it
+  would say the pre-log total in its very next sentence" — a `bumpOwnWrites`
+  call guarding against staleness in a read that, measured, DID NOT EXIST
+  anywhere except the one-shot evening accountability nudge
+  (`accountability.ts` rule 8, fires once per conversation, only when
+  short). Outside that narrow window — which is most of the time — the
+  coach had nothing to answer "how's my water today?" from. The comment
+  described the fix as already built; it wasn't.
+  **Unlike steps, no write-side bug rides along.** Checked before building
+  (this could have been another destructive-overwrite risk, the exact shape
+  that made steps' read/write ship together): `log_water` is
+  "IMMEDIATE, append-only" by its own tool description — every call ADDS an
+  amount, never replaces a day's total, so there is no "total vs increment"
+  ambiguity for a missing read to get wrong. This is a pure read-side gap,
+  a missing helpful answer rather than a correctness bug.
+  **Built the same way as steps**: `src/lib/water-context.ts`,
+  `buildCoachWaterSummary(waterMl, waterTargetMl)`, reading
+  `proactiveData.waterMl`/`waterTargetMl` — values `dashboard-data.ts`
+  already computes for the Dashboard, never re-derived, so the coach's
+  number and the Dashboard's number cannot drift apart by construction. A
+  new "WATER:" line sits right beside the existing "STEPS:" line in the
+  prompt. No null/"not logged yet" state to handle unlike steps: water has
+  no single upserted daily row that can be missing versus zero, so an empty
+  sum reading as 0 is honest, not ambiguous.
+  **CSCS review**: not applicable in the usual sense — no prescription,
+  no exercise selection; pure conversational completeness on a wellness
+  metric, same shape as the injuries and steps precedents.
+  **Gates**: new gate `test:coach-water-context`, 10 checks. 2 mutations
+  run, 2 caught (dropped comma-grouping; swapped the two arguments at the
+  call site), both restored. `npx tsc --noEmit` clean. Same 55 gates
+  reading `ChatAssistant.tsx`/`chat-gemini/index.ts` re-run clean.
+  **Same standing caveat as every prompt change today**: needs the
+  `chat-gemini` deploy and a real coach-exam run before "the coach reports
+  water correctly" is known rather than asserted.
+
 - [x] **THE COACH CAN NOW SAY WHAT IT IS ALREADY DOING ABOUT AN INJURY.** 22
   Sep 2026, closing the injuries finding from the profile-field audit — put
   to Ashley first because it's safety-adjacent, not wired through alone.
