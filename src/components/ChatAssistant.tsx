@@ -1545,6 +1545,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // lifting-experience tier), so the prompt says so rather than
         // guessing 'novice'.
         training_experience: profile.training_experience,
+        // The third of the same optional trio (types.ts groups all three
+        // under one comment: no honest value on an activity-only profile).
+        // Found in a systematic pass checking every UserProfile field
+        // against this object: training_style is used all over this very
+        // component (building the style-change proposal, computing the
+        // split) and never once reaches the coach.
+        training_style: profile.training_style,
         bmr: liveBmr,
         tdee: liveTdee,
       },

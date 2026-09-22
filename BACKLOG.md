@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **SYSTEMATIC AUDIT: EVERY `UserProfile` FIELD AGAINST WHAT THE COACH
+  ACTUALLY RECEIVES.** 22 Sep 2026, prompted by finding two dead fields
+  (`equipment_access`, `training_experience`) ad hoc earlier the same day —
+  asked whether that was a coincidence or a pattern. Checked all ~50 fields
+  on the type against `ChatAssistant.tsx`'s context object and chat-gemini's
+  prompt reads, not just the ones sitting in the coach-exam's base fixture.
+  **FOUND A THIRD: `training_style`.** Same optional trio as the other two —
+  `types.ts` literally groups `equipment_access`, `training_style` and
+  `training_experience` under one comment ("no honest value on an
+  activity-format profile") — and the same shape: used all over
+  `ChatAssistant.tsx` itself (building the style-change proposal, computing
+  the split) and never once reached the coach. Fixed the same way: added to
+  the context object, a new "Training Style:" line under Equipment Access
+  and Training Experience in the USER PROFILE block, same "not recorded"
+  fallback for an activity-only profile.
+  **CSCS review**: pure context-plumbing, no prescription change, same
+  favourable shape as the other two. **Gates**: `npx tsc --noEmit` clean;
+  same 55 gates reading these two files re-run clean.
+  **TWO MORE FOUND, DELIBERATELY NOT FIXED HERE — named, put to Ashley
+  rather than acted on alone:**
+  - `injuries` (the trainee's current injury list) is never sent to the
+    coach either — not as a raw list, not as any derived summary. It reaches
+    the PLAN (generation already filters around it, so the exercise list the
+    coach reads is already injury-aware) but not the CONVERSATION: asked
+    directly "what have you adjusted for my knee?" the coach has nothing to
+    answer from. This is safety-adjacent (CLAUDE.md's own standing rule:
+    injury filtering always gets a plan before a build, obvious-looking fix
+    or not) and touches what the coach is allowed to say it knows — hers to
+    weigh in on, not mine to just wire through.
+  - `water_target_ml` has no read-back at all, unlike steps — the coach can
+    log water (`log_water`) but cannot say how today is going or what the
+    target is, where steps got exactly this fix on 5 Sep 2026
+    (`steps-context.ts`, "both halves ship together on purpose"). Possibly
+    the same unfinished-pair shape, possibly a deliberate scope line (an
+    app-tour note elsewhere frames water TARGETS as Nutrition-tab-only) —
+    not measured which, so named rather than guessed at.
+  **Checked and correctly NOT gaps, so not touched:**
+  `daily_step_target` is fine — properly derived through `stepsTargetFor`
+  into `steps_summary`, not a raw field the coach needs directly.
+  `preferred_time` is DELIBERATELY unread: its own onboarding writes the
+  literal string 'morning' for every account (never a real per-user answer),
+  and `test:coach-clock` explicitly gates the prompt never stating a
+  preferred/usual training time — this is the SAME shape as the other two
+  findings and is correctly NOT wired up. The equipment-ceiling fields
+  (`max_dumbbell_kg` etc.), `recovery_capacity`, `conditioning_preference`
+  and `start_preference` are all real gaps in the sense that the coach
+  cannot answer a direct question about them, but their EFFECTS are already
+  visible in what the coach does see (prescribed weights, the plan's actual
+  volume and cardio share) — lower priority, named here rather than acted on
+  in this pass.
+
 - [x] **BUILT THE "WHICH EXERCISE" HALF OF THE COACH EXAM — NAMED TWICE, THIS
   TIME BUILT RATHER THAN DEFERRED AGAIN.** 22 Sep 2026, closing the follow-up
   from this morning's equipment-preference rule. `expectsProposalKind` can
