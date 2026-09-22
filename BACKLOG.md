@@ -2,6 +2,69 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S MEMORY NOW INCLUDES WARM-UPS AND DROPS — LABELLED, NEVER
+  CONFUSED WITH A WORKING SET.** 22 Sep 2026. Ashley's ruling on the
+  "screen-only" investigation: fix the coach's memory (option 3 of three) —
+  the bigger, separate decision that unlocks read-back for both build-up and
+  drop logging, rather than building an incomplete write-only half.
+  **What was actually broken, traced before touching anything**: the coach's
+  conversational history (`workout_log_history`) is built from ONE function
+  (`getRecentLogs` → `formatLogsForAI`), and that function excludes every
+  warm-up and drop row — DELIBERATELY, and for a real reason (a drop left in
+  reads as an extra working set; the exact same exclusion also feeds
+  `dashboard-data.ts`'s STREAK calculation, where a warm-up-only day counting
+  as "trained" would be a second, unrelated bug). So the coach was blind to
+  every warm-up, however it was logged — screen-logged ones included — not
+  just ones it might someday write itself.
+  **The fix, scoped to not touch the streak-facing half**: a NEW, separate
+  fetch, `getRecentLogsWithWarmups` — same query, no `is_warmup`/`drop_index`
+  filter — used ONLY by the coach. `getRecentLogs` itself is byte-identical
+  to before; `dashboard-data.ts` still calls it, untouched, so the streak
+  calculation cannot be affected by this at all. `formatLogsForAI` (the
+  coach's only consumer, confirmed by grep) now labels every set by kind —
+  "Warm-up 1", "Set 3", "Set 3, drop 1" — using `setLabelLong`, the SAME
+  function the screen uses for "anything read aloud or read back" (its own
+  doc comment says so verbatim), not a second copy of that labelling logic.
+  **The prompt-side guard, and why it was necessary rather than optional**:
+  the existing PERFORMANCE COACHING DIRECTIVES already told the coach to
+  "celebrate personal records", "track progressive overload" and "reference
+  their LAST logged performance" — written when only working sets could ever
+  appear in this list. Mixing in warm-ups/drops without a rule would have
+  let those existing directives misfire on a warm-up's light weight or a
+  drop's easier rep count. Added an explicit block explaining what each
+  label means and that a warm-up/drop is NEVER a working attempt, a personal
+  record, or the number progression anchors to — wording taken directly from
+  `drop_index`'s own column comment ("counts toward volume... not the set
+  count, a personal best, or where the load goes next"), not invented fresh.
+  Re-scoped PERFORMANCE COACHING DIRECTIVES's own heading to say it is about
+  working sets only.
+  **CSCS review**: no prescription change — pure conversational memory. (1)
+  Training effect — none; nothing about what is prescribed or how it is
+  scored moves. (2) Takes away — nothing; the streak/PR/progression
+  exclusion this whole design depends on is untouched and separately tested.
+  (3) Fundamentals — untouched. (4) Floor/ceiling redefinition — none. (5)
+  Scope — logging and conversation, nothing clinical.
+  **Gates**: new gate `test:coach-warmup-memory`, 19 checks, covering the
+  labelling itself (constructed rows: plain working, warm-up, drop, and a
+  mixed real session), that the two fetches stay genuinely separate (reading
+  each function's own body, not just grepping the file), and that the
+  prompt teaches the labels and fences the coaching directives. 3 mutations
+  run, 3 caught (label logic reverted to always say "Set N"; the new fetch's
+  own body given back the `is_warmup` filter; the directive heading's
+  "working sets only" scoping removed), all restored and re-verified with a
+  fresh `git status`/`git diff` read, not assumed. `npx tsc --noEmit` clean.
+  59 gates re-run clean — the standard 55 that read `ChatAssistant.tsx`/
+  `chat-gemini/index.ts`, plus `test:logging-roundtrip`, `test:no-dead-code`,
+  `test:training-week` and `test:meal-roundtrip` (the four other readers of
+  `daily-tracking.ts`, found by grep) and the new gate itself.
+  **Same standing caveat as every prompt change today**: whether the coach
+  actually respects the new rule in a real conversation — never quoting a
+  warm-up as a working weight, never congratulating a drop as a PR — needs
+  the `chat-gemini` deploy and a real coach-exam run to know rather than
+  assert. Worth a coach-exam case once the exam can run for real; not built
+  here for the same reason the swap-replacement case wasn't guessed at
+  without live model access.
+
 - [x] **`coach-screen-parity.md`'s screen-only count was stale.** 22 Sep 2026,
   found answering Ashley's "how confident are you that everything can be
   changed from chat" — the doc said "Four... as of 17 Sep 2026" while a

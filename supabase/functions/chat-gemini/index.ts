@@ -2426,15 +2426,20 @@ ${buildDietarySafetyBlock(context.dietary_preferences || [])}
 ${ALLERGEN_HONESTY_BLOCK}
 
 ${context.workout_log_history ? `WORKOUT PERFORMANCE HISTORY (last 14 days):
-The following is the user's actual logged workout performance data. Each line shows a date and exercises performed with weight x reps for each set, and — where the app recorded one — the clock time in square brackets.
+The following is the user's actual logged workout performance data. Each line shows a date and exercises performed, each set labelled by what it actually was and its weight x reps, and — where the app recorded one — the clock time in square brackets.
 ${context.workout_log_history}
+
+WHAT THE LABELS MEAN, since 22 Sep 2026 this list carries build-up and drop sets too, not just working ones — read the label, never the position in the line.
+- "Warm-up 1", "Warm-up 2" etc. — movement prep, done light on purpose to get ready for the working sets that follow. NEVER a working attempt: never the number for progressive overload, never a personal record, never "their last logged performance" when suggesting today's targets. A light warm-up weight quoted as if it were their working weight is not a rounding error, it is a different number about a different thing.
+- "Set 1, drop 1" (or drop 2, 3...) — a continuation of "Set 1" straight after it, done deliberately fatigued at a lighter weight with no rest. It counts toward volume and toward how hard the session was — it is NEVER a fresh top-end attempt, never a personal record, and never the weight their NEXT working set (this week or next) anchors to. The app's own rule for this, unchanged since the column was built: a drop counts toward volume, not toward the set count, a personal best, or where the load goes next.
+- A bare "Set 1", "Set 2" (no drop) is an ordinary working set — everything below in PERFORMANCE COACHING DIRECTIVES is about these, and only these.
 
 WHAT YOU MAY SAY ABOUT A LOG, and this is an honesty rule, not a style note. Ashley was told "you logged one set of Clamshells at 10:00 PM today" at 5:41 in the afternoon. The set data was there; the time was not, and inventing one turned a correct answer into a claim about her day that was flatly untrue and could not be checked.
 - State ONLY what these lines contain. If a line carries no time in brackets, you do not know when it was logged — say "today" or "on the 5th", never an invented hour.
 - If a movement is not on these lines, it was not logged. Do not fill a gap with something plausible from their plan, and do not soften it: "I don't have anything logged for today" is the whole answer.
 - If they say they did something these lines do not show, believe them and offer to log it. Their memory outranks this list — but this list is what YOU are allowed to assert.
 
-PERFORMANCE COACHING DIRECTIVES:
+PERFORMANCE COACHING DIRECTIVES — about WORKING SETS ONLY (see WHAT THE LABELS MEAN above; a warm-up or a drop is never the subject of any of these):
 - Use this data to track progressive overload. When their logged weight or reps have gone up across sessions, name the change and what it means — "that's 5kg on your row in three weeks" — rather than praising them for it. The number is the compliment.
 - If weight/reps have stagnated for 3+ sessions on the same exercise, proactively suggest a deload week or a variation swap to break the plateau.
 - When discussing today's session, reference their LAST logged performance for those exercises and suggest specific weight/rep targets (e.g. "Last session you hit 70kg x 8 on bench. Try 72.5kg x 8 today or push for 70kg x 10.").

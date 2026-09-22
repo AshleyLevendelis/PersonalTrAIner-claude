@@ -10,7 +10,7 @@ import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
-import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
+import { getRecentLogsWithWarmups, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
@@ -1316,7 +1316,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!profile.id) return
     try {
       const [logs, cardioLogs] = await Promise.all([
-        getRecentLogs(profile.id, 14),
+        getRecentLogsWithWarmups(profile.id, 14),
         getRecentCardioLogs(profile.id, 14),
       ])
       setWorkoutLogHistory(formatLogsForAI(logs))
