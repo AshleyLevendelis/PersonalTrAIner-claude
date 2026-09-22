@@ -369,7 +369,7 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
 //
 // Absent from this map = unranked = contributes nothing:
 //   - accessories that aren't the loading implement at all ('bench',
-//     'incline bench', 'squat rack', 'box', 'farmer handles')
+//     'incline bench', 'squat rack', 'box')
 //   - cardio machines ('treadmill', 'rowing machine', 'stationary bike',
 //     'elliptical machine', 'battle ropes', 'jump rope') — these are picked
 //     by the cardio reservation, not ranked against strength implements, and
@@ -416,6 +416,16 @@ const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
   kettlebell: 'high',
   'dip bars': 'high',
   'pull-up bar': 'high',
+  // CORRECTED 22 Sep 2026. The comment above used to list 'farmer handles'
+  // among the furniture-like exclusions ('bench', 'squat rack') — wrong: the
+  // catalogue's one use of it (Farmer's Walk) has `equipment_alternatives:
+  // true` against 'dumbbells' with its own comment "Either implement carries
+  // the same way" — a real loadable carry handle, not an accessory. Currently
+  // a no-op (the same entry always lists 'dumbbells' too, which already
+  // dominates the max in bestEquipmentRank/carriesExternalLoad), but left
+  // unranked it would have been the same silently-invisible gap as the six
+  // machine strings fixed 21 Sep the moment any future entry uses it alone.
+  'farmer handles': 'high',
   // Real training tools whose load is fixed, coarse, or capped by the
   // trainee's own mass.
   bodyweight: 'medium',

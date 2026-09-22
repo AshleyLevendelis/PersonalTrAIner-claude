@@ -2,6 +2,48 @@
 
 Newest first. One line each.
 
+- [x] **'FARMER HANDLES' WAS FLAGGED TWICE AS A MISSING EQUIPMENT-QUALITY
+  ENTRY. MEASURED: IT WAS NEVER A LIVE GAP — IT WAS A WRONG COMMENT.** 22 Sep
+  2026, closing the "noticed, not measured, not in today's scope" note from
+  21 Sep. `EQUIPMENT_QUALITY`'s own header comment listed 'farmer handles'
+  among the furniture-like exclusions ('bench', 'squat rack', 'box' —
+  "accessories that aren't the loading implement at all"). That was wrong:
+  the catalogue's one use of it, Farmer's Walk, carries `equipment_alternatives:
+  true` against 'dumbbells' with its own comment "Either implement carries
+  the same way" — a real loadable carry handle (loaded with plates, same as a
+  trap bar), not furniture.
+  **Measured before fixing, both ways.** `bestEquipmentRank` and
+  `carriesExternalLoad` both take the MAXIMUM/ANY over an exercise's equipment
+  array, and Farmer's Walk always lists 'dumbbells' (already 'high') alongside
+  'farmer handles' — so today this was a true no-op, confirmed by running the
+  same lookup against the tree before and after the fix (`git stash`/`pop`
+  around a scratch script): `rank=high, carriesLoad=true`, identical both
+  sides. Not reasoned about — run.
+  **Fixed anyway**, because "currently masked" is not "not a bug": it is the
+  identical shape to the six machine strings fixed 21 Sep — a map silently
+  out of sync with the catalogue's real semantics, invisible only because
+  nothing today exercises the gap. The moment a future entry uses 'farmer
+  handles' alone (no accompanying 'dumbbells'), it would go unranked with no
+  test catching it, exactly like the six machines did for nine days. Added
+  `'farmer handles': 'high'` to the map and removed it from the exclusion
+  comment, with a dated note explaining both the correction and why it was
+  worth fixing at zero measured effect.
+  **CSCS review**: no live prescription changes today (measured, not assumed)
+  — this closes a latent miscategorization before it can bite, the same
+  favourable-only shape as the 21 Sep fix it completes.
+  **Gates**: `npx tsc --noEmit` clean. `test:style-starve` (the one real gate
+  that imports `bestEquipmentRank`/`carriesExternalLoad`/`EQUIPMENT_QUALITY`,
+  found by grep for those symbols rather than the broader ~100-file
+  `exercise-plan` mention-grep, which is too wide to be useful) re-run clean.
+  `test:quality`'s grid not re-run: the stash-diff measurement above proves
+  bit-identical output for the only affected catalogue entry, so a 22-minute
+  run would prove nothing a cheaper, targeted measurement hadn't already
+  shown.
+  **Worth keeping**: a BACKLOG note that says "noticed, not measured" is a
+  lead, not a fact, same as any other finding in this file — this one turned
+  out to need a different kind of fix (a wrong comment, not a missing map
+  entry) than its own one-line summary implied.
+
 - [x] **THE COACH'S OWN SWAP TOOL HAD NO EQUIPMENT-QUALITY AWARENESS — NAMED
   21 SEP, BUILT 22 SEP.** Screen-side swap/add/ban/rebuild all prefer a
   genuinely loaded alternative (barbell/dumbbell/cable/machine) over a band
