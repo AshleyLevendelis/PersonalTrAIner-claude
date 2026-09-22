@@ -1540,6 +1540,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // never sent, so a swap-preference rule referencing it would have
         // been dead prompt text. See EQUIPMENT-QUALITY AWARENESS below.
         equipment_access: profile.equipment_access,
+        // Also never sent — same shape as equipment_access above. Absent on
+        // an activity-only profile (the starting-out walking plan has no
+        // lifting-experience tier), so the prompt says so rather than
+        // guessing 'novice'.
+        training_experience: profile.training_experience,
         bmr: liveBmr,
         tdee: liveTdee,
       },

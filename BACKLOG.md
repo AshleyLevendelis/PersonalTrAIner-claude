@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S PROMPT ALREADY CLAIMED TO REASON ABOUT "EXPERIENCE" IT WAS
+  NEVER SENT.** 22 Sep 2026, the second half of the "same shape" gap named in
+  today's equipment-access fix. `training_experience` was never in
+  `ChatAssistant.tsx`'s context object and never read by chat-gemini's prompt
+  template — the exact same "dead on both ends" shape as `equipment_access`
+  was that morning, and it was sitting in the coach-exam's own base fixture
+  the same way, as if it were live. Worth noting: the prompt already SAYS "it
+  was the best available option for that slot given their equipment/
+  experience/goal" (line 2169, EXERCISE COACHING INTELLIGENCE) — the model
+  was already being told to reason about a field it had never once received,
+  the same "coach-promises" shape this file exists to catch pointed at the
+  model's own context rather than a screen claim.
+  **Fixed the same way**: `training_experience` added to `ChatAssistant.tsx`'s
+  `context.profile` and printed as a new "Training Experience:" line in
+  chat-gemini's USER PROFILE block, right under Equipment Access. Fell back to
+  a labelled "not recorded (activity-only profile, or not asked)" rather than
+  guessing 'novice' — `types.ts`'s own comment says the field is genuinely
+  absent for an activity-only profile (the starting-out walking plan has no
+  lifting-experience tier), and silently defaulting it would tell the coach
+  something false about someone who was never asked.
+  **No new behavioural rule added**, deliberately, unlike the equipment fix:
+  that one needed a new instruction because nothing told the model to prefer
+  load over a band. Here the model's general coaching judgement already
+  covers "calibrate technique detail and complexity to experience level" —
+  the gap was purely that the data never arrived, not that a rule was
+  missing. Adding an invented calibration rule nobody asked for would have
+  been scope beyond the one gap actually found.
+  **CSCS review**: not a prescription change — pure context-plumbing, same
+  favourable-only shape as the equipment fix; scope is coaching tone/detail,
+  nothing clinical.
+  **Gates**: `npx tsc --noEmit` clean. Same 55 gates that read
+  `ChatAssistant.tsx`/`chat-gemini/index.ts` (identical file pair to the
+  equipment fix, so the same derived set applies) re-run clean, sweep
+  completed with no crash.
+  **Same unverifiable-until-deployed caveat as the equipment fix**: this is
+  prompt text and context plumbing: whether the coach actually calibrates
+  differently for a beginner versus an advanced lifter, in its own words, on
+  a real conversation, needs the `chat-gemini` deploy and a real coach-exam
+  run to know rather than assert.
+
 - [x] **'FARMER HANDLES' WAS FLAGGED TWICE AS A MISSING EQUIPMENT-QUALITY
   ENTRY. MEASURED: IT WAS NEVER A LIVE GAP — IT WAS A WRONG COMMENT.** 22 Sep
   2026, closing the "noticed, not measured, not in today's scope" note from

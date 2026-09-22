@@ -2343,6 +2343,7 @@ USER PROFILE:
 - Activity Level: ${context.profile.activity_level}
 - Fitness Goal: ${context.profile.fitness_goal}
 - Equipment Access: ${context.profile.equipment_access || 'not recorded'}
+- Training Experience: ${context.profile.training_experience || 'not recorded (activity-only profile, or not asked)'}
 - Training Days: Originally ${context.training_days_count} days/week (user can add or remove days at any time via chat — this is NOT a ceiling)
 - Session Duration: ${context.session_duration_preference || '45-60'} minutes
 - Workout Split: ${context.workout_split_preference || 'ai_recommendation'}
