@@ -2,6 +2,87 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAN NOW LOG A WARM-UP OR DROP SET FROM CHAT, NOT JUST TALK
+  ABOUT ONES ALREADY ON RECORD.** 22 Sep 2026, Ashley's follow-up request
+  after the read-back build ("add the ability to log a build-up or drop from
+  chat") — the write half deliberately deferred that day so an incomplete
+  half didn't ship alone.
+  **The live risk this found before writing any handler code**: `drop_index`
+  is one of three migrations still pending on both databases. The screen's
+  own writer (`set-log-store.ts`) hit the exact failure shape once, found by
+  a browser driver 19 Sep 2026 — on an unmigrated database the upsert's
+  conflict target is the old 5-column one, which does not include
+  `drop_index`, so a drop row and its parent working set collide on every
+  OTHER column and the write silently OVERWRITES the parent with the drop.
+  `chat-gemini`'s `upsertUnifiedSets` is an independent, hand-duplicated copy
+  of that same upsert (this codebase does not share code across the
+  Deno/browser boundary for this table), so it had the identical exposure
+  and needed the identical fix, separately. Traced before any handler code
+  was written, per the standing rule that safety-adjacent work gets a plan
+  first.
+  **What was built**: `log_workout_set` gained `is_warmup`/`is_drop`
+  parameters. Three guards, all refuse rather than guess or fall back:
+  (1) a drop's weight is never inferred from history or the plan — an
+  unstated warm-up/drop weight now makes the coach ask, exactly like an
+  unstated rep count already does (`resolveWeight` gained an
+  `allowInference` flag, checked before the history/plan lookups); (2) the
+  drop's own index is computed server-side from what's actually on record
+  for that set today (`getNextDropIndex`), never trusted from the model, and
+  a drop named against a set_number with no parent row on record is refused
+  outright rather than assumed to be index 1; (3) on an unmigrated database,
+  a drop write throws a distinct `DropMigrationPendingError` instead of
+  falling back to the old conflict target — the coach tells the truth
+  ("drop-set tracking isn't switched on for your account yet") and the
+  `action` field is suppressed so nothing is claimed that didn't happen.
+  **A routing gap found before it could ship silently**: the prompt's
+  existing rule sends virtually every natural-language completed-set report
+  to `log_workout` (a parser with no warm-up/drop concept at all), so adding
+  the new parameters to `log_workout_set` alone would have been practically
+  unreachable. Added an explicit routing exception naming both trigger
+  phrasings and why `log_workout` can't be used for either.
+  **CSCS review**: this is a logging capability, not a prescription change —
+  nothing about what's prescribed, scored, or how progression anchors moves.
+  (1) Training effect — none; the app records what happened, it invents
+  nothing. (2) Takes away — nothing; it's a new route alongside the existing
+  one, no existing behaviour removed. (3) Fundamentals — untouched, no
+  interaction with pattern coverage, overload, recovery or specificity.
+  (4) Floor/ceiling redefinition — none. (5) Scope — logging only, nothing
+  clinical. The real risk here was data integrity (a write silently
+  clobbering a real set), not training science, and that's what the three
+  guards above are for.
+  **Gates**: new gate `test:coach-logs-warmup-drop`, 35 checks across six
+  properties — the tool can say what it is, routing reaches the right tool,
+  weight is never inferred, the drop index is computed server-side, the
+  migration-pending guard actually blocks the destructive fallback, and the
+  confirmation text's hand-written label matches `setLabelLong` (the same
+  formatter the screen uses) rather than drifting from it. 8 mutations run,
+  8 caught — but 2 of the first attempts were MISSED and exposed real holes
+  in the gate itself, fixed before counting them as caught: neutering the
+  migration guard with `if (false && ...)` left the position-based "does
+  this substring sit between these two markers" check green, because the
+  substring was still there — fixed by pinning the guard's exact `if (...)`
+  line instead of just its position; and rewriting the handler's `kindLabel`
+  expression to a wrong-but-plausible string left the drift check green,
+  because that check was comparing `setLabelLong` against a value it
+  reconstructed BY HAND rather than the handler's real expression — the
+  exact "asking a question of evidence you created" shape this file already
+  warns about. Fixed by extracting and actually evaluating the real
+  expression text. The other 6 mutations (the migration-pending throw
+  itself, the null-parent guard, the `allowInference` ordering, the routing
+  exception, the tool schema's `is_drop` description, and the suppressed
+  `action` field on a refused write) were each caught cleanly first try.
+  `npx tsc --noEmit` clean (no `deno` binary in this environment to
+  typecheck the edge function directly — verified by full manual diff
+  re-read instead, the established pattern here). 51 gates re-run clean —
+  every gate that reads `chat-gemini/index.ts`, derived by grep, not
+  memory.
+  **What's proven live versus asserted**: the write path, the refusals and
+  the labelling are proven by source-level gate and manual trace, not by a
+  real conversation — this repo's `chat-gemini` deploy is needed for that,
+  and a coach-exam case would need real model access to build honestly
+  (same reason the swap-replacement case wasn't guessed at without it).
+  Needs the `chat-gemini` deploy to take effect for real users.
+
 - [x] **THE COACH'S MEMORY NOW INCLUDES WARM-UPS AND DROPS — LABELLED, NEVER
   CONFUSED WITH A WORKING SET.** 22 Sep 2026. Ashley's ruling on the
   "screen-only" investigation: fix the coach's memory (option 3 of three) —

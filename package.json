@@ -146,6 +146,7 @@
     "test:coach-injuries-context": "tsx scripts/test-coach-injuries-context.ts",
     "test:coach-water-context": "tsx scripts/test-coach-water-context.ts",
     "test:coach-warmup-memory": "tsx scripts/test-coach-warmup-memory.ts",
+    "test:coach-logs-warmup-drop": "tsx scripts/test-coach-logs-warmup-drop.ts",
     "test:coach-sees-technique": "tsx scripts/test-coach-sees-technique.ts",
     "test:coach-sees-ingredients": "tsx scripts/test-coach-sees-ingredients.ts",
     "test:food-dislike-is-a-ban": "tsx scripts/test-food-dislike-is-a-ban.ts",
