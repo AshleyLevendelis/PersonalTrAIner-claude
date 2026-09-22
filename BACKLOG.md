@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **`coach-screen-parity.md`'s screen-only count was stale.** 22 Sep 2026,
+  found answering Ashley's "how confident are you that everything can be
+  changed from chat" — the doc said "Four... as of 17 Sep 2026" while a
+  fifth bullet (logging a drop set, added 19 Sep) sat right below it,
+  uncounted. Exactly the failure the section's own note already names
+  ("somebody edited a bullet and left the header alone") — the gate can't
+  catch this class (§4 only checks the section is non-empty, not that the
+  count matches the bullets). Corrected to five, re-derived from the
+  bullets rather than assumed.
+
 - [x] **THE WATER GAP WAS REAL, NOT DELIBERATE — SAME SHAPE AS STEPS BEFORE 5
   SEP, BUT NO WRITE-SIDE BUG TO GO WITH IT.** 22 Sep 2026, closing the
   question raised (not answered) in the profile-field audit. Investigated

@@ -72,10 +72,17 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Four screen-only, as of 17 Sep 2026** — the pre-session tightness check,
-macro mode, macro split, and logging a build-up set. The calorie target below
-is a fifth entry but a different kind: it is on NEITHER surface and cannot be,
-because it is derived rather than set.
+**Five screen-only, as of 22 Sep 2026** — the pre-session tightness check,
+macro mode, macro split, logging a build-up set, and logging a drop set. The
+calorie target below is a sixth entry but a different kind: it is on NEITHER
+surface and cannot be, because it is derived rather than set.
+CORRECTED 22 Sep 2026: this said "Four... as of 17 Sep 2026" while the
+drop-set bullet below it (added 19 Sep) was never folded into the count —
+exactly the failure this section's own note already names ("somebody edited
+a bullet and left the header alone"). Re-derived from the bullets rather
+than assumed, per that note's own instruction. Found answering Ashley's
+"how confident are you that everything can be changed from chat" — the
+count is one of the numbers that answer rests on.
 
 **THE COUNT IS RE-DERIVED FROM THE BULLETS, NEVER CARRIED FORWARD.** It has
 been wrong twice — "None" while tightness shipped, then "One" while three more
