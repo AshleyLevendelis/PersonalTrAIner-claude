@@ -2055,6 +2055,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial, weekNumber: activeSession.liveWeek,
       dayName: day.day, kind: 'swap', scope, exerciseName: oldEx.name, newExerciseName: newEntry.name,
+      exclusions: exerciseExclusions,
     }, {
       kind: 'swap',
       exerciseName: oldEx.name,
@@ -2151,6 +2152,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
       dayName, kind: 'add', scope, exerciseName: entry.name,
+      exclusions: exerciseExclusions,
     })
 
     return {
@@ -2346,6 +2348,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
       dayName: day.day, kind: 'remove', scope, exerciseName: target.exerciseName,
+      exclusions: exerciseExclusions,
     }, {
       kind: 'remove',
       exerciseName: target.exerciseName,

@@ -756,7 +756,7 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
 const PUSH_PATTERNS = new Set(['push'])
 const PULL_PATTERNS = new Set(['pull'])
 
-function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
+function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclusions: string[] = []): DimensionResult {
   const block1 = mesocycle.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
   const [w1, w2, w3] = block1
   const week1 = mesocycle.find(w => w.week_number === 1)
@@ -790,7 +790,7 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     const experience = profile.training_experience || 'novice'
     let anyAccessoryRotated = experience === 'beginner' || experience === 'novice'
     let anyAccessoryHadAlternative = false
-    const pool = getConstrainedPool(profile, [])
+    const pool = getConstrainedPool(profile, exclusions)
     for (const day of w2.days) {
       const dayW3 = w3.days.find(d => d.day === day.day)
       if (!dayW3) continue
@@ -957,18 +957,13 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   // the way generation skips its own equipment_fit factor for one.
   const equipmentTier = profile.equipment_access
   if (equipmentTier && EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
-    // KNOWN GAP, NAMED RATHER THAN FIXED HERE: this pool is built with NO
-    // exclusions (`[]`), the same as every other peer-pool computation in
-    // this file (scoreProgression, scoreStructure, scoreSelection's own
-    // isolation check). A trainee who has personally banned every loaded
-    // option in a movement pattern can be scored down here for the band the
-    // app correctly gave them — measured nowhere yet. Fixing it needs
-    // exclusions threaded through scorePlan's own signature and every one of
-    // its call sites (test:quality, test:audit, edit-tradeoff.ts,
-    // ChatAssistant.tsx), which is bigger than this pass and shared by
-    // multiple rules, not just this one — a dedicated pass, not a side effect
-    // of closing the edit-time gap.
-    const equipmentPool = getConstrainedPool(profile, [])
+    // CLOSED 22 Sep 2026: this pool now takes the trainee's REAL exclusions,
+    // threaded through scorePlan's ScoreOptions rather than hardcoded to
+    // `[]`. Named as a gap the day before and closed the day after — a
+    // trainee who has banned every loaded option in a pattern is no longer
+    // scored down for the band the app correctly gave them. Every existing
+    // caller that doesn't pass exclusions keeps identical behaviour (`[]`).
+    const equipmentPool = getConstrainedPool(profile, exclusions)
     // EVERY WEEK, not just week 1. Selection happens once and the later weeks
     // rotate off it — but rotation had no equipment term at all until 8 Sep
     // 2026, so the weeks this rule could not see were exactly the ones where
@@ -1031,7 +1026,10 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     }
   }
 
-  const pool = getConstrainedPool(profile, [])
+  // Same exclusions as above, for the same reason: a week can only be
+  // "missing" a pattern its own equipment AND injuries AND bans could
+  // actually have supplied.
+  const pool = getConstrainedPool(profile, exclusions)
   const poolHasSquat = pool.some(e => e.movement_pattern === 'knee_dominant' || e.movement_pattern === 'single_leg')
   const poolHasHinge = pool.some(e => e.movement_pattern === 'hip_hinge')
   const poolHasPush = pool.some(e => e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push')
@@ -1321,6 +1319,19 @@ export interface ScoreOptions {
    * profile. Deltas only — see the note above.
    */
   skipComparisons?: boolean
+  /**
+   * The trainee's own banned exercises — ADDED 22 Sep 2026. Every peer pool
+   * scoreSelection builds used to hardcode `[]` here, so a trainee who had
+   * banned every loaded option in a pattern could be marked down for the
+   * band the app correctly gave them: `worse_implement_than_available`
+   * would name a "better-loading option" that was never actually available
+   * to prescribe. The same gap affected two sibling checks in the same
+   * dimension — whether an accessory had room to rotate, and whether a week
+   * missing a pattern (push/pull/squat/hinge) could have held it at all.
+   * Absent means `[]`, so every existing caller keeps its exact behaviour;
+   * this is opt-in for callers that actually know the trainee's exclusions.
+   */
+  exclusions?: string[]
 }
 
 export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comboKey: string, opts?: ScoreOptions): PlanScoreResult {
@@ -1328,7 +1339,7 @@ export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comb
     timeFit: scoreTimeFit(profile, mesocycle),
     structure: scoreStructure(mesocycle, profile),
     progression: scoreProgression(profile, mesocycle),
-    selection: scoreSelection(profile, mesocycle),
+    selection: scoreSelection(profile, mesocycle, opts?.exclusions ?? []),
     goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey, opts),
     primerFit: scorePrimerFit(profile, mesocycle),
   }

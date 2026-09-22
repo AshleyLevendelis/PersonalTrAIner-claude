@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **THE QUALITY SCORER COULD MARK A PLAN DOWN FOR A SUBSTITUTION IT HAD NO
+  CHOICE ABOUT.** 22 Sep 2026, closing the gap named-not-fixed in yesterday's
+  entry. `scoreSelection`'s peer pool — used by three checks
+  (`worse_implement_than_available`, whether an accessory had room to rotate,
+  and whether a week missing push/pull/squat/hinge could have held it at all)
+  — was built with `getConstrainedPool(profile, [])`, hardcoded, in all three
+  places. A trainee's own banned exercises live outside the `profile` object
+  (`user_facts` rows, not a column), so none of the three checks could see
+  them: someone who has banned every barbell/dumbbell/cable/machine option in
+  a pattern could have the band the app correctly gave them flagged as a
+  mistake, or a week correctly missing a pattern (because every option in it
+  is banned) counted as a real gap.
+  **The fix, threaded rather than guessed at**: `ScoreOptions` gained an
+  `exclusions?: string[]` field (absent means `[]`, so every existing caller —
+  ~20 test/measurement scripts, none of which pass it — keeps identical
+  behaviour). `scoreSelection` takes it and uses it at all three call sites.
+  `EditContext` (edit-tradeoff.ts) gained the same field; `scoreDrop` and
+  `assessEdit` pass it through. `ChatAssistant.tsx` already holds the
+  trainee's live ban list as `exerciseExclusions` (used by add/injury/
+  equipment adaptation already) — it just wasn't reaching the scorer. All
+  three of the coach's `adviseEdit(...)` call sites (swap, add, remove) now
+  pass it.
+  **Scope, checked rather than assumed**: `assessEdit`/`adviseEdit` has
+  exactly one caller-file, `ChatAssistant.tsx` — no screen component calls it,
+  so this is a coach-path fix and correctly so; the screen's own cost
+  language (`session-balance-cost.ts`, the balance pass) is a different
+  mechanism already covered elsewhere.
+  **CSCS review**: favourable-only, not a behaviour change to what's
+  PRESCRIBED. (1) Training effect — none; this only corrects the app's own
+  self-assessment of a plan it already generated or edited. (2) What it takes
+  away — nothing: excluding an already-banned exercise from the peer pool can
+  only REMOVE a false "better option available" finding, never add one, so a
+  score can only go up or stay flat for a profile with real bans, never down.
+  (3) Fundamentals — untouched. (4) Floor redefinition — none: nothing that
+  used to clear 7.2 can now fail it, by the same one-directional argument.
+  (5) Scope — pure scoring logic, nothing clinical.
+  **Verified live, not just read**: constructed a plan holding one low-rank
+  exercise (Backpack Shrug) with a real high-rank peer, confirmed
+  `worse_implement_than_available` fires without exclusions and does not fire
+  once every real peer is banned. **First attempt UNDER-COUNTED the peer set**
+  (found 3 of 4 real peers by reading the style-filtered pool) and the test
+  still failed — not a bug in the fix: banning 3 of 4 narrowed the pool enough
+  to trigger the 18 Sep style-floor reinstatement (a pattern below the
+  workable minimum pulls back in an off-style option), surfacing a 4th peer
+  the narrower pool had legitimately excluded for style. Re-derived the ban
+  list from the WHOLE catalogue rather than the filtered pool and it passed
+  cleanly. Worth keeping: a fixture that bans "every peer visible right now"
+  can be invalidated by the very mechanism it triggers — ban from the
+  unfiltered set when the test's whole point is exhaustiveness.
+  `test:quality`'s own 9,216-profile grid is mathematically unaffected — read
+  its call site: `scorePlan(profile, mesocycle, key)` with no `opts` at all,
+  so `exclusions` is always `[]` there, identical to before this change. Not
+  re-run for that reason; re-running would have proven nothing new.
+  **Gates**: 21 gates reading the three changed files (quality-score.ts,
+  edit-tradeoff.ts, ChatAssistant.tsx) re-run clean — `test:edit-tradeoff`,
+  `test:edit-keeps-the-bar`, `test:style-does-not-starve`, `test:session-edit`,
+  `test:exercise-add`, `test:coach-parity`, `test:coach-promises` among them.
+  `test:audit` re-run: 17,423/17,423. `npx tsc --noEmit` clean throughout.
+
 - [x] **"ONE DEFINITION IN ALL FOUR PLACES" WAS TRUE OF THE FOUR PLACES IT
   COUNTED, AND FALSE OF THE PLACES THAT MATTER MOST.** 21 Sep 2026. Ashley
   asked for 3 investigate-only checks on the just-landed implement-quality
