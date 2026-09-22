@@ -2,6 +2,73 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S OWN SWAP TOOL HAD NO EQUIPMENT-QUALITY AWARENESS — NAMED
+  21 SEP, BUILT 22 SEP.** Screen-side swap/add/ban/rebuild all prefer a
+  genuinely loaded alternative (barbell/dumbbell/cable/machine) over a band
+  or bodyweight-only one, same movement pattern and tier, since the 20-21 Sep
+  unification (`hasBetterLoadingPeer`). The coach's chat swap had nothing:
+  `propose_exercise_swap`'s `new_item` is whatever string the model chose,
+  resolved against the live plan with no ranking check anywhere on that path.
+  **Deliberately NOT a code filter.** The tool's `new_item` is required, and
+  when the user names their own replacement the house rule (13 Sep, "you
+  asked for it, you get it") says give it to them, loaded or not — a hard
+  block would refuse a legitimate direct request. The gap is narrower: the
+  moments the MODEL itself picks what to suggest — a pain swap ("briefly
+  discuss WHY, suggest biomechanically similar alternatives" §3) or "give me
+  something different" with nothing named — had no preference at all, so the
+  same "Backpack Lateral Raise beats a real peer" failure the screen-side
+  work closed could still happen in chat, invisibly, because free text has no
+  gate to catch it.
+  **A prompt rule can't reference data it isn't given, so the fix has two
+  parts.** (1) `equipment_access` was never sent to the coach at all —
+  measured by reading `ChatAssistant.tsx`'s context-building and chat-gemini's
+  prompt template, neither mentioned it, despite the coach-exam's own base
+  fixture (`_base-context.json`) already carrying `"equipment_access":
+  "home_gym"` as if it were read. It was dead data on both ends: sent nowhere
+  real, read nowhere real. Wired it through (`ChatAssistant.tsx` → context →
+  a new "Equipment Access:" line in the USER PROFILE block) so the new rule
+  has something real to reason from. (2) A new rule in EXERCISE COACHING
+  INTELLIGENCE, right beside the existing movement-pattern/mechanics-tier
+  rule it extends: when the coach is the one picking the replacement, prefer
+  whichever same-pattern option keeps genuine external load, when realistic
+  for their Equipment Access — and three explicit exceptions so it cannot
+  become a second, contradicting rule: a user's own named choice wins
+  regardless of load; pain calling for LESS load wins; and it never
+  suggests anything already on PERMANENTLY EXCLUDED EXERCISES (already in
+  context) or off their equipment tier.
+  **Noticed, not fixed, same shape**: `training_experience` is in the same
+  base exam fixture and is equally dead — never sent by `ChatAssistant.tsx`,
+  never read by chat-gemini. Unrelated to this rule (nothing here needed it),
+  named rather than bundled in.
+  **CSCS review.** (1) Training effect — protected rather than changed: this
+  only governs which of several already-valid, same-pattern candidates the
+  coach reaches for, in favour of the one that stays progressable. (2) What
+  it takes away — nothing a trainee would want: it removes only the chance of
+  the coach quietly handing over a compromise (band/bodyweight) when a loaded
+  peer was sitting right there and nothing forced the downgrade. (3)
+  Fundamentals — untouched; pattern coverage, overload, recovery and
+  specificity are unaffected, this is a same-pattern/same-tier preference
+  only. (4) Floor/ceiling redefinition — none; it is a preference, not a
+  filter, with three named escape hatches so it cannot silently override
+  pain or a direct request the way a hard rule could. (5) Scope — pure
+  exercise-selection judgement, nothing clinical.
+  **Verified so far, and what is still owed.** `npx tsc --noEmit` clean. 55
+  gates that read `ChatAssistant.tsx` or `chat-gemini/index.ts` (derived by
+  grep for `readFileSync`, not guessed) re-run clean, sweep completed (no
+  crash, no truncated run). **This is a coach PROMPT change and this session
+  cannot call the real model** — so whether the coach actually follows the
+  new rule, in its own words, on a real pain-swap or a real "something
+  different" request, is UNVERIFIED and stays so until the coach exam is run
+  against this prompt for real (needs the `chat-gemini` deploy first, then
+  `coach-exam:run` + `coach-exam:grade` on a machine with credentials). No
+  new coach-exam CASE was added for it: the exam's `expectsProposalKind`
+  check can assert WHICH TOOL fired but not WHICH EXERCISE was named in
+  `new_item`, and writing a check I cannot see fail (no live model access
+  here) would be exactly the "a check nobody has seen fail is not a check"
+  trap — named as real follow-up work, not built as a hollow gate.
+  **Needs**: the `chat-gemini` deploy, then a real coach-exam run, before this
+  can be called verified rather than written.
+
 - [x] **THE QUALITY SCORER COULD MARK A PLAN DOWN FOR A SUBSTITUTION IT HAD NO
   CHOICE ABOUT.** 22 Sep 2026, closing the gap named-not-fixed in yesterday's
   entry. `scoreSelection`'s peer pool — used by three checks

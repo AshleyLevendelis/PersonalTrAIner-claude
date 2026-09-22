@@ -1535,6 +1535,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         activity_level: profile.activity_level,
         fitness_goal: profile.fitness_goal,
         preferred_time: profile.preferred_time,
+        // What the coach needs to judge equipment quality when IT picks a
+        // replacement (pain swaps, "give me something different") — was
+        // never sent, so a swap-preference rule referencing it would have
+        // been dead prompt text. See EQUIPMENT-QUALITY AWARENESS below.
+        equipment_access: profile.equipment_access,
         bmr: liveBmr,
         tdee: liveTdee,
       },
