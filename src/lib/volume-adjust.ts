@@ -24,7 +24,7 @@
 
 import { clampToVolumeRole, getRoleSetFloor, getRoleSetCeiling } from './exercise-plan'
 import { getExerciseEntry, getVolumeRole } from './exercise-db'
-import { estimateDaySeconds, getSessionMaximumSeconds } from './session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds, yieldFillerTo } from './session-duration'
 import type { WorkoutDay, Exercise, UserProfile } from './types'
 
 export type VolumeDirection = 'lighter' | 'heavier'
@@ -91,8 +91,13 @@ export function adjustDayVolume(
   // slot that has none. A day the app generated always has one — but a volume
   // change is not the place to discover otherwise, and refusing to add sets
   // is the safe direction when the length cannot be established.
+  // Optional filler yields to real work first (yieldFillerTo): "no room in
+  // the session" is only true once the padding has already gone.
   const overBudget = (() => {
-    try { return estimateDaySeconds(candidate) > maxSeconds } catch { return true }
+    try {
+      if (direction === 'heavier') candidate = yieldFillerTo(candidate, maxSeconds)
+      return estimateDaySeconds(candidate) > maxSeconds
+    } catch { return true }
   })()
   if (direction === 'heavier' && overBudget) {
     candidate = day

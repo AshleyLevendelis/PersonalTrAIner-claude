@@ -2856,6 +2856,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (trial.achievedMinutes > minutes) {
       implications.push({ severity: 'warn', text: `${minutes} minutes isn't reachable without cutting into your main lift — about ${trial.achievedMinutes} is the closest.` })
     }
+    // SAY WHAT ACTUALLY COMES OFF when it is only the padding — otherwise the
+    // card reads "75 → 58 min, 5 → 5 exercises" and leaves the reader to guess.
+    if (trial.fillerMinutesRemoved > 0) {
+      implications.push({ severity: 'info', text: trial.droppedExercises.length === 0 && trial.setsRemoved === 0
+        ? `Only the optional mobility at the end comes off (${trial.fillerMinutesRemoved} min) — every exercise stays.`
+        : `The optional mobility at the end (${trial.fillerMinutesRemoved} min) comes off first.` })
+    }
     if (impact.balancing) implications.push({ severity: 'info', text: impact.balancing })
     if (impact.cost) implications.push({ severity: 'warn', text: impact.cost })
 

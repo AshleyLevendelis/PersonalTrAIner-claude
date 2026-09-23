@@ -13,7 +13,11 @@ import type { RecommendedCardio } from '@/lib/types'
 // the old direct insertCardioLog network call.
 // ---------------------------------------------------------------------------
 
-export function FinisherRow({ cardio, onLogged }: { cardio: RecommendedCardio; onLogged?: () => void }) {
+/** `label` leads the row. "Finisher" unless the caller knows better — the
+ *  mobility close-out on a day that already had its cardio says "Optional",
+ *  because that is what it is, and a second row headed "Finisher" would read
+ *  as a second thing the session requires. */
+export function FinisherRow({ cardio, onLogged, label = 'Finisher' }: { cardio: RecommendedCardio; onLogged?: () => void; label?: string }) {
   const { profileId, date } = useActiveSession()
   const [saving, setSaving] = useState(false)
   const [logged, setLogged] = useState(false)
@@ -76,7 +80,7 @@ export function FinisherRow({ cardio, onLogged }: { cardio: RecommendedCardio; o
             line. */}
         <div className="min-w-0">
           <span className="block text-xs text-foreground">
-            Finisher · {cardio.duration}m {name} · RPE {cardio.targetRpe}
+            {label} · {cardio.duration}m {name} · RPE {cardio.targetRpe}
           </span>
           {protocol && (
             <span className="block text-[0.6875rem] leading-4 text-muted-foreground">{protocol}</span>

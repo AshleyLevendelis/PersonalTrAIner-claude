@@ -1015,9 +1015,13 @@ export async function executeSessionShorten(
   const settled = settleWeek(result.week, payload.dayName, profile)
   const next = mesocycle.map(w => (w.week_number === payload.weekNumber ? settled.week : w))
 
+  // The optional filler is named first because it went first — a receipt
+  // that lists only exercises reads as "nothing came off" when the padding
+  // was the whole change.
+  const fillerPart = result.fillerMinutesRemoved > 0 ? ` — ${result.fillerMinutesRemoved} min of optional mobility came off first` : ''
   landed.push(
-    `${payload.dayName}: about ${result.achievedMinutes} min` +
-    (result.droppedExercises.length > 0 ? ` — out came ${result.droppedExercises.join(', ')}` : '') +
+    `${payload.dayName}: about ${result.achievedMinutes} min` + fillerPart +
+    (result.droppedExercises.length > 0 ? `${fillerPart ? ', then' : ' —'} out came ${result.droppedExercises.join(', ')}` : '') +
     (result.setsRemoved > 0 ? `${result.droppedExercises.length > 0 ? ', and' : ' —'} ${result.setsRemoved} set${result.setsRemoved === 1 ? '' : 's'} off what stayed` : ''),
   )
 
@@ -1150,6 +1154,7 @@ export async function executeCardioSession(
       // session, leaving it would be two prescriptions on one day and no way
       // to tell which is which.
       recommendedCardio: undefined,
+      mobilityFiller: undefined,
       plannedActivity: {
         activity: payload.activity,
         duration: payload.minutes,

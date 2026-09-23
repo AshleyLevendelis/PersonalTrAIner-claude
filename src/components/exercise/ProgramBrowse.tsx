@@ -551,6 +551,11 @@ export function ProgramBrowse({
                       {workout.recommendedCardio.timing === 'post_session' ? ' — after the lifting' : ''}
                     </p>
                   )}
+                  {workout.mobilityFiller && (
+                    <p className="text-xs text-muted-foreground">
+                      Optional: {prescriptionLine(workout.mobilityFiller)}
+                    </p>
+                  )}
                   {workout.conditioning_note && !workout.recommendedCardio && (
                     <p className="text-xs text-muted-foreground">{workout.conditioning_note}</p>
                   )}

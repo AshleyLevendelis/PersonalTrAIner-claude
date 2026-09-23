@@ -254,5 +254,72 @@ export function estimateDaySeconds(day: WorkoutDay): number {
   // block of time and stays out of this session's estimate.
   const postSessionCardioSeconds =
     day.recommendedCardio?.timing === 'post_session' ? day.recommendedCardio.duration * 60 : 0
-  return (day.warmup?.total_seconds ?? 0) + SESSION_OVERHEAD_SECONDS + estimateSlotsSeconds(slots) + postSessionCardioSeconds
+  const mobilityFillerSeconds =
+    day.mobilityFiller?.timing === 'post_session' ? day.mobilityFiller.duration * 60 : 0
+  return (day.warmup?.total_seconds ?? 0) + SESSION_OVERHEAD_SECONDS + estimateSlotsSeconds(slots) + postSessionCardioSeconds + mobilityFillerSeconds
+}
+
+// ---------------------------------------------------------------------------
+// OPTIONAL FILLER IS ELASTIC — it gives way before any real work does.
+//
+// applyDurationFiller (exercise-plan.ts) tops a short day up with an OPTIONAL
+// mobility flow or light finisher, sized to use the time the work left over.
+// That time is counted above, correctly: it is what the day asks of somebody's
+// evening. But it is not work, and every path that asks "what has to go?" was
+// treating it as if it were. Measured 23 Sep 2026: "I've only got 58 minutes"
+// on a day of 56 minutes' lifting plus a 19-minute optional mobility flow
+// dropped Hip Thrust, Pull-Ups AND Plank, and kept the mobility.
+//
+// So: the filler is the first thing any budget takes back, and only what is
+// still over after it has gone may touch a set, an exercise or a rest.
+// ---------------------------------------------------------------------------
+
+/** Below this, a shrunk filler is removed rather than kept as a token. */
+const MIN_FILLER_MINUTES = 5
+
+/** Seconds of this day that are optional filler — the part a budget takes back first. */
+export function optionalFillerSeconds(day: WorkoutDay): number {
+  const cardio = day.recommendedCardio?.is_filler && day.recommendedCardio.timing === 'post_session'
+    ? day.recommendedCardio.duration * 60 : 0
+  const mobility = day.mobilityFiller?.timing === 'post_session' ? day.mobilityFiller.duration * 60 : 0
+  return cardio + mobility
+}
+
+/** The day's length without its optional filler: what the WORK takes. */
+export function estimateRequiredDaySeconds(day: WorkoutDay): number {
+  return estimateDaySeconds(day) - optionalFillerSeconds(day)
+}
+
+/**
+ * The day with its optional filler shrunk — or removed — just enough for the
+ * whole day to fit `limitSeconds`. Touches nothing else. Returns the SAME
+ * object when the day already fits, so a caller can compare by reference.
+ *
+ * The mobility close-out goes before a filler finisher, because a day that
+ * has both had its conditioning first. A filler recommendedCardio carries
+ * its own conditioning_note (the filler wrote both), so the note follows the
+ * block: rewritten with the new minutes, or cleared with it.
+ */
+export function yieldFillerTo(day: WorkoutDay, limitSeconds: number): WorkoutDay {
+  let over = estimateDaySeconds(day) - limitSeconds
+  if (over <= 0 || optionalFillerSeconds(day) === 0) return day
+  let next: WorkoutDay = { ...day }
+
+  if (next.mobilityFiller?.timing === 'post_session' && over > 0) {
+    const keep = next.mobilityFiller.duration - Math.ceil(over / 60)
+    const kept = keep >= MIN_FILLER_MINUTES ? keep : 0
+    over -= (next.mobilityFiller.duration - kept) * 60
+    next.mobilityFiller = kept > 0 ? { ...next.mobilityFiller, duration: kept } : undefined
+  }
+  if (next.recommendedCardio?.is_filler && next.recommendedCardio.timing === 'post_session' && over > 0) {
+    const keep = next.recommendedCardio.duration - Math.ceil(over / 60)
+    if (keep >= MIN_FILLER_MINUTES) {
+      next.recommendedCardio = { ...next.recommendedCardio, duration: keep }
+      next.conditioning_note = next.conditioning_note?.replace(/~\d+\s*min/, `~${keep} min`) ?? next.conditioning_note
+    } else {
+      next.recommendedCardio = undefined
+      next.conditioning_note = undefined
+    }
+  }
+  return next
 }

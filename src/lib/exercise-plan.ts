@@ -19,7 +19,7 @@ import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, REC
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
 import { dayAnchorExercise, anchorScore } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
-import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS } from './session-duration'
+import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS, yieldFillerTo, optionalFillerSeconds } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
 
 // ---------------------------------------------------------------------------
@@ -4646,6 +4646,11 @@ function enforceDayDurationBudget(
   flaggedJoints: Set<string> = new Set(),
 ): WorkoutDay {
   if (day.exercises.length === 0) return day
+  // NO FILLER YIELD HERE, deliberately. One was written and measured: across
+  // all 9,216 grid plans it changed 0 days, because the per-week yield ahead
+  // of the rest trim (generateMesocycle) has always taken any filler back
+  // before this runs. A second mechanism for one property that never fires is
+  // a gate that cannot fail — CLAUDE.md, "measure which one works".
   let exercises = day.exercises
   let guard = 0
   while (estimateDaySeconds({ ...day, exercises }) > budgetSeconds && guard < 30) {
@@ -6253,6 +6258,13 @@ export interface DayShortening {
   setsRemoved: number
   /** What the day actually takes now, rounded to a minute — not what was asked for. */
   achievedMinutes: number
+  /**
+   * Minutes of OPTIONAL filler (the mobility flow or light finisher a short
+   * day is topped up with) that came off before any exercise was touched.
+   * Always 0 or more; a receipt that names what came out must name this too,
+   * or a shortening that only trimmed padding reads as nothing happening.
+   */
+  fillerMinutesRemoved: number
   /** Why nothing happened, in words a person can read. Empty when `changed`. */
   refusal?: string
 }
@@ -6280,7 +6292,7 @@ export function shortenDayTo(
 ): DayShortening {
   const day = week.days.find(d => d.day === dayName)
   const nothing = (refusal: string): DayShortening =>
-    ({ week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: 0, refusal })
+    ({ week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: 0, fillerMinutesRemoved: 0, refusal })
 
   if (!day || day.exercises.length === 0) return nothing(`There's no session on ${dayName} to shorten.`)
   if (!Number.isFinite(minutes) || minutes <= 0) return nothing("I need a number of minutes to aim for.")
@@ -6288,14 +6300,33 @@ export function shortenDayTo(
   const budgetSeconds = Math.round(minutes * 60)
   const before = estimateDaySeconds(day)
   if (before <= budgetSeconds) {
-    return { week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: Math.round(before / 60), refusal: `${dayName}'s session already fits in ${minutes} minutes.` }
+    return { week, changed: false, droppedExercises: [], setsRemoved: 0, achievedMinutes: Math.round(before / 60), fillerMinutesRemoved: 0, refusal: `${dayName}'s session already fits in ${minutes} minutes.` }
+  }
+
+  // THE OPTIONAL FILLER GOES FIRST. Measured 23 Sep 2026: asking for 58
+  // minutes on a day of 56 minutes' lifting and a 19-minute optional mobility
+  // flow dropped three exercises and kept the mobility. The filler exists only
+  // to use time the work left over; a day being cut for time has none left.
+  const yielded = yieldFillerTo(day, budgetSeconds)
+  const fillerMinutesRemoved = Math.round((optionalFillerSeconds(day) - optionalFillerSeconds(yielded)) / 60)
+  if (estimateDaySeconds(yielded) <= budgetSeconds) {
+    const marked: WorkoutDay = { ...yielded, shortened_to_minutes: minutes }
+    return {
+      week: { ...week, days: week.days.map(d => (d.day === dayName ? marked : d)) },
+      changed: true,
+      droppedExercises: [],
+      setsRemoved: 0,
+      achievedMinutes: Math.round(estimateDaySeconds(yielded) / 60),
+      fillerMinutesRemoved,
+    }
   }
 
   const policy = getGoalPolicy(profile.fitness_goal || 'hypertrophy')
   // restAdjustSeconds 0: this day's rest is already prescribed and stored, so
   // there is no block-level adjustment still to come. The estimate reads what
-  // the day actually says.
-  const [sized] = sizeBlockToRestBudget([day], 0, budgetSeconds, mainLiftNamesOf(day), policy)
+  // the day actually says. Sized from the YIELDED day, which by now carries no
+  // filler at all — the work alone is over the budget.
+  const [sized] = sizeBlockToRestBudget([yielded], 0, budgetSeconds, mainLiftNamesOf(yielded), policy)
 
   // COPIED BEFORE THE MUTATING TRIM. sizeBlockToRestBudget returns a new day,
   // but the exercises it did not touch are the caller's own objects — the
@@ -6329,6 +6360,7 @@ export function shortenDayTo(
     droppedExercises,
     setsRemoved,
     achievedMinutes: Math.round(after / 60),
+    fillerMinutesRemoved,
   }
 }
 
@@ -6347,6 +6379,23 @@ const FILLER_TRIGGER_SECONDS = 15 * 60
  * 'avoid' conditioning preference) gets mobility only; everything else gets
  * a light goal-appropriate conditioning finisher. Never overwrites a
  * conditioning note the day already has from assignConditioningNotes.
+ *
+ * A DAY THAT ALREADY HAS ITS CARDIO STILL GETS THE REST OF ITS TIME. Until
+ * 23 Sep 2026 this skipped any day carrying assignConditioningNotes' cardio,
+ * because a day holds one recommendedCardio and that one was taken. MEASURED
+ * across the 9,216-profile grid: 348 plans ran a day under the minimum they
+ * asked for, and on 346 of them EVERY such day was one already carrying
+ * assigned cardio — 3,838 of 3,841 short days. The cardio lands on training
+ * days only once the rest days are used up, and the thinnest days (an
+ * injury-narrowed or bodyweight pool on a long session) are exactly where the
+ * leftover lands, so the day that got the goal's conditioning was reliably the
+ * shortest of the week. Those days now get the same optional mobility
+ * close-out as every other short day, in their own field (mobilityFiller) —
+ * ALWAYS mobility, whatever the recovery tier, because the day has already
+ * had its conditioning and a finisher on top would be a second dose.
+ * CSCS basis: the house rule already says spare time goes to mobility rather
+ * than more lifting volume; this only stops a data-model limit deciding which
+ * days the rule reached.
  */
 function applyDurationFiller(
   days: WorkoutDay[],
@@ -6364,7 +6413,11 @@ function applyDurationFiller(
   const mobilityOnly = recovery === 'low' || recovery === 'moderate' || profile.conditioning_preference === 'avoid'
 
   for (const day of days) {
-    if (day.exercises.length === 0 || day.conditioning_note) continue
+    if (day.exercises.length === 0 || day.mobilityFiller) continue
+    const assignedCardio = day.recommendedCardio && !day.recommendedCardio.is_filler ? day.recommendedCardio : null
+    // A note with no assigned block behind it is either this function's own
+    // earlier filler or a note that is the whole prescription — leave both.
+    if (day.conditioning_note && !assignedCardio) continue
     const actualSeconds = estimateDaySeconds(day)
     const underBySeconds = totalBudgetSeconds - actualSeconds
     // Two triggers, because one flat number cannot serve every tier. The
@@ -6393,6 +6446,18 @@ function applyDurationFiller(
     // much time available isn't hearing an implausible number if the honest
     // answer is "the rest of it goes to mobility, not more lifting."
     const fillerMinutes = Math.min(90, Math.round(underBySeconds / 60))
+
+    if (assignedCardio) {
+      day.mobilityFiller = {
+        activity: 'Mobility & Movement Prep Flow',
+        duration: fillerMinutes,
+        targetRpe: 2,
+        timing: 'post_session',
+        reason: "Optional — today's session ran under your time budget; the extra time goes to mobility, not more training volume.",
+        is_filler: true,
+      }
+      continue
+    }
 
     if (mobilityOnly) {
       day.conditioning_note = `Optional mobility flow (~${fillerMinutes} min) — today's session ran under your time budget; the extra time goes to mobility, not more lifting volume.`
@@ -8067,6 +8132,15 @@ export function generateMesocycle(
         // first line), and only a day that broke the ceiling gives up rest.
         // Rest is also the one lever this is allowed to pull — trimming sets
         // here would fight the very pass that just set them.
+        //
+        // AND NOT BEFORE THE OPTIONAL FILLER HAS GONE. A day the pattern-
+        // balance pass bumped over the maximum still had its filler, sized
+        // before the bump — and rest is what Ashley ruled on 18 Sep must not
+        // pay for time, least of all for optional mobility.
+        {
+          const sessionMaxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
+          for (let i = 0; i < days.length; i++) days[i] = yieldFillerTo(days[i], sessionMaxSeconds)
+        }
         trimWeekRestForBudget(
           days,
           getSessionMaximumSeconds(profile.session_duration_preference || '45-60'),

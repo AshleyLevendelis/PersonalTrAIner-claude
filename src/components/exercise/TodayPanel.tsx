@@ -1172,10 +1172,14 @@ export function TodayPanel({
               }
             }}
           />
-          {workout!.recommendedCardio && (
+          {(workout!.recommendedCardio || workout!.mobilityFiller) && (
             <>
               <p className="ds-label-compact">Finish</p>
-              <FinisherRow cardio={workout!.recommendedCardio} />
+              {workout!.recommendedCardio && <FinisherRow cardio={workout!.recommendedCardio} />}
+              {/* The optional mobility close-out on a day that already had its
+                  cardio and still ran short — applyDurationFiller. Its own row,
+                  after the cardio, because that is the order to do them in. */}
+              {workout!.mobilityFiller && <FinisherRow cardio={workout!.mobilityFiller} label="Optional" />}
             </>
           )}
           <AdditionalWorkSection plannedExercises={workout!.exercises} profile={profile} onOpenPlateCalc={onOpenPlateCalc} />

@@ -145,6 +145,15 @@ const OFF_STYLE = new URLSearchParams(location.search).get('offstyle') === '1'
 // finisher after a session, rather than hand-seeding a row, which would have
 // proved only that a string written here renders. Same reasoning as ?legcurl.
 const FINISHER = new URLSearchParams(location.search).get('finisher') === '1'
+// ?mobility=1 — A DAY THAT ALREADY HAS ITS CARDIO AND STILL RAN SHORT, for
+// verify:mobility-filler (23 Sep 2026). Only a thin pool on a cardio-loving
+// profile produces one, so the inputs are one of the grid's own measured
+// offenders' shape — full gym, a shoulder injury, 90+ minutes, bodybuilding,
+// beginner, fat loss, high recovery, loves cardio — and the plan is generated,
+// never hand-built: the driver finds the day by asking the page. Chosen by
+// running the harness's own day pattern and seed across 108 variants, not by
+// guessing — the first guess (30-45) gave the live week no such day at all.
+const MOBILITY = new URLSearchParams(location.search).get('mobility') === '1'
 // ?walker=1 — THE BEGINNER'S WALKING PLAN, the only plan the app generates
 // whose days hold a prescribed ACTIVITY instead of exercises.
 //
@@ -175,7 +184,7 @@ const profile: UserProfile = {
   // old size. The app now SAYS so (meal-refit's residue line), and the harness
   // stops describing a profile that eats a snack it does not budget for.
   meals_per_day: 3, include_snacks: true,
-  fitness_goal: FINISHER || WALKER ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
+  fitness_goal: FINISHER || WALKER || MOBILITY ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   ...(WALKER ? { start_preference: 'move_more' as const } : {}),
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
   //
@@ -185,14 +194,14 @@ const profile: UserProfile = {
   // three splits and three seeds before picking this one, rather than
   // hand-seeding a plan row, which would have proved only that a string I
   // wrote myself renders.
-  equipment_access: WALKER ? 'bodyweight' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: [],
-  training_style: WALKER || OFF_STYLE ? 'functional' : 'hybrid',
-  training_experience: WALKER ? 'beginner' : 'intermediate', session_duration_preference: '45-60',
+  equipment_access: WALKER ? 'bodyweight' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: MOBILITY ? ['shoulders'] : [],
+  training_style: WALKER || OFF_STYLE ? 'functional' : MOBILITY ? 'bodybuilding' : 'hybrid',
+  training_experience: WALKER || MOBILITY ? 'beginner' : 'intermediate', session_duration_preference: MOBILITY ? '90+' : '45-60',
   workout_split_preference: LEG_CURL ? 'push_pull_legs' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
-  coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: FINISHER ? 'enjoy' : 'tolerate',
+  coaching_persona: 'supportive', recovery_capacity: MOBILITY ? 'high' : 'moderate', conditioning_preference: MOBILITY ? 'love' : FINISHER ? 'enjoy' : 'tolerate',
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
@@ -421,6 +430,21 @@ const loggedTarget = (() => {
     .map(d => ({ day: d.day, date: nearestAnchorDate(d.day), activity: d.recommendedCardio!.activity, duration: d.recommendedCardio!.duration, rpe: d.recommendedCardio!.targetRpe }))
   if (withFinisher.length === 0) return null
   return withFinisher.reduce((best, d) => (d.activity.length > best.activity.length ? d : best))
+})()
+
+// A DAY WITH ITS CARDIO AND AN OPTIONAL MOBILITY CLOSE-OUT — published for
+// verify:mobility-filler. Same rules as __finisherTarget: training days only,
+// from the live week, asked of the plan rather than named.
+;(window as unknown as { __mobilityTarget: unknown }).__mobilityTarget = (() => {
+  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan
+  const hit = liveDays.find(d => d.exercises.length > 0 && !!d.recommendedCardio && !!d.mobilityFiller)
+  if (!hit) return null
+  return {
+    day: hit.day, date: nearestAnchorDate(hit.day),
+    cardio: hit.recommendedCardio!.activity, cardioMinutes: hit.recommendedCardio!.duration,
+    mobility: hit.mobilityFiller!.activity, mobilityMinutes: hit.mobilityFiller!.duration,
+  }
 })()
 
 // THE LIVE WEEK'S PRESCRIBED ACTIVITY — published for verify:planned-activity.

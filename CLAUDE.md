@@ -40,6 +40,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
+- **And a short day gets the rest of its time, as optional mobility — the day
+  that already has its cardio included** — since 23 Sep 2026. MEASURED: 348 of
+  9,216 plans ran a day under the minimum asked for, and on 346 of them every
+  such day was one already carrying the goal's cardio — the filler skipped any
+  day with a cardio block, and a day holds only one. They now get a separate
+  optional mobility close-out; 3 plans remain, from the push:pull pass trimming
+  after the filler. **Optional filler is elastic**: it is the first thing any
+  budget takes back, before a set, an exercise or a rest — "I've only got 58
+  minutes" had been dropping three exercises to keep 19 minutes of optional
+  mobility. `filler-yields` (58 checks; 18 mutations, 17 caught — the 18th
+  exposed a second safety net that fired on 0 of 9,216 plans, now deleted),
+  `verify:mobility-filler`
 - **Rest suits the exercise, and the time budget is paid for in WORK** — since
   18 Sep 2026. Ashley, from the gym floor: *"The rest breaks between the lat
   pulldown seem very short 30s, check that is correct."* It was not: measured
@@ -322,9 +334,11 @@ menu" stays true when a copy is also left outside it.
 - Shorten or lighten TODAY only — both surfaces since 13 Sep 2026. Her ruling
   that day, from three options: **protect the main lift and drop accessories**
   — you still squat and squat properly, and the accessory work at the end goes,
-  from the bottom up, until it fits. Never below three exercises. `today-only`,
+  from the bottom up, until it fits. Never below three exercises. And before
+  any of that, the day's OPTIONAL mobility goes (23 Sep 2026) — it was being
+  kept while real exercises were cut. `today-only`,
   `verify:shorten-today`, `edit-keeps-the-bar`, `session-shortfall`,
-  `what-happened`, `coach-volume-schedule`.
+  `what-happened`, `coach-volume-schedule`, `filler-yields`.
   CORRECTED the line that stood here: it said the only lightening control was
   the coach's volume change, which reaches to the end of the plan. True, and
   still true — this adds a second, narrower one beside it rather than changing

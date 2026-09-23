@@ -521,6 +521,20 @@ export interface WorkoutDay {
   conditioning_note?: string
   recommendedCardio?: RecommendedCardio
   /**
+   * The optional mobility close-out for a day that ALREADY carries its own
+   * cardio and still runs short of the time the trainee set aside. Always
+   * `is_filler: true`, always `post_session`, always mobility — the day has
+   * had its conditioning. See applyDurationFiller in exercise-plan.ts.
+   *
+   * A SECOND field rather than a second use of recommendedCardio because a
+   * day can hold only one of those, and that one limit is exactly why these
+   * days were skipped: until 23 Sep 2026 the filler passed over any day that
+   * already had cardio, so the one day of the week that got the goal's cardio
+   * was reliably the SHORTEST. Like every filler it is elastic — see
+   * yieldFillerTo in session-duration.ts.
+   */
+  mobilityFiller?: RecommendedCardio
+  /**
    * Set when this day's whole prescription is an activity rather than a gym
    * session — see PlannedActivity. Mutually exclusive with a populated
    * exercises array in practice, though nothing enforces that structurally.

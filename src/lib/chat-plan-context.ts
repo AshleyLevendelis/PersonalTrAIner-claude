@@ -139,6 +139,11 @@ function describeNonLiftingDay(d: WorkoutDay): string {
     bits.push(`${cardio.activity}, ${cardio.duration} min at RPE ${cardio.targetRpe}/10 (${cardio.timing.replace(/_/g, ' ')})`
       + (cardio.reason ? ` — ${cardio.reason}` : ''))
   }
+  const mobility = d.mobilityFiller
+  if (mobility) {
+    bits.push(`then optionally ${mobility.activity}, ${mobility.duration} min at RPE ${mobility.targetRpe}/10`
+      + (mobility.reason ? ` — ${mobility.reason}` : ''))
+  }
   if (d.conditioning_note) bits.push(d.conditioning_note)
   return bits.length > 0 ? bits.join(' | ') : 'no session prescribed'
 }

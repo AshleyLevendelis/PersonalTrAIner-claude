@@ -2,6 +2,74 @@
 
 Newest first. One line each.
 
+- [x] **SHORT DAYS GET THE REST OF THEIR TIME — AND OPTIONAL PADDING STOPS
+  COSTING REAL WORK.** 23 Sep 2026, item 2 of Ashley's "work on 1 then 2 then
+  3" ("long sessions come out too short").
+  **Measured before touching anything**, on the full 9,216-profile grid with
+  the scorer's own rule: 348 plans ran a training day more than 20% under the
+  minimum they asked for (the tracked report said 403; it predates this
+  branch's catalogue changes). **3,838 of the 3,841 short days already
+  carried the goal's assigned cardio**, and on 346 of the 348 plans every
+  short day did. Cause, traced then confirmed: `applyDurationFiller` skipped
+  any day with a conditioning note, because a day holds ONE cardio block and
+  that one was taken — and cardio overflows onto training days only after the
+  rest days are used, landing on the thinnest days (injury-narrowed or
+  bodyweight pools on long sessions: wrists 78, shoulders+knees+lower back 66,
+  shoulders 52...). So the day that got the cardio was reliably the SHORTEST.
+  **Fix 1 — `mobilityFiller`**, a second optional block: those days now get
+  the same "extra time goes to mobility" close-out every other short day
+  already got. Always mobility at RPE 2 — the day has had its conditioning.
+  Shown as its own row after the cardio, headed "Optional".
+  **Fix 2 — found on the way, and worse: optional padding was treated as
+  work.** Measured: "I've only got 58 minutes" on a day of 56 minutes'
+  lifting plus a 19-minute optional mobility flow dropped Hip Thrust,
+  Pull-Ups (Assisted) AND Plank, and kept the mobility. Four profiles, same
+  result every time. Now `yieldFillerTo` (session-duration.ts) makes the
+  filler the first thing any budget takes back — in shorten-today, in the
+  volume change's "no room" check, and in the week's final trim to the
+  maximum, where it had been costing REST instead (one measured plan: 18
+  rests cut, 260 seconds, with the filler untouched). The coach's shorten
+  receipt and card now say when it was only the padding that came off.
+  **After: 348 → 3 plans.** The 3 were already failing before, and have a
+  different cause, left for item 3: the push:pull pass trims pull sets AFTER
+  the filler has sized the day, on pull-heavy days.
+  **CSCS review.** (1) Training effect: none on lifting; adds optional
+  low-intensity mobility where time was left over, and stops shortening from
+  cutting real stimulus to keep padding. (2) Takes away: only optional
+  mobility minutes, which is the thing that should go first. Measured that
+  the fix does not remove anything else. (3) Fundamentals: pattern coverage,
+  overload and specificity untouched; recovery untouched (RPE 2, optional).
+  (4) Floors: the time-fit floor is not redefined — the scorer always counted
+  post-session filler; the rest floor is now PROTECTED from being cut for
+  padding, which strengthens Ashley's 18 Sep rest ruling. (5) Scope: general
+  mobility, not rehab.
+  **Decided by me under the CSCS delegation**: that a day already carrying
+  its cardio gets mobility and never a second conditioning dose, and that
+  optional filler always yields first. **Copy that is hers to change**: the
+  new row's label "Optional", the browse line "Optional: …", and the two new
+  receipt sentences ("19 min of optional mobility came off first", and on the
+  coach card "Only the optional mobility at the end comes off — every
+  exercise stays."). The existing filler rows still say "Finisher".
+  **Gates:** `test:filler-yields` (58 checks) — constructed days for the
+  mechanism, four measured grid offenders seeded by their own key, the exact
+  shorten case that failed, a searched volume case, and the rest-cut case.
+  18 mutations, 17 caught; the 18th was a second safety net that MISSED, and
+  measuring it showed why: it fired on 0 of 9,216 plans, so it was deleted.
+  `verify:mobility-filler` (9 checks, 4 mutations, 4 caught) drives a real
+  generated plan at 390px; screenshot read.
+  **Full sweep before commit:** 284 gates ran, 273 passed. `test:quality`,
+  scored against a clean checkout of the previous commit on the same grid:
+  the ONLY rule that moved is time_fit, 348 → 3; every other rule count is
+  identical, and the average went 11.64 → 11.70, with 0 plans below the floor.
+  The 11 failures, each read rather than assumed: the three cloud-only ones;
+  `coach-exam-fresh`, correctly red until the exam re-runs; two snapshot
+  gates and four browser drivers that fail IDENTICALLY with this change set
+  aside (run on the previous commit, same machine) — not this change, taken
+  up in the next entry; and `verify:rest-day-race`, which crashed once on a
+  null page body and passed on the re-run — recorded, not explained.
+  **Noticed, not fixed:** a 30-45 day's cardio is a SEPARATE session, yet
+  Today's card shows it under "Finish", headed "Finisher".
+
 - [x] **THE COACH EXAM'S MARKING HALF, MADE TO WORK — AND ONE MORE FALSE
   "SILENCE".** 23 Sep 2026, item 1 of Ashley's "work on 1 then 2 then 3".
   Her run that morning graded 24 cases and marked NONE: every judge call came
