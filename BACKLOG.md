@@ -2,6 +2,61 @@
 
 Newest first. One line each.
 
+- [x] **FOUR CABLE-ATTACHMENT VARIANTS, ON ASHLEY'S "YES BUILD CABLE
+  ATTACHMENTS."** 23 Sep 2026, the follow-up to the machine batch above —
+  attachments were named as an observation, not built there, and this
+  closes it.
+  **Investigated the real gap before building anything.** Read all 16
+  cable-machine exercises directly rather than guessing. Several already
+  correctly name a specific attachment (Face Pulls and Cable Pull-Through
+  use rope, Close-Grip Lat Pulldown uses a V-bar/neutral handle) — the
+  gap was narrower than "attachments aren't modelled" made it sound. Three
+  real, well-established gym distinctions were genuinely missing: rope vs.
+  fixed-bar tricep pushdown (different wrist path, different head
+  emphasis), a rope/hammer cable curl (neutral grip shifts real work onto
+  the brachialis), and — the one true content gap, not just a naming one —
+  no UNILATERAL option existed anywhere in vertical pulling at all.
+  **Built four, each additive, generic siblings left untouched:**
+  - Rope Tricep Pushdown / Straight-Bar Tricep Pushdown — split out of
+    Tricep Pushdowns, which stays exactly as it is for anyone whose gym
+    situation isn't attachment-specific.
+  - Cable Rope Hammer Curl — split out of Cable Curls the same way.
+  - Single-Arm Lat Pulldown — new unilateral vertical-pull option, tagged
+    like Lat Pulldown for the pattern and joint load, and given the
+    "corrects imbalances" reasoning Dumbbell Rows already carries for
+    horizontal pulling.
+  All four use the SAME `'cable machine'` equipment tag their generic
+  siblings already use — unlike the machine batch, no new equipment string
+  meant no new LOADED_EQUIPMENT/EQUIPMENT_QUALITY work was needed here.
+  **CSCS review**: (1) Training effect — real, established biomechanical
+  distinctions (grip path, unilateral core demand), not invented variety.
+  (2) Takes away — nothing; the generic entries are untouched and still
+  available. (3) Fundamentals — vertical pulling gains genuine unilateral
+  content where none existed; no change to overload, recovery or
+  specificity elsewhere. (4) Floor/ceiling — none; same equipment tag,
+  same clamps as the siblings they're modelled on. (5) Scope — pure
+  exercise-selection catalogue work.
+  **A real gate catch, fixed at the root rather than worked around.**
+  `test:exercise-demo` failed: "brachialis" (Cable Rope Hammer Curl's
+  second primary muscle) had no entry in the muscle-map's display
+  vocabulary, so the body diagram couldn't paint it. Read the file's own
+  stated rule before fixing it — REGIONS is a DISPLAY vocabulary that
+  deliberately approximates ("a rotator cuff sits under the deltoid"),
+  separate from the MEASUREMENT vocabulary in exercise-db.ts, so this was
+  never a candidate for inventing a new drawable region — just mapping
+  brachialis to the same 'biceps' region its neighbour (deep to the biceps,
+  same visible arm) already uses. One line, matching the file's own
+  precedent exactly.
+  **Gates**: same 15 directly-relevant gates as the machine batch, all
+  clean after the muscle-map fix. `npx tsc --noEmit` clean.
+  **PROVEN EMPIRICALLY**: full 9,216-profile quality scorer re-run —
+  average held (11.63→11.64/12, noise), 0/9216 below floor (unchanged),
+  and `selection/worse_implement_than_available` genuinely IMPROVED
+  (782→598 combinations) — a richer catalogue gave the ranker more
+  high-quality implement choices to reach for, a real measured benefit,
+  not just "nothing broke". None of the four new exercises appear in the
+  ten worst-scoring plans.
+
 - [x] **SIX MORE MACHINES IN THE EXERCISE CATALOGUE, ON ASHLEY'S "ALL OF
   THEM."** 23 Sep 2026. Ashley, from the gym floor: *"we need more exercise
   machines to select from. Too many times I've gone into the gym and tried

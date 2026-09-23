@@ -51,6 +51,10 @@ const REGION_BY_MUSCLE: Record<string, MuscleRegion[]> = {
   'rotator cuff': ['shoulders'], 'external rotators': ['shoulders'],
   'biceps': ['biceps'], 'biceps brachii': ['biceps'],
   'biceps brachii (long head)': ['biceps'],
+  // Deep to the biceps on the front of the upper arm, same visible region —
+  // the approximation rule's own example ("a rotator cuff sits under the
+  // deltoid"), applied here.
+  'brachialis': ['biceps'],
   'forearms': ['forearms'], 'brachioradialis': ['forearms'], 'grip': ['forearms'],
   'wrist flexors': ['forearms'], 'wrist extensors': ['forearms'],
   'forearm flexors': ['forearms'], 'forearm extensors': ['forearms'],

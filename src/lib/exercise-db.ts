@@ -1090,6 +1090,31 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 30,
   },
+  // ATTACHMENT FLOOR, 23 Sep 2026 — same "build cable attachments" ask, and
+  // the one genuine gap in this group: nothing UNILATERAL existed anywhere
+  // in vertical pulling. A single D-handle on the lat pulldown tower is a
+  // real, commonly-programmed variant — same joint verdict as Lat Pulldown
+  // (the pattern and the shoulder load are identical, one arm at a time),
+  // and the same "corrects imbalances" reasoning Dumbbell Rows already
+  // carries for horizontal pulling.
+  {
+    name: 'Single-Arm Lat Pulldown',
+    id: 'single-arm-lat-pulldown',
+    movement_pattern: 'vertical_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['lats', 'biceps', 'teres major'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: ['Single D-handle, kneel or sit side-on to the tower', 'Pull the elbow down and back, past the hip', 'Resist rotating the torso toward the working side', 'Control the stretch back up'],
+    coach_note_swap: 'Unilateral pulling corrects side-to-side imbalances and adds a real anti-rotation core demand.',
+    loads_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'vertical_pull',
+    unilateral: true,
+    avg_duration_seconds: 32,
+  },
   // Swap-depth fix, and the same content gap the catalogue-thinness audit
   // found: at home_gym/minimalist, the only vertical_pull option a
   // beginner/novice could reach was Pull-Ups itself gated to intermediate+
@@ -3078,6 +3103,30 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 28,
   },
+  // ATTACHMENT FLOOR, 23 Sep 2026 — same "build cable attachments" ask.
+  // Cable Curls above stays untouched; this is the real, commonly-named
+  // rope/hammer variant — a neutral grip shifts real emphasis onto the
+  // brachialis and brachioradialis rather than the biceps brachii alone,
+  // the same reasoning Close-Grip Lat Pulldown already uses for its own
+  // neutral-grip shift.
+  {
+    name: 'Cable Rope Hammer Curl',
+    id: 'cable-rope-hammer-curl',
+    movement_pattern: 'isolation_bicep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['biceps brachii', 'brachialis'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: ['Rope attachment, low pulley', 'Neutral grip — thumbs up throughout', 'Curl with constant tension', 'Squeeze at top, slow negative'],
+    coach_note_swap: 'Neutral grip shifts real work onto the brachialis, not just the biceps.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'bicep_curl',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
   {
     name: 'Incline Dumbbell Curls',
     id: 'incline-dumbbell-curls',
@@ -3233,6 +3282,52 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Elbows pinned to sides', 'Push down to full extension', 'Squeeze at bottom', 'Control the return'],
     coach_note_swap: 'Cable isolation for tricep lateral head emphasis.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  // ATTACHMENT FLOOR, 23 Sep 2026 — Ashley's follow-up to the machine batch:
+  // "build cable attachments". The generic 'Tricep Pushdowns' above stays
+  // exactly as it is (nothing that already reads it should change); these
+  // two split out the real, commonly-named gym distinction — rope lets the
+  // wrists rotate and hands separate at the bottom, a fixed bar does not —
+  // for someone whose cable station only has one or the other, or who
+  // specifically wants the named variant. Same equipment tag as the
+  // generic ('cable machine' already covers every attachment, per
+  // isEquipmentAllowed) and the same substitution_group, so all three can
+  // freely substitute for each other.
+  {
+    name: 'Rope Tricep Pushdown',
+    id: 'rope-tricep-pushdown',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['triceps'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: ['Rope attachment, elbows pinned to sides', 'Push down and pull the ends apart at full extension', 'Squeeze and hold the spread', 'Control the return, elbows stay still'],
+    coach_note_swap: 'The rope lets the wrists rotate through the finish — more lateral head, easier on a cranky wrist than a fixed bar.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  {
+    name: 'Straight-Bar Tricep Pushdown',
+    id: 'straight-bar-tricep-pushdown',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['triceps'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: ['Straight or angled bar, overhand grip', 'Elbows pinned to sides', 'Push down to full extension', 'Control the return'],
+    coach_note_swap: 'The fixed grip lets you load it heaviest of the three pushdown variants.',
     loads_joints: [],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'tricep_extension',
