@@ -33,6 +33,7 @@ import {
   ceilingKindFor, ceilingToAskFor, hasStatedCeiling, isValidCeilingKg,
   LOAD_CEILING_QUESTION, LOAD_CEILING_COLUMN,
 } from '../src/lib/load-ceiling-prompt'
+import { EQUIPMENT_QUALITY } from '../src/lib/exercise-plan'
 import type { UserProfile, WorkoutDay, EquipmentAccess } from '../src/lib/types'
 
 let failures = 0
@@ -261,6 +262,28 @@ console.log('\n7. Every piece of equipment is classified, so none can mean "no w
   for (const e of ['assisted pull-up machine', 'resistance band', 'treadmill']) {
     check(`"${e}" is deliberately NOT external load`, UNLOADED_EQUIPMENT.has(e) && !LOADED_EQUIPMENT.has(e))
   }
+
+  // THE SIX MACHINES ASHLEY'S "MORE MACHINES TO SELECT FROM" ASK BROUGHT,
+  // 23 Sep 2026 — named the same way the 13 Sep six are named above, so a
+  // revert here is loud rather than a silent "Bodyweight" prescription.
+  for (const e of ['standing calf raise machine', 'rotary torso machine',
+    'back extension machine', 'reverse hyper machine', 'multi-hip machine',
+    't-bar row machine']) {
+    check(`"${e}" counts as external load`, LOADED_EQUIPMENT.has(e))
+  }
+
+  // AND THE THIRD TABLE, added 21 Sep 2026 after the SAME six 13-Sep
+  // machines went stale here too — EQUIPMENT_QUALITY. Nothing had ever
+  // checked its completeness, only LOADED_EQUIPMENT/UNLOADED_EQUIPMENT's
+  // partition above; this closes that gap generally rather than only for
+  // today's six. EQUIPMENT_QUALITY is deliberately NOT a full partition
+  // (furniture and cardio are legitimately absent, contributing nothing to
+  // bestEquipmentRank) — but every genuinely LOADED implement is a real
+  // working-set tool by definition, and every one already in the table is
+  // ranked, so LOADED_EQUIPMENT subset of EQUIPMENT_QUALITY's keys is the
+  // honest invariant to hold, not "every string everywhere".
+  const unranked = [...LOADED_EQUIPMENT].filter(e => !(e in EQUIPMENT_QUALITY))
+  check('every loaded implement is also ranked in EQUIPMENT_QUALITY — the exact staleness that hit 21 Sep, generalised', unranked.length === 0, unranked)
 
   // A SMITH MACHINE IS A BAR, NOT A STACK — otherwise it gets a 5kg pin floor.
   const smithSquat = getExerciseEntry('Smith Machine Squat')

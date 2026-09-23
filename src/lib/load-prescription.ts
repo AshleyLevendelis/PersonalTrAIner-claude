@@ -1021,6 +1021,13 @@ export const LOADED_EQUIPMENT = new Set([
   // A Smith machine shoulder press with no weight on it.
   'smith machine', 'hip thrust machine', 'glute kickback machine',
   'hip abduction machine', 'hip adduction machine', 'belt squat machine',
+  // ADDED 23 Sep 2026, same shape as the 13 Sep fix directly above, and
+  // added in the SAME commit as the catalogue entries this time rather than
+  // a day later — Ashley's "more machines to select from" ask brought six
+  // new equipment strings; this Set grows with them immediately.
+  'standing calf raise machine', 'rotary torso machine',
+  'back extension machine', 'reverse hyper machine', 'multi-hip machine',
+  't-bar row machine',
 ])
 
 /**

@@ -376,7 +376,7 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
 //     ranking a treadmill against a barbell is a category error.
 // Both cases fall through to a 0 contribution rather than a low one, so an
 // unranked entry is never quietly penalised for being unranked.
-const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
+export const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
   // Externally loaded in fine increments — the tools a working set is
   // actually built on.
   barbell: 'high',
@@ -403,6 +403,17 @@ const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
   'glute kickback machine': 'high',
   'hip abduction machine': 'high',
   'hip adduction machine': 'high',
+  // ADDED 23 Sep 2026, in the SAME commit as the catalogue entries — the
+  // exact discipline the note above exists to demand. Ashley's "more
+  // machines to select from" ask brought six new equipment strings, all
+  // fine-increment loaded implements exactly like every other 'high' entry
+  // in this table.
+  'standing calf raise machine': 'high',
+  'rotary torso machine': 'high',
+  'back extension machine': 'high',
+  'reverse hyper machine': 'high',
+  'multi-hip machine': 'high',
+  't-bar row machine': 'high',
   // 'dumbbells' (two implements, one per hand) and 'dumbbell' (ONE implement,
   // held centrally) are listed SEPARATELY and deliberately. They are not a
   // typo for each other: loadingMode() (load-prescription.ts:415) reads that

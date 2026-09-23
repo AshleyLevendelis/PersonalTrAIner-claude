@@ -108,11 +108,20 @@ console.log('\n[5b] The lower back was reviewed: the two paths diverge by exactl
   // Squats, T-Bar Rows, Romanian Deadlifts). All three load the joint in
   // BOTH paths, so the old-vs-new divergence stays exactly the three rehab
   // movements.
+  //
+  // MOVED 15 -> 17 on 23 Sep 2026, same shape: Ashley's "more machines"
+  // catalogue batch added Back Extension Machine and Rotary Torso Machine,
+  // each mirroring a free-weight sibling's lower_back_axial contraindication
+  // (Good Mornings, Russian Twist) rather than inventing a new verdict.
+  // Reverse Hyper Machine and Multi-Hip Machine, added the same batch,
+  // deliberately do NOT carry this tag — Reverse Hyper mirrors Hip Thrust's
+  // "almost nothing on the spine" tagging instead — so the count moves by
+  // exactly two, not by the whole batch of six.
   const j = getFlaggedJoints(['lower_back'])
   const viaNew = EXERCISE_DATABASE.filter(e => isContraindicatedFor(e, j))
   const viaOld = EXERCISE_DATABASE.filter(e => e.loads_joints.some(x => j.has(x)))
   const REHAB = ['Dead Bug', 'Side Plank', 'Bird Dog']
-  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 15, { viaNew: viaNew.length })
+  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 17, { viaNew: viaNew.length })
   check('...and none of the rehab movements is among the exclusions',
     REHAB.every(n => !viaNew.some(e => e.name === n)),
     viaNew.filter(e => REHAB.includes(e.name)).map(e => e.name).join(', '))

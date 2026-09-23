@@ -1042,6 +1042,34 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 30,
   },
+  // MACHINE FLOOR, 23 Sep 2026 — Ashley's "more machines to select from" ask.
+  // The plate-loaded, chest-supported T-bar row machine — distinct
+  // equipment from 'T-Bar Rows' above (a straddle-bar or landmine setup
+  // with a free-standing hinge). Tagged like Seated Machine Row just above,
+  // its closer mechanical sibling: the chest pad removes the hip-hinge hold
+  // entirely, so this carries none of the free-standing T-bar's lower-back
+  // tag, and style_tags follow Seated Machine Row's narrower set rather
+  // than the free-standing version's — full support removes exactly the
+  // standing-stability demand that earns 'functional'/'combat' there.
+  {
+    name: 'T-Bar Row Machine',
+    id: 't-bar-row-machine',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'rear deltoid', 'biceps'],
+    equipment: ['t-bar row machine'],
+    joint_stress: 'low',
+    form_cues: ['Chest against the pad, grip the handles', 'Pull the handles to the torso', 'Squeeze the shoulder blades together', 'Return under control, arms fully extended'],
+    coach_note_swap: 'Chest support removes the lower-back hold of a free-standing T-bar row.',
+    loads_joints: ['shoulder', 'elbow'],
+    contraindicated_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
 
   // VERTICAL PULL
   {
@@ -1719,6 +1747,59 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 35,
   },
+  // MACHINE FLOOR, 23 Sep 2026 — Ashley's "more machines to select from" ask.
+  // A lever/pad hyperextension machine — the loaded version of a
+  // Roman-chair back extension. Tagged like Good Mornings above: real
+  // spinal-erector loading through the hip hinge, contraindicated when the
+  // lower back or hip is injured, same as its free-weight sibling.
+  {
+    name: 'Back Extension Machine',
+    id: 'back-extension-machine',
+    movement_pattern: 'hip_hinge',
+    contraindicated_joints: ['hip', 'lower_back_axial'],
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['erectors', 'glutes', 'hamstrings'],
+    equipment: ['back extension machine'],
+    joint_stress: 'moderate',
+    form_cues: ['Hips on the pad, ankles secured', 'Lower under control to a flat back, not rounded', 'Drive the hips forward to rise', 'Stop at torso parallel — do not hyperextend past it'],
+    coach_note_swap: 'Builds the spinal erectors directly — the loaded version of a bodyweight hyperextension.',
+    loads_joints: ['lower_back_axial'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'hip_hinge',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
+  // MACHINE FLOOR, 23 Sep 2026 — same ask. The reverse hyperextension: hips
+  // unsupported, legs swing freely below a pad while the torso stays fixed.
+  // DELIBERATE tag deviation from Back Extension/Good Mornings above: this
+  // is the specific machine S&C practice singles out as spine-friendly
+  // hip-extension work (the reverse hyper's original design brief), because
+  // the spine stays passive and under mild traction rather than loaded in
+  // extension — the same reasoning Hip Thrust's tags already carry ("almost
+  // nothing on the spine", below). No lower_back_axial tag for that reason:
+  // this is genuinely usable posterior-chain work for someone whose lower
+  // back is off-limits to Good Mornings or a barbell hip hinge.
+  {
+    name: 'Reverse Hyper Machine',
+    id: 'reverse-hyper-machine',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['glutes', 'hamstrings', 'erectors'],
+    equipment: ['reverse hyper machine'],
+    joint_stress: 'low',
+    form_cues: ['Torso flat and fixed on the pad, hips at the edge', 'Legs hang free at the start', 'Swing the legs up to torso height, squeezing the glutes', 'Lower under control — no swinging momentum'],
+    coach_note_swap: 'Loads the glutes and hamstrings with the spine passive, not compressed — a genuine option when a hinge is off the table.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'hip_hinge',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
   {
     name: 'Kettlebell Swing (Heavy)',
     id: 'kettlebell-swing-heavy',
@@ -2122,6 +2203,34 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'hip_adduction',
     unilateral: false,
     avg_duration_seconds: 30,
+  },
+  // MACHINE FLOOR, 23 Sep 2026 — Ashley's "more machines to select from" ask.
+  // The multi-hip / hip extension machine — standing, leg strapped into a
+  // rotating cuff pad rather than braced against a chest pad. DISTINCT
+  // PIECE OF EQUIPMENT from Glute Kickback Machine above (different setup,
+  // wider range of motion, no chest support) even though both are
+  // hip-extension work in the same family — a real gym stocking one does
+  // not necessarily stock the other. Same joint verdict as Glute Kickback:
+  // Hip Thrust family, torso stays neutral, nothing loaded through the
+  // spine.
+  {
+    name: 'Multi-Hip Machine',
+    id: 'multi-hip-machine',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'diagonal',
+    primary_muscles: ['glutes', 'hamstrings'],
+    equipment: ['multi-hip machine'],
+    joint_stress: 'low',
+    form_cues: ['Stand tall, leg strapped into the rotating pad', 'Hold the handles for balance, torso stays upright', 'Drive the leg back and up', 'Return under control — do not let the stack slam'],
+    coach_note_swap: 'Standing hip extension with a wider range than the kickback machine.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'hip_thrust',
+    unilateral: true,
+    avg_duration_seconds: 32,
   },
 
   // KNEE DOMINANT
@@ -2751,6 +2860,34 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Full range of motion', 'Pause at the top', 'Stretch at the bottom', 'Straight legs'],
     coach_note_swap: 'Standing variation emphasizes the gastrocnemius.',
+    loads_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'calf',
+    unilateral: false,
+    avg_duration_seconds: 28,
+  },
+  // MACHINE FLOOR, 23 Sep 2026. Ashley, from the gym floor: "we need more
+  // exercise machines to select from... gone into the gym and tried to
+  // swap an exercise for a different machine that I have in the gym but
+  // there is no option for it in the app." A dedicated standing calf
+  // machine (shoulder pads, its own stack or plate-loaded lever) is
+  // distinct from 'Calf Raises' above, which is tagged generically
+  // ['machine', 'bodyweight'] and covers a standing calf raise done on a
+  // Smith machine, step, or leg press platform — a full-gym trainee with
+  // an actual dedicated standing calf machine had no entry naming it.
+  {
+    name: 'Standing Calf Raise Machine',
+    id: 'standing-calf-raise-machine',
+    movement_pattern: 'isolation_calf',
+    contraindicated_joints: ['ankle'],
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['gastrocnemius', 'soleus'],
+    equipment: ['standing calf raise machine'],
+    joint_stress: 'low',
+    form_cues: ['Shoulders under the pads, balls of feet on the platform', 'Full range of motion', 'Pause at the top', 'Stretch at the bottom — do not bounce'],
+    coach_note_swap: 'The dedicated standing machine — heavier loading than a Smith-machine or platform calf raise.',
     loads_joints: [],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'calf',
@@ -3517,6 +3654,33 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'core_rotational',
     unilateral: false,
     avg_duration_seconds: 28,
+  },
+  // MACHINE FLOOR, 23 Sep 2026 — Ashley's "more machines to select from" ask.
+  // Seated, hip-braced resisted trunk rotation — closer to Russian Twist's
+  // risk profile than Cable Woodchops': Cable Woodchops is a standing,
+  // hip-driven rotational pull with the spine along for the ride, but this
+  // machine braces the hips and resists rotation at the lumbar spine
+  // directly, the loaded-spinal-rotation pattern S&C practice is genuinely
+  // cautious about. Tagged accordingly rather than defaulting to
+  // Woodchops' more forgiving 'low'/empty tags.
+  {
+    name: 'Rotary Torso Machine',
+    id: 'rotary-torso-machine',
+    movement_pattern: 'core',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'rotational',
+    primary_muscles: ['obliques', 'core'],
+    equipment: ['rotary torso machine'],
+    joint_stress: 'moderate',
+    form_cues: ['Sit tall, hips and legs braced against the pads', 'Rotate through a controlled range, do not force it', 'Pause briefly at full rotation', 'Return under control — no slamming the stack'],
+    coach_note_swap: 'Machine-braced rotation — isolates the obliques more than a standing cable woodchop.',
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: ['lower_back_axial'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'core_rotational',
+    unilateral: false,
+    avg_duration_seconds: 30,
   },
   // -------------------------------------------------------------------------
   // ANKLE, WRIST AND ELBOW REHAB.

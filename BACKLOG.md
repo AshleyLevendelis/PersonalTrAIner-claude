@@ -2,6 +2,98 @@
 
 Newest first. One line each.
 
+- [x] **SIX MORE MACHINES IN THE EXERCISE CATALOGUE, ON ASHLEY'S "ALL OF
+  THEM."** 23 Sep 2026. Ashley, from the gym floor: *"we need more exercise
+  machines to select from. Too many times I've gone into the gym and tried
+  to swap an exercise for a different machine that I have in the gym but
+  there is no option for it in the app."*
+  **Investigated before building anything.** Full-gym access already
+  unlocks every machine the catalogue has — this was never a filtering bug,
+  it's a coverage gap. 200 exercises, 43 already machine-tagged. Confirmed
+  by name search: no standing calf raise machine (only an ambiguous
+  bodyweight/machine "Calf Raises" and a seated one), no rotary torso
+  machine, no back extension/hyperextension machine, no reverse hyper
+  machine, no multi-hip machine, no lever-style T-bar row machine — the six
+  Ashley confirmed she wanted, all of them. The swap search box only
+  searches what's already in the catalogue; there's no way to type in a
+  missing machine and have it added.
+  **Built all six**, each modeled directly on a real sibling already in the
+  catalogue rather than invented from scratch:
+  - Standing Calf Raise Machine — sibling to Seated Calf Raises.
+  - Rotary Torso Machine — tagged closer to Russian Twist than Cable
+    Woodchops on purpose: a seated, hip-braced machine resists rotation at
+    the lumbar spine directly, the loaded-spinal-rotation pattern S&C
+    practice is genuinely cautious about, unlike Woodchops' standing,
+    hip-driven pull.
+  - Back Extension Machine — tagged like Good Mornings: real spinal-erector
+    loading, contraindicated for an injured lower back or hip.
+  - Reverse Hyper Machine — DELIBERATELY not given the same lower-back tag.
+    This is the machine S&C practice specifically singles out as
+    spine-friendly hip-extension work (hips unsupported, torso fixed, spine
+    passive under traction rather than loaded) — modeled on Hip Thrust's
+    existing "almost nothing on the spine" tagging, not invented. A
+    genuine option for someone whose lower back rules out Good Mornings.
+  - Multi-Hip Machine — a standing, cuff-strapped hip-extension machine,
+    named as a distinct piece of equipment from Glute Kickback Machine
+    (different setup, wider range, no chest support) since a real gym
+    stocking one doesn't necessarily stock the other.
+  - T-Bar Row Machine — tagged like Seated Machine Row, its closer
+    mechanical sibling, not like free-standing T-Bar Rows: chest support
+    removes the lower-back hold entirely, so it carries the shoulder/elbow
+    tags a supported row carries, not a hinge's spine tag.
+  **CSCS review**: (1) Training effect — none of the existing prescriptions
+  change; this only adds real-world implement choices for movements
+  already prescribed. (2) Takes away — nothing; pure additions to the pool,
+  nothing removed or reprioritised. (3) Fundamentals — pattern coverage
+  widens (more hip-hinge, calf, rotational-core and pull options); no
+  change to overload, recovery dosing or goal-specificity. (4) Floor/
+  ceiling redefinition — none; every entry uses the standard 'stack'
+  loading mode and the same generic ceiling as its siblings, verified
+  empirically rather than assumed (below). (5) Scope — pure exercise-
+  selection catalogue work, no diagnosis or clinical judgement.
+  **A THIRD TABLE WOULD HAVE GONE STALE THE SAME WAY IT DID ON 21 SEP,
+  EXCEPT THIS TIME IT DIDN'T.** New equipment strings need THREE separate
+  classifications or they silently misbehave — this repo has hit this
+  exact shape twice before (13 Sep: unclassified machines prescribed
+  "Bodyweight"; 21 Sep: unclassified machines silently lost every
+  equipment-quality point). All six new strings added to `LOADED_EQUIPMENT`
+  and `EQUIPMENT_QUALITY` (both 'high', same as every other machine) in the
+  SAME commit as the catalogue entries, not a day later. `EQUIPMENT_QUALITY`
+  is now exported and `test:load-ceilings` gained a general completeness
+  check — every string in `LOADED_EQUIPMENT` must also be ranked in
+  `EQUIPMENT_QUALITY` — so the NEXT catalogue expansion can't repeat the
+  21 Sep staleness silently either, not just this one.
+  **`test:joint-tags` caught a real, expected divergence**: the lower-back
+  exclusion count moved from 15 to 17 (Back Extension Machine and Rotary
+  Torso Machine, both deliberately tagged contraindicated). This gate has
+  hit this exact shape once before (12→15, 1 Sep 2026) and its own history
+  says the right response is to review and update the number, not treat it
+  as a failure — reviewed, confirmed deliberate (Reverse Hyper and
+  Multi-Hip correctly did NOT move it), updated with the same reasoning
+  recorded inline.
+  **Gates**: `test:load-ceilings` gained 6 named-machine checks plus the
+  new EQUIPMENT_QUALITY completeness check (2 mutations run, both caught —
+  a string missing from EQUIPMENT_QUALITY, a string missing from
+  LOADED_EQUIPMENT). `test:joint-tags`' baseline updated with the same
+  before/after review the 1 Sep precedent used. `npx tsc --noEmit` clean.
+  15 directly-relevant gates (equipment-labels, style-starve, swap-target,
+  slot-replacement, injury-adaptation-safety, joint-tags, lift/set-
+  plausibility, load-suggestions, exercise-history/demo, muscle-balance,
+  week-load-consistency, pattern-floor, audit) all clean.
+  **PROVEN EMPIRICALLY, NOT JUST BY CONSTRUCTION**: ran the full 9,216-
+  profile quality scorer rather than trusting the schema alone — overall
+  average held at 11.63/12 (unchanged), 0/9216 below the 7.2 floor
+  (unchanged), and every rule-frequency count matched the prior baseline
+  within natural noise. None of the six new machines appear anywhere in
+  the ten worst-scoring plans. The new machines integrate cleanly; nothing
+  downstream needed reweighting.
+  **Not built**: cable attachments (rope/straight bar/single handle) as
+  distinct equipment — a different kind of change (a data-modelling
+  question, not "add a missing machine") that Ashley's "all of them" most
+  naturally didn't cover, since it was raised as an observation alongside
+  the six named machines rather than a seventh item on the list. Flagged
+  here rather than silently built or silently dropped.
+
 - [x] **THE FIRST REAL COACH-EXAM RUN FOUND FIVE THINGS — THREE REAL, TWO
   FALSE ALARMS IN THE EXAM ITSELF — AND ALL FIVE ARE NOW RESOLVED.** 23 Sep
   2026, Ashley's choice from a "what's next" menu: fix what the exam found.
