@@ -33,8 +33,14 @@ import { coachFingerprint } from './coach-fingerprint.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
-const TRANSCRIPTS = join(ROOT, 'coach-exam/transcripts')
+// Both overrides exist for test:coach-exam-judge, which drives this script end
+// to end against a fake Messages API in a scratch directory. The defaults are
+// the real ones; nothing but that gate sets either.
+const OUT_BASE = process.env.COACH_EXAM_OUT_DIR || join(ROOT, 'coach-exam')
+const REPORT_DIR = process.env.COACH_EXAM_OUT_DIR || ROOT
+const TRANSCRIPTS = join(OUT_BASE, 'transcripts')
 const RUBRIC = join(ROOT, 'docs/coach-exam-rubric.md')
+const JUDGE_URL = process.env.COACH_EXAM_JUDGE_URL || 'https://api.anthropic.com/v1/messages'
 
 // --- the rubric, read rather than restated ---------------------------------
 
@@ -71,6 +77,21 @@ Reply with a single JSON object and nothing else:
 Use null for a dimension the conversation genuinely does not exercise — do not invent a 3 to fill a gap. A "reasons" entry is REQUIRED for every dimension you mark below 2 and ignored for the rest.`
 }
 
+// ROOM FOR THE JUDGE TO THINK, AND THEN TO ANSWER. This was 1024 until the
+// first real run on 23 Sep 2026. The judge model thinks before it answers by
+// default, and the thinking is paid out of the same max_tokens — so a budget
+// sized for a short JSON object could be spent entirely on reasoning, ending
+// with stop_reason "max_tokens" and no text block at all. That arrived here as
+// an empty string and was reported as "the judge did not return JSON", which
+// names the wrong culprit. 16000 is the non-streaming default the API itself
+// suggests; the answer is still a few hundred tokens.
+const JUDGE_MAX_TOKENS = 16000
+
+/** The API refused the KEY. Every later call would get the same answer, so the
+ *  grader stops calling rather than printing the same 401 twenty-four times —
+ *  and says so once, in words, instead of a raw response body. */
+class JudgeKeyRejected extends Error {}
+
 async function callJudge(apiKey: string, system: string, transcriptText: string): Promise<string> {
   // Retry ONLY a thrown fetch — a transport fault. An error RESPONSE is a real
   // answer from the server (run-llm-review.ts learned this on a 400 for a low
@@ -78,18 +99,25 @@ async function callJudge(apiKey: string, system: string, transcriptText: string)
   const waits = [2000, 4000]
   for (let attempt = 0; ; attempt++) {
     try {
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
+      const r = await fetch(JUDGE_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({
           model: JUDGE_MODEL,
-          max_tokens: 1024,
+          max_tokens: JUDGE_MAX_TOKENS,
           system,
           messages: [{ role: 'user', content: transcriptText }],
         }),
       })
+      if (r.status === 401 || r.status === 403) {
+        throw new JudgeKeyRejected(`the Anthropic API rejected ANTHROPIC_API_KEY (${r.status}) — check it is a real sk-ant-… key and not a placeholder`)
+      }
       if (!r.ok) throw new Error(`Anthropic API returned ${r.status}: ${await r.text()}`)
-      const data = await r.json() as { content: { type: string; text?: string }[] }
+      const data = await r.json() as { stop_reason?: string; content: { type: string; text?: string }[] }
+      // A cut-off or declined answer is not an answer, and its partial text can
+      // contain a half-written JSON object that would parse into invented marks.
+      if (data.stop_reason === 'max_tokens') throw new Error('the judge ran out of room before it finished answering (stop_reason max_tokens)')
+      if (data.stop_reason === 'refusal') throw new Error('the judge declined to mark this conversation (stop_reason refusal)')
       return data.content.find(b => b.type === 'text')?.text ?? ''
     } catch (e) {
       const transport = e instanceof TypeError
@@ -144,6 +172,7 @@ async function main() {
   const tabs = realTabNames(ROOT)
   const current = coachFingerprint(ROOT)
   const apiKey = process.env.ANTHROPIC_API_KEY
+  let keyRejected: string | null = null
 
   const files = readdirSync(TRANSCRIPTS).filter(f => f.endsWith('.json')).sort()
   const marked: Marked[] = []
@@ -155,11 +184,12 @@ async function main() {
     const violations = hardRuleViolations(t, tabs)
     let judgement: Judgement | null = null
     let judgeError: string | null = null
-    if (apiKey) {
+    if (apiKey && !keyRejected) {
       try {
         judgement = parseJudgement(await callJudge(apiKey, judgePrompt(rubric, dimensions), renderTranscript(t)), dimensions)
       } catch (e) {
-        judgeError = (e as Error).message
+        if (e instanceof JudgeKeyRejected) keyRejected = e.message
+        else judgeError = (e as Error).message
       }
     }
     marked.push({ name: t.case, why: t.why ?? '', transcript: t, violations, judgement, judgeError })
@@ -183,7 +213,15 @@ async function main() {
   say('NOTE: the fingerprint above is of the code on disk. These answers came from what was DEPLOYED')
   say('      when the exam ran. If chat-gemini was not deployed first, the two describe different coaches.')
   say(`rubric: docs/coach-exam-rubric.md — ${dimensions.length} dimensions (${dimensions.join(', ')})`)
-  say(apiKey ? `judge: ${JUDGE_MODEL}` : 'judge: NOT RUN — ANTHROPIC_API_KEY is not set, so the five dimensions are unmarked. The hard rules below still ran.')
+  // THE JUDGE LINE SAYS WHAT HAPPENED, NOT WHAT WAS CONFIGURED. On 23 Sep 2026
+  // it printed "judge: claude-opus-5" over twenty-three cases that had every one
+  // failed with a 401 — a report naming a marker that marked nothing.
+  const judged = marked.filter(m => m.judgement).length
+  say(!apiKey
+    ? 'judge: NOT RUN — ANTHROPIC_API_KEY is not set, so the five dimensions are unmarked. The hard rules below still ran.'
+    : keyRejected
+      ? `judge: NOT RUN — ${keyRejected}. Stopped after the first call; the hard rules below still ran.`
+      : `judge: ${JUDGE_MODEL} — marked ${judged} of ${marked.length} case(s)`)
   say()
 
   const breached = marked.filter(m => m.violations.length > 0)
@@ -252,14 +290,14 @@ async function main() {
   say('='.repeat(78))
 
   const report = lines.join('\n')
-  writeFileSync(join(ROOT, 'coach-exam-report.txt'), report + '\n', 'utf8')
+  writeFileSync(join(REPORT_DIR, 'coach-exam-report.txt'), report + '\n', 'utf8')
 
-  writeFileSync(join(ROOT, 'coach-exam-scores.json'), JSON.stringify({
+  writeFileSync(join(REPORT_DIR, 'coach-exam-scores.json'), JSON.stringify({
     _comment: "THE COACH EXAM'S SCOREBOARD. Written by scripts/grade-coach-exam.ts and read by scripts/test-coach-exam-fresh.ts, which fails the sweep when the coach on disk no longer matches the coach these scores describe. Tracked in git so the history survives, the same as quality-report.txt.",
     fingerprint: current.hash,
     fingerprintParts: current.parts,
     model: current.model,
-    judge: apiKey ? JUDGE_MODEL : null,
+    judge: judged > 0 ? JUDGE_MODEL : null,
     ranAt: new Date().toISOString(),
     floor: null,
     _floor: 'Proposed to Ashley from the first real run and enforced from the run after that — the same way test:quality\'s 7.2 was chosen against measured scores rather than picked in advance.',
@@ -275,19 +313,28 @@ async function main() {
 
   console.log('')
   console.log(`Tier A: ${breached.length} of ${marked.length} case(s) breached a hard rule`)
-  console.log(`Tier B: ${overall === null ? 'unmarked (no ANTHROPIC_API_KEY)' : `${overall.toFixed(2)} / 3 across ${allMarks.length} marks`}`)
+  console.log(`Tier B: ${overall !== null ? `${overall.toFixed(2)} / 3 across ${allMarks.length} marks, ${judged} of ${marked.length} case(s) marked`
+    : !apiKey ? 'unmarked (no ANTHROPIC_API_KEY)'
+    : keyRejected ? `unmarked — ${keyRejected}`
+    : `unmarked — the judge was called and marked nothing; see coach-exam-report.txt`}`)
   console.log('Written: coach-exam-report.txt, coach-exam-scores.json')
 
   // THE HARD RULES DECIDE THE EXIT CODE, not the average. The floor is not set
   // until the first real run has numbers to set it from.
-  if (breached.length > 0) {
-    console.error(`FAIL: ${breached.length} case(s) breached a hard rule — see coach-exam-report.txt`)
-    process.exit(1)
+  //
+  // AND A JUDGE THAT WAS ASKED AND DID NOT MARK IS A FAILURE, where no key at all
+  // is not: no key is a choice to run tier A alone, a key that was set is a
+  // request for tier B, and exiting 0 over an unmarked tier B reads as done.
+  // One exit, so a second failure is never hidden behind the first.
+  const failures: string[] = []
+  if (breached.length > 0) failures.push(`${breached.length} case(s) breached a hard rule — see coach-exam-report.txt`)
+  if (mixed) failures.push('the transcripts come from more than one coach — re-run the whole exam.')
+  if (apiKey && judged < marked.length) {
+    failures.push(keyRejected
+      ?? `the judge marked ${judged} of ${marked.length} case(s) — the report says why for each; re-run coach-exam:grade`)
   }
-  if (mixed) {
-    console.error('FAIL: the transcripts come from more than one coach — re-run the whole exam.')
-    process.exit(1)
-  }
+  for (const f of failures) console.error(`FAIL: ${f}`)
+  if (failures.length > 0) process.exit(1)
 }
 
 main().catch(e => {

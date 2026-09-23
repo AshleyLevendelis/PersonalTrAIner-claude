@@ -164,6 +164,7 @@
     "test:coach-rules-sync": "tsx scripts/test-coach-rules-sync.ts",
     "test:coach-exam-grader": "tsx scripts/test-coach-exam-grader.ts",
     "test:coach-exam-runner": "tsx scripts/test-coach-exam-runner.ts",
+    "test:coach-exam-judge": "tsx scripts/test-coach-exam-judge.ts",
     "test:chosen-not-shuffled": "tsx scripts/test-chosen-not-shuffled.ts",
     "test:target-change-notice": "tsx scripts/test-target-change-notice.ts",
     "test:session-rebuild": "tsx scripts/test-session-rebuild.ts",

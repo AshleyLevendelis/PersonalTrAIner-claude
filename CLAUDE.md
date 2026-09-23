@@ -785,6 +785,16 @@ menu" stays true when a copy is also left outside it.
   10 mutations, 10 caught — one of them only after being rewritten, because the
   first attempt was a convoluted edit that applied and did not create the
   defect, which reads exactly like a missed check.
+  **RUN FOR REAL ON 23 SEP 2026 — and the judged half marked nothing.** Every
+  judge call was 401, and the report named the judge anyway. Behind the key were
+  two more defects that only a run could show: the judge's 1024-token budget
+  was smaller than its own default thinking, and the runner recorded an INSTANT
+  SAVE (`memoryIntent` and three siblings, `reply: ""` by design) as silence —
+  the 16 Sep card lesson, one shape over. All fixed. The grader now has the
+  mocked end-to-end gate the runner got on 16 Sep, `coach-exam-judge`. **The rule
+  above was applied to the half that was in front of us, not to its sibling**,
+  which is the "re-run a derivation against the cases it was not written for"
+  shape again. Tier B has still never marked a real conversation.
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —

@@ -238,6 +238,34 @@ async function main() {
     check('silence still fires on an empty reply with no card behind it', rules.includes('silence'), rules)
   }
 
+  // THE SAME MISTAKE ONE SHAPE OVER, found by the first real run on 23 Sep
+  // 2026: "remember I'm allergic to sesame" is an order, the coach saves it at
+  // once and answers `{ reply: "", memoryIntent }`, and the runner wrote that
+  // down as nothing. The second turn uses a key no tool has yet, because the
+  // runner reads the SHAPE — a list of today's four names is how the first
+  // three were missed.
+  console.log('\n[4b] an instant save — no card, no words, and not silence')
+  {
+    const coach = await fakeCoach((_m, n) => n === 1
+      ? { body: { reply: '', memoryIntent: { tool: 'record_fact', rawArgs: { fact: 'allergic to sesame' } } } }
+      : { body: { reply: '', someFutureIntent: { tool: 'log_something_new', rawArgs: {} } } })
+    const r = await runExam(wantsCard.name, coach.port)
+    await coach.close()
+
+    const t = r.transcript!
+    const turn0 = t.turns?.[0]
+    const turn1 = t.turns?.[1]
+    check('the save is recorded', turn0?.saved?.kind === 'record_fact', turn0)
+    check('...with its arguments', JSON.stringify(turn0?.saved?.args ?? {}).includes('sesame'), turn0?.saved)
+    check('a save under a key no tool uses yet is recorded too — read by shape, not by name', turn1?.saved?.kind === 'log_something_new', turn1)
+    const marker = (coach.seen[1]?.history ?? []).find(h => h.role === 'assistant')
+    check('the second turn is told the app saved something', !!marker && marker.content.includes('record_fact'), coach.seen[1]?.history)
+    const rules = hardRuleViolations(t).map(v => v.rule)
+    check('silence does NOT fire on a turn the app answered with a save', !rules.includes('silence'), rules)
+    check('...but missing-proposal still does, because a save is not the card a change needs', rules.includes('missing-proposal'), rules)
+    check('the grader renders the save rather than "(no text at all)"', coachLine(turn0).includes('saved it straight away'), coachLine(turn0))
+  }
+
   console.log('\n[5] --dry is still the free path, and still calls nothing')
   {
     const coach = await fakeCoach(() => TEXT('should never be reached'))

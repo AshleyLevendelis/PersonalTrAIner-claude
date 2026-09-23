@@ -181,11 +181,34 @@ function readProposal(j: Record<string, unknown>): { kind: string; args: unknown
   return { kind, args: (p as Record<string, unknown>).rawArgs ?? null }
 }
 
+/** AND NEITHER IS AN INSTANT SAVE — the same mistake one shape over, found by
+ *  the first real run on 23 Sep 2026. Four tools save at once rather than
+ *  proposing: an order to remember something (`memoryIntent`), how a session
+ *  felt (`feelIntent`), the shopping list (`groceryIntent`) and water
+ *  (`waterIntent`). Each returns `{ reply: "", <x>Intent: { tool, rawArgs } }`
+ *  and the app shows its own receipt. This runner recorded none of them, so
+ *  "remember I'm allergic to sesame" — which the coach saved exactly as told —
+ *  reached the grader as an empty turn and was marked silence.
+ *
+ *  Read by SHAPE, not by a list of the four names: a fifth instant-save tool
+ *  would otherwise arrive here as silence all over again, which is how the
+ *  first three were missed. */
+function readSaved(j: Record<string, unknown>): { kind: string; args: unknown } | null {
+  for (const [key, v] of Object.entries(j)) {
+    if (!key.endsWith('Intent') || !v || typeof v !== 'object') continue
+    const kind = String((v as Record<string, unknown>).tool ?? '').trim()
+    if (kind) return { kind, args: (v as Record<string, unknown>).rawArgs ?? null }
+  }
+  return null
+}
+
 /** The stand-in for the card's own sentence — see the note at its use. It says
  *  it is the app talking so a model reading it back cannot mistake it for
  *  something it said itself. */
 const proposalHistoryLine = (kind: string) =>
   `[the app showed a confirm card for ${kind}; the user has not tapped it yet]`
+const savedHistoryLine = (kind: string) =>
+  `[the app saved ${kind} straight away and showed its own receipt]`
 
 fs.mkdirSync(OUT_DIR, { recursive: true })
 const ranAt = new Date().toISOString()
@@ -202,6 +225,7 @@ for (const c of cases) {
     const raw = String(j.reply ?? '')
     const reply = strip(raw)
     const proposal = readProposal(j)
+    const saved = readSaved(j)
     history.push({ role: 'user', content: text })
     // WHAT THE NEXT TURN SEES, and why it must not be nothing. The app pushes
     // the CARD's own sentence into its message list and sends that list as
@@ -212,13 +236,14 @@ for (const c of cases) {
     // states the KIND and says plainly that it is the app's line.
     if (raw) history.push({ role: 'assistant', content: raw })
     else if (proposal) history.push({ role: 'assistant', content: proposalHistoryLine(proposal.kind) })
+    else if (saved) history.push({ role: 'assistant', content: savedHistoryLine(saved.kind) })
     if (j._error) transportFailures++
 
     console.log(`  USER:  ${text}`)
-    console.log(`  COACH: ${reply || (proposal ? `(card: ${proposal.kind})` : '*** NO TEXT ***')}`)
+    console.log(`  COACH: ${reply || (proposal ? `(card: ${proposal.kind})` : saved ? `(saved: ${saved.kind})` : '*** NO TEXT ***')}`)
     if (j._error) console.log(`         [transport: ${j._error}]`)
 
-    turnRecords.push({ user: text, reply, raw, error: j._error ?? null, action: j.action ?? null, proposal })
+    turnRecords.push({ user: text, reply, raw, error: j._error ?? null, action: j.action ?? null, proposal, saved })
   }
 
   fs.writeFileSync(path.join(OUT_DIR, `${c.name}.json`), JSON.stringify({

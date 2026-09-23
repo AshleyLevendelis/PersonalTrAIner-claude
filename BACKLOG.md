@@ -2,6 +2,49 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH EXAM'S MARKING HALF, MADE TO WORK — AND ONE MORE FALSE
+  "SILENCE".** 23 Sep 2026, item 1 of Ashley's "work on 1 then 2 then 3".
+  Her run that morning graded 24 cases and marked NONE: every judge call came
+  back 401, and the report still said "judge: claude-opus-5" at the top.
+  **Four defects, all in the exam's own code, none in the coach:**
+  - **An instant save was recorded as silence.** "I need to avoid sesame" is
+    an order, so the coach saves it at once and answers `{reply: "",
+    memoryIntent}` — the app shows its own receipt. The runner recorded cards
+    (fixed 16 Sep) and never these, so the sesame case's opening turn was
+    marked `silence` for doing exactly what it was told. Four tools answer this
+    way (memory, feel, grocery, water); the runner now reads them BY SHAPE, any
+    `*Intent` carrying a `tool`, so a fifth cannot arrive as silence the way
+    the first four did. The next turn's history now says the app saved it.
+  - **The judge's budget was smaller than its thinking.** max_tokens 1024,
+    and the judge model thinks first by default out of the same budget — a
+    good key would likely have come back with no text block, reported as "did
+    not return JSON". Now 16000, and `stop_reason` is checked: a cut-off or a
+    refusal is an error, never parsed (a cut-off can still hold a complete
+    JSON object, which would have been recorded as marks the judge never
+    finished giving).
+  - **A rejected key was called 24 times and reported as a working judge.**
+    Now: first 401/403 stops the calls, the report says "NOT RUN — the API
+    rejected ANTHROPIC_API_KEY", the scoreboard records no judge, and the
+    grader exits non-zero. No key at all still exits clean (tier A alone is a
+    choice); a key that was set is a request for tier B.
+  - **The judge line said what was configured, not what happened.** It now
+    says how many cases were marked.
+  **The first three were findable only by running** — so the grader now has
+  what the runner got on 16 Sep: `test:coach-exam-judge` (27 checks) drives
+  the REAL grader against a fake Messages API. It returns a thinking block
+  before the text, so reading the wrong block fails. `test:coach-exam-runner`
+  gained an instant-save section (35 checks, was 28). Mutation-tested: 15
+  mutations across the grader, runner and rules, 15 caught, and every run
+  executed its full check count.
+  **What the 23 Sep hard rules said, re-graded with the fixed rules:** 3 of 24.
+  The sesame "silence" is the defect above. The other two — a "doesn't contain
+  nuts" verdict and the first-timer case never naming a doctor — are real, and
+  were already fixed in the coach's prompt earlier today. So all three
+  describe a coach that is no longer the one on disk.
+  **NOT verified:** a real judge call. That needs Ashley's real key on her
+  machine, and a re-run against the redeployed TEST coach (fingerprint
+  `c3ced2ceaa72c932`). `test:coach-exam-fresh` is red until then, correctly.
+
 - [x] **FOUR CABLE-ATTACHMENT VARIANTS, ON ASHLEY'S "YES BUILD CABLE
   ATTACHMENTS."** 23 Sep 2026, the follow-up to the machine batch above —
   attachments were named as an observation, not built there, and this

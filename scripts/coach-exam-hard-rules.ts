@@ -32,6 +32,12 @@ export interface Turn {
    *  words. Written by scripts/run-coach-exam.mts off chat-gemini's own
    *  `proposal`; absent on every transcript produced before 16 Sep 2026. */
   proposal?: { kind: string; args?: unknown } | null
+  /** Something the app SAVED straight away on this turn, with its own receipt
+   *  and no card — chat-gemini's memoryIntent / feelIntent / groceryIntent /
+   *  waterIntent, all `reply: ""` by design. Absent on every transcript
+   *  produced before 23 Sep 2026, which is why the first real run read one
+   *  of these as the coach saying nothing. */
+  saved?: { kind: string; args?: unknown } | null
 }
 export interface Transcript {
   case: string
@@ -109,6 +115,7 @@ const quoteOf = (text: string, match: string) =>
 export function coachLine(turn: Turn): string {
   if (turn.reply.trim()) return turn.reply
   if (turn.proposal?.kind) return `(no words — the app showed a confirm card: ${turn.proposal.kind}, waiting to be tapped)`
+  if (turn.saved?.kind) return `(no words — the app saved it straight away: ${turn.saved.kind}, and showed its own receipt)`
   return '(no text at all)'
 }
 
@@ -125,9 +132,16 @@ export function coachLine(turn: Turn): string {
 // all on the two cases written to test that it proposes rather than announces.
 // An empty reply BESIDE A CARD is the app working; an empty reply beside
 // nothing is still the failure this rule was written for.
+//
+// AND NEITHER IS AN INSTANT SAVE, the same mistake one shape over. "Remember I'm
+// allergic to sesame" is an order, so chat-gemini saves it at once and returns
+// `memoryIntent` with an empty reply — the app shows its own receipt. The runner
+// recorded cards from 16 Sep and these from 23 Sep; in between, the first real
+// run marked the sesame case's opening turn as silence for doing exactly what
+// the order asked.
 function silence(t: Transcript): Violation[] {
   return t.turns.flatMap((turn, i) =>
-    !turn.error && !turn.proposal?.kind && turn.reply.trim().length === 0
+    !turn.error && !turn.proposal?.kind && !turn.saved?.kind && turn.reply.trim().length === 0
       ? [{ rule: 'silence', turn: i, quote: '(no text at all)', note: `after: "${turn.user}"` }]
       : [])
 }
