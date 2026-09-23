@@ -1,0 +1,74 @@
+{
+  "case": "specific-plateau",
+  "why": "A plain training question where generic advice and the right answer look different. The context holds the actual lift, the actual weight and the actual completed session, so a coach that reads them can say what to do next week and a coach that does not can only say 'progressive overload'.",
+  "checks": {},
+  "fingerprint": "83b4c220c48e7d0a",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-23T10:22:48.091Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "my squat's been stuck for a bit, what should I do",
+      "reply": "When a squat gets stuck, it's usually one of three things holding it up: your bracing, your recovery, or just needing a fresh stimulus to spark some new adaptation. \n\nSince you've been hitting 45kg for 3x8 recently, the first thing to look at is how you're preparing for each rep. If you aren't actively pulling a massive breath into your abdomen and clamping your core down like you're about to get punched, you'll lose power at the bottom of the squat. \n\nIf your bracing is already rock-solid, we can look at changing up the stimulus. One option is to temporarily swap the back squat for something like a goblet squat or a box squat to build confidence and power in a slightly different pattern, or we can adjust the volume on Tuesdays to let you recover better. \n\nHow have those heavy sets of squats actually felt on your back and legs when you've hit that 8th rep?",
+      "raw": "When a squat gets stuck, it's usually one of three things holding it up: your bracing, your recovery, or just needing a fresh stimulus to spark some new adaptation. \n\nSince you've been hitting 45kg for 3x8 recently, the first thing to look at is how you're preparing for each rep. If you aren't actively pulling a massive breath into your abdomen and clamping your core down like you're about to get punched, you'll lose power at the bottom of the squat. \n\nIf your bracing is already rock-solid, we can look at changing up the stimulus. One option is to temporarily swap the back squat for something like a goblet squat or a box squat to build confidence and power in a slightly different pattern, or we can adjust the volume on Tuesdays to let you recover better. \n\nHow have those heavy sets of squats actually felt on your back and legs when you've hit that 8th rep?",
+      "error": null,
+      "action": null,
+      "proposal": null
+    },
+    {
+      "user": "ok, and how long before I'd expect that to move",
+      "reply": "If we dial in your bracing and keep your recovery on point, you should start seeing the bar speed improve within two to three weeks, with the actual weight on the bar moving up shortly after. \n\nIf we swap the movement or adjust the volume to break the plateau, we usually give that new stimulus a full 4-week block to do its job. Strength adaptations take a little time to register in the tendons and nervous system, so patience is key. \n\nAre you noticing the struggle right out of the bottom of the squat, or are you getting stuck halfway up?",
+      "raw": "If we dial in your bracing and keep your recovery on point, you should start seeing the bar speed improve within two to three weeks, with the actual weight on the bar moving up shortly after. \n\nIf we swap the movement or adjust the volume to break the plateau, we usually give that new stimulus a full 4-week block to do its job. Strength adaptations take a little time to register in the tendons and nervous system, so patience is key. \n\nAre you noticing the struggle right out of the bottom of the squat, or are you getting stuck halfway up?",
+      "error": null,
+      "action": null,
+      "proposal": null
+    }
+  ]
+}

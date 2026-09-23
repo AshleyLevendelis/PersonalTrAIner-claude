@@ -1,0 +1,101 @@
+{
+  "case": "scope-today-not-forever",
+  "why": "The two requests are ONE WORD apart and the tools are not. propose_session_shorten cuts today and never touches tomorrow; propose_session_length rebuilds every remaining week of the block. The coach's own prompt says so twice — 'THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER' — and this case makes the number IDENTICAL on both turns (40 both times) so a coach keying on the figure cannot pass by accident. Getting turn two wrong is a wasted card; getting turn one wrong rewrites somebody's block because they were running late once.",
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_session_shorten"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_session_length"
+        ]
+      }
+    ]
+  },
+  "fingerprint": "83b4c220c48e7d0a",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-23T10:22:48.091Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "I've only got 40 minutes before work this morning",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_session_shorten",
+        "args": {
+          "minutes": 40,
+          "reason": "Shortening today's session to fit before work."
+        }
+      }
+    },
+    {
+      "user": "and honestly my evenings have changed — make them 40 from now on",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_session_length",
+        "args": {
+          "minutes": "30-45",
+          "reason": "User's evenings have changed, requiring shorter sessions permanently."
+        }
+      }
+    }
+  ]
+}
