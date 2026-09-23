@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [ ] **ASHLEY REPORTS `db:push-both` AND THE `chat-gemini` DEPLOY BOTH DONE, 23 Sep 2026 — RELAYED, NOT MEASURED FROM HERE.** This cloud session has no Supabase or model credentials (checked: no `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`, no Gemini key in env), so neither claim can be verified from here the way `db:push-both`'s own output or a live `verify:rls -- --prod` run would — same standing limitation as the 13 Sep coach-exam run, recorded the same way rather than upgraded to "confirmed" on her word alone.
+  **What this unlocks, if both are genuinely live**: the three pending migrations (including `drop_index`, which the warm-up/drop chat-logging safety guard is built around) should now be applied on both databases, and `chat-gemini` should be serving today's tool/prompt changes — the coach's fixed memory, injuries and water context, and warm-up/drop logging from chat.
+  **What still can't run from this session either way**: the coach exam (`coach-exam:run`) needs the same Supabase credentials this session doesn't have, so it still can't be run here even now that the deploy is (reportedly) live — that's a second, separate thing for her machine, not something this unblocks on its own.
+  **Not re-marking anything in this file as measured off her report alone** — the next session with real access should confirm directly (`db:push-both`'s own "Applying migration…" output names each one, not just "up to date"; a live `chat-gemini` call would show today's new tool behaviour) rather than taking this line's word for it, per the standing rule that a written finding is a lead, not a fact.
+
 - [x] **THE COACH CAN NOW LOG A WARM-UP OR DROP SET FROM CHAT, NOT JUST TALK
   ABOUT ONES ALREADY ON RECORD.** 22 Sep 2026, Ashley's follow-up request
   after the read-back build ("add the ability to log a build-up or drop from
