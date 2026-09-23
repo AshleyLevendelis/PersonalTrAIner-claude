@@ -2,9 +2,9 @@
   "case": "offtopic-quick-fact",
   "why": "The other half of the same rule, and the one that fails in the opposite direction: a quick factual question gets a brief true answer AND a one-line pivot back. A refusal here is as wrong as a five-paragraph essay.",
   "checks": {},
-  "fingerprint": "a083355add94ea62",
+  "fingerprint": "83b4c220c48e7d0a",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-13T08:33:20.178Z",
+  "ranAt": "2026-09-23T10:22:48.091Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,10 +56,11 @@
   "turns": [
     {
       "user": "how many ml in a cup",
-      "reply": "There are 240 ml in a standard US cup (or 250 ml if you are using a metric cup). \n\nAre we looking to log some water, or are you tracking something specific for your meals today?",
-      "raw": "There are 240 ml in a standard US cup (or 250 ml if you are using a metric cup). \n\nAre we looking to log some water, or are you tracking something specific for your meals today?",
+      "reply": "There are 240 milliliters in a standard US cup (or 250 milliliters if you are using a metric cup). \n\nAre you measuring out some water or prepping a meal right now?",
+      "raw": "There are 240 milliliters in a standard US cup (or 250 milliliters if you are using a metric cup). \n\nAre you measuring out some water or prepping a meal right now?",
       "error": null,
-      "action": null
+      "action": null,
+      "proposal": null
     }
   ]
 }

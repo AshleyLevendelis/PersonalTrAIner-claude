@@ -1,7 +1,22 @@
 {
-  "case": "where-is-the-shopping-list",
-  "why": "The shopping list moved off the Tools tab on 12 Sep 2026 — it is its own screen now, reached from Nutrition and from a Home card on shop day. This case exists because a prompt that still says 'Tools: a stopwatch and the Grocery list' sends someone to a tab that no longer has it, and no static gate noticed. A tab-description drift is exactly what an exam catches that a text check does not.",
-  "checks": {},
+  "case": "scope-today-not-forever",
+  "why": "The two requests are ONE WORD apart and the tools are not. propose_session_shorten cuts today and never touches tomorrow; propose_session_length rebuilds every remaining week of the block. The coach's own prompt says so twice — 'THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER' — and this case makes the number IDENTICAL on both turns (40 both times) so a coach keying on the figure cannot pass by accident. Getting turn two wrong is a wasted card; getting turn one wrong rewrites somebody's block because they were running late once.",
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_session_shorten"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_session_length"
+        ]
+      }
+    ]
+  },
   "fingerprint": "83b4c220c48e7d0a",
   "model": "gemini-3.5-flash",
   "ranAt": "2026-09-23T10:22:48.091Z",
@@ -55,12 +70,32 @@
   },
   "turns": [
     {
-      "user": "where's my shopping list?",
-      "reply": "Your shopping list has its own screen in the app, and you can get to it a few different ways. \n\nThe quickest way is to tap the **Nutrition** tab at the bottom of your screen, where you'll see a link that opens the list directly. You can also find it under the **Tools** tab by tapping the \"Grocery list\" row. \n\nSince it's Tuesday, you might also see a \"Shopping\" card right on your **Home** tab showing the first few items you need to grab. \n\nAre you planning out your meals for the rest of the week, or just checking on what you need to buy today?",
-      "raw": "Your shopping list has its own screen in the app, and you can get to it a few different ways. \n\nThe quickest way is to tap the **Nutrition** tab at the bottom of your screen, where you'll see a link that opens the list directly. You can also find it under the **Tools** tab by tapping the \"Grocery list\" row. \n\nSince it's Tuesday, you might also see a \"Shopping\" card right on your **Home** tab showing the first few items you need to grab. \n\nAre you planning out your meals for the rest of the week, or just checking on what you need to buy today?",
+      "user": "I've only got 40 minutes before work this morning",
+      "reply": "",
+      "raw": "",
       "error": null,
       "action": null,
-      "proposal": null
+      "proposal": {
+        "kind": "propose_session_shorten",
+        "args": {
+          "minutes": 40,
+          "reason": "Shortening today's session to fit before work."
+        }
+      }
+    },
+    {
+      "user": "and honestly my evenings have changed — make them 40 from now on",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_session_length",
+        "args": {
+          "minutes": "30-45",
+          "reason": "User's evenings have changed, requiring shorter sessions permanently."
+        }
+      }
     }
   ]
 }
