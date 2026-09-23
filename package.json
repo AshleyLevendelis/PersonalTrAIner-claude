@@ -150,6 +150,8 @@
     "test:coach-sees-technique": "tsx scripts/test-coach-sees-technique.ts",
     "test:coach-sees-ingredients": "tsx scripts/test-coach-sees-ingredients.ts",
     "test:food-dislike-is-a-ban": "tsx scripts/test-food-dislike-is-a-ban.ts",
+    "test:allergen-hidden-forms": "tsx scripts/test-allergen-hidden-forms.ts",
+    "test:coach-first-timer-note": "tsx scripts/test-coach-first-timer-note.ts",
     "test:audit-fixes": "tsx scripts/test-audit-fixes.ts",
     "test:round-timer": "tsx scripts/test-round-timer.ts",
     "test:hero-surface": "tsx scripts/test-hero-surface.ts",

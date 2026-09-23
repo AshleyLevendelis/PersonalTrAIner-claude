@@ -205,6 +205,21 @@ const CATEGORY_LABEL_FOR_RECEIPT: Record<GroceryCategory, string> = {
   produce: 'Produce', meat_fish: 'Meat & Fish', dairy: 'Dairy', dry_goods: 'Dry Goods', frozen: 'Frozen', other: 'Other',
 }
 
+// THE FIVE ALLERGENS WITH NO TAG MECHANISM AT ALL (chat-gemini's
+// ALLERGEN_HONESTY_BLOCK names the same five) — keyed by the exact word a
+// dislike would be recorded under, matching how the filter itself works
+// ("purely on the word said, not other names for the same thing"). Used by
+// resolveAndSaveMemory's food_preference receipt so the caveat and the
+// hidden forms reach the user even when the model said nothing this turn.
+const UNTAGGED_ALLERGEN_HIDDEN_FORMS: Record<string, string> = {
+  sesame: 'tahini, hummus, and halva',
+  celery: 'stock cubes and stock',
+  mustard: 'mayonnaise, salad dressings, and curry sauces',
+  lupin: 'lupin flour, used in some gluten-free breads and pasta',
+  sulphite: 'dried fruit, wine, and wine vinegar',
+  sulphites: 'dried fruit, wine, and wine vinegar',
+}
+
 interface FavoriteMeal {
   name: string
   meal_slot: string
@@ -3878,6 +3893,26 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             rows.push({
               label: `Today's ${stillPresent.map(m => m.meal).join(', ')}`,
               detail: 'still has it — swap from the Nutrition tab if you don\'t want it today',
+            })
+          }
+          // AN UNTAGGED ALLERGEN GETS THE CAVEAT ON THE RECEIPT, NOT JUST IN
+          // THE MODEL'S WORDS — because the model's words never arrive here.
+          // ALLERGEN HONESTY in chat-gemini's prompt tells the coach to say
+          // this caveat and name the hidden forms, but record_fact's server
+          // handler always returns reply: "" (the receipt speaks, by design,
+          // same as every other propose_*/record_* tool) — so whatever the
+          // model writes for this turn can never reach the user regardless
+          // of what the prompt asks for. Found by the first real coach-exam
+          // run, 23 Sep 2026: "avoid sesame" saved silently, with nothing
+          // said about the app having no automated check for it at all —
+          // exactly the false-reassurance outcome ALLERGEN_HONESTY_BLOCK
+          // exists to prevent. Coded here instead, deterministically, so it
+          // fires whether or not the model said anything this turn.
+          const hiddenForms = UNTAGGED_ALLERGEN_HIDDEN_FORMS[targetPhrase.trim().toLowerCase()]
+          if (hiddenForms) {
+            rows.push({
+              label: 'No automated check for this one',
+              detail: `Works only on the exact word "${targetPhrase}" — there's no tag for it in the food data. Common hidden forms: ${hiddenForms}. Say the word if you want those added too.`,
             })
           }
         }
