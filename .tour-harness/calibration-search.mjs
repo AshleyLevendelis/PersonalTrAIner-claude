@@ -12,7 +12,7 @@
 // box, and a tick on an empty set 3 is refused rather than logging the guess.
 //
 // TODAY IS PINNED TO A DAY THAT HOLDS A RAMPED, LOADED MAIN LIFT (the
-// verify:ramp-ticks trick): the anchor's own today has none, and the harness
+// verify:ramp-readonly trick): the anchor's own today has none, and the harness
 // plan's week 1 is a calibration week. WHICH day, and which lift, the page
 // tells us — see below. Nothing here names a weekday or an exercise.
 // ---------------------------------------------------------------------------
@@ -77,7 +77,11 @@ const setValue = `(el, v) => { const s = Object.getOwnPropertyDescriptor(window.
 const leafTop = re => `(() => { const sec = ${SECTION}; if (!sec) return null
   const n = [...sec.querySelectorAll('*')].find(x => x.children.length === 0 && ${re}.test(x.textContent.trim()))
   return n ? Math.round(n.getBoundingClientRect().top) : null })()`
-const box = n => ev(`(() => { const sec = ${SECTION}; const el = sec && sec.querySelector('input[id$="-${n}"][id^="setgrid-weight-"]')
+// A ROW IS A KIND AND A NUMBER (17 Sep 2026). The weight box used to be
+// `...-2`; it is `...-s2` for working set 2 and `...-w2` for build-up step 2,
+// because a card now holds both and they are different rows everywhere it
+// matters. This driver is about the WORKING sets, so it asks for s.
+const box = n => ev(`(() => { const sec = ${SECTION}; const el = sec && sec.querySelector('input[id$="-s${n}"][id^="setgrid-weight-"]')
   return el ? { value: el.value, placeholder: el.placeholder } : null })()`)
 const tapSave = n => ev(`(() => { const sec = ${SECTION}; const b = sec && [...sec.querySelectorAll('button')].find(x => x.getAttribute('aria-label') === 'Save set ${n}'); if (!b) return false; b.click(); return true })()`)
 const savedState = n => ev(`(() => { const sec = ${SECTION}; const b = sec && [...sec.querySelectorAll('button')].find(x => /^(Save set ${n}|Set ${n} saved)$/.test(x.getAttribute('aria-label') || '')); return b ? b.getAttribute('aria-label') : null })()`)
@@ -86,10 +90,39 @@ const scrollTo = re => ev(`(() => { const sec = ${SECTION}; if (!sec) return fal
 
 console.log('\nCALIBRATION WEEK, ON THE SCREEN\n')
 check('0. the expanded main-lift row with its log grid is on screen', (await ev(`!!(${SECTION})`)) === true)
-const rampTop = await ev(leafTop('/Ramp up first/i'))
-const numberTop = await ev(`(() => { const sec = ${SECTION}; const n = sec && sec.querySelector('.ds-num-lg'); return n ? Math.round(n.getBoundingClientRect().top) : null })()`)
-check('1. the ramp block is drawn ABOVE the start number', rampTop != null && numberTop != null && rampTop < numberTop, { rampTop, numberTop })
-check('2. ...and says what it is for, on screen', (await ev(`(() => { const sec = ${SECTION}; return sec ? /then set 1/i.test(sec.innerText) : false })()`)) === true)
+// REPLACED 17 Sep 2026, not re-anchored. These two asked whether the ramp
+// STRIP sat above the start number on today's card, and whether it said "then
+// set 1". Ashley's ruling that day removed the strip from today's card: the
+// build-up is a box per set now, in the grid. The property she ruled on in
+// September — the build-up comes first, and it is said on screen rather than
+// in a tooltip — is what is read here, off what replaced it.
+const buildUp = await ev(`(() => { const sec = ${SECTION}; if (!sec) return null
+  const rows = [...sec.querySelectorAll('[data-testid="warmup-row"],[data-testid="working-row"]')]
+  const cap = sec.querySelector('[data-testid="warmup-caption"]')
+  const num = sec.querySelector('.ds-num-lg')
+  return {
+    order: rows.map(r => r.getAttribute('data-testid')),
+    caption: cap ? cap.textContent.trim() : null,
+    capTop: cap ? Math.round(cap.getBoundingClientRect().top) : null,
+    firstWorkingTop: (() => { const w = sec.querySelector('[data-testid="working-row"]'); return w ? Math.round(w.getBoundingClientRect().top) : null })(),
+    numberTop: num ? Math.round(num.getBoundingClientRect().top) : null,
+  } })()`)
+check('1. the build-up is drawn ABOVE the working sets, in the same grid',
+  !!buildUp && buildUp.capTop != null && buildUp.firstWorkingTop != null && buildUp.capTop < buildUp.firstWorkingTop
+  && (buildUp.order || []).indexOf('working-row') > (buildUp.order || []).lastIndexOf('warmup-row'), buildUp)
+// RE-ANCHORED 19 Sep 2026, and it had been RED SINCE THAT MORNING'S COMMIT
+// without anyone noticing — the group-header build replaced the sentence
+// "Warm-up · doesn't count toward your weight going up" with a two-part
+// header, and this driver names a sentence on screen rather than a source
+// file, so the `grep scripts/ for the file you changed` derivation could not
+// have found it. That is the second half of the standing rule, met in
+// practice: grep the scripts, AND run the drivers for the screen.
+// The property, not the wording: the header says what the group IS and what
+// it COSTS. Either half alone is the regression — naming the group without
+// the cost re-creates the ambiguity the whole design exists to remove.
+check('2. ...and says what it is for, on screen',
+  /ramp|warm.?up/i.test(buildUp?.caption || '') && /not counted|doesn.t count/i.test(buildUp?.caption || ''),
+  buildUp?.caption)
 check('3. the number is labelled START HERE', (await ev(`(() => { const sec = ${SECTION}; return sec ? /start here/i.test(sec.innerText) : false })()`)) === true)
 const probe = await ev(`(() => { const sec = ${SECTION}; const c = sec && sec.querySelector('[data-testid="probe-chip"]'); return c ? c.textContent.trim() : null })()`)
 check('4. one probe line, not three identical set chips', /Set 1 · probe at ~?[\d.]+kg/.test(probe || '') && (await ev(`(() => { const sec = ${SECTION}; return sec ? /\\bS1: \\d/.test(sec.innerText) : true })()`)) === false, probe)
@@ -134,7 +167,7 @@ const BW_SECTION = `(() => {
   for(let i=0;i<12&&p.parentElement;i++){ p=p.parentElement; if(p.querySelector('input[id^="setgrid-weight-"]')) return p }
   return null
 })()`
-const bwBox2 = await ev(`(() => { const sec = ${BW_SECTION}; const el = sec && sec.querySelector('input[id$="-2"][id^="setgrid-weight-"]')
+const bwBox2 = await ev(`(() => { const sec = ${BW_SECTION}; const el = sec && sec.querySelector('input[id$="-s2"][id^="setgrid-weight-"]')
   return el ? { value: el.value, placeholder: el.placeholder } : null })()`)
 check('12. a bodyweight lift in the same week keeps its own default, not "type it"',
   !!bwBox2 && bwBox2.placeholder !== 'type it', bwBox2)

@@ -1,0 +1,14 @@
+{
+  "name": "scope-today-not-forever",
+  "why": "The two requests are ONE WORD apart and the tools are not. propose_session_shorten cuts today and never touches tomorrow; propose_session_length rebuilds every remaining week of the block. The coach's own prompt says so twice — 'THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER' — and this case makes the number IDENTICAL on both turns (40 both times) so a coach keying on the figure cannot pass by accident. Getting turn two wrong is a wasted card; getting turn one wrong rewrites somebody's block because they were running late once.",
+  "messages": [
+    "I've only got 40 minutes before work this morning",
+    "and honestly my evenings have changed — make them 40 from now on"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": ["propose_session_shorten"] },
+      { "turn": 1, "oneOf": ["propose_session_length"] }
+    ]
+  }
+}

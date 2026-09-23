@@ -20,7 +20,7 @@
 //      (band, weighted backpack) while a 'high'-rank peer for the same pattern
 //      and tier sits in the same person's pool. This is quality-score.ts's own
 //      `worse_implement_than_available` predicate, imported rather than
-//      restated — but run over EVERY week of the mesocycle. The harness rule
+//      restated — TRUE since 21 Sep 2026, and it was not before — but run over EVERY week of the mesocycle. The harness rule
 //      hardcodes week 1, which is exactly why rotation-induced cases have
 //      never appeared in a number.
 //
@@ -44,7 +44,7 @@
 import * as fs from 'fs'
 import {
   generateMesocycle, getConstrainedPool, setRandomSource, resetRandomSource,
-  bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS,
+  bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer,
 } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getExerciseEntry } from '../src/lib/exercise-db'
@@ -121,12 +121,13 @@ function measure(): Report {
             for (const day of week.days) {
               for (const ex of day.exercises) {
                 const entry = getExerciseEntry(ex.name)
-                if (!entry || isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') continue
-                const better = pool.some(p =>
-                  p.movement_pattern === entry.movement_pattern &&
-                  p.mechanics_tier === entry.mechanics_tier &&
-                  bestEquipmentRank(p) === 'high')
-                if (!better) continue
+                // THE FOURTH COPY, deleted 21 Sep 2026. This file's own header
+                // said the predicate was "imported rather than restated"; it
+                // was restated, on `movement_pattern` and with no loadable
+                // test, so this instrument could disagree with the engine and
+                // with the scorer it claims to mirror. Now it calls the one
+                // definition, like everything else.
+                if (!entry || !hasBetterLoadingPeer(entry, pool)) continue
                 out.implement.push({
                   key, week: week.week_number, day: day.day,
                   exercise: ex.name, equipment: entry.equipment.join('/'),

@@ -70,9 +70,18 @@ export function calibrationCueText(hasLoad: boolean): string {
     : 'Calibration: leave 3-4 reps in reserve. Log what you actually do.'
 }
 
+/**
+ * NEUTRAL, NOT AMBER, SINCE 19 Sep 2026 — Ashley's design handoff asks for it
+ * and the reason generalises past this component: amber is the app's caution
+ * colour, and this is an INSTRUCTION. Printed in caution amber it read as a
+ * warning about the week rather than the coaching it is, and it sat on the
+ * card next to ramp rows that were also amber, so one colour was doing two
+ * unrelated jobs on one screen. The ramp took violet; this took the quiet
+ * grey every other explanatory line on the card uses.
+ */
 export function CalibrationCue({ hasLoad }: { hasLoad: boolean }) {
   return (
-    <p className="flex items-start gap-1 text-[0.625rem] text-[color:var(--role-warn-text)] mt-0.5">
+    <p className="flex items-start gap-1 text-[0.625rem] text-muted-foreground mt-0.5">
       <CornerDownRight className="size-2.5 mt-0.5 shrink-0" />
       <span>{calibrationCueText(hasLoad)}</span>
     </p>

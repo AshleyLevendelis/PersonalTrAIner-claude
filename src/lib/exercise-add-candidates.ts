@@ -34,9 +34,9 @@
 // through one row component, and ties break on name so the same day offers
 // the same list twice.
 // ---------------------------------------------------------------------------
-import { getConstrainedPool, mapMovementPattern } from './exercise-plan'
+import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
 import { EXERCISE_DATABASE, getExerciseEntry, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
-import type { WorkoutDay, UserProfile, MesocycleMovementPattern } from './types'
+import type { WorkoutDay, UserProfile, MesocycleMovementPattern, EquipmentAccess } from './types'
 
 export interface AdditionCandidate {
   exercise: ExerciseEntry
@@ -72,6 +72,11 @@ function dayMuscleSets(day: WorkoutDay): Map<MuscleGroup, number> {
   return counts
 }
 
+/** A real, loadable tool sorts before an improvised one (band, backpack) when both are tied on everything else — the same shared question generation, rotation, the swap list and the scorer all ask. */
+function equipmentPenalty(exercise: ExerciseEntry, pool: ExerciseEntry[], equipment?: EquipmentAccess): number {
+  return equipment && EQUIPMENT_QUALITY_TIERS.has(equipment) && hasBetterLoadingPeer(exercise, pool) ? 1 : 0
+}
+
 /**
  * The exercises this session could use, best first.
  *
@@ -96,8 +101,10 @@ export function getAdditionCandidates(
   const patterns = new Set(day.exercises.map(e => e.movement_pattern).filter(Boolean) as MesocycleMovementPattern[])
   const leastInDay = Math.min(...muscles.values())
   const present = new Set(day.exercises.map(e => e.name.toLowerCase()))
+  const pool = getConstrainedPool(profile, exclusions)
+  const equipment = profile.equipment_access
 
-  const scored = getConstrainedPool(profile, exclusions)
+  const scored = pool
     .filter(e => !present.has(e.name.toLowerCase()))
     .map(exercise => {
       const overlap = muscleGroupsOf(exercise).filter(g => muscles.has(g))
@@ -132,6 +139,15 @@ export function getAdditionCandidates(
     .sort((a, b) =>
       (b.score - a.score)
       || (a.thinnestSets - b.thinnestSets)
+      // A REAL TOOL BEFORE AN IMPROVISED ONE, ADDED 21 Sep 2026. Every tied
+      // candidate used to fall straight to alphabetical order — the exact
+      // "Backpack Lateral Raise sorts to index 0" shape this whole line of
+      // work exists to close, reproduced on the one path nobody had re-
+      // checked: driven on a real full-gym push day, tied triceps candidates
+      // offered Band Tricep Kickback and Band Tricep Pushdown ahead of Cable
+      // Pushdown and Skull Crushers, on name alone. Same shared definition as
+      // generation, rotation, the swap list and the scorer.
+      || (equipmentPenalty(a.exercise, pool, equipment) - equipmentPenalty(b.exercise, pool, equipment))
       || a.exercise.name.localeCompare(b.exercise.name))
 
   return scored.slice(0, limit).map(({ exercise, note }) => ({ exercise, note }))

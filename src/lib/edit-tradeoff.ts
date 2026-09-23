@@ -219,10 +219,11 @@ export function scoreDrop(
   profile: UserProfile,
   before: MesocycleWeek[],
   after: MesocycleWeek[],
+  exclusions?: string[],
 ): ScoreDrop | null {
   const key = `tradeoff:${profile.id ?? 'anon'}`
-  const b = scorePlan(profile, before, key, { skipComparisons: true })
-  const a = scorePlan(profile, after, key, { skipComparisons: true })
+  const b = scorePlan(profile, before, key, { skipComparisons: true, exclusions })
+  const a = scorePlan(profile, after, key, { skipComparisons: true, exclusions })
   let worst: ScoreDrop | null = null
   for (const dimension of DIMENSION_KEYS) {
     const lost = b.dimensions[dimension].points - a.dimensions[dimension].points
@@ -264,6 +265,13 @@ export interface EditContext {
    * they need history this pure module must not fetch. Absent means zero.
    */
   priorShorteningsThisBlock?: number
+  /**
+   * The trainee's own banned exercises — ADDED 22 Sep 2026, threaded down to
+   * scorePlan so a person who has banned every loaded option in a pattern
+   * isn't charged a cost for the band the app correctly gave them. Absent
+   * means `[]`, same as before this existed.
+   */
+  exclusions?: string[]
 }
 
 const weekOf = (meso: MesocycleWeek[], n: number) => meso.find(w => w.week_number === n)
@@ -302,7 +310,7 @@ const free = (reason: string): Tradeoff => ({ tier: 0, cost: null, alternatives:
  * and never writes, and the caller throws the trial away.
  */
 export function assessEdit(ctx: EditContext): Tradeoff {
-  const { profile, before, after, weekNumber, dayName, kind, scope, exerciseName, newExerciseName } = ctx
+  const { profile, before, after, weekNumber, dayName, kind, scope, exerciseName, newExerciseName, exclusions } = ctx
   const goal = (profile.fitness_goal ?? 'hypertrophy') as FitnessGoal
 
   // NOTHING IS EVER CHARGED TO SOMEONE STARTING OUT. First, before any other
@@ -320,7 +328,7 @@ export function assessEdit(ctx: EditContext): Tradeoff {
   }
 
   const volume = muscleVolumeChange(beforeWeek, afterWeek)
-  const drop = scoreDrop(profile, before, after)
+  const drop = scoreDrop(profile, before, after, exclusions)
 
   // --- TIER 2: the seven pinned cases ------------------------------------
   //

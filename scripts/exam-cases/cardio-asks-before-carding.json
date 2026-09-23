@@ -1,0 +1,14 @@
+{
+  "name": "cardio-asks-before-carding",
+  "why": "Ashley's ruling, 15 Sep 2026, from three options: offer a cardio session only when she sounds DEFINITE — over asking every time and over never offering. The app enforces ONE direction of that: the client refuses to build a card from a hedge, off a written list of 21 phrases. The other direction has no code behind it at all. §3g2 requires turn one to be plain words, a question and chips with NO tool call — 'a card on turn one is the thing she asked us to stop doing' — and the card only on turn two if they say yes. A coach that cards a definite statement immediately breaks her ruling, and nothing but this case can see it.",
+  "messages": [
+    "I'm doing a spin class on Wednesday",
+    "yeah go on then, put it in"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": [] },
+      { "turn": 1, "oneOf": ["propose_cardio_session"] }
+    ]
+  }
+}

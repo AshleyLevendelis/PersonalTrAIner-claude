@@ -35,6 +35,7 @@ import { setSupabaseClient } from '@/lib/supabase'
 import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
+import { resolveLoadFields } from '@/lib/warmup'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { getPools, setMealPick } from '@/lib/meal-store'
 import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
@@ -63,9 +64,12 @@ import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { getExerciseId, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
+import { getExerciseId, getExerciseEntry, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
+import { prescribeLoad } from '@/lib/load-prescription'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
+import { computeMealMacros } from '@/lib/food-db'
+import { buildRotation, assembleRotationDay, rotationIndexFor } from '@/lib/meal-rotation'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
 
@@ -122,6 +126,15 @@ const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, 
 // unchanged.
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
 const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
+// ?offstyle=1 — A FULL GYM AND A FUNCTIONAL TRAINEE, which is the only pairing
+// where the swap shortlist has anything to demote. Ashley, 18 Sep 2026: offered
+// two sliders and a band for her leg curl while standing next to the machine,
+// because all three machine leg curls are tagged bodybuilding. Off by default
+// so every existing run of this harness is unchanged.
+//
+// FULL GYM IS LOAD-BEARING, not scenery: at home_gym there are no machines to
+// demote and the driver would measure an empty group as a pass.
+const OFF_STYLE = new URLSearchParams(location.search).get('offstyle') === '1'
 // ?finisher=1 — A POST-SESSION FINISHER ON A TRAINING DAY, for verify:finisher.
 //
 // The default profile's conditioning lands on REST days, where TodayPanel
@@ -173,7 +186,7 @@ const profile: UserProfile = {
   // hand-seeding a plan row, which would have proved only that a string I
   // wrote myself renders.
   equipment_access: WALKER ? 'bodyweight' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: [],
-  training_style: WALKER ? 'functional' : 'hybrid',
+  training_style: WALKER || OFF_STYLE ? 'functional' : 'hybrid',
   training_experience: WALKER ? 'beginner' : 'intermediate', session_duration_preference: '45-60',
   workout_split_preference: LEG_CURL ? 'push_pull_legs' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
@@ -192,7 +205,49 @@ const profile: UserProfile = {
 // panel fed one shows a state no user can reach (a squat under an ACCESSORY
 // label, no MAIN LIFT anywhere). Seeded so a re-run is comparable.
 setRandomSource(seededRngFromKey('tour-real-screens'))
-const generated = generateMesocycle(profile)
+const generated0 = generateMesocycle(profile)
+// ?prep=1 — A PREP MOVE THAT NEEDS A BELL, which the generator does not pick.
+//
+// Ashley, 18 Sep 2026: her Kettlebell Swings sat in the prep slot with no
+// weight on the card at all and a box offering 0. Her ruling that day: a prep
+// move needing an implement gets a starting weight, kept light.
+//
+// THE GENERATOR WILL NOT PRODUCE THIS ON ITS OWN — measured: 64 of 64 primer
+// slots in a generated mesocycle are wall slides, band work and bodyweight
+// marches, none of which take a weight. So the fixture puts the bell in the
+// slot the way she did, by NAME, and the driver reads what the card says.
+// Off by default so every existing run of this harness is unchanged.
+const PREP_BELL = new URLSearchParams(location.search).get('prep') === '1'
+const generated = !PREP_BELL ? generated0 : generated0.map(w => ({
+  ...w,
+  days: w.days.map(d => {
+    const i = d.exercises.findIndex(e => (e as unknown as { tier?: string }).tier === 'tier_0_primer')
+    if (i < 0) return d
+    const bell = getExerciseEntry('Kettlebell Swings')
+    if (!bell) return d
+    const load = prescribeLoad(bell, profile, { targetRpeLabel: 'Light — movement prep', isFirstBlock: true, sets: d.exercises[i].sets })
+    const exercises = [...d.exercises]
+    exercises[i] = {
+      ...exercises[i],
+      id: bell.id,
+      name: bell.name,
+      prescription_type: bell.prescription_type,
+      // THE APP'S OWN DECISION, not a copy of it. This used to hand-write
+      // `load.display` / `load.starting_weight_kg` / `load.per_set` straight
+      // onto the slot, which meant the driver was measuring THE FIXTURE and
+      // not the app: the prep weight never went through the primer branch at
+      // all. Found 18 Sep 2026 by mutation — doubling the box's placeholder in
+      // SetGrid changed nothing on screen, because the fixture was supplying a
+      // per-set ladder the real generator no longer puts on a primer, so the
+      // row never reached the suggested-load line being broken.
+      // `resolveLoadFields` is the one function generation and the swap path
+      // both call, so calling it here is what makes this fixture the app.
+      ...resolveLoadFields(bell, true, load),
+      ramp_up: undefined,
+    } as typeof exercises[number]
+    return { ...d, exercises }
+  }),
+}))
 resetRandomSource()
 
 // ?tilt=lopsided — A DELIBERATELY UNBALANCED WEEK, for one driver only.
@@ -397,6 +452,20 @@ const loggedTarget = (() => {
 // 2026. The screen control that makes a day a cardio day lives on the rest-day
 // card, so the driver needs a day that HAS one. Asked of the page rather than
 // named, for the reason the two targets above record: weekday names move.
+// A TRUE REST DAY IS A WEEKDAY THE PLAN HAS NO ROW FOR — TodayPanel's
+// `isRestDay` is literally `!workout`. __restDayTarget below finds a day with
+// an EMPTY row, which is a different card (ActiveRecoveryCard), and driving
+// the rest-day rebuild against it measured the wrong component for an hour.
+// This names the weekday the plan omits, or null when it omits none.
+;(window as unknown as { __noRowDay: unknown }).__noRowDay = (() => {
+  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan
+  const named = new Set(liveDays.map(d => d.day))
+  const missing = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].find(d => !named.has(d))
+  if (!missing) return null
+  return { day: missing, date: nearestAnchorDate(missing) }
+})()
+
 ;(window as unknown as { __restDayTarget: unknown }).__restDayTarget = (() => {
   const liveWeekForRest = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
   const liveDays = mesocycle.find(w => w.week_number === liveWeekForRest)?.days ?? exercisePlan
@@ -607,12 +676,24 @@ if (ABSURD) {
 
 // Real meals, shaped like generate-meals' output, so the `meals` stop has
 // something with real height under it rather than an empty-state card.
-const meal = (slot: string, name: string, kcal: number) => ({
+const meal = (slot: string, name: string, kcal: number, prep = '') => ({
   slot, name,
   ingredients: [{ name: 'chicken breast', quantity: 180, unit: 'g' }, { name: 'basmati rice', quantity: 120, unit: 'g' }],
   macros: { calories: kcal, protein: 45, carbs: 60, fat: 12 },
   tags: [],
+  prep,
 })
+
+// THE METHOD, AS THREE INPUTS AND NOTHING ELSE.
+//
+// The fixture chooses what is STORED against each meal and stops there: a
+// clean method, a method that names an amount, and no method at all. Whether
+// each one reaches the screen, and where, is the app's decision and the thing
+// verify:meal-method is measuring. Assembling the rendered output here — for
+// instance by pre-stripping the middle one — would be the harness testing
+// itself, which is how verify:prep-weight spent weeks proving nothing.
+const CLEAN_METHOD = 'Season the chicken and sear it skin-side down until golden, then finish it in the oven while the rice steams. Rest it before slicing.'
+const METHOD_WITH_AN_AMOUNT = 'Fry the 180g chicken breast until golden, then stir through the rice.'
 // ?ate=1 — ROADMAP ITEM 9. Two things a preference change must not do to a
 // meal already eaten. Breakfast contains almond butter and the profile below
 // turns on nut-free, so the re-check trips on a meal that is ALREADY LOGGED
@@ -627,14 +708,73 @@ const nuttyBreakfast = {
   macros: { calories: 480, protein: 18, carbs: 60, fat: 18 },
   tags: [],
 }
+// ?leftovers=1 — COOK ONCE, EAT TWICE, THROUGH THE APP'S OWN ROTATION.
+//
+// The fixture chooses the INPUT — a pool with a dinner big enough to re-portion
+// into lunch, and batch cooking on — and then hands the whole decision to
+// buildRotation / assembleRotationDay, the same pair App.tsx uses. It does NOT
+// hand-write `leftoverFrom` or `reusedTomorrow` onto a slot: those are the
+// OUTPUT, and a fixture that assembles the output is testing itself. That is
+// the mistake verify:prep-weight spent weeks making, and the rule it left
+// behind — put the food in the pool, let the app decide what the slot carries.
+const LEFTOVERS = new URLSearchParams(location.search).get('leftovers') === '1'
+
 const chosen = (REFIT ? refitChosen : {
-  breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480),
-  lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720),
+  breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
+  lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720, METHOD_WITH_AN_AMOUNT),
   dinner: meal('dinner', 'Salmon, new potatoes and green beans', 780),
 }) as never
 const pools = (REFIT
   ? { breakfast: [refitChosen.breakfast], lunch: [refitChosen.lunch], dinner: [refitChosen.dinner], snack: [refitChosen.snack] }
   : { breakfast: [(chosen as never as Record<string, unknown>).breakfast], lunch: [(chosen as never as Record<string, unknown>).lunch], dinner: [(chosen as never as Record<string, unknown>).dinner] }) as never
+
+// The leftovers run needs a pool it can actually re-portion, so the dinner is
+// sized for a dinner and the lunch slot is left to the rotation. Quantities
+// only — every macro below is computed by the app from food-db.
+const leftoverPools = (() => {
+  const dish = (slot: string, name: string, chicken: number, rice: number, oil: number) => {
+    const ingredients = [
+      { name: 'chicken breast', quantity: chicken, unit: 'g' },
+      { name: 'cooked basmati rice', quantity: rice, unit: 'g' },
+      { name: 'olive oil', quantity: oil, unit: 'g' },
+    ]
+    const m = computeMealMacros(ingredients)
+    return {
+      slot, name, ingredients,
+      macros: { calories: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) },
+      tags: [], prep: '',
+    }
+  }
+  return {
+      // SIZED TO THIS PROFILE'S ACTUAL TARGETS — 3040 kcal, 160g protein, 411g
+    // carbs, 84g fat. A first version was all chicken and rice and delivered
+    // 339g of protein against that 160g target, so NO combination was ever
+    // inside tolerance; with every day out of band the variety sort never
+    // applied, the same dinner won every day, and the leftover yielded every
+    // time. The screen showed nothing and the feature looked broken. A fixture
+    // has to be a plausible DAY, not just plausible food.
+    //
+    // THREE OPTIONS EACH, not two: a day whose dinner would repeat its lunch
+    // gives the leftover back rather than serve one dish twice, so a thin pool
+    // starves the very feature this run exists to show.
+    breakfast: [dish('breakfast', 'Oats and yoghurt', 118, 440, 20), dish('breakfast', 'Eggs on toast', 124, 430, 21), dish('breakfast', 'Rice pudding bowl', 112, 450, 19)],
+    lunch: [dish('lunch', 'Chicken salad bowl', 158, 587, 26), dish('lunch', 'Rice and greens', 165, 575, 27), dish('lunch', 'Warm grain salad', 152, 600, 25)],
+    dinner: [dish('dinner', 'Roast chicken tray bake', 118, 440, 20), dish('dinner', 'Chicken and rice pot', 124, 430, 21), dish('dinner', 'Baked chicken and rice', 112, 450, 19)],
+  }
+})()
+
+const leftoverRotation = LEFTOVERS && macros
+  ? buildRotation(leftoverPools as never, macros, [], { mealsPerDay: 3, includeSnacks: false, batchCooking: true })
+  : null
+// The FIRST date in the rotation whose lunch the app decided is a leftover —
+// found by asking the rotation, not by picking a day and hoping.
+const leftoverDate = leftoverRotation
+  ? (Array.from({ length: 14 }, (_, k) => `2026-09-${String(k + 1).padStart(2, '0')}`)
+      .find(d => leftoverRotation.leftoverFor(rotationIndexFor(d)).lunch !== undefined) ?? today)
+  : today
+const leftoverDay = leftoverRotation && macros
+  ? assembleRotationDay(leftoverRotation, leftoverDate, leftoverPools as never, macros, [], {})
+  : null
 
 /**
  * SEED THE FAKE POOL TABLE TOO, not just the props.
@@ -646,12 +786,13 @@ const pools = (REFIT
  * halves go through meal-store against this database. A screen whose meals
  * live only in a prop cannot be edited by the code that ships.
  */
-for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number } }>)) {
+for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
   db.meal_plan_slots.push({
     profile_id: PROFILE_ID, slot, pool_index: 0, name: option.name,
     ingredients: option.ingredients,
     macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
     tags: [],
+    prep: option.prep ?? '',
   })
 }
 
@@ -660,8 +801,8 @@ function Harness() {
   // WHAT THE SCREEN IS SHOWING RIGHT NOW, so an edit can move it. App.tsx
   // holds the same two pieces of state and updates them in the same order:
   // persist the pick, re-read the pool, then move what is on screen.
-  const [liveChosen, setLiveChosen] = useState(chosen as Record<string, PoolOption>)
-  const [livePools, setLivePools] = useState(pools as Record<string, PoolOption[]>)
+  const [liveChosen, setLiveChosen] = useState((leftoverDay ? leftoverDay.chosen : chosen) as Record<string, PoolOption>)
+  const [livePools, setLivePools] = useState((LEFTOVERS ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
     const fresh = await getPools(PROFILE_ID)

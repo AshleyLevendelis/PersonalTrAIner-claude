@@ -1,6 +1,8 @@
 import { supabase } from './supabase'
 import type { SessionMove } from './session-move'
 import type { DailyMetric, DailyNutritionTarget, WorkoutSession, WorkoutExerciseRow, ExerciseSetLog, CardioLog } from './types'
+import { setLabelLong, type SetRef } from './session-derive'
+import { isMalformedZeroWeight } from './set-log-store'
 
 export async function upsertDailyMetric(metric: Omit<DailyMetric, 'id' | 'created_at' | 'updated_at'>) {
   const { data, error } = await supabase
@@ -363,8 +365,48 @@ export interface WeeklyDashboardDay {
   nutrition: DailyNutritionTarget | null
   session: WorkoutSession | null
   exercises: WorkoutExerciseRow[]
-  workoutLogs: ExerciseSetLog[]
+  /**
+   * WORKING sets only. RENAMED FROM `workoutLogs`, 17 Sep 2026, and the rename
+   * IS the fix: once a build-up can be a real row, "the workout logs for this
+   * day" is a question with two answers, and the week strip was reading the
+   * ambiguous one. Tick three warm-up boxes on a deadlift and walk out and the
+   * week said you part-trained. A rename forces every reader to say which it
+   * meant instead of inheriting the old answer.
+   */
+  workingLogs: ExerciseSetLog[]
+  /** The build-up rows, kept rather than dropped — they are real history and the diary shows them. They just do not count as having trained. */
+  warmupLogs: ExerciseSetLog[]
   cardioLogs: CardioLog[]
+}
+
+/**
+ * ONE DAY'S ROWS, SPLIT BY WHAT THEY ARE. Exported and pure so a gate can
+ * reach it: the split used to be an inline filter pair, and a mutation that
+ * collapsed it — putting every row back into `workingLogs` — passed every
+ * check, because the week-strip gate builds its own fixtures and never
+ * exercised the partition itself. The behaviour was guarded and the thing
+ * PRODUCING it was not.
+ */
+/**
+ * MEASURED 19 Sep 2026 AND DELIBERATELY LEFT ALONE, so the next reader does
+ * not "fix" it: a drop lands in `workingLogs` here, and that is harmless.
+ * Every consumer of this bucket asks whether ANYTHING was logged that day —
+ * `length > 0`, or the dates mapped into a Set (useTrainingWeek:137,139;
+ * dashboard-data:348,409,413) — and none counts sets or sums volume. A day
+ * with a drop always has that drop's parent set too, so the answer is
+ * identical either way. Adding a third bucket would be churn, and would risk
+ * the opposite defect: a consumer that wanted VOLUME losing the drops, which
+ * the ruling says do count toward it.
+ */
+export function partitionLogsByKind(
+  logs: (ExerciseSetLog & { date?: string })[],
+  dateStr: string,
+): { workingLogs: ExerciseSetLog[]; warmupLogs: ExerciseSetLog[] } {
+  const onDay = logs.filter(l => l.date === dateStr)
+  return {
+    workingLogs: onDay.filter(l => !l.is_warmup),
+    warmupLogs: onDay.filter(l => !!l.is_warmup),
+  }
 }
 
 export async function getWeeklyDashboard(
@@ -437,7 +479,7 @@ export async function getWeeklyDashboard(
       ? allExercises.filter(e => e.workout_session_id === sess.id)
       : []
 
-    days.push({ date: dateStr, metric, nutrition: nut, session: sess, exercises: exs, workoutLogs: allLogs.filter(l => l.date === dateStr), cardioLogs: allCardio.filter(c => c.date === dateStr) })
+    days.push({ date: dateStr, metric, nutrition: nut, session: sess, exercises: exs, ...partitionLogsByKind(allLogs, dateStr), cardioLogs: allCardio.filter(c => c.date === dateStr) })
     current.setDate(current.getDate() + 1)
   }
 
@@ -448,7 +490,20 @@ export async function getWeeklyDashboard(
 // Set WRITES live exclusively in set-log-store.ts (C0 Part 3) — the legacy
 // upsertWorkoutLog/getLogsForDate pair is gone with the workout_logs table.
 
-/** Recent working-set history from the unified store (chat/AI context). */
+/**
+ * Recent WORKING-set history — the streak/PR/progression view.
+ *
+ * DROPS AND WARM-UPS EXCLUDED, deliberately and permanently: this function's
+ * result also feeds dashboard-data.ts's streak calculation, where a
+ * warm-up-only day counting as "trained" would be a real, separate bug. Do
+ * not widen this filter for the coach's sake — see getRecentLogsWithWarmups
+ * below, a sibling fetch, for that.
+ *
+ * Filtered in JS rather than in the query, off the `select('*')` already
+ * there, so it works on both sides of the migration — naming `drop_index` in
+ * a PostgREST filter is rejected before the column exists, and this function
+ * THROWS on a query error, which would take the coach's whole context down.
+ */
 export async function getRecentLogs(
   userId: string,
   days: number = 14,
@@ -466,7 +521,9 @@ export async function getRecentLogs(
     .order('completed_at', { ascending: true })
 
   if (error) throw error
-  const rows = ((data || []) as (ExerciseSetLog & { session_id?: string })[]).map(row => ({
+  const rows = ((data || []) as (ExerciseSetLog & { session_id?: string })[])
+    .filter(row => (row.drop_index ?? 0) === 0)
+    .map(row => ({
     ...row,
     weight_kg: Number(row.weight_kg),
     date: row.date || (row.completed_at ?? '').slice(0, 10),
@@ -477,6 +534,51 @@ export async function getRecentLogs(
   // effectively-unique timestamp now, so sorting purely by it (descending)
   // reversed every session's set order (a ramp read as 80kg, 70kg, 60kg
   // instead of the order it was actually performed in).
+  return rows.sort((a, b) => {
+    const dayCompare = b.date.localeCompare(a.date)
+    if (dayCompare !== 0) return dayCompare
+    return (a.completed_at ?? '').localeCompare(b.completed_at ?? '')
+  })
+}
+
+/**
+ * Recent history INCLUDING warm-ups and drops — the coach's own conversational
+ * memory, and only that. 22 Sep 2026, Ashley's ruling on the profile-field
+ * audit's screen-only list: the coach could not discuss a build-up or drop
+ * set at all, because getRecentLogs (above) excludes both, and that exclusion
+ * is load-bearing for streak calculation — widening it there would have been
+ * a second, unrelated bug. This is a SEPARATE fetch for exactly that reason:
+ * broadening the coach's memory must not broaden what counts as "trained".
+ *
+ * Every row this returns MUST be labelled by kind before it reaches a model —
+ * see formatLogsForAI below. Returning it unlabelled would recreate the
+ * house's own "a hint and a record must not look alike" bug: a warm-up's
+ * light weight and a working set's real weight would print identically.
+ */
+export async function getRecentLogsWithWarmups(
+  userId: string,
+  days: number = 14,
+): Promise<ExerciseSetLog[]> {
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+  const sinceStr = since.toISOString().split('T')[0]
+
+  const { data, error } = await supabase
+    .from('exercise_set_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('completed_at', sinceStr)
+    .order('completed_at', { ascending: true })
+
+  if (error) throw error
+  const rows = ((data || []) as (ExerciseSetLog & { session_id?: string })[])
+    .filter(row => !isMalformedZeroWeight(row))
+    .map(row => ({
+    ...row,
+    weight_kg: Number(row.weight_kg),
+    date: row.date || (row.completed_at ?? '').slice(0, 10),
+  }))
+
   return rows.sort((a, b) => {
     const dayCompare = b.date.localeCompare(a.date)
     if (dayCompare !== 0) return dayCompare
@@ -505,14 +607,30 @@ function setTimeLabel(completedAt?: string): string {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
+/**
+ * Every row's kind, in the app's own words — same function the screen uses
+ * for "anything read aloud or read back" (see its own doc comment), so a
+ * warm-up and a working set can never print identically here. Always
+ * applied, even on a day with nothing but working sets: a formatter that
+ * sometimes labels and sometimes doesn't is a formatter a model can't learn
+ * to trust either way.
+ */
+function labelFor(log: ExerciseSetLog): string {
+  const ref: SetRef = log.is_warmup
+    ? { kind: 'warmup', setNumber: log.set_number }
+    : { kind: 'working', setNumber: log.set_number, dropIndex: log.drop_index ?? 0 }
+  return setLabelLong(ref)
+}
+
 export function formatLogsForAI(logs: ExerciseSetLog[]): string {
   if (logs.length === 0) return ''
 
-  const grouped: Record<string, Record<string, { weight: number; reps: number; bw: boolean; at: string }[]>> = {}
+  const grouped: Record<string, Record<string, { label: string; weight: number; reps: number; bw: boolean; at: string }[]>> = {}
   for (const log of logs) {
     if (!grouped[log.date]) grouped[log.date] = {}
     if (!grouped[log.date][log.exercise_name]) grouped[log.date][log.exercise_name] = []
     grouped[log.date][log.exercise_name].push({
+      label: labelFor(log),
       weight: log.weight_kg, reps: log.reps_completed, bw: log.is_bodyweight,
       at: setTimeLabel(log.completed_at),
     })
@@ -523,7 +641,7 @@ export function formatLogsForAI(logs: ExerciseSetLog[]): string {
     const exercises = grouped[date]
     const parts: string[] = []
     for (const [name, sets] of Object.entries(exercises)) {
-      const setsStr = sets.map(s => s.bw ? `BW x ${s.reps}` : `${s.weight}kg x ${s.reps}`).join(', ')
+      const setsStr = sets.map(s => `${s.label} ${s.bw ? `BW x ${s.reps}` : `${s.weight}kg x ${s.reps}`}`).join(', ')
       // The times, once, after the sets — not repeated per set, which would
       // treble the line length for something read at a glance. Omitted
       // entirely when no row carries one, so an absent time reads as absent

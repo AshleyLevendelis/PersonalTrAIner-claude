@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Plus, ShieldAlert, Zap, Clock } from 'lucide-react'
-import { searchExerciseCatalog, type ExerciseEntry } from '@/lib/exercise-db'
+import { searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getAdditionCandidates } from '@/lib/exercise-add-candidates'
 import type { SwapScope } from '@/lib/mesocycle-edit'
@@ -94,7 +94,7 @@ export function AddExerciseSheet({
     : []
   const present = new Set((target?.day.exercises ?? []).map(e => e.name.toLowerCase()))
   const searchResults = target && searchQuery.trim()
-    ? searchExerciseCatalog(searchQuery, 20).filter(e =>
+    ? searchExerciseCatalogByWords(searchQuery, 20).filter(e =>
         !present.has(e.name.toLowerCase()) &&
         !suggestions.some(s => s.exercise.name === e.name)
       )

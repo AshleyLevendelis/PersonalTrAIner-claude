@@ -196,13 +196,17 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // this check tested for /defaultWeightFor\(setNumber\)/ anywhere in the file
   // and passed with the save fallback replaced by '0' — the placeholder three
   // hundred lines below still named the function. Caught by mutation.
+  // RE-ANCHORED 17 Sep 2026: the argument is the ROW now, not a bare number,
+  // because a build-up row and a working row can both be "2". The property is
+  // the shape of the fallback, not what the parameter is called — so the
+  // identifier is captured and the placeholder below must use the SAME one.
   check('a blank weight still logs the prescribed number, as ruled',
-    /input\.weight \|\| \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\(setNumber\)\)/.test(setGrid))
+    /input\.weight \|\| \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\((\w+)\)\)/.test(setGrid))
   // The placeholder shows the SAME default the tick would log, where one
   // exists — routed through one helper so the two cannot drift apart.
   check('...and the box shows that same number, so the tick keeps its promise',
-    /placeholder=\{isBW \? 'BW' : \(ghost \? String\(ghost\.weight_kg\) : weightPlaceholderFor\(setNumber\)\)\}/.test(setGrid)
-    && /const d = defaultWeightFor\(setNumber\)\s*\n\s*return d === '' \? '[^']+' : d/.test(setGrid))
+    /placeholder=\{isBW \? 'BW' : \(ghost \? String\(ghost\.weight_kg\) : weightPlaceholderFor\((\w+)\)\)\}/.test(setGrid)
+    && /const d = defaultWeightFor\((\w+)\)\s*\n\s*return d === '' \? '[^']+' : d/.test(setGrid))
 }
 
 // ---------------------------------------------------------------------------

@@ -165,6 +165,40 @@ export function mealsDrifted(mealCalories: number, targetCalories: number): stri
   return `Your meals add up to ${grouped(mealCalories)} calories against a ${grouped(targetCalories)} target. I can resize them — same meals, different amounts.`
 }
 
+/**
+ * WHAT A NOTIFICATION SAYS, and it is the coach saying it.
+ *
+ * Ashley chose notifications on 17 Sep 2026. These live here rather than beside
+ * the sending code for the reason every other card lead does: a notification is
+ * the coach speaking, and a second place to write the coach's words is a second
+ * voice. `test:coach-voice` and the coach exam can only grade what is in the
+ * phrasebook.
+ *
+ * SHORT, because a phone truncates. Lower case and no exclamation marks, which
+ * is the house voice everywhere else — a notification that shouts is a
+ * different personality arriving in someone's pocket.
+ *
+ * NO NUMBERS EXCEPT THE STREAK, deliberately. A notification is read on a lock
+ * screen, out of context, possibly days late; a figure quoted there is one the
+ * app cannot promise is still true when it is read. The streak is the
+ * exception because it IS the subject of its own line.
+ */
+export function notification(key: string, streakDays = 0): string {
+  switch (key) {
+    case 'session_feel': return 'how did that session actually feel?'
+    case 'session_not_logged': return "today's session is still waiting — got twenty minutes?"
+    case 'missed_yesterday': return 'yesterday got away from you. want to move it or let it go?'
+    case 'week_gone_quiet': return "it's been a quiet week. shall we pick something small to start again?"
+    case 'streak_at_risk': return `${streakDays} days in a row so far — today would keep it going.`
+    case 'block_review': return "that's a block done. come and see what moved."
+    case 'beat_target': return "you're beating the weights I set you. want them raised?"
+    // A KEY WITH NO SENTENCE IS NOT A SENTENCE. Returning something generic
+    // here would let a new moment ship with placeholder words nobody wrote,
+    // which is exactly how a screen ends up speaking in a voice no one chose.
+    default: return ''
+  }
+}
+
 // ---------------------------------------------------------------------------
 // ASKING
 // ---------------------------------------------------------------------------
@@ -191,13 +225,154 @@ export function mealsDrifted(mealCalories: number, targetCalories: number): stri
  * is worse than no number: it looks right.
  *
  * Ashley's ruling, 16 Sep 2026: at bodyweight the record is the most reps
- * in one set; once a belt goes on, the record is the added weight. So the
- * three readings are three sentences, not one sentence with a variable.
+ * in one set; once a belt goes on, the record is the added weight. Hers of
+ * 17 Sep added a fourth: a best the estimate found shows the whole SET. So
+ * the readings are four sentences, not one sentence with a variable.
  */
-export function personalBest(metric: 'load' | 'added_load' | 'reps', value: number): string {
-  if (metric === 'reps') return `${value} reps`
-  if (metric === 'added_load') return `+${value}kg`
-  return `${value}kg`
+export type BestReading =
+  | { kind: 'load'; weightKg: number }
+  | { kind: 'added_load'; addedKg: number }
+  | { kind: 'reps'; reps: number }
+  /**
+   * A best the ESTIMATE found, not the bar. You lifted less weight for more
+   * reps and worked harder for it — real progress that a heaviest-ever record
+   * cannot see. It shows the whole set, because the alternative is what this
+   * used to do: fire on the estimate and then print the lighter weight on its
+   * own, so someone whose best is 100kg read "95kg" labelled as a best.
+   * Ashley's ruling, 17 Sep 2026, from three options.
+   */
+  | { kind: 'best_set'; weightKg: number; reps: number }
+
+/**
+ * ONE ARGUMENT, NOT A METRIC AND A LOOSE NUMBER. The old signature was
+ * (metric, value) and every one of its three call sites re-derived `value`
+ * with its own ternary over four fields — which is the bug surface, not the
+ * renderer. A caller that picked the wrong field passed a valid number for
+ * the wrong kind and this function had no way to know.
+ */
+export function personalBest(reading: BestReading): string {
+  if (reading.kind === 'reps') return `${reading.reps} reps`
+  if (reading.kind === 'added_load') return `+${reading.addedKg}kg`
+  if (reading.kind === 'best_set') return `${reading.weightKg}kg × ${reading.reps}`
+  return `${reading.weightKg}kg`
+}
+
+/**
+ * The words that go beside a best_set reading, so both screens that show one
+ * say the same thing. Kept here rather than written twice: two copies of a
+ * four-word qualifier is two things to drift, and the drifted one is the one
+ * nobody re-reads.
+ */
+/**
+ * WHAT YOU DID LAST TIME, said so it cannot be read as an instruction.
+ *
+ * Ashley, 17 Sep 2026, looking at her own dumbbell rows: *"Last sets
+ * prescribed were sets of 11 reps. Is thay correct at the end of a
+ * exercise?"* Nothing had prescribed 11. The faint numbers in the boxes were
+ * her OWN last session — 9, 11, 11 — shown in the same grey the app uses for
+ * a hint, with nothing saying which they were. She read her history as a
+ * prescription, and it is the only reading the screen supported.
+ *
+ * Her ruling, 18 Sep 2026, from three options: **mark them "last time"** —
+ * the numbers stay in the boxes where her thumb is, and the row says what
+ * they are. She rejected moving them out of the boxes to a line above the
+ * sets (history one glance further away mid-set) and emptying the boxes
+ * entirely (a number to type on every set instead of a tap).
+ *
+ * ONE ARGUMENT OVER A UNION, the same shape as personalBest above and for the
+ * same reason: a reps count and a kilo figure are different quantities, and a
+ * caller holding a loose number must not be able to render it as either.
+ */
+export type LoggedSetReading =
+  | { kind: 'loaded'; weightKg: number; reps: number }
+  | { kind: 'bodyweight'; reps: number }
+  | { kind: 'added_load'; addedKg: number; reps: number }
+
+export function lastTime(reading: LoggedSetReading): string {
+  // NEVER A BARE COUNT. "last time 9" beside a weight box reads as 9kg;
+  // the kind travels with the number, same rule as personalBest.
+  if (reading.kind === 'bodyweight') return `last time bodyweight × ${reading.reps}`
+  if (reading.kind === 'added_load') return `last time +${reading.addedKg}kg × ${reading.reps}`
+  return `last time ${reading.weightKg}kg × ${reading.reps}`
+}
+
+/**
+ * The bridge from a stored set to the reading above, for the same reason
+ * `bestReadingOf` exists: the caller must not rebuild it with a ternary.
+ * That exact shape is what put "12 kg" on a reps record — three call sites,
+ * each with its own ternary, two of them wrong.
+ *
+ * The order of the branches is the whole content of this function. A belted
+ * dip carries `is_bodyweight: true` AND an added load, so added load must be
+ * tested first or it renders as a plain bodyweight set with its belt lost.
+ * And a row with no weight is a bodyweight row whether or not the flag was
+ * set — the flag arrived later than the rows, so history predates it.
+ */
+export function loggedSetReading(log: {
+  weight_kg: number
+  reps_completed: number
+  is_bodyweight?: boolean | null
+  added_load_kg?: number | null
+}): LoggedSetReading {
+  if (log.added_load_kg != null && log.added_load_kg > 0) {
+    return { kind: 'added_load', addedKg: log.added_load_kg, reps: log.reps_completed }
+  }
+  if (log.is_bodyweight || !(log.weight_kg > 0)) {
+    return { kind: 'bodyweight', reps: log.reps_completed }
+  }
+  return { kind: 'loaded', weightKg: log.weight_kg, reps: log.reps_completed }
+}
+
+/**
+ * The heading over the swap options that clear every constraint except the
+ * trainee's training style. Ashley's ruling, 18 Sep 2026: show them, below
+ * the ones that match, with a line saying what they are.
+ *
+ * IT DOES NOT NAME THE STYLE, deliberately. The four style labels are phrases
+ * ("Functional / athletic", "Combat / conditioning") that do not fit inside a
+ * possessive, and a second copy of them here would be a second thing to drift.
+ * There is exactly one training style on a profile, so "your training style"
+ * points at it without ambiguity.
+ */
+/**
+ * COOK ONCE, EAT TWICE — the two sentences that keep a deliberate repeat from
+ * reading as an accidental one.
+ *
+ * On 19 Sep 2026 the app was fixed to stop serving the same meals every day.
+ * Hours later it was taught to serve tonight's dinner again at lunch, on
+ * purpose. From the outside those are the same thing, so each side of the pair
+ * has to say which it is: the dinner promises the repeat before it happens,
+ * and the lunch names where it came from. A repeat the app cannot explain is
+ * indistinguishable from the bug.
+ *
+ * Both are here rather than inline so test:coach-voice and the coach exam can
+ * grade them alongside every other sentence the app writes.
+ */
+export const COOK_ONCE = {
+  /** On the dinner that will be cooked in double. */
+  dinner: 'Cook both portions together — tomorrow\'s lunch is this.',
+  /** On the lunch that came out of last night's pan. */
+  lunch: 'Last night\'s dinner.',
+} as const
+
+export const OUTSIDE_YOUR_STYLE = 'Outside your training style'
+
+export const BEST_SET_QUALIFIER = 'best set'
+
+/**
+ * The bridge for callers that hold a PRMetric and its already-chosen number —
+ * Home's recent list, which is built from the PR cache's heaviest-ever
+ * figures and therefore can never be the estimate case.
+ *
+ * It exists so that caller does not rebuild a reading with a ternary, which
+ * is exactly the shape that put "12 kg" on a reps record. There is no
+ * 'best_set' branch here ON PURPOSE: a metric alone cannot express it, so a
+ * caller holding only a metric must not be able to claim one.
+ */
+export function bestReadingOf(metric: 'load' | 'added_load' | 'reps', value: number): BestReading {
+  if (metric === 'reps') return { kind: 'reps', reps: value }
+  if (metric === 'added_load') return { kind: 'added_load', addedKg: value }
+  return { kind: 'load', weightKg: value }
 }
 
 export function ask(verbPhrase: string): string {
@@ -255,6 +430,34 @@ export const WEEK_NOT_LOADED = "I can't see this week on your plan just now — 
  * changed locally is knowable from the receipt's own `landed` list, so the
  * surface that has that list says it, and this sentence does not guess.
  */
+/**
+ * HOW TO TRAIN A SUPERSET, said once under the pair rather than on each row.
+ *
+ * The first half has always been there. The SECOND half is Ashley's handoff,
+ * 19 Sep 2026: when a member of the pair has a build-up, the footnote says so
+ * — because the alternation instruction, read literally, tells somebody to
+ * alternate their warm-up sets with the other exercise, and that is not how
+ * a superset is run. You ramp the loaded lift on its own, then start pairing.
+ *
+ * DECIDED HERE UNDER THE CSCS DELEGATION, and the basis rather than the
+ * assertion: a build-up exists to prepare ONE movement's tissue and groove
+ * its pattern at rising load. Alternating it with an unrelated exercise adds
+ * fatigue and time between the very steps that are meant to run close
+ * together, and the second exercise gets a warm-up it did not need. The
+ * pairing begins once the ramp has done its job.
+ *
+ * Empty string when nothing ramps, so the caller renders one line rather
+ * than a line with a trailing separator — the shape `couldNot` uses below.
+ */
+export function supersetAlternation(rampedLabels: string[] = []): string {
+  const base = 'alternate — no rest between'
+  if (rampedLabels.length === 0) return base
+  const names = rampedLabels.length === 1
+    ? rampedLabels[0]
+    : `${rampedLabels.slice(0, -1).join(', ')} and ${rampedLabels[rampedLabels.length - 1]}`
+  return `${base} · ramp ${names} first, then start the pairing`
+}
+
 export function didNotSave(thing: string): string {
   return `${thing} didn't save. Check your connection and give it another go.`
 }
@@ -418,3 +621,53 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
 // test:coach-voice §5 asserts this file holds no copy of the safety text at
 // all. That was always the real property; the re-export was a mechanism for it.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// WHAT PICKING KETO ACTUALLY BUYS — Ashley's ruling, 20 Sep 2026.
+//
+// Keto and Low-carb are offered at setup and DO filter food: bread, pasta,
+// rice, potatoes, oats, beans and added sugar are all refused by
+// `FORBIDDEN_TAGS`, measured rather than assumed. What they do NOT do is
+// change the daily numbers — `computeMacroSplitTargets` derives carbs as the
+// REMAINDER of calories after protein and fat, with a 50g floor, and
+// `FAT_PERCENT_RANGE` is deliberately capped at 0.35 so the split can never be
+// forced into a ketogenic shape through the wrong derivation order. Measured
+// the same day: a keto profile's carb target is 150-370g, i.e. 25-57% of
+// energy, against the under-50g/under-10% a ketogenic diet means.
+//
+// Her ruling, from four options — say it on the setup screen — over building a
+// real ketogenic derivation, over removing Keto from the list, and over
+// leaving it (where the coach tells the truth only when asked, and nothing
+// says it where the choice is made).
+//
+// TWO THINGS THIS SENTENCE DELIBERATELY DOES NOT CLAIM, both measured before
+// it was written:
+//   - It does not say "sugary fruit". The filter blocks DRIED fruit (raisins,
+//     dates, figs, dried apricots) and lets fresh banana, grapes and mango
+//     through — so the coach prompt's own keto rule names three fruits the
+//     code-level guard permits. Claiming them here would be the app asserting
+//     a filter it does not have.
+//   - It does not say "yet". "Not a keto split yet" is a promise to build one,
+//     and nobody has decided to.
+// ---------------------------------------------------------------------------
+
+/** The two diets the food filter honours and the daily targets do not. */
+const MACRO_BLIND_DIETS: Record<string, string> = { keto: 'Keto', 'low-carb': 'Low-carb' }
+
+/**
+ * The caveat for a dietary selection, or null when nothing selected needs one.
+ * Returns null for every other diet — vegan, the allergen lanes and the rest
+ * are enforced by the same ingredient filter AND need no target change, so
+ * they are honoured in full and must not carry a warning that implies
+ * otherwise.
+ */
+export function dietTargetCaveat(selected: readonly string[] = []): string | null {
+  const named = Object.keys(MACRO_BLIND_DIETS)
+    .filter(key => selected.includes(key))
+    .map(key => MACRO_BLIND_DIETS[key])
+  if (named.length === 0) return null
+  const subject = named.join(' and ')
+  const verb = named.length > 1 ? 'keep' : 'keeps'
+  const split = named.length > 1 || named[0] === 'Keto' ? 'a keto split' : 'a low-carb split'
+  return `${subject} ${verb} bread, pasta, rice, potatoes, beans and added sugar out of your meals — but not fresh fruit. Your daily carb target stays a standard one, not ${split}.`
+}

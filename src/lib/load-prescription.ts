@@ -895,6 +895,33 @@ export function plateStepKg(mode: LoadingMode): number {
   return PLATE_STEP_KG[mode]
 }
 
+/**
+ * IS THERE ANYTHING FOR A PLATE CALCULATOR TO WORK OUT?
+ *
+ * On a cable machine the number IS the weight: you move a pin to the plate
+ * that says 35 and you are done. A control offering to work out which plates
+ * to load is describing a machine that is not in front of you — the
+ * "never offer what is not there" rule, met on a row rather than on a tab.
+ * Ashley's handoff, 19 Sep 2026, scope item for the superset screen.
+ *
+ * CABLE, NOT `loadingMode === 'stack'`, AND THAT IS MEASURED RATHER THAN
+ * CAUTIOUS. 149 of the catalogue's 201 entries fall through to 'stack' —
+ * every push-up, band, pull-up bar and machine among them — and some of those
+ * machines (leg press, belt squat) really are plate-loaded. Hiding the
+ * calculator from all 149 would take it away from the plate-loaded ones,
+ * which is the same defect in the other direction. 16 entries name a cable
+ * machine and every one of them is pin-loaded.
+ *
+ * DUMBBELLS ARE DELIBERATELY LEFT ALONE and the question is Ashley's, not
+ * mine: you pick a fixed bell off a rack, so there is usually nothing to
+ * calculate — but an adjustable pair is plate-loaded and the catalogue cannot
+ * tell the two apart. The handoff said cable; this does cable.
+ */
+export function takesPlateCalculator(entry: ExerciseEntry | undefined): boolean {
+  if (!entry) return true
+  return !(entry.equipment ?? []).some(e => /cable/i.test(e))
+}
+
 /** Round to something actually loadable rather than a number like 43.7kg. */
 export function roundToPlate(kg: number, mode: LoadingMode): number {
   const floor = LOADING_FLOOR_KG[mode]
@@ -1030,6 +1057,65 @@ export const UNLOADED_EQUIPMENT = new Set([
 
 export function isExternallyLoaded(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => LOADED_EQUIPMENT.has(e))
+}
+
+/**
+ * DOES THIS PRIMER NEED A NUMBER, OR IS "LIGHT" THE WHOLE ANSWER?
+ *
+ * Ashley, 18 Sep 2026, mid-session: *"Swapped exercises doesnt show prescribed
+ * weights."* Her Kettlebell Swings sat in the primer slot with no weight
+ * anywhere on the card and a box offering 0. She put 24kg on the bell.
+ *
+ * MEASURED: `prescribeLoad` had already worked out 8kg for that slot, with the
+ * primer's own RPE label, under every existing ceiling. Three call sites then
+ * discarded it — `isPrimer ? null : load.starting_weight_kg` — and across a
+ * whole generated mesocycle 64 of 64 primers carried no weight at all. The
+ * swap was faithfully reproducing generation; there was no parity gap and
+ * nothing missing from the prescription. The app knew and did not say.
+ *
+ * **The blanket rule is right for most primers and wrong for this one.** The
+ * primers the generator picks are wall slides, band hip abductions, bodyweight
+ * squat marches — nothing to load, and a number there would be noise. A
+ * kettlebell swing cannot be done without choosing a weight.
+ *
+ * Her ruling, from three options: **a starting weight, kept light** — over
+ * saying "Light" with no number, and over asking her once and remembering.
+ *
+ * WHAT THIS DOES NOT CHANGE, and the half that makes the ruling safe: every
+ * primer keeps `Light — movement prep` and keeps *"Stay light and controlled.
+ * This is preparation, not a working set."* The number appears beside that
+ * sentence, never instead of it.
+ */
+export function primerCarriesWeight(entry: ExerciseEntry): boolean {
+  return isExternallyLoaded(entry)
+}
+
+/**
+ * WHAT TO PRINT WHERE THE WEIGHT WOULD GO, when there is no weight.
+ *
+ * Ashley, 17 Sep 2026, swapped a loaded leg curl for a slider curl mid-session
+ * and the card showed nothing at all where every other card carried a number.
+ * The answer was right; the screen rendered it as an absence, so it read as a
+ * failure. "No external load" has to SAY so.
+ *
+ * AND IT IS NOT ONE KIND. The partition above already makes the distinction
+ * this needs, in its own words: "a resistance band's resistance is real but is
+ * not expressible in kilos". Printing "Bodyweight" on a band pull-apart would
+ * be a second, smaller lie of exactly the kind this is fixing — MEASURED: 22
+ * catalogue entries use a band. So the KIND travels with the value, which is
+ * the standing rule (CLAUDE.md, the personalBest union of the same week).
+ *
+ * Returns null rather than guessing for anything whose prescription is not a
+ * set of reps at all — a treadmill has no load to state and no reps column to
+ * state it beside, and inventing a word for it is how the last one started.
+ */
+const CARDIO_EQUIPMENT = new Set(['treadmill', 'stationary bike', 'rowing machine', 'elliptical machine'])
+
+export function unloadedLoadLabel(entry: ExerciseEntry): string | null {
+  if (isExternallyLoaded(entry)) return null
+  if (entry.equipment.some(e => CARDIO_EQUIPMENT.has(e))) return null
+  if (entry.equipment.includes('resistance band')) return 'Band'
+  return 'Bodyweight'
 }
 
 // SAFETY: a backpack (or other improvised implement) is not a farmer's

@@ -136,6 +136,10 @@ interface UnifiedSetRow {
   reps_completed: number;
   rpe?: number | null;
   is_bodyweight: boolean;
+  /** True for a build-up/warm-up set. Defaults false — every row before 22 Sep 2026 was implicitly this. */
+  is_warmup?: boolean;
+  /** 0 (or absent) = a set in its own right. 1, 2, ... = a drop off the set with the same set_number. See the migration's own comment for what this means. */
+  drop_index?: number;
 }
 
 /**
@@ -165,6 +169,16 @@ function dedupeAndRenumberBatch(rows: UnifiedSetRow[]): UnifiedSetRow[] {
   });
 }
 
+/**
+ * Thrown instead of writing when a drop set cannot be saved because the
+ * database has not yet run `20260919160000_add_drop_index_to_set_logs` — a
+ * distinct type so the handler can give an honest, specific reply rather
+ * than the generic "couldn't save that" every other write failure gets.
+ */
+class DropMigrationPendingError extends Error {
+  constructor() { super("drop_index migration not applied yet"); }
+}
+
 /** Upserts set rows into exercise_set_logs on the natural key — same semantics as set-log-store.ts. */
 async function upsertUnifiedSets(
   supabaseUrl: string,
@@ -187,11 +201,37 @@ async function upsertUnifiedSets(
     rpe: r.rpe ?? null,
     unit: "reps",
     is_bodyweight: r.is_bodyweight,
-    is_warmup: false,
+    is_warmup: r.is_warmup ?? false,
+    drop_index: r.drop_index ?? 0,
     completed_at: new Date().toISOString(),
   }));
-  const resp = await fetch(
-    `${supabaseUrl}/rest/v1/exercise_set_logs?on_conflict=user_id,session_id,exercise_id,set_number,is_warmup`,
+  // THE CONFLICT TARGET HAS TO MOVE WITH THE MIGRATION, AND THIS FUNCTION
+  // CANNOT KNOW WHEN THAT IS — the same problem the browser client has, in the
+  // one place a browser driver could never look.
+  //
+  // `20260919160000_add_drop_index_to_set_logs` REPLACES unique_set_per_session
+  // with one that includes drop_index. The moment it is applied, an upsert
+  // naming the old five columns matches no unique index and Postgres rejects
+  // it with 42P10 — so every set the COACH logs would fail, for everyone, with
+  // no drop set anywhere in sight. Before it is applied, naming the new six
+  // fails the same way. There is no deploy order that avoids the gap: the
+  // migration is run by hand and this function is deployed separately.
+  //
+  // So: try the new target, fall back to the old one on 42P10 alone. One extra
+  // round trip on a database that has not migrated, none after.
+  //
+  // CORRECTED 22 Sep 2026: this comment used to say "the coach never writes a
+  // DROP... so the fallback here is always correct". That stopped being true
+  // the day log_workout_set gained is_drop. set-log-store.ts's own history is
+  // the warning: its identical fallback was found BY A BROWSER DRIVER writing
+  // a drop's numbers over its PARENT SET's row on an unmigrated database,
+  // because the old five-column conflict target does not include drop_index —
+  // a drop and its parent share every other column, so the old target treats
+  // them as the SAME row and the second write clobbers the first. An ordinary
+  // set has no such twin and falls back safely; a drop does not, ever. See the
+  // guard just below, which is the fix that incident produced, applied here.
+  const post = (conflict: string) => fetch(
+    `${supabaseUrl}/rest/v1/exercise_set_logs?on_conflict=${conflict}`,
     {
       method: "POST",
       headers: {
@@ -203,8 +243,29 @@ async function upsertUnifiedSets(
       body: JSON.stringify(payload),
     },
   );
+  const WITH_DROP = "user_id,session_id,exercise_id,set_number,is_warmup,drop_index";
+  const BEFORE_DROP = "user_id,session_id,exercise_id,set_number,is_warmup";
+  let resp = await post(WITH_DROP);
   if (!resp.ok) {
     const errText = await resp.text();
+    // 42P10 — "no unique or exclusion constraint matching the ON CONFLICT
+    // specification". Only that: any other failure is a real one and must not
+    // be retried into a second, differently-wrong write.
+    if (resp.status === 400 && /42P10|no unique or exclusion constraint/i.test(errText)) {
+      // A DROP MUST NOT FALL BACK — see the comment above. Degrading to the
+      // old target would silently overwrite its parent working set's row
+      // rather than merely fail loudly, which is worse than refusing. An
+      // ordinary set (and a warm-up — is_warmup has existed since 2 Aug and
+      // needs no fallback dance at all) has no such twin and falls back fine.
+      if (payload.some((p) => p.drop_index > 0)) {
+        throw new DropMigrationPendingError();
+      }
+      resp = await post(BEFORE_DROP);
+      if (!resp.ok) {
+        throw new Error(`exercise_set_logs upsert failed (${resp.status}): ${await resp.text()}`);
+      }
+      return;
+    }
     throw new Error(`exercise_set_logs upsert failed (${resp.status}): ${errText}`);
   }
 }
@@ -219,7 +280,31 @@ async function upsertUnifiedSets(
 // asks the user for the weight instead.
 // ---------------------------------------------------------------------------
 
-/** Most recent logged working weight (weight_kg > 0, never a warmup) for this exercise — mirrors set-log-store.ts's getLastSessionSets base-weight semantics closely enough for a one-shot lookup. */
+/**
+ * Most recent logged working weight (weight_kg > 0, never a warmup, never a
+ * drop) for this exercise — mirrors set-log-store.ts's getLastSessionSets
+ * base-weight semantics closely enough for a one-shot lookup.
+ *
+ * `drop_index=eq.0` ADDED 19 Sep 2026 with the column, and it is not a tidying
+ * detail. A drop is logged immediately after its working set, so it is the
+ * MOST RECENT row by completed_at and would win this query every time — the
+ * coach would answer "last time you did 35kg" about a lift she took to 47.5,
+ * and resolve an unstated weight to the drop. That is the same class of defect
+ * as the coach quoting a different weight from the plan, which this app has
+ * already had once.
+ *
+ * CORRECTED BEFORE IT SHIPPED, and the correction is the useful part: the
+ * first version filtered in the QUERY, as `or=(drop_index.eq.0,drop_index.is.null)`,
+ * with a comment claiming the null half kept it legal on a database that has
+ * not run the migration. That is FALSE. PostgREST resolves column names
+ * against its schema cache at parse time, so naming an unknown column in a
+ * filter is rejected whichever operator follows it — and this function
+ * swallows a failed lookup (`if (!resp.ok) return null`), so the coach would
+ * have silently stopped knowing anybody's last weight until the migration ran.
+ * The filter is in JS instead, off `select=*`, which needs no column to exist:
+ * `drop_index` is undefined before the migration and 0 or more after, and
+ * `?? 0` reads both. The limit is raised so a drop cannot occupy the only slot.
+ */
 async function getLastLoggedWeight(
   supabaseUrl: string,
   serviceKey: string,
@@ -227,12 +312,14 @@ async function getLastLoggedWeight(
   exerciseSlug: string,
 ): Promise<number | null> {
   const resp = await fetch(
-    `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${profileId}&exercise_id=eq.${exerciseSlug}&is_warmup=eq.false&weight_kg=gt.0&order=completed_at.desc&limit=1&select=weight_kg`,
+    `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${profileId}&exercise_id=eq.${exerciseSlug}&is_warmup=eq.false&weight_kg=gt.0&order=completed_at.desc&limit=8&select=*`,
     { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } },
   );
   if (!resp.ok) return null;
   const rows = await resp.json();
-  return rows[0]?.weight_kg != null ? Number(rows[0].weight_kg) : null;
+  const working = (rows as Array<{ weight_kg?: number; drop_index?: number | null }>)
+    .find((r) => (r.drop_index ?? 0) === 0);
+  return working?.weight_kg != null ? Number(working.weight_kg) : null;
 }
 
 /** The current mesocycle's suggested_load_kg for this exercise name, searched across every persisted week (small, bounded per profile). */
@@ -271,7 +358,22 @@ interface ResolvedWeight {
   inferredFrom?: "history" | "plan";
 }
 
-/** Resolves one exercise's weight per the fix #2 order: explicit > bodyweight > last logged > plan suggestion > unresolved (caller must skip the write and ask). */
+/**
+ * Resolves one exercise's weight per the fix #2 order: explicit > bodyweight
+ * > last logged > plan suggestion > unresolved (caller must skip the write
+ * and ask).
+ *
+ * `allowInference` is false for a warm-up or a drop, since 22 Sep 2026: the
+ * history/plan fallback both name a WORKING weight, and handing that back as
+ * a warm-up or drop's weight would be the exact "coach quotes a different
+ * weight from what actually happened" defect the drop_index column itself
+ * was built to stop, one caller earlier. Neither has an honest weight to
+ * infer from — a warm-up is deliberately lighter than nothing on record, and
+ * a drop is a fraction of a specific set that just happened, not this
+ * exercise's usual number — so an unstated weight on either goes straight to
+ * "unresolved" and the model asks, same as it already does for an unstated
+ * exercise name or rep count.
+ */
 async function resolveWeight(
   supabaseUrl: string,
   serviceKey: string,
@@ -279,9 +381,11 @@ async function resolveWeight(
   exerciseName: string,
   statedWeightKg: number | null | undefined,
   statedIsBodyweight: boolean | null | undefined,
+  allowInference: boolean = true,
 ): Promise<ResolvedWeight | null> {
   if (statedIsBodyweight) return { weightKg: 0, isBodyweight: true };
   if (typeof statedWeightKg === "number" && statedWeightKg > 0) return { weightKg: statedWeightKg, isBodyweight: false };
+  if (!allowInference) return null;
 
   const slug = slugifyExerciseName(exerciseName);
   const lastLogged = await getLastLoggedWeight(supabaseUrl, serviceKey, profileId, slug);
@@ -291,6 +395,47 @@ async function resolveWeight(
   if (planSuggested != null) return { weightKg: planSuggested, isBodyweight: false, inferredFrom: "plan" };
 
   return null; // Unresolved — caller skips the write and asks the user.
+}
+
+/**
+ * The drop_index a NEW drop off this working set should get, for today's
+ * session only — mirrors SetGrid.tsx's own handleAddDrop (max existing + 1),
+ * read from the database instead of local UI state, since the coach has no
+ * UI state to read. Scoped to sessionId, the same scope set_number itself
+ * resets within, so a drop off "set 2" today is never numbered against a
+ * same-numbered set from a different day.
+ *
+ * Returns null when there is genuinely no row on record for this set_number
+ * today — a drop needs a parent, and a model saying "drop after set 3" about
+ * a set 3 that was never logged would create an orphaned drop with nothing
+ * above it, the same "invented number written as fact" defect this whole
+ * file exists to refuse elsewhere. The caller asks instead of writing one.
+ *
+ * Selects only `drop_index` (not `select=*`) so a database that has not run
+ * the migration fails this ONE column lookup rather than the whole read —
+ * PostgREST rejects a query naming a column that does not exist yet, and
+ * that failure is read as "cannot confirm a parent, but do not refuse
+ * outright either" (returns 1): the write path a caller reaches next is
+ * what actually refuses a real drop on an unmigrated database, and refusing
+ * here too would give the wrong reason for the same failure.
+ */
+async function getNextDropIndex(
+  supabaseUrl: string,
+  serviceKey: string,
+  profileId: string,
+  exerciseSlug: string,
+  setNumber: number,
+  sessionId: string,
+): Promise<number | null> {
+  const resp = await fetch(
+    `${supabaseUrl}/rest/v1/exercise_set_logs?user_id=eq.${profileId}&session_id=eq.${sessionId}&exercise_id=eq.${exerciseSlug}&set_number=eq.${setNumber}&select=drop_index`,
+    { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } },
+  );
+  if (!resp.ok) return 1;
+  const rows = (await resp.json()) as Array<{ drop_index?: number | null }>;
+  if (rows.length === 0) return null; // No working set on record for this set_number today.
+  const highest = rows.reduce((max, r) => Math.max(max, r.drop_index ?? 0), 0);
+  return highest + 1;
 }
 
 const toolDeclarations = [
@@ -1329,7 +1474,7 @@ const toolDeclarations = [
   {
     name: "log_workout_set",
     description:
-      "Logs a single set of an exercise. Call when the user reports one set at a time (e.g. 'just did 8 reps of bench at 80kg'). For multiple sets, prefer log_workout_session instead. If the user states reps/weight but names no exercise, do NOT call this with a guessed name — ask which exercise instead.",
+      "Logs a single set of an exercise. Call when the user reports one set at a time (e.g. 'just did 8 reps of bench at 80kg'). For multiple sets, prefer log_workout_session instead. If the user states reps/weight but names no exercise, do NOT call this with a guessed name — ask which exercise instead. Can also log a WARM-UP (is_warmup) or a DROP (is_drop) — see those fields.",
     parameters: {
       type: "object",
       properties: {
@@ -1339,7 +1484,7 @@ const toolDeclarations = [
         },
         set_number: {
           type: "integer",
-          description: "Which set number (1, 2, 3, etc.)",
+          description: "Which set number (1, 2, 3, etc.) for an ordinary set or a warm-up. For a DROP (is_drop: true), this is instead the WORKING set it followed — see is_drop.",
         },
         reps: {
           type: "integer",
@@ -1347,7 +1492,7 @@ const toolDeclarations = [
         },
         weight_kg: {
           type: "number",
-          description: "Weight in kg, ONLY if the user actually stated one. Omit this field entirely if unmentioned — do NOT guess or default to 0. Zero specifically means bodyweight (see is_bodyweight), never 'unstated'.",
+          description: "Weight in kg, ONLY if the user actually stated one. Omit this field entirely if unmentioned — do NOT guess or default to 0. Zero specifically means bodyweight (see is_bodyweight), never 'unstated'. For a warm-up or a drop, an unstated weight is NEVER inferred from history or the plan (both would hand back a working weight) — if they don't say it, ask, the same as you would for reps.",
         },
         is_bodyweight: {
           type: "boolean",
@@ -1356,6 +1501,14 @@ const toolDeclarations = [
         rpe: {
           type: "number",
           description: "Rate of perceived exertion (1-10), if mentioned",
+        },
+        is_warmup: {
+          type: "boolean",
+          description: "True if this was a warm-up/build-up set done to get ready for the working sets — not a working attempt itself (e.g. 'I did a couple of light warm-up sets first, 20kg then 40kg'). Leave false/omitted for an ordinary working set. Mutually exclusive with is_drop — a warm-up is never a drop.",
+        },
+        is_drop: {
+          type: "boolean",
+          description: "True if this was a DROP set — a continuation of a working set done immediately after it, with less weight and no rest, in a deliberately fatigued state (e.g. 'I did a drop after my third set of squats' or 'then dropped to 60kg for another 8'). set_number must be the WORKING set this followed, read from WORKOUT PERFORMANCE HISTORY above (e.g. 3 in the squats example) — the app numbers the drop itself, never send drop_index or similar. If you cannot tell which working set a drop followed, ask before calling rather than guessing. Mutually exclusive with is_warmup.",
         },
       },
       required: ["exercise_name", "set_number", "reps"],
@@ -1856,7 +2009,8 @@ ${context.weight_trend_summary ? `WEIGHT TREND: ${context.weight_trend_summary}`
 ${context.streak_days != null ? `CURRENT STREAK: ${context.streak_days} day(s)` : ''}
 ${context.adherence_note ? `WORTH NOTICING: ${context.adherence_note}` : ''}
 - Follow-up: if WHAT YOU ALREADY KNOW, ACTIVE GOALS, or HOW TO TALK TO THIS USER below mentions something recent — a niggle, a plan, a stated goal, a stressor — and it's still live, ask how it's going rather than waiting for them to bring it up again. Don't force it into every message; raise it when it's naturally relevant to the turn.
-- This applies to a brand-new conversation too: open with something specific and current (today's session and a real detail from it, a recent PR, or something worth noticing above) — never a generic "Hey, how can I help?" greeting.
+- This applies to a brand-new conversation too: open with something specific and current — never a generic "Hey, how can I help?" greeting.
+- BUT NOT THE SESSION, BY DEFAULT. Ashley, 17 Sep 2026, after raising it more than once: "All it does is tell me every time I speak to it about an upcoming workout. Thats not what a coach does. Yes it should know about workouts but that's not all it should bring up immediately." She is right. Knowing what is on today is AWARENESS, not a conversation topic — a trainer who opens every exchange by reciting the schedule is a notification, not a coach. So: do NOT lead with today's or tomorrow's session, its exercises, or a reminder that it is coming. Lead with the person — how they are, how something recent went, a real thing worth noticing. Bring the session up when THEY raise it, when they say they are about to train, or when what they asked genuinely turns on it.
 
 === 1c. SCOPE — WHEN TO REDIRECT ===
 You're genuinely useful on training and nutrition: form cues, why a movement is programmed the way it is, how to handle a bad session, sleep and recovery, hydration, eating out, plateaus. Answer substantively and practically — don't hedge a plain question into uselessness with disclaimers.
@@ -2064,8 +2218,8 @@ Assistant: Noted. Hotel gym or are you finding somewhere local?
 User: "I hate cottage cheese"
 Assistant: Fair enough — I'll keep it off your plans. Anything else in the dairy family you'd rather avoid?
 
-User: "hey" (evening, preferred training time is morning, no session logged today)
-Assistant: Evening — did you get this morning's Push session in?
+User: "hey" (it is Wednesday evening, today's Push session is not logged)
+Assistant: Evening — did you get today's Push session in?
 [QUICK_REPLIES: "Yes" | "Not yet" | "Rest day"]
 
 User: "just finished deadlifts"
@@ -2089,17 +2243,19 @@ Assistant: Your nut-free filter is active, so it's excluded from anything with a
 If this is for a real allergy, treat any homemade dish the same way you would eating out — check what actually went in it.
 
 === TEMPORAL AWARENESS ===
-The current date is ${context.current_date || new Date().toISOString()} and today is ${context.day_of_week || "unknown"}. You know the user's schedule—never ask "Which day are you planning to train?"
+RIGHT NOW IT IS ${context.current_time_formatted || context.day_of_week || "unknown"}${context.current_part_of_day ? ` — ${context.day_of_week || "today"} ${context.current_part_of_day}` : ""}. That is the user's OWN local clock, and it is the only time that matters in this conversation. Never describe the current part of the day as anything other than what that line says: if it says evening, it is evening, and "this morning" can only ever refer to a part of TODAY that has already gone.
+(Reference timestamp, UTC, for arithmetic only — never quote it and never reason about time of day from it: ${context.current_date || new Date().toISOString()}.) You know the user's schedule—never ask "Which day are you planning to train?"
 ${context.day_of_week ? `Today is ${context.day_of_week}. DO NOT WORK OUT WHICH SESSION THAT IS FOR YOURSELF. The exercise plan below OPENS with the answer — which day it is, what part of the day, today's session by name, whether it is already done, part-done or not started, and which session is next — and every day row is tagged (TODAY) or (tomorrow). Read those and use them verbatim. A session on a row that is not tagged (TODAY) is NOT today's, however well it fits what is being discussed. Added 7 Sep 2026 after this instruction, which used to say "cross-reference this with the exercise plan below", produced "let me know how today's bench and shoulder press go" about a session two days away.` : "Use the exercise plan below to identify relevant sessions."}
 
 
-SESSION-WINDOW REASONING (do this comparison yourself, every turn): weigh the current time (below, in CONTEXT) against this person's preferred training time (below, under USER PROFILE). If their preferred window has clearly already passed today (e.g. they train mornings and it's now evening) and no session is logged, that window is CLOSED, not still open — ask directly whether they trained ("did you get today's session in?") — and attach [QUICK_REPLIES: "Yes" | "Not yet" | "Rest day"] (or the equivalent for what you actually asked), never phrase it as a live choice between "this morning" or "tonight" as if both are still equally available; that reads as not having registered what time it actually is. Only present training as still-upcoming, or ask when they're planning to train, when their preferred window genuinely hasn't arrived yet or is still plausibly in progress.
+SESSION-WINDOW REASONING (do this yourself, every turn): read the current time from TEMPORAL AWARENESS above and weigh it against whether a session is logged today. YOU DO NOT KNOW WHEN THIS PERSON USUALLY TRAINS — nobody has ever asked them, so do not assume, state or imply a usual training time, and never call a part of the day "theirs". Work from the clock alone: a part of the day that has already gone is gone. THIS GOVERNS HOW YOU ASK, NOT WHETHER YOU RAISE IT: per §1b, you do not open a conversation with the session. When the session IS the subject — they brought it up, or it is genuinely what their message turns on — ask directly whether they trained ("did you get today's session in?") — and attach [QUICK_REPLIES: "Yes" | "Not yet" | "Rest day"] (or the equivalent for what you actually asked), never phrase it as a live choice between "this morning" or "tonight" as if both are still equally available; that reads as not having registered what time it actually is. Present training as still-upcoming only when there is genuinely time left in the day for it — and say "today", not a part of the day you are guessing at.
 
 === EXERCISE COACHING INTELLIGENCE ===
 - You understand movement patterns: horizontal push/pull, vertical push/pull, hip hinge, knee dominant, single-leg, isolation, cardio, core.
 - You understand mechanics tiers: Tier 1 Compound (heavy multi-joint), Tier 2 Compound (moderate multi-joint), Tier 3 Isolation (single-joint).
 - You understand exercise taxonomy: movement_pattern (push/pull/hinge/squat/carry/rotation/isolation), tier (tier_0_primer through tier_4_finisher), fatigue_cost (low/moderate/high).
 - When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
+- WHEN YOU ARE THE ONE PICKING THE REPLACEMENT — suggesting alternatives for a pain swap (§3), or when they ask for "something different" without naming what — prefer whichever same-pattern, same-tier option keeps genuine external load (barbell, dumbbell, cable, machine) over a resistance band or a bodyweight-only variation, when both are realistic for their Equipment Access above: a band or unloaded variation cannot be progressively overloaded the way a loaded one can. Three things this does NOT override: if they name the replacement themselves, that is theirs to choose and you give it to them, loaded or not; if pain calls for LESS load, that governs and you say so; and never suggest anything on PERMANENTLY EXCLUDED EXERCISES above or anything their Equipment Access could not plausibly supply.
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
 - Trigger propose_exercise_add when they want to DO something the session does not contain ("add some face pulls", "can I put curls in on Thursday", "I want more calf work"). ADDING IS NOT LOGGING and the distinction matters: log_history records something already done and it never joins the plan, while this puts the exercise IN the session so it is prescribed and progressed. Adding takes nothing out — if they name something to drop in exchange, that is propose_exercise_swap. The session gets longer and the card says the new length; never offer to cut something else to make room, and never say by how much yourself — the card does the arithmetic.
 - Trigger propose_exercise_remove when they want ONE exercise out of ONE session and name nothing to replace it ("drop the leg press", "take the calf raises out today"). Removing is not banning — a ban is every week of every block and you cannot do it from chat. If they name a replacement, that is propose_exercise_swap.
@@ -2144,6 +2300,7 @@ PERIODIZATION COACHING RULES:
 
 === NATURAL LANGUAGE WORKOUT LOGGING ===
 - When the user describes exercises they completed (e.g. "Just did bench 3x8 at 90kg", "Finished my push day", "Hit squats for 4 sets of 6 at 100"), ALWAYS invoke the log_workout tool to record their performance — including for a single exercise. log_workout is preferred over log_workout_session/log_workout_set for every natural-language description because it's the one tool with a clarification round-trip when the exercise name is ambiguous or missing; the others write immediately with no chance to ask first.
+- THE ONE EXCEPTION: a WARM-UP/BUILD-UP set or a DROP set (e.g. "did a couple of light warm-ups first", "then dropped to 60kg for 8 more", "I did a drop after my third set of squats"). log_workout's parser has no way to mark either kind — it would log it as an ordinary working set, indistinguishable from a real one, which is the exact mistake the app spent 19-22 Sep closing everywhere else it could happen. Use log_workout_set instead, with is_warmup or is_drop set correctly, even for just one set. If the SAME message also reports ordinary working sets, split it: log_workout for those, log_workout_set for the warm-up/drop line.
 - CRITICAL — never invent an exercise name. exercise_phrase/exercise_name must be a span of text the user actually wrote. If the message states sets/reps/weight but names no exercise at all (e.g. "I did 5x5 at 80kg", "just hit 3x10 at 60"), do NOT guess one from today's plan, their history, or the conversation so far — however confident the guess feels, a wrong guess silently writes sets against the wrong exercise with no easy way to notice. Ask a single short question instead ("Which exercise was that?") and wait for their answer before calling any log tool.
 - CRITICAL — NEVER INVENT REPS OR SETS EITHER. The same rule as the exercise name above, and it was learned the same way. If the user says "3" when asked for sets and reps, that is a SET COUNT and the rep count is still missing — do not complete it from the prescription, the plan, their history, or what would be typical. Measured live: the plan said 3x8, she answered "3", and the app recorded 3x8 @100kg. The 8 was never said by anyone but the app. Ask "how many reps?" and wait. A number you supplied is indistinguishable from a number they reported the moment it is written.
 - A CORRECTION REPLACES; IT NEVER ADDS. When a message fixes something just logged — "no, 3x10 deadlifts", "actually 100kg", "sorry, only 2 sets" — call log_workout with corrects_previous: true. Getting this wrong is not a cosmetic error: logged as an addition, the same session is counted twice and every future weight builds on sets that never happened. Live example: 3x8 was logged wrongly, she said "No 3x10 deadlifts", and her log ended up with SIX sets against three prescribed. If you genuinely cannot tell a correction from extra work, ask which — do not guess.
@@ -2282,11 +2439,14 @@ USER PROFILE:
 - Height: ${context.profile.height_cm} cm | Weight: ${context.profile.weight_kg} kg
 - Activity Level: ${context.profile.activity_level}
 - Fitness Goal: ${context.profile.fitness_goal}
+- Equipment Access: ${context.profile.equipment_access || 'not recorded'}
+- Training Experience: ${context.profile.training_experience || 'not recorded (activity-only profile, or not asked)'}
+- Training Style: ${context.profile.training_style || 'not recorded (activity-only profile, or not asked)'}
 - Training Days: Originally ${context.training_days_count} days/week (user can add or remove days at any time via chat — this is NOT a ceiling)
-- Preferred Time: ${context.profile.preferred_time}
 - Session Duration: ${context.session_duration_preference || '45-60'} minutes
 - Workout Split: ${context.workout_split_preference || 'ai_recommendation'}
 ${context.dietary_preferences && context.dietary_preferences.length > 0 ? `- Dietary Restrictions: ${context.dietary_preferences.join(", ")}` : ""}
+- Injuries: ${context.injuries_summary || 'No injuries or sore areas currently on file.'}
 
 SESSION DURATION SCALING (MANDATORY):
 The user has ${context.session_duration_preference || '45-60'} minutes per session. Scale your exercise recommendations accordingly:
@@ -2305,6 +2465,7 @@ NUTRITION TARGETS:
 - Protein: ${context.macros.protein}g | Carbs: ${context.macros.carbs}g | Fat: ${context.macros.fat}g
 
 STEPS: ${context.steps_summary || 'no step count available for today.'}
+WATER: ${context.water_summary || 'no water total available for today.'}
 
 CURRENT EXERCISE PLAN (this includes the PRESCRIBED WEIGHT for every movement — the "@" clause):
 How to read the "@" clause:
@@ -2362,15 +2523,20 @@ ${buildDietarySafetyBlock(context.dietary_preferences || [])}
 ${ALLERGEN_HONESTY_BLOCK}
 
 ${context.workout_log_history ? `WORKOUT PERFORMANCE HISTORY (last 14 days):
-The following is the user's actual logged workout performance data. Each line shows a date and exercises performed with weight x reps for each set, and — where the app recorded one — the clock time in square brackets.
+The following is the user's actual logged workout performance data. Each line shows a date and exercises performed, each set labelled by what it actually was and its weight x reps, and — where the app recorded one — the clock time in square brackets.
 ${context.workout_log_history}
+
+WHAT THE LABELS MEAN, since 22 Sep 2026 this list carries build-up and drop sets too, not just working ones — read the label, never the position in the line.
+- "Warm-up 1", "Warm-up 2" etc. — movement prep, done light on purpose to get ready for the working sets that follow. NEVER a working attempt: never the number for progressive overload, never a personal record, never "their last logged performance" when suggesting today's targets. A light warm-up weight quoted as if it were their working weight is not a rounding error, it is a different number about a different thing.
+- "Set 1, drop 1" (or drop 2, 3...) — a continuation of "Set 1" straight after it, done deliberately fatigued at a lighter weight with no rest. It counts toward volume and toward how hard the session was — it is NEVER a fresh top-end attempt, never a personal record, and never the weight their NEXT working set (this week or next) anchors to. The app's own rule for this, unchanged since the column was built: a drop counts toward volume, not toward the set count, a personal best, or where the load goes next.
+- A bare "Set 1", "Set 2" (no drop) is an ordinary working set — everything below in PERFORMANCE COACHING DIRECTIVES is about these, and only these.
 
 WHAT YOU MAY SAY ABOUT A LOG, and this is an honesty rule, not a style note. Ashley was told "you logged one set of Clamshells at 10:00 PM today" at 5:41 in the afternoon. The set data was there; the time was not, and inventing one turned a correct answer into a claim about her day that was flatly untrue and could not be checked.
 - State ONLY what these lines contain. If a line carries no time in brackets, you do not know when it was logged — say "today" or "on the 5th", never an invented hour.
 - If a movement is not on these lines, it was not logged. Do not fill a gap with something plausible from their plan, and do not soften it: "I don't have anything logged for today" is the whole answer.
 - If they say they did something these lines do not show, believe them and offer to log it. Their memory outranks this list — but this list is what YOU are allowed to assert.
 
-PERFORMANCE COACHING DIRECTIVES:
+PERFORMANCE COACHING DIRECTIVES — about WORKING SETS ONLY (see WHAT THE LABELS MEAN above; a warm-up or a drop is never the subject of any of these):
 - Use this data to track progressive overload. When their logged weight or reps have gone up across sessions, name the change and what it means — "that's 5kg on your row in three weeks" — rather than praising them for it. The number is the compliment.
 - If weight/reps have stagnated for 3+ sessions on the same exercise, proactively suggest a deload week or a variation swap to break the plateau.
 - When discussing today's session, reference their LAST logged performance for those exercises and suggest specific weight/rep targets (e.g. "Last session you hit 70kg x 8 on bench. Try 72.5kg x 8 today or push for 70kg x 10.").
@@ -2413,7 +2579,7 @@ NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 
 Always use the user's specific data when answering. Nutrition, supplements, and recovery questions are always within your scope — answer them directly. For anything genuinely off-topic, see §1e above (factual question vs. task request get different treatment).
 
-CONTEXT: Current Time: ${context.current_time_formatted} | Preferred Training Time: ${context.profile?.preferred_time || 'morning'} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : 'No'}.
+CONTEXT: Current Time: ${context.current_time_formatted}${context.current_part_of_day ? ` (${context.current_part_of_day})` : ''} | Workout Logged Today: ${context.workout_logged_today ? 'Yes' : 'No'}.
 Keep this context in mind to ensure your greetings and questions naturally align with the time of day and their workout status.`;
 
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
@@ -3496,51 +3662,109 @@ Keep this context in mind to ensure your greetings and questions naturally align
 
       if (name === "log_workout_set") {
         const profileId = context.profile_id;
+        // Same-thing-twice guard: the tool description says these are
+        // mutually exclusive, but nothing stops a model sending both. A drop
+        // is never also a warm-up (SetKind is 'warmup' | 'working', and a
+        // drop is a 'working' row with dropIndex>0) — is_drop wins, since
+        // guessing "warm-up" for a set explicitly marked as a drop would be
+        // the more actively wrong of the two misreadings.
+        const isDrop = !!args.is_drop;
+        const isWarmup = !!args.is_warmup && !isDrop;
         let dbSuccess = true;
         let dbError = "";
+        let dropMigrationPending = false;
+        let noDropParent = false;
         let resolved: ResolvedWeight | null = null;
+        let dropIndex = 0;
 
         if (profileId) {
           try {
-            resolved = await resolveWeight(supabaseUrl, serviceKey, profileId, args.exercise_name, args.weight_kg, args.is_bodyweight);
+            resolved = await resolveWeight(
+              supabaseUrl, serviceKey, profileId, args.exercise_name, args.weight_kg, args.is_bodyweight,
+              !(isWarmup || isDrop),
+            );
             if (resolved) {
               const todayDate = context.current_local_date;
               const dayOfWeek = context.day_of_week;
               const sessionId = await ensureWorkoutSession(supabaseUrl, serviceKey, profileId, todayDate, dayOfWeek);
-              await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, [{
-                exercise_name: args.exercise_name,
-                set_number: args.set_number,
-                weight_kg: resolved.weightKg,
-                reps_completed: args.reps,
-                rpe: args.rpe ?? null,
-                is_bodyweight: resolved.isBodyweight,
-              }]);
+              let canWrite = true;
+              if (isDrop) {
+                const nextIndex = await getNextDropIndex(
+                  supabaseUrl, serviceKey, profileId, slugifyExerciseName(args.exercise_name), args.set_number, sessionId,
+                );
+                if (nextIndex === null) {
+                  noDropParent = true;
+                  canWrite = false;
+                } else {
+                  dropIndex = nextIndex;
+                }
+              }
+              if (canWrite) {
+                await upsertUnifiedSets(supabaseUrl, serviceKey, profileId, sessionId, dayOfWeek, [{
+                  exercise_name: args.exercise_name,
+                  set_number: args.set_number,
+                  weight_kg: resolved.weightKg,
+                  reps_completed: args.reps,
+                  rpe: args.rpe ?? null,
+                  is_bodyweight: resolved.isBodyweight,
+                  is_warmup: isWarmup,
+                  drop_index: dropIndex,
+                }]);
+              }
             }
           } catch (err) {
-            dbSuccess = false;
-            dbError = `Database error: ${err instanceof Error ? err.message : "unknown"}`;
-            console.error("log_workout_set DB error:", err);
+            if (err instanceof DropMigrationPendingError) {
+              dropMigrationPending = true;
+            } else {
+              dbSuccess = false;
+              dbError = `Database error: ${err instanceof Error ? err.message : "unknown"}`;
+              console.error("log_workout_set DB error:", err);
+            }
           }
         }
 
+        // Read aloud, never the raw label — "Set 3" / "Warm-up 1" / "Set 3,
+        // drop 1", the same words formatLogsForAI already labels history
+        // with, so a set logged from chat and one read back from chat never
+        // disagree about what to call it.
+        const kindLabel = isDrop ? `Set ${args.set_number}, drop ${dropIndex}` : isWarmup ? `Warm-up ${args.set_number}` : `Set ${args.set_number}`;
+
         let confirmText: string;
-        if (!dbSuccess) {
+        if (noDropParent) {
+          // Refused rather than written as an orphan — see getNextDropIndex.
+          // "Not logged" here is the honest answer: a drop is a continuation
+          // of a set that has to exist first.
+          confirmText = `I don't have set ${args.set_number} of ${args.exercise_name} logged today, so I can't attach a drop to it — log that set first, or tell me again which set the drop followed.`;
+        } else if (dropMigrationPending) {
+          // Honest and specific rather than the generic save-failed line
+          // below: this trainee's own reps are not lost (nothing was
+          // written, so there is nothing to lose), but drop-set tracking
+          // genuinely is not available on this account yet, and saying so
+          // is more useful than a vague retry that will fail the same way.
+          confirmText = `I can log warm-ups from chat, but drop-set tracking isn't switched on for your account yet — so I can't log that one as a drop without risking overwriting your set ${args.set_number}. Tell me the set itself if you haven't already, and I'll note the drop once it's available.`;
+        } else if (!dbSuccess) {
           // Was `the save failed: ${dbError}` — a raw Postgres message in her
           // chat. She cannot act on it and it reads as the app being broken
           // rather than one save failing. It stays in the server log.
           console.error("log_workout_set save failed:", dbError);
           confirmText = "I couldn't save that set just now — it isn't recorded. Try again in a moment, or tap it in on the exercise screen.";
         } else if (!resolved) {
-          confirmText = `I couldn't log that set for ${args.exercise_name} — you didn't say the weight and there's nothing logged or planned to go on. What did you use?`;
+          confirmText = isWarmup || isDrop
+            ? `I couldn't log that ${isDrop ? "drop" : "warm-up"} for ${args.exercise_name} — you didn't say the weight, and I don't guess one for a ${isDrop ? "drop" : "warm-up"} the way I would a working set. What did you use?`
+            : `I couldn't log that set for ${args.exercise_name} — you didn't say the weight and there's nothing logged or planned to go on. What did you use?`;
         } else {
           const inferredNote = resolved.inferredFrom
             ? ` (used your ${resolved.inferredFrom === "history" ? "last logged" : "plan's suggested"} weight — say the actual weight if that's off)`
             : "";
-          const setFloor = `Logged set ${args.set_number} of **${args.exercise_name}**: ${args.reps} reps @ ${resolved.weightKg}kg${args.rpe ? ` (RPE ${args.rpe})` : ""}.${inferredNote}`;
+          const setFloor = `Logged ${kindLabel} of **${args.exercise_name}**: ${args.reps} reps @ ${resolved.weightKg}kg${args.rpe ? ` (RPE ${args.rpe})` : ""}.${inferredNote}`;
           confirmText = (await toolReply({
             outcome: {
               name, args,
-              response: { status: "logged", exercise: args.exercise_name, set_number: args.set_number, reps: args.reps, weight_kg: resolved.weightKg, weight_inferred_from: resolved.inferredFrom ?? null },
+              response: {
+                status: "logged", exercise: args.exercise_name, set_number: args.set_number, reps: args.reps,
+                weight_kg: resolved.weightKg, weight_inferred_from: resolved.inferredFrom ?? null,
+                is_warmup: isWarmup, is_drop: isDrop, drop_index: dropIndex,
+              },
             },
             floor: setFloor,
             preferFirstLegText: true,
@@ -3551,7 +3775,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
         return new Response(
           JSON.stringify({
             reply: confirmText,
-            action: dbSuccess && resolved ? { type: "log_workout_set", ...args, weight_kg: resolved.weightKg } : undefined,
+            action: dbSuccess && resolved && !dropMigrationPending && !noDropParent ? { type: "log_workout_set", ...args, weight_kg: resolved.weightKg } : undefined,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

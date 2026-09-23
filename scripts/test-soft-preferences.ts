@@ -211,13 +211,26 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
   check('App compiles food likes from memory', /compileSoftFoodPreferences\(memoryFacts\)/.test(app))
   // The fifth argument (pinnedMeals) arrived with the custom-meals build —
   // soft food preferences still ride in position 4, which is what this pins.
-  check('...and the assembled day is built with them', /assembleDay\(mealPools, macros, \{\}, compiledSoftFoodPreferences, pinnedMeals\)/.test(app))
+  // Property, not the call's text — see the same re-anchoring in
+  // test-custom-meal.ts. The old literal included the empty variety history,
+  // so fixing that on 19 Sep 2026 reddened this check for no good reason.
+  const assemblyDeclSP = (() => {
+    const a = app.indexOf('const assembledMeals')
+    const b = app.indexOf('const chosenMeals', a)
+    return a < 0 ? '' : (b < 0 ? app.slice(a) : app.slice(a, b))
+  })()
+  check('...and the assembled day is built with them',
+    /\bcompiledSoftFoodPreferences\b/.test(assemblyDeclSP), assemblyDeclSP.slice(0, 120))
 
   // The shopping list assembles the SAME days the Nutrition tab shows.
   // Withhold the preferences from one and the two diverge — a list for meals
   // the app never serves.
   const grocery = readFileSync(join(ROOT, 'src/lib/grocery-store.ts'), 'utf8')
-  check('the grocery horizon passes them to assembleDay', /assembleDay\(pools, targets, recentNames, softLikedFoods\)/.test(grocery))
+  // Property, not the call's text: the horizon's assembly must be given the
+  // soft likes. Pinning the exact argument list broke the day the call gained
+  // a leftovers pin — the same re-anchoring as test:custom-meal above.
+  check('the grocery horizon passes them to assembleDay',
+    /assembleDay\((?:[^()]|\([^()]*\))*softLikedFoods/.test(grocery))
   check('...and they reach it from the caller', /assembleHorizon\(input\.mealPools, input\.targets, days, input\.softLikedFoods/.test(grocery))
   check('App gives the grocery tab the same value it gave assembleDay',
     /softLikedFoods=\{compiledSoftFoodPreferences\}/.test(app))

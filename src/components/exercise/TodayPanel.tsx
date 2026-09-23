@@ -5,7 +5,7 @@ import { useWakeLock } from '@/hooks/useWakeLock'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
-import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation } from '@/lib/progression-engine'
+import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
@@ -72,7 +72,7 @@ import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
-import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
+import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -245,7 +245,7 @@ export function TodayPanel({
         .map(async ex => {
           const rec = ex.suggested_added_load_kg != null
             ? await getAddedLoadProgression(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))
-            : await getDoubleProgressionRecommendation(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))
+            : await getDoubleProgressionRecommendation(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps), workingCtx(ex))
           return [ex.name, rec] as const
         })
     )
@@ -618,7 +618,7 @@ export function TodayPanel({
             const added = await getAddedLoadProgression(profileId, ex.name, today, parseRepsHigh(ex.reps))
             return [ex.name, added, 'added'] as const
           }
-          const rec = await getDoubleProgressionRecommendation(profileId, ex.name, today, parseRepsHigh(ex.reps))
+          const rec = await getDoubleProgressionRecommendation(profileId, ex.name, today, parseRepsHigh(ex.reps), workingCtx(ex))
           return [ex.name, rec, 'load'] as const
         })
     ).then(results => {
@@ -1436,11 +1436,28 @@ function ExerciseList({
   )
 }
 
+/**
+ * The bottom of the range, beside its twin. Needed by the progression engine
+ * to tell a build-up step from a ramped WORKING set — both can sit at 85% of
+ * the top weight, and only the reps separate them.
+ */
+function parseRepsLow(reps: string): number {
+  const rangeMatch = reps.match(/^(\d+)\s*-\s*(\d+)$/)
+  if (rangeMatch) return parseInt(rangeMatch[1])
+  const single = parseInt(reps)
+  return isNaN(single) ? 8 : single
+}
+
 function parseRepsHigh(reps: string): number {
   const rangeMatch = reps.match(/^(\d+)\s*-\s*(\d+)$/)
   if (rangeMatch) return parseInt(rangeMatch[2])
   const single = parseInt(reps)
   return isNaN(single) ? 12 : single
+}
+
+/** What the engine needs to tell a build-up from a working set, read off this exercise's own prescription. */
+function workingCtx(ex: Exercise): WorkingSetContext {
+  return { repRangeLow: parseRepsLow(ex.reps), perSetLoadKg: ex.per_set_load?.map(s => s.load_kg), prescribedSets: ex.sets }
 }
 
 function parseRestSeconds(rest: string): number {

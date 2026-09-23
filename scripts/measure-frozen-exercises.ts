@@ -35,107 +35,16 @@
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { scorePlan } from '../src/lib/quality-score'
-import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
-import { categorize, isExternallyLoaded } from '../src/lib/load-prescription'
-import {
-  ALL_EQUIPMENT, ALL_DURATIONS, ALL_STYLES, ALL_EXPERIENCE, getInjuryCombinations,
-} from '../src/lib/dev-constraint-audit'
-import type {
-  UserProfile, EquipmentAccess, TrainingStyle, SessionDuration, TrainingExperience,
-  FitnessGoal, RecoveryCapacity, ConditioningPreference, MesocycleWeek, Exercise,
-} from '../src/lib/types'
+import { buildProfile, comboKey, generateAllCombinations, ALL_GOALS } from './quality-grid'
+import { frozenPairs, causeOf } from './frozen-pairs'
+import type { MesocycleWeek } from '../src/lib/types'
 
-// --- the quality sweep's grid, copied field for field -----------------------
-const ALL_GOALS: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'conditioning', 'functional']
-const ALL_RECOVERY: RecoveryCapacity[] = ['low', 'moderate', 'high']
-const ALL_CONDITIONING_PREF: ConditioningPreference[] = ['love', 'tolerate', 'avoid']
-
-interface Combination {
-  equipment: EquipmentAccess; injuries: string[]; duration: SessionDuration; style: TrainingStyle
-  experience: TrainingExperience; goal: FitnessGoal; recovery: RecoveryCapacity; conditioningPref: ConditioningPreference
-}
-function buildProfile(combo: Combination): UserProfile {
-  return {
-    age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
-    fitness_goal: combo.goal, preferred_time: 'morning', bmr: 1800, tdee: 2500,
-    equipment_access: combo.equipment, injuries: combo.injuries,
-    training_style: combo.style, training_experience: combo.experience,
-    session_duration_preference: combo.duration, workout_split_preference: 'ai_recommendation',
-    training_days: [
-      { day: 'Monday', available: true }, { day: 'Tuesday', available: true },
-      { day: 'Wednesday', available: false }, { day: 'Thursday', available: true },
-      { day: 'Friday', available: true }, { day: 'Saturday', available: false },
-      { day: 'Sunday', available: false },
-    ],
-    weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], exercise_exclusions: [],
-    macro_calculation_mode: 'STANDARD_STATIC', coaching_persona: 'supportive',
-    recovery_capacity: combo.recovery, conditioning_preference: combo.conditioningPref,
-  }
-}
-const comboKey = (c: Combination) => [c.equipment, c.injuries.join('+') || 'none', c.duration, c.style, c.experience, c.goal, c.recovery, c.conditioningPref].join('|')
-function generateAllCombinations(): Combination[] {
-  const combos: Combination[] = []
-  let rotationIndex = 0
-  for (const equipment of ALL_EQUIPMENT)
-    for (const injuries of getInjuryCombinations())
-      for (const duration of ALL_DURATIONS)
-        for (const style of ALL_STYLES)
-          for (const experience of ALL_EXPERIENCE)
-            for (const goal of ALL_GOALS) {
-              combos.push({
-                equipment, injuries, duration, style, experience, goal,
-                recovery: ALL_RECOVERY[rotationIndex % ALL_RECOVERY.length],
-                conditioningPref: ALL_CONDITIONING_PREF[Math.floor(rotationIndex / ALL_RECOVERY.length) % ALL_CONDITIONING_PREF.length],
-              })
-              rotationIndex++
-            }
-  return combos
-}
-
-// --- the frozen_week rule, mirrored from quality-score.ts ------------------
-interface FrozenPair { name: string; reps: string; kg: number | null; weekA: number; weekB: number; hold?: string; bump?: string }
-export function frozenPairs(mesocycle: MesocycleWeek[]): FrozenPair[] {
-  const out: FrozenPair[] = []
-  for (let block = 1; block <= 4; block++) {
-    const blockWeeks = mesocycle.filter(w => w.block_number === block).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
-    const pairs: [MesocycleWeek | undefined, MesocycleWeek | undefined][] = [[blockWeeks[0], blockWeeks[1]], [blockWeeks[1], blockWeeks[2]]]
-    for (const [wa, wb] of pairs) {
-      if (!wa || !wb || wa.is_deload || wb.is_deload) continue
-      for (const dayA of wa.days) {
-        const dayB = wb.days.find(d => d.day === dayA.day)
-        if (!dayB) continue
-        dayA.exercises.forEach((exA: Exercise, i: number) => {
-          const exB = dayB.exercises[i]
-          if (!exB || exB.name !== exA.name) return
-          if (exA.tier === 'tier_0_primer' || exA.prescription_type === 'steady_state') return
-          const loadFrozen = exA.suggested_load_kg == null ? exB.suggested_load_kg == null : exA.suggested_load_kg === exB.suggested_load_kg
-          if (loadFrozen && exA.reps === exB.reps) out.push({ name: exA.name, reps: exA.reps, kg: exA.suggested_load_kg ?? null, weekA: wa.week_number, weekB: wb.week_number, hold: exB.load_hold, bump: exB.rep_bump })
-        })
-      }
-    }
-  }
-  return out
-}
-
-// The loaded class is split by what the generator itself recorded on week B
-// (Exercise.load_hold / rep_bump) — `loaded:<hold>/<bump>`. A bar held at the
-// standards ceiling with the rep bump at its cap is held BY DESIGN; one where
-// no permitted bump can change the rep range is a floor decision (Ashley's);
-// a band decline is a safety refusal; 'matched' is the one-target/one-weight
-// per-lift rules pinning a slot to its sibling; a carry at its distance cap
-// is its own thing.
-type Cause = string
-const byName = new Map(EXERCISE_DATABASE.map(e => [e.name, e]))
-export function causeOf(p: FrozenPair): Cause {
-  const entry = byName.get(p.name)
-  if (!entry) return 'unknown_exercise'
-  if (p.kg != null) {
-    if (entry.movement_pattern === 'carry') return 'loaded_carry'
-    return `loaded:${p.hold ?? 'nohold'}/${p.bump ?? '-'}`
-  }
-  if (isExternallyLoaded(entry) && categorize(entry) == null) return 'tagged_loaded_no_kg'
-  return 'bodyweight_no_kg'
-}
+// The grid and the rule both used to be spelled out here. The grid moved to
+// quality-grid.ts on 18 Sep 2026 and this file kept its own field-for-field
+// copy; the rule moved to frozen-pairs.ts on 19 Sep 2026 when the lever audit
+// needed the same one. Both are imports now for the same reason: two copies of
+// a denominator is how two measurements of one question quietly stop being
+// comparable. Section 4 below still cross-checks the rule against the scorer.
 
 // --- sweep -----------------------------------------------------------------
 const bump = (m: Map<string, number>, k: string, n = 1) => m.set(k, (m.get(k) ?? 0) + n)

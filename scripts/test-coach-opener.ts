@@ -64,14 +64,22 @@ console.log('\n1. Priority: the thing that matters most is the one thing said')
   // The prompt's rule for a miss, applied to the opener's own words.
   check('...and follows the no-drama rule rather than shaming', /no drama/.test(missed.text) && !/should have|failed|streak/i.test(missed.text), missed.text)
 
-  const today = pickOpener(base)
-  check('otherwise a training day ahead is the opener', today.kind === 'training_today', today.kind)
+  // THE ORDINARY DAY CHANGED ON 17 Sep 2026, and these five checks changed
+  // with it. They used to assert that a training day ALWAYS opened with the
+  // session — which is exactly what Ashley kept raising: "All it does is tell
+  // me every time I speak to it about an upcoming workout." Her ruling, from
+  // four options: keep it varied. So the session opener is still produced,
+  // but only when the rotation reaches it.
+  const afterNoticed = { ...base, lastOrdinaryKind: 'noticed' as const }
+  const today = pickOpener(afterNoticed)
+  check('a training day still gets its session line when the rotation reaches it',
+    today.kind === 'training_today', today.kind)
   const done = pickOpener({ ...base, hour: 20 })
   check('past the training cutoff it becomes "how did it go"', done.kind === 'training_done_today', done.kind)
-  const rest = pickOpener(restDay)
-  check('a rest day is the fallback', rest.kind === 'rest_day', rest.kind)
+  const rest = pickOpener({ ...restDay, lastOrdinaryKind: 'noticed' })
+  check('a rest day is the session slot\'s other half', rest.kind === 'rest_day', rest.kind)
   check('...and previews the next session, with its lead lift', /Pull & Hinge/.test(rest.text) && /Deadlifts/.test(rest.text), rest.text)
-  const restNoNext = pickOpener({ ...restDay, tomorrowSession: null })
+  const restNoNext = pickOpener({ ...restDay, tomorrowSession: null, lastOrdinaryKind: 'noticed' })
   check('...but says nothing about a next session when there is none', !/leads with/.test(restNoNext.text), restNoNext.text)
 
   // AN UNLOADED PLAN IS NOT A REST DAY. Ashley, 7 Sep 2026, from her phone:
@@ -96,7 +104,7 @@ console.log('\n1. Priority: the thing that matters most is the one thing said')
 
   // The other half, and the one a naive fix breaks: a plan that HAS loaded
   // and has nothing scheduled is still a rest day, and must still say so.
-  const genuineRest = pickOpener({ ...restDay, planKnown: true })
+  const genuineRest = pickOpener({ ...restDay, planKnown: true, lastOrdinaryKind: 'noticed' })
   check('a loaded plan with no session today is still a rest day', genuineRest.kind === 'rest_day', genuineRest.kind)
 
   // The signals that do not depend on the plan keep outranking it: an
@@ -123,10 +131,82 @@ console.log('\n2. Ashley\'s ruling: no chips under the how-did-it-feel question'
   }
   // ...and every other kind may.
   check('a missed day carries chips', pickOpener({ ...base, missedYesterday: { dayName: 'Monday', focus: 'Legs' } }).chips.length > 0)
-  check('a rest day carries chips', pickOpener(restDay).chips.length > 0)
-  check('a training day ahead carries the trim chip', pickOpener(base).chips.some(c => /short on time/i.test(c)))
+  check('a rest day carries chips', pickOpener({ ...restDay, lastOrdinaryKind: 'noticed' }).chips.length > 0)
+  check('a training day ahead carries the trim chip',
+    pickOpener({ ...base, lastOrdinaryKind: 'noticed' }).chips.some(c => /short on time/i.test(c)))
   check('...but not mid-session — trimming a session you are in is a different conversation',
-    pickOpener({ ...base, todayLogged: true }).chips.length === 0, pickOpener({ ...base, todayLogged: true }).chips)
+    pickOpener({ ...base, todayLogged: true, lastOrdinaryKind: 'noticed' }).chips.length === 0,
+    pickOpener({ ...base, todayLogged: true, lastOrdinaryKind: 'noticed' }).chips)
+}
+
+console.log('\n2b. The ordinary day is VARIED, and the session can never lead twice running')
+{
+  // ASHLEY, 17 Sep 2026, having raised it more than once: "All it does is tell
+  // me every time I speak to it about an upcoming workout. Thats not what a
+  // coach does." She was right, and the cause was HERE rather than in the
+  // model's persona — five of the seven openers led with the session.
+  // Her ruling, from four options: KEEP IT VARIED.
+  const noticed = { text: 'nice one on Deadlifts — 120kg is a best. How\'s it feeling?' }
+  const day = { ...base, noticed }
+
+  // A FRESH CHAT DOES NOT OPEN WITH THE PLAN. This is the single check that
+  // most directly answers what she reported.
+  const first = pickOpener({ ...day, lastOrdinaryKind: null })
+  check('a first-ever conversation opens with a check-in, not the session',
+    first.kind === 'check_in', first.kind)
+  check('...and says nothing about today\'s session at all',
+    !/today's|Push|Bench/i.test(first.text), first.text)
+
+  // THE ROTATION, WALKED. Deterministic, so this is provable rather than
+  // sampled — the same reason nextPoolOption rotates instead of drawing.
+  const walk: string[] = []
+  let last: 'check_in' | 'noticed' | 'session' | null = null
+  for (let i = 0; i < 6; i++) {
+    const o = pickOpener({ ...day, lastOrdinaryKind: last })
+    walk.push(o.kind)
+    last = o.kind === 'check_in' ? 'check_in' : o.kind === 'noticed' ? 'noticed' : 'session'
+  }
+  check('three openers cycle rather than one repeating', new Set(walk).size === 3, walk)
+  check('...in a stable order, every lap the same', walk.slice(0, 3).join() === walk.slice(3).join(), walk)
+  // THE PROMISE, STATED AS A CHECK: never twice in a row, for any of them.
+  check('...and no two neighbours are the same',
+    walk.every((k, i) => i === 0 || k !== walk[i - 1]), walk)
+  check('...the session appearing once per lap, not every time',
+    walk.filter(k => k === 'training_today').length === 2, walk)
+
+  // WITH NOTHING TO NOTICE the rotation must skip that slot rather than
+  // inventing a fact — and must still not let the session lead twice running.
+  const bare = { ...base, noticed: null }
+  const a = pickOpener({ ...bare, lastOrdinaryKind: null })
+  const b = pickOpener({ ...bare, lastOrdinaryKind: 'check_in' })
+  const c = pickOpener({ ...bare, lastOrdinaryKind: 'session' })
+  check('with nothing noticed it alternates instead', [a.kind, b.kind, c.kind].join() === 'check_in,training_today,check_in',
+    [a.kind, b.kind, c.kind])
+  check('...and never invents something to have noticed',
+    ![a, b, c].some(o => o.kind === 'noticed'), [a.kind, b.kind, c.kind])
+
+  // A REST DAY IS THE SAME SLOT'S OTHER HALF, so it rotates too — the old
+  // rest-day line swung round to tomorrow's session every single time.
+  const restRotation = pickOpener({ ...restDay, noticed, lastOrdinaryKind: null })
+  check('a rest day opens with a check-in too, not tomorrow\'s session',
+    restRotation.kind === 'check_in', restRotation.kind)
+  check('...and mentions no session', !/Pull & Hinge|Deadlifts|leads with/.test(restRotation.text), restRotation.text)
+
+  // EVENTS ARE NOT SMALL TALK. An unreviewed session or a missed day still
+  // outranks the whole rotation, whatever came last — those are the things a
+  // coach genuinely opens with, and Ashley's complaint was never about them.
+  const feelFirst = pickOpener({ ...day, lastOrdinaryKind: 'check_in', awaitingFeel: { date: '2026-09-07', day: 'Sunday', isToday: false } })
+  check('an unreviewed session still outranks the rotation', feelFirst.kind === 'session_feel', feelFirst.kind)
+  const missedFirst = pickOpener({ ...day, lastOrdinaryKind: 'check_in', missedYesterday: { dayName: 'Monday', focus: 'Legs' } })
+  check('...and so does a missed day', missedFirst.kind === 'missed_yesterday', missedFirst.kind)
+
+  // THE CHECK-IN IS ABOUT THE PERSON, and reads right for the time of day.
+  const morning = pickOpener({ ...day, hour: 9, lastOrdinaryKind: null })
+  const evening = pickOpener({ ...day, hour: 20, cutoffHour: 23, lastOrdinaryKind: null })
+  check('the check-in fits the hour', /morning/i.test(morning.text) && /evening/i.test(evening.text),
+    [morning.text, evening.text])
+  check('...and its chips are not about the plan either',
+    morning.chips.every(c => !/session|workout|today's/i.test(c)), morning.chips)
 }
 
 console.log('\n3. Every chip is a sentence the coach\'s existing tools can finish')

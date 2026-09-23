@@ -1,0 +1,14 @@
+{
+  "name": "goal-change-says-the-food-half",
+  "why": "The goal is the ONLY setup answer that is an input to both the plan generator and the calorie calculation, which is why Ashley's ruling of 17 Sep 2026 — training AND food, from this week, chosen from three options — is the only offer in the app with a food sentence on the card. Her reason: somebody training for muscle while still eating a fat-loss deficit is the worst of both. So the card is the coach reaching propose_goal_change, and the second turn asks the question outright: a coach that answers 'no, just your training' is contradicting what the app is about to do to their calories.",
+  "messages": [
+    "I want to stop cutting and start building muscle instead",
+    "does that change what I'm eating as well, or just the training?"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": ["propose_goal_change"] }
+    ],
+    "mustMention": ["calorie", "calories", "protein", "eating", "food", "macros"]
+  }
+}

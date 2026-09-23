@@ -40,7 +40,7 @@ const fail = (label: string, extra?: unknown) => {
 
 const TABS = ['Home', 'Nutrition', 'Exercise', 'Tools', 'Chat']
 
-function t(turns: { user?: string; reply: string; error?: string | null; card?: string }[], checks?: Transcript['checks']): Transcript {
+function t(turns: { user?: string; reply: string; error?: string | null; card?: string; cardArgs?: unknown }[], checks?: Transcript['checks']): Transcript {
   return {
     case: 'fixture',
     checks,
@@ -48,7 +48,7 @@ function t(turns: { user?: string; reply: string; error?: string | null; card?: 
       user: x.user ?? 'q',
       reply: x.reply,
       error: x.error ?? null,
-      proposal: x.card !== undefined ? { kind: x.card } : null,
+      proposal: x.card !== undefined ? { kind: x.card, args: x.cardArgs } : null,
     })),
   }
 }
@@ -185,6 +185,145 @@ const declaring = readdirSync(join(ROOT, 'scripts/exam-cases'))
   .filter(f => JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases', f), 'utf8')).checks?.expectsProposal === true)
 if (declaring.length > 0) pass(`missing-proposal: ${declaring.length} exam case(s) declare expectsProposal (${declaring.map(f => f.replace('.json', '')).join(', ')})`)
 else fail('missing-proposal: no exam case declares expectsProposal, so the rule can never fire on a real run')
+
+console.log('\n[10b] wrong-proposal-kind — the RIGHT card, on the right turn')
+// THE SESSION-LENGTH PAIR. Both requests carry a figure in minutes and the
+// tools differ only on scope, so the failure mode is a perfectly well-formed
+// card that rebuilds a block when somebody was running late once.
+const todayThenForever = {
+  expectsProposalKind: [
+    { turn: 0, oneOf: ['propose_session_shorten'] },
+    { turn: 1, oneOf: ['propose_session_length'] },
+  ],
+}
+mustFire('today\'s request answered with the lasting tool', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', card: 'propose_session_length' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+mustFire('the lasting request answered with the today-only tool', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', card: 'propose_session_shorten' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_shorten' },
+], todayThenForever))
+mustNotFire('each turn reaching its own tool', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', card: 'propose_session_shorten' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+// NO CARD IS ALSO WRONG when a card was required — otherwise a coach could
+// pass by doing nothing, which is the exact shape missing-proposal exists for.
+mustFire('a required card that never appeared', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: 'Sure, keep it short today.' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+
+// THE INVERSE — oneOf: [] asserts the turn asks rather than cards. Ashley's
+// 15 Sep ruling; §3g2 requires the question first and nothing enforces it but
+// this, because the client only refuses to build a card from a HEDGE.
+const askThenCard = {
+  expectsProposalKind: [
+    { turn: 0, oneOf: [] },
+    { turn: 1, oneOf: ['propose_cardio_session'] },
+  ],
+}
+mustFire('carded on the turn that was supposed to ask', 'wrong-proposal-kind', t([
+  { user: 'I\'m doing a spin class Wednesday', reply: '', card: 'propose_cardio_session' },
+  { user: 'yeah go on', reply: '', card: 'propose_cardio_session' },
+], askThenCard))
+mustNotFire('asked first, then carded on the yes', 'wrong-proposal-kind', t([
+  { user: 'I\'m doing a spin class Wednesday', reply: "Wednesday's your cardio day — want me to put that in your plan?" },
+  { user: 'yeah go on', reply: '', card: 'propose_cardio_session' },
+], askThenCard))
+
+// A TURN THAT NEVER HAPPENED IS NOT A WRONG ANSWER — the distinction silence
+// and missing-proposal both draw, applied one level down, per turn.
+mustNotFire('the graded turn failed in transport', 'wrong-proposal-kind', t([
+  { user: 'I\'ve only got 40 minutes this morning', reply: '', error: 'HTTP 503' },
+  { user: 'make them 40 from now on', reply: '', card: 'propose_session_length' },
+], todayThenForever))
+// AND A CASE THAT DECLARES NOTHING IS NOT JUDGED, so the rule cannot leak onto
+// the twenty cases written before it existed.
+mustNotFire('a case that never declared expectsProposalKind', 'wrong-proposal-kind',
+  t([{ reply: '', card: 'propose_meal_swap' }]))
+
+// THE CASES THEMSELVES STILL DECLARE IT, and both SHAPES are still in use — a
+// derivation that only counted cases would go quiet if every `oneOf: []` were
+// dropped, which is the half no other rule covers.
+const kindCases = readdirSync(join(ROOT, 'scripts/exam-cases'))
+  .filter(f => f.endsWith('.json') && !f.startsWith('_'))
+  .map(f => JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases', f), 'utf8')))
+  .filter(c => Array.isArray(c.checks?.expectsProposalKind))
+const specs = kindCases.flatMap(c => c.checks.expectsProposalKind as { oneOf: string[] }[])
+if (kindCases.length > 0) pass(`wrong-proposal-kind: ${kindCases.length} exam case(s) declare expectsProposalKind (${kindCases.map(c => c.name).join(', ')})`)
+else fail('wrong-proposal-kind: no exam case declares expectsProposalKind, so the rule can never fire on a real run')
+if (specs.some(sp => sp.oneOf.length > 0)) pass('wrong-proposal-kind: at least one turn names the tool it must reach')
+else fail('wrong-proposal-kind: no turn names a required tool')
+if (specs.some(sp => sp.oneOf.length === 0)) pass('wrong-proposal-kind: at least one turn asserts NO card, which is the half only this rule holds')
+else fail('wrong-proposal-kind: nothing asserts a turn must ask rather than card')
+// AND EVERY NAMED TOOL IS A TOOL THE COACH ACTUALLY DECLARES. A case naming a
+// renamed or deleted tool would fail every run and read as a coach defect.
+const fnSrc = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+const unknown = [...new Set(specs.flatMap(sp => sp.oneOf))].filter(k => !fnSrc.includes(`name: "${k}"`))
+if (unknown.length === 0) pass('wrong-proposal-kind: every tool named by a case is one chat-gemini declares')
+else fail('wrong-proposal-kind: case names a tool the coach does not declare', unknown)
+
+console.log('\n[10c] wrong-swap-replacement — WHICH EXERCISE, not just which tool')
+// Bulgarian Split Squats is the one same-pattern, same-tier, home-gym-real,
+// genuinely loaded peer of Walking Lunges in the catalogue (checked against
+// EQUIPMENT_SETS.home_gym directly, not assumed) — a real scenario, not an
+// invented pair.
+const lungeSwap = { swapReplacementOneOf: [{ turn: 0, oneOf: ['Bulgarian Split Squats'] }] }
+mustFire('the coach reached for the unloaded variant on its own pick', 'wrong-swap-replacement', t([
+  {
+    user: "swap the walking lunges for something else, I'm bored of them",
+    reply: '',
+    card: 'propose_exercise_swap',
+    cardArgs: { day: 'Tuesday', old_item: 'Walking Lunges', new_item: 'Split Squat (Bodyweight)' },
+  },
+], lungeSwap))
+mustNotFire('the coach reached for the loaded peer', 'wrong-swap-replacement', t([
+  {
+    user: "swap the walking lunges for something else, I'm bored of them",
+    reply: '',
+    card: 'propose_exercise_swap',
+    cardArgs: { day: 'Tuesday', old_item: 'Walking Lunges', new_item: 'Bulgarian Split Squats' },
+  },
+], lungeSwap))
+// CASE-INSENSITIVE, because the model is not guaranteed to reproduce the
+// catalogue's exact capitalisation and that is not this rule's concern.
+mustNotFire('the coach\'s casing differs from the catalogue\'s', 'wrong-swap-replacement', t([
+  { user: 'q', reply: '', card: 'propose_exercise_swap', cardArgs: { new_item: 'bulgarian split squats' } },
+], lungeSwap))
+// A DIRECT, NAMED REQUEST IS NOT THIS RULE'S CONCERN — "you asked for it, you
+// get it" (13 Sep 2026) is the house rule, and this check exists only for the
+// turns where the COACH is the one choosing.
+mustNotFire('a turn the case never declared', 'wrong-swap-replacement', t([
+  { user: 'swap lunges for step-ups', reply: '', card: 'propose_exercise_swap', cardArgs: { new_item: 'Step-Ups' } },
+]))
+// NOT THIS RULE'S JOB — wrong-proposal-kind and missing-proposal already
+// cover "wrong tool" and "no card at all".
+mustNotFire('the wrong tool entirely', 'wrong-swap-replacement', t([
+  { user: 'q', reply: '', card: 'propose_exercise_remove', cardArgs: { item: 'Walking Lunges' } },
+], lungeSwap))
+mustNotFire('no card at all', 'wrong-swap-replacement', t([
+  { user: 'q', reply: 'Sure, I can swap that.' },
+], lungeSwap))
+mustNotFire('the graded turn failed in transport', 'wrong-swap-replacement', t([
+  { user: 'q', reply: '', error: 'HTTP 503' },
+], lungeSwap))
+
+// AND ANY REAL EXAM CASE USING IT NAMES A REAL EXERCISE — a typo'd catalogue
+// name would fail every run and read as a coach defect forever.
+const swapCases = readdirSync(join(ROOT, 'scripts/exam-cases'))
+  .filter(f => f.endsWith('.json') && !f.startsWith('_'))
+  .map(f => JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases', f), 'utf8')))
+  .filter(c => Array.isArray(c.checks?.swapReplacementOneOf))
+if (swapCases.length > 0) pass(`wrong-swap-replacement: ${swapCases.length} exam case(s) declare swapReplacementOneOf (${swapCases.map(c => c.name).join(', ')})`)
+else fail('wrong-swap-replacement: no exam case declares swapReplacementOneOf, so the rule can never fire on a real run')
+const swapNames = [...new Set(swapCases.flatMap(c => c.checks.swapReplacementOneOf as { oneOf: string[] }[]).flatMap(sp => sp.oneOf))]
+const dbSrc = readFileSync(join(ROOT, 'src/lib/exercise-db.ts'), 'utf8')
+const unknownExercises = swapNames.filter(name => !dbSrc.includes(`name: '${name}'`) && !dbSrc.includes(`name: "${name}"`))
+if (swapNames.length > 0 && unknownExercises.length === 0) pass('wrong-swap-replacement: every exercise named by a case is one the catalogue actually has')
+else if (swapNames.length === 0) fail('wrong-swap-replacement: no case names an acceptable exercise')
+else fail('wrong-swap-replacement: case names an exercise the catalogue does not have', unknownExercises)
 
 console.log('\n[11] coachLine — what the report and the judge are shown for each turn')
 {

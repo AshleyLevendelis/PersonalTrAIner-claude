@@ -1,4 +1,7 @@
 import { ExerciseRow, type ExerciseRowProps } from './ExerciseRow'
+import { supersetAlternation } from '@/lib/coach-voice'
+import { formatRampSets } from '@/lib/session-derive'
+import type { Exercise } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // Fused superset rendering (LAYOUT-DESIGN.md §3.4) — a bracketed group with
@@ -32,10 +35,20 @@ import { ExerciseRow, type ExerciseRowProps } from './ExerciseRow'
 export function SupersetShell({
   label,
   count,
+  ramped = [],
   renderMember,
 }: {
   label: string
   count: number
+  /**
+   * The member labels whose exercise carries a build-up — "A1", or both.
+   *
+   * Passed IN rather than derived here, because this shell deliberately has
+   * "no opinion about what a row is" (see above) and the two callers hold
+   * different row types. Both read the same `formatRampSets`, so the two
+   * surfaces cannot disagree about whether a pair ramps.
+   */
+  ramped?: string[]
   /** Called per member with its 1-based superset label ("A1", "A2"). */
   renderMember: (index: number, memberLabel: string) => React.ReactNode
 }) {
@@ -52,7 +65,14 @@ export function SupersetShell({
       />
       <div className="space-y-2">
         {Array.from({ length: count }, (_, i) => renderMember(i, `${label}${i + 1}`))}
-        <p className="text-[0.625rem] text-muted-foreground italic">alternate — no rest between</p>
+        {/* THE INSTRUCTION FOR THE PAIR, from the phrasebook so both surfaces
+            and the coach exam read one sentence. Its second clause appears
+            only when a member ramps — see supersetAlternation for why an
+            unconditional "alternate" is wrong advice on a pair that has a
+            build-up in it. */}
+        <p className="text-[0.625rem] text-muted-foreground italic" data-testid="superset-alternation">
+          {supersetAlternation(ramped)}
+        </p>
       </div>
     </div>
   )
@@ -69,9 +89,27 @@ export function SupersetGroup({
     <SupersetShell
       label={label}
       count={members.length}
+      ramped={rampedMemberLabels(label, members.map(m => (m.props as { ex: Exercise }).ex))}
       renderMember={(i, memberLabel) => (
         <ExerciseRow key={i} {...members[i].props} supersetLabel={memberLabel} />
       )}
     />
   )
+}
+
+/**
+ * Which members of a pair carry a build-up, by their A1/A2 label.
+ *
+ * Exported so the read-only surfaces answer it with the same function rather
+ * than their own copy — the drift this file's header was written about, one
+ * sentence further down the card. A 'stale' ramp names an exercise the slot
+ * no longer holds, so it prescribes nothing and must not produce the clause.
+ */
+export function rampedMemberLabels(label: string, exercises: Exercise[]): string[] {
+  return exercises
+    .map((ex, i) => {
+      const ramp = formatRampSets(ex)
+      return ramp && ramp.kind !== 'stale' && ramp.sets.length > 0 ? `${label}${i + 1}` : null
+    })
+    .filter((x): x is string => x !== null)
 }

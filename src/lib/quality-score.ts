@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
 import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry} from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, TRACKS } from './exercise-plan'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, hasBetterLoadingPeer, TRACKS } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -296,6 +296,36 @@ function scoreStructure(mesocycle: MesocycleWeek[], profile: UserProfile): Dimen
         const entry = dbEntry(day.exercises[i].name)
         if (!entry) continue
         const isCoreOrFinisher = entry.movement_pattern === 'core' || entry.movement_pattern === 'carry' || day.exercises[i].tier === 'tier_4_finisher'
+        // CORRECTIVE WORK FOR A FLAGGED JOINT, IN THE PREP BLOCK, IS NOT A
+        // SEQUENCING FAULT — it is what a coach does. The generator places it
+        // deliberately ("straight after the warm-up, before the working sets:
+        // rehab is prep", exercise-plan.ts), and low-intensity work for an
+        // injured area before that area is loaded is correct practice.
+        //
+        // MEASURED 18 Sep 2026: this rule fired on 725 of 9,216 plans and the
+        // named examples were all the rehab slot — Side Plank before Pull-Ups
+        // and Bird Dog before Chin-Ups, for a lower-back trainee, both
+        // `isIndicatedFor` that flagged joint. The plans were right and the
+        // measurement was wrong, and the asymmetry was visible one rule above:
+        // `primer_not_first` has carried this exact exemption all along and
+        // this rule never got it.
+        //
+        // ASHLEY'S RULING, 18 Sep 2026, from three options: exempt it in the
+        // PREP BLOCK ONLY. She rejected exempting it anywhere before the main
+        // lift, which would stop the app noticing corrective work that drifted
+        // into the middle of the heavy work — a real problem when it happens —
+        // and rejected leaving the score alone. So the exemption needs BOTH
+        // halves, exactly as the primer rule does: indicated for a flagged
+        // joint, AND nothing but warm-up or other corrective work before it.
+        //
+        // THIS CHANGES WHAT THE METRIC MEASURES. Structure rises and scores
+        // from this commit on are not comparable with earlier ones. Hers to
+        // decide for that reason, and she did.
+        const onlyPrepBefore = day.exercises.slice(0, i).every(e => {
+          const before = dbEntry(e.name)
+          return !!before && (before.mechanics_tier === 'primer' || isIndicatedFor(before, flaggedJoints))
+        })
+        if (isCoreOrFinisher && onlyPrepBefore && isIndicatedFor(entry, flaggedJoints)) continue
         if (isCoreOrFinisher) {
           violatedRules.add('core_before_main')
           deductions.push({
@@ -726,7 +756,7 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
 const PUSH_PATTERNS = new Set(['push'])
 const PULL_PATTERNS = new Set(['pull'])
 
-function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
+function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclusions: string[] = []): DimensionResult {
   const block1 = mesocycle.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
   const [w1, w2, w3] = block1
   const week1 = mesocycle.find(w => w.week_number === 1)
@@ -760,7 +790,7 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     const experience = profile.training_experience || 'novice'
     let anyAccessoryRotated = experience === 'beginner' || experience === 'novice'
     let anyAccessoryHadAlternative = false
-    const pool = getConstrainedPool(profile, [])
+    const pool = getConstrainedPool(profile, exclusions)
     for (const day of w2.days) {
       const dayW3 = w3.days.find(d => d.day === day.day)
       if (!dayW3) continue
@@ -919,9 +949,21 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   // correctly scores clean. That is the same ordering guarantee the engine
   // relies on (filter first, prefer second) rather than a second opinion
   // about it.
-  const equipmentTier = profile.equipment_access || 'full_gym'
-  if (EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
-    const equipmentPool = getConstrainedPool(profile, [])
+  // NO DEFAULT, 21 Sep 2026. This used to fall back to 'full_gym' — the
+  // STRICTEST tier this rule has — when equipment_access was absent, which is
+  // backwards: ScoreContext's own convention (exercise-plan.ts) is that an
+  // omitted equipment tier means the factor is OFF, not that the trainee is
+  // assumed to own everything. A missing tier now skips this rule exactly
+  // the way generation skips its own equipment_fit factor for one.
+  const equipmentTier = profile.equipment_access
+  if (equipmentTier && EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
+    // CLOSED 22 Sep 2026: this pool now takes the trainee's REAL exclusions,
+    // threaded through scorePlan's ScoreOptions rather than hardcoded to
+    // `[]`. Named as a gap the day before and closed the day after — a
+    // trainee who has banned every loaded option in a pattern is no longer
+    // scored down for the band the app correctly gave them. Every existing
+    // caller that doesn't pass exclusions keeps identical behaviour (`[]`).
+    const equipmentPool = getConstrainedPool(profile, exclusions)
     // EVERY WEEK, not just week 1. Selection happens once and the later weeks
     // rotate off it — but rotation had no equipment term at all until 8 Sep
     // 2026, so the weeks this rule could not see were exactly the ones where
@@ -935,13 +977,21 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
         // Same exemptions the engine applies (rehab-indicated work, core) —
         // imported rather than restated so the harness can never start
         // penalising a pick the engine deliberately makes.
-        if (!entry || isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') continue
-        const betterAvailable = equipmentPool.some(p =>
-          p.movement_pattern === entry.movement_pattern &&
-          p.mechanics_tier === entry.mechanics_tier &&
-          bestEquipmentRank(p) === 'high'
-        )
-        if (!betterAvailable) continue
+        // ONE DEFINITION, SHARED WITH THE ENGINE — 21 Sep 2026, Ashley's call.
+        //
+        // This used to restate the question inline, on `movement_pattern` and
+        // with no test of whether the "better" peer could be loaded at all.
+        // The engine's predicate moved to `substitution_group` plus a loadable
+        // test, and leaving this one behind re-created the exact disagreement
+        // the work existed to remove — pointing the other way: the engine
+        // correctly kept a band lat pulldown and this rule went on calling it
+        // a defect.
+        //
+        // *** THE COUNT THIS RULE PRODUCES IS NOT COMPARABLE ACROSS THIS
+        // CHANGE. *** It now counts a narrower thing, so a drop is partly a
+        // change of definition and not only better plans. Any before/after
+        // quoting this rule must say which side of 21 Sep 2026 it came from.
+        if (!entry || !hasBetterLoadingPeer(entry, equipmentPool)) continue
         violatedRules.add('worse_implement_than_available')
         deductions.push({
           rule: 'worse_implement_than_available', day: day.day, weekNumber: week.week_number,
@@ -976,7 +1026,10 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
     }
   }
 
-  const pool = getConstrainedPool(profile, [])
+  // Same exclusions as above, for the same reason: a week can only be
+  // "missing" a pattern its own equipment AND injuries AND bans could
+  // actually have supplied.
+  const pool = getConstrainedPool(profile, exclusions)
   const poolHasSquat = pool.some(e => e.movement_pattern === 'knee_dominant' || e.movement_pattern === 'single_leg')
   const poolHasHinge = pool.some(e => e.movement_pattern === 'hip_hinge')
   const poolHasPush = pool.some(e => e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push')
@@ -1266,6 +1319,19 @@ export interface ScoreOptions {
    * profile. Deltas only — see the note above.
    */
   skipComparisons?: boolean
+  /**
+   * The trainee's own banned exercises — ADDED 22 Sep 2026. Every peer pool
+   * scoreSelection builds used to hardcode `[]` here, so a trainee who had
+   * banned every loaded option in a pattern could be marked down for the
+   * band the app correctly gave them: `worse_implement_than_available`
+   * would name a "better-loading option" that was never actually available
+   * to prescribe. The same gap affected two sibling checks in the same
+   * dimension — whether an accessory had room to rotate, and whether a week
+   * missing a pattern (push/pull/squat/hinge) could have held it at all.
+   * Absent means `[]`, so every existing caller keeps its exact behaviour;
+   * this is opt-in for callers that actually know the trainee's exclusions.
+   */
+  exclusions?: string[]
 }
 
 export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comboKey: string, opts?: ScoreOptions): PlanScoreResult {
@@ -1273,7 +1339,7 @@ export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comb
     timeFit: scoreTimeFit(profile, mesocycle),
     structure: scoreStructure(mesocycle, profile),
     progression: scoreProgression(profile, mesocycle),
-    selection: scoreSelection(profile, mesocycle),
+    selection: scoreSelection(profile, mesocycle, opts?.exclusions ?? []),
     goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey, opts),
     primerFit: scorePrimerFit(profile, mesocycle),
   }

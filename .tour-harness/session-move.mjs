@@ -74,7 +74,12 @@ const read = () => ev(`(() => {
     movedIn: inb ? inb.textContent.trim() : null,
     saysStartWorkout: buttons.includes('Start workout'),
     saysTrainAnyway: buttons.includes('Train it anyway'),
-    saysDoItToday: buttons.includes('Do it today instead →'),
+    // RE-ANCHORED 20 Sep 2026: the arrow went when the moved card's way back
+    // became a row in the "Change the plan" group rather than a dotted link —
+    // a row has a chevron of its own, so the arrow in the text was a second
+    // one. Matched on the words, which are what a person reads, rather than
+    // on the punctuation that came with one particular presentation.
+    saysDoItToday: buttons.some(b => /^Do it today instead/.test(b)),
     // The tier labels are leaf elements with exactly these words. Not a regex
     // over innerText: the week note says "the main lifts" in a sentence, and
     // /MAIN LIFT/i matched it on a screen with no list at all (8 Sep 2026).
@@ -146,7 +151,9 @@ await shoot('session-move-home')
 await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
 let before = await read()
 for (let i = 0; i < 12 && !before.saysDoItToday; i++) { await wait(500); before = await read() }
-await ev(`(() => { const b = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Do it today instead →'); if (b) b.click(); return !!b })()`)
+// Same prefix match as the read above — fixing one and not the other left the
+// check green and the TAP landing on nothing, which read as the unmake failing.
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(b => /^Do it today instead/.test(b.textContent.trim())); if (b) b.click(); return !!b })()`)
 let back = await read()
 for (let i = 0; i < 20 && !back.saysStartWorkout; i++) { await wait(500); back = await read() }
 check('10. tapping it brings the session back — Start workout, the list, no moved card',

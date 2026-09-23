@@ -100,13 +100,37 @@ console.log('\n2. The hook merges rather than re-listing fields')
 console.log('\n3. The set grid reads and writes those drafts')
 {
   const grid = stripComments(readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8'))
-  check('a typed value is written to the record', /saveSetDraft\(exerciseId, setNumber, next\)/.test(grid))
-  check('a stored draft is read back when nothing is in component state', /const draft = setDraft\(exerciseId, setNumber\)/.test(grid))
+  // RE-ANCHORED 17 Sep 2026, when a row became a KIND and a number. These
+  // three pinned the literal `exerciseId` argument; the grid now files a
+  // build-up's draft under its own namespace, so working set 1 cannot sweep
+  // away a typed-but-unsaved warm-up 3 (clearSetDrafts matches on the id
+  // prefix). The PROPERTY is unchanged and is what is checked now: a typed
+  // value survives, a logged set beats a draft, and a save clears its own.
+  check('a typed value is written to the record', /saveSetDraft\(draftIdFor\(ref\), setNumber, next\)/.test(grid))
+  check('a stored draft is read back when nothing is in component state', /const draft = setDraft\(draftIdFor\(ref\), ref\.setNumber\)/.test(grid))
   // Ordering matters: a real logged set is always the truth, and must win.
   const inputFor = grid.slice(grid.indexOf('const inputFor'), grid.indexOf('const ghostFor'))
+  // TWO indexOf RESULTS COMPARED WITHOUT ASKING WHETHER EITHER WAS FOUND —
+  // the standing rule, found live in this gate on 19 Sep 2026. `logsFor` was
+  // replaced by a resolver that handles all three row kinds, indexOf returned
+  // -1, and -1 is less than everything, so this check went on printing a tick
+  // over an anchor that no longer exists. Both ends are asserted present now,
+  // and the first is anchored on the resolver by whatever name it has.
+  const loggedAt = /logged\w*\(ref\)|logsFor\(ref\)/.exec(inputFor)?.index ?? -1
+  const draftAt = inputFor.indexOf('setDraft(')
   check('...but a logged set still wins over a draft',
-    inputFor.indexOf('existingLogs.find') < inputFor.indexOf('setDraft('), inputFor)
-  check('the draft is cleared once the set is logged', /clearSetDrafts\(exerciseId\)/.test(grid))
+    loggedAt >= 0 && draftAt >= 0 && loggedAt < draftAt, { loggedAt, draftAt })
+  check('the draft is cleared once the set is logged', /clearSetDrafts\(draftIdFor\(ref\)\)/.test(grid))
+  // AND THE TWO KINDS DO NOT SHARE A DRAWER. Without this the re-anchoring
+  // above would pass just as well with one namespace for both.
+  // RE-ANCHORED 19 Sep 2026 off the exact one-liner, which gained a third
+  // branch for drop rows. The property is that each KIND gets its own drawer,
+  // so a value typed into one cannot reappear in another of the same number.
+  const draftId = /const draftIdFor = \(ref: SetRef\) => \(([\s\S]*?)\n  \)/.exec(grid)?.[1]
+    ?? /const draftIdFor = \(ref: SetRef\) =>([^\n]*)/.exec(grid)?.[1] ?? ''
+  check('...and a build-up\'s draft is filed apart from the working set of the same number',
+    /isWarm\(ref\)/.test(draftId) && /#warmup/.test(draftId) && /:\s*exerciseId/.test(draftId), draftId)
+  check('...and a drop\'s apart from both', /isDrop\(ref\)/.test(draftId) && /#drop/.test(draftId), draftId)
   check('extra set rows come from the record, not component state',
     /const extraSetNumbers = extraSetsFor\(exerciseId\)/.test(grid) &&
     !/useState<number\[\]>\(\[\]\)/.test(grid))

@@ -110,8 +110,19 @@ check('...with the ceiling itself still a real number under 501',
 
 console.log('\n3. No control is drawn that cannot do anything\n')
 const setGrid = stripComments(read('src/components/exercise/SetGrid.tsx'))
+// RE-ANCHORED 20 Sep 2026, and it had been red for an hour. The condition
+// gained a second clause — a cable machine has no plates to work out, so the
+// button is hidden there too — and this check pinned the condition's exact
+// TEXT rather than the property, which is that the HANDLER gates the button.
+// The new condition is strictly narrower, so the property never weakened.
+//
+// Anchored on two things instead: the guard opens with the handler (so a
+// missing one short-circuits before anything else in the condition can run),
+// and the very next thing rendered is the button itself. Whatever else joins
+// the condition is free to change.
 check('the plate-calculator button only renders where a handler exists',
-  /\{onOpenPlateCalc && \(/.test(setGrid))
+  /\{onOpenPlateCalc &&[^\n]*\(\s*\n\s*<Button/.test(setGrid),
+  setGrid.match(/\{onOpenPlateCalc[^\n]*/)?.[0])
 check('...and Additional Work is given one', /onOpenPlateCalc=\{onOpenPlateCalc\}/.test(stripComments(read('src/components/exercise/AdditionalWorkSection.tsx'))))
 check('...threaded from the panel that has it',
   /<AdditionalWorkSection[^>]*onOpenPlateCalc=\{onOpenPlateCalc\}/.test(stripComments(read('src/components/exercise/TodayPanel.tsx'))))

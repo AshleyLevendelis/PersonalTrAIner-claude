@@ -34,15 +34,43 @@ const EFFORTS: { label: string; note: string; rpe: number }[] = [
   { label: 'Hard', note: 'intervals', rpe: 7 },
 ]
 
-export function AddCardioSession({ dayName, onAdd }: { dayName: string; onAdd: (a: string, m: number, rpe: number) => Promise<string | null> }) {
-  const [open, setOpen] = useState(false)
+export function AddCardioSession({
+  dayName,
+  onAdd,
+  startOpen = false,
+  onClose,
+}: {
+  dayName: string
+  onAdd: (a: string, m: number, rpe: number) => Promise<string | null>
+  /**
+   * WHO OWNS THE TRIGGER. Default false keeps the dotted-underline link this
+   * component has always rendered, which is still right for ActiveRecoveryCard
+   * — there the control is an aside on a day that already has a session.
+   *
+   * RestDayCard passes true because the rest-day rebuild (20 Sep 2026) moved
+   * that trigger into its "Change the plan" group, where it sits as a row with
+   * its scope in a subtitle. It had to move: as a bare link it was one of three
+   * identical dotted underlines, indistinguishable from "log a walk" — which
+   * writes one row for today, where this rewrites every one of these weekdays
+   * to the end of the block. The FORM is unchanged either way; only the thing
+   * that opens it moved.
+   */
+  startOpen?: boolean
+  /** Called when the form closes itself, so an owner rendering the trigger can drop back to it. */
+  onClose?: () => void
+}) {
+  const [open, setOpen] = useState(startOpen)
   const [activity, setActivity] = useState('')
   const [minutes, setMinutes] = useState('')
   const [rpe, setRpe] = useState(EFFORTS[1].rpe)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const close = () => { setOpen(false); setError(null); onClose?.() }
+
   if (!open) {
+    // Only reachable when this component owns its trigger — see startOpen.
+    if (startOpen) return null
     return (
       <button
         type="button"
@@ -70,7 +98,7 @@ export function AddCardioSession({ dayName, onAdd }: { dayName: string; onAdd: (
     const failure = await onAdd(activity.trim(), mins, rpe)
     setSaving(false)
     if (failure) { setError(failure); return }
-    setOpen(false)
+    close()
     setActivity(''); setMinutes('')
   }
 
@@ -104,7 +132,7 @@ export function AddCardioSession({ dayName, onAdd }: { dayName: string; onAdd: (
         <Button size="sm" className="h-8" disabled={!ready || saving} onClick={handleSave}>
           {saving ? <Loader2 className="size-3 animate-spin" /> : 'Add it'}
         </Button>
-        <button type="button" className="text-xs text-muted-foreground underline" onClick={() => { setOpen(false); setError(null) }}>
+        <button type="button" className="text-xs text-muted-foreground underline" onClick={close}>
           Cancel
         </button>
       </div>

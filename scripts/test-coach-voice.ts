@@ -24,7 +24,10 @@
 
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, resolve, dirname } from 'path'
-import { ask, whichOne, didNotSave, couldNot, SCOPE, GOAL_TERMS, RECEIPTS } from '../src/lib/coach-voice'
+import { ask, whichOne, didNotSave, couldNot, SCOPE, GOAL_TERMS, RECEIPTS, dietTargetCaveat } from '../src/lib/coach-voice'
+import { DIETARY_PREFERENCES, FORBIDDEN_TAGS } from '../src/lib/diet-rules'
+import { FOOD_DB } from '../src/lib/food-db'
+import { computeMacroSplitTargets, MACRO_SPLIT_PRESET_VALUES } from '../src/lib/macro-calculator'
 
 let failures = 0
 const check = (label: string, ok: boolean, extra?: unknown) => {
@@ -240,6 +243,94 @@ check('every goal has its own words', goals.length === 4 && goals.every(g => !!G
 check('...and no two goals share a noun', new Set(goals.map(g => GOAL_TERMS[g].noun)).size === goals.length)
 check('the three scopes say three different things',
   new Set([SCOPE.today('Monday'), SCOPE.thisWeek('Monday'), SCOPE.restOfBlock]).size === 3)
+
+console.log('\n[8] Keto and Low-carb say what they actually buy\n')
+// ---------------------------------------------------------------------------
+// Ashley's ruling, 20 Sep 2026, from four options: say it on the setup screen.
+// The trap this section exists for is a sentence that overclaims — it is a
+// caveat, so every word in it is the app describing its own limits, and a
+// wrong one is worse than silence.
+const ketoLine = dietTargetCaveat(['keto'])
+check('picking Keto produces a line at all', typeof ketoLine === 'string' && ketoLine.length > 40, ketoLine)
+// BOTH ENDS OF THE SENTENCE, found by a MISSED mutation: the first version
+// checked only the SUBJECT, so collapsing the split name to 'a keto split'
+// for everyone passed — a Low-carb user told their target is "not a keto
+// split", which is true and answers a question they did not ask.
+check('...Low-carb gets one too, and names itself rather than Keto',
+  (dietTargetCaveat(['low-carb']) ?? '').startsWith('Low-carb')
+  && /not a low-carb split\.$/.test(dietTargetCaveat(['low-carb']) ?? '')
+  && !/keto/i.test(dietTargetCaveat(['low-carb']) ?? ''),
+  dietTargetCaveat(['low-carb']))
+check('...and Keto names keto, so the two are not one sentence with a swapped noun',
+  /not a keto split\.$/.test(ketoLine ?? ''), ketoLine)
+check('...and picking both says it once, not twice',
+  (dietTargetCaveat(['keto', 'low-carb']) ?? '').split('Your daily carb target').length === 2,
+  dietTargetCaveat(['keto', 'low-carb']))
+// THE OTHER TWENTY DIETS MUST STAY SILENT. A warning under Vegan or Nut-free
+// would say the app honours them less than it does, which is the same class
+// of untruth pointing the other way.
+const others = DIETARY_PREFERENCES.filter(d => d !== 'keto' && d !== 'low-carb')
+check(`every other diet is silent (${others.length} of them)`,
+  others.every(d => dietTargetCaveat([d]) === null),
+  others.filter(d => dietTargetCaveat([d]) !== null))
+check('...and an empty selection says nothing', dietTargetCaveat([]) === null && dietTargetCaveat() === null)
+
+// EVERY CLAIM IN THE SENTENCE IS CHECKED AGAINST THE ACTUAL FILTER, because a
+// caveat that names the wrong foods is the app asserting a guard it lacks.
+// The first draft said "sugary fruit" and would have been false: the filter
+// blocks DRIED fruit and lets fresh banana, grapes and mango through.
+const ketoBlocks = (name: string) => {
+  const entry = FOOD_DB.find(f => f.name.toLowerCase() === name || f.aliases.some(a => a.toLowerCase() === name))
+  if (!entry) return null
+  return FORBIDDEN_TAGS.keto.some(t => (entry.tags as Record<string, unknown>)[t] === true)
+}
+for (const food of ['bread', 'pasta', 'white rice', 'potato', 'sugar']) {
+  check(`the sentence names ${food}, and the filter really refuses it`,
+    ketoBlocks(food) === true, ketoBlocks(food))
+}
+check('...and beans, which the sentence also names', ketoBlocks('black beans') === true && ketoBlocks('chickpeas') === true)
+check('the sentence says fresh fruit is NOT filtered, and it really is not',
+  ketoBlocks('banana') === false && ketoBlocks('grapes') === false && ketoBlocks('mango') === false,
+  { banana: ketoBlocks('banana'), grapes: ketoBlocks('grapes'), mango: ketoBlocks('mango') })
+check('...and the line actually says so rather than only implying it',
+  /not fresh fruit/i.test(ketoLine ?? ''))
+// NO PROMISE. "not a keto split YET" would commit the app to building one,
+// which nobody has decided to do.
+check('it states the limit without promising to remove it', !/\byet\b/i.test(ketoLine ?? ''), ketoLine)
+// AND THE TARGET CLAIM IS TRUE — derived, not asserted. A keto target would be
+// under 50g; the app floors carbs AT 50 and fills them from the remainder.
+const ketoTarget = computeMacroSplitTargets(75, 2200, MACRO_SPLIT_PRESET_VALUES.lower_carb)
+check('the daily carb target really is not ketogenic, even on the lowest-carb preset the UI offers',
+  ketoTarget.carbs > 50 && (ketoTarget.carbs * 4) / ketoTarget.calories > 0.10,
+  { carbs: ketoTarget.carbs, shareOfEnergy: Math.round((ketoTarget.carbs * 4) / ketoTarget.calories * 100) })
+// AND THE FLOOR IS WHAT STOPS THE EXTREME CASE, which the check above cannot
+// see — at 75kg/2200 carbs come from the remainder and never touch it, so
+// lowering CARB_FLOOR_G changed nothing and the mutation came back MISSED.
+// This profile is chosen because the floor ACTUALLY ENGAGES: protein and fat
+// eat the whole budget, the remainder lands under 50, and the floor lifts it
+// back. That is the one case where the app could otherwise drift into a
+// ketogenic number by accident rather than by design.
+const flooredCase = computeMacroSplitTargets(100, 1500, MACRO_SPLIT_PRESET_VALUES.lower_carb)
+check('the floor really engages on this profile (sanity check on the check below)',
+  flooredCase.clampedCarbFloor === true, flooredCase)
+check('...and it holds carbs AT the non-ketogenic floor rather than below it',
+  flooredCase.carbs >= 50, flooredCase.carbs)
+
+// BOTH PLACES THE CHOICE IS MADE RENDER IT, from the shared function rather
+// than a copy — the drift this whole module exists to prevent.
+for (const [what, file] of [['setup', 'src/components/onboarding/SlotChipsCard.tsx'], ['Profile', 'src/components/ProfileScreen.tsx']] as const) {
+  const src = read(file)
+  check(`the ${what} picker calls the shared line`, /dietTargetCaveat\(/.test(src) && /from '@\/lib\/coach-voice'/.test(src))
+  // THE GUARD, NOT JUST THE BODY — found by a MISSED mutation. Replacing the
+  // condition with `{false && (` left the testid and the call in the file, so
+  // a check for either passed over a caveat that can never render. The
+  // property is that what DECIDES whether it appears is the function itself.
+  check(`...and renders it rather than computing and dropping it`,
+    /data-testid="diet-target-caveat"/.test(src) && /\{dietTargetCaveat\([^)]*\)\}/.test(src))
+  check(`...and it is the line itself that decides whether the ${what} picker shows it`,
+    /dietTargetCaveat\([^)]*\)\s*&&/.test(src),
+    src.match(/\{[^{}]*&&\s*\(?\s*\n?\s*<p data-testid="diet-target-caveat"/)?.[0])
+}
 
 console.log(failures === 0 ? '\nOne voice, in the words the app writes itself.\n' : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

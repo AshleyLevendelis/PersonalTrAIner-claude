@@ -148,7 +148,20 @@ console.log('\n6. The measured rate, across a real grid')
   // loss is the LATERAL RAISE, not the tricep work the review complained about.
   const shoulder = lost.get('isolation_shoulder') ?? 0
   const tricep = lost.get('isolation_tricep') ?? 0
-  check('the side delt is still the most-dropped slot, not the triceps', shoulder > tricep, { shoulder, tricep })
+  //
+  // RE-ANCHORED 18 Sep 2026, because the fix below emptied its subject. This
+  // read `shoulder > tricep`, which needs the loss to still be happening: the
+  // one-main-lift guard took this grid from 12 dropped slots to 0, and a check
+  // that asserts a defect persists goes red on the commit that removes it. When
+  // a check blocks a fix, suspect the check.
+  //
+  // The property was never "slots are dropped". It is "IF a named isolation
+  // slot is lost, it is the side delt and not the tricep work the review
+  // complained about". Stated that way, an empty grid passes honestly and a
+  // tricep loss still fails — and the count is printed on every run so a zero
+  // reads as a zero rather than as silence.
+  console.log(`  dropped isolation slots: shoulder=${shoulder} tricep=${tricep} (total ${shoulder + tricep})`)
+  check('the triceps are never the dominant dropped slot', tricep === 0 || shoulder > tricep, { shoulder, tricep })
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

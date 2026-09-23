@@ -51,6 +51,12 @@ const PROFILE_ID = 'harness-profile'
 // what day it is where the machine is.
 setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 const FULL_GYM = new URLSearchParams(location.search).get('fullgym') === '1'
+// INPUT ONLY. The fixture picks the DIET; the sentence under the picker is
+// whatever ProfileScreen and the phrasebook decide to print for it. Writing
+// the caveat text here would be the harness testing itself — the `?prep=1`
+// mistake of 18 Sep 2026, which spent weeks proving a fixture's own number
+// reached the screen.
+const KETO = new URLSearchParams(location.search).get('keto') === '1'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
 
@@ -70,7 +76,7 @@ const baseProfile: UserProfile = {
   training_experience: 'intermediate', session_duration_preference: '60-90',
   workout_split_preference: 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
-  weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
+  weekly_schedule: {}, dietary_preferences: KETO ? ['keto'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
   // ANSWERED, so the row renders with a value and the driver's change is a

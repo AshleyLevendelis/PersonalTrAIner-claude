@@ -123,8 +123,6 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
    */
   setDraft: (exerciseId: string, setNumber: number) => SetDraft | undefined
   /** Which ramp-up steps are ticked for this exercise today. A place-keeper, never a log. */
-  rampTicksFor: (exerciseId: string) => number[]
-  toggleRampTick: (exerciseId: string, setNumber: number) => void
   /** Areas she said felt tight before today's session — drives the extra warm-up drills. */
   tightAreas: string[]
   setTightAreas: (areas: string[]) => void
@@ -281,22 +279,23 @@ export function ActiveSessionProvider({
   // starts or ends.
   useEffect(() => { statusRef.current = status }, [status])
   const [startedAtIso, setStartedAtIso] = useState<string | null>(null)
-  /**
-   * Ramp ticks, MIRRORED INTO REACT STATE and not only into the record.
-   *
-   * The set drafts next door deliberately skip a mirror: a draft changes on
-   * every keystroke and lives in an uncontrolled input, so a re-render per
-   * character would cost more than it buys. A tick is the opposite — the
-   * whole point is that the step LOOKS different afterwards, and a value read
-   * straight from localStorage gives React nothing to re-render on.
-   *
-   * Copying the drafts' pattern is exactly what I did first, and the browser
-   * caught it: the tap wrote through, the strip did not change, and the tick
-   * only appeared after a tab switch remounted the row. A tick you cannot see
-   * is worse than no tick, because you tap it again.
-   */
-  const [rampTicks, setRampTicks] = useState<Record<string, number[]>>({})
   const [tightAreas, setTightAreasState] = useState<string[]>([])
+  /**
+   * THE EXTRA ROWS ARE REACT STATE, NOT JUST A STORED FIELD — 17 Sep 2026.
+   *
+   * This used to live only in the persisted record, read back through
+   * currentRecord() on each render. Nothing subscribes to that store, so
+   * "Add Set" wrote the row and the screen did not change: the new box
+   * appeared later, whenever something unrelated re-rendered the card. Found
+   * in the browser, invisible from the source — the write succeeded, the
+   * value was correct, and the button read as dead on a phone. The ramp
+   * ticks above solved the identical problem with a state mirror; this is
+   * that, and the record stays the durable copy for a reload mid-session.
+   * (The ramp ticks it was copied from are gone — Ashley's 17 Sep ruling
+   * replaced them with real rows — but the pattern they proved is why this
+   * one works.)
+   */
+  const [extraSets, setExtraSetsState] = useState<Record<string, number[]>>({})
 
   // Hydrate status/startedAtIso from the persisted record on identity
   // change — same pattern restEndsAt already uses below.
@@ -309,8 +308,8 @@ export function ActiveSessionProvider({
     const record = getActiveSessionRecord(identity.profileId, identity.date)
     setStatus(record?.status ?? 'idle')
     setStartedAtIso(record?.startedAtIso ?? null)
-    setRampTicks(record?.rampTicks ?? {})
     setTightAreasState(record?.tightAreas ?? [])
+    setExtraSetsState(record?.extraSets ?? {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 
@@ -607,43 +606,25 @@ export function ActiveSessionProvider({
   }, [currentRecord, patchRecord])
 
   const extraSetsFor = useCallback((exerciseId: string): number[] =>
-    currentRecord()?.extraSets?.[exerciseId] ?? [], [currentRecord])
+    extraSets[exerciseId] ?? [], [extraSets])
 
-  // --- Ramp ticks (7 Sep 2026) ------------------------------------------
-  //
-  // Which warm-up steps have been marked done. Same storage as the drafts
-  // above and for the same reason: it has to survive a tab switch, or it is
-  // no use to someone holding a phone between sets. It is NOT a log — see
-  // ActiveSessionRecord.rampTicks for why recording warm-ups would change
-  // nothing the app ever shows back.
-  const rampTicksFor = useCallback((exerciseId: string): number[] =>
-    rampTicks[exerciseId] ?? [], [rampTicks])
-
-  const toggleRampTick = useCallback((exerciseId: string, setNumber: number) => {
-    setRampTicks(prev => {
-      const current = prev[exerciseId] ?? []
-      const next = current.includes(setNumber)
-        ? current.filter(n => n !== setNumber)
-        : [...current, setNumber].sort((a, b) => a - b)
-      const updated = { ...prev, [exerciseId]: next }
-      // Written through in the same tick, so a reload mid-warm-up finds it.
-      patchRecord({ rampTicks: updated })
-      return updated
-    })
-  }, [patchRecord])
-
-  // Written through in the same tick, like the ramp ticks beside it: somebody
-  // answering this is standing in a changing room, and an answer that did not
-  // survive a glance at another tab would be worse than not asking.
+  // Written through in the same tick: somebody answering this is standing in a
+  // changing room, and an answer that did not survive a glance at another tab
+  // would be worse than not asking.
   const setTightAreas = useCallback((areas: string[]) => {
     setTightAreasState(areas)
     patchRecord({ tightAreas: areas })
   }, [patchRecord])
 
   const setExtraSets = useCallback((exerciseId: string, setNumbers: number[]) => {
-    const existing = currentRecord()?.extraSets ?? {}
-    patchRecord({ extraSets: { ...existing, [exerciseId]: setNumbers } })
-  }, [currentRecord, patchRecord])
+    setExtraSetsState(prev => {
+      const updated = { ...prev, [exerciseId]: setNumbers }
+      // Written through in the same tick: a reload between sets must find the
+      // rows that are on screen.
+      patchRecord({ extraSets: updated })
+      return updated
+    })
+  }, [patchRecord])
 
   const persistDeclaredOffPlan = useCallback((names: string[]) => {
     patchRecord({ declaredOffPlan: names })
@@ -803,8 +784,6 @@ export function ActiveSessionProvider({
     setDraft,
     saveSetDraft,
     clearSetDrafts,
-    rampTicksFor,
-    toggleRampTick,
     tightAreas,
     setTightAreas,
     extraSetsFor,

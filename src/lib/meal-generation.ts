@@ -34,7 +34,8 @@ import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
-import { getPools, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
+import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
+import { isMissingColumnError } from './missing-column'
 
 export const MIN_COVERAGE = 0.8
 export const DEFAULT_POOL_SIZE = 5
@@ -114,6 +115,33 @@ export interface PoolOption {
   ingredients: { name: string; quantity: number; unit: string }[]
   macros: MacroTargets
   tags: string[]
+  /**
+   * How to cook it — technique only, never amounts. OPTIONAL on purpose: pools
+   * stored before this existed have none, and several option builders
+   * (custom meals, a food added or swapped within a meal) legitimately produce
+   * a meal with no method at all. An absent method renders as no method, which
+   * is honest; a wrong one would not be.
+   */
+  prep?: string
+  /**
+   * Set when this option is a portion of another slot's meal — today's lunch
+   * being last night's dinner, under the batch-cooking preference.
+   *
+   * NEVER PERSISTED, and that is deliberate rather than an omission: a
+   * leftover is derived fresh from the rotation on every render, exactly as
+   * the rest of the assembled day is, so storing one would create a second
+   * copy that could disagree with the dinner it came from. It exists so the
+   * card can SAY where the meal came from — a repeat the app cannot explain
+   * is indistinguishable from the repeat bug fixed the same morning.
+   */
+  leftoverFrom?: MealSlotName
+  /**
+   * Set on tonight's dinner when tomorrow's lunch is going to be a portion of
+   * it, so the card can promise the repeat BEFORE it happens rather than
+   * explaining it afterwards. Derived, never persisted, for the same reason
+   * `leftoverFrom` is.
+   */
+  reusedTomorrow?: boolean
 }
 
 export interface RawProposal {
@@ -259,6 +287,40 @@ export function checkSlotAppropriate(
   }
 
   return null
+}
+
+/**
+ * A quantity of FOOD appearing in prose: a number followed by a mass or volume
+ * unit. Deliberately does not match times ("simmer for 10 minutes") or oven
+ * temperatures ("200C"), which are not amounts of an ingredient and are the
+ * most useful things a method can tell you.
+ */
+const FOOD_QUANTITY_IN_PROSE =
+  /\b\d+(?:[.,]\d+)?\s*(?:g|gram|grams|kg|kilo|kilos|kilogram|kilograms|ml|millilitre|millilitres|milliliter|milliliters|l|litre|litres|liter|liters|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|lbs|pound|pounds|cup|cups)\b/i
+
+/**
+ * The method, if it is safe to show beside the ingredient list — otherwise
+ * nothing.
+ *
+ * WHY A METHOD CAN BE UNSAFE. The model proposes roughly the right portions
+ * and `scaleToTarget` then multiplies every ingredient to hit the slot budget,
+ * by as much as 2.5x. A method that says "fry the 200g of chicken" is
+ * therefore describing an amount the ingredient list beside it no longer
+ * contains — the app printing a number it did not verify, next to numbers it
+ * did. That is the thing load-prescription.ts forbids in its own domain and
+ * the reason this exists.
+ *
+ * THE WHOLE METHOD GOES, NOT THE OFFENDING SENTENCE. Removing one step leaves
+ * instructions that skip something; a meal with no method is a smaller loss
+ * than a meal whose method quietly disagrees with its own ingredients. The
+ * generation prompt asks for technique without amounts, so this should be the
+ * rare case rather than the common one — but the prompt is a request to a
+ * model and this is the check.
+ */
+export function methodSafeToShow(prep: string | undefined): string {
+  const text = (prep ?? '').trim()
+  if (text.length === 0) return ''
+  return FOOD_QUANTITY_IN_PROSE.test(text) ? '' : text
 }
 
 /**
@@ -411,6 +473,10 @@ export function verifyProposal(
     // existed purely to leak into the UI as meaningless chips. Every option
     // reaching here already passed checkSlotAppropriate above regardless.
     tags: [proposal.cuisine, prepBand].filter(Boolean),
+    // Technique only. A method naming an amount is dropped rather than shown
+    // next to the rescaled ingredients it would contradict — see
+    // methodSafeToShow.
+    prep: methodSafeToShow(proposal.prep),
   }
 }
 
@@ -630,6 +696,51 @@ export async function generateMealPools(params: {
   return { accepted, rejectionLog, shortfalls, unrecognisedPreferences: [...unrecognisedPreferences].sort(), generatorReached }
 }
 
+/** A row as this module writes it. `prep` is the only key that can be absent from the database — see insertPoolRows. */
+type PoolRowInsert = {
+  profile_id: string
+  slot: string
+  pool_index: number
+  name: string
+  ingredients: unknown
+  macros: unknown
+  tags: unknown
+  prep: string
+}
+
+/**
+ * THE ONE PLACE THIS MODULE WRITES POOL ROWS, so a database that has not run
+ * 20260919120000 costs a cooking method and never a meal.
+ *
+ * PostgREST rejects the WHOLE statement when a payload names a column it does
+ * not know, so before the migration lands every one of these inserts fails —
+ * and the callers below treat a failed insert as "the slot could not be
+ * saved", which is exactly right and exactly what nobody wants to happen
+ * because of a text field.
+ *
+ * WHY A RETRY AND NOT `addedLoadPayload`'S OMIT-WHEN-EMPTY, measured rather
+ * than assumed: omitting an empty `prep` only helps while generate-meals has
+ * not been deployed, because a deployed generator fills the field on every
+ * option. The live risk is the other order — the function deployed, the
+ * migration pending — and omit-when-empty does nothing for it. So the retry
+ * is the mechanism that works and it is the only one kept (CLAUDE.md: two
+ * mechanisms for one property, measure which one works before keeping both).
+ *
+ * One extra round trip before the migration, none after, and it self-heals.
+ */
+async function insertPoolRows(rows: PoolRowInsert[], what: string): Promise<{ error: { code?: string; message?: string } | null }> {
+  const { error } = await supabase.from('meal_plan_slots').insert(rows)
+  if (!error || !isMissingColumnError(error, 'prep')) return { error }
+  console.warn(
+    `[Meals] the prep column is not present — ${what} was saved WITHOUT its cooking method. ` +
+    'Run `npm run db:push-both` to apply migration 20260919120000.'
+  )
+  const { error: retryError } = await supabase
+    .from('meal_plan_slots')
+    .insert(rows.map(({ prep: _prep, ...rest }) => rest))
+  return { error: retryError }
+}
+
 /** One stored pool row, as persistPools reads it back and may have to write it again unchanged. */
 interface PoolRowSnapshot {
   pool_index: number
@@ -637,6 +748,7 @@ interface PoolRowSnapshot {
   ingredients: unknown
   macros: unknown
   tags?: string[] | null
+  prep?: string | null
 }
 
 /**
@@ -662,8 +774,9 @@ async function appendPools(
       ingredients: opt.ingredients,
       macros: { kcal: opt.macros.calories, protein: opt.macros.protein, carbs: opt.macros.carbs, fat: opt.macros.fat },
       tags: opt.tags,
+      prep: opt.prep ?? '',
     }))
-    const { error } = await supabase.from('meal_plan_slots').insert(rows)
+    const { error } = await insertPoolRows(rows, `the extra options for ${slot}`)
     if (error) console.error(`Failed to append pool options for slot ${slot}:`, error)
   }
 }
@@ -681,6 +794,25 @@ async function appendPools(
  * nothing, a delete that fails inserts nothing, and an insert that fails puts
  * the old pool back exactly as it was.
  */
+/**
+ * Does this stored meal survive "Regenerate all"?
+ *
+ * KEPT: meals asked for by name, and meals hearted. Both are the user saying
+ * "this one stays", and regeneration replaces what the APP suggested — Ashley,
+ * 3 Sep 2026, after asking the coach for steak and watching a regenerate take
+ * it away.
+ *
+ * A FUNCTION RATHER THAN A CONDITION INSIDE THE LOOP, because a gate needs to
+ * ask this and reading a filter body with a regex is how three checks ended up
+ * pinned to one line of JSX earlier the same day. The two tags stay separate:
+ * "I asked for this by name" and "I like this" are different facts, and one
+ * tag meaning both makes either impossible to count later.
+ */
+export function survivesRegeneration(tags: string[] | null | undefined): boolean {
+  const list = tags ?? []
+  return list.includes(USER_REQUESTED_TAG) || list.includes(FAVOURITE_TAG)
+}
+
 async function persistPools(profileId: string, accepted: Partial<Record<MealSlotName, PoolOption[]>>): Promise<void> {
   for (const [slot, options] of Object.entries(accepted) as [MealSlotName, PoolOption[]][]) {
     if (options.length === 0) continue
@@ -703,7 +835,12 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
     // every path already relies on.
     const { data: keepRows, error: readError } = await supabase
       .from('meal_plan_slots')
-      .select('pool_index, name, ingredients, macros, tags')
+      // `*` rather than a column list — see missing-column.ts. Naming `prep`
+      // before the migration lands makes this read fail, and a failed read
+      // here means the slot is skipped entirely: regeneration would silently
+      // do nothing rather than lose a meal, which is the safe half of a
+      // failure nobody would have been told about.
+      .select('*')
       .eq('profile_id', profileId)
       .eq('slot', slot)
     // NOT a shrug-and-carry-on. This read is the only thing that knows which
@@ -715,7 +852,7 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       continue
     }
     const previous = (keepRows ?? []) as PoolRowSnapshot[]
-    const keep = previous.filter(row => (row.tags ?? []).includes(USER_REQUESTED_TAG))
+    const keep = previous.filter(row => survivesRegeneration(row.tags))
 
     const { error: deleteError } = await supabase.from('meal_plan_slots').delete().eq('profile_id', profileId).eq('slot', slot)
     if (deleteError) {
@@ -733,6 +870,7 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       ingredients: opt.ingredients,
       macros: { kcal: opt.macros.calories, protein: opt.macros.protein, carbs: opt.macros.carbs, fat: opt.macros.fat },
       tags: opt.tags,
+      prep: opt.prep ?? '',
     }))
     // Appended AFTER the fresh options, keeping pool_index contiguous. Their
     // macros are re-inserted exactly as stored — a meal she chose is not
@@ -745,14 +883,15 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       ingredients: row.ingredients,
       macros: row.macros,
       tags: row.tags,
+      prep: row.prep ?? '',
     }))
-    const { error } = await supabase.from('meal_plan_slots').insert([...rows, ...keptRows])
+    const { error } = await insertPoolRows([...rows, ...keptRows], `the new pool for ${slot}`)
     if (error) {
       console.error(`Failed to persist pool for slot ${slot}:`, error)
       // The delete already landed, so doing nothing here leaves the slot
       // empty. Put back exactly what was there, pool_index included.
       if (previous.length > 0) {
-        const { error: restoreError } = await supabase.from('meal_plan_slots').insert(
+        const { error: restoreError } = await insertPoolRows(
           previous.map(row => ({
             profile_id: profileId,
             slot,
@@ -761,7 +900,9 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
             ingredients: row.ingredients,
             macros: row.macros,
             tags: row.tags,
+            prep: row.prep ?? '',
           })),
+          `the previous pool for ${slot}`,
         )
         if (restoreError) console.error(`...and restoring the previous pool for slot ${slot} failed too:`, restoreError)
       }
@@ -927,7 +1068,7 @@ function dayWithinTolerance(totals: MacroTargets, targets: MacroTargets): boolea
  * scoring only penalised a shortfall (`Math.max(0, target - actual)`), which
  * is exactly why nothing ever pushed back on the QA sweep's ~1.7x overshoot.
  */
-function macroDistanceScore(totals: MacroTargets, targets: MacroTargets): number {
+export function macroDistanceScore(totals: MacroTargets, targets: MacroTargets): number {
   return relDiff(totals.calories, targets.calories) * 1.0
     + relDiff(totals.protein, targets.protein) * 0.6
     + relDiff(totals.carbs, targets.carbs) * 0.25
@@ -966,17 +1107,105 @@ function optionMatchesLikedFood(option: PoolOption, liked: string[]): boolean {
 }
 
 /**
+ * How much a day that repeats a recent meal is penalised WHEN NO COMBINATION
+ * REACHES TOLERANCE — the only case left where variety is a tiebreak rather
+ * than a sort key. Unchanged in value and in meaning from when it was the
+ * whole mechanism; see `rankCombo` for why it could never work as one.
+ */
+export const REPEAT_TIEBREAK = 0.01
+
+/**
+ * A combination's place in the order, compared field by field in the order
+ * declared. Lower is better throughout.
+ */
+interface ComboRank {
+  /** 0 = inside the day's tolerance bands, 1 = outside them. Never traded away. */
+  tier: 0 | 1
+  /** How many slots hold a meal seen in the last few days. */
+  repeats: number
+  /** Weighted relative macro distance, plus the soft-like and multi-exotic penalties. */
+  fit: number
+}
+
+interface BestCombo {
+  combo: Partial<Record<MealSlotName, PoolOption>>
+  totals: MacroTargets
+  rank: ComboRank
+}
+
+/**
+ * WHY VARIETY IS A SORT KEY HERE AND NOT A PENALTY, which is the whole point
+ * of this function.
+ *
+ * Until 19 Sep 2026 every preference — day-to-day variety, cuisine coherence,
+ * stated likes — was a small constant added to the macro-distance score, and
+ * variety's constant was 0.01, the cost of a 1% calorie miss. Measured over
+ * 500 profiles walking a seven-day horizon with the history threaded exactly
+ * as grocery-store does: **1.11 distinct days out of 7, and 89.4% of profiles
+ * ate the identical day all week**. The gap between the best combination and
+ * the best one sharing no meal with it is a median 0.033 — three times the
+ * penalty — so the tiebreak could only ever win an almost exact tie. It was
+ * not switched off; it could not work. (`measure:meal-variety` re-runs this.)
+ *
+ * A bigger constant is the wrong fix: any number large enough to buy variety
+ * is by definition large enough to buy a day that misses its targets. The
+ * right frame is that the app ALREADY has a definition of a correct day — the
+ * tolerance bands — and every combination inside them is correct. Among
+ * correct days, variety costs nothing real, so it should not be haggling with
+ * macro fit in the same units at all.
+ *
+ * Hence the order below: tolerance, then variety, then fit.
+ *
+ * ONLY VARIETY IS PROMOTED, AND THAT IS DELIBERATE. The soft-food-like nudge
+ * sits in `fit` exactly where it has always sat, still worth
+ * SOFT_FOOD_MISS_PENALTY against macro distance and no more. Lifting it to a
+ * key of its own was tried on the way to this change and backed out: it makes
+ * a stated like ABSOLUTE within tolerance, which contradicts that penalty's
+ * own recorded position — *"a soft preference is a tiebreak between days that
+ * fit equally well, never a reason to ship a worse-fitting day"* — and
+ * test:soft-preferences pins the boundary that says so. Variety was the
+ * measured defect; a calibrated decision about somebody's food preferences is
+ * not something to redefine in passing while fixing it.
+ *
+ * OUTSIDE TOLERANCE NOTHING CHANGES. A day the app cannot get right spends
+ * everything on getting it as close as possible, with variety back to being
+ * the old 0.01 tiebreak — which is why `repeats` is folded into `fit` for
+ * tier 1 and left at zero. Do not "simplify" that: it is what keeps a day
+ * that misses its targets from being chosen for its novelty.
+ */
+function rankCombo(inTolerance: boolean, repeats: number, fit: number): ComboRank {
+  if (inTolerance) return { tier: 0, repeats, fit }
+  return { tier: 1, repeats: 0, fit: fit + (repeats > 0 ? REPEAT_TIEBREAK : 0) }
+}
+
+/**
+ * Keeps whichever of the two ranks higher, and the FIRST on an exact tie, so
+ * the result is stable for a given pool order the way the old strict `<` was.
+ * The candidate's combo is copied here because the search mutates one object
+ * as it walks.
+ */
+function betterOf(current: BestCombo | null, candidate: BestCombo): BestCombo {
+  if (!current) return { ...candidate, combo: { ...candidate.combo } }
+  const a = candidate.rank
+  const b = current.rank
+  if (a.tier !== b.tier) return a.tier < b.tier ? { ...candidate, combo: { ...candidate.combo } } : current
+  if (a.repeats !== b.repeats) return a.repeats < b.repeats ? { ...candidate, combo: { ...candidate.combo } } : current
+  return a.fit < b.fit ? { ...candidate, combo: { ...candidate.combo } } : current
+}
+
+/**
  * Picks one option per active slot from `pools` to best match the day's
  * targets across all four macros: calories within ±5%, protein within
  * −5%/+15% (a real two-sided band, not a one-sided floor), carbs and fat
  * within a looser ±25% each (see dayWithinTolerance/macroDistanceScore).
  * Pools are small (a few options per slot), so this is a full cartesian
  * search over every combination rather than a heuristic — cheap and exact.
- * Among combinations that hit every band, and as a tiebreak among all
- * combinations otherwise, prefers ones that don't repeat a name in
- * `recentNames` (best-effort day-to-day variety; a slot whose entire pool was
- * used recently can still repeat — this is a preference, not a hard
- * constraint the pool must satisfy).
+ * Among combinations that hit every band, prefers the one repeating the
+ * fewest names in `recentNames`, and the closest macro fit among those. See
+ * `rankCombo` for why variety is a sort key rather than a penalty, and for
+ * what happens when no combination hits every band. A slot whose entire pool
+ * was used recently can still repeat: this is a preference, not a constraint
+ * the pool must satisfy.
  *
  * If NO combination reaches tolerance, applies one bounded proportional
  * scale to the day's single largest-calorie slot (closing exactly the gap
@@ -1024,7 +1253,6 @@ export function assembleDay(
     return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools, missingSlots }
   }
 
-  type BestCombo = { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; score: number }
   // Held in a wrapper object (not a bare `let`) so TS's control-flow narrowing
   // doesn't get confused by the closure below mutating it across calls.
   const state: { best: BestCombo | null } = { best: null }
@@ -1033,7 +1261,7 @@ export function assembleDay(
     if (index === slots.length) {
       const chosenOptions = slots.map(s => combo[s]!)
       const totals = sumOptionMacros(chosenOptions)
-      const repeatsAny = slots.some(s => recentNames[s]?.includes(combo[s]!.name))
+      const repeats = slots.filter(s => recentNames[s]?.includes(combo[s]!.name)).length
       // Cuisine coherence (meal-realism round): each slot's pool already
       // caps at one exotic option, but nothing previously stopped a day from
       // picking THAT exotic option in every slot at once. Soft tiebreak only
@@ -1041,18 +1269,19 @@ export function assembleDay(
       // calorie/protein fit always wins first.
       const exoticSlots = slots.filter(s => isExoticOption(combo[s]!)).length
       const exoticPenalty = exoticSlots > 1 ? (exoticSlots - 1) * 0.005 : 0
-      // Lower score wins: macroDistanceScore weighs all four macros
-      // (calories dominant, protein second, carbs/fat loosest), and a
-      // same-as-recent combo or multi-exotic day is only a mild tiebreak
-      // penalty — variety/coherence are preferences, never worth shipping a
-      // worse-fitting day for.
       // At least ONE liked thing in the day, not as many as possible: someone
       // who says they love salmon wants salmon once, not at every meal.
       const missesEveryLikedFood = softLikedFoods.length > 0
         && !slots.some(s => optionMatchesLikedFood(combo[s]!, softLikedFoods))
-      const score = macroDistanceScore(totals, targets) + (repeatsAny ? 0.01 : 0) + exoticPenalty
+      // The soft-like and multi-exotic nudges live INSIDE fit, at the
+      // magnitudes they have always had. See rankCombo.
+      const fit = macroDistanceScore(totals, targets) + exoticPenalty
         + (missesEveryLikedFood ? SOFT_FOOD_MISS_PENALTY : 0)
-      if (!state.best || score < state.best.score) state.best = { combo: { ...combo }, totals, score }
+      state.best = betterOf(state.best, {
+        combo,
+        totals,
+        rank: rankCombo(dayWithinTolerance(totals, targets), repeats, fit),
+      })
       return
     }
     const slot = slots[index]
@@ -1151,7 +1380,7 @@ export function chosenToMealPlanDays(chosen: Partial<Record<MealSlotName, PoolOp
         carbs: Math.round(option.macros.carbs),
         fat: Math.round(option.macros.fat),
         portion_size: option.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`).join(', '),
-        prep: '',
+        prep: option.prep ?? '',
         substitution: '',
         ingredients: option.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`),
         // Unlike M0's ban on this field (the old Edamam-verification claim

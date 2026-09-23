@@ -5144,6 +5144,60 @@ export function searchExerciseCatalog(query: string, limit = 20): ExerciseEntry[
   return [...startsWith.sort(byName), ...contains.sort(byName)].slice(0, limit)
 }
 
+/** Punctuation is not meaning: "Iso-Lateral" and "iso lateral" are the same words. */
+function catalogWords(text: string): string[] {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean)
+}
+
+/**
+ * THE PICKER'S SEARCH, which wants RECALL — a superset of the matcher above,
+ * never a replacement for it.
+ *
+ * Ashley, 17 Sep 2026, mid-session in a gym: "Iso lateral leg curl isn't
+ * available as a swap". It IS in the catalogue. MEASURED the same day, typing
+ * her exact words into the box returned "No matching exercise found", because
+ * the strict matcher above needs one contiguous substring and the entry is
+ * named "Iso-Lateral Kneeling Leg Curl" — her hyphen is missing and the word
+ * "Kneeling" sits in the middle. Even "iso-lateral leg curl" failed. Only the
+ * bare fragment "iso-lateral" worked.
+ *
+ * That box is not a nicety: it is the escape hatch Ashley RULED FOR on 13 Sep
+ * 2026 ("show everything, warn me" — the shortlist is constrained, the search
+ * reaches the whole catalogue). A search that cannot find her own words makes
+ * that ruling untrue in practice.
+ *
+ * SO WHY NOT JUST WIDEN THE ONE ABOVE. Because its other two callers are
+ * RESOLVERS, not pickers, and they want the opposite thing:
+ *   - fact-compiler.ts:38 turns a typed phrase into resolved_refs, and a HARD
+ *     dislike bans every name returned. More recall there silently bans more
+ *     exercises than the person named.
+ *   - set-parse.ts:292 keys on `results.length === 1` to decide a logged set
+ *     is unambiguous. More recall there turns resolved into ambiguous.
+ * A picker's false positive costs one line of reading; a resolver's changes
+ * her plan or her diary. One function was serving two requirements, and that
+ * was the actual defect — so the difference is now named rather than split
+ * into a second matcher. The strict tiers here come from calling the function
+ * above, so there is exactly one implementation of them; this only APPENDS a
+ * looser tier below everything it already found.
+ */
+export function searchExerciseCatalogByWords(query: string, limit = 20): ExerciseEntry[] {
+  const strict = searchExerciseCatalog(query, limit)
+  const words = catalogWords(query)
+  if (words.length < 2) return strict
+  const already = new Set(strict.map(e => e.name))
+  const allWords: ExerciseEntry[] = []
+  for (const ex of EXERCISE_DATABASE) {
+    if (ex.retired || already.has(ex.name)) continue
+    const nameWords = catalogWords(ex.name)
+    // Every word she typed has to appear, so "leg curl" cannot drag in a leg
+    // press. A prefix counts, so "iso" finds "iso-lateral" — but only a
+    // prefix, so "curl" never matches "curls" the other way round by accident.
+    if (words.every(w => nameWords.some(nw => nw.startsWith(w)))) allWords.push(ex)
+  }
+  allWords.sort((a, b) => a.name.localeCompare(b.name))
+  return [...strict, ...allWords].slice(0, limit)
+}
+
 /**
  * The slug scheme behind every ExerciseEntry.id. The SQL backfill in the C0
  * migration derives exercise_id with the Postgres equivalent of exactly this

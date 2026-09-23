@@ -34,9 +34,174 @@ export function filterLoggableSets(
     const matches = l.exercise_id ? l.exercise_id === exerciseId : l.exercise_name === exerciseName
     if (!matches) return false
     if (l.is_warmup) return false
+    // DROPS ARE NOT SETS, and this function is named by LAYOUT-DESIGN §5.2 as
+    // the sole source for every checkmark, count, progress line and completion
+    // state. A drop is a continuation of the set above it — letting one in
+    // here would turn "3 working sets" into 5 on every one of those surfaces,
+    // which is the exact outcome Ashley's 19 Sep ruling chose the drop_index
+    // column to avoid. Volume asks a different question and has its own
+    // reader, `setsCountingTowardVolume`, below.
+    if (isDropRow(l)) return false
     if (isMalformedZeroWeight(l)) return false
     return true
   })
+}
+
+/** 0 and absent are the same thing: a row that is a set rather than a drop. */
+export function isDropRow(l: Pick<ExerciseSetLog, 'drop_index'>): boolean {
+  return (l.drop_index ?? 0) > 0
+}
+
+/**
+ * The drops hanging off one exercise — same identity match and same malformed
+ * guard as its two siblings. Pass `parentSetNumber` for the drops of one set.
+ */
+export function filterDropSets(
+  logs: ExerciseSetLog[],
+  exerciseId: string,
+  exerciseName?: string,
+  parentSetNumber?: number,
+): ExerciseSetLog[] {
+  return logs.filter(l => {
+    const matches = l.exercise_id ? l.exercise_id === exerciseId : l.exercise_name === exerciseName
+    if (!matches) return false
+    if (l.is_warmup) return false
+    if (!isDropRow(l)) return false
+    if (parentSetNumber !== undefined && l.set_number !== parentSetNumber) return false
+    if (isMalformedZeroWeight(l)) return false
+    return true
+  })
+}
+
+/**
+ * Every row whose work counts as working volume: the sets AND their drops.
+ *
+ * The one place the two are added together, so "how many sets" and "how much
+ * work" can never drift into meaning the same thing. Deliberately NOT a flag
+ * on filterLoggableSets, for the reason its own doc gives about its sibling:
+ * the function every count depends on should not carry a switch that changes
+ * what a count means.
+ */
+export function setsCountingTowardVolume(
+  logs: ExerciseSetLog[],
+  exerciseId: string,
+  exerciseName?: string,
+): ExerciseSetLog[] {
+  return [
+    ...filterLoggableSets(logs, exerciseId, exerciseName),
+    ...filterDropSets(logs, exerciseId, exerciseName),
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// A SET'S IDENTITY IS A KIND AND A NUMBER, NOT A NUMBER
+//
+// Ashley, 17 Sep 2026, ruling from three options after standing in a gym with
+// three boxes for five sets: "A box for every set, labelled — Warm-up 1, 2, 3
+// then Set 1, 2, 3 — each with its own box. Warm-up boxes are marked as
+// warm-ups so they never count toward your weight going up." This reverses her
+// 7 Sep ruling ("tick them off, don't record them"), which was made about a
+// strip of chips before anyone had watched a real lifter run out of rows.
+//
+// TWO NAMESPACES, NOT ONE CONTINUOUS RUN, and that is forced by four
+// mechanisms that already exist rather than chosen for tidiness: the database
+// unique constraint includes is_warmup, `naturalKey` already spells the kind
+// 'w'/'s' (set-log-store.ts:175-177), getLastSessionSets dedupes on
+// `${set_number}|${is_warmup}`, and dedupeAndRenumberSets groups on
+// `${exerciseId}|${isWarmup}`. So warm-up 1 and working 1 are already distinct
+// rows everywhere it matters — no migration, no renumbering.
+//
+// WHICH IS EXACTLY WHY THE SCREEN MUST CARRY THE KIND TOO. The moment both can
+// exist, every place the UI uses a BARE set number as an identity becomes a
+// collision: the typed-value map, the row error, the armed delete, the PR
+// badge, the weight input's DOM id, and `deleteSet` itself — whose four
+// callers all omit the kind and default it to false, so deleting a warm-up row
+// would tombstone the WORKING set of the same number. One pair, threaded
+// through, closes all of them at once instead of six separate guards.
+// ---------------------------------------------------------------------------
+
+export type SetKind = 'warmup' | 'working'
+/**
+ * A row's identity. `dropIndex` absent or 0 is the set itself; 1, 2, ... are
+ * the drops hanging off it.
+ *
+ * A DROP IS NOT A THIRD KIND, and that is the point. It is a working set's
+ * continuation, so it belongs on the working namespace with an extra
+ * coordinate rather than beside 'warmup' — which is also what stops the
+ * database's own key (set_number + is_warmup + drop_index) and the screen's
+ * key from disagreeing about what a row is.
+ */
+export interface SetRef { kind: SetKind; setNumber: number; dropIndex?: number }
+
+/** 'w2' / 's2' / 's3.1' — the same discriminator set-log-store's naturalKey spells, so the screen and the store never disagree about what a row is. */
+export function rowKey(ref: SetRef): string {
+  const base = `${ref.kind === 'warmup' ? 'w' : 's'}${ref.setNumber}`
+  return ref.dropIndex ? `${base}.${ref.dropIndex}` : base
+}
+
+/**
+ * The short prefix in the row's first column: 'R2' for a ramp step, '3' for a
+ * working set, '3·1' for its first drop.
+ *
+ * 'R', not 'W', since 19 Sep 2026 — the handoff's label for the ramp group,
+ * whose header ("RAMP UP · not counted") now carries the meaning the longer
+ * word used to. `setLabelLong` below is unchanged and still says "Warm-up",
+ * which is the half a screen reader hears.
+ */
+export function setLabel(ref: SetRef): string {
+  if (ref.kind === 'warmup') return `R${ref.setNumber}`
+  return ref.dropIndex ? `${ref.setNumber}\u00b7${ref.dropIndex}` : `${ref.setNumber}`
+}
+
+/**
+ * The full words, for anything read aloud or read back — a receipt or an
+ * aria-label must not say "R1".
+ *
+ * THIS IS WHAT KEEPS TWO ROWS FROM SHARING ONE SPOKEN NAME, the standing rule
+ * written after a tick button said "Save set 2" on both a warm-up row and a
+ * working row. Shortening the VISIBLE label to R2 does not shorten this one.
+ */
+export function setLabelLong(ref: SetRef): string {
+  if (ref.kind === 'warmup') return `Warm-up ${ref.setNumber}`
+  return ref.dropIndex ? `Set ${ref.setNumber}, drop ${ref.dropIndex}` : `Set ${ref.setNumber}`
+}
+
+/**
+ * The build-up rows for one exercise — the mirror of filterLoggableSets, with
+ * the same identity match and the same malformed-row guard.
+ *
+ * DELIBERATELY NOT A PARAMETER ON ITS SIBLING. `filterLoggableSets` is named by
+ * LAYOUT-DESIGN §5.2 as the sole source for every checkmark, count, progress
+ * line and completion state in the app; giving it a `kind` argument puts a
+ * footgun on the one function whose whole job is to be the thing nobody has to
+ * think about.
+ */
+export function filterWarmupSets(
+  logs: ExerciseSetLog[],
+  exerciseId: string,
+  exerciseName?: string,
+): ExerciseSetLog[] {
+  return logs.filter(l => {
+    const matches = l.exercise_id ? l.exercise_id === exerciseId : l.exercise_name === exerciseName
+    if (!matches) return false
+    if (!l.is_warmup) return false
+    if (isMalformedZeroWeight(l)) return false
+    return true
+  })
+}
+
+/**
+ * Does this session carry an explicit build-up marking at all?
+ *
+ * The bridge between the old data and the new. Every session logged before
+ * this shipped has `is_warmup` false on every row, because nothing could set
+ * it — so the progression engine has to INFER which rows were build-up, and
+ * `workingSetsOf` does. From the moment a session carries one real warm-up
+ * row, the app KNOWS, and guessing would be strictly worse than reading. This
+ * is what lets the inference retire by itself rather than living for ever.
+ */
+export function sessionDeclaresWarmups(logs: ExerciseSetLog[]): boolean {
+  return logs.some(l => l.is_warmup === true)
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +260,46 @@ export type RampDisplay =
  * equipment's real loadable minimum so "0% of working weight" never
  * displays as an unsafe 0kg.
  */
+/**
+ * The two counters the progress track draws, from ONE derivation.
+ *
+ * Ashley's handoff, 19 Sep 2026: a continuous row of segments — N violet for
+ * the ramp, a gap, M mint for the working sets — with "RAMP n/N" and
+ * "WORKING n/M" beneath it. The header inside each group states the same
+ * numbers, so they are computed here once and read twice rather than counted
+ * in two places that can disagree. Same reason the meal refit computes its
+ * verdict once and hands the object to both surfaces.
+ *
+ * TOTALS ARE THE LARGER OF PRESCRIBED AND DONE. A lifter who adds a fourth
+ * working set has done 4 of 4, not 4 of 3 — a track that overflows its own
+ * width is the app telling someone their extra effort was a mistake.
+ */
+export interface SetProgress {
+  rampDone: number
+  rampTotal: number
+  workingDone: number
+  workingTotal: number
+}
+
+export function setProgress(
+  logs: ExerciseSetLog[],
+  exerciseId: string,
+  exerciseName: string | undefined,
+  prescribedRamp: number,
+  prescribedWorking: number,
+): SetProgress {
+  const rampDone = filterWarmupSets(logs, exerciseId, exerciseName).length
+  // Drops are excluded here because filterLoggableSets excludes them: the
+  // track counts SETS, and a drop is part of the set above it.
+  const workingDone = filterLoggableSets(logs, exerciseId, exerciseName).length
+  return {
+    rampDone,
+    rampTotal: Math.max(prescribedRamp, rampDone),
+    workingDone,
+    workingTotal: Math.max(prescribedWorking, workingDone),
+  }
+}
+
 export function formatRampSets(ex: Exercise): RampDisplay | null {
   if (!ex.ramp_up) return null
   if (ex.ramp_up.exercise !== ex.name) return { kind: 'stale' }
@@ -375,6 +580,12 @@ export function computeOffPlanWork(
     byId.set(id, { exerciseId: id, name, source: 'declared' })
   }
   for (const log of logs) {
+    // A BUILD-UP IS NOT "ADDITIONAL WORK". Its sibling at the bottom of this
+    // file has skipped warm-ups since it was written; this loop never did,
+    // because until 17 Sep 2026 no warm-up row could exist. Without it, a
+    // build-up logged against an exercise that was later swapped out raises an
+    // "Additional work" card for a lift nobody did a working set of.
+    if (log.is_warmup) continue
     const id = log.exercise_id ?? getExerciseId(log.exercise_name)
     if (plannedIds.has(id)) continue
     if (!byId.has(id)) byId.set(id, { exerciseId: id, name: log.exercise_name, source: 'logged' })

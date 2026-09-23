@@ -27,10 +27,11 @@
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { formatLoad, splitLoadDisplay, loadingMode, isPerSideLoad } from '../src/lib/load-prescription'
-import { getExerciseEntry } from '../src/lib/exercise-db'
+import { formatLoad, splitLoadDisplay, loadingMode, isPerSideLoad, takesPlateCalculator } from '../src/lib/load-prescription'
+import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
 let failures = 0
 const check = (name: string, ok: boolean, detail?: unknown) => {
@@ -174,6 +175,52 @@ console.log('\n4. The rule this all rests on still holds')
   const squat = getExerciseEntry('Barbell Squats')!
   check('a barbell-only movement is priced as a total',
     loadingMode(squat) === 'barbell' && !isPerSideLoad(squat), { equipment: squat.equipment })
+}
+
+// ---------------------------------------------------------------------------
+// §N. IS THERE ANYTHING FOR A PLATE CALCULATOR TO WORK OUT?
+//
+// Ashley's handoff, 19 Sep 2026: no plate calculator on cable exercises. On a
+// selectorised stack the pin IS the weight, so a control offering to work out
+// the plates describes a machine that is not in front of her — the app's
+// standing "never offer what is not there" rule, met on a row.
+//
+// THESE CALL THE PREDICATE, they do not grep for it. A check that greps the
+// JSX for `takesPlateCalculator(` proves an expression is written down; only
+// calling it proves it ANSWERS correctly, and only the render checks below
+// prove the answer reaches a screen.
+// ---------------------------------------------------------------------------
+console.log('\nN. THE PLATE CALCULATOR, WHERE THERE ARE PLATES')
+{
+  const cable = getExerciseEntry('Lat Pulldown')!
+  const bar = getExerciseEntry('Barbell Squats')!
+  const bw = getExerciseEntry('Push-Ups')!
+  check('a cable machine is offered no plate calculator', takesPlateCalculator(cable) === false,
+    { name: cable.name, equipment: cable.equipment })
+  check('...while a barbell still is', takesPlateCalculator(bar) === true, { equipment: bar.equipment })
+  // THE BOUNDARY THAT MAKES THIS CABLE AND NOT `loadingMode === 'stack'`.
+  // 149 of 201 entries fall through to 'stack' — press-ups among them, and
+  // the plate-loaded machines too. Hiding the calculator from all of them is
+  // the same defect in the other direction, so the rule reads the equipment.
+  check('...and the rule is not simply "every stack"',
+    loadingMode(bw) === 'stack' && takesPlateCalculator(bw) === true, { mode: loadingMode(bw) })
+  // A row whose exercise is not in the catalogue keeps the control: the app
+  // does not know it is pin-loaded, and removing a working control on a guess
+  // is worse than leaving one that is merely unhelpful.
+  check('an unknown exercise keeps it rather than losing it on a guess', takesPlateCalculator(undefined) === true)
+  // EVERY CABLE ENTRY, not the one that was easy to name.
+  const cables = EXERCISE_DATABASE.filter(e => (e.equipment ?? []).some(x => /cable/i.test(x)))
+  check('every cable entry in the catalogue answers the same way',
+    cables.length >= 10 && cables.every(e => takesPlateCalculator(e) === false), { count: cables.length })
+
+  // AND IT REACHES BOTH SURFACES. The row's own button and the header link
+  // are two controls making one claim; a rule applied to one of them is the
+  // "said twice, answered differently" shape.
+  const grid = read('src/components/exercise/SetGrid.tsx')
+  const row = read('src/components/exercise/ExerciseRow.tsx')
+  check('the set grid asks it before drawing the button',
+    /onOpenPlateCalc && takesPlateCalculator\(/.test(grid), grid.match(/.{0,60}takesPlateCalculator.{0,40}/)?.[0])
+  check('...and so does the header link', /takesPlateCalculator\(catalogEntry\) && \(/.test(row))
 }
 
 console.log(failures === 0 ? '\nAll load-display checks passed.\n' : `\n${failures} FAILED\n`)

@@ -10,7 +10,7 @@ import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { supabase } from '@/lib/supabase'
-import { getRecentLogs, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
+import { getRecentLogsWithWarmups, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
@@ -37,7 +37,7 @@ import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE } from '@/lib/coach-voice'
 import { isHedged } from '@/lib/definite-mention'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
@@ -71,7 +71,7 @@ import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDo
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
-import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter } from '@/lib/chat-plan-context'
+import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -84,6 +84,8 @@ import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
+import { buildCoachInjuriesSummary } from '@/lib/injuries-context'
+import { buildCoachWaterSummary } from '@/lib/water-context'
 import { ProposalCard } from '@/components/chat/ProposalCard'
 import { TypewriterMarkdown } from '@/components/chat/TypewriterMarkdown'
 import { ReceiptCard } from '@/components/chat/ReceiptCard'
@@ -94,12 +96,13 @@ import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { pickOpener, missedYesterdayFrom, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
+import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
   type NudgeInput, type NudgeStore,
 } from '@/lib/coach-nudge'
+import { markFavourite } from '@/lib/favourite-meals'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -928,7 +931,44 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
       todayLogged: activeSession.logs.length > 0,
       tomorrowSession,
+      // ONE REAL THING WORTH NOTICING, or nothing. Built from facts the
+      // proactive read already holds, so this costs no extra query — and
+      // null when there is nothing, because a "noticed" line invented to
+      // fill a rotation slot is the app making small talk about a fact it
+      // does not have.
+      noticed: noticedFact(),
+      lastOrdinaryKind: readLastOrdinaryKind(profile.id ?? ''),
     })
+  }
+
+  /**
+   * THE "SOMETHING IT NOTICED" OPENER'S SUBJECT.
+   *
+   * A personal best outranks a streak because it is the more specific fact,
+   * and specificity is the whole difference between a coach who is paying
+   * attention and one making conversation. Both are read off the same
+   * proactive data Home draws from, so the two can never disagree.
+   *
+   * THE UNIT COMES FROM THE PHRASEBOOK. Two other lines in this file printed
+   * `${pr.weightKg}kg` and would have said "0kg" for a bodyweight best — the
+   * same defect fixed on three screens on 17 Sep 2026 and still live here.
+   */
+  const noticedFact = (): { text: string; chips?: string[] } | null => {
+    const pr = proactiveData?.recentPRs[0]
+    if (pr) {
+      return {
+        text: `nice one on ${pr.exerciseName} — ${personalBest(bestReadingOf(pr.metric, pr.value))} is a best. How's it feeling?`,
+        chips: ['How am I doing so far?'],
+      }
+    }
+    const streak = proactiveData?.streak ?? 0
+    if (streak >= 3) {
+      return {
+        text: `${streak} days on the trot now. How are you holding up?`,
+        chips: ['How am I doing so far?'],
+      }
+    }
+    return null
   }
 
   // ---------------------------------------------------------------------------
@@ -1107,7 +1147,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const recentPR = proactiveData?.recentPRs[0]
       const detail = initialGreetingDetail()
       const scheduleLine = recentPR
-        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${personalBest(bestReadingOf(recentPR.metric, recentPR.value))}. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
         : buildInitialGreeting()
       // Chat round 2, item 1 — a brand-new user meets someone, rather than
       // opening a tool. Several short messages instead of one block: who this
@@ -1138,10 +1178,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // complete sentence; the how-did-it-feel kind carries none, per
       // Ashley's ruling that the answer there should be a sentence, not a tap.
       const opener = composeOpener()
-      const detailLine = `${opener.text.charAt(0).toUpperCase()}${opener.text.slice(1)}`
-      const content = recentPR
-        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${recentPR.weightKg}kg. ${detailLine}`
-        : `${greetName()} — ${opener.text}`
+      // ONE MECHANISM FOR THE PR, NOT TWO. A recent best used to be glued in
+      // front of WHATEVER the opener said — so it stacked onto a missed-day
+      // line, and from 17 Sep 2026 it would have said the same PR twice, once
+      // as the prefix and once as the rotation's "noticed" opener. It is now
+      // one of the three things the coach may open with, and nothing else.
+      const content = `${greetName()} — ${opener.text}`
       void scheduleLine
       setMessages([{
         role: 'assistant',
@@ -1149,13 +1191,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         status: 'complete',
         quickReplies: opener.chips.length > 0 ? opener.chips : undefined,
       }])
+      // ADVANCE THE ROTATION, so the next conversation opens differently.
+      // After setMessages rather than before: a bubble that never rendered
+      // should not count as something the coach said.
+      rememberOrdinaryKind(profile.id ?? '', opener.kind)
       // The opener has now said its one thing, so coach-nudge.ts must not say
       // it again the moment she replies. Burnt WITHOUT starting the quiet
       // period: she opened the chat herself, so this bubble is not an
       // interruption and must not delay one that would be.
       writeNudgeStore(rememberWithoutSpeaking(
         nudgeStore(),
-        keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), Boolean(recentPR)),
+        keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), opener.kind === 'noticed'),
       ))
     }
 
@@ -1270,7 +1316,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!profile.id) return
     try {
       const [logs, cardioLogs] = await Promise.all([
-        getRecentLogs(profile.id, 14),
+        getRecentLogsWithWarmups(profile.id, 14),
         getRecentCardioLogs(profile.id, 14),
       ])
       setWorkoutLogHistory(formatLogsForAI(logs))
@@ -1316,47 +1362,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const upsertFavorite = async (action: { new_item: string; meal_slot: string; protein: number; carbs: number; fat: number; portion_size?: string; prep?: string }) => {
     if (!profile.id) return
-
-    const calories = calculateCalories(action.protein, action.carbs, action.fat)
-
-    const { data: existing } = await supabase
-      .from('favorite_meals')
-      .select('id, times_used')
-      .eq('profile_id', profile.id)
-      .eq('name', action.new_item)
-      .maybeSingle()
-
-    if (existing) {
-      await supabase
-        .from('favorite_meals')
-        .update({
-          times_used: existing.times_used + 1,
-          last_used_at: new Date().toISOString(),
-          meal_slot: action.meal_slot,
-          calories,
-          protein: action.protein,
-          carbs: action.carbs,
-          fat: action.fat,
-          portion_size: action.portion_size || null,
-          prep: action.prep || null,
-        })
-        .eq('id', existing.id)
-    } else {
-      await supabase
-        .from('favorite_meals')
-        .insert({
-          profile_id: profile.id,
-          name: action.new_item,
-          meal_slot: action.meal_slot,
-          calories,
-          protein: action.protein,
-          carbs: action.carbs,
-          fat: action.fat,
-          portion_size: action.portion_size || null,
-          prep: action.prep || null,
-        })
-    }
-
+    // ONE WRITE PATH WITH THE MEAL CARD'S HEART. This used to be a private
+    // upsert living only here, so the screen had no way to name a favourite at
+    // all — the coach knew them and the Nutrition tab could not add one. When
+    // the heart was built on 19 Sep 2026 the obvious move was a second upsert
+    // beside this one, and two writers of one table drift. Both call
+    // markFavourite now.
+    await markFavourite(profile.id, {
+      name: action.new_item,
+      slot: action.meal_slot,
+      calories: calculateCalories(action.protein, action.carbs, action.fat),
+      protein: action.protein,
+      carbs: action.carbs,
+      fat: action.fat,
+      portionSize: action.portion_size,
+      prep: action.prep,
+    })
     loadFavorites()
   }
 
@@ -1378,6 +1399,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // carried no prescribed weight while the Exercise tab showed that weight
     // on the next screen.
     const stepsSummary = buildCoachStepsSummary(todaySteps, profile)
+    const injuriesSummary = buildCoachInjuriesSummary(profile)
+    // Same shape as steps_summary below, and the same shared source: reads
+    // proactiveData rather than re-deriving it, so the coach's number and
+    // the Dashboard's number cannot drift apart.
+    const waterSummary = proactiveData ? buildCoachWaterSummary(proactiveData.waterMl, proactiveData.waterTargetMl) : null
     // WHICH DAY IT IS, ANSWERED RATHER THAN IMPLIED. Ashley, 7 Sep 2026: the
     // coach called Tuesday's bench "today's", then offered a finished Monday
     // session as something to head in for "this morning" at 6:33 PM. Every
@@ -1477,6 +1503,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const liveTdee = liveBmr != null ? computeStaticTDEE(liveBmr, profile.activity_level) : null
 
     return {
+      /**
+       * HER LOCAL TIME, IN WORDS, from the one place that decides what part of
+       * the day it is. Added 17 Sep 2026: the prompt section literally headed
+       * TEMPORAL AWARENESS stated the time ONLY as `current_date`, a raw UTC
+       * instant — an hour behind her clock in British summer, with no timezone
+       * note and no time-of-day word anywhere in it. The two correct
+       * statements were elsewhere and quieter than the two assertions that she
+       * trains mornings.
+       */
+      current_part_of_day: partOfDay(now.getHours()),
       current_date: now.toISOString(),
       /**
        * TODAY, AS THE APP RECKONS IT — the same YYYY-MM-DD every screen and
@@ -1506,6 +1542,23 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         activity_level: profile.activity_level,
         fitness_goal: profile.fitness_goal,
         preferred_time: profile.preferred_time,
+        // What the coach needs to judge equipment quality when IT picks a
+        // replacement (pain swaps, "give me something different") — was
+        // never sent, so a swap-preference rule referencing it would have
+        // been dead prompt text. See EQUIPMENT-QUALITY AWARENESS below.
+        equipment_access: profile.equipment_access,
+        // Also never sent — same shape as equipment_access above. Absent on
+        // an activity-only profile (the starting-out walking plan has no
+        // lifting-experience tier), so the prompt says so rather than
+        // guessing 'novice'.
+        training_experience: profile.training_experience,
+        // The third of the same optional trio (types.ts groups all three
+        // under one comment: no honest value on an activity-only profile).
+        // Found in a systematic pass checking every UserProfile field
+        // against this object: training_style is used all over this very
+        // component (building the style-change proposal, computing the
+        // split) and never once reaches the coach.
+        training_style: profile.training_style,
         bmr: liveBmr,
         tdee: liveTdee,
       },
@@ -1539,6 +1592,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       training_days_count: profile.training_days.filter(d => d.available).length,
       exercise_summary: exerciseSummary,
       steps_summary: stepsSummary,
+      water_summary: waterSummary,
+      injuries_summary: injuriesSummary,
       phase_brief: phaseBrief,
       // Empty string when there is nothing to say — which is also what stops
       // the coach asking twice: once record_session_feel writes `felt`, the
@@ -1743,11 +1798,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
+    // EVERY TURN SAYS WHEN IT WAS SAID — see stampTurnTime. History is
+    // restored with no date filter, so this morning's conversation is replayed
+    // into this evening's; undated, the coach's own 8am "this morning" reads
+    // as the sentence immediately before this one.
+    const historyNow = getAppNow(profile.id)
     const history = messages
       .filter(m => m.status === 'complete' || m.status === undefined)
       .slice(1)
       .slice(-PAGE_SIZE)
-      .map(m => ({ role: m.role, content: m.content }))
+      .map(m => ({ role: m.role, content: stampTurnTime(m.content, m.created_at, historyNow) }))
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -2021,6 +2081,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial, weekNumber: activeSession.liveWeek,
       dayName: day.day, kind: 'swap', scope, exerciseName: oldEx.name, newExerciseName: newEntry.name,
+      exclusions: exerciseExclusions,
     }, {
       kind: 'swap',
       exerciseName: oldEx.name,
@@ -2117,6 +2178,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
       dayName, kind: 'add', scope, exerciseName: entry.name,
+      exclusions: exerciseExclusions,
     })
 
     return {
@@ -2312,6 +2374,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
       dayName: day.day, kind: 'remove', scope, exerciseName: target.exerciseName,
+      exclusions: exerciseExclusions,
     }, {
       kind: 'remove',
       exerciseName: target.exerciseName,
@@ -4245,6 +4308,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         date: activeSession.date,
         exerciseId: key.exerciseId,
         setNumber: key.setNumber,
+        // Carried from the row being corrected, not assumed — the executor
+        // reads it off the log it is replacing. Same for the drop index: a
+        // correction to the first drop of set 3 must tombstone that drop and
+        // not set 3.
+        isWarmup: key.isWarmup,
+        dropIndex: key.dropIndex,
       }),
     })
     onLogsUpdated?.()
@@ -5823,7 +5892,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // clearing them), so restoring first and deleting second would delete
       // the sets just put back.
       for (const key of keys) {
-        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber })
+        // FALSE, AND IT IS A FACT ABOUT THIS PATH RATHER THAN A DEFAULT: an
+        // undo token only ever names sets the COACH logged, and the coach's
+        // writer hard-codes is_warmup false (chat-gemini/index.ts). If it ever
+        // gains a way to log a build-up, the token has to carry the kind and
+        // this line has to read it — the type now forces that conversation.
+        activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false, dropIndex: 0 })
       }
       for (const pre of replaced) activeSession.logSet(pre)
       // deleteSet is the raw store function (unlike logSet, which already

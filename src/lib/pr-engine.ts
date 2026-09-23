@@ -1,3 +1,4 @@
+import type { BestReading } from './coach-voice'
 import { supabase } from './supabase'
 import type { ExerciseSetLog } from './types'
 
@@ -72,6 +73,25 @@ export interface PRResult {
   previousAddedLoadKg: number
 }
 
+/**
+ * HOW A PR RESULT IS READ OUT, decided here rather than at each screen.
+ *
+ * Two screens used to rebuild this with their own ternary over four fields,
+ * and both got the estimate case wrong in the same way: `type === 'e1rm'`
+ * means the WEIGHT did not move — you lifted less for more reps — so printing
+ * newWeight alone told someone whose best is 100kg that their new best was
+ * 95kg. Ashley's ruling, 17 Sep 2026, from three options: keep celebrating
+ * it, and show the whole set.
+ *
+ * 'both' and 'weight' stay a plain weight: the bar genuinely went up.
+ */
+export function readingFor(result: PRResult): BestReading {
+  if (result.metric === 'reps') return { kind: 'reps', reps: result.newReps }
+  if (result.metric === 'added_load') return { kind: 'added_load', addedKg: result.newAddedLoadKg }
+  if (result.type === 'e1rm') return { kind: 'best_set', weightKg: result.newWeight, reps: result.newReps }
+  return { kind: 'load', weightKg: result.newWeight }
+}
+
 export interface SessionSet {
   setNumber: number
   weight: number
@@ -90,6 +110,12 @@ export interface SessionSet {
  */
 export function toSessionSets(logs: ExerciseSetLog[]): SessionSet[] {
   return logs
+    // A BUILD-UP SET IS NOT A PERSONAL BEST, and this is the structural place
+    // to say so rather than at each caller. Added 17 Sep 2026, when warm-up
+    // rows became real: without it a 20kg opener on a brand-new exercise is a
+    // candidate maximum, and on a high-rep build-up it can win the bodyweight
+    // "most reps in one set" record outright.
+    .filter(l => !l.is_warmup)
     .filter(l => l.reps_completed > 0)
     .map(l => ({
       setNumber: l.set_number,
@@ -144,7 +170,12 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
   // by the query, so there is one rule rather than two.
   const { data, error } = await supabase
     .from('exercise_set_logs')
-    .select('exercise_name, weight_kg, reps_completed, completed_at, is_bodyweight, added_load_kg')
+    // `*`, NOT A COLUMN LIST, so this keeps working on a database that has
+    // not run the drop migration. Naming `drop_index` here would be rejected
+    // outright before the column exists — and this function swallows the
+    // error (`if (error || !data) return`), so every personal best in the app
+    // would quietly vanish until somebody ran db:push-both.
+    .select('*')
     .eq('user_id', userId)
     .eq('is_warmup', false)
     .gt('reps_completed', 0)
@@ -153,6 +184,14 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
 
   const cache: Record<string, PRRecord> = {}
   for (const row of data) {
+    // A DROP IS NOT A PERSONAL BEST — Ashley's ruling, 19 Sep 2026, and the
+    // CSCS basis recorded with it: a drop is performed already fatigued,
+    // immediately after a working set, with no rest. It is the easier half of
+    // one effort, which is the same reasoning that already excludes warm-ups
+    // two lines up. This is the SEVENTH member of the exclusion family named
+    // in the comment above, and it is here rather than in the query for the
+    // reason that comment now gives.
+    if (((row as { drop_index?: number | null }).drop_index ?? 0) > 0) continue
     const shape: SetShape = {
       weightKg: Number(row.weight_kg),
       reps: row.reps_completed,

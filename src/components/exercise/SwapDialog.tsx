@@ -6,9 +6,10 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
-import { getExerciseEntry, searchExerciseCatalog, type ExerciseEntry } from '@/lib/exercise-db'
+import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getReplacementCandidates, type SwapScope } from '@/lib/mesocycle-edit'
+import { OUTSIDE_YOUR_STYLE } from '@/lib/coach-voice'
 import type { UserProfile } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -96,11 +97,17 @@ export function SwapDialog({
   const replacements = target && profile
     ? getReplacementCandidates(target.exerciseName, profile, exclusions, softExercisePreferences)
     : []
+  // ONE LIST, MARKED PER ROW — Ashley's ruling, 18 Sep 2026, settling the
+  // collision between her 10 Sep rule (a loaded lift is never offered an
+  // unloaded replacement above a loaded one) and her own choice an hour
+  // earlier to sink off-style options. WEIGHT ALWAYS WINS, so the loaded ones
+  // lead whatever their style, and a grouped layout can no longer express the
+  // order. The marker moves onto the row instead of heading a group.
   const INITIAL_SHOWN = 4
   const visibleReplacements = showAllReplacements ? replacements : replacements.slice(0, INITIAL_SHOWN)
   const currentEntry = target ? getExerciseEntry(target.exerciseName) : undefined
   const searchResults = target && searchQuery.trim()
-    ? searchExerciseCatalog(searchQuery, 20).filter(e =>
+    ? searchExerciseCatalogByWords(searchQuery, 20).filter(e =>
         e.name.toLowerCase() !== target.exerciseName.toLowerCase() &&
         !replacements.some(r => r.exercise.name === e.name)
       )
@@ -197,13 +204,44 @@ export function SwapDialog({
         {!pendingSwap && (
           replacements.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No alternative exercises fit your equipment, injuries, style, and skill level for this movement pattern. Search below to pick anything from the full catalog instead.
+              No alternative exercises fit your equipment, injuries and skill level for this movement pattern. Search below to pick anything from the full catalog instead.
             </p>
           ) : (
+            <>
+            {/* A SHORT LIST EXPLAINS ITSELF, AND IT HAS TO DO SO WHERE SHE CAN
+                SEE IT. The empty case has said why since it was written; one or
+                two options said nothing, so the screen looked like a complete
+                answer. Ashley met that on 8 Sep 2026 — one suggestion above a
+                search box that turned up three more perfectly good ones the
+                moment she typed.
+
+                MOVED ABOVE THE LIST, 17 Sep 2026, and the move is the fix. The
+                sentence existed and was correct; it sat INSIDE the list's own
+                `max-h-80 overflow-y-auto` box, below three option cards, so it
+                was only readable by scrolling past the very options it was
+                meant to frame. Ashley hit exactly that in a gym: offered three
+                unloaded leg curls while standing next to a machine, with no
+                visible hint that her training style was the filter. A true
+                sentence rendered where nobody reads it is not a sentence the
+                app has said. Above the list it also reads in the right order —
+                what this list is, then the list. */}
+            {/* STYLE IS NO LONGER ONE OF THE FILTERS, and this sentence used
+                to say it was. Since 18 Sep 2026 an off-style option is shown
+                below rather than removed, so naming style here would tell her
+                something was excluded for a reason that no longer excludes
+                anything — while the group heading two blocks down shows the
+                very options it claimed were missing. */}
+            {replacements.length < INITIAL_SHOWN && (
+              <p className="text-xs text-muted-foreground px-1 pb-1" data-testid="swap-short-list-reason">
+                {replacements.length === 1 ? "That's the only alternative" : `Only ${replacements.length} alternatives`} that fit your
+                equipment, injuries and skill level for this movement. Search below for anything else in the catalog.
+              </p>
+            )}
             <div className="space-y-2 max-h-80 overflow-y-auto">
-              {visibleReplacements.map(({ exercise, note }) => (
+              {visibleReplacements.map(({ exercise, note, offStyle }) => (
                 <button
                   key={exercise.name}
+                  data-testid="swap-option"
                   className="w-full text-left rounded-md border p-3 hover:bg-accent hover:border-primary/30 transition-colors"
                   onClick={() => setPendingSwap(exercise)}
                 >
@@ -215,6 +253,20 @@ export function SwapDialog({
                         {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
                           <Badge className="text-xs bg-primary/15 text-primary-text">
                             lower stress
+                          </Badge>
+                        )}
+                        {/* THE MARKER, ON THE ROW. Ashley's ruling, 18 Sep
+                            2026: show the options her style used to hide, and
+                            since weight outranks style in the ordering, they
+                            can land anywhere in the list — so the row has to
+                            carry its own label rather than sit under a
+                            heading. Outline, not a colour: nothing is wrong
+                            with the option and nothing is being warned about.
+                            The words come from the phrasebook with every other
+                            sentence the app writes. */}
+                        {offStyle && (
+                          <Badge variant="outline" className="text-xs font-normal text-muted-foreground" data-testid="swap-off-style-mark">
+                            {OUTSIDE_YOUR_STYLE}
                           </Badge>
                         )}
                       </div>
@@ -234,20 +286,8 @@ export function SwapDialog({
                   Show {replacements.length - INITIAL_SHOWN} more
                 </Button>
               )}
-              {/* A SHORT LIST EXPLAINS ITSELF. The empty case has said why since
-                  it was written; one or two options said nothing, so the screen
-                  looked like a complete answer. Ashley met that on 8 Sep 2026 —
-                  one suggestion above a search box that turned up three more
-                  perfectly good ones the moment she typed. The list is honest
-                  again now; this is what keeps it honest when a movement really
-                  does have few alternatives. */}
-              {replacements.length < INITIAL_SHOWN && (
-                <p className="text-xs text-muted-foreground px-1 pt-1">
-                  {replacements.length === 1 ? "That's the only alternative" : `Only ${replacements.length} alternatives`} that fit your
-                  equipment, injuries, style and skill level for this movement. Search below for anything else in the catalog.
-                </p>
-              )}
             </div>
+            </>
           )
         )}
 

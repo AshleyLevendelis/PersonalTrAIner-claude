@@ -131,9 +131,12 @@ export function classifyDay(
   // read as a tick the trainee could not remove: a chosen rest day ranked
   // below it. Finish no longer completes an empty session, and the rows that
   // already exist stop counting here.
-  const loggedWork = !!dashboardDay && (dashboardDay.workoutLogs.length > 0 || (dashboardDay.cardioLogs?.length ?? 0) > 0)
+  // WORKING sets, not any row. This is the guard written FOR Ashley's Thursday
+  // — a session marked complete with nothing in it — and a build-up row would
+  // have satisfied it just as an empty completed session used to.
+  const loggedWork = !!dashboardDay && (dashboardDay.workingLogs.length > 0 || (dashboardDay.cardioLogs?.length ?? 0) > 0)
   if (dashboardDay?.session?.is_completed && loggedWork) return 'done'
-  if (dashboardDay && dashboardDay.workoutLogs.length > 0) return 'partial'
+  if (dashboardDay && dashboardDay.workingLogs.length > 0) return 'partial'
 
   // SAID missed, not merely looking missed. Ranked directly under logged work
   // — someone who marked Tuesday missed and then trained has earned the done

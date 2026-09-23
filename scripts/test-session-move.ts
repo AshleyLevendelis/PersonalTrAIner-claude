@@ -182,7 +182,7 @@ check('and with no moves at all, nothing changes about any day',
 console.log('\n[9] The week strip, from classifyDay itself')
 // ---------------------------------------------------------------------------
 const dashDay = (over: Record<string, unknown> = {}) =>
-  ({ date: '', metric: null, nutrition: null, session: null, exercises: [], workoutLogs: [], cardioLogs: [], ...over }) as never
+  ({ date: '', metric: null, nutrition: null, session: null, exercises: [], workingLogs: [], warmupLogs: [], cardioLogs: [], ...over }) as never
 
 // Origin: Tuesday, seen from Thursday. Without the move this is the 'missed'
 // the whole feature exists to stop.
@@ -208,11 +208,11 @@ check('...so the week still owes exactly the same number of sessions',
 
 // Logged work outranks the move, exactly as it outranks a swap and a chosen
 // rest: someone who said they would move it and trained anyway earned the tick.
-const trained = dashDay({ session: { is_completed: true }, workoutLogs: [{ id: 'x' }] })
+const trained = dashDay({ session: { is_completed: true }, workingLogs: [{ id: 'x' }] })
 check('training it anyway still counts as done',
   classifyDay('Tuesday', TUE, THU, plan, trained, MON, moves) === 'done',
   classifyDay('Tuesday', TUE, THU, plan, trained, MON, moves))
-const partial = dashDay({ session: { is_completed: false }, workoutLogs: [{ id: 'x' }] })
+const partial = dashDay({ session: { is_completed: false }, workingLogs: [{ id: 'x' }] })
 check('...and part-training it still reads as part-done',
   classifyDay('Tuesday', TUE, THU, plan, partial, MON, moves) === 'partial',
   classifyDay('Tuesday', TUE, THU, plan, partial, MON, moves))

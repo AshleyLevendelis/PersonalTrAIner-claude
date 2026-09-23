@@ -48,6 +48,7 @@ import { describeActivity } from '@/lib/concurrent-activity'
 import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
+import { dietTargetCaveat } from '@/lib/coach-voice'
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 
@@ -1089,6 +1090,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
+              {/* THE SAME SENTENCE AS SETUP, FROM THE SAME PHRASEBOOK — Ashley
+                  ruled it onto the setup screen (20 Sep 2026) and this is the
+                  other place the choice is made. Saying it once at setup and
+                  going silent when somebody turns Keto on here would leave the
+                  app honest only to people who chose it on day one. */}
+              {dietTargetCaveat(profile.dietary_preferences ?? []) && (
+                <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                  {dietTargetCaveat(profile.dietary_preferences ?? [])}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>
@@ -1127,6 +1138,15 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Row label="Include snacks">
               <Button size="sm" variant={profile.include_snacks ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ include_snacks: !profile.include_snacks })}>
                 {profile.include_snacks ? 'Yes' : 'No'}
+              </Button>
+            </Row>
+            {/* COOK ONCE, EAT TWICE. On by default (Ashley, 19 Sep 2026), so an
+                absent value reads as Yes rather than as off — the same
+                convention include_snacks uses one row above. Turning it off
+                frees lunch to be its own dish again from the next day. */}
+            <Row label="Batch cook lunches">
+              <Button size="sm" variant={(profile.batch_cooking ?? true) ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ batch_cooking: !(profile.batch_cooking ?? true) })}>
+                {(profile.batch_cooking ?? true) ? 'Yes' : 'No'}
               </Button>
             </Row>
             {/* WHICH DAY SHE SHOPS — design handoff 2d. The Home card is

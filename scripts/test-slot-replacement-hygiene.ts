@@ -17,7 +17,7 @@
  * adaptation, so covering it covers all four.
  */
 import { applyReplacement } from '../src/lib/mesocycle-edit'
-import { EXERCISE_DATABASE, searchExerciseCatalog } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, searchExerciseCatalog, searchExerciseCatalogByWords } from '../src/lib/exercise-db'
 import { prescribeLoad } from '../src/lib/load-prescription'
 import type { Exercise, UserProfile } from '../src/lib/types'
 
@@ -112,7 +112,14 @@ console.log('\n[5] Primer guard still holds (regression 1 above)')
   }
 }
 
-if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
+// MOVED TO THE BOTTOM, 17 Sep 2026. This line used to sit HERE, above section
+// [6] — so every check below it printed FAIL and the gate still exited 0.
+// MEASURED by breaking section [6]'s last check on purpose: it printed
+// "FAIL: the query still finds the live sibling", then "All slot-replacement
+// hygiene checks passed", then exit 0. Section [6] had been decorative since
+// the day it was written. CLAUDE.md's rule — a gate has exactly ONE exit, and
+// one that can print FAIL and exit 0 is worse than no gate, because the tick
+// is now evidence.
 console.log('\n[6] The swap search offers only live entries')
 {
   // A retired entry stays in the DB so history keeps resolving, and
@@ -132,6 +139,74 @@ console.log('\n[6] The swap search offers only live entries')
   // the retired row still returns its live replacement.
   check('the query still finds the live sibling (Seated Cable Row)',
     searchExerciseCatalog('cable row').some(r => r.name === 'Seated Cable Row'))
+  // The picker's own search must not reopen the hole this section closed.
+  for (const e of retired) {
+    check(`the picker search cannot surface retired "${e.name}" either`,
+      !searchExerciseCatalogByWords(e.name).some(r => r.name === e.name))
+  }
 }
 
+console.log('\n[7] The picker finds what a person actually types')
+{
+  // Ashley, 17 Sep 2026, standing in a gym mid-session: "Iso lateral leg curl
+  // isn't available as a swap". It was in the catalogue the whole time. Typing
+  // her exact words returned "No matching exercise found", because the strict
+  // matcher wants ONE CONTIGUOUS SUBSTRING and the entry is called
+  // "Iso-Lateral Kneeling Leg Curl" — her hyphen missing, and the word
+  // "Kneeling" sitting in the middle of the phrase.
+  //
+  // That box is the escape hatch she RULED FOR on 13 Sep 2026 ("show
+  // everything, warn me"), so a search that cannot find her own words makes
+  // her ruling untrue in practice rather than merely inconvenient.
+  //
+  // MEASURED, and it was never about one exercise: 49 of the 200 live entries
+  // could not be found by typing their OWN NAME without punctuation — every
+  // Push-Ups variant, T-Bar Rows, Chest-Supported Row, Neutral-Grip anything.
+  const depunct = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const live = EXERCISE_DATABASE.filter(e => !e.retired)
+  check('there are enough live entries for this to mean something', live.length > 100, live.length)
+
+  // THE PROPERTY, derived from the database rather than a hand-written list,
+  // so it keeps holding for entries nobody has added yet: if you type an
+  // exercise's name the way a person types — no hyphens, no capitals — the
+  // picker finds it.
+  const unfindable = live.filter(e => !searchExerciseCatalogByWords(depunct(e.name), 60).some(r => r.name === e.name))
+  check('every live exercise is findable by its own name, typed without punctuation',
+    unfindable.length === 0, unfindable.slice(0, 8).map(e => e.name))
+
+  // Her literal case, kept beside the general property because a general
+  // property that happens to pass says nothing about the report it came from.
+  check('"iso lateral leg curl" finds the Iso-Lateral Kneeling Leg Curl',
+    searchExerciseCatalogByWords('iso lateral leg curl', 20).some(r => r.name === 'Iso-Lateral Kneeling Leg Curl'))
+
+  // THE SEPARATION IS THE POINT, and this is the half that protects her plan.
+  // searchExerciseCatalog's other two callers are RESOLVERS: fact-compiler
+  // turns a typed phrase into a hard exercise BAN over every name returned,
+  // and set-parse keys on "exactly one match" to decide a logged set is
+  // unambiguous. Widening THAT function would silently ban more than she
+  // named. So the two must stay measurably different, and a future tidy-up
+  // that unifies them has to fail here rather than pass quietly.
+  check('the strict matcher is NOT widened — it still needs one contiguous run',
+    searchExerciseCatalog('iso lateral leg curl', 20).length === 0,
+    searchExerciseCatalog('iso lateral leg curl', 20).map(r => r.name))
+  check('...and the ban resolver therefore still resolves to what it always did',
+    searchExerciseCatalog('leg curl', 50).length === 7, searchExerciseCatalog('leg curl', 50).length)
+
+  // RECALL MUST NOT BECOME NOISE. Every word typed has to appear, so a
+  // hamstring query can never drag in a quad machine.
+  const legCurl = searchExerciseCatalogByWords('leg curl', 30).map(r => r.name)
+  check('"leg curl" returns curls', legCurl.includes('Lying Leg Curl') && legCurl.includes('Seated Leg Curl'))
+  check('...and never a Leg Press', !legCurl.includes('Leg Press'), legCurl)
+
+  // PROVE THE DETECTOR, so this section cannot go vacuous if the matcher is
+  // ever loosened to "any word matches" — which would make every check above
+  // pass while the box returned the whole catalogue.
+  check('a word that appears nowhere finds nothing',
+    searchExerciseCatalogByWords('zebra curl', 30).length === 0,
+    searchExerciseCatalogByWords('zebra curl', 30).map(r => r.name))
+  check('...and a single word is still handled by the strict matcher alone',
+    searchExerciseCatalogByWords('deadlift', 30).length === searchExerciseCatalog('deadlift', 30).length)
+}
+
+if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
 console.log('\nAll slot-replacement hygiene checks passed.')

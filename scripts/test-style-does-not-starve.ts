@@ -30,7 +30,9 @@ import { fileURLToPath } from 'url'
 import {
   getConstrainedPool, generateMesocycle, setRandomSource, resetRandomSource,
   bestEquipmentRank, isEquipmentQualityExempt, EQUIPMENT_QUALITY_TIERS, poolForRotation,
+  hasBetterLoadingPeer,
 } from '../src/lib/exercise-plan'
+import { getExerciseEntry } from '../src/lib/exercise-db'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getReplacementCandidates } from '../src/lib/mesocycle-edit'
 import { EXERCISE_DATABASE, getMovementFamily } from '../src/lib/exercise-db'
@@ -156,8 +158,7 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   const fullPool = getConstrainedPool(hers, [])
   const noPeer = fullPool.filter(e =>
     bestEquipmentRank(e) === 'low' && !isEquipmentQualityExempt(e) &&
-    !fullPool.some(o => o.substitution_group === e.substitution_group &&
-      o.mechanics_tier === e.mechanics_tier && bestEquipmentRank(o) === 'high'))
+    !hasBetterLoadingPeer(e, fullPool))
   check('improvised kit with no better peer is KEPT, not swept up',
     noPeer.length > 0 && noPeer.every(e => rotation.some(r => r.name === e.name)),
     { checked: noPeer.length, missing: noPeer.filter(e => !rotation.some(r => r.name === e.name)).map(e => e.name) })
@@ -167,8 +168,7 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   const kept = poolForRotation(minimal, 'minimalist')
   for (const dropped of minimal.filter(e => !kept.includes(e))) {
     check(`only dropped where a better peer exists: ${dropped.name}`,
-      minimal.some(o => o.substitution_group === dropped.substitution_group &&
-        o.mechanics_tier === dropped.mechanics_tier && bestEquipmentRank(o) === 'high'))
+      hasBetterLoadingPeer(dropped, minimal))
   }
 
   // ALL WEEKS, which is the half no gate could see: quality-score's own
@@ -186,9 +186,8 @@ console.log('\n2. Improvised kit never beats the real thing you own')
         for (const day of week.days) {
           for (const ex of day.exercises) {
             const entry = p.find(e => e.name === ex.name)
-            if (!entry || isEquipmentQualityExempt(entry) || bestEquipmentRank(entry) !== 'low') continue
-            if (p.some(o => o.substitution_group === entry.substitution_group &&
-              o.mechanics_tier === entry.mechanics_tier && bestEquipmentRank(o) === 'high')) {
+            if (!entry) continue
+            if (hasBetterLoadingPeer(entry, p)) {
               offenders.push(`${equipment}/${style} wk${week.week_number} ${day.day} ${ex.name}`)
             }
           }
@@ -199,6 +198,32 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   check('no week of any plan reaches for improvised kit when a real peer was available',
     offenders.length === 0, offenders.slice(0, 10))
 
+  // THIS CHECK'S OWN GENERATION GRID NEVER REACHES THE CASE IT EXISTS FOR.
+  // Measured, not assumed: across this exact 4-equipment x 4-style x
+  // all-weeks sweep, Band Lat Pulldown / Kneeling Band Lat Pulldown appear
+  // ZERO times — so a green result above proves nothing about whether this
+  // rule still enforces the definition the engine deliberately abandoned
+  // (matching only on movement_pattern, with no test of whether the "better"
+  // peer can actually be loaded). Before 21 Sep 2026 this file restated that
+  // question three times, inline, and would have flagged a full-range band
+  // pulldown as an offender for losing to Pull-Up Negatives — an
+  // eccentric-only drill that cannot be loaded at all.
+  //
+  // Constructed, deterministic, no generation needed: call the real shared
+  // predicate directly on the two catalogue entries the fix was written for.
+  const bandPulldown = getExerciseEntry('Band Lat Pulldown')
+  const pullUpNegatives = getExerciseEntry('Pull-Up Negatives')
+  check('the catalogue still has both fixture entries this case needs',
+    !!bandPulldown && !!pullUpNegatives, { bandPulldown: !!bandPulldown, pullUpNegatives: !!pullUpNegatives })
+  if (bandPulldown && pullUpNegatives) {
+    check('Pull-Up Negatives is the theoretically-better-ranked peer, so a stale predicate WOULD have flagged this pair',
+      bestEquipmentRank(pullUpNegatives) === 'high' &&
+      pullUpNegatives.substitution_group === bandPulldown.substitution_group &&
+      pullUpNegatives.mechanics_tier === bandPulldown.mechanics_tier)
+    check('...and the real, current rule correctly does NOT flag it, because negatives cannot be loaded',
+      !hasBetterLoadingPeer(bandPulldown, [bandPulldown, pullUpNegatives]))
+  }
+
   // REINSTATED IS NOT UNFILTERED. The floor widens the choice; style_fit is
   // what stops it erasing the preference. Without the ranking half, a
   // functional trainee's plan would simply become everyone else's.
@@ -206,8 +231,22 @@ console.log('\n2. Improvised kit never beats the real thing you own')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('an off-style candidate is ranked below an on-style one',
     /if \(ctx\.trainingStyle && !candidate\.style_tags\.includes\(ctx\.trainingStyle\)\) \{[\s\S]{0,80}?style_fit = -/.test(src))
-  check('...and the trainee\'s own style reaches the scorer',
-    /trainingStyle\b[\s\S]{0,200}?equipmentAccess, trainingStyle \}/.test(src) || /equipmentAccess, trainingStyle \}/.test(src))
+  // RE-ANCHORED 20 Sep 2026, on the PROPERTY rather than the closing brace.
+  // This pinned the literal text `equipmentAccess, trainingStyle }` — the end
+  // of the context object — and went red the moment a FIFTH field was added
+  // after it, at entirely correct code. CLAUDE.md's own case: "a
+  // mechanism-pinned check does not merely fail to catch a drift, it can
+  // ENFORCE it... when a check blocks a fix, suspect the check."
+  //
+  // The property is "every orderCandidates call site hands the scorer this
+  // trainee's style". Asserted per site, and the site COUNT is asserted too,
+  // so deleting a call site cannot quietly satisfy it — the old version passed
+  // on a single occurrence anywhere in a 7,000-line file.
+  const ctxLiterals = src.match(/\{ trackPatterns:[^}]*\}/g) ?? []
+  const withoutStyle = ctxLiterals.filter(l => !/\btrainingStyle\b/.test(l))
+  check('...and the trainee\'s own style reaches the scorer, at every call site',
+    ctxLiterals.length >= 4 && withoutStyle.length === 0,
+    { sites: ctxLiterals.length, missing: withoutStyle })
   check('the improvised penalty is decisive, not a tie-break',
     /IMPROVISED_OVER_REAL_PENALTY = ([2-9]\d*)/.test(src), src.match(/IMPROVISED_OVER_REAL_PENALTY = \d+/)?.[0])
   check('...and only when a better peer is on the same shortlist',
@@ -218,8 +257,24 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   // is what keeps it honest when a movement genuinely has few alternatives.
   const dialog = readFileSync(join(ROOT, 'src/components/exercise/SwapDialog.tsx'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  check('a short suggestion list says why it is short',
-    /replacements\.length < INITIAL_SHOWN && \(/.test(dialog) && /equipment, injuries, style and skill level/.test(dialog))
+  // RE-ANCHORED 18 Sep 2026, and the old version is the lesson. It pinned the
+  // literal sentence "equipment, injuries, style and skill level" — a
+  // MECHANISM, not the property. On Ashley's ruling that day the swap list
+  // stopped removing options for training style and began showing them marked,
+  // so that sentence had to stop naming style as a filter. The check then went
+  // red on the CORRECTED copy and would have enforced the lie, which is
+  // exactly what `test:chat-app-reality` did to the coach prompt over the
+  // grocery list on 13 Sep.
+  //
+  // The property is: a short list renders an explanation, and that explanation
+  // names the things that really do remove options — equipment, injuries and
+  // skill — and does not claim style is one of them.
+  check('a short suggestion list renders an explanation',
+    /replacements\.length < INITIAL_SHOWN && \(/.test(dialog) && /data-testid="swap-short-list-reason"/.test(dialog))
+  check('...naming the three constraints that actually remove options',
+    /equipment, injuries and skill level/.test(dialog))
+  check('...and not blaming training style, which no longer removes any',
+    !/equipment, injuries, style/.test(dialog))
 }
 
 console.log('\n3. A movement family is listed whole, or not at all')

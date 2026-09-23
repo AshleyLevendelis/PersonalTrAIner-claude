@@ -298,6 +298,7 @@ RULES:
 3. Include all cooking fats with exact amounts.
 4. Aim your ingredient quantities at ALL FOUR stated macro targets, not just calories — exact precision isn't required (the app rescales), but stay in the right neighborhood on protein, carbs AND fat so rescaling doesn't need to be extreme in any one direction. Undershooting protein is a rejection; so is padding it out so far that carbs/fat are starved (see HIT ALL THREE MACROS above).
 5. Report which single cuisine (from the list above, or "Other") each dish draws from as the "cuisine" field.
+6. "prep" is the COOKING METHOD and it must contain NO AMOUNTS OF FOOD — no grams, millilitres, tablespoons, teaspoons, ounces or cups. Write the technique and the order of operations only: "Sear the chicken skin-side down until golden, then finish in the oven. Toast the rice in the pan juices before adding stock." The ingredient list carries every amount, and the app rescales those amounts after you propose them — so a quantity written into the method will end up describing food that is no longer in the dish, and the method gets thrown away rather than shown. Times and oven temperatures are welcome and are not amounts of food.
 
 SLOTS TO GENERATE:
 ${slotDescriptions}
@@ -305,7 +306,7 @@ ${slotDescriptions}
 Return ONLY valid JSON, no markdown:
 {
   "meals": [
-    { "slot": "breakfast", "name": "Dish Name", "ingredients": ["165g ingredient", "1 tbsp ingredient"], "prep": "Brief steps.", "cuisine": "Thai" }
+    { "slot": "breakfast", "name": "Dish Name", "ingredients": ["165g ingredient", "1 tbsp ingredient"], "prep": "Sear, then roast. Toast the rice before adding stock.", "cuisine": "Thai" }
   ]
 }
 
