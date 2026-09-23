@@ -65,7 +65,7 @@ import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { getExerciseId, getExerciseEntry, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
-import { prescribeLoad } from '@/lib/load-prescription'
+import { prescribeLoad, isExternallyLoaded } from '@/lib/load-prescription'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
@@ -406,6 +406,25 @@ const loggedTarget = (() => {
   return { name: ex.name, planKg: ex.suggested_load_kg as number, liftedKg, sets: ex.sets }
 })()
 ;(window as unknown as { __loggedTarget: unknown }).__loggedTarget = loggedTarget
+
+// A CARD WITH NO EXTERNAL LOAD ON TODAY'S SESSION — published for
+// verify:bodyweight-progress §3, 23 Sep 2026. That section asked "today's first
+// card" and its comment named Band Pull-Aparts; when new catalogue entries
+// reshuffled the seeded plan, the first card became Medicine Ball Slams — a
+// LOADED move — and the section was measuring a row it was never about. It is
+// about a movement with no external load, so it is asked for by that: a band
+// first where the day has one (the harder word to get right), otherwise any.
+// Cardio machines are left out, as unloadedLoadLabel leaves them out.
+;(window as unknown as { __unloadedTarget: unknown }).__unloadedTarget = (() => {
+  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const today = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === DAYS[todayIdx])
+  const CARDIO = ['treadmill', 'stationary bike', 'rowing machine', 'elliptical machine']
+  const unloaded = (today?.exercises ?? [])
+    .map(e => ({ name: e.name, entry: getExerciseEntry(e.name) }))
+    .filter(x => !!x.entry && !isExternallyLoaded(x.entry) && !x.entry.equipment.some(q => CARDIO.includes(q)))
+  const pick = unloaded.find(x => x.entry!.equipment.includes('resistance band')) ?? unloaded[0]
+  return pick ? { name: pick.name, equipment: pick.entry!.equipment } : null
+})()
 
 // WHICH DAY CARRIES A FINISHER, and what the plan says it is — published for
 // verify:finisher, 14 Sep 2026. Same rule as rampTarget above: the driver asks

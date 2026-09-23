@@ -919,8 +919,19 @@ export function plateStepKg(mode: LoadingMode): number {
  */
 export function takesPlateCalculator(entry: ExerciseEntry | undefined): boolean {
   if (!entry) return true
-  return !(entry.equipment ?? []).some(e => /cable/i.test(e))
+  return !(entry.equipment ?? []).some(e => /cable/i.test(e) || NEVER_PLATE_LOADED.has(e))
 }
+
+/**
+ * AND A MEDICINE BALL, since 23 Sep 2026. Unlike a dumbbell (the open question
+ * above), there is no adjustable version to worry about: a medicine ball is a
+ * sealed ball with its weight printed on it, so a button offering to work out
+ * its plates describes something that does not exist. Found when a seeded
+ * harness plan put Medicine Ball Slams first on the card and two browser
+ * drivers checking "no plate calculator where there are no plates" went red.
+ * Named rather than inferred from 'stack', for the reason recorded above.
+ */
+const NEVER_PLATE_LOADED = new Set(['medicine ball'])
 
 /** Round to something actually loadable rather than a number like 43.7kg. */
 export function roundToPlate(kg: number, mode: LoadingMode): number {

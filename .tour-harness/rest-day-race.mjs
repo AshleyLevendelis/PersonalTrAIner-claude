@@ -72,7 +72,11 @@ const check = (name, ok, detail) => {
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 
-const read = () => ev(`({ text: document.body.innerText, planArrived: window.__planArrived === true })`)
+// NULL-SAFE, 23 Sep 2026: polling starts the instant Page.navigate returns,
+// which can land between documents, where `document.body` is null — the driver
+// crashed on the full sweep that day (2 checks ran of 20) and passed on the
+// re-run. A page with no body yet has no text yet; the poll simply goes round.
+const read = () => ev(`({ text: document.body ? document.body.innerText : '', planArrived: window.__planArrived === true })`)
 const text = async () => (await read()).text
 // UNDER the 2.5s opener ceiling on purpose: the runs that recovered on their
 // own were the SLOW ones, where the plan missed the deadline and the timer

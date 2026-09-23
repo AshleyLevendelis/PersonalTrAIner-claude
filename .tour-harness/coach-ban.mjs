@@ -81,13 +81,15 @@ console.log('\nA BAN REACHES THE WHOLE PLAN, AND SAYS SO FIRST\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/` })
 await wait(3000)
 const banTarget = await ev(`window.__banTarget`)
-const swapTarget = await ev(`window.__swapTarget`)
+const swapTarget = await ev(`window.__banAmbiguous`)
 check('0a. the plan holds a lift whose loose name means one thing plan-wide',
   !!banTarget && !!banTarget.full && !!banTarget.loose, banTarget)
-check('0b. ...and one whose loose name does NOT, for the ambiguous case',
-  !!swapTarget && !!swapTarget.loose, swapTarget)
+// ASSERTED, not assumed. This used the swap target and never checked it was
+// ambiguous; on 23 Sep 2026 it quietly was not, and check 4 blamed the coach.
+check('0b. ...and one whose loose name does NOT — at least two lifts on the plan answer to it',
+  !!swapTarget && !!swapTarget.loose && (swapTarget.matches?.length ?? 0) >= 2, swapTarget)
 if (!banTarget || !swapTarget) { console.error('\nNo usable lift on today’s session.\n'); ws.close(); chrome.kill(); server.close(); process.exit(1) }
-console.log(`asking to ban "${banTarget.loose}" — the plan spells it "${banTarget.full}"; the ambiguous probe is "${swapTarget.loose}"`)
+console.log(`asking to ban "${banTarget.loose}" — the plan spells it "${banTarget.full}"; the ambiguous probe is "${swapTarget.loose}" (${swapTarget.matches.join(', ')})`)
 const TARGET_FULL = banTarget.full
 
 // THE SLOPPY ARGUMENTS ARE THE TEST. No day at all, and the old exercise named

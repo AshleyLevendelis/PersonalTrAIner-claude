@@ -129,12 +129,27 @@ check('1i. ...while the plate calculator, which changes nothing, stays one tap a
 // AND NOT ON A ROW WITH NOTHING TO LOAD. A band warm-up offering to work out
 // your plates is the app claiming something it cannot do — the same class as
 // the "Bodyweight" label on a machine.
-check('1j. ...and is not offered where there is no weight to load',
-  (await ev(`(() => {
-    const r = [...document.querySelectorAll('[data-exercise-name]')].find(x => /\\b(Band|Bodyweight)\\b/.test(x.innerText || '') && !/~\\s*[\\d.]+\\s*kg/i.test(x.innerText || ''))
-    if (!r) return 'no unloaded row on this fixture'
-    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.textContent || ''))
-  })()`)) === false)
+// ASKED FOR BY WHAT IT IS, 23 Sep 2026. This used to take whichever row said
+// "Band" or "Bodyweight" — the open band warm-up at the top of the card. When
+// new catalogue entries reshuffled the seeded plan, the top of the card became
+// a medicine-ball warm-up and no closed row prints either word, so the check
+// had no subject and failed for want of one. The page names an unloaded
+// exercise (__unloadedTarget, real.tsx); the row is opened, then read. The
+// value is printed on failure, so "no subject" and "a calculator on it" are
+// different findings.
+const unloadedTarget = await ev('window.__unloadedTarget ?? null')
+if (unloadedTarget) {
+  await escape()
+  await tap(`[data-exercise-name=${JSON.stringify(unloadedTarget.name)}] [role="button"], [data-exercise-name=${JSON.stringify(unloadedTarget.name)}] .cursor-pointer`)
+  await wait(900)
+}
+const unloadedCalc = await ev(`(() => {
+    const want = ${JSON.stringify(unloadedTarget?.name ?? null)}
+    const r = [...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === want)
+    if (!r) return 'no unloaded exercise on today to ask about: ' + want
+    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.textContent || '')) ? 'calculator on ' + want : false
+  })()`)
+check('1j. ...and is not offered where there is no weight to load', unloadedCalc === false, unloadedCalc)
 
 // The menu was closed to read the row underneath it; the move checks below
 // need it open again on the SAME exercise the order was recorded from.

@@ -231,8 +231,23 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   hips       14->18  Cable Pull-Through, Hip Abduction/Adduction Machines, Smith Machine Squat
     //   ankles     19      unchanged
     //   elbows     18->21  both preacher curls, Assisted Dip Machine
-    lower_back: 15, knees: 37, shoulders: 66, neck: 7, wrists: 28,
-    hips: 18, ankles: 19, elbows: 21,
+    //
+    // RE-MEASURED 23 Sep 2026 after the six machines and four cable variants
+    // (+10 entries) — late, found by the next full sweep, because this gate
+    // was not in the set run for that batch. Every delta by name, each tag
+    // mirroring the sibling it was modelled on; no pre-existing exercise
+    // moved:
+    //   lower_back 15->17  Rotary Torso Machine, Back Extension Machine
+    //   shoulders  66->68  T-Bar Row Machine, Single-Arm Lat Pulldown
+    //   hips       18->19  Back Extension Machine (Multi-Hip and Reverse Hyper
+    //                      stay available: hip-extension work on Glute
+    //                      Kickback's and Hip Thrust's verdict, inside the
+    //                      hip ruling's "keep the controlled movements")
+    //   ankles     19->20  Standing Calf Raise Machine
+    //   the four cable variants load nothing their parents did not, and
+    //   add to no count
+    lower_back: 17, knees: 37, shoulders: 68, neck: 7, wrists: 28,
+    hips: 19, ankles: 20, elbows: 21,
   }
   const drift: string[] = []
   for (const code of CODES) {

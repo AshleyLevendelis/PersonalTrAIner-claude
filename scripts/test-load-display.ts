@@ -27,7 +27,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { formatLoad, splitLoadDisplay, loadingMode, isPerSideLoad, takesPlateCalculator } from '../src/lib/load-prescription'
+import { formatLoad, splitLoadDisplay, loadingMode, isPerSideLoad, takesPlateCalculator, unloadedLoadLabel, isExternallyLoaded } from '../src/lib/load-prescription'
 import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -212,6 +212,30 @@ console.log('\nN. THE PLATE CALCULATOR, WHERE THERE ARE PLATES')
   const cables = EXERCISE_DATABASE.filter(e => (e.equipment ?? []).some(x => /cable/i.test(x)))
   check('every cable entry in the catalogue answers the same way',
     cables.length >= 10 && cables.every(e => takesPlateCalculator(e) === false), { count: cables.length })
+  // AND A MEDICINE BALL (23 Sep 2026): a sealed ball has no plates, and no
+  // adjustable version exists — the dumbbell question stays open, this does
+  // not. Every catalogue entry using one, not the one that surfaced it.
+  const balls = EXERCISE_DATABASE.filter(e => (e.equipment ?? []).includes('medicine ball'))
+  check('no medicine-ball movement is offered a plate calculator',
+    balls.length >= 2 && balls.every(e => takesPlateCalculator(e) === false), balls.map(e => e.name))
+  check('...while a kettlebell, whose adjustable version does exist, keeps it',
+    takesPlateCalculator(getExerciseEntry('Kettlebell Swings')!) === true)
+}
+
+console.log('\nO. WHAT STANDS WHERE THE WEIGHT WOULD GO, WHEN THERE IS NONE')
+{
+  // Held in a browser by verify:bodyweight-progress §3 until 23 Sep 2026, on
+  // whichever card the seeded plan happened to put first. That plan stopped
+  // carrying a band that day, so the KIND is now held here, on every band in
+  // the catalogue, and the driver checks whichever unloaded card today has.
+  // A band ALONE. Eccentric Wrist Extension pairs one with a dumbbell, is
+  // externally loaded, and correctly says nothing here — found by this check
+  // being written too broadly the first time.
+  const bands = EXERCISE_DATABASE.filter(e => (e.equipment ?? []).includes('resistance band') && !isExternallyLoaded(e))
+  check('every band-only movement says "Band", never "Bodyweight"',
+    bands.length >= 10 && bands.every(e => unloadedLoadLabel(e) === 'Band'), bands.filter(e => unloadedLoadLabel(e) !== 'Band').map(e => e.name))
+  check('a push-up says "Bodyweight"', unloadedLoadLabel(getExerciseEntry('Push-Ups')!) === 'Bodyweight')
+  check('a loaded lift says nothing here — its number does the talking', unloadedLoadLabel(getExerciseEntry('Barbell Squats')!) === null)
 
   // AND IT REACHES BOTH SURFACES. The row's own button and the header link
   // are two controls making one claim; a rule applied to one of them is the

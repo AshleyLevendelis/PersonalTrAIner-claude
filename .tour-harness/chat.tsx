@@ -322,6 +322,25 @@ const banTarget = (() => {
 })()
 ;(window as unknown as { __banTarget: unknown }).__banTarget = banTarget
 
+// A NAME THAT MEANS SEVERAL THINGS ACROSS THE WHOLE PLAN — for verify:coach-ban's
+// "asks which one" case. That case used the SWAP target, on the stated
+// assumption that a name unique within one DAY is ambiguous across the PLAN.
+// Nothing made that true; it held by coincidence ("row") until 23 Sep 2026,
+// when new catalogue entries reshuffled the seeded plan and the probe became
+// "circles" — one lift plan-wide, which the coach correctly banned, and the
+// driver reported as a guess. Chosen now by the rule the ban path itself
+// applies (ChatAssistant: a word-bounded match against every name on the plan,
+// more than one is a question), so it is ambiguous by construction.
+const banAmbiguous = (() => {
+  const all = [...new Set(mesocycle.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))]
+  const words = (n: string) => new Set(n.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+  const lastWords = [...new Set(all.map(n => n.trim().split(/\s+/).pop()!.toLowerCase()))]
+    .filter(l => /^[a-z0-9]+$/.test(l))
+  const loose = lastWords.find(l => all.filter(m => words(m).has(l)).length >= 2) ?? null
+  return loose ? { loose, matches: all.filter(m => words(m).has(loose)) } : null
+})()
+;(window as unknown as { __banAmbiguous: unknown }).__banAmbiguous = banAmbiguous
+
 // ...and the same on this page, for the other half of that comparison.
 ;(window as unknown as { __todayFocus: unknown }).__todayFocus =
   mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.focus ?? null

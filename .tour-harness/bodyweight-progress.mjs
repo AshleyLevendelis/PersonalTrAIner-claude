@@ -272,10 +272,17 @@ if (!sawDetail) {
 console.log('\n[3] A bodyweight card states its prescription')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1#/tab/exercise` })
 await wait(4000)
+// THE SUBJECT IS ASKED FOR BY WHAT IT IS, not by position — see
+// __unloadedTarget in real.tsx for the morning "the first card" stopped being
+// an unloaded one. The expected word is worked out HERE from the catalogue's
+// equipment, never read back from the app's own labeller.
+const unloadedTarget = await ev('window.__unloadedTarget ?? null')
+const expectedWord = unloadedTarget?.equipment?.includes('resistance band') ? 'Band' : 'Bodyweight'
 const bw = await ev(`(() => {
+  const want = ${JSON.stringify(unloadedTarget?.name ?? null)}
   const rows = [...document.querySelectorAll('[data-exercise-name]')]
-  const first = rows[0]
-  if (!first) return { err: 'no exercise rows' }
+  const first = rows.find(r => r.getAttribute('data-exercise-name') === want)
+  if (!first) return { err: 'no card for ' + want, names: rows.map(r => r.getAttribute('data-exercise-name')) }
   const card = first.closest('[data-exercise-name]') || first
   const txt = (card.innerText || '')
   return {
@@ -289,14 +296,15 @@ const bw = await ev(`(() => {
     printsABareKg: /(^|[^a-z])0\s*kg/i.test(txt),
   }
 })()`)
-check('3a. today\'s first card rendered', !bw?.err && !!bw?.name, bw)
+check('3a. today has a card with no external load, and it rendered', !!unloadedTarget && !bw?.err && !!bw?.name, { unloadedTarget, bw })
 check('3b. it states its load where a weight would be, instead of nothing', bw?.saysBodyweight === true, bw)
-// AND IT NAMES THE RIGHT KIND. Today's first card is Band Pull-Aparts — a
-// resistance band, whose resistance is real but not expressible in kilos (the
-// catalogue's own words). Printing "Bodyweight" on it would be a second,
-// smaller version of the lie this whole section exists to fix, so the word is
-// checked, not just its presence.
-check('3b2. ...and calls a band a Band, not Bodyweight', bw?.loadWord === 'Band', bw)
+// AND IT NAMES THE RIGHT KIND. A resistance band's resistance is real but not
+// expressible in kilos (the catalogue's own words), so printing "Bodyweight"
+// on one would be a second, smaller version of the lie this whole section
+// exists to fix — the word is checked, not just its presence. Which word is
+// right comes from the equipment, worked out above; test:load-display holds
+// the band case directly now that today's plan may not carry one.
+check(`3b2. ...and names the right kind of no-load: "${expectedWord}"`, bw?.loadWord === expectedWord, { bw, expectedWord })
 check('3c. ...and keeps the effort target, which is the only thing it prescribes', bw?.keepsEffortTarget === true, bw)
 check('3d. ...and offers no plate calculator for a movement with no plates', bw?.offersPlateCalc === false, bw)
 check('3e. ...and never prints a bare "0 kg"', bw?.printsABareKg === false, bw)
