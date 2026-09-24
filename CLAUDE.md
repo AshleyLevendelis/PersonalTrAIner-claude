@@ -109,6 +109,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   silently open a session, and the pain boundary is enforced on the screen
   only. `tightness`, `verify:tightness`
 - No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
+- **A pull-heavy week is not scored as a flaw when the injuries left one
+  press** — Ashley's ruling 24 Sep 2026, from three options: don't count it,
+  over keeping the flag and over cutting pulling to match. 366 of 379 flags
+  were exactly that; a coach prescribes more pulling than pressing when
+  pressing is what hurts. Push-heavy is flagged whatever the pool, and
+  pull-heavy wherever a second press existed. **This changed what the rule
+  measures** — push_pull_imbalance counts before 24 Sep are not comparable.
+  `push-pull-score` (13 checks, 5 mutations)
 - Activity-shaped plans: only the starting-out walking plan exists, and only
   it is offered — `starting-out`. **It is now RENDERED, since 15 Sep 2026** —
   `planned-activity`, `verify:planned-activity`.

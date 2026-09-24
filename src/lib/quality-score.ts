@@ -1014,9 +1014,27 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
       if (ex.movement_pattern === 'hinge') hasHinge = true
     }
   }
+  // Same exclusions as below, for the same reason: a week can only be
+  // faulted for what its own equipment AND injuries AND bans could supply.
+  const pool = getConstrainedPool(profile, exclusions)
+  const isPress = (e: ExerciseEntry) => e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push'
+  // PULL-HEAVY IS NOT A FLAW WHEN THERE WAS ONE PRESS TO BE HAD. Ashley's
+  // ruling, 24 Sep 2026, from three options: don't count it — over keeping
+  // the flag, and over cutting pulling to match. Measured that day: 366 of
+  // the 397 pull-heavy plans on the grid had exactly one pressing exercise
+  // left once injuries were applied (a wrist injury removes every push-up;
+  // a sore shoulder most presses). The generator had already put that press
+  // at its ceiling and every pull at its floor. CSCS basis: when pressing is
+  // what hurts, pulling more than you press is the prescription, not the
+  // defect. PUSH-heavy is still flagged whatever the pool — that is the
+  // direction that costs a shoulder — and so is pull-heavy wherever a second
+  // press existed. THIS CHANGED WHAT THE RULE MEASURES: counts from before
+  // 24 Sep are not comparable.
+  const pressOptions = pool.filter(isPress).length
   if (pushSets > 0 && pullSets > 0) {
     const ratio = pushSets / pullSets
-    if (ratio < 0.6 || ratio > 1.6) {
+    const unavoidablyPullHeavy = ratio < 0.6 && pressOptions <= 1
+    if ((ratio < 0.6 || ratio > 1.6) && !unavoidablyPullHeavy) {
       violatedRules.add('push_pull_imbalance')
       deductions.push({
         rule: 'push_pull_imbalance', weekNumber: 1,
@@ -1028,8 +1046,8 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
 
   // Same exclusions as above, for the same reason: a week can only be
   // "missing" a pattern its own equipment AND injuries AND bans could
-  // actually have supplied.
-  const pool = getConstrainedPool(profile, exclusions)
+  // actually have supplied. (The pool itself is built above the push:pull
+  // check, which asks the same question.)
   const poolHasSquat = pool.some(e => e.movement_pattern === 'knee_dominant' || e.movement_pattern === 'single_leg')
   const poolHasHinge = pool.some(e => e.movement_pattern === 'hip_hinge')
   const poolHasPush = pool.some(e => e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push')

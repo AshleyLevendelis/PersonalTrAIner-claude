@@ -204,6 +204,7 @@
     "test:edit-keeps-the-bar": "tsx scripts/test-edit-keeps-the-bar.ts",
     "test:tightness": "tsx scripts/test-tightness.ts",
     "test:filler-yields": "tsx scripts/test-filler-yields.ts",
+    "test:push-pull-score": "tsx scripts/test-push-pull-score.ts",
     "test:today-only": "tsx scripts/test-today-only.ts",
     "test:day-coverage": "tsx scripts/test-day-coverage.ts",
     "test:pattern-tags": "tsx scripts/test-movement-pattern-tags.ts",

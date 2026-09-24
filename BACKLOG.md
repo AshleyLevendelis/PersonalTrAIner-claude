@@ -2,6 +2,35 @@
 
 Newest first. One line each.
 
+- [x] **ASHLEY'S RULING: A PULL-HEAVY WEEK ISN'T A FLAW WHEN THE INJURY LEFT
+  ONE PRESS.** 24 Sep 2026, the question item 3 left open. Asked, from three
+  options: **don't count it** (my recommendation) — over keeping the flag
+  and over cutting pulling to match. She answered directly.
+  Why it was hers: the plans themselves are right under the CSCS delegation
+  (when pressing is what hurts, a coach prescribes more pulling than
+  pressing), but whether the score counts them is a change to what a metric
+  measures, which CLAUDE.md reserves.
+  **Built:** the scorer's push:pull rule now skips a pull-heavy week when the
+  person's own pool (equipment, injuries, bans) holds at most one pressing
+  exercise — the same shape as the missing-squat and missing-hinge rules,
+  which only fire when the pool could have supplied one. Push-heavy is still
+  flagged whatever the pool; pull-heavy is still flagged wherever a second
+  press existed. **What the rule measures changed**: push_pull_imbalance
+  counts from before today are not comparable.
+  **Gate:** `test:push-pull-score` (13 checks) — three measured grid plans,
+  each first proving it is really in the state the rule asks about, plus two
+  constructed boundaries no grid plan sits on: a push-heavy week on a
+  one-press pool (still a flaw) and a pool banned down to exactly two presses,
+  then one. Building that second one found that banning presses makes the
+  bodyweight style floor re-admit one — the sanity check read 3 where it
+  asked for 2 — so the bans loop until the count is true. 5 mutations, 5
+  caught, full counts. The 15 gates that read the scorer, `test:bundle` and
+  `verify:tradeoff` (the coach's trade-off cards use the scorer) all pass.
+  **`test:quality` after, same grid:** push_pull_imbalance 379 → 13 — the 12
+  pull-heavy plans that had a second press, plus the one push-heavy plan,
+  exactly the count the measurement predicted. Every other rule unchanged;
+  average 11.70 → 11.72; 0 below the floor.
+
 - [x] **PUSH:PULL — ONE REAL DEFECT FIXED, ONE QUESTION FOR ASHLEY, ONE GROUP
   NAMED.** 24 Sep 2026, item 3 of "work on 1 then 2 then 3" ("bodyweight
   plans are lopsided").
