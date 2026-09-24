@@ -1800,6 +1800,12 @@ old — the commands were right and the context was missing.
   the allowlist sentence) would not find it, and could reasonably conclude the
   failure was real. Both wordings are the honest "I proved nothing" shape; what
   was wrong was claiming they are the same string.
+  AND AGAIN 24 Sep 2026: in a session with NO Supabase variables set at all,
+  neither prints the allowlist sentence. `test:meal-quality` says
+  *"VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY must be set"* and `verify:rls`
+  says *"No database to read, and no key given."* Same cause, a third and
+  fourth wording — so read each output for ANY "I could not reach it"
+  sentence, not for one string.
   CORRECTED 17 Sep 2026, measured: this line said TWO for weeks and named only
   the first pair. `verify:rls` has the same cause and was simply never in a
   reported sweep here. **The shape is the one this file keeps relearning: a

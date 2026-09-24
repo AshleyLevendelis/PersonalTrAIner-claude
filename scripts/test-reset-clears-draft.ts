@@ -74,6 +74,13 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   fitplan_grocery_deadletter_v1: { clear: false, why: 'grocery writes that already failed' },
   fitplan_mealevent_pending_v1: { clear: false, why: 'offline meal-event queue' },
   fitplan_mealevent_deadletter_v1: { clear: false, why: 'meal writes that already failed' },
+
+  // WHAT HOME LAST SENT THE COACH'S REMINDER SERVICE (24 Sep 2026), so an
+  // unchanged streak is not re-sent on every render. Kept like the queues and
+  // for the same reason: every entry is keyed by its profile id, so the new
+  // profile a reset creates can never match an old entry — it simply sends
+  // its own facts the first time Home opens. Clearing it buys nothing.
+  fitplan_moment_facts_sent_v1: { clear: false, why: 'reminder-facts send memo, keyed per profile — a new profile never matches an old entry' },
 }
 
 /** Resolve `const SOME_KEY = 'literal'` across src/, so a key named by a constant is still found. */

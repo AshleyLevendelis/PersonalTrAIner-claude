@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [x] **PUT LIVE: EVERYTHING ON THE WORK BRANCH MERGED TO MAIN.** 24 Sep
+  2026. Ashley: *"I ran the coach prompt in vs code then did npm run
+  coach:exam and npm run db both but i dont see the changes in my app"*. The
+  cause, measured: the live app is built from `main`, whose last production
+  deploy was 23 Sep ("Coach exam: first real run"); the 16 commits since —
+  the catalogue machines and cable variants, short-day mobility, push:pull,
+  the tour wording, cardio-like-a-set, and chat fixes 3-5 — were only on the
+  branch and its Vercel previews. The handover prompt never merged, by
+  design. Told her so, with the preview link; her answer: *"Put it live"*.
+  **Before merging, the full sweep (291 gates):** 285 passed first time. Of
+  the six: `test:meal-quality`, `test:schema-parity` and `verify:rls` are the
+  environmental three (no database variables in this session — see the
+  CLAUDE.md correction on their wording); `test:coach-exam-fresh` is red
+  until her exam results are pushed; `test:quality` was killed by my own
+  600-second per-gate limit and re-run alone with none: it passed, 0 of
+  9,216 plans below the 7.2 floor, average 11.72 of 12; and
+  `test:reset-clears-draft` was REAL: the reminders' send memo
+  (`fitplan_moment_facts_sent_v1`) was a new phone-storage key nobody had
+  classified for "Start a new plan". Classified as kept, like the offline
+  queues, because every entry is keyed by profile id. **No file-grep
+  derivation could have named that gate** — it scans all of `src/` for
+  storage keys — which is the "some gates read no source file" rule again,
+  and why the full sweep runs before a merge.
+  **Merged as a fast-forward** (main was already wholly inside the branch).
+
 - [x] **CHAT FIX 5: THE COACH EXAM MARKS THE COACH'S VOICE.** 24 Sep 2026,
   the last of the five chat fixes she asked for. The app's own sentences were
   already graded (`coach-voice`); the MODEL's voice was graded by nothing that
