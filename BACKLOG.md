@@ -2,6 +2,75 @@
 
 Newest first. One line each.
 
+- [x] **PUSH:PULL — ONE REAL DEFECT FIXED, ONE QUESTION FOR ASHLEY, ONE GROUP
+  NAMED.** 24 Sep 2026, item 3 of "work on 1 then 2 then 3" ("bodyweight
+  plans are lopsided").
+  **Measured first**, over the 9,216-profile grid with the scorer's own rule
+  (week 1, push:pull sets outside 0.6-1.6): 432 plans, 430 of them minimalist
+  or bodyweight. 397 pull-heavy, 35 push-heavy. Three different things:
+  - **366 pull-heavy plans had exactly ONE pressing exercise available** once
+    injuries were applied — mostly shoulders and wrists (a wrist injury
+    removes every push-up variant; `contraindicated_joints` falls back to
+    `loads_joints`, and every push-up loads the wrist). The generator had
+    already done all it can: the one press at its ceiling, every pull at its
+    floor of 2. CSCS: when pressing is what hurts, pulling more than you
+    press is the right plan, not a flaw — scapular and rear-delt work is what
+    a coach adds for a sore shoulder, and cutting pull volume to match would
+    be less training for a number. **The plans are right and the SCORE flags
+    them.** Changing what the score counts is a metric change, so it is
+    Ashley's — asked, not done. The rule it would mirror already exists:
+    "missing squat/hinge" only fires when the pool could have supplied one.
+  - **35 push-heavy plans — a real defect, FIXED.** A bodybuilding-style
+    bodyweight trainee kept ONE pulling exercise (Inverted Row) against six to
+    eight pushes, because Towel Row, Table Row and Pull-Up Negatives carry no
+    bodybuilding tag, and the "a style may not starve a movement" floor was
+    switched off at bodyweight (it once flooded bodyweight plans with backpack
+    items). It now applies at bodyweight for pushing and pulling only,
+    bringing back only what needs no backpack. Push-heavy 35 → 1; the
+    measured offender went 8:4 → 11:11.
+  - **~31 pull-heavy plans with two or more presses available** — bodyweight
+    long sessions, where Pull-Ups/Chin-Ups are main lifts that top up to 6
+    sets while push-ups, the best press at that tier, are capped at 4 as
+    accessories. NOT fixed, and named: the direction is the benign one, and
+    the fix (letting the top press count as a main at bodyweight) moves set
+    ceilings for a whole tier and deserves its own measurement.
+  **THE COST, MEASURED BEFORE SHIPPING — and it changed the fix.** The first
+  version reached every pattern at bodyweight. Its full-grid score cut the
+  imbalance as intended and took `duplicate_movement_family` from 109 to 211:
+  legs came back as Air Squat, Tempo Air Squat and Box Squat on one day, one
+  movement three times. Listed pair by pair on the 2,304 bodyweight plans:
+  37 plans with a duplicate before, 139 after. Narrowed to push/pull: 34.
+  **CSCS review.** (1) Training effect: bodybuilding-style bodyweight trainees
+  get real horizontal and vertical pulling — rows they can do at home —
+  instead of pushing twice what they pull. (2) Takes away: nothing measured;
+  off-style picks rank below on-style ones, and the leg duplicates of the first
+  version were the cost that forced the narrowing. (3) Fundamentals: pull
+  pattern coverage improves; overload, recovery and goal specificity untouched.
+  (4) Floors: MIN_VIABLE_PER_PATTERN keeps its meaning at the quality tiers;
+  at bodyweight it now applies to four patterns, and the backpack exclusion
+  keeps the reason it was switched off intact. (5) Scope: exercise selection.
+  **Gate:** `test:style-does-not-starve`, whose old check asserted that
+  NOTHING off-style survives at bodyweight — the mechanism standing in for its
+  own stated property ("the pool has not filled up with backpack items") — and
+  so blocked the fix. Re-anchored on the property in both directions, plus the
+  push/pull-only rule and the measured offender's week. 5 mutations over two
+  rounds, all caught with full counts (46 checks).
+  **Also in this commit:** `test:bundle`'s re-download ceiling, 272 → 280,
+  on the 15 Sep precedent. Clean-worktree measurement: 271 of 272 BEFORE 23
+  Sep's work, so the filler and medicine-ball commits were the last kilobyte,
+  and both were pushed with it red — this gate reads the build, which no
+  file-grep derivation can name. Rule added to CLAUDE.md. The first-paint
+  budget sits at 427 of 428 and will be next.
+  **Final full sweep on the committed tree:** 284 ran, 279 passed. The five
+  failures, each read: the three cloud-only ones, `coach-exam-fresh` (red
+  until the exam re-runs), and `verify:tour-real` check 7 (the open question
+  in the entry below). Scorer against item 2's run on the same grid:
+  push_pull_imbalance 432 → 379 (re-measured on the final code: push-heavy
+  35 → 1, pull-heavy 397 → 378), duplicate_movement_family 109 → 106,
+  frozen_week 4,080 → 4,022, recovery_volume_not_reduced 631 → 612,
+  fat_loss_structure_reduced 14 → 15; every other rule unchanged, average
+  11.70, 0 below the floor.
+
 - [x] **SIX GATES I LEFT RED THIS MORNING, AND ONE OPEN QUESTION BEHIND THEM.**
   23 Sep 2026. The six machines and four cable variants shipped after running
   15 gates chosen by what the work felt like it touched. The full sweep that

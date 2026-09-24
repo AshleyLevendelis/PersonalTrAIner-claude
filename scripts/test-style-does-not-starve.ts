@@ -37,6 +37,7 @@ import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getReplacementCandidates } from '../src/lib/mesocycle-edit'
 import { EXERCISE_DATABASE, getMovementFamily } from '../src/lib/exercise-db'
 import { ALL_EQUIPMENT, ALL_STYLES } from '../src/lib/dev-constraint-audit'
+import { buildProfile, comboKey, type Combination } from './quality-grid'
 import type { UserProfile, EquipmentAccess, TrainingStyle, TrainingExperience } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -111,14 +112,48 @@ console.log('\n1. A style may not starve a movement')
   check('no movement is starved below a workable choice, wherever the trainee has real kit',
     starved.length === 0, starved.slice(0, 8))
 
-  // ...and the bodyweight tier is left alone, which is what keeps a bodyweight
-  // plan a bodyweight plan. Asserted as a PROPERTY of the output, not by
-  // reading the guard: the reinstated entries there were all improvised, so
-  // the thing to hold is that the pool has not filled up with them.
+  // AT BODYWEIGHT THE FLOOR BRINGS BACK ONLY WHAT NEEDS NO BACKPACK.
+  //
+  // RE-ANCHORED 23 Sep 2026. This check used to assert that NOTHING off-style
+  // survived at bodyweight — the MECHANISM (floor off) standing in for the
+  // PROPERTY it was protecting, which its own comment named: a bodyweight plan
+  // must not fill up with backpack items. It then blocked a fix: a bodybuilding
+  // bodyweight trainee with sore knees and back was left ONE pulling exercise
+  // against six or seven pushes (Towel Row, Table Row and Pull-Up Negatives
+  // carry no bodybuilding tag), and 32 plans on the grid pushed up to twice
+  // what they pulled. Held now on the property itself, in both directions.
   const bwStyled = getConstrainedPool(profileFor('bodyweight', 'bodybuilding'), [])
-  check('the floor is not applied at bodyweight — style still filters there',
-    bwStyled.some(e => !e.style_tags.includes('bodybuilding')) === false,
-    bwStyled.filter(e => !e.style_tags.includes('bodybuilding')).map(e => e.name).slice(0, 6))
+  const bwOffStyle = bwStyled.filter(e => !e.style_tags.includes('bodybuilding'))
+  check('at bodyweight, nothing brought back past the style filter needs a backpack',
+    bwOffStyle.every(e => !e.equipment.includes('weighted backpack')),
+    bwOffStyle.filter(e => e.equipment.includes('weighted backpack')).map(e => e.name))
+  check('...while the floor does reach bodyweight — so the check above is not vacuous',
+    bwOffStyle.length > 0, bwOffStyle.length)
+  // PUSHING AND PULLING ONLY. Reaching every pattern brought legs back as
+  // three near-identical air squats on one day and took duplicate movements
+  // from 37 bodyweight plans to 139 on the grid — measured, then narrowed.
+  const PUSH_PULL = ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull']
+  check('...and at bodyweight it brings back only pushes and pulls, never a third air squat',
+    bwOffStyle.every(e => PUSH_PULL.includes(e.movement_pattern)),
+    bwOffStyle.filter(e => !PUSH_PULL.includes(e.movement_pattern)).map(e => `${e.name} (${e.movement_pattern})`))
+  const sore = { ...profileFor('bodyweight', 'bodybuilding', 'beginner'), injuries: ['lower_back', 'knees'] } as UserProfile
+  const sorePulls = getConstrainedPool(sore, []).filter(e => e.movement_pattern === 'horizontal_pull' || e.movement_pattern === 'vertical_pull')
+  check('a style can no longer leave a bodyweight trainee one way to pull (the 23 Sep offender)',
+    sorePulls.length >= 2, sorePulls.map(e => e.name))
+  // AND THE WEEK IT PRODUCES. A measured grid offender, seeded with the key the
+  // grid used: 8 sets of pushing against 4 of pulling before, 11:11 after.
+  {
+    const combo = { equipment: 'bodyweight', injuries: ['lower_back', 'knees'], duration: '45-60', style: 'bodybuilding', experience: 'beginner', goal: 'hypertrophy', recovery: 'high', conditioningPref: 'tolerate' } as unknown as Combination
+    setRandomSource(seededRngFromKey(comboKey(combo)))
+    const week1 = generateMesocycle(buildProfile(combo))[0]
+    resetRandomSource()
+    let push = 0, pull = 0
+    for (const d of week1.days) for (const ex of d.exercises) {
+      if (ex.movement_pattern === 'push') push += ex.sets
+      if (ex.movement_pattern === 'pull') pull += ex.sets
+    }
+    check('...and that trainee\'s week no longer pushes more than 1.6x what it pulls', pull > 0 && push / pull <= 1.6, { push, pull })
+  }
   void catalogueByPattern
 }
 

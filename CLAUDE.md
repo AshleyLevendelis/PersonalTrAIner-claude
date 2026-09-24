@@ -1632,6 +1632,15 @@ old — the commands were right and the context was missing.
   new since I last thought about this".** Having already run a file's gates is
   not a property of the file; it is a property of a version of it that no
   longer exists.
+- **AND SOME GATES READ NO SOURCE FILE AT ALL, SO NO GREP WILL EVER NAME
+  THEM.** 23 Sep 2026: `test:bundle` measures the BUILT app, so any change
+  under `src/` is a change to what it reads, and the file-grep derivation can
+  never find it. Two commits were pushed with it red that day — one kilobyte
+  over a ceiling that had one kilobyte left. **Every `src/` change runs
+  `test:bundle`**, and the catalogue (`exercise-db.ts`) is read by nearly every
+  gate, so a catalogue change is a full sweep, not a derived set: the six
+  machines shipped after 15 hand-picked gates and six more were red at the
+  next sweep.
 - **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
   2026: yesterday's sweep found two real failures, both were fixed, and the
   sweep was reported clean without being re-run. One of those fixes — pulling a

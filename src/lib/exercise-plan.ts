@@ -970,13 +970,42 @@ function stageStyleFilter(
   // Reinstates only what STYLE removed. This stage runs after the equipment
   // and injury stages, so everything in `rejected` has already cleared both:
   // nothing unavailable or contraindicated can come back through here.
+  //
+  // AND AT BODYWEIGHT, FOR WHAT NEEDS NO BACKPACK — 23 Sep 2026. The floor was
+  // switched off at this tier because applying it there reinstated weighted-
+  // backpack items (see the parameter note above): those patterns are thin
+  // because of KIT. But style also thins patterns the kit covers perfectly
+  // well. Measured on the 9,216-profile grid: a bodybuilding-style bodyweight
+  // trainee with sore knees and back kept ONE pulling exercise (Inverted Row)
+  // against six or seven pushes, because Towel Row, Table Row and Pull-Up
+  // Negatives carry no bodybuilding tag — 32 plans pushing up to twice what
+  // they pulled, the direction a coach does not accept for shoulder health.
+  // So at bodyweight the floor counts, and brings back, only entries that
+  // need no backpack: the kit-thin patterns stay exactly as thin as before,
+  // and the style-thin ones get their choices back. CSCS basis: style is a
+  // preference (Ashley, 18 Sep), a row is a row, and a pulling deficit is
+  // the imbalance that costs a shoulder.
+  //
+  // PUSHING AND PULLING ONLY, measured rather than reasoned. The first version
+  // reached every pattern and took duplicate movements on one day from 37
+  // bodyweight plans to 139: legs came back as Air Squat, Tempo Air Squat and
+  // Box Squat side by side — one movement three times, which is not a choice.
+  // At this tier a towel row, a table row and a pull-up negative are
+  // genuinely different pulls; three air squats are not. The push:pull
+  // balance is what the floor is for here, so that is all it reaches.
+  const bodyweightFloor = equipmentAccess === 'bodyweight'
+  const BODYWEIGHT_FLOOR_PATTERNS = new Set(['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull'])
+  const reinstatable = (ex: ExerciseEntry) => !bodyweightFloor
+    || (!ex.equipment.includes('weighted backpack') && BODYWEIGHT_FLOOR_PATTERNS.has(ex.movement_pattern))
   const availableByPattern = new Map<string, number>()
-  for (const ex of pool) availableByPattern.set(ex.movement_pattern, (availableByPattern.get(ex.movement_pattern) ?? 0) + 1)
+  for (const ex of pool) {
+    if (result.includes(ex) || reinstatable(ex)) availableByPattern.set(ex.movement_pattern, (availableByPattern.get(ex.movement_pattern) ?? 0) + 1)
+  }
   const keptByPattern = new Map<string, number>()
   for (const ex of result) keptByPattern.set(ex.movement_pattern, (keptByPattern.get(ex.movement_pattern) ?? 0) + 1)
 
   const starved = new Set<string>()
-  const floorApplies = !!equipmentAccess && EQUIPMENT_QUALITY_TIERS.has(equipmentAccess)
+  const floorApplies = !!equipmentAccess && (EQUIPMENT_QUALITY_TIERS.has(equipmentAccess) || bodyweightFloor)
   for (const [pattern, available] of floorApplies ? availableByPattern : []) {
     // min(floor, available): a pattern the catalogue only has two of is thin
     // by nature, not by filtering, and reinstating there would be asking for
@@ -985,7 +1014,7 @@ function stageStyleFilter(
   }
 
   for (const ex of rejected) {
-    if (starved.has(ex.movement_pattern)) {
+    if (starved.has(ex.movement_pattern) && reinstatable(ex)) {
       // Reinstated, NOT unfiltered: scoreCandidate's style_fit factor ranks
       // every one of these below an on-style option, so the trainee still
       // gets their style wherever the catalogue can serve it. Recorded in the
