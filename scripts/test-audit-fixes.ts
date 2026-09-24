@@ -119,8 +119,6 @@ console.log('\n6. The orphan class cannot come back')
     'src/lib/meal-ingredients.ts', 'src/lib/meal-store.ts', 'src/lib/meal-swap-proposal.ts',
   ]
   const KNOWN_UNCONSUMED: Record<string, string> = {
-    getCardioLogsForDateMerged:
-      'No day-level cardio list exists for it to feed; the failed-log surface reads getPendingCardioFailures instead. Exercised by test:cardio-log.',
     getDeadLetterCount:
       'A dead-lettered meal event is poison data with no user action to offer, so a count has nowhere honest to go. Exercised by test:meal-roundtrip, which is what proves permanent failures are dead-lettered at all.',
   }
@@ -169,8 +167,11 @@ console.log('\n6. The orphan class cannot come back')
   //
   // getCardioLogsForDateMerged is declared `export async function`. If the
   // scanner cannot see it, it was never scanned, and every other async export
-  // in these five files is invisible too.
-  const missedByScanner = Object.keys(KNOWN_UNCONSUMED).filter(n => !scanned.has(n))
+  // in these five files is invisible too. NAMED HERE rather than read off the
+  // acknowledgement list: it left that list on 24 Sep 2026, when the cardio
+  // rows started reading the day back from it — the stale-entry check above
+  // is what said so — and the list's remaining entry is not async.
+  const missedByScanner = ['getCardioLogsForDateMerged', ...Object.keys(KNOWN_UNCONSUMED)].filter(n => !scanned.has(n))
   check('async exports are actually scanned, not skipped', missedByScanner.length === 0, missedByScanner)
 }
 

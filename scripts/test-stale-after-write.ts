@@ -187,8 +187,12 @@ console.log('\n6. Every local-first writer reaches the tab that never unmounts\n
   // components and none of them told anyone. Threading a callback out of each
   // would have fixed those four and missed the next one — so the chat tab
   // subscribes to the store instead, which every writer already notifies.
+  // COUNTED AS SCREENS, not as files that call the store. Since 24 Sep 2026
+  // (Ashley's "like a lifting set") the screens log through one shared row,
+  // so the direct callers fell to two while the places cardio is logged from
+  // stayed at four — and the point of this sanity check is the second number.
   const cardioWriters = execSync(
-    "grep -rl 'saveCardioLog(' src/components/ || true",
+    "grep -rlE 'saveCardioLog\\(|<(PlannedCardioRow|UnplannedCardioEntry|FinisherRow)\\b' src/components/ || true",
     { cwd: ROOT, encoding: 'utf8' },
   ).split('\n').filter(Boolean)
   check(`cardio is written from several places (${cardioWriters.length})`, cardioWriters.length >= 3, cardioWriters)

@@ -891,6 +891,25 @@ menu" stays true when a copy is also left outside it.
 - History is permanent — `diary-preservation`, `replace-without-losing`
 - Every write succeeds or says it did not — `silent-writes`,
   `queue-listeners`, `stale-after-write`
+- **Cardio is logged like a lifting set, on every screen that logs it** —
+  Ashley's ruling 24 Sep 2026, from three options: the set row's boxes and
+  mint ✓, the plan pre-filled so one tap logs it, a read-back with Undo
+  ("✓ Walk · 20 min · Easy"), and effort as Easy / Steady / Hard everywhere,
+  including the plan's own phrase. One shared row, so the five screens cannot
+  drift apart again. Under the CSCS delegation (basis in BACKLOG): RPE ≤4 is
+  Easy, 5-6 Steady, ≥7 Hard, and a plan logged as prescribed keeps its exact
+  RPE. **Nothing pre-chooses an effort the app cannot know** — "Other", the
+  round timer and What happened start blank. `cardio-effort` (29 checks, 18
+  mutations), `rest-day-card`, `verify:rest-day`, `verify:finisher`,
+  `verify:planned-activity`, `verify:mobility-filler`, `verify:round-presets`,
+  `verify:what-happened`
+- **AN UNDO IS A WRITE, AND IT ASKS BEFORE IT OFFERS.** 24 Sep 2026: the old
+  cardio Undo cleared its row whether or not the delete happened, and the
+  store's ten-minute window was measured on the APP's clock — which a dev
+  override moves by days — so under every browser driver the log was pruned at
+  birth, Undo did nothing, and the screen said it was gone. An Undo is drawn
+  only while the store says it can work, and a window about elapsed time is
+  measured on the clock that elapses
 - Nothing is offered that is not built — `equipment-labels`,
   `says-what-it-contains`, `injury-coverage`, `enforcement-gaps`. **The APP
   TOUR is GUARDED for this class of claim since 14 Sep 2026** — `app-tour` §9.
@@ -1744,6 +1763,10 @@ old — the commands were right and the context was missing.
   could be a false green. **Before believing a watcher, prove its own detector
   finds the thing while it is definitely running** — the same "prove the
   detector on something that should fail" habit the gates already use.
+  **And prove it does not find ITSELF**: 24 Sep 2026, a watcher's `pgrep -f`
+  pattern appeared in the watcher's own command line, so it would have seen a
+  live process for ever. `pgrep -f "[t]imeout 600 npm"` matches the sweep and
+  not the line that contains it.
 - **THREE checks ALWAYS fail in a cloud session and are not your problem:**
   `test:meal-quality`, `test:schema-parity` and `verify:rls`. All three need a
   live database this machine cannot reach. Report them as environmental rather

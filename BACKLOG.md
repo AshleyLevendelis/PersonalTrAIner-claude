@@ -2,6 +2,96 @@
 
 Newest first. One line each.
 
+- [x] **ASHLEY'S RULING: CARDIO IS LOGGED LIKE A LIFTING SET, EVERYWHERE.**
+  24 Sep 2026. Her words: *"The loggin cardio system needs a revamp to fit
+  with the aesthetic of the rest of the app."* Asked which look to use
+  everywhere, from three options: **like a lifting set** (my recommendation)
+  — the same boxes and mint ✓ as a set, the plan pre-filled so one tap logs
+  it, a saved row that reads back what was done ("✓ Walk · 20 min · Easy")
+  with Undo, and effort as Easy / Steady / Hard everywhere. She answered
+  directly. Plan: `docs/plans/cardio-logging-like-a-set.md`.
+  **What it was, measured:** five screens wrote a cardio log and each looked
+  like a different app — an amber strip with an outline "Log" (finisher and
+  optional rows), another amber strip on activity days, three tiles that
+  wrote on tap, a 5-10 number strip (unplanned work), two plain text fields
+  (What happened → something else). Two of them recorded an effort nobody
+  chose and no screen ever showed: 4 on the rest-day tiles, 6 on "something
+  else". And no "Logged" survived a tab change — each was component state, so
+  coming back to Today offered to log the same finisher again.
+  **Built:** one shared row (`CardioSetRow`) on all five: a 44px minutes box
+  with the plan's minutes faint in it, a three-segment Easy / Steady / Hard
+  box, the lit mint ✓, and on save the mint read-back with Undo. It reads
+  itself back from the day's logs, so it stays saved. The planned rows print
+  the plan in the same words the read-back uses, so planned and done compare
+  by eye. The rest-day chips now CHOOSE rather than write, with Walk
+  pre-chosen, so its commonest answer is still one tap — on the ✓. The week
+  list and the coach's cardio card print the same phrase ("Cycle · 35 min ·
+  Easy", was "35m · RPE 3").
+  **Decided by me (CSCS delegation), with the basis:** a plan's RPE maps to a
+  word as ≤4 Easy, 5-6 Steady, ≥7 Hard — the everyday 1-10 talk-test scale,
+  and the app's own labels (every RPE-4 prescription says "conversational
+  pace"; RPE 5 is Zone 2; 7-8 are the intervals). Logging a plan as
+  prescribed stores the plan's EXACT RPE (an RPE-8 finisher stays 8, not
+  Hard's 7); choosing a different word stores that word's number (3/5/7).
+  An untouched rest-day tile still stores 4, so nothing about the record
+  changed. "Other", the timer's hand-off and What happened start with NO
+  effort chosen — the app cannot know how a class felt.
+  **Not a prescription change**, so the five-question review does not apply:
+  nothing about what anyone is asked to do moved, only how it is logged.
+  **Decided from screenshots:** one lit ✓ per card — on a walking day the
+  extra-activity row no longer pre-selects, because two glowing ticks split
+  the card's one call to action; and a planned row claims ONE log of its
+  name, so a second walk logged under "anything else" reads back there
+  instead of vanishing behind the first.
+  **Three store defects the read-back exposed, all fixed:** an undo that
+  raced a sync left a tombstone the day's read returned (an undone walk would
+  come straight back ticked); a synced log lost the handle its Undo needs the
+  moment the network answered; and the ten-minute undo window was measured
+  on the APP's clock, which a dev-clock override moves by days — so under
+  every browser driver a synced log was pruned at birth, Undo silently did
+  nothing, and **the old row cleared itself anyway**, telling her it was gone
+  while the server still counted it. The window now runs on real time, and
+  Undo is only offered while the store can honour it.
+  **Verified:** `test:cardio-effort` (new, 29 checks, 18 mutations, 18
+  caught — two first caught by a sanity check and re-ordered so the right
+  check fires). Re-anchored where the behaviour moved: `test:rest-day-card`
+  (5 mutations, 5 caught — one MISSED first, a check asking for one of the
+  card's two prescribed rows), `test:bounds-and-boundaries` (4/4),
+  `test:round-logging` (4/4), `test:what-happened` (2/2),
+  `test:planned-activity`, `test:cardio-session`. In a real browser at
+  390px, screenshots read: `verify:rest-day` (48), `verify:finisher`,
+  `verify:mobility-filler`, `verify:planned-activity`,
+  `verify:cardio-session`, `verify:round-presets`, `verify:what-happened` —
+  each now reads the STORED figure (minutes and RPE) off the fake database,
+  not just the words on screen. 10 screen mutations, 10 caught — one MISSED
+  first: resetting the row after a save was also done by a remount on the
+  first log, so only a second log in a row can see it.
+  **The quick-gate sweep (221 gates, fresh log) found three more, all this
+  change's and all fixed:** `test:bundle` — first paint 429 kB against a 428
+  ceiling that had shown 1 kB left since 23 Sep; measured on a clean worktree
+  of the commit before at 427, so the row costs 2 kB gzipped; raised to 437,
+  today's 429 plus the 8 kB every move there has used. `test:audit-fixes` —
+  its list of store functions nothing reads still named the day's cardio read,
+  which the row now reads; the entry is gone and the async-scanner check that
+  leaned on it names it directly (mutated: caught). `test:stale-after-write` —
+  a sanity check counted FILES calling the cardio store and fell from four to
+  two when the screens moved onto one row; it counts screens now (six). The
+  fourth failure, `test:coach-exam-fresh`, predates this: the coach changed in
+  earlier work and the exam must be re-run on Ashley's machine — this change
+  touches no coach file.
+  **Watcher lesson, the pgrep one again:** my first sweep watcher's pattern
+  appeared in its own command line, so it matched itself and could never have
+  reported the sweep dying. Proved the `[t]imeout` form finds the sweep and not
+  itself before trusting it.
+  **New words, hers to change:** "Minutes" / "How hard" over the boxes; "Pick
+  what you did first."; "Pick how hard it felt."; "Enter how many minutes.";
+  "Too late to undo that one — it has already been saved."; "That didn't
+  undo — try again in a moment."; "Suggested" over an otherwise empty day's
+  cardio; "Other activity" / "What did you do? e.g. run, class, row".
+  **Not built, named:** a cardio log cannot be deleted after the ten-minute
+  window — before or after this; a lifting set can be deleted at any time.
+  The coach's own cardio logging still records the effort it is told, or 6.
+
 - [x] **ASHLEY'S RULING: ON A DAY WITH NO WEIGHT TO OFFER, THE TOUR SAYS TO
   TYPE ONE.** 24 Sep 2026, the open question from the gate-fix entry below.
   Asked, from three options: **change the words** (my recommendation) — over

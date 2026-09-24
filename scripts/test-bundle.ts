@@ -207,9 +207,15 @@ console.log('\n2b. The coach is not on the path to first paint')
   // 428 is 8 kB over a value measured TODAY (420), the same margin every other
   // move here has used, and the printed line means the next erosion is visible
   // before it is a failure.
-  headroom('first paint fetches', firstLoadGzip, 428, 'kB gzipped')
+  // 24 Sep 2026: crossed at 429, by cardio logging "like a lifting set"
+  // (Ashley's ruling) — one shared row now drawn on the rest day, the finisher
+  // and the activity day, all first-paint screens. Measured on a clean
+  // worktree of the commit before: 427, so the row costs 2 kB gzipped. It sat
+  // at 427 of 428 with 1 kB printed as left since 23 Sep. 437 is 8 kB over
+  // today's 429, the margin every move here has used.
+  headroom('first paint fetches', firstLoadGzip, 437, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 428, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 437, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
