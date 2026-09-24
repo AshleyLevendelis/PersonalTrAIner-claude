@@ -34,6 +34,10 @@ const SHEET = 'src/components/exercise/AddCardioSessionSheet.tsx'
 const card = read(CARD)
 const cardBare = strip(card)
 const sheet = read(SHEET)
+// THE SHARED CARDIO ROW, since 24 Sep 2026 (Ashley's "like a lifting set"):
+// the chips, the typed "Other", the refusal and the undo moved out of this card
+// into CardioSetRow, so the properties section 5 holds are asked of it.
+const row = strip(read('src/components/exercise/CardioSetRow.tsx'))
 
 console.log('rest-day-card gate\n')
 
@@ -111,7 +115,7 @@ check('the sheet still offers its own trigger by default, for the sibling card',
 check('...and renders nothing rather than a stray link when its owner supplies one',
   /if \(startOpen\) return null/.test(strip(sheet)))
 const restBody = cardBare.slice(cardBare.indexOf('export function RestDayCard'), cardBare.indexOf('export function MovedDayCard'))
-const recoveryBody = cardBare.slice(cardBare.indexOf('export function ActiveRecoveryCard'), cardBare.indexOf('function PrescribedRow'))
+const recoveryBody = cardBare.slice(cardBare.indexOf('export function ActiveRecoveryCard'))
 check('the rest day owns the trigger itself', /startOpen/.test(restBody))
 check('...and active recovery deliberately does not', !/startOpen/.test(recoveryBody))
 check('the sheet is still lazily loaded on both, so its weight stays off first paint',
@@ -124,14 +128,21 @@ check('...and still validates its minutes', /isPlausibleCardioDuration/.test(she
 // ===========================================================================
 console.log('\n5. Everything the rebuild had to keep')
 // ===========================================================================
+const entry = row.slice(row.indexOf('export function UnplannedCardioEntry'))
+check('the entry sections were located (sanity check on this section)', entry.length > 1500 && row.indexOf('export function UnplannedCardioEntry') > 0, entry.length)
+check('the rest-day card draws its logging from the shared row, not its own form',
+  /<UnplannedCardioEntry /.test(cardBare) && !/saveCardioLog\(/.test(cardBare))
 check('the typed form survives as the "Other" path, validation and all',
-  /isPlausibleCardioDuration\(minutes\)/.test(cardBare) && /MAX_PLAUSIBLE_CARDIO_MINUTES/.test(cardBare))
-check('...reporting a refusal in the warn role rather than reverting silently',
-  /var\(--role-warn-text\)/.test(cardBare))
-check('a one-tap chip reports a failed write too, not just the typed form',
-  /That didn't save — try again in a moment\./.test(cardBare))
+  /pick === 'other'/.test(entry) && /isPlausibleCardioDuration\(mins\)/.test(entry) && /MAX_PLAUSIBLE_CARDIO_MINUTES/.test(entry))
+check('...reporting a refusal on screen rather than reverting silently',
+  /if \(!view\) \{ setError\(/.test(entry))
+check('a one-tap log reports a failed write too, not just the typed form',
+  /That didn't save — try again in a moment\./.test(entry))
+const readbackFn = row.slice(row.indexOf('export function CardioReadback'), row.indexOf('export function EffortBox'))
 check('undo still deletes by the client id the write returned',
-  /deleteCardioLog\(loggedClientId\)/.test(cardBare))
+  /deleteCardioLog\(log\.clientId\)/.test(readbackFn))
+check('...and is only OFFERED while the store can still honour it, so it never pretends',
+  /const undoable = isCardioLogUndoable\(log\.clientId\)/.test(readbackFn) && /\{undoable && \(/.test(readbackFn))
 check('the tomorrow preview is still disabled when there is nowhere to peek',
   /disabled=\{!onPeek\}/.test(cardBare))
 check('...and still prints the caller\'s own detail string rather than reformatting it',
@@ -140,7 +151,7 @@ check('the train-anyway row is hidden entirely when there is nothing to borrow',
   /trainAnywayOptions\.length > 0/.test(restBody))
 // alsoLabel is what keeps ActiveRecoveryCard from asking the same question twice.
 check('a day that already prescribes something asks a different question',
-  /alsoLabel \? 'Did anything else\?' : 'Did you move today\?'/.test(cardBare))
+  /const asked = alsoLabel \|\|/.test(cardBare) && /asked \? 'Did anything else\?' : 'Did you move today\?'/.test(cardBare))
 check('...and drops the "your plan doesn\'t change" caption there, because it already did',
   /!alsoLabel && \(/.test(cardBare))
 
@@ -152,7 +163,11 @@ for (const name of ['RestDayCard', 'MovedDayCard', 'ActiveRecoveryCard']) {
 }
 check('active recovery keeps its warn-role colouring rather than inheriting the violet',
   /var\(--role-warn-bg\)/.test(recoveryBody) && /var\(--role-warn\)/.test(recoveryBody))
-check('...and its prescribed row', /<PrescribedRow/.test(recoveryBody))
+// BOTH of them: the walk the plan prescribes AND the suggestion an otherwise
+// empty day gets. The first version asked for one row and so passed with the
+// suggestion deleted — found by mutation.
+check('...and its prescribed rows, drawn by the shared cardio row — the planned session and the suggestion',
+  /<PlannedCardioRow prescription=\{planned\}/.test(recoveryBody) && /<PlannedCardioRow prescription=\{cardio\}/.test(recoveryBody))
 // The violet is the recovery role, from the token rather than the mock's hex.
 check('the rest day wears the violet role from the token, not a literal',
   /var\(--role-ai-text\)/.test(restBody) && !/#B4A9FF/.test(card))

@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Plus, X, Dumbbell, Activity, Clock, Flame, Loader2 } from 'lucide-react'
+import { Plus, X, Dumbbell, Activity } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES, saveCardioLog } from '@/lib/cardio-log-store'
+import { UnplannedCardioEntry, type CardioPick } from './CardioSetRow'
 
 // ---------------------------------------------------------------------------
 // One entry point for off-plan lifts AND ad-hoc cardio (LAYOUT-DESIGN.md
@@ -15,14 +15,19 @@ import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES, saveCardioLog 
 // mesocycle.
 // ---------------------------------------------------------------------------
 
-const CONDITIONING_PRESETS = [
-  { label: '15m Incline Walk', activity: 'Incline Treadmill Walk', duration: 15, rpe: 4 },
-  { label: '15m Heavy Bag', activity: 'Heavy Bag / Functional Circuit', duration: 15, rpe: 7 },
-  { label: '10m HIIT Bike', activity: 'HIIT / Assault Bike', duration: 10, rpe: 8 },
-  { label: '15m Zone 2', activity: 'Zone 2 Cardio', duration: 15, rpe: 5 },
-] as const
-
-const RPE_CHOICES = [5, 6, 7, 8, 9, 10]
+// LOGGED LIKE A LIFTING SET since 24 Sep 2026 (Ashley's ruling — see
+// CardioSetRow). The presets were buttons that filled two text boxes and a
+// 5-10 number strip; they are the row's activity chips now, each carrying its
+// minutes and its effort, and the effort is Easy / Steady / Hard like every
+// other cardio log. The activity strings are unchanged — they are what the
+// log has always recorded — and so are the RPEs, which a preset logged as-is
+// still stores exactly (see rpeToStore): the HIIT bike is still an 8.
+const CONDITIONING_PRESETS: readonly CardioPick[] = [
+  { label: 'Incline walk', activity: 'Incline Treadmill Walk', minutes: 15, rpe: 4 },
+  { label: 'Heavy bag', activity: 'Heavy Bag / Functional Circuit', minutes: 15, rpe: 7 },
+  { label: 'HIIT bike', activity: 'HIIT / Assault Bike', minutes: 10, rpe: 8 },
+  { label: 'Zone 2', activity: 'Zone 2 Cardio', minutes: 15, rpe: 5 },
+]
 
 export function AddUnplannedWork({
   onLiftAdded,
@@ -75,14 +80,9 @@ export function AddUnplannedWork({
    */
   overlay?: boolean
 }) {
-  const { profileId, date, declareOffPlan } = useActiveSession()
+  const { declareOffPlan } = useActiveSession()
   const [mode, setMode] = useState<null | 'lift' | 'cardio'>(null)
   const [liftName, setLiftName] = useState('')
-  const [activity, setActivity] = useState('')
-  const [duration, setDuration] = useState('')
-  const [durationError, setDurationError] = useState<string | null>(null)
-  const [rpe, setRpe] = useState(6)
-  const [saving, setSaving] = useState(false)
 
   // Controlled mode: opening from outside (the day-level menu) needs a
   // default sub-tab, since nothing here set `mode` yet. A prefill says which
@@ -90,10 +90,10 @@ export function AddUnplannedWork({
   // currently arrives in.
   useEffect(() => {
     if (!hideTrigger || !open || mode !== null) return
+    // The row itself takes the prefill's name and minutes (UnplannedCardioEntry's
+    // `prefill`), and leaves the effort blank for her.
     if (prefill) {
       setMode('cardio')
-      setActivity(prefill.activityName)
-      setDuration(String(prefill.durationMinutes))
       return
     }
     setMode('lift')
@@ -102,9 +102,6 @@ export function AddUnplannedWork({
   const reset = () => {
     setMode(null)
     setLiftName('')
-    setActivity('')
-    setDuration('')
-    setRpe(6)
     onOpenChange?.(false)
   }
 
@@ -114,35 +111,6 @@ export function AddUnplannedWork({
     if (!liftName.trim()) return
     declareOffPlan(liftName.trim())
     onLiftAdded?.()
-    reset()
-  }
-
-  const handleSaveCardio = () => {
-    if (!profileId || !activity.trim() || !duration) return
-    // Same unenforced `min="1"` as the rest-day card had — see its handler.
-    const minutes = parseInt(duration, 10)
-    if (!isPlausibleCardioDuration(minutes)) {
-      setDurationError(`Enter between 1 and ${MAX_PLAUSIBLE_CARDIO_MINUTES} minutes.`)
-      return
-    }
-    setDurationError(null)
-    setSaving(true)
-    const view = saveCardioLog({
-      userId: profileId,
-      date,
-      activityName: activity.trim(),
-      durationMinutes: minutes,
-      intensityRpe: rpe,
-      // "3 rounds · 120s work / 30s rest" — what the timer actually ran, so
-      // the log says more than "Intervals, 7 min" when she reads it back.
-      notes: prefill?.notes ?? null,
-    })
-    setSaving(false)
-    if (!view) {
-      setDurationError("That didn't save — check the number and try again.")
-      return
-    }
-    onCardioLogged?.()
     reset()
   }
 
@@ -205,66 +173,14 @@ export function AddUnplannedWork({
       )}
 
       {mode === 'cardio' && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-1.5">
-            {CONDITIONING_PRESETS.map(preset => (
-              <Button
-                key={preset.activity}
-                variant="outline"
-                size="sm"
-                className="h-7 text-[0.6875rem] justify-start px-2"
-                onClick={() => { setActivity(preset.activity); setDuration(String(preset.duration)); setRpe(preset.rpe) }}
-              >
-                {preset.label}
-              </Button>
-            ))}
-          </div>
-          <Input
-            placeholder="Activity name"
-            value={activity}
-            onChange={e => setActivity(e.target.value)}
-            className="h-8 text-sm"
-          />
-          <div className="flex items-center gap-2">
-            <Clock className="size-3 text-muted-foreground shrink-0" />
-            <Input
-              type="number"
-              min="1"
-              placeholder="Duration (mins)"
-              value={duration}
-              onChange={e => setDuration(e.target.value)}
-              className="h-8 text-sm"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <span className="text-[0.625rem] text-muted-foreground flex items-center gap-1">
-              <Flame className="size-2.5" /> RPE {rpe}
-            </span>
-            <div className="flex gap-1">
-              {RPE_CHOICES.map(val => (
-                <button
-                  key={val}
-                  type="button"
-                  className={`flex-1 h-11 min-w-11 rounded text-xs font-semibold transition-all ${
-                    val === rpe ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
-                  }`}
-                  onClick={() => setRpe(val)}
-                >
-                  {val}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            className="w-full h-8"
-            disabled={!activity.trim() || !duration || saving}
-            onClick={handleSaveCardio}
-          >
-            {saving ? <Loader2 className="size-3 mr-1 animate-spin" /> : <Activity className="size-3 mr-1" />}
-            Save
-          </Button>
-        </div>
+        <UnplannedCardioEntry
+          picks={CONDITIONING_PRESETS}
+          prefill={prefill}
+          // "3 rounds · 120s work / 30s rest" — what the timer actually ran, so
+          // the log says more than "Intervals, 7 min" when she reads it back.
+          notes={prefill?.notes ?? null}
+          onLogged={() => { onCardioLogged?.(); reset() }}
+        />
       )}
     </div>
   )

@@ -151,7 +151,7 @@ check('...and the coach\'s reason, which is what the day shows underneath',
 // the screens call; if the written shape were wrong they would show a blank
 // card, which is the defect this feature exists downstream of.
 check('the screens count it as a session', isScheduledDay(day1) === true)
-check('...render it as a prescription', prescriptionLine(day1.plannedActivity!) === 'Cycle · 35m · RPE 3', prescriptionLine(day1.plannedActivity!))
+check('...render it as a prescription', prescriptionLine(day1.plannedActivity!) === 'Cycle · 35 min · Easy', prescriptionLine(day1.plannedActivity!))
 check('...and preview it in minutes, never "0 exercises"', dayDetail(day1) === '35 minutes', dayDetail(day1))
 
 check('"my cardio day" means every week of the block', !!wed(added.mesocycle[3]).plannedActivity)

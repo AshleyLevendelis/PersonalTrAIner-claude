@@ -45,6 +45,16 @@ interface PendingCardioLog extends CardioLogInput {
   id?: string
   /** Set by deleteCardioLog when undo races an in-flight sync (item was still 'pending' at the time) — flushPending's success path checks this and deletes the just-inserted row immediately instead of marking 'synced'. */
   pendingDelete?: boolean
+  /**
+   * WALL-CLOCK time of the tap, for the undo window only. completedAt is the
+   * APP's clock (getAppNow), which a dev-clock override moves by days — and
+   * the window was measured against it, so on any overridden day a synced log
+   * was already "older than ten minutes" and pruned on the next flush. Undo
+   * then no-opped while the row it sat on cleared itself: found 24 Sep 2026
+   * when the cardio rows started asking whether Undo would work before
+   * offering it. Absent on entries written before that; they fall back.
+   */
+  savedAtMs?: number
 }
 
 export interface CardioLogView extends CardioLog {
@@ -140,6 +150,7 @@ function saveCardioLogUnchecked(input: CardioLogInput): CardioLogView {
     ...input,
     clientId,
     completedAt: getAppNow(input.userId).toISOString(),
+    savedAtMs: Date.now(),
     attempts: 0,
     status: 'pending',
   }
@@ -209,9 +220,28 @@ export async function deleteCardioLog(clientId: string): Promise<void> {
   notify()
 }
 
+/**
+ * CAN THIS LOG STILL BE UNDONE? Asked by a row BEFORE it offers Undo, so the
+ * button is never drawn over a log deleteCardioLog would silently leave in
+ * place. deleteCardioLog no-ops on anything it no longer holds — past the
+ * window, or already tombstoned — and a row that then hid the log anyway
+ * would be telling her it was gone while the server still counted it.
+ */
+export function isCardioLogUndoable(clientId: string | null | undefined): boolean {
+  if (!clientId) return false
+  const item = loadPending().find(i => i.clientId === clientId)
+  if (!item || item.pendingDelete) return false
+  if (item.status !== 'synced') return true
+  return savedAt(item) > Date.now() - CARDIO_UNDO_WINDOW_MS
+}
+
+function savedAt(item: PendingCardioLog): number {
+  return item.savedAtMs ?? new Date(item.completedAt).getTime()
+}
+
 function pruneAgedSynced(items: PendingCardioLog[]): PendingCardioLog[] {
   const cutoff = Date.now() - CARDIO_UNDO_WINDOW_MS
-  return items.filter(i => i.status !== 'synced' || new Date(i.completedAt).getTime() > cutoff)
+  return items.filter(i => i.status !== 'synced' || savedAt(i) > cutoff)
 }
 
 let flushPromise: Promise<void> | null = null
@@ -321,10 +351,28 @@ export async function getCardioLogsForDateMerged(userId: string, date: string): 
   // 'synced' local rows are excluded here — they're already represented by
   // serverRows below (kept locally only so deleteCardioLog can undo them by
   // id within CARDIO_UNDO_WINDOW_MS, not for display).
-  const pendingRows = loadPending()
-    .filter(i => i.userId === userId && i.date === date && i.status !== 'synced')
+  //
+  // A TOMBSTONED ROW IS NOT A LOG. An undo that races an in-flight insert
+  // marks the entry `pendingDelete` rather than dropping it (see
+  // deleteCardioLog), and this read used to return it anyway — invisible
+  // until 24 Sep 2026, when the cardio rows started reading themselves back
+  // from here and an undone walk came straight back as "✓ Walk".
+  const local = loadPending().filter(i => i.userId === userId && i.date === date)
+  const pendingRows = local
+    .filter(i => i.status !== 'synced' && !i.pendingDelete)
     .map(pendingToView)
-  return [...pendingRows, ...serverRows.map(r => ({ ...r, syncStatus: 'synced' as const }))]
+  // AND A SYNCED ROW KEEPS THE HANDLE ITS UNDO NEEDS. The server's copy has no
+  // clientId, so without this a row read back from here lost its Undo the
+  // moment the network answered — a few hundred milliseconds after the tap,
+  // well inside the ten minutes the store promises.
+  const clientIdByServerId = new Map(local.filter(i => i.status === 'synced' && i.id).map(i => [i.id!, i.clientId]))
+  const tombstoned = new Set(local.filter(i => i.pendingDelete && i.id).map(i => i.id!))
+  return [
+    ...pendingRows,
+    ...serverRows
+      .filter(r => !(r.id && tombstoned.has(r.id)))
+      .map(r => ({ ...r, clientId: (r.id && clientIdByServerId.get(r.id)) || undefined, syncStatus: 'synced' as const })),
+  ]
 }
 
 /**

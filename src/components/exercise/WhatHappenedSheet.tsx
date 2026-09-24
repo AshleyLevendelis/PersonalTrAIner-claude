@@ -26,6 +26,8 @@ import { Input } from '@/components/ui/input'
 import { markSessionCompleted, setDeliberateRest, setMarkedMissed, setSessionMove, setSwappedForActivity } from '@/lib/daily-tracking'
 import { ensureSessionSynced, prescriptionUnit, writeHistoricalSession, type SetUnit } from '@/lib/set-log-store'
 import { isPlausibleCardioDuration, saveCardioLog } from '@/lib/cardio-log-store'
+import { rpeToStore, type EffortKey } from '@/lib/cardio-effort'
+import { EffortBox } from './CardioSetRow'
 import { resolveMoveTarget, sessionForDate, type MoveTarget, type SessionMove } from '@/lib/session-move'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { isExternallyLoaded } from '@/lib/load-prescription'
@@ -109,6 +111,7 @@ export function WhatHappenedSheet({
   const [error, setError] = useState<string | null>(null)
   const [activity, setActivity] = useState('')
   const [minutes, setMinutes] = useState('')
+  const [effort, setEffort] = useState<EffortKey | null>(null)
   const [rows, setRows] = useState<Record<number, { sets: string; reps: string; weight: string }>>({})
 
   const date = target?.date ?? ''
@@ -171,7 +174,7 @@ export function WhatHappenedSheet({
     return r.ok ? { date: r.date, dayName: r.dayName, remapFrom: r.remapFrom } : null
   }, [target, date, today, plan, weekOf, moves])
 
-  const reset = () => { setPhase('menu'); setBusy(false); setError(null); setActivity(''); setMinutes(''); setRows({}) }
+  const reset = () => { setPhase('menu'); setBusy(false); setError(null); setActivity(''); setMinutes(''); setEffort(null); setRows({}) }
   const close = () => { reset(); onClose() }
 
   /** Runs one write; a false lands as a sentence on screen, never as a silent tick. */
@@ -233,13 +236,19 @@ export function WhatHappenedSheet({
     const mins = Number(minutes)
     if (!name) { setError('Name what you did — a walk, a class, a swim.'); return }
     if (minutes.trim() && !isPlausibleCardioDuration(mins)) { setError('Minutes look off — between 1 and 600.'); return }
+    // EFFORT IS ASKED, NOT ASSUMED, since 24 Sep 2026. This wrote an RPE of 6
+    // that no screen ever showed; it is the same Easy / Steady / Hard box every
+    // other cardio log uses now (Ashley's "like a lifting set" ruling), and it
+    // is only asked when there IS a log — minutes given. The coach's own path
+    // records the effort the person stated in the same way.
+    if (minutes.trim() && !effort) { setError('Pick how hard it felt.'); return }
     return run(async () => {
       const ok = await setSwappedForActivity(profileId!, date, name)
       if (!ok) return false
       // The activity's own log, exactly as the coach's tool writes it — so
       // "I did a swim instead" and "swap today for a swim" leave the same rows.
       if (minutes.trim()) {
-        saveCardioLog({ userId: profileId!, date, activityName: name, durationMinutes: Math.round(mins), intensityRpe: 6, notes: 'Swapped in place of the prescribed lifting session' })
+        saveCardioLog({ userId: profileId!, date, activityName: name, durationMinutes: Math.round(mins), intensityRpe: rpeToStore(effort!), notes: 'Swapped in place of the prescribed lifting session' })
       }
       return true
     }, 'close')
@@ -448,6 +457,14 @@ export function WhatHappenedSheet({
           <div className="space-y-2" data-testid="what-happened-something-else">
             <Input value={activity} onChange={e => setActivity(e.target.value)} placeholder="What did you do? e.g. swim, class, run" aria-label="Activity" />
             <Input value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="Minutes (optional)" inputMode="numeric" aria-label="Minutes" />
+            {/* Shown once there is something to log. With no minutes the day is
+                marked and nothing is logged, so there is nothing to rate. */}
+            {minutes.trim() !== '' && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground font-medium">How hard</p>
+                <EffortBox effort={effort} onEffort={e => { setEffort(e); setError(null) }} />
+              </div>
+            )}
             <div className="flex gap-2">
               <Button disabled={busy} onClick={saveSomethingElse} data-verb="save-something-else">Save</Button>
               <Button variant="ghost" onClick={() => setPhase('menu')}>Back</Button>

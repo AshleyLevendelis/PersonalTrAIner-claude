@@ -145,8 +145,15 @@ const cands = sheet.slice(sheet.indexOf('const moveCandidates'), sheet.indexOf('
 check('move destinations come from the coach\'s own resolver, one candidate per requested day',
   /resolveMoveTarget\(\{ fromDate: date, requestedDate: d\.date/.test(cands) && /r\.ok && r\.asWanted/.test(cands))
 check('after a miss, the offer to move uses the resolver\'s next free day', /resolveMoveTarget\(\{ fromDate: date, todayDate: today, plan, weekOf, existing: moves \}\)/.test(sheet) && /missed_recorded/.test(sheet))
+// RE-ANCHORED 24 Sep 2026: the effort is no longer an invented 6 — it is the
+// Easy / Steady / Hard answer, asked whenever there are minutes to log, as the
+// coach's own path records the effort the person stated. The two ROWS are
+// still the same two: the day flag and the log, with the same note.
 check('"something else" leaves the same two rows the coach\'s tool leaves',
-  /saveCardioLog\(\{ userId: profileId!, date, activityName: name, durationMinutes: Math\.round\(mins\), intensityRpe: 6, notes: 'Swapped in place of the prescribed lifting session' \}\)/.test(sheet))
+  /saveCardioLog\(\{ userId: profileId!, date, activityName: name, durationMinutes: Math\.round\(mins\), intensityRpe: rpeToStore\(effort!\), notes: 'Swapped in place of the prescribed lifting session' \}\)/.test(sheet))
+check('...and asks the effort rather than inventing one, before anything is written',
+  /if \(minutes\.trim\(\) && !effort\) \{ setError\(/.test(sheet) && !/intensityRpe: 6/.test(sheet)
+    && sheet.indexOf('!effort) { setError(') > -1 && sheet.indexOf('!effort) { setError(') < sheet.indexOf('await setSwappedForActivity('))
 const did = sheet.slice(sheet.indexOf('const saveDidElsewhere'), sheet.indexOf('const focus ='))
 check('"did it elsewhere" logs real sets through the history writer, then completes the row',
   did.indexOf('writeHistoricalSession(') > 0 && did.indexOf('markSessionCompleted(') > did.indexOf('writeHistoricalSession('))

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Loader2 } from 'lucide-react'
 import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES } from '@/lib/cardio-log-store'
+import { EFFORTS } from '@/lib/cardio-effort'
 
 /**
  * "MAKE THIS A CARDIO DAY" — the screen half of propose_cardio_session.
@@ -27,12 +28,11 @@ import { isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES } from '@/lib/c
  * EFFORT IS THREE CHIPS, NOT A 1-10 BOX. The scale is the coach's own
  * (conversational / steady / hard), and nobody standing in a kitchen wants to
  * pick a number between one and ten for a walk.
+ *
+ * AND THE SAME THREE WORDS LOG IT, since 24 Sep 2026: the scale moved to
+ * cardio-effort.ts so a session planned "Steady" here is logged against a
+ * "Steady" box on the day, not against a number.
  */
-const EFFORTS: { label: string; note: string; rpe: number }[] = [
-  { label: 'Easy', note: 'can hold a conversation', rpe: 3 },
-  { label: 'Steady', note: 'working, but not gasping', rpe: 5 },
-  { label: 'Hard', note: 'intervals', rpe: 7 },
-]
 
 export function AddCardioSession({
   dayName,

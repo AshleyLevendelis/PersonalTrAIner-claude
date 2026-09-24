@@ -110,15 +110,25 @@ console.log('\n4. It reaches the places she looked')
   // cannot know one, so the sheet asks. A prefilled RPE would be the app
   // making up a fact about her training.
   const sheet = strip(readFileSync('src/components/exercise/AddUnplannedWork.tsx', 'utf8'))
-  check('the prefill fills the activity and the duration', /setActivity\(prefill\.activityName\)/.test(sheet)
-    && /setDuration\(String\(prefill\.durationMinutes\)\)/.test(sheet), null)
+  // RE-ANCHORED 24 Sep 2026: the form is the shared cardio row now (Ashley's
+  // "like a lifting set"), so the sheet hands the prefill over and the row
+  // fills itself — both ends are held.
+  const row = strip(readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8'))
+  const entry = row.slice(row.indexOf('export function UnplannedCardioEntry'))
+  check('the sheet hands the prefill to the row', /prefill=\{prefill\}/.test(sheet), null)
+  check('the prefill fills the activity and the duration',
+    /useState\(prefill\?\.activityName \?\? ''\)/.test(entry) && /useState\(prefill \? String\(prefill\.durationMinutes\) : ''\)/.test(entry), null)
   check('...and never the effort, which only she knows',
-    !/prefill\.(rpe|intensity)/.test(sheet), null)
+    !/prefill\.(rpe|intensity)/.test(sheet) && !/prefill\??\.(rpe|intensity)/.test(entry)
+      && /useState<number \| 'other' \| null>\(prefill \? 'other'/.test(entry)
+      && /useState<EffortKey \| null>\(chosen \? effortForRpe\(chosen\.rpe\) : null\)/.test(entry), null)
   // AND THE DETAIL SURVIVES THE SAVE. Checked at the writing end, not the
   // passing end: ToolsTab handing over `notes` proves nothing if the save
   // then drops them, which is what a mutation did while this file was green.
-  check('the round detail is written into the log, not just handed over',
-    /notes: prefill\?\.notes \?\? null/.test(sheet), null)
+  check('the round detail is handed over',
+    /notes=\{prefill\?\.notes \?\? null\}/.test(sheet), null)
+  check('...and written into the log, not just handed over',
+    /notes: notes \?\? null/.test(entry), null)
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }

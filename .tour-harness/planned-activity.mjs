@@ -113,10 +113,14 @@ if (!card.found) {
   ws.close(); chrome.kill(); server.close(); process.exit(1)
 }
 
+// The driver's own copy of the scale — a literal, so it cannot agree with the
+// app by construction. Effort is in words since 24 Sep 2026 (Ashley's "like a
+// lifting set" ruling): "Walk · 20 min · Easy", not "20m · RPE 3".
+const word = rpe => (rpe <= 4 ? 'Easy' : rpe <= 6 ? 'Steady' : 'Hard')
 check('2. the prescription names the activity, the minutes and the effort',
   card.prescription.includes(want.activity) &&
-    card.prescription.includes(`${want.duration}m`) &&
-    (want.targetRpe == null || card.prescription.includes(`RPE ${want.targetRpe}`)),
+    card.prescription.includes(`${want.duration} min`) &&
+    (want.targetRpe == null || card.prescription.includes(`${want.duration} min · ${word(want.targetRpe)}`)),
   { shown: card.prescription, want })
 
 // THE COACH'S REASON. It is written for a person and, before this, reached
@@ -127,7 +131,59 @@ check('3. and the coach\'s reason for it is on screen',
     || card.card.toLowerCase().includes(w.toLowerCase())),
   { reason: want.reason, shown: card.card.slice(0, 200) })
 
-check('4. one tap logs the prescribed walk', card.buttons.some(b => /^log$/i.test(b)), card.buttons)
+// ONE CALL TO ACTION. The prescribed walk is the session; the "anything else"
+// row under it must not glow as well, or the card asks for two things at once.
+const lit = await ev(`[...document.querySelectorAll('[data-testid="cardio-save"]')].filter(n => n.className.includes('glow-pulse')).map(n => !!n.closest('[data-testid="planned-activity"]'))`)
+check('3b. exactly one ✓ on the card is lit, and it is the prescribed walk\'s', lit.length === 1 && lit[0] === true, lit)
+
+// ONE TAP, ON THE ✓ — like a set. The plan's minutes are in the box and its
+// effort is chosen, so tapping the lit ✓ logs exactly what the plan asked.
+const tapped = await ev(`(() => {
+  const n = document.querySelector('[data-testid="planned-activity"] [data-testid="cardio-save"]')
+  if (!n || !n.className.includes('glow-pulse')) return false
+  const r = n.getBoundingClientRect()
+  for (const type of ['mousedown', 'mouseup', 'click']) n.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }))
+  return true
+})()`)
+await wait(900)
+const readback = await ev(`(document.querySelector('[data-testid="planned-activity"] [data-testid="cardio-readback"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim()`)
+const stored = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => ({ a: r.activity_name, m: r.duration_minutes, rpe: r.intensity_rpe }))`)
+check('4. one tap on the lit ✓ logs the prescribed walk, and it reads back',
+  tapped === true && readback.startsWith(`${want.activity} · ${want.duration} min`) && /Undo/.test(readback), { tapped, readback })
+check('4b. ...stored as the plan wrote it — its minutes and its exact effort',
+  stored.length === 1 && stored[0].a === want.activity && stored[0].m === want.duration && (want.targetRpe == null || stored[0].rpe === want.targetRpe),
+  { stored, want })
+// A SECOND WALK IS NOT SWALLOWED BY THE FIRST. The prescribed row reads back
+// ONE log of its activity; an extra walk logged under "anything else" must
+// read back there, not vanish behind the planned one. Two logs of one name is
+// the case a name-based read-back gets wrong.
+await ev(`(() => {
+  const tap = n => { const r = n.getBoundingClientRect(); for (const t of ['mousedown', 'mouseup', 'click']) n.dispatchEvent(new MouseEvent(t, { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 })) }
+  const chip = [...document.querySelectorAll('[data-testid="cardio-unplanned"] [role="radio"]')].find(b => /^${want.activity}\\b/.test((b.innerText || '').trim()))
+  if (chip) tap(chip)
+  return !!chip
+})()`)
+await wait(300)
+await ev(`(() => {
+  const box = document.querySelector('[data-testid="cardio-unplanned"]')
+  const easy = box?.querySelector('[data-effort="easy"]')
+  if (easy && easy.getAttribute('aria-checked') !== 'true') easy.click()
+  const n = box?.querySelector('[data-testid="cardio-save"]')
+  if (!n) return false
+  const r = n.getBoundingClientRect()
+  for (const t of ['mousedown', 'mouseup', 'click']) n.dispatchEvent(new MouseEvent(t, { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }))
+  return true
+})()`)
+await wait(900)
+const extra = await ev(`[...document.querySelectorAll('[data-testid="activity-logged"] [data-testid="cardio-readback"]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
+const plannedStill = await ev(`(document.querySelector('[data-testid="planned-activity"] [data-testid="cardio-readback"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim()`)
+const count = await ev(`(window.__fakeDb?.cardio_logs ?? []).length`)
+check('4c. a second walk logged under "anything else" reads back there',
+  // EXACTLY ONE receipt there, and it is the 30-minute one: the prescribed walk
+  // must not ALSO be listed under "anything else" — the claim is what stops it.
+  count === 2 && extra.length === 1 && extra[0].startsWith(`${want.activity} · 30 min`) && plannedStill.startsWith(`${want.activity} · ${want.duration} min`), { count, extra, plannedStill })
+writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/planned-activity-logged.png',
+  Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 
 // THE HEADLINE. A prescribed session must not introduce itself as recovery.
 check('5. the card does not call a prescribed session "active recovery"',
@@ -162,7 +218,7 @@ const week = await ev(`(() => {
   return new Promise(res => setTimeout(() => res(document.body.innerText.replace(/\\s+/g, ' ').trim()), 1200))
 })()`)
 check('10. the week view gives the activity day a line of its own',
-  new RegExp(`${want.activity}[^]{0,24}${want.duration}m`, 'i').test(week || ''),
+  new RegExp(`${want.activity}[^]{0,24}${want.duration} min`, 'i').test(week || ''),
   (week || '').slice(0, 400))
 check('11. ...and does not call it light movement and mobility',
   !/light movement and mobility/i.test(week || ''), (week || '').slice(0, 300))

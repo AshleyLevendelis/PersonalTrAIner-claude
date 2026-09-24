@@ -68,17 +68,20 @@ if (target) {
   await wait(4000)
 }
 
-const rows = await ev(`(() => {
-  const leaves = [...document.querySelectorAll('*')].filter(x => x.children.length === 0 && /^(Finisher|Optional) ·/.test((x.textContent || '').trim()))
-  return leaves.map(leaf => {
-    let card = leaf
-    for (let i = 0; i < 8 && card.parentElement; i++) { card = card.parentElement; if (/rounded/.test(card.className || '') && card.querySelector('button')) break }
+const readRows = async () => (await ev(`(() => {
+  return [...document.querySelectorAll('[data-testid^="finisher-row"]')].map(card => {
     const nodes = [card, ...card.querySelectorAll('*')]
     const clipped = nodes.filter(n => n.scrollWidth > n.clientWidth + 1 && (n.textContent || '').trim().length > 0).length
     const r = card.getBoundingClientRect()
-    return { label: (leaf.textContent || '').trim().split(' ·')[0], text: card.innerText.replace(/\\s+/g, ' ').trim(), clipped, top: Math.round(r.top + window.scrollY), h: Math.round(r.height), w: Math.round(r.width) }
+    return {
+      label: (card.querySelector('p')?.textContent || '').trim(),
+      text: card.innerText.replace(/\\s+/g, ' ').trim(),
+      saved: !!card.querySelector('[data-testid="cardio-readback"]'),
+      clipped, top: Math.round(r.top + window.scrollY), h: Math.round(r.height), w: Math.round(r.width),
+    }
   })
-})()`) ?? []
+})()`)) ?? []
+const rows = await readRows()
 
 const last = rows[rows.length - 1]
 if (last) await ev(`window.scrollTo(0, ${Math.max(0, last.top - 500)})`)
@@ -89,13 +92,31 @@ writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/mobility-filler.p
 console.log('\nA SHORT DAY WITH ITS CARDIO, AND THE OPTIONAL REST OF ITS TIME\n')
 const cardioRow = rows.find(r => r.label === 'Finisher') ?? null
 const mobilityRow = rows.find(r => r.label === 'Optional') ?? null
-check('1. the goal\'s cardio is still on the card, headed "Finisher"', !!cardioRow && (cardioRow.text || '').includes(`${target?.cardioMinutes}m`), { rows, target })
+check('1. the goal\'s cardio is still on the card, headed "Finisher"', !!cardioRow && (cardioRow.text || '').includes(`${target?.cardioMinutes} min`), { rows, target })
 check('2. the mobility close-out is its own row, headed "Optional"', !!mobilityRow && /Mobility/.test(mobilityRow.text || ''), rows)
-check('3. ...with the minutes the plan gave it', !!mobilityRow && (mobilityRow.text || '').includes(`${target?.mobilityMinutes}m`), { shown: mobilityRow?.text, want: `${target?.mobilityMinutes}m` })
+check('3. ...with the minutes the plan gave it', !!mobilityRow && (mobilityRow.text || '').includes(`${target?.mobilityMinutes} min`), { shown: mobilityRow?.text, want: `${target?.mobilityMinutes} min` })
 check('4. the optional row comes AFTER the cardio — the order to do them in', !!cardioRow && !!mobilityRow && mobilityRow.top > cardioRow.top, { cardio: cardioRow?.top, mobility: mobilityRow?.top })
 check('5. exactly one of each — the cardio was not replaced and the mobility is not doubled', rows.filter(r => r.label === 'Finisher').length === 1 && rows.filter(r => r.label === 'Optional').length === 1, rows.map(r => r.label))
 check('6. neither row cuts its own text off', rows.length > 0 && rows.every(r => r.clipped === 0), rows.map(r => ({ label: r.label, clipped: r.clipped })))
-check('7. both fit the phone', rows.length > 0 && rows.every(r => r.w <= 390 && r.h > 0 && r.h <= 96), rows.map(r => ({ w: r.w, h: r.h })))
+// A row is now a heading and one 44px row of boxes (Ashley's "like a lifting
+// set", 24 Sep 2026), so the height bound is the whole block's, measured at
+// 390px: under 170px each, never a form that pushes the session off screen.
+check('7. both fit the phone', rows.length > 0 && rows.every(r => r.w <= 390 && r.h > 0 && r.h <= 170), rows.map(r => ({ w: r.w, h: r.h })))
+
+// ONE CANDIDATE CANNOT TEST A CHOICE. Two rows are on screen, so logging the
+// FINISHER must tick the finisher and leave the optional row open — a read-back
+// keyed on the wrong thing would tick both, or the wrong one.
+await ev(`(() => {
+  const n = document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-save"]')
+  if (!n) return false
+  const r = n.getBoundingClientRect()
+  for (const type of ['mousedown', 'mouseup', 'click']) n.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }))
+  return true
+})()`)
+await wait(900)
+const afterLog = await readRows()
+check('7b. logging the finisher ticks the finisher', afterLog.find(r => r.label === 'Finisher')?.saved === true, afterLog.map(r => ({ label: r.label, saved: r.saved })))
+check('7c. ...and leaves the optional row open, because it is a separate thing', afterLog.find(r => r.label === 'Optional')?.saved === false, afterLog.map(r => ({ label: r.label, saved: r.saved })))
 
 const err = await ev('window.__err ?? null')
 check('8. no uncaught error on the page', err === null, err)

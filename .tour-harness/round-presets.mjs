@@ -247,8 +247,22 @@ const sheet = await ev(`document.body.innerText`)
 // the field held it. The property here is which FORM opened: conditioning,
 // with an effort to pick, rather than the lift form the sheet defaults to.
 // The values themselves are read straight off the inputs in 27.
+// LIKE A SET since 24 Sep 2026 (Ashley's ruling): effort is the Easy / Steady /
+// Hard box, and NONE of it is chosen — the app cannot know how a round felt —
+// so the ✓ is not lit until she answers.
+const effortState = await ev(`(() => {
+  const box = document.querySelector('[data-testid="unplanned-work-sheet"]')
+  if (!box) return { found: false }
+  const save = box.querySelector('[data-testid="cardio-save"]')
+  return {
+    found: true,
+    effort: [...box.querySelectorAll('[data-effort]')].map(b => b.getAttribute('aria-checked')),
+    lit: !!save && save.className.includes('glow-pulse'),
+  }
+})()`)
 check('26. ...on the conditioning side, with an effort still to answer',
-  /RPE/.test(sheet) && /Save/.test(sheet), sheet.slice(0, 200))
+  /How hard/.test(sheet) && effortState.found && effortState.effort.length === 3 && effortState.effort.every(v => v === 'false') && effortState.lit === false,
+  { effortState, sheet: sheet.slice(0, 200) })
 const filled = await ev(`(() => {
   const out = {}
   for (const i of document.querySelectorAll('input')) {
@@ -264,12 +278,20 @@ await shoot('round-log-sheet')
 // THE WRITE ITSELF. The queue is local-first, so the row exists the moment it
 // saves — read it back out of the fake database rather than trusting the UI.
 const saveClicked = await ev(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => /^(Save|Log it|Add)$/i.test(x.textContent.trim()))
-  if (!b || b.disabled) return [...document.querySelectorAll('button')].map(x => x.textContent.trim()).filter(Boolean)
-  b.click(); return true
+  const box = document.querySelector('[data-testid="unplanned-work-sheet"]')
+  const hard = box?.querySelector('[data-effort="hard"]')
+  if (hard) hard.click()
+  return new Promise(res => setTimeout(() => {
+    const b = box?.querySelector('[data-testid="cardio-save"]')
+    if (!b || b.disabled || !b.className.includes('glow-pulse')) return res({ found: !!b, lit: !!b && b.className.includes('glow-pulse') })
+    b.click(); res(true)
+  }, 250))
 })()`)
-check('28. the save button is found and pressed', saveClicked === true, saveClicked)
+check('28. once the effort is answered the ✓ lights, and is pressed', saveClicked === true, saveClicked)
 await wait(1500)
+const storedRound = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => ({ a: r.activity_name, m: r.duration_minutes, rpe: r.intensity_rpe, notes: r.notes }))`)
+check('28b. ...and the store holds the round at the effort she chose, with what the timer ran',
+  storedRound.length === 1 && storedRound[0].rpe === 7 && /Intervals/.test(storedRound[0].a) && !!storedRound[0].notes, storedRound)
 const logged = await ev(`document.body.innerText`)
 check('29. the app says it was logged, rather than going quiet',
   /Logged ·/.test(logged), logged.slice(0, 200))

@@ -122,7 +122,15 @@ await ev(`(() => {
   return true
 })()`)
 await wait(300)
-await clickText('/^Easy$/')
+// SCOPED TO THE FORM. Since 24 Sep 2026 the rest day's own log row carries an
+// Easy / Steady / Hard box too, above this one, and a page-wide "first button
+// reading Easy" chose that — leaving this form on its default and the day
+// planned at Steady. Found by check 7, not by reading.
+await ev(`(() => {
+  const b = [...document.querySelectorAll('[data-testid="add-cardio"] button')].find(x => (x.textContent || '').trim() === 'Easy')
+  if (!b) return false
+  b.click(); return true
+})()`)
 await wait(200)
 const tapped = await clickText('/^Add it$/')
 check('5. the Add button is reachable and enabled once it is filled in', tapped === true)
@@ -153,7 +161,8 @@ writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/cardio-session.pn
 // nothing on it; the card has to be a real one.
 check('6. the day is now a session, not an empty card', after.rendered === true, after.body?.slice(0, 260))
 check('7. ...naming the activity, the minutes and the effort',
-  /Cycle/.test(after.prescription || '') && /35m/.test(after.prescription || '') && /RPE 3/.test(after.prescription || ''),
+  // Effort in words since 24 Sep 2026: planned at RPE 3 is "Easy".
+  /Cycle · 35 min · Easy/.test(after.prescription || ''),
   after.prescription)
 check('8. ...and it introduces itself as the session, not as recovery',
   /Cycle/.test(after.title || '') && !/active recovery/i.test(after.card || ''), { title: after.title, card: after.card?.slice(0, 160) })
@@ -165,7 +174,7 @@ const week = await ev(`(() => {
   return new Promise(res => setTimeout(() => res(document.body.innerText.replace(/\\s+/g, ' ').trim()), 1400))
 })()`)
 check('9. the week list shows it too, in the same words',
-  /Cycle[^]{0,20}35m/i.test(week || ''), (week || '').slice(0, 400))
+  /Cycle[^]{0,20}35 min/i.test(week || ''), (week || '').slice(0, 400))
 
 const err = await ev('window.__err ?? null')
 check('10. no uncaught error on the page', err === null, err)

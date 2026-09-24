@@ -175,12 +175,15 @@ check('3d. ...and is PLURAL, because it writes a standing session rather than on
 check('3e. ...and the two scopes are different sentences',
   trainRow !== cardioRow && !/today only/i.test(cardioRow), { trainRow, cardioRow })
 
-console.log('\n4. Logging is one tap, and says what it did\n')
+console.log('\n4. Logging is one tap, like a set, and reads back what it did\n')
+// LIKE A LIFTING SET since 24 Sep 2026 — Ashley's ruling. The chips no longer
+// write on the tap: they fill the row under them, and the mint ✓ writes. Walk
+// starts chosen, so the commonest answer is still ONE tap — on the ✓.
 const chips = await ev(`(() => {
   const ids = ['quick-log-walk', 'quick-log-cycle', 'quick-log-swim', 'quick-log-other']
   return ids.map(i => {
     const n = document.querySelector('[data-testid="' + i + '"]')
-    return { id: i, text: n ? n.innerText.replace(/\\s+/g, ' ').trim() : null, h: n ? Math.round(n.getBoundingClientRect().height) : 0 }
+    return { id: i, text: n ? n.innerText.replace(/\\s+/g, ' ').trim() : null, on: n ? n.getAttribute('aria-checked') : null }
   })
 })()`)
 check('4a. all four chips are there', chips.every(c => c.text !== null), chips)
@@ -190,35 +193,121 @@ check('4c. ...and the blank "what did you do" form is not the default path',
   !/log a walk or other activity/i.test(await ev('document.body.innerText')))
 check('4d. ...the caption says a log is not a plan change',
   /logs it for today\. your plan doesn't change\./i.test(await ev('document.body.innerText')))
+// ONE CANDIDATE CANNOT TEST A CHOICE: all four chips are read, so "Walk is the
+// one chosen" is distinguishable from "every chip is lit".
+check('4e. Walk is chosen before any tap, and only Walk',
+  chips.map(c => c.on).join(',') === 'true,false,false,false', chips.map(c => c.on))
+const row = async () => ev(`(() => {
+  const box = document.querySelector('[data-testid="cardio-unplanned"]')
+  if (!box) return { found: false, minutes: null, effort: [], lit: false }
+  const save = box.querySelector('[data-testid="cardio-save"]')
+  return {
+    found: true,
+    minutes: box.querySelector('input[data-field="minutes"]')?.placeholder ?? null,
+    effort: [...box.querySelectorAll('[data-effort]')].map(b => b.dataset.effort + ':' + b.getAttribute('aria-checked')),
+    lit: !!save && save.className.includes('glow-pulse'),
+  }
+})()`)
+const before = await row()
+check('4f. the row under it holds the walk\'s own minutes, faint, as a set holds its reps',
+  before.found && before.minutes === (chips[0].text.match(/(\d+) min/) || [])[1], { before, walk: chips[0].text })
+check('4g. ...its effort already chosen, in words — Easy, not a number', before.effort.join(',') === 'easy:true,steady:false,hard:false', before.effort)
+check('4h. ...and the mint ✓ is lit, the one thing asking to be tapped', before.lit === true, before)
 
 await shoot('rest-day-4a')
 
-const tapped = await tap('[data-testid="quick-log-walk"]')
-check('4e. the Walk chip is tappable', tapped === true)
-await wait(800)
+check('4i. the ✓ is tappable', await tap('[data-testid="cardio-unplanned"] [data-testid="cardio-save"]'))
+await wait(900)
 const logged = await text('[data-testid="activity-logged"]')
-check('4f. ...one tap logs it, with no form in between', /activity logged for today/i.test(logged), logged)
-check('4g. ...and offers Undo rather than leaving it written', /undo/i.test(logged), logged)
+check('4j. ...one tap logs it and reads back what it did', /^Walk · \d+ min · Easy/.test(logged), logged)
+check('4k. ...with Undo beside it', /undo/i.test(logged), logged)
+// THE FIGURE, NOT THE WORDS: what the tap stored. An untouched chip keeps the
+// RPE the chips always wrote (4), so the new look changed nothing in the record.
+const stored = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => r.activity_name + ':' + r.duration_minutes + ':' + r.intensity_rpe)`)
+check('4l. ...and the store holds exactly one walk at the chip\'s minutes and RPE 4', stored.length === 1 && new RegExp('^Walk:' + before.minutes + ':4$').test(stored[0]), stored)
+const after = await row()
+check('4m. after a save NOTHING is chosen, so a second tap cannot log the same walk twice',
+  (await ev(`[...document.querySelectorAll('[data-testid^="quick-log-"]')].every(n => n.getAttribute('aria-checked') === 'false')`)) === true && after.lit === false,
+  after)
+check('4n. ...and the question moves on, because something is logged now', /did anything else\?/i.test(await ev('document.body.innerText')))
 await shoot('rest-day-4a-logged')
 
-const undone = await tap('[data-testid="activity-logged"] button')
-check('4h. Undo is reachable', undone === true)
-await wait(800)
-check('4i. ...and puts the chips back', !!(await text('[data-testid="quick-log-walk"]')))
+// IT IS STILL SAVED WHEN YOU COME BACK. The old "logged" was component state
+// and a tab change forgot it; a set reads back from its logs and so does this.
+await send('Page.navigate', { url: `${BASE}&today=${restDay?.date ?? ''}#/tab/home` })
+await wait(2500)
+await send('Page.navigate', { url: `${BASE}&today=${restDay?.date ?? ''}#/tab/exercise` })
+await wait(3500)
+const back = await text('[data-testid="activity-logged"]')
+check('4o. leaving and coming back, the walk still reads back', /^Walk · \d+ min · Easy/.test(back), back)
 
-console.log('\n5. "Other" still opens the form it always was\n')
+const undone = await tap('[data-testid="activity-logged"] button')
+check('4p. Undo is reachable', undone === true)
+await wait(1200)
+const afterUndo = await ev(`(window.__fakeDb?.cardio_logs ?? []).length`)
+check('4q. ...it really deletes the log', afterUndo === 0, afterUndo)
+check('4r. ...and puts the row back with Walk chosen again', (await ev(`document.querySelector('[data-testid="quick-log-walk"]')?.getAttribute('aria-checked')`)) === 'true')
+
+console.log('\n5. "Other" names it, in the same row\n')
 await tap('[data-testid="quick-log-other"]')
 await wait(500)
 const form = await ev(`(() => {
   const box = document.querySelector('[data-testid="activity-quick-log"]')
-  if (!box) return { inputs: [], buttons: [] }
+  if (!box) return { inputs: [], lit: false }
+  const save = box.querySelector('[data-testid="cardio-save"]')
   return {
-    inputs: [...box.querySelectorAll('input')].map(i => i.placeholder),
-    buttons: [...box.querySelectorAll('button')].map(b => (b.textContent || '').trim()),
+    inputs: [...box.querySelectorAll('input')].map(i => i.dataset.field),
+    labels: [...box.querySelectorAll('input')].map(i => i.getAttribute('aria-label')),
+    effort: [...box.querySelectorAll('[data-effort]')].map(b => b.getAttribute('aria-checked')),
+    lit: !!save && save.className.includes('glow-pulse'),
   }
 })()`)
-check('5a. it opens the two-input form in place', (form.inputs || []).includes('Activity') && (form.inputs || []).includes('Mins'), form)
-check('5b. ...with its Save', (form.buttons || []).includes('Save'), form.buttons)
+check('5a. it opens a name box above the same row', (form.inputs || []).join(',') === 'activity,minutes', form)
+// TWO ROWS MUST NOT SHARE ONE SPOKEN NAME: the What-happened sheet has its own
+// "Activity" and "Minutes" fields, so these say whose they are.
+check('5a2. ...each named for what it is, not a bare "Minutes"', !(form.labels || []).includes('Minutes') && !(form.labels || []).includes('Activity') && (form.labels || []).length === 2, form.labels)
+check('5b. ...with no effort chosen — the app cannot know how a class felt', (form.effort || []).every(v => v === 'false') && form.lit === false, form)
+const type = async (sel, value) => ev(`(() => {
+  const n = document.querySelector(${JSON.stringify(sel)})
+  if (!n) return false
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+  set.call(n, ${JSON.stringify(value)})
+  n.dispatchEvent(new Event('input', { bubbles: true }))
+  return true
+})()`)
+await tap('[data-testid="activity-quick-log"] [data-testid="cardio-save"]')
+await wait(300)
+check('5c. a ✓ with nothing filled in says what is missing, like a set row', /name what you did/i.test(await text('[data-testid="activity-quick-log"]')))
+await type('[data-testid="activity-quick-log"] input[data-field="activity"]', 'Rowing')
+await type('[data-testid="activity-quick-log"] input[data-field="minutes"]', '20')
+await tap('[data-testid="activity-quick-log"] [data-effort="hard"]')
+await wait(300)
+await tap('[data-testid="activity-quick-log"] [data-testid="cardio-save"]')
+await wait(900)
+check('5d. ...and logs what was typed, at the effort chosen', /Rowing · 20 min · Hard/.test(await text('[data-testid="activity-logged"]')), await text('[data-testid="activity-logged"]'))
+const storedOther = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => r.activity_name + ':' + r.duration_minutes + ':' + r.intensity_rpe)`)
+check('5e. ...stored as Hard\'s RPE, 7', storedOther.join(',') === 'Rowing:20:7', storedOther)
+await shoot('rest-day-4a-other')
+
+// A SECOND LOG IN A ROW. The first save changes the card's question and so
+// rebuilds the row, which resets it for free; a save when something is ALREADY
+// logged does not, and the reset has to be the row's own. Found by mutation:
+// removing it passed every check above.
+await tap('[data-testid="quick-log-cycle"]')
+await wait(300)
+await tap('[data-testid="activity-quick-log"] [data-testid="cardio-save"]')
+await wait(900)
+const third = await ev(`(() => {
+  const box = document.querySelector('[data-testid="cardio-unplanned"]')
+  const save = box?.querySelector('[data-testid="cardio-save"]')
+  return {
+    receipts: [...document.querySelectorAll('[data-testid="activity-logged"] [data-testid="cardio-readback"]')].length,
+    chosen: [...document.querySelectorAll('[data-testid^="quick-log-"]')].filter(n => n.getAttribute('aria-checked') === 'true').length,
+    lit: !!save && save.className.includes('glow-pulse'),
+  }
+})()`)
+check('5f. a second log in a row reads back too', third.receipts === 2, third)
+check('5g. ...and leaves nothing chosen and the ✓ dark, so a double tap cannot log it twice', third.chosen === 0 && third.lit === false, third)
 
 console.log('\n6. The plan actions still do what they did\n')
 await send('Page.navigate', { url: `${BASE}&today=${restDay?.date ?? ''}#/tab/exercise` })

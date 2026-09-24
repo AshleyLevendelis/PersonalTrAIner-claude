@@ -142,12 +142,15 @@ check('...and one exercise is not "1 exercises"', dayDetail({ ...gymDay, exercis
 
 check(
   'one phrase for one thing: activity, minutes, effort',
-  prescriptionLine({ activity: 'Walk', duration: 20, targetRpe: 4 }) === 'Walk · 20m · RPE 4',
+  // In words since 24 Sep 2026 — Ashley's "like a lifting set" ruling put
+  // effort as Easy / Steady / Hard everywhere, and this phrase is literally the
+  // one a saved cardio row reads back.
+  prescriptionLine({ activity: 'Walk', duration: 20, targetRpe: 4 }) === 'Walk · 20 min · Easy',
   prescriptionLine({ activity: 'Walk', duration: 20, targetRpe: 4 }),
 )
 check(
   'an unstated effort target disappears rather than printing "RPE undefined"',
-  prescriptionLine({ activity: 'Walk', duration: 20 }) === 'Walk · 20m' &&
+  prescriptionLine({ activity: 'Walk', duration: 20 }) === 'Walk · 20 min' &&
     !prescriptionLine({ activity: 'Walk', duration: 20 }).toLowerCase().includes('undefined'),
   prescriptionLine({ activity: 'Walk', duration: 20 }),
 )
@@ -162,9 +165,17 @@ console.log('\n3. Every screen that shows a day asks the shared question')
 type Use = { symbol: string; form: 'call' | 'field' }
 const readers: { file: string; must: Use[]; why: string }[] = [
   {
+    // RE-ANCHORED 24 Sep 2026: the card hands the prescription to the shared
+    // cardio row, which is where the phrase is now printed — so the card must
+    // read the field AND render that row, and the row must call the phrase.
     file: 'src/components/exercise/RestDayCard.tsx',
-    must: [{ symbol: 'plannedActivity', form: 'field' }, { symbol: 'prescriptionLine', form: 'call' }],
+    must: [{ symbol: 'plannedActivity', form: 'field' }, { symbol: '<PlannedCardioRow prescription={planned}', form: 'field' }],
     why: 'the card for the day itself — this is where the blank form was',
+  },
+  {
+    file: 'src/components/exercise/CardioSetRow.tsx',
+    must: [{ symbol: 'prescriptionLine', form: 'call' }],
+    why: 'the row every prescribed activity is drawn with',
   },
   {
     file: 'src/components/exercise/TodayPanel.tsx',

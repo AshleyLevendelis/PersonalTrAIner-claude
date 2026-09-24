@@ -76,14 +76,22 @@ check('saveCardioLog refuses an implausible duration itself',
   /if \(!isPlausibleCardioDuration\(input\.durationMinutes\)\)/.test(cardioStore))
 check('...and returns null rather than throwing on a tap',
   /export function saveCardioLog\([^)]*\): CardioLogView \| null/.test(cardioStore))
-for (const file of ['src/components/exercise/RestDayCard.tsx', 'src/components/exercise/AddUnplannedWork.tsx']) {
-  const src = stripComments(read(file))
-  check(`${file} checks the typed duration`, /isPlausibleCardioDuration\(minutes\)/.test(src))
-  check(`...and shows the refusal`, /setDurationError\(/.test(src))
+// RE-ANCHORED 24 Sep 2026: every screen that logs cardio by hand now draws
+// the shared row (CardioSetRow — Ashley's "like a lifting set"), so the typed
+// bound lives there ONCE, on both the planned and the unplanned path, and the
+// screens are held to not writing around it.
+const cardioRow = stripComments(read('src/components/exercise/CardioSetRow.tsx'))
+const planned = cardioRow.slice(cardioRow.indexOf('export function PlannedCardioRow'), cardioRow.indexOf('export interface CardioPick'))
+const unplanned = cardioRow.slice(cardioRow.indexOf('export function UnplannedCardioEntry'))
+for (const [name, body] of [['the planned cardio row', planned], ['the unplanned cardio entry', unplanned]] as const) {
+  check(`${name} checks the typed duration`, /isPlausibleCardioDuration\(mins/.test(body))
+  check(`...and shows the refusal`, /setError\(`Enter between 1 and \$\{MAX_PLAUSIBLE_CARDIO_MINUTES\} minutes\.`\)/.test(body))
+  check(`...and does not report "logged" when the store refused`, /if \(!view\) \{ setError\(/.test(body))
 }
-for (const file of ['src/components/exercise/FinisherRow.tsx', 'src/components/exercise/RestDayCard.tsx']) {
+for (const file of ['src/components/exercise/RestDayCard.tsx', 'src/components/exercise/AddUnplannedWork.tsx', 'src/components/exercise/FinisherRow.tsx']) {
   const src = stripComments(read(file))
-  check(`${file} does not report "logged" when the store refused`, /if \(!view\)/.test(src))
+  check(`${file} logs through the shared row and never writes around it`,
+    /<(PlannedCardioRow|UnplannedCardioEntry)\b/.test(src) && !/saveCardioLog\(/.test(src))
 }
 
 const grocery = stripComments(read('src/components/GroceryList.tsx'))

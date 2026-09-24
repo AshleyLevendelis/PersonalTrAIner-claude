@@ -699,6 +699,10 @@ const db: Db = {
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)
+// The stored rows, for a driver that must read the FIGURE the app wrote rather
+// than the words it drew — the cardio drivers check the RPE a tap stored, the
+// same exposure chat.tsx already makes for the coach drivers.
+;(window as unknown as Record<string, unknown>).__fakeDb = db
 
 // The Additional Work row for ?absurd=1. Declared through the same record
 // the app itself writes, so the section renders exactly as it does for a

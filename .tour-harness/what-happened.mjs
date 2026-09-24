@@ -156,10 +156,21 @@ await clickText('/Do it today instead/'); check('8d. ...which brings it back', n
 check('9a. "I did something else instead"', (await openSheet()) === 'open' && await clickSel('[data-verb="something_else"]'))
 await wait(300)
 check('9b. ...takes an activity and minutes', await setValue('input[aria-label="Activity"]', 'Swim') && await setValue('input[aria-label="Minutes"]', '30'))
+// EFFORT IS ASKED, NOT ASSUMED, since 24 Sep 2026: this wrote an RPE of 6 no
+// screen ever showed. With minutes given, saving without an effort refuses and
+// says why; the same Easy / Steady / Hard box as every other cardio log.
+await clickSel('[data-verb="save-something-else"]')
+await wait(300)
+check('9b2. ...and with minutes given, asks how hard before it saves',
+  /pick how hard it felt/i.test(await ev(`document.querySelector('[data-testid="what-happened-error"]')?.innerText || ''`)))
+check('9b3. ...in words, from the same effort box', await clickSel('[data-testid="what-happened-something-else"] [data-effort="steady"]'))
+await wait(200)
 check('9c. ...and saving swaps the day', await clickSel('[data-verb="save-something-else"]') && await untilClosed() && /swapped for another activity/.test(await untilCell(TODAY_NAME, /swapped/) || ''), await cell(TODAY_NAME))
 let swapped = await ev(`document.querySelector('[data-testid="swapped-today"]')?.innerText || ''`)
 for (let i = 0; i < 10 && !/Swim/.test(swapped); i++) { await wait(300); swapped = await ev(`document.querySelector('[data-testid="swapped-today"]')?.innerText || ''`) }
 check('9d. ...and today’s panel says so, by name', /Swim/.test(swapped), swapped)
+const swimRows = await ev(`(window.__fakeDb?.cardio_logs ?? []).filter(r => r.activity_name === 'Swim').map(r => r.duration_minutes + ':' + r.intensity_rpe)`)
+check('9d2. ...and the swim is logged at the effort chosen — Steady, RPE 5 — not an invented 6', swimRows.join(',') === '30:5', swimRows)
 await shoot('what-happened-swapped')
 check('9e. ...and can be unsaid', (await openSheet()) === 'open' && await clickSel('button[aria-label="Undo the swap"]') && await untilClosed() && new RegExp(`^${TODAY_NAME}: due$`).test(await untilCell(TODAY_NAME, /due/) || ''), await cell(TODAY_NAME))
 

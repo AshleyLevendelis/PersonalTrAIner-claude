@@ -69,10 +69,8 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&finisher=
 await wait(4000)
 
 const row = await ev(`(() => {
-  const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && /^Finisher\\b/.test((x.textContent || '').trim()))
-  if (!leaf) return { found: false }
-  let card = leaf
-  for (let i = 0; i < 8 && card.parentElement; i++) { card = card.parentElement; if (/rounded/.test(card.className || '') && card.querySelector('button')) break }
+  const card = document.querySelector('[data-testid="finisher-row"]')
+  if (!card) return { found: false }
   card.scrollIntoView({ block: 'center' })
   // CLIPPING, ASKED OF THE BROWSER. An element whose content is wider than its
   // box is cutting text off, whatever CSS is doing it — truncate, a fixed
@@ -82,11 +80,20 @@ const row = await ev(`(() => {
   const clipped = nodes
     .filter(n => n.scrollWidth > n.clientWidth + 1 && (n.textContent || '').trim().length > 0)
     .map(n => ({ tag: n.tagName, cls: String(n.className).slice(0, 60), text: (n.textContent || '').trim().slice(0, 60) }))
-  return { found: true, text: card.innerText.replace(/\\s+/g, ' ').trim(), clipped, h: Math.round(card.getBoundingClientRect().height) }
+  const boxes = card.querySelector('[data-effort]')?.closest('[style]')
+  return {
+    found: true,
+    text: card.innerText.replace(/\\s+/g, ' ').trim(),
+    clipped,
+    h: Math.round(card.getBoundingClientRect().height),
+    boxesH: boxes ? Math.round(boxes.getBoundingClientRect().height) : 0,
+    minutesHint: card.querySelector('input[data-field="minutes"]')?.placeholder ?? null,
+    effort: [...card.querySelectorAll('[data-effort]')].filter(b => b.getAttribute('aria-checked') === 'true').map(b => b.dataset.effort),
+  }
 })()`)
-
-const shot = await send('Page.captureScreenshot', { format: 'png' })
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/finisher-detail.png', Buffer.from(shot.result.data, 'base64'))
+// The driver's own copy of the scale, a literal rather than an import: a gate
+// that asks the app what "Hard" means can only ever agree with it.
+const word = rpe => (rpe <= 4 ? 'Easy' : rpe <= 6 ? 'Steady' : 'Hard')
 
 console.log('\nTHE FINISHER SAYS WHAT THE FINISHER IS\n')
 check('0b. the finisher row is on the day the plan puts it', row.found === true, row)
@@ -100,14 +107,49 @@ check('2. ...no ellipsis stands in for the prescription', !/[.]{3}|…/.test(row
 const words = target.activity.split(/\s+/).filter(w => /[a-z0-9]/i.test(w))
 const missing = words.filter(w => !(row.text || '').toLowerCase().includes(w.toLowerCase()))
 check('3. every word of the prescription is on screen', missing.length === 0, { missing, shown: row.text })
-check('4. ...along with the duration and the effort',
-  (row.text || '').includes(`${target.duration}m`) && (row.text || '').includes(`RPE ${target.rpe}`),
-  { shown: row.text, want: `${target.duration}m / RPE ${target.rpe}` })
-// It is still one row on a phone, not a paragraph that pushes the session down.
-check('5. and it is still a row, not a wall of text', row.h > 0 && row.h <= 96, { height: row.h })
+check('4. ...along with the duration and the effort, in words',
+  (row.text || '').includes(`${target.duration} min · ${word(target.rpe)}`),
+  { shown: row.text, want: `${target.duration} min · ${word(target.rpe)}` })
+// LIKE A SET (Ashley, 24 Sep 2026): the plan's minutes faint in the box and its
+// effort already chosen, so the ✓ alone logs what was prescribed.
+check('5. the log row is ONE 44px row of boxes, not a form', row.boxesH >= 44 && row.boxesH <= 52, { boxes: row.boxesH, whole: row.h })
+check('5b. ...holding the plan\'s minutes and its effort before any tap',
+  row.minutesHint === String(target.duration) && row.effort.join(',') === word(target.rpe).toLowerCase(), row)
+
+const shot = await send('Page.captureScreenshot', { format: 'png' })
+writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/finisher-detail.png', Buffer.from(shot.result.data, 'base64'))
+
+const tapSave = await ev(`(() => {
+  const n = document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-save"]')
+  if (!n) return false
+  const r = n.getBoundingClientRect()
+  for (const type of ['mousedown', 'mouseup', 'click']) n.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }))
+  return true
+})()`)
+check('6. one tap on the ✓ logs it', tapSave === true)
+await wait(900)
+const readback = await ev(`(document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-readback"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim()`)
+check('7. ...and the row reads back what was done, with Undo',
+  readback.startsWith(`${target.activity.split(/\s+[—–-]\s+/)[0]} · ${target.duration} min · ${word(target.rpe)}`) && /Undo/.test(readback), readback)
+// THE FIGURE: the plan's EXACT RPE is stored, not the one its word stands for.
+// An RPE-8 interval finisher logged as prescribed is an 8, not "Hard" = 7.
+const stored = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => ({ a: r.activity_name, m: r.duration_minutes, rpe: r.intensity_rpe }))`)
+check('8. ...stored at the plan\'s own minutes and its exact RPE',
+  stored.length === 1 && stored[0].a === target.activity && stored[0].m === target.duration && stored[0].rpe === target.rpe,
+  { stored, want: { a: target.activity, m: target.duration, rpe: target.rpe } })
+await send('Page.captureScreenshot', { format: 'png' }).then(r => writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/finisher-logged.png', Buffer.from(r.result.data, 'base64')))
+
+// AND IT IS STILL LOGGED WHEN YOU COME BACK — the old "Logged" was component
+// state, and a tab change offered to log the same finisher a second time.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&finisher=1&today=${target.date}#/tab/home` })
+await wait(2500)
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&finisher=1&today=${target.date}#/tab/exercise` })
+await wait(4000)
+const back = await ev(`(document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-readback"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim()`)
+check('9. leaving and coming back, it is still logged — not offered again', back.includes(`${target.duration} min · ${word(target.rpe)}`) && !(await ev(`!!document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-save"]')`)), back)
 
 const err = await ev('window.__err ?? null')
-check('6. no uncaught error on the page', err === null, err)
+check('10. no uncaught error on the page', err === null, err)
 
 console.log(failures === 0 ? '\nThe whole finisher is readable at 390px.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

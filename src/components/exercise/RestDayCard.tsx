@@ -1,14 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Heart, ChevronRight, Loader2, ArrowRight, Footprints, Bike, Waves, Plus, Dumbbell, CalendarDays } from 'lucide-react'
+import { Heart, ChevronRight, ArrowRight, Footprints, Bike, Waves, Dumbbell, CalendarDays } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import {
-  isPlausibleCardioDuration, MAX_PLAUSIBLE_CARDIO_MINUTES, saveCardioLog, deleteCardioLog,
-  getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES,
-} from '@/lib/cardio-log-store'
-import { prescriptionLine } from '@/lib/activity-day'
+import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, type CardioLogView } from '@/lib/cardio-log-store'
+import { PlannedCardioRow, UnplannedCardioEntry, CardioReadback, useCardioLogsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
 const AddCardioSession = lazy(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
 import type { WorkoutDay } from '@/lib/types'
@@ -79,31 +75,46 @@ function WeekTrack({ done, planned }: { done: number; planned: number }) {
  *
  * The form was not wrong, it was just the wrong DEFAULT: a rest day's most
  * likely answer is a walk, and asking for it in two free-text fields made the
- * commonest case the most expensive one. Walk / Cycle / Swim write immediately;
- * "Other" opens the very same form, unchanged, for everything else.
+ * commonest case the most expensive one.
  *
  * THE DURATION IS THE PERSON'S OWN LAST ONE. A chip that silently logs thirty
  * minutes for somebody whose walk is always fifty is putting a number they did
  * not choose into their record — so the default is read from their history and
  * falls back to thirty only when there is none. It is on the chip face before
  * the tap, which is what makes one tap honest rather than merely quick.
+ *
+ * LIKE A LIFTING SET since 24 Sep 2026 (Ashley's ruling — see CardioSetRow).
+ * A chip no longer writes on the tap; it fills the row under it, and the mint
+ * ✓ writes. Walk starts chosen, so the commonest answer is STILL one tap —
+ * and now the minutes and the effort it will record are on screen first, where
+ * the chip used to record an effort of 4 that nobody ever saw.
+ *
+ * The effort each chip starts on is Easy: this card asks about movement on a
+ * day off, and an easy walk, ride or swim is what that question is for. It is
+ * RPE 4, the number the chips always wrote, so an untouched tap records what it
+ * did before.
  */
 const QUICK_ACTIVITIES = [
   { label: 'Walk', Icon: Footprints },
   { label: 'Cycle', Icon: Bike },
   { label: 'Swim', Icon: Waves },
 ] as const
+const QUICK_RPE = 4
 
-function ActivityLogEntry({ alsoLabel = false }: { alsoLabel?: boolean }) {
-  const { profileId, date } = useActiveSession()
-  const [open, setOpen] = useState(false)
-  const [activity, setActivity] = useState('')
-  const [duration, setDuration] = useState('')
-  const [durationError, setDurationError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [loggedClientId, setLoggedClientId] = useState<string | null>(null)
-  const [undoing, setUndoing] = useState(false)
+function ActivityLogEntry({ alsoLabel = false, claimed = [] }: {
+  alsoLabel?: boolean
+  /**
+   * The activities a PRESCRIBED row on this card reads back. Each claims ONE
+   * log — the same first match PlannedCardioRow takes — so a second walk
+   * logged here on a walking day still reads back here rather than vanishing
+   * behind the first.
+   */
+  claimed?: readonly string[]
+}) {
+  const { profileId } = useActiveSession()
   const [defaults, setDefaults] = useState<Record<string, number>>({})
+  const logs = useCardioLogsToday()
+  const [undone, setUndone] = useState<CardioLogView[]>([])
 
   // Their own recent durations, per chip. Starts empty and fills in — a chip
   // is tappable the whole time, just with the fallback on it until this lands.
@@ -115,159 +126,59 @@ function ActivityLogEntry({ alsoLabel = false }: { alsoLabel?: boolean }) {
     return () => { live = false }
   }, [profileId])
 
-  const minutesFor = (label: string) => defaults[label] ?? DEFAULT_ACTIVITY_MINUTES
+  const picks: CardioPick[] = QUICK_ACTIVITIES.map(({ label, Icon }) => ({
+    label,
+    activity: label,
+    minutes: defaults[label] ?? DEFAULT_ACTIVITY_MINUTES,
+    rpe: QUICK_RPE,
+    Icon,
+  }))
 
-  const handleUndo = async () => {
-    if (!loggedClientId) return
-    setUndoing(true)
-    try {
-      await deleteCardioLog(loggedClientId)
-      setLoggedClientId(null)
-      setActivity('')
-      setDuration('')
-    } finally {
-      setUndoing(false)
-    }
-  }
-
-  // ONE TAP IS STILL A WRITE THAT CAN FAIL, and it fails the same way the typed
-  // form does rather than reverting to a chip row that looks untouched.
-  const handleQuickLog = (label: string) => {
-    if (!profileId || saving) return
-    setDurationError(null)
-    setSaving(true)
-    const view = saveCardioLog({
-      userId: profileId,
-      date,
-      activityName: label,
-      durationMinutes: minutesFor(label),
-      intensityRpe: 4,
-    })
-    setSaving(false)
-    if (!view) {
-      setDurationError("That didn't save — try again in a moment.")
-      return
-    }
-    setLoggedClientId(view.clientId ?? null)
-  }
-
-  if (loggedClientId) {
-    return (
-      <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground" data-testid="activity-logged">
-        <span>Activity logged for today.</span>
-        <button type="button" className="font-semibold text-primary-text disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
-          {undoing ? 'Undoing…' : 'Undo'}
-        </button>
-      </div>
-    )
-  }
-
-  const handleSave = () => {
-    if (!profileId || !activity.trim() || !duration) return
-    // `min="1"` on the input is a hint the browser does not enforce: -5 typed
-    // here parsed, passed the truthiness check, and was stored as minus five
-    // minutes of cardio. The store refuses it now; this is what tells the
-    // person holding the phone, instead of a spinner that stops and no row.
-    const minutes = parseInt(duration, 10)
-    if (!isPlausibleCardioDuration(minutes)) {
-      setDurationError(`Enter between 1 and ${MAX_PLAUSIBLE_CARDIO_MINUTES} minutes.`)
-      return
-    }
-    setDurationError(null)
-    setSaving(true)
-    const view = saveCardioLog({
-      userId: profileId,
-      date,
-      activityName: activity.trim(),
-      durationMinutes: minutes,
-      intensityRpe: 4,
-    })
-    setSaving(false)
-    if (!view) {
-      setDurationError("That didn't save — check the number and try again.")
-      return
-    }
-    setLoggedClientId(view.clientId ?? null)
-  }
+  // WHAT WAS ALREADY LOGGED TODAY READS BACK ABOVE THE ROW, the way a set's
+  // saved rows sit above the next empty one. A log a prescribed row on this
+  // card has claimed is left out: it reads itself back there.
+  const isUndone = (l: CardioLogView) => undone.some(u =>
+    (!!u.clientId && u.clientId === l.clientId) || (!!u.id && u.id === l.id))
+  const live = logs.filter(l => !isUndone(l))
+  const taken = new Set(claimed.map(name => live.find(l => l.activity_name === name)).filter(Boolean))
+  const receipts = live.filter(l => !taken.has(l))
+  const asked = alsoLabel || receipts.length > 0
+  // ONE LIT ✓ PER CARD. Walk is pre-chosen only when nothing else on the card
+  // is asking to be tapped: on a walking day the prescribed walk is the
+  // session, and a second glowing ✓ under it for "anything else" split the
+  // card's one call to action in two — read off the screenshot, 24 Sep 2026.
+  const preselect = claimed.length === 0 && receipts.length === 0
 
   return (
-    <div className="mt-[18px]" data-testid="activity-quick-log">
+    <div className="mt-[18px] space-y-2" data-testid="activity-quick-log">
       <div className="flex items-center justify-between gap-2 px-0.5">
         {/* When the day already PRESCRIBES an activity, that activity has its
-            own one-tap Log above this. Offering "did you move today?" underneath
-            a prescribed walk reads as the same question twice, so this one asks
-            what it is actually for. */}
+            own row above this. Offering "did you move today?" underneath a
+            prescribed walk reads as the same question twice, so this one asks
+            what it is actually for — and so does a day with a log on it. */}
         <span className={`${MICRO} text-[color:var(--role-ai-text)]`}>
-          {alsoLabel ? 'Did anything else?' : 'Did you move today?'}
+          {asked ? 'Did anything else?' : 'Did you move today?'}
         </span>
-        <span className={`${MICRO} text-muted-foreground`}>optional · one tap</span>
+        <span className={`${MICRO} text-muted-foreground`}>{preselect ? 'optional · one tap' : 'optional'}</span>
       </div>
-
-      {open ? (
-        <div className="mt-2 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Activity"
-              value={activity}
-              onChange={e => setActivity(e.target.value)}
-              className="h-8 text-sm"
-              autoFocus
-            />
-            <Input
-              type="number"
-              min="1"
-              max={MAX_PLAUSIBLE_CARDIO_MINUTES}
-              placeholder="Mins"
-              value={duration}
-              onChange={e => setDuration(e.target.value)}
-              className="h-8 text-sm w-20"
-            />
-            <Button size="sm" className="h-8 shrink-0" disabled={!activity.trim() || !duration || saving} onClick={handleSave}>
-              {saving ? <Loader2 className="size-3 animate-spin" /> : 'Save'}
-            </Button>
-          </div>
-          {durationError && (
-            <p className="text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">{durationError}</p>
-          )}
+      {receipts.length > 0 && (
+        <div className="space-y-1" data-testid="activity-logged">
+          {receipts.map(r => (
+            <CardioReadback key={r.clientId ?? r.id} log={r} onUndone={() => setUndone(u => [...u, r])} />
+          ))}
         </div>
-      ) : (
-        <>
-          <div className="mt-2 flex items-stretch gap-2">
-            {QUICK_ACTIVITIES.map(({ label, Icon }) => (
-              <button
-                key={label}
-                type="button"
-                data-testid={`quick-log-${label.toLowerCase()}`}
-                disabled={saving || !profileId}
-                onClick={() => handleQuickLog(label)}
-                className="flex-1 h-16 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--hairline)] flex flex-col items-center justify-center gap-1 transition-colors hover:bg-accent/40 disabled:opacity-50"
-              >
-                <Icon className="size-[17px] text-secondary-foreground" />
-                <span className="text-xs text-foreground leading-none">{label}</span>
-                <span className="text-[0.625rem] text-muted-foreground leading-none">{minutesFor(label)} min</span>
-              </button>
-            ))}
-            <button
-              type="button"
-              data-testid="quick-log-other"
-              onClick={() => setOpen(true)}
-              className="w-[52px] shrink-0 h-16 rounded-xl bg-[color:var(--surface-raised)] border border-[color:var(--hairline)] flex flex-col items-center justify-center gap-1 transition-colors hover:bg-accent/40"
-            >
-              <Plus className="size-[17px] text-muted-foreground" />
-              <span className="text-[0.625rem] text-muted-foreground leading-none">Other</span>
-            </button>
-          </div>
-          {/* Dropped when the day already prescribes something: the plan DOES
-              change on such a day, it just changed before you got here. */}
-          {!alsoLabel && (
-            <p className="mt-2 mx-0.5 text-[0.6875rem] leading-[1.4] text-muted-foreground">
-              Logs it for today. Your plan doesn&apos;t change.
-            </p>
-          )}
-          {durationError && (
-            <p className="mt-2 mx-0.5 text-[0.6875rem] leading-[1.4] text-[color:var(--role-warn-text)]">{durationError}</p>
-          )}
-        </>
+      )}
+      {/* KEYED ON THE PRE-SELECTION, so the entry starts on Walk only while
+          nothing is logged and nothing else on the card asks: after a save it
+          comes back with nothing chosen, and a second tap on the ✓ cannot log
+          the same walk twice. */}
+      <UnplannedCardioEntry key={preselect ? 'first' : 'more'} picks={picks} initialPick={preselect ? 0 : null} />
+      {/* Dropped when the day already prescribes something: the plan DOES
+          change on such a day, it just changed before you got here. */}
+      {!alsoLabel && (
+        <p className="mx-0.5 text-[0.6875rem] leading-[1.4] text-muted-foreground">
+          Logs it for today. Your plan doesn&apos;t change.
+        </p>
       )}
     </div>
   )
@@ -582,15 +493,16 @@ export function ActiveRecoveryCard({
           </div>
         </div>
         <WeekTrack done={weekTally.done} planned={weekTally.planned} />
+        {/* LOGGED LIKE A SET since 24 Sep 2026 — the plan's minutes in the box
+            and its effort already chosen, so the ✓ alone logs the walk the plan
+            asked for. PlannedCardioRow reads itself back from today's logs, so
+            a walk logged this morning is still ticked this afternoon; the old
+            row forgot on every tab change and offered to log it again. */}
         {planned && (
           <div className="space-y-1.5" data-testid="planned-activity">
-            <PrescribedRow
-              activity={planned.activity}
-              duration={planned.duration}
-              targetRpe={planned.targetRpe}
-            />
+            <PlannedCardioRow prescription={planned} />
             {planned.reason && (
-              <p className="text-xs leading-[1.5] text-muted-foreground">{planned.reason}</p>
+              <p className="text-xs leading-[1.5] text-muted-foreground px-0.5">{planned.reason}</p>
             )}
           </div>
         )}
@@ -600,9 +512,9 @@ export function ActiveRecoveryCard({
             or Light Swim" and left the person to guess which was the session —
             the same unanswerable question the type comment warns about, on
             screen instead of in the data. Found by the driver, on a real card. */}
-        {!planned && cardio && <PrescribedRow activity={cardio.activity} duration={cardio.duration} targetRpe={cardio.targetRpe} />}
+        {!planned && cardio && <PlannedCardioRow prescription={cardio} label="Suggested" />}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
-        <ActivityLogEntry alsoLabel={!!planned} />
+        <ActivityLogEntry alsoLabel={!!planned} claimed={planned ? [planned.activity] : cardio ? [cardio.activity] : []} />
         {/* AN EMPTY DAY IS THE ONE YOU WANT TO FILL, and this is the card an
             empty day actually gets. The control was on RestDayCard alone at
             first — which only renders when the plan has NO row for the day at
@@ -614,85 +526,5 @@ export function ActiveRecoveryCard({
         {onAddCardio && !planned && <Suspense fallback={null}><AddCardioSession dayName={workout.day} onAdd={onAddCardio} /></Suspense>}
       </CardContent>
     </Card>
-  )
-}
-
-/**
- * ONE ROW FOR ANYTHING THE PLAN PRESCRIBES BY TIME AND EFFORT — the cardio
- * finisher bolted to a day, and the walk that IS the day. They render
- * identically on purpose: what separates them is where they sit on the card
- * and what the card says around them, not how they look.
- *
- * targetRpe is optional because PlannedActivity's is — a first walking
- * prescription may deliberately carry no effort target — so the effort clause
- * disappears rather than printing "RPE undefined".
- */
-function PrescribedRow({
-  activity,
-  duration,
-  targetRpe,
-}: {
-  activity: string
-  duration: number
-  targetRpe?: number
-}) {
-  const { profileId, date } = useActiveSession()
-  const [saving, setSaving] = useState(false)
-  const [loggedClientId, setLoggedClientId] = useState<string | null>(null)
-  const [undoing, setUndoing] = useState(false)
-
-  const handleLog = () => {
-    if (!profileId || loggedClientId) return
-    setSaving(true)
-    const view = saveCardioLog({
-      userId: profileId,
-      date,
-      activityName: activity,
-      durationMinutes: duration,
-      // Same default the typed form below uses for an unstated effort, so one
-      // convention covers both — an easy prescribed walk and a logged one land
-      // on the same number rather than two.
-      intensityRpe: targetRpe ?? 4,
-    })
-    setSaving(false)
-    // The plan supplies this duration, so a refusal here means the plan holds
-    // an impossible one — nothing the user can correct from this row, but it
-    // must not leave the button reading "Logged" over a row that never wrote.
-    if (!view) {
-      console.error('Refused to log a prescribed activity:', { activity, duration })
-      return
-    }
-    setLoggedClientId(view.clientId ?? null)
-  }
-
-  const handleUndo = async () => {
-    if (!loggedClientId) return
-    setUndoing(true)
-    try {
-      await deleteCardioLog(loggedClientId)
-      setLoggedClientId(null)
-    } finally {
-      setUndoing(false)
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-2 rounded-lg bg-[color:var(--role-warn-bg)] px-3 py-2">
-      <span className="text-xs text-foreground">
-        {prescriptionLine({ activity, duration, targetRpe })}
-      </span>
-      {loggedClientId ? (
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-muted-foreground">Logged</span>
-          <button type="button" className="text-xs font-semibold text-primary-text disabled:opacity-50" disabled={undoing} onClick={handleUndo}>
-            {undoing ? 'Undoing…' : 'Undo'}
-          </button>
-        </div>
-      ) : (
-        <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" disabled={saving} onClick={handleLog}>
-          {saving ? <Loader2 className="size-3 animate-spin" /> : 'Log'}
-        </Button>
-      )}
-    </div>
   )
 }

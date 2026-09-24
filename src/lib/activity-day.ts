@@ -20,6 +20,7 @@
  */
 
 import type { WorkoutDay } from './types'
+import { cardioReadback } from './cardio-effort'
 
 /** The shape both a prescribed activity and a cardio finisher share. */
 export interface TimedPrescription {
@@ -43,7 +44,7 @@ export function isScheduledDay(day?: WorkoutDay | null): boolean {
 }
 
 /**
- * ONE PHRASE FOR ONE THING. "Walk · 20m · RPE 4".
+ * ONE PHRASE FOR ONE THING. "Walk · 20 min · Easy".
  *
  * Both surfaces that print a timed prescription print it this way — the card
  * on Today and the row in the week list, which said "20 min @ RPE 4" and
@@ -51,10 +52,15 @@ export function isScheduledDay(day?: WorkoutDay | null): boolean {
  * than printing "RPE undefined", because PlannedActivity's targetRpe is
  * deliberately optional: a first walking prescription may carry no effort
  * target at all.
+ *
+ * THE SAME PHRASE A SAVED CARDIO ROW READS BACK, since 24 Sep 2026 — Ashley's
+ * "like a lifting set" ruling put effort in three words everywhere, so the
+ * plan saying "RPE 4" above a row that logs "Easy" would be one fact in two
+ * vocabularies. It is literally the read-back function: what was planned and
+ * what was done are written the same way, so they can be compared by eye.
  */
 export function prescriptionLine(p: TimedPrescription): string {
-  const effort = p.targetRpe != null ? ` · RPE ${p.targetRpe}` : ''
-  return `${p.activity} · ${p.duration}m${effort}`
+  return cardioReadback({ activity: p.activity, minutes: p.duration, rpe: p.targetRpe })
 }
 
 /**
