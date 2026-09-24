@@ -906,7 +906,11 @@ menu" stays true when a copy is also left outside it.
   running it against CORRECT copy: naming a feature is not claiming it (the
   Nutrition stop truthfully says the water TARGET is set there while Home does
   the logging), and a sentence that names another tab is a signpost, not a
-  claim about here
+  claim about here. **And a tour line is only true on the day it is shown**:
+  "leave the fields blank" was false on any plan opening with a medicine-ball
+  warm-up. Ashley's ruling 24 Sep 2026: on those days the words change (type
+  the weight, then tap ✓), and the spotlight covers the whole row so the box
+  it asks for can actually be reached. `verify:tour-real`, `app-tour`
 - Safety ships correct or not at all — `injury-adaptation-safety`,
   `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`

@@ -32,6 +32,15 @@ export interface TourStep {
   /** Shown in the info phase. */
   copy: string
   /**
+   * The set stop's words on a day its row has NO weight to offer — a
+   * medicine-ball warm-up first, whose box says "type it" and whose blank ✓ is
+   * refused. Ashley's ruling, 24 Sep 2026, from three options: change the
+   * words (over pointing at a later exercise, and over skipping the stop).
+   * Here, not in AppTour.tsx, so the honesty scan reads them too.
+   */
+  typedWeightTapHint?: string
+  typedWeightCopy?: string
+  /**
    * Stands in for `copy` while the thing this stop points at genuinely is not
    * there yet. Lives HERE rather than as a literal in AppTour.tsx so it goes
    * through the same honesty scan as every other line — copy written inside
@@ -114,6 +123,10 @@ export const TOUR_STEPS: TourStep[] = [
     key: 'set', tab: 'exercise', target: 'setrow', gate: true,
     tapHint: 'Tap the ✓ to log the set', teaser: 'Your turn — log a set.',
     copy: "Logged — that easy. Leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own.",
+    // "Leave the fields blank" is false on a row that just made them type, so
+    // the claim is narrowed to where it holds rather than dropped.
+    typedWeightTapHint: "Type the weight you're using, then tap the ✓",
+    typedWeightCopy: "Logged — that easy. Wherever I've given you a weight, leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own.",
   },
   {
     // CORRECTED 13 Sep 2026, TWICE OVER.

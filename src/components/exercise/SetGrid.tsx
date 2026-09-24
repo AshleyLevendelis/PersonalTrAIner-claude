@@ -444,6 +444,20 @@ export function SetGrid({
     return catalogEntryIsLoaded ? '' : '0'
   }
   /** What the empty box SHOWS — the default where one exists, a prompt where it does not. */
+  /**
+   * THIS ROW HAS NO WEIGHT TO OFFER — no prescription and no last time — so a
+   * blank ✓ is refused with "Enter the weight you lifted". A medicine-ball
+   * warm-up is the case: the app cannot know the ball's weight, and the load
+   * engine refuses to invent one.
+   *
+   * Deliberately blind to what has been TYPED. The app tour holds this row
+   * while it waits, and treats the marker leaving as the set being saved; a
+   * marker that moved as soon as somebody typed a weight would end the tour's
+   * step before the set was logged. Ashley's ruling, 24 Sep 2026, from three
+   * options: on these days the tour says to type the weight, then tap ✓.
+   */
+  const offersNoWeight = (ref: SetRef): boolean => !ghostFor(ref) && defaultWeightFor(ref) === ''
+
   const weightPlaceholderFor = (ref: SetRef): string => {
     const d = defaultWeightFor(ref)
     return d === '' ? 'type it' : d
@@ -832,6 +846,12 @@ export function SetGrid({
           )}
           <div
             data-testid={warm ? 'warmup-row' : drop ? 'drop-row' : 'working-row'}
+            // THE TOUR'S TARGET IS THE WHOLE ROW when the weight must be typed:
+            // the tour blocks every tap outside its spotlight, so a spotlight
+            // on the ✓ alone would ask for a weight it will not let anyone
+            // type. See offersNoWeight; the ✓ below carries it otherwise.
+            data-tour={!isSaved && offersNoWeight(ref) ? 'setrow' : undefined}
+            data-needs-weight={!isSaved && offersNoWeight(ref) ? 'true' : undefined}
             // A RAIL MEANS GROUPING, A COLOUR MEANS WHAT A SET COUNTS AS —
             // the rule the whole handoff rests on. The rail is drawn per row
             // rather than as a wrapper because both groups share one grid, so
@@ -963,7 +983,7 @@ export function SetGrid({
                   waiting instead of congratulating the user for a set that
                   was never logged. See AppTour.tsx's measure loop. */}
               <Button
-                data-tour={isSaved ? undefined : 'setrow'}
+                data-tour={isSaved || offersNoWeight(ref) ? undefined : 'setrow'}
                 variant="ghost"
                 size="icon"
                 className={`size-7 shrink-0 ${isSaved ? (warm ? 'text-[color:var(--ramp-label)]' : 'text-primary-text') : 'glow-pulse'}`}

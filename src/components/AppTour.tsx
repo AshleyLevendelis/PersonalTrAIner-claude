@@ -211,6 +211,10 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
    * measure has not found it yet, which is not the same as it having gone.
    */
   const gateNode = useRef<HTMLElement | null>(null)
+  // Read ONCE, when the set stop first finds its row, and held for the step:
+  // the after-log line has to match what the person actually had to do, and
+  // the marker is gone by then (the row saved). See SetGrid's offersNoWeight.
+  const [setNeedsWeight, setSetNeedsWeight] = useState(false)
 
   const stepIndex = state.status === 'active' ? state.step : state.status === 'skipped' ? state.step : 0
   const step = STEPS[stepIndex]
@@ -365,7 +369,10 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
           el = held
         } else {
           el = findTarget(key)
-          if (el) gateNode.current = el
+          if (el) {
+            gateNode.current = el
+            if (step.key === SET_STEP_KEY) setSetNeedsWeight(el.getAttribute('data-needs-weight') === 'true')
+          }
         }
       } else {
         el = findTarget(key)
@@ -463,7 +470,9 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   // promising three things you can do to a meal that is not on screen. Once
   // they land — or the wait expires — it goes back to the real line.
   const showPending = stepIndex === MEALS_STEP_INDEX && mealsPending && !!step.pendingCopy
-  const body = tapPhase ? (step.teaser ?? '') : (showPending ? step.pendingCopy! : step.copy)
+  const typedWeight = step.key === SET_STEP_KEY && setNeedsWeight
+  const body = tapPhase ? (step.teaser ?? '') : (showPending ? step.pendingCopy! : (typedWeight && step.typedWeightCopy ? step.typedWeightCopy : step.copy))
+  const tapHint = typedWeight && step.typedWeightTapHint ? step.typedWeightTapHint : step.tapHint
   const calloutTop = calloutPosition(rect, step.last === true)
 
   return (
@@ -553,7 +562,7 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
         <p className="mt-2 text-[0.84375rem] leading-[1.55] text-foreground">{body}</p>
 
         {tapPhase ? (
-          <p className="mb-1 mt-2.5 text-[0.78125rem] font-semibold text-primary-text glow-mint">→ {step.tapHint}</p>
+          <p className="mb-1 mt-2.5 text-[0.78125rem] font-semibold text-primary-text glow-mint">→ {tapHint}</p>
         ) : (
           <div className="mt-3 flex items-center gap-2.5">
             {stepIndex > 0 && (

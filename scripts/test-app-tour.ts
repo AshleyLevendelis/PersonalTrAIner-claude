@@ -262,8 +262,18 @@ console.log('\n5. The behaviour the copy depends on is still wired')
   // The set stop's whole design: the attribute is conditional on the row being
   // unsaved, and the tour advances when it goes away. Either half alone is a
   // tour that congratulates the user for a set that never saved.
-  check('the set ✓ is tagged only while the row is open',
-    /data-tour=\{isSaved \? undefined : 'setrow'\}/.test(setGrid))
+  // RE-ANCHORED 24 Sep 2026 on the property rather than one line of JSX. The
+  // tag now lives in TWO places — the whole row when it has no weight to
+  // offer, so the tour's spotlight covers the box it asks to be typed in, and
+  // the ✓ otherwise (Ashley's ruling that day). The old regex pinned the
+  // single line and went red at correct code. What must hold: EVERY site is
+  // conditional on the row being unsaved, and the two split on the SAME
+  // condition, so exactly one element per row carries it.
+  const tagSites = [...setGrid.matchAll(/data-tour=\{([^}]*'setrow'[^}]*)\}/g)].map(m => m[1])
+  check('the set ✓ is tagged only while the row is open — at every site that tags it',
+    tagSites.length >= 1 && tagSites.every(e => /(^|\s)(!isSaved &&|isSaved \|\|)/.test(e) || /^isSaved \?/.test(e.trim())), tagSites)
+  check('...and the row and its ✓ split on one condition, so a row carries the tag once',
+    tagSites.length === 2 && tagSites.some(e => /!isSaved && offersNoWeight\(ref\)/.test(e)) && tagSites.some(e => /isSaved \|\| offersNoWeight\(ref\)/.test(e)), tagSites)
   check('...and the tour advances on that attribute disappearing',
     /getAttribute\('data-tour'\) !== key/.test(tour))
 

@@ -2,6 +2,42 @@
 
 Newest first. One line each.
 
+- [x] **ASHLEY'S RULING: ON A DAY WITH NO WEIGHT TO OFFER, THE TOUR SAYS TO
+  TYPE ONE.** 24 Sep 2026, the open question from the gate-fix entry below.
+  Asked, from three options: **change the words** (my recommendation) — over
+  pointing the tour at a later exercise, and over skipping the step. She
+  answered directly.
+  The case: the tour's "log your first set" step, on a plan whose first
+  exercise is a medicine-ball warm-up. The app cannot know the ball's weight
+  (the load engine refuses to invent one), so the box says "type it" and a
+  blank ✓ is refused. The tour said "Tap the ✓" and then "Leave the fields
+  blank and I'll take the prescribed numbers" — false on that row, and the
+  tour sat there waiting.
+  **Building it found the part the option did not say.** The tour blocks
+  every tap outside its spotlight, and the spotlight was the ✓ alone, so
+  "type the weight" would have asked for something the tour physically
+  prevents. On those days the spotlight is now the whole set row. The row's
+  marker is deliberately blind to what has been typed: the tour treats the
+  marker leaving as "the set saved", so a marker that moved on typing would
+  end the step before anything was logged.
+  **Words, both in the tour's step list so its honesty scan reads them:**
+  tap-phase "Type the weight you're using, then tap the ✓"; after logging,
+  "Logged — that easy. Wherever I've given you a weight, leave the fields
+  blank and I'll take the prescribed numbers; your rest timer starts on its
+  own." — the original claim narrowed to where it holds. Hers to reword.
+  **Verified in a real browser at 390px**: `verify:tour-real` now follows
+  the instruction the way a person would (types a weight through the
+  spotlight, taps ✓) and passes all 36 checks, where it had failed since 23
+  Sep; both screenshots read. `test:app-tour`'s tag check re-anchored from
+  one line of JSX to the property (every site that tags the row drops it on
+  save; row and ✓ split on one condition). 5 mutations across the two, 5
+  caught. `verify:tour`, `verify:warmup-rows`, `verify:one-number`,
+  `verify:coach-speaks-first`, `verify:six`, the 19 gates reading these
+  files and `test:bundle` pass.
+  **Noticed, not fixed:** logging that medicine-ball warm-up set showed a
+  personal-best badge and an "Add a drop · 3.5kg" offer — neither belongs on
+  movement prep. Predates this change.
+
 - [x] **ASHLEY'S RULING: A PULL-HEAVY WEEK ISN'T A FLAW WHEN THE INJURY LEFT
   ONE PRESS.** 24 Sep 2026, the question item 3 left open. Asked, from three
   options: **don't count it** (my recommendation) — over keeping the flag

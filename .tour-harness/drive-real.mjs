@@ -125,6 +125,10 @@ console.log('\nTHE TOUR, STOP BY STOP, AGAINST THE REAL SCREENS\n')
 const byKey = Object.fromEntries(STOPS.map((s, i) => [i + 1, s]))
 const asserted = new Set()
 const taps = {}
+// Set once the set stop's row turns out to have no weight to offer, so the
+// after-log line can be held to the narrower claim. Ashley's ruling, 24 Sep
+// 2026: on those days the tour says to type the weight, then tap the ✓.
+let typedWeightRow = false
 let guard = 0
 
 while (guard++ < 40) {
@@ -167,6 +171,13 @@ while (guard++ < 40) {
     } else {
       check(`${label}: an untargeted stop draws no spotlight`, !s.spot, s.spot)
     }
+    if (stop.key === 'set') {
+      // "Leave the fields blank and I'll take the prescribed numbers" is false
+      // on a row that just made somebody type the weight.
+      check(`${label}: the after-log line makes only the claim this row bears out`,
+        typedWeightRow ? /Wherever I've given you a weight/.test(s.body ?? '') : /Leave the fields blank/.test(s.body ?? ''),
+        { typedWeightRow, body: s.body })
+    }
     console.log(`      ${s.counter} · ${String(s.cta).trim()} · ${String(s.body).slice(0, 72)}`)
     await shot(`${n}-${stop.key}`)
   }
@@ -206,7 +217,37 @@ while (guard++ < 40) {
       break
     }
     taps[key] = (taps[key] ?? 0) + 1
-    const res = await tapTarget(key)
+    // A ROW WITH NO WEIGHT TO OFFER is the whole row, not its ✓: the tour
+    // asks for a weight to be typed, so the box has to be reachable through
+    // the spotlight. Follow the instruction the way a person would.
+    const needsWeight = key === 'setrow' && await evalJs(`(() => { const el = document.querySelector('[data-tour="setrow"]'); return !!el && el.getAttribute('data-needs-weight') === 'true' })()`)
+    if (needsWeight && !typedWeightRow) {
+      typedWeightRow = true
+      check(`${label}: a row with no weight to offer is told to type one`, /Type the weight you're using/.test(s.body ?? ''), s.body)
+      await shot(`${n}-${stop.key}-type`)
+      const typed = await evalJs(`(() => {
+        const row = document.querySelector('[data-tour="setrow"]')
+        const input = row && [...row.querySelectorAll('input')].find(i => i.placeholder === 'type it')
+        if (!input) return { error: 'no empty weight box in the row' }
+        const r = input.getBoundingClientRect()
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        const reachable = input === top || input.contains(top)
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+        setter.call(input, '6'); input.dispatchEvent(new Event('input', { bubbles: true }))
+        return { reachable, value: input.value }
+      })()`)
+      check(`${label}: ...and the weight box is inside the spotlight, so it can be typed in`, typed?.reachable === true && typed?.value === '6', typed)
+      await wait(300)
+    }
+    const res = needsWeight ? await evalJs(`(() => {
+      const row = document.querySelector('[data-tour="setrow"]')
+      const btn = row && row.querySelector('button.glow-pulse')
+      if (!btn) return 'MISSING'
+      const r = btn.getBoundingClientRect()
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      const blocked = !(btn === top || btn.contains(top))
+      btn.click(); return blocked ? 'CLICK-BLOCKED' : 'ok'
+    })()`) : await tapTarget(key)
     check(`${label}: the real ${key} is reachable through the hole`, res === 'ok', res)
     if (res !== 'ok') break
     await wait(1600)
