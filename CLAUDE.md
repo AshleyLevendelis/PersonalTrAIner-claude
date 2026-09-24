@@ -726,10 +726,16 @@ menu" stays true when a copy is also left outside it.
   the point.** The sentences the APP writes — every card lead, receipt,
   refusal and floor — are held by `coach-voice` (33 checks, 10 mutations) and
   `verify:activity-swap` / `verify:swap-request` read on a real screen. The
-  MODEL's own voice is still `UNGUARDED` and still unmeasurable here: every
-  tone probe posts to the deployed function and needs credentials a cloud
-  session does not have, and the coach exam grades ADVICE, not voice, by
-  design (`docs/coach-exam-rubric.md:7`). Measured first in
+  MODEL's own voice is still `UNGUARDED` IN PRACTICE, but no longer for want
+  of a standard: since 24 Sep 2026 the coach exam marks **voice** as a sixth
+  judged dimension, written only from rules the coach is already given (§1
+  VOICE, §1b-i's one question, VISION's coach chat) — texting not articles,
+  length fitted to the turn, no unasked lists, no praise opener, attention
+  over cheer, one question that earns its place. It still needs the exam RUN,
+  which needs credentials a cloud session lacks, so no voice mark exists yet.
+  A changed marking guide now makes the scores stale on its own line, with the
+  cheaper fix named: re-grade the same transcripts, do not re-run the coach
+  (`coach-exam-fresh`, `coach-exam-judge`). Measured first in
   `docs/audits/the-coachs-own-words-2026-09-15.md`: three grammars for one
   job, eight wordings of one failure, three narrators in one file
 - Never claims a capability, screen or guarantee it lacks; proposes,
@@ -758,8 +764,8 @@ menu" stays true when a copy is also left outside it.
   three rulings out of date. The three added each grade a ruling Ashley had
   ALREADY given, so nothing new was decided to write them — the session-length
   pair, the cardio ask-before-carding turn, and the goal change's food half.
-  **TEN hard rules** checked in code and five
-  judged dimensions marked against `docs/coach-exam-rubric.md`
+  **TEN hard rules** checked in code and six
+  judged dimensions (voice added 24 Sep 2026) marked against `docs/coach-exam-rubric.md`
   (`coach-exam:grade`); and `coach-exam-fresh` in every sweep, which fails
   when the coach changes and the exam has not been re-run — that gate is what
   makes rule 5 enforceable rather than aspirational. The rules are

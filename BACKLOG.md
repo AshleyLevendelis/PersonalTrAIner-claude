@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **CHAT FIX 5: THE COACH EXAM MARKS THE COACH'S VOICE.** 24 Sep 2026,
+  the last of the five chat fixes she asked for. The app's own sentences were
+  already graded (`coach-voice`); the MODEL's voice was graded by nothing that
+  could run here — the tone probes post to the deployed coach — and the exam's
+  rubric said outright it grades advice, not voice.
+  **Now:** a sixth judged dimension, `voice`, in `docs/coach-exam-rubric.md`,
+  marked 0-3 like the others. Written ONLY from rules the coach is already
+  given, so nothing new was decided: texting not articles, the length fitted
+  to the kind of turn, no lists or headers unless asked, the answer first, no
+  praise opener or AI talk, warmth as attention, a bad day acknowledged before
+  it is fixed, and exactly one question that earns its place. A card-only turn
+  has no words to mark and is never held against it. The grader reads its
+  dimensions from the file, so no code had to learn the new one — and the
+  judge gate now proves the voice standard reaches the judge and the voice
+  mark reaches the scoreboard.
+  **And a changed marking guide now marks the scores stale**, on its own line
+  and with the cheaper fix named: re-grade the same transcripts, do not re-run
+  the coach. Kept separate from the coach's own fingerprint on purpose —
+  folding it in would send her to replay every conversation for a wording
+  change. Whitespace is collapsed, so reflowing a paragraph changes nothing;
+  prose outside the judged block changes nothing.
+  **Verified:** `test:coach-exam-judge` (29 checks; 3 mutations, 3 caught —
+  one first written as a no-op, which "caught nothing" and was rewritten);
+  `test:coach-exam-fresh` (5 mutations, 5 caught; one read as a crash by the
+  harness only because that gate prints a line per problem it finds in the
+  real scores file, and its own check did fail). `test:coach-exam-runner` and
+  `test:coach-exam-grader` pass. `test:coach-exam-fresh` is RED, as it was
+  before this: the exam has not been run against the current coach, and now
+  also says the guide changed. Both clear on her next run.
+  **Hers to change:** the voice wording, like the rest of the rubric — the
+  training science does not pick how her app should sound.
+  **Not measured:** no voice mark exists until the exam runs on her machine.
+
 - [x] **CHAT FIX 4: THE COACH CAN REACH YOU WHEN THE APP IS SHUT — BUILT,
   NOT YET LIVE.** 24 Sep 2026, the fourth of the five chat fixes Ashley asked
   for (*"Implement all the chat fixes you just mentioned in the order you

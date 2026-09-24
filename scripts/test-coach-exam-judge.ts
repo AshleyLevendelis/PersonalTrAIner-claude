@@ -101,7 +101,10 @@ function writeTranscripts(dir: string) {
   return 2
 }
 
-const MARKS = { correct: 3, specific: 2, asks: 3, scope: 3, honest: 3 }
+// SIX, since the voice dimension (24 Sep 2026). Voice is marked 1 on purpose:
+// the only value that differs from every other mark, so the average below can
+// only come out right if voice was asked for, returned AND counted.
+const MARKS = { correct: 3, specific: 2, asks: 3, scope: 3, honest: 3, voice: 1 }
 const answer = (stop: string, text: string) => ({
   status: 200,
   body: {
@@ -167,7 +170,12 @@ async function main() {
     // that shipped and could be spent entirely on thinking.
     check('max_tokens leaves room to think AND answer (well above the 1024 that shipped)', maxTokens >= 8000, maxTokens)
     check('the key travels in x-api-key', api.seen[0]?.headers['x-api-key'] === 'sk-ant-gate', api.seen[0]?.headers['x-api-key'])
-    check('the marks were read from the TEXT block, not the thinking block', r.scores?.overall === (3 + 2 + 3 + 3 + 3) / 5, r.scores?.overall)
+    check('the marks were read from the TEXT block, not the thinking block', r.scores?.overall === (3 + 2 + 3 + 3 + 3 + 1) / 6, r.scores?.overall)
+    const system = String(api.seen[0]?.body.system ?? '')
+    check('the judge is sent the voice standard and asked for a voice mark',
+      /DIMENSION: voice/.test(system) && /"voice": 0-3 or null/.test(system), system.slice(-300))
+    const avgs = (r.scores?.dimensionAverages ?? {}) as Record<string, number | null>
+    check('...and the voice mark lands in the scoreboard as its own dimension', avgs.voice === 1 && Object.keys(avgs).length === 6, avgs)
     check('the report names the judge and how many cases it marked', /claude-opus-5 — marked 2 of 2/.test(judgeLine(r.report)), judgeLine(r.report))
     check('the scoreboard names the judge', r.scores?.judge === 'claude-opus-5', r.scores?.judge)
     const shown = String((api.seen[0]?.body.messages as { content?: string }[] | undefined)?.[0]?.content ?? '')

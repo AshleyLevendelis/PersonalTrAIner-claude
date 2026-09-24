@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { hardRuleViolations, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
-import { coachFingerprint } from './coach-fingerprint.ts'
+import { coachFingerprint, rubricFingerprint } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
 // THE COACH EXAM, PART 2 OF 3 — mark the transcripts.
@@ -20,7 +20,7 @@ import { coachFingerprint } from './coach-fingerprint.ts'
 //   line is not a thing you average. These run whether or not there is an API
 //   key, so the exam still says something useful with no grader available.
 //
-//   TIER B — the five dimensions in docs/coach-exam-rubric.md, marked 0-3 by
+//   TIER B — the dimensions in docs/coach-exam-rubric.md, marked 0-3 by
 //   Claude. The rubric is READ FROM THAT FILE and sent verbatim: a second copy
 //   of the standard living in this script is a second thing to keep in step,
 //   and the one that drifts is always the copy nobody is reading. Same reason
@@ -218,7 +218,7 @@ async function main() {
   // failed with a 401 — a report naming a marker that marked nothing.
   const judged = marked.filter(m => m.judgement).length
   say(!apiKey
-    ? 'judge: NOT RUN — ANTHROPIC_API_KEY is not set, so the five dimensions are unmarked. The hard rules below still ran.'
+    ? `judge: NOT RUN — ANTHROPIC_API_KEY is not set, so the ${dimensions.length} dimensions are unmarked. The hard rules below still ran.`
     : keyRejected
       ? `judge: NOT RUN — ${keyRejected}. Stopped after the first call; the hard rules below still ran.`
       : `judge: ${JUDGE_MODEL} — marked ${judged} of ${marked.length} case(s)`)
@@ -296,6 +296,7 @@ async function main() {
     _comment: "THE COACH EXAM'S SCOREBOARD. Written by scripts/grade-coach-exam.ts and read by scripts/test-coach-exam-fresh.ts, which fails the sweep when the coach on disk no longer matches the coach these scores describe. Tracked in git so the history survives, the same as quality-report.txt.",
     fingerprint: current.hash,
     fingerprintParts: current.parts,
+    rubric: rubricFingerprint(ROOT),
     model: current.model,
     judge: judged > 0 ? JUDGE_MODEL : null,
     ranAt: new Date().toISOString(),

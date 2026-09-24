@@ -88,3 +88,26 @@ export function coachFingerprint(root: string = ROOT): CoachFingerprint {
     model,
   }
 }
+
+/**
+ * WHICH MARKING GUIDE PRODUCED THESE SCORES — a separate stamp from the coach,
+ * on purpose. Added 24 Sep 2026 with the rubric's sixth dimension (voice).
+ *
+ * The coach fingerprint answers "is this the coach that was examined?"; this
+ * answers "were its answers marked against the standard on disk?". They are
+ * different questions with different fixes: a changed coach needs the
+ * conversations played again, while a changed rubric only needs the SAME
+ * transcripts marked again. Folding the rubric into the coach hash would have
+ * sent her to re-run the coach for a wording change in the marking guide.
+ *
+ * Only the marked block the judge is actually sent, and with whitespace
+ * collapsed, so reflowing a paragraph never demands a re-grade while changing
+ * a single word of the standard always does.
+ */
+export function rubricFingerprint(root: string = ROOT): string {
+  const md = readFileSync(join(root, 'docs/coach-exam-rubric.md'), 'utf8')
+  const start = md.indexOf('<!-- RUBRIC:BEGIN -->')
+  const end = md.indexOf('<!-- RUBRIC:END -->')
+  if (start < 0 || end < start) return 'no-rubric-block'
+  return sha(md.slice(start, end).replace(/\s+/g, ' ').trim())
+}

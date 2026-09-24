@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { coachFingerprint, FINGERPRINT_PARTS, type CoachFingerprint } from './coach-fingerprint.ts'
+import { coachFingerprint, rubricFingerprint, FINGERPRINT_PARTS, type CoachFingerprint } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
 // THE PART OF THE COACH EXAM THAT RUNS IN EVERY SWEEP, BECAUSE IT IS FREE.
@@ -48,6 +49,8 @@ const SCORES = join(ROOT, 'coach-exam-scores.json')
 export interface Scores {
   fingerprint?: string
   fingerprintParts?: Record<string, string>
+  /** The marking guide the answers were marked against (rubricFingerprint). */
+  rubric?: string
   model?: string
   ranAt?: string
   baselinePending?: boolean
@@ -69,10 +72,19 @@ export interface Verdict {
  * BOTH can be true at once — a scores file can be for an old coach AND hold
  * no cases — so problems is a list rather than a single reason.
  */
-export function freshnessVerdict(scores: Scores, current: CoachFingerprint): Verdict {
+export function freshnessVerdict(scores: Scores, current: CoachFingerprint, rubric: string = rubricFingerprint(ROOT)): Verdict {
   if (scores.baselinePending) return { state: 'pending', problems: [] }
 
   const problems: string[] = []
+  // THE STANDARD MOVED, as distinct from the coach. Its own sentence, because
+  // its fix is different and cheaper: mark the same transcripts again
+  // (npm run coach-exam:grade), with no need to play the conversations again.
+  if (scores.rubric !== rubric) {
+    problems.push(
+      `the marking guide has changed since these answers were marked — marked against ${scores.rubric ?? '(no guide recorded)'}, ` +
+      `the guide on disk is ${rubric}. Re-grade the same transcripts; the coach need not be run again for this`,
+    )
+  }
   if (scores.fingerprint !== current.hash) {
     problems.push(
       `the coach has changed since the exam last ran — scores are for ${scores.fingerprint ?? '(none recorded)'}, ` +
@@ -118,6 +130,7 @@ console.log('1. The verdict itself, on situations this repository is not in')
 const MATCHING: Scores = {
   fingerprint: current.hash,
   fingerprintParts: { ...current.parts },
+  rubric: rubricFingerprint(ROOT),
   model: current.model,
   ranAt: '2026-09-20T00:00:00Z',
   cases: { 'ask-shoulder-pain': {}, 'scope-medication': {} },
@@ -148,6 +161,32 @@ check('...including the model, when that is what moved',
 // A MATCHING FINGERPRINT OVER AN EMPTY RUN IS THE SUBTLE ONE: every hash
 // agrees, so the comparison this gate is named for passes, and nothing was
 // measured. It has to fail on the case count alone.
+const reRubric = v({ ...MATCHING, rubric: 'oldrubrichash00' })
+check('scores marked against a DIFFERENT marking guide are stale, even for the same coach',
+  reRubric.state === 'stale' && reRubric.problems.length === 1, reRubric)
+check('...and the reason says to re-grade, not to run the coach again',
+  /marking guide has changed/.test(reRubric.problems[0] ?? '') && /need not be run again/.test(reRubric.problems[0] ?? ''), reRubric.problems)
+check('...and a scores file from before the guide was recorded is stale too',
+  v({ ...MATCHING, rubric: undefined }).state === 'stale')
+// THE STAMP MOVES WITH THE STANDARD AND ONLY WITH IT: a changed word inside
+// the marked block changes it, a reflowed line does not, and the prose outside
+// the block (which the judge is never sent) does not. Measured on a copy.
+{
+  const guide = readFileSync(join(ROOT, 'docs/coach-exam-rubric.md'), 'utf8')
+  const stampOf = (text: string) => {
+    const dir = mkdtempSync(join(tmpdir(), 'rubric-fp-'))
+    mkdirSync(join(dir, 'docs'))
+    writeFileSync(join(dir, 'docs/coach-exam-rubric.md'), text)
+    return rubricFingerprint(dir)
+  }
+  const WORD = "Reads like a good coach's texts."
+  const base = stampOf(guide)
+  check('the stamp is the one the real guide gives, and the sentence the probes edit is in it', base === rubricFingerprint(ROOT) && guide.includes(WORD), base)
+  check('...a changed word in the marked block changes it', stampOf(guide.replace(WORD, "Reads like a decent coach's texts.")) !== base)
+  check('...a reflowed line in the block does not', stampOf(guide.replace(WORD, "Reads like a good\ncoach's texts.")) === base)
+  check('...and prose outside the block, which the judge never sees, does not',
+    stampOf(guide.replace('# The coach exam rubric', '# The coach exam rubric (renamed)')) === base)
+}
 const empty = v({ ...MATCHING, cases: {} })
 check('a run that recorded no cases fails even when the fingerprint matches',
   empty.state === 'empty' && empty.problems.length === 1, empty)
@@ -175,7 +214,7 @@ console.log('\n2. The grader still writes every field this gate reads')
 // this repository is in has no real one to read, which is the same reason
 // section 1 exists.
 const graderSrc = readFileSync(join(ROOT, 'scripts/grade-coach-exam.ts'), 'utf8')
-for (const field of ['fingerprint', 'fingerprintParts', 'model', 'ranAt', 'cases'] as const) {
+for (const field of ['fingerprint', 'fingerprintParts', 'rubric', 'model', 'ranAt', 'cases'] as const) {
   check(`the grader writes \`${field}\`, which this gate reads`,
     new RegExp(`\\b${field}:`).test(graderSrc))
 }
