@@ -8,6 +8,7 @@
 
 import { getExerciseEntry, searchExerciseCatalog, slugifyExerciseName, type ExerciseEntry } from './exercise-db'
 import { isExternallyLoaded } from './load-prescription'
+import { effortFromWords, EFFORTS, type EffortKey } from './cardio-effort'
 
 export interface ParsedSet {
   setNumber: number
@@ -31,8 +32,14 @@ export type ExerciseResolution =
   | { resolution: 'unknown'; exerciseId: string; exerciseName: string }
 
 export interface SetsAmbiguity {
-  field: 'sets_x_reps' | 'weight' | 'exercise_name'
+  field: 'sets_x_reps' | 'weight' | 'exercise_name' | 'effort'
   message: string
+  /**
+   * Answers to offer as taps, when the question has a fixed set of them. Only
+   * `effort` has one today: Easy / Steady / Hard. The tapped value is added to
+   * the phrase and re-parsed, like every other answer here.
+   */
+  options?: { label: string; value: string }[]
 }
 
 export interface ParsedSetGroup {
@@ -44,6 +51,19 @@ export interface ParsedSetGroup {
   sets: ParsedSet[]
   routesToCardio?: boolean
   cardioMinutes?: number
+  /**
+   * What the cardio WAS, as a name a person reads back — "Walk", not the
+   * "30 min walk" phrase it came from. The same literals the rest-day chips
+   * write, so a walk logged by chat and a walk logged by a tap are one
+   * activity to the app's duration memory.
+   */
+  cardioActivity?: string
+  /**
+   * How hard she SAID it was — her number kept exactly, or the RPE of the word
+   * she used. Never set from nothing: when absent the group carries an
+   * `effort` ambiguity instead, and nothing is written until she answers.
+   */
+  cardioRpe?: number
   /** BLOCKING — drives the CLARIFICATION card. Nothing writes until resolved. */
   ambiguity?: SetsAmbiguity
   /**
@@ -268,6 +288,12 @@ export function parseSetsPhrase(phrase: string): SetsPhraseParse {
 
 const CARDIO_RE = /(\d+)\s*(?:min|mins|minutes)\b.*\b(bike|run|jog|row|swim|elliptical|cycling|cardio|walk)/i
 
+/** The word she used -> the activity the app reads back. The rest-day chip names where one exists. */
+const CARDIO_ACTIVITY: Record<string, string> = {
+  bike: 'Cycle', cycling: 'Cycle', run: 'Run', jog: 'Run', row: 'Row',
+  swim: 'Swim', elliptical: 'Elliptical', cardio: 'Cardio', walk: 'Walk',
+}
+
 export function resolveExerciseName(phrase: string, todaysPlanExerciseNames: string[]): ExerciseResolution {
   const trimmed = phrase.trim()
   // AN EMPTY PHRASE MATCHES NOTHING, and saying so here is not belt-and-braces.
@@ -360,12 +386,31 @@ export function parseWorkoutEntries(input: ParseWorkoutInput): ParseWorkoutResul
   const groups: ParsedSetGroup[] = input.entries.map(entry => {
     const cardioMatch = CARDIO_RE.exec(entry.rawText)
     if (cardioMatch) {
+      const activity = CARDIO_ACTIVITY[cardioMatch[2].toLowerCase()] ?? 'Cardio'
+      // HER WORDS FOR HOW HARD, FROM THE ENTRY — or from the whole message
+      // when this is the only thing in it, because the model may segment
+      // "30 min walk" out of "did a 30 min walk, nice and easy" and drop the
+      // half that answers the question. With several entries the message's
+      // words could belong to any of them, so only the entry counts.
+      const effort = effortFromWords(entry.rawText)
+        ?? (input.entries.length === 1 ? effortFromWords(input.userSaid) : null)
       return {
         matchedRawPhrase: entry.rawText,
         resolution: 'unknown',
         sets: [],
         routesToCardio: true,
         cardioMinutes: parseInt(cardioMatch[1], 10),
+        cardioActivity: activity,
+        cardioRpe: effort?.rpe,
+        // NOTHING IS WRITTEN ON AN EFFORT SHE DID NOT GIVE. This recorded 5
+        // for every chat-logged walk until 24 Sep 2026; the screens had just
+        // stopped inventing one (Ashley's "like a lifting set"), and a chat
+        // that still did would be the same app saying two things.
+        ambiguity: effort ? undefined : {
+          field: 'effort',
+          message: `How hard was the ${activity === 'Cardio' ? 'session' : activity.toLowerCase()}?`,
+          options: EFFORTS.map(e => ({ label: e.label, value: e.key satisfies EffortKey })),
+        },
       }
     }
 

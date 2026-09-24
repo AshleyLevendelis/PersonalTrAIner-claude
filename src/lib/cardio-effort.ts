@@ -76,3 +76,43 @@ export function cardioReadback(p: { activity: string; minutes: number; rpe?: num
   const key = effortForRpe(p.rpe)
   return `${p.activity} · ${p.minutes} min${key ? ` · ${effortLabel(key)}` : ''}`
 }
+
+/**
+ * HOW HARD SHE SAID IT WAS, read from her own words — or null, and then the
+ * app asks. Added 24 Sep 2026 for the chat: "did a 30 min walk" had recorded
+ * an effort of 5 that nobody chose, the one writer still inventing after the
+ * screens stopped (Ashley's "like a lifting set" ruling; nothing pre-chooses
+ * an effort the app cannot know).
+ *
+ * A NUMBER SHE STATED WINS and is kept exactly — "RPE 8", "8/10". Otherwise
+ * a word from one of three short lists. The lists are deliberately narrow:
+ * a word that could mean either ("comfortable", "zone 2", "tempo") is not on
+ * any of them, because a wrong guess is a fact she did not give, and asking
+ * costs one tap. A word she NEGATED ("not hard", "wasn't easy") is not taken,
+ * and two words that disagree are not resolved by picking one — both ask.
+ */
+const EFFORT_WORDS: Record<EffortKey, RegExp> = {
+  easy: /\b(easy|easily|light|gentle|relaxed|leisurely|conversational|chilled|slow)\b/gi,
+  steady: /\b(steady|moderate|medium)\b/gi,
+  hard: /\b(hard|tough|intense|intervals?|sprints?|hiit|all[- ]out|brutal|flat[- ]out)\b/gi,
+}
+const NEGATED = /\b(not|never|no|wasn't|isn't|wasnt|isnt|didn't|didnt|hardly)\s+(?:\w+\s+)?$/i
+
+export function effortFromWords(text: string | null | undefined): { key: EffortKey; rpe: number } | null {
+  if (!text) return null
+  const rpeMatch = /\brpe\s*(\d{1,2}(?:\.\d)?)\b/i.exec(text) ?? /\b(\d{1,2})\s*\/\s*10\b/.exec(text)
+  if (rpeMatch) {
+    const n = Math.round(Number(rpeMatch[1]))
+    const key = effortForRpe(n)
+    if (key && n <= 10) return { key, rpe: n }
+  }
+  const found = new Set<EffortKey>()
+  for (const key of Object.keys(EFFORT_WORDS) as EffortKey[]) {
+    for (const m of text.matchAll(EFFORT_WORDS[key])) {
+      if (!NEGATED.test(text.slice(0, m.index))) found.add(key)
+    }
+  }
+  if (found.size !== 1) return null
+  const key = [...found][0]
+  return { key, rpe: EFFORTS.find(e => e.key === key)!.rpe }
+}

@@ -2,6 +2,53 @@
 
 Newest first. One line each.
 
+- [x] **CHAT FIX 3: CARDIO LOGGED THROUGH THE CHAT, THE WAY THE SCREENS LOG
+  IT.** 24 Sep 2026. Ashley asked "how would you improve the chat?", got five
+  ideas, and said *"Implement all the chat fixes you just mentioned in the order
+  you mentioned them."* This is the third; 1 and 2 (the coach exam and the
+  coach deploy) run on her machine, so they go last as one handover prompt —
+  **a deviation from her order, on purpose**: the exam then grades the finished
+  coach, including fix 5's tone dimension, and she deploys once, not twice.
+  **What was wrong, measured by reading and then by driving the real chat:**
+  "did a 30 min walk" wrote an RPE of **5 nobody chose**; stored the whole
+  phrase ("did a 30 min walk") as the activity; read back "Cardio" under
+  **"0 exercises · 0 sets"**; pushed its "Logged" row **whether or not the
+  store took the write** (a 0-minute entry was refused and still reported);
+  and the receipt's **Undo left the walk in place** — it only ever deleted
+  sets. No gate covered any of it.
+  **Now:** her effort is taken from her words — her number exactly ("RPE 8",
+  "8/10"), or a word from three narrow lists (easy / steady / hard and their
+  plainest synonyms). A word that could mean either ("comfortable", "zone 2")
+  counts as nothing, a negated word ("not hard") counts as nothing, and two
+  that disagree count as nothing. With nothing, the chat asks "How hard was the
+  walk?" with Easy / Steady / Hard as taps, and **nothing is written until she
+  taps**. The message's other words speak for the walk only when it is the
+  only thing in the message, so "bench 3x5, that was hard, then 20 min bike"
+  does not make the bike hard. The receipt reads "Walk · 30 min · Easy",
+  counts "1 activity", says "Not logged" with the reason when the store
+  refuses, and Undo removes the walk.
+  **Decided by me (CSCS delegation, same basis as the screens' mapping):** the
+  word lists, and that "zone 2" is not on them — the app's own plan labels
+  Zone 2 at both RPE 4 and 5, so it cannot be read as one word.
+  **Verified:** `test:chat-cardio` (new, 16 checks, 12 mutations, 12 caught);
+  `verify:chat-cardio` (new, 21 checks, real chat at 390px, screenshots read;
+  6 mutations, 6 caught — one MISSED first: "0 exercises · 0 sets" was checked
+  as a pair, so "0 exercises · 1 activity" passed). The 61 gates reading the
+  changed files and `test:bundle` pass; `test:replace-without-losing`
+  re-anchored from the Undo token's exact literal to the property it guards
+  (mutated: still catches losing the replaced half). Chat screen drivers:
+  see the commit.
+  **Hers to change:** "How hard was the walk?", "1 activity", "Not logged",
+  "Not saved — that length doesn't look right. Tell me the minutes again."
+  **Named, not done:** two other chat paths still record an effort of 6 when
+  she gives none — "swap today for Muay Thai, 60 minutes" and a moved session
+  with something done instead. Both are confirm cards, and a card has no way
+  to ask a follow-up question yet; the database requires an effort, so leaving
+  it blank is not possible without a migration. Either the card gains three
+  answer buttons or the column becomes optional — a small build, not done here.
+  Chat logging also only recognises "N min walk/run/bike/…" in that order;
+  "walked for 30 minutes" is not seen as cardio, before or after this.
+
 - [x] **ASHLEY'S RULING: CARDIO IS LOGGED LIKE A LIFTING SET, EVERYWHERE.**
   24 Sep 2026. Her words: *"The loggin cardio system needs a revamp to fit
   with the aesthetic of the rest of the app."* Asked which look to use

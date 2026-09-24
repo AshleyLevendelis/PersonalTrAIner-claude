@@ -48,7 +48,7 @@ export interface ClarificationOption {
  * that unsayable.
  */
 export function answerPlaceholderFor(
-  field: 'exercise_name' | 'weight' | 'sets_x_reps' | undefined,
+  field: 'exercise_name' | 'weight' | 'sets_x_reps' | 'effort' | undefined,
   hasOptions: boolean,
 ): string | undefined {
   if (field === 'exercise_name') return 'or type the exercise'

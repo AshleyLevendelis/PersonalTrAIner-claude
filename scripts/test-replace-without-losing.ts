@@ -103,8 +103,11 @@ console.log('\n1. A correction hands back what it replaced — behavioural\n')
 console.log('\n2. The undo carries both halves, and applies them in the safe order\n')
 {
   const chat = read('src/components/ChatAssistant.tsx')
+  // THE PROPERTY, NOT THE LITERAL: both halves are in the token. Since
+  // 24 Sep 2026 it also carries the cardio a turn logged, and a check pinned
+  // to the whole object literal went red on a token that had only gained.
   check('the receipt carries logged AND replaced',
-    /undoToken: JSON\.stringify\(\{ logged: loggedKeys, replaced: replacedLogs \}\)/.test(chat))
+    /undoToken: JSON\.stringify\(\{ logged: loggedKeys, replaced: replacedLogs(?:, [^}]*)? \}\)/.test(chat))
   check('...and the undo still reads the old bare-array shape',
     /if \(Array\.isArray\(token\)\) keys = token/.test(chat))
   check('...without throwing on an unreadable token', /failed to read its own token/.test(chat))

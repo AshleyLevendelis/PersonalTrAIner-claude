@@ -80,7 +80,7 @@ import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
-import { subscribeCardioLogStore } from '@/lib/cardio-log-store'
+import { subscribeCardioLogStore, deleteCardioLog } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
@@ -4313,9 +4313,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // the shape the card's own note calls the loop — because the only
       // branch that offered taps was the one where the model HAD named
       // something and the catalogue could not choose between two meanings.
+      // Or the answers the question itself carries — Easy / Steady / Hard
+      // for a walk logged with no effort (24 Sep 2026), so the one thing the
+      // app will not guess is one tap away rather than a sentence to type.
       const options = group.ambiguousCandidates
         ? group.ambiguousCandidates.map(c => ({ label: c.name, value: c.name }))
-        : []
+        : group.ambiguity?.options ?? []
       // A QUESTION WITH NO WAY TO ANSWER IT IS THE LOOP. Only the pick-one
       // exercise-name case has buttons; a weight or a sets×reps is a number
       // the trainee has to type, and before 8 Sep 2026 there was nowhere on
@@ -4334,7 +4337,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         .filter(e => e.suggested_load_kg != null)
         .map(e => [e.name, e.suggested_load_kg as number] as const)
     )
-    const { rows, totalSets, loggedKeys, replacedSets, replacedLogs } = executeLogWorkout(parsed.groups, {
+    const { rows, totalSets, loggedKeys, replacedSets, replacedLogs, cardioLogged, cardioRefused } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
       weekNumber: activeSession.liveWeek,
@@ -4365,10 +4368,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // receipt for "I did 3 more" — and the wrong one of those quietly doubles
     // the session. Naming the replaced count makes a mis-call visible on the
     // spot, while Undo is still one tap away.
-    const summary = replacedSets > 0
-      ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} · replaced ${replacedSets}`
-      : `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'}`
-    const title = replacedSets > 0 ? `Corrected · ${activeSession.dayName}` : `Logged · ${activeSession.dayName}`
+    //
+    // AND ONLY WHAT IS THERE, since 24 Sep 2026. A walk on its own read
+    // "0 exercises · 0 sets" under "Logged" — a count of nothing, beside a
+    // title claiming something — and a walk the store refused was still
+    // "Logged". Each part is said only when it is non-zero, cardio is counted
+    // as what it is, and a turn that saved nothing does not say it did.
+    const parts = [
+      exerciseCount > 0 ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : '',
+      totalSets > 0 || exerciseCount > 0 ? `${totalSets} set${totalSets === 1 ? '' : 's'}` : '',
+      cardioLogged.length > 0 ? `${cardioLogged.length} ${cardioLogged.length === 1 ? 'activity' : 'activities'}` : '',
+      replacedSets > 0 ? `replaced ${replacedSets}` : '',
+    ].filter(Boolean)
+    const summary = parts.join(' · ')
+    const savedAnything = totalSets > 0 || cardioLogged.length > 0
+    const title = !savedAnything ? `Not logged · ${activeSession.dayName}`
+      : replacedSets > 0 ? `Corrected · ${activeSession.dayName}` : `Logged · ${activeSession.dayName}`
     return {
       text: title,
       receipt: {
@@ -4376,7 +4391,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         title,
         rows,
         summary,
-        status: 'done',
+        status: !savedAnything ? 'failed' : cardioRefused > 0 ? 'partial' : 'done',
         resolvedAt: new Date().toISOString(),
         // Undo (C17) parses this back out to call deleteSet per natural key
         // — loggedKeys never leaves this module otherwise, so JSON-encode
@@ -4387,7 +4402,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // new sets AND writing the old ones back. Carrying only `logged` made
         // Undo destroy both versions — see ReplacedSetPreImage. `replaced` is
         // empty for an ordinary append, which is every non-correction turn.
-        undoToken: JSON.stringify({ logged: loggedKeys, replaced: replacedLogs }),
+        //
+        // AND THE CARDIO, since 24 Sep 2026: Undo on a receipt that logged a
+        // walk deleted the sets beside it and left the walk in place.
+        undoToken: JSON.stringify({ logged: loggedKeys, replaced: replacedLogs, cardio: cardioLogged }),
       },
     }
   }
@@ -5919,12 +5937,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // available" rather than as an exception on a tap.
       let keys: { exerciseId: string; setNumber: number }[] = []
       let replaced: ReplacedSetPreImage[] = []
+      let cardio: string[] = []
       try {
         const token = JSON.parse(receipt.undoToken) as
           | { exerciseId: string; setNumber: number }[]
-          | { logged?: { exerciseId: string; setNumber: number }[]; replaced?: ReplacedSetPreImage[] }
+          | { logged?: { exerciseId: string; setNumber: number }[]; replaced?: ReplacedSetPreImage[]; cardio?: string[] }
         if (Array.isArray(token)) keys = token
-        else { keys = token.logged ?? []; replaced = token.replaced ?? [] }
+        else { keys = token.logged ?? []; replaced = token.replaced ?? []; cardio = token.cardio ?? [] }
       } catch (err) {
         console.error('Undoing a chat workout log failed to read its own token:', err)
         return
@@ -5942,6 +5961,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         activeSession.deleteSet({ userId: profile.id, date: activeSession.date, exerciseId: key.exerciseId, setNumber: key.setNumber, isWarmup: false, dropIndex: 0 })
       }
       for (const pre of replaced) activeSession.logSet(pre)
+      // The walk goes too. The store's own undo window is the receipt's ten
+      // minutes, so inside it the delete can always be honoured; a network
+      // error on a synced row is logged and the rest of the undo still runs,
+      // the same as the set deletes above.
+      for (const clientId of cardio) {
+        try { await deleteCardioLog(clientId) } catch (err) { console.error('Undoing a chat-logged cardio entry failed:', err) }
+      }
       // deleteSet is the raw store function (unlike logSet, which already
       // calls refresh() after writing) — without this, the Exercise tab's
       // dot ladder, TodayPanel progress, dock chip, and dashboard aggregate

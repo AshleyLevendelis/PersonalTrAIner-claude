@@ -14,6 +14,7 @@ import type { ExerciseSetLog } from './types'
 import { nextExtraSetNumber } from './session-derive'
 import { prescriptionUnit } from './set-log-store'
 import { saveCardioLog } from './cardio-log-store'
+import { effortForRpe, effortLabel } from './cardio-effort'
 
 export interface LogWorkoutContext {
   profileId: string
@@ -120,23 +121,53 @@ export interface LoggedSetKey {
  */
 export type ReplacedSetPreImage = SaveSetInput
 
-export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): { rows: LogWorkoutReceiptRow[]; totalSets: number; loggedKeys: LoggedSetKey[]; replacedSets: number; replacedLogs: ReplacedSetPreImage[] } {
+export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutContext): {
+  rows: LogWorkoutReceiptRow[]
+  totalSets: number
+  loggedKeys: LoggedSetKey[]
+  replacedSets: number
+  replacedLogs: ReplacedSetPreImage[]
+  /** The cardio this turn wrote, by the client id its Undo deletes by. */
+  cardioLogged: string[]
+  /** Cardio the store REFUSED — said on the receipt, never counted as logged. */
+  cardioRefused: number
+} {
   const rows: LogWorkoutReceiptRow[] = []
   const loggedKeys: LoggedSetKey[] = []
   const replacedLogs: ReplacedSetPreImage[] = []
+  const cardioLogged: string[] = []
+  let cardioRefused = 0
   let totalSets = 0
   let replacedSets = 0
 
   for (const group of groups) {
     if (group.routesToCardio) {
-      saveCardioLog({
-        userId: ctx.profileId,
-        date: ctx.date,
-        activityName: group.matchedRawPhrase,
-        durationMinutes: group.cardioMinutes ?? 0,
-        intensityRpe: 5, // no RPE stated in a bare duration phrase — a reasonable default, never blocks the write
-      })
-      rows.push({ label: group.matchedRawPhrase, detail: `${group.cardioMinutes} min`, note: 'Cardio' })
+      // LOGGED LIKE THE SCREENS LOG IT, since 24 Sep 2026. This wrote an RPE
+      // of 5 nobody chose, stored the whole "30 min walk" phrase as the
+      // activity, read back "Cardio", and pushed its receipt row whether or
+      // not the store took the write — so "0 min walk" was refused and still
+      // reported as logged. Now: the activity's name, her effort (the parse
+      // never lets a cardio group through without one), the read-back in the
+      // screen's own words, and a refusal said as a refusal.
+      const activity = group.cardioActivity ?? group.matchedRawPhrase
+      const minutes = group.cardioMinutes ?? 0
+      const effort = effortForRpe(group.cardioRpe)
+      const view = group.cardioRpe != null
+        ? saveCardioLog({
+          userId: ctx.profileId,
+          date: ctx.date,
+          activityName: activity,
+          durationMinutes: minutes,
+          intensityRpe: group.cardioRpe,
+        })
+        : null
+      if (view) {
+        if (view.clientId) cardioLogged.push(view.clientId)
+        rows.push({ label: activity, detail: `${minutes} min${effort ? ` · ${effortLabel(effort)}` : ''}` })
+      } else {
+        cardioRefused++
+        rows.push({ label: activity, detail: `${minutes} min`, note: "Not saved — that length doesn't look right. Tell me the minutes again." })
+      }
       continue
     }
 
@@ -258,5 +289,5 @@ export function executeLogWorkout(groups: ParsedSetGroup[], ctx: LogWorkoutConte
     })
   }
 
-  return { rows, totalSets, loggedKeys, replacedSets, replacedLogs }
+  return { rows, totalSets, loggedKeys, replacedSets, replacedLogs, cardioLogged, cardioRefused }
 }
