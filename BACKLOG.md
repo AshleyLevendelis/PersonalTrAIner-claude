@@ -2,6 +2,80 @@
 
 Newest first. One line each.
 
+- [x] **CHAT FIX 4: THE COACH CAN REACH YOU WHEN THE APP IS SHUT — BUILT,
+  NOT YET LIVE.** 24 Sep 2026, the fourth of the five chat fixes Ashley asked
+  for (*"Implement all the chat fixes you just mentioned in the order you
+  mentioned them"*). Slices 2 and 3 of `docs/plans/the-coach-can-reach-you.md`
+  (her 17 Sep ruling: all seven moments, each switchable, all on to begin
+  with). **Everything a cloud session can do is done; the migration, the
+  function deploy, the keys and the real-phone test are hers**, in the
+  handover prompt that closes this round.
+  **What it does once live:** once an hour the server looks at each person
+  with a phone switched on, at THEIR local time, and asks the same question
+  the in-app coach asks on opening (slice 1's decision, copied to the server
+  with a parity gate). If one of the seven moments is live and switched on,
+  the phone gets one notification in the phrasebook's words; tapping it opens
+  the chat.
+  **The design decision that made it small:** the server cannot run the plan
+  engine, so Home sends ahead only what the plan knows — the training
+  weekdays, when the plan and the current block end, and the streak it just
+  showed — and the server reads everything else live (logs, rest/moved/
+  swapped/missed marks, sessions moved onto a day, an unrated session, an open
+  beat-the-target offer). So a day she moved is not nagged about even if the
+  app was never reopened. The plan doc said the app would send four weeks of
+  dates; corrected there, with why.
+  **Decided by me, flagged for her (how often the app speaks is hers):** at
+  most ONE notification a day; never the same moment two days running; never
+  before 8am or after 9pm on her own clock. And the browser's permission
+  prompt is only ever raised by her own tap on the switch — never on load.
+  **Profile → App → Coach reminders:** "On this phone" plus the seven
+  switches. Before the migration lands it says "Not live yet" and shows no
+  switch; a refused permission and an iPhone outside the home screen each say
+  what is true and offer no dead switch.
+  **Verified:** `test:reach-out` (61 checks; 23 mutations, 23 caught — one
+  first CRASHED the gate instead of failing a check, so the loop is now run
+  through a wrapper that turns a throw into a failed check); `verify:reminders`
+  (30 checks at 390px, screenshots read; 13 mutations, 13 caught);
+  `verify:reach-out-function` runs the REAL function file in Deno against a
+  fake database and a fake push endpoint that decrypts what arrives (13 checks;
+  11 mutations, 11 caught — one MISSED first: the fake database ignored
+  filters, so reading on the server's calendar, or forgetting to filter by
+  person, was invisible. Now every per-person read must name the person,
+  because the server reads with a key that sees everyone); `test:auth-and-rls`
+  §8b holds every table added since 30 Aug to its own owner-scoped policies
+  (4 mutations, 4 caught). The RLS generator now reads only migrations older
+  than its own output, so it never wants to rewrite an applied migration. The
+  scheduler half of the migration was run against stand-in cron / net / vault
+  schemas on a local Postgres: applied twice it leaves one hourly job, and the
+  job calls the function's address with the secret.
+  **Found by the affected-gate run, and fixed:** "Download my data" left out
+  the three new tables (`test:user-data`); the profile-restore gate flagged
+  the switches column as read but never restored — it is read straight off
+  the row on purpose, so it gained a narrow exemption that PROVES its reader
+  fetches the row itself (1 mutation, caught); `test:rls-local` could not
+  apply the migration on a Postgres without a scheduler, so the schedule is
+  now created only where pg_cron and pg_net exist, with a NOTICE where they
+  do not; and it held the sent log to the same four owner policies as every
+  table (it had one). Then `test:bundle` put the main chunk at exactly its
+  985 kB budget, so the Reminders screen now loads when Profile opens and only
+  the small "send the facts ahead" half stays in the first download: 978 of
+  985 kB. 96 gates read the changed files; after these fixes the gates
+  reading the fixed files were run again (71, then 40) and all pass.
+  **Added for the real-phone test:** a secret-protected test push — the
+  handover session can send "Reminders are working on this phone." to one
+  person's phones, recorded nowhere, so a phone is proven without waiting for
+  a moment to come due (3 mutations, 3 caught).
+  **NOT proven, and cannot be from here:** that Apple or Google accept the
+  push, that the hourly schedule fires, that a real phone buzzes. iPhone only
+  works once the app is on the home screen (iOS 16.4+).
+  **Hers to change:** the seven switch labels, "Not live yet…", the phone
+  notes, the "once a day … 8am … 9pm" line — and the three defaults above.
+  **Named, not done:** two phones in two time zones use the first phone's
+  zone. The facts are sent from Home only; somebody who never opens Home
+  sends no streak (a stale streak is simply not used, so nothing wrong is
+  said). Whether the coach should OFFER to switch reminders on is a question
+  for her, not built.
+
 - [x] **CHAT FIX 3: CARDIO LOGGED THROUGH THE CHAT, THE WAY THE SCREENS LOG
   IT.** 24 Sep 2026. Ashley asked "how would you improve the chat?", got five
   ideas, and said *"Implement all the chat fixes you just mentioned in the order

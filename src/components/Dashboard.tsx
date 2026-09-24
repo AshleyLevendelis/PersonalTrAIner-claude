@@ -11,6 +11,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
+import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
 import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
@@ -259,6 +260,17 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         // network to blame. A day we could not compute is not a day worth
         // remembering; the re-run below replaces it within the same visit.
         if (fresh.session.status !== 'unknown') saveDashboardCache(profile.id, activeSession.date, fresh)
+        // THE COACH, WHEN THE APP IS SHUT, needs the few facts only the plan
+        // engine knows — sent from here because Home is where the streak is
+        // counted and the default tab everyone opens. Same guard as the cache:
+        // a day computed without a plan is not worth telling anyone about.
+        // Deduped inside, so a re-render sends nothing new.
+        if (fresh.session.status !== 'unknown' && exercisePlan?.length && profile.id) {
+          void sendFactsAhead(profile.id, momentFactsFrom({
+            exercisePlan, mesocycle: mesocycle ?? [], planCreatedAt,
+            now: getAppNow(profile.id), streakDays: fresh.streak, today: activeSession.date,
+          }))
+        }
       })
       // WITHOUT THIS, A FAILED LOAD IS INDISTINGUISHABLE FROM A SLOW ONE —
       // forever. `finally` cleared `loading`, but `data` stayed null and the

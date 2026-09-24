@@ -57,6 +57,11 @@ const FULL_GYM = new URLSearchParams(location.search).get('fullgym') === '1'
 // mistake of 18 Sep 2026, which spent weeks proving a fixture's own number
 // reached the screen.
 const KETO = new URLSearchParams(location.search).get('keto') === '1'
+// ?reminders=live — the profile row as it reads AFTER the reach-out migration:
+// the switches column is present (empty = all on). Without it the row is as
+// it reads today, and the Reminders section must say "not live yet" and offer
+// no switch. The column's PRESENCE is the signal, so it is the only thing set.
+const REMINDERS_LIVE = new URLSearchParams(location.search).get('reminders') === 'live'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
 
@@ -107,11 +112,13 @@ const MESO = generateMesocycle(baseProfile)
 resetRandomSource()
 
 const db: Db = {
-  fitness_profiles: [{ ...baseProfile }],
+  fitness_profiles: [{ ...baseProfile, ...(REMINDERS_LIVE ? { notification_switches: {} } : {}) }],
   daily_metrics: [], water_logs: [], exercise_set_logs: [], workout_sessions: [],
   cardio_logs: [], daily_steps: [], meal_events: [], user_facts: [], user_goals: [],
 } as unknown as Db
 setSupabaseClient(makeFakeSupabase(db) as never)
+// Read back by reminders.mjs: what the screen WROTE, not what it shows.
+;(window as unknown as { __fakeDb: Db }).__fakeDb = db
 
 function Harness() {
   // ITS OWN STATE, because fake-supabase's update() mutates the row in `db`

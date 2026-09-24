@@ -59,6 +59,11 @@ export const EXPORTED_TABLES: { table: string; column: string }[] = [
   { table: 'plan_adaptations', column: 'profile_id' },
   { table: 'load_suggestions', column: 'profile_id' },
   { table: 'weight_basis_offers', column: 'profile_id' },
+  // The coach reminders (24 Sep 2026): the facts sent ahead, this person's
+  // phones, and every notification the coach sent them.
+  { table: 'coach_moment_facts', column: 'user_id' },
+  { table: 'push_subscriptions', column: 'user_id' },
+  { table: 'coach_notifications_sent', column: 'user_id' },
 ]
 
 export interface DataExport {

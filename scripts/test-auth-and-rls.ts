@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { execFileSync } from 'child_process'
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -298,6 +298,34 @@ console.log('\n8. The migration is generated, and still matches the schema')
   // OR together, so the old open policy would survive the migration.
   check('it drops chat_messages\' policies by their REAL names',
     /DROP POLICY IF EXISTS "anon_select_messages" ON chat_messages;/.test(migration))
+}
+
+console.log('\n8b. Every table added since brings its own owner-scoped policies')
+{
+  // The generated file scoped the schema as it stood on 30 Aug 2026, and its
+  // generator now reads only what came before it (so it never wants to rewrite
+  // an applied migration). That moves the duty onto every LATER migration: a
+  // table it creates must switch RLS on and must not open itself to anyone.
+  // Derived from the files, so a table nobody remembers to list is still held.
+  const dir = join(ROOT, 'supabase/migrations')
+  const CUTOFF = '20260830120000_scope_every_table_to_its_owner.sql'
+  const later = readdirSync(dir).filter(f => f.endsWith('.sql') && f > CUTOFF).sort()
+  const created: { file: string; table: string; sql: string }[] = []
+  for (const f of later) {
+    const sql = readFileSync(join(dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '')
+    for (const m of sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)) created.push({ file: f, table: m[1], sql })
+  }
+  check('the sweep found the tables added since (sanity check — an empty list proves nothing)',
+    created.some(c => c.table === 'push_subscriptions'), created.map(c => c.table))
+  const noRls = created.filter(c => !new RegExp(`ALTER TABLE ${c.table} ENABLE ROW LEVEL SECURITY`).test(c.sql)).map(c => c.table)
+  check('every one switches row-level security on', noRls.length === 0, noRls)
+  const open = created.filter(c => new RegExp(`CREATE POLICY "[^"]+" ON ${c.table}[\\s\\S]{0,200}?(USING|WITH CHECK) \\(true\\)`).test(c.sql)).map(c => c.table)
+  check('...and none opens itself with USING (true)', open.length === 0, open)
+  const unscoped = created.filter(c => {
+    const policies = [...c.sql.matchAll(new RegExp(`CREATE POLICY "[^"]+" ON ${c.table}[^;]*;`, 'g'))].map(m => m[0])
+    return policies.some(p => !/owns_profile\(/.test(p))
+  }).map(c => c.table)
+  check('...and every policy it has is scoped through owns_profile', unscoped.length === 0, unscoped)
 }
 
 console.log('\n9. A failed sign-in says what actually went wrong')

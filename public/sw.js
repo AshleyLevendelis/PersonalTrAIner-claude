@@ -99,3 +99,52 @@ self.addEventListener('fetch', event => {
     }),
   )
 })
+
+// ---------------------------------------------------------------------------
+// THE COACH, WHEN THE APP IS SHUT — docs/plans/the-coach-can-reach-you.md.
+//
+// The coach-reach-out function sends one encrypted JSON message:
+//   { title, body, moment }
+// The words are the phrasebook's (coach-voice.ts notification()), chosen on
+// the server by the same decision the app makes; nothing here writes any.
+//
+// ONE AT A TIME ON THE LOCK SCREEN: every coach notification shares one tag,
+// so a new one replaces an unread old one rather than stacking beside it —
+// the same "at most one thing to say" the decision is built on.
+//
+// A tap opens the chat, where the coach can pick the thought up with
+// everything a screen has — focusing an open window rather than starting a
+// second one.
+// ---------------------------------------------------------------------------
+self.addEventListener('push', event => {
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch { data = {} }
+  // A push with no words is not shown. The server never sends one; if one
+  // ever arrives the browser may put up its own generic notice, which is
+  // still better than a notification in words nobody wrote.
+  if (!data || typeof data.body !== 'string' || !data.body) return
+  event.waitUntil(self.registration.showNotification(data.title || 'Your coach', {
+    body: data.body,
+    tag: 'coach',
+    renotify: false,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: { url: '/#/tab/chat', moment: data.moment || null },
+  }))
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const target = (event.notification.data && event.notification.data.url) || '/#/tab/chat'
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    for (const w of windows) {
+      if (new URL(w.url).origin === self.location.origin) {
+        await w.focus()
+        if ('navigate' in w) await w.navigate(target).catch(() => {})
+        return
+      }
+    }
+    await self.clients.openWindow(target)
+  })())
+})

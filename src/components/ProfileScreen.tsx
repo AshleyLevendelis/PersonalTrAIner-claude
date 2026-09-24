@@ -10,7 +10,7 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +49,11 @@ import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 import { dietTargetCaveat } from '@/lib/coach-voice'
+
+// LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
+// push plumbing are needed by nobody on first paint (test:bundle holds the
+// main chunk to a budget, and this was the kilobyte that crossed it).
+const RemindersSection = lazy(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 
@@ -1422,6 +1427,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
 
         <Group label="App">
         <AppearanceSection appearance={appearance} />
+
+        {profile.id && <Suspense fallback={null}><RemindersSection profileId={profile.id} /></Suspense>}
 
         {/* Audit §1.4 — there was neither of these. "New Plan" cleared the
             browser and started fresh without deleting a single row, so

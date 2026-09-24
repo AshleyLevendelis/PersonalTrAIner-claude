@@ -120,6 +120,22 @@ const SERVER_SIDE_ONLY: Record<string, string> = {
   owner_id: 'the row\'s auth.users owner — read by RLS policies and claim_profile, never by the app',
 }
 
+/**
+ * COLUMNS READ STRAIGHT OFF THE ROW, never through the client profile — so
+ * "not restored" is correct for them, and restoring them would be a second
+ * copy to go stale. Added 24 Sep 2026 with the coach reminders: the Reminders
+ * section reads the row every time it opens (select('*'), which is also how it
+ * learns whether the column exists yet), and the hourly function reads it on
+ * the server.
+ *
+ * NOT TAKEN ON TRUST: each entry names the file that reads it, and the check
+ * below proves that file really does fetch the profile row itself and name
+ * the column — so an entry cannot outlive the reader that justified it.
+ */
+const READ_OFF_THE_ROW: Record<string, string> = {
+  notification_switches: 'src/lib/coach-reach-out.ts',
+}
+
 const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
 const cols = profileColumns()
 const restored = restoredKeys(app)
@@ -132,7 +148,13 @@ console.log('\n1. Nothing the app reads is dropped on reload')
   check(`restoreSession was parsed (${restored.size} keys)`, restored.size > 30, restored.size)
 
   const dropped = [...cols].filter(c => !restored.has(c)).sort()
+  for (const [col, file] of Object.entries(READ_OFF_THE_ROW)) {
+    const src = stripComments(readFileSync(join(ROOT, file), 'utf8'))
+    check(`${col} is read off the row by ${file}, which really fetches the row itself`,
+      /from\('fitness_profiles'\)\.select\('\*'\)/.test(src) && src.includes(col) && !restored.has(col), file)
+  }
   const withConsumers = dropped
+    .filter(c => !(c in READ_OFF_THE_ROW))
     .map(c => ({ column: c, readBy: consumersOf(c) }))
     .filter(x => x.readBy.length > 0)
 

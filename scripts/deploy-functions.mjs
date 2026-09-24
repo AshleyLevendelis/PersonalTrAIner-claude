@@ -64,8 +64,14 @@ link(target)
 // aimed by argument rather than by ambient link state. The link above is what
 // keeps a follow-up command consistent with what was just deployed; this flag
 // is what makes the deploy itself impossible to misaim.
+// CALLED BY THE DATABASE, NOT BY A SIGNED-IN APP. coach-reach-out is invoked
+// hourly by pg_cron through pg_net, which carries no user's JWT, so the
+// gateway's JWT check would refuse every run. It checks its own shared secret
+// (REACH_OUT_SECRET) instead, and its only other door is the public push key.
+const NO_JWT = new Set(['coach-reach-out'])
+
 for (const f of functions) {
-  const status = supabase(['functions', 'deploy', f, '--project-ref', target])
+  const status = supabase(['functions', 'deploy', f, '--project-ref', target, ...(NO_JWT.has(f) ? ['--no-verify-jwt'] : [])])
   if (status !== 0) {
     console.error(`\nDeploy of ${f} to ${label} FAILED. Later functions in the list were not attempted.`)
     process.exit(status)

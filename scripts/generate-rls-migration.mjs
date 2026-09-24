@@ -51,8 +51,14 @@ const ROOT_TABLE = 'fitness_profiles'
 
 // --- read the schema -------------------------------------------------------
 
+// ONLY THE MIGRATIONS BEFORE ITS OWN. This file scoped the schema as it stood
+// on 30 Aug 2026 and has been applied; a table added later brings its own
+// owner-scoped policies in its own migration (24 Sep 2026's coach_reach_out
+// was the first), and test:auth-and-rls §8b holds every later table to that.
+// Reading later files would make this generator want to REWRITE an applied
+// migration every time the schema grows.
 const sources = readdirSync(MIGRATIONS)
-  .filter(f => f.endsWith('.sql') && f !== OUTPUT_NAME)
+  .filter(f => f.endsWith('.sql') && f !== OUTPUT_NAME && f < OUTPUT_NAME)
   .sort()
 const sql = sources.map(f => readFileSync(join(MIGRATIONS, f), 'utf8')).join('\n')
 

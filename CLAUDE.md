@@ -887,7 +887,13 @@ menu" stays true when a copy is also left outside it.
   the gates can grade it. Any field that can hold two kinds of quantity needs
   the same treatment
 - Accountability is active — the coach opens, asks how it went, follows up
-  — `coach-opener`, `coach-nudge`, `session-feel`, `verify:coach-speaks-first`
+  — `coach-opener`, `coach-nudge`, `session-feel`, `verify:coach-speaks-first`.
+  **And from outside the app: BUILT 24 Sep 2026, NOT LIVE.** Seven switchable
+  phone notifications (her 17 Sep ruling), at most one a day, 8am-9pm on her
+  clock, the permission asked only from her own tap — `reach-out`,
+  `verify:reminders`, `verify:reach-out-function`. Live only once the
+  migration, the function deploy and the keys are done on her machine; until
+  then Profile says "Not live yet" and offers no switch
 - History is permanent — `diary-preservation`, `replace-without-losing`
 - Every write succeeds or says it did not — `silent-writes`,
   `queue-listeners`, `stale-after-write`
@@ -1600,6 +1606,16 @@ old — the commands were right and the context was missing.
   Put the bell in the slot by name, then let the app decide what that slot
   carries. And when a driver's mutation comes back MISSED, suspect the fixture
   before the check.
+- **A FAKE THAT IGNORES FILTERS CANNOT SEE A MISSING FILTER — and on a
+  service key, the filter IS the privacy.** 24 Sep 2026: the reach-out smoke
+  test ran the real function against a fake database that returned the same
+  rows whatever the query asked, so reading on the server's calendar instead
+  of the person's came back MISSED, and so would dropping the person filter
+  from a read. The server reads with a key that bypasses row-level security,
+  so "every read names this person" is the ONLY thing keeping one person's
+  logs out of another's notification. Fixed by recording what was ASKED and
+  checking that, not what came back. **Any fake standing in for a query must
+  be asked what it was asked**, or everything the query decides is invisible.
 - **A MUTATION HARNESS THAT REBUILDS A BUNDLE MUST REBUILD AFTER RESTORING
   TOO.** 17 Sep 2026: the browser mutation runner restored the source file in
   its `finally` and left the MUTANT bundle sitting in `.tour-harness/dist`. The
