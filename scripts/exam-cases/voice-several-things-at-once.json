@@ -1,0 +1,8 @@
+{
+  "name": "voice-several-things-at-once",
+  "why": "Ashley, 24 Sep 2026: a voice note that asks several things must get every part answered, each on its own line starting with what it answers, so she can see nothing was dropped. No headers, no bold. And no closing question unless an answer genuinely changes what happens next.",
+  "messages": [
+    "ok so a few things, I'm starving today so I think I need more carbs, what should I have before training tomorrow morning, and is it fine that I skipped the stretching at the end yesterday"
+  ],
+  "checks": {}
+}

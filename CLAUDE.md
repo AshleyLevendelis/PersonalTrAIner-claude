@@ -738,6 +738,25 @@ menu" stays true when a copy is also left outside it.
   (`coach-exam-fresh`, `coach-exam-judge`). Measured first in
   `docs/audits/the-coachs-own-words-2026-09-15.md`: three grammars for one
   job, eight wordings of one failure, three narrators in one file
+- **It reads like texting a coach — Ashley's three rulings of 24 Sep 2026**,
+  after seeing four-paragraph answers and a question tacked onto every reply:
+  (1) **"short steps"**, from three options (over speech-only and over a
+  designed checklist card): a how-to is up to THREE short numbered lines with
+  a "Full form guide" button for the rest, and a message that asks several
+  things gets one line per thing, each starting with what it answers — no
+  headers, no bold, everything else still speech. (2) **A question only when
+  the answer matters**, from three options — it REVERSES her 15 Sep "end every
+  response with exactly one question", which had turned into padding ("Have
+  you noticed the RPE targets…?"); never more than one, tap buttons where the
+  answers are obvious. (3) **No new cards for suggestions**, in her words: *"I
+  want it to feel like a text conversation with a coach. A coach wouldn't send
+  a card."* Offered a card for a suggested meal change, she declined; the
+  existing Apply cards for changes she ASKS for are untouched and were not
+  what she was ruling on. The essays had a findable cause: the prompt's
+  trigger list said "provide step-by-step form cues, target muscles, common
+  mistakes, and coaching tips" while §1 said "offer the rest", and the model
+  obeyed the more specific line. `coach-promises` (source only — whether the
+  model OBEYS is the exam's `voice` dimension, two cases added for it)
 - Never claims a capability, screen or guarantee it lacks; proposes,
   confirms, can be undone — `coach-promises`, `chat-app-reality`,
   `pending-actions`, `log-correction`, `replace-without-losing`,
@@ -758,8 +777,10 @@ menu" stays true when a copy is also left outside it.
   next day. So the 13 Sep scores measure a coach and a grader that both no
   longer exist, and the number to act on is the one from the first run AFTER
   the deploy. Keep the commit — it is the only record of what the exam said
-  before any of this was fixed, and the comparison is the point. **23 cases and
-  43 turns** since 20 Sep 2026, up from 20 and 37: the exam was written on
+  before any of this was fixed, and the comparison is the point. **26 cases and
+  47 turns** since 24 Sep 2026 (two voice cases for her "short steps" and
+  "question only when it matters" rulings; 23 and 43 on 20 Sep, up from 20 and
+  37): the exam was written on
   13 Sep and the coach has gained tools since, so it was measuring a surface
   three rulings out of date. The three added each grade a ruling Ashley had
   ALREADY given, so nothing new was decided to write them — the session-length

@@ -975,8 +975,25 @@ if (failures > 0) {
     /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,400}say WHY/.test(src), null)
   check('...with a ceiling of its own, so it cannot become an essay',
     /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,600}two is the ceiling/.test(src), null)
-  check('the no-lists rule survived the relaxation',
-    /NEVER use headers, bullet lists, numbered lists/.test(src), null)
+  // AMENDED 24 Sep 2026, Ashley's "short steps": the ban on formatting stays,
+  // with exactly two shapes let through — a how-to capped at three lines, and
+  // one line per thing when several were asked. Each half is checked, because
+  // "lists are allowed now" with no cap is how the four-paragraph essays come
+  // back as eight bullet points.
+  check('no documents: headers and bold section titles are still banned',
+    /NO DOCUMENTS: never use headers, bold section titles/.test(src), null)
+  check('a how-to is capped at three short steps, with the rest offered on a tap',
+    /"1\." to "3\." at most/.test(src) && /\[QUICK_REPLIES: "Full form guide" \| "Got it"\]/.test(src), null)
+  check('several asks in one message get one line each, never a header',
+    /SEVERAL THINGS ASKED IN ONE MESSAGE[\s\S]{0,500}never a header/.test(src), null)
+  check('...and every other reply is still speech',
+    /Everything else is speech/.test(src), null)
+  // The contradiction that produced the essays: §1 said "offer the rest", the
+  // triggers section said "give step-by-step cues, target muscles, common
+  // mistakes and coaching tips". The model obeyed the more specific one.
+  check('the technique line no longer asks for everything at once',
+    !/Provide step-by-step form cues, target muscles, common mistakes, and coaching tips/.test(src)
+      && /in the how-to shape §1 gives/.test(src), null)
 
   // Warmth, as Ashley asked for it — and not as the tone probe penalises it.
   check('warmth is defined as attention, not praise', /WARMTH IS ATTENTION, NOT PRAISE/.test(src), null)
@@ -986,8 +1003,16 @@ if (failures > 0) {
     !/congratulate/i.test(src), null)
   check('a bad week is acknowledged before it is fixed',
     /acknowledge it before you fix it/.test(src), null)
-  check('the follow-up-question rule is untouched',
-    /End most turns with a SPECIFIC question/.test(src), null)
+  // REVERSED 24 Sep 2026 by Ashley, from three options: a question only when
+  // the answer changes what happens next — over "keep one every time" (her
+  // 15 Sep rule) and over "never ask". Both halves held: the old every-time
+  // rule is gone, and "never more than one" survives it.
+  check('a question only when the answer matters — the every-time rule is gone',
+    /ASK ONLY WHEN THEIR ANSWER CHANGES WHAT HAPPENS NEXT/.test(src)
+      && !/ONE QUESTION AT THE END, EVERY TIME/.test(src)
+      && !/End most turns with a SPECIFIC question/.test(src), null)
+  check('...never more than one, and one tap where it can be',
+    /NEVER MORE THAN ONE/.test(src) && /MAKE IT ONE TAP/.test(src), null)
 }
 
 console.log('\nEVERY EDIT CARD SAYS WHAT IT COSTS THE WEEK — including the swap (14 Sep 2026)\n')

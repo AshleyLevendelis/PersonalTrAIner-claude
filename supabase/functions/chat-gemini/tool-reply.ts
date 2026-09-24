@@ -182,7 +182,7 @@ export async function resolveToolReply(opts: ToolReplyOptions): Promise<ToolRepl
 // One retry, tools off, then the floor. Zero extra calls in the normal case.
 // ---------------------------------------------------------------------------
 export const PLAIN_TURN_NUDGE =
-  "(System: your last turn produced no message at all, so they are still waiting. Answer them now in your own voice as their coach texting — plain text, no lists, no bold. If you genuinely cannot tell what they meant, ask one short question about the specific thing that is unclear; never ask them to rephrase.)";
+  "(System: your last turn produced no message at all, so they are still waiting. Answer them now in your own voice as their coach texting — plain text, no headers, no bold; a how-to may use up to three short numbered steps, nothing else is a list. If you genuinely cannot tell what they meant, ask one short question about the specific thing that is unclear; never ask them to rephrase.)";
 
 export interface PlainReplyOptions {
   contents: unknown[];

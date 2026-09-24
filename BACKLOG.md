@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH READS LIKE TEXTING A COACH: SHORT STEPS, FEWER QUESTIONS,
+  NO NEW CARDS.** 24 Sep 2026. Ashley sent feedback on a chat screenshot (the
+  image did not reach this session, only her text): a deadlift answer in four
+  long paragraphs, a question tacked onto the end of nearly every reply ("Have
+  you noticed the RPE targets…?"), a meal change described in prose, and a
+  multi-part voice note answered as one block. Four fixes were proposed; three
+  reversed her own earlier rulings, so each went to her, one at a time.
+  **Her rulings:** (1) *"Short steps"* (recommended), over speech-only and over
+  a designed checklist card — a how-to is up to three short numbered lines plus
+  a "Full form guide" button, and several asks get one line each starting with
+  what it answers; no headers, no bold, everything else still speech. (2) *"Only
+  when it matters"* (recommended) — REVERSES her 15 Sep "exactly one question
+  at the end, every time": ask only when the answer changes what happens next,
+  never more than one, tap buttons where obvious. (3) Offered cards for
+  suggested meal changes, she declined in her own words: *"You dont need a
+  card. I want it to feel like a text conversion with a coach. A coach
+  wouldn't send a card. They would respond to natural conversation."* So item
+  3 is not built; the Apply cards for changes she asks for are unchanged and
+  were not the question.
+  **The essays had a findable cause:** the prompt's trigger list said "provide
+  step-by-step form cues, target muscles, common mistakes, and coaching tips"
+  while §1 said "give the part they asked about and offer the rest" — the
+  model obeyed the more specific line. Rewritten to agree with §1; the plain
+  reply fallback's "no lists" now allows the three-step how-to.
+  **Verified:** `test:coach-promises` — 7 new/rewritten checks, 9 mutations, 9
+  caught. SOURCE ONLY: whether the model obeys is model behaviour, graded by the
+  exam's voice dimension, whose wording now matches her rulings, plus two new
+  exam cases (a how-to with the "Full form guide" follow-up, and a several-
+  things voice note): 26 cases, 47 turns. The 56 gates reading the changed
+  files pass bar `coach-exam-fresh`, red until the exam is re-run.
+  **Needs:** the `chat-gemini` deploy (her machine, typed phrase) before any of
+  this reaches her chat, and an exam run to know if the coach obeys.
+
 - [x] **PUT LIVE: EVERYTHING ON THE WORK BRANCH MERGED TO MAIN.** 24 Sep
   2026. Ashley: *"I ran the coach prompt in vs code then did npm run
   coach:exam and npm run db both but i dont see the changes in my app"*. The
