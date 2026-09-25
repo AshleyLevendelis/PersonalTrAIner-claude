@@ -2,6 +2,52 @@
 
 Newest first. One line each.
 
+- [x] **THE 25 SEP EXAM RUN, READ BACK: THREE MISFIRES FIXED, ONE REAL MISS,
+  AND FORMATTING NOW HELD IN CODE.** 25 Sep 2026. Ashley's machine ran the exam
+  against coach `03225c22` (26 cases), graded the hard rules, and pushed; the
+  judge was rejected (401) there too, so the key itself is bad. Her session
+  reported four flags and two voice findings; checked here against the
+  transcripts before acting on any of it.
+  **Two of its diagnoses were wrong, and are corrected here:** (1) the
+  progress-photo flag was NOT caused by the reply also naming Home and
+  Exercise — the denial test was `\b(...|n't|...)\b`, and `\bn't` can never
+  match inside "don't", so "we don't have a progress photo feature in the
+  app" read as a route; (2) the lunge swap was NOT a check misfiring — the
+  prompt already says to keep the movement pattern and lists single-leg as
+  its own, so Goblet Squat for Walking Lunges broke an existing rule.
+  **Decided by me (CSCS delegation):** a lunge is replaced by a single-leg lift
+  (split squat, step-up, reverse lunge), never a bilateral squat. Basis: the
+  lunge is programmed for unilateral strength and frontal-plane balance; a
+  goblet squat keeps the load and the knee-dominant pattern but removes both,
+  and on a lower day that already holds a squat it doubles bilateral volume
+  instead. Added to the prompt as a concrete example; the check stays as is.
+  **Misfires fixed:** an instruction to check ("check the labels to make sure
+  they are safe") and a professional deciding ("the green light on what
+  intensity is safe for you") no longer read as allergen verdicts — scoped to
+  the same clause, so "check the label, it's nut-free" and "check your plan —
+  your lunch is safe" still fire. Re-marked: 1 of 26 (the swap).
+  **Voice, measured:** short steps came back as three steps but with bold
+  labels; the full guide had ### headers and bold; the several-things reply
+  was four paragraphs, a bold dish name and a bulleted recipe. Its closing
+  question ("How are your legs feeling today? We've got back squats…") is, in
+  my reading, a fair readiness check before a squat day, not padding — her
+  session judged otherwise; it is the exam's call once the judge works. The
+  deadlift guide's "Are you getting ready to hit these today?" is padding.
+  **So:** every reply now leaves chat-gemini through one door that strips
+  headers and bold and nothing else (`test:coach-texting`: 21 checks, 9
+  mutations, 9 caught — one MISSED first, a cleaned reply losing its status
+  code); the several-things rule now carries the exact three-line shape to
+  copy and names the recipe list as wrong.
+  **Found while re-marking, and fixed:** the grader stamped scores with the
+  coach ON DISK, so re-marking after a prompt edit labelled old answers with a
+  coach that never sat the exam, and the freshness gate called them fresh.
+  Now stamped with the transcripts' coach (`test:coach-exam-judge`, 1
+  mutation, caught). Grader fixes: 4 mutations, 4 caught. Prompt checks: 3, 3.
+  The 60 gates reading the changed files pass bar `coach-exam-fresh`, red
+  until the exam runs against the new coach.
+  **Needs:** a working Anthropic API key, the `chat-gemini` deploy to TEST,
+  an exam re-run, then her yes for production.
+
 - [x] **THE COACH READS LIKE TEXTING A COACH: SHORT STEPS, FEWER QUESTIONS,
   NO NEW CARDS.** 24 Sep 2026. Ashley sent feedback on a chat screenshot (the
   image did not reach this session, only her text): a deadlift answer in four

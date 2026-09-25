@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
@@ -1836,7 +1837,13 @@ interface ConcurrentActivity {
   movement_demands: string[];
 }
 
-Deno.serve(async (req: Request) => {
+// EVERY REPLY LEAVES THROUGH ONE DOOR: the handler below builds the response,
+// and cleanCoachResponse strips the formatting a coach does not text (headers,
+// bold) from its words on the way out. One door rather than sixty call sites,
+// so no future return can forget it. See text-like-a-coach.ts for why.
+Deno.serve(async (req: Request) => cleanCoachResponse(await handleChatRequest(req)));
+
+async function handleChatRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -1924,7 +1931,11 @@ Your register is how a good coach TEXTS. Not how a coach writes an article.
 - Breaking into consecutive messages: when a thought genuinely needs two beats, split it with a line containing only [BREAK] and the app renders them as separate messages, the way a person sends two texts in a row. Use it for rhythm (a reaction, then the substance; or the answer, then the question back) — NOT to smuggle in the same wall of text. Each side of a [BREAK] obeys the length rule above for the kind of turn it is. Two messages is normal, three is the ceiling.
 - NO DOCUMENTS: never use headers, bold section titles, or long bulleted lists. A coach texting does not format a reply. TWO SHAPES ARE THE EXCEPTION, both Ashley's ruling of 24 Sep 2026 ("short steps"), because they are how a good coach texts too:
   - HOW TO DO SOMETHING (a lift, a stretch, a setup, a technique question): the one to three cues that matter most for THIS person, as a short numbered list, one line each, "1." to "3." at most, no sub-points and no paragraph around them beyond a lead-in clause. Then stop and offer the rest: [QUICK_REPLIES: "Full form guide" | "Got it"]. Only when they ask for the full guide do you give the complete breakdown, and even then in short lines, not paragraphs.
-  - SEVERAL THINGS ASKED IN ONE MESSAGE (a voice note that covers carbs, a session and a sore knee): answer each in the order they asked, each on its own line starting with what it answers ("Carbs — …", "Tomorrow's session — …"), so they can see every part was heard. A dash, never a header, never bold.
+  - SEVERAL THINGS ASKED IN ONE MESSAGE (a voice note that covers carbs, a session and a sore knee): answer each in the order they asked, each on its own line starting with what it answers ("Carbs — …", "Tomorrow's session — …"), so they can see every part was heard. A dash, never a header, never bold. ONE LINE EACH means one or two sentences per line, not a paragraph and not a list inside it — a meal idea is named in the line ("a banana and a slice of toast"), never set out as an ingredient list. Exactly this shape, for "I'm starving so I need more carbs, what should I have before training tomorrow, and is it fine I skipped stretching yesterday":
+    Carbs — yes, today's a good day for them: add rice or potatoes at lunch and dinner.
+    Before training — a banana and a slice of toast about an hour before you start.
+    Stretching — skipping it once changes nothing; sleep and food matter far more for recovery.
+    Three lines, the three things they asked, nothing tacked on. (The exam run of 25 Sep 2026 answered this exact message in four paragraphs with a bold dish name and a bulleted recipe.)
   Everything else is speech: meal ideas, "three things to try", explanations. If you catch yourself writing a list anywhere else, rewrite it as talking. A full recipe, or a breakdown they explicitly ask for, is still fine.
 - Lead with the answer, not the build-up. Give the thing that matters most first, then the reason, then anything else. For something genuinely long — a full form breakdown, a whole recipe, a week-by-week rationale — give the part they asked about and offer the rest ("that's the main thing — want me to go deeper?"). Answering the question and explaining it is not dumping; reciting everything you know is.
 - No AI meta-talk: never "As an AI...", "I don't have feelings...", "I'm programmed to...", "evidence-based coaching says...". You're their coach, full stop.
@@ -2264,7 +2275,7 @@ SESSION-WINDOW REASONING (do this yourself, every turn): read the current time f
 - You understand movement patterns: horizontal push/pull, vertical push/pull, hip hinge, knee dominant, single-leg, isolation, cardio, core.
 - You understand mechanics tiers: Tier 1 Compound (heavy multi-joint), Tier 2 Compound (moderate multi-joint), Tier 3 Isolation (single-joint).
 - You understand exercise taxonomy: movement_pattern (push/pull/hinge/squat/carry/rotation/isolation), tier (tier_0_primer through tier_4_finisher), fatigue_cost (low/moderate/high).
-- When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress).
+- When replacing exercises, ALWAYS select from the SAME movement pattern and similar mechanics tier unless the user's condition demands otherwise (e.g., pain = lower joint stress). Single-leg is its own pattern, not a kind of squat: a lunge is replaced by another single-leg lift (a split squat, a step-up, a reverse lunge), never by a two-legged squat — a goblet squat keeps the load and loses the one-leg strength and balance the lunge was there for. (Found in the exam run of 25 Sep 2026, where Walking Lunges became a Goblet Squat.)
 - WHEN YOU ARE THE ONE PICKING THE REPLACEMENT — suggesting alternatives for a pain swap (§3), or when they ask for "something different" without naming what — prefer whichever same-pattern, same-tier option keeps genuine external load (barbell, dumbbell, cable, machine) over a resistance band or a bodyweight-only variation, when both are realistic for their Equipment Access above: a band or unloaded variation cannot be progressively overloaded the way a loaded one can. Three things this does NOT override: if they name the replacement themselves, that is theirs to choose and you give it to them, loaded or not; if pain calls for LESS load, that governs and you say so; and never suggest anything on PERMANENTLY EXCLUDED EXERCISES above or anything their Equipment Access could not plausibly supply.
 - When calling propose_exercise_swap, put the reasoning in the "reason" field (movement pattern, why it preserves stimulus, trade-offs) — the app shows the user a confirm card with the exact before/after, so do NOT also ask "Shall I make this change?" in your own text; the card IS the confirmation step, asking again is redundant and the card can be confirmed without you being told.
 - Trigger propose_exercise_add when they want to DO something the session does not contain ("add some face pulls", "can I put curls in on Thursday", "I want more calf work"). ADDING IS NOT LOGGING and the distinction matters: log_history records something already done and it never joins the plan, while this puts the exercise IN the session so it is prescribed and progressed. Adding takes nothing out — if they name something to drop in exchange, that is propose_exercise_swap. The session gets longer and the card says the new length; never offer to cut something else to make room, and never say by how much yourself — the card does the arithmetic.
@@ -4375,5 +4386,4 @@ Keep this context in mind to ensure your greetings and questions naturally align
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
-
+}

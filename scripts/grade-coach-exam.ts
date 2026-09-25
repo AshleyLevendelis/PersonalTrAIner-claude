@@ -199,6 +199,7 @@ async function main() {
   // A mixed set means someone re-ran half the exam after changing the coach.
   // Averaging across two different coaches is a number about nothing.
   const mixed = stamps.size > 1
+  const answeredBy = stamps.size === 1 ? [...stamps][0] : stamps.size === 0 ? 'unstamped' : `mixed:${[...stamps].sort().join('+')}`
   const stale = stamps.size === 1 && ![...stamps][0].startsWith(current.hash.slice(0, 8)) && [...stamps][0] !== current.hash
 
   const lines: string[] = []
@@ -294,8 +295,13 @@ async function main() {
 
   writeFileSync(join(REPORT_DIR, 'coach-exam-scores.json'), JSON.stringify({
     _comment: "THE COACH EXAM'S SCOREBOARD. Written by scripts/grade-coach-exam.ts and read by scripts/test-coach-exam-fresh.ts, which fails the sweep when the coach on disk no longer matches the coach these scores describe. Tracked in git so the history survives, the same as quality-report.txt.",
-    fingerprint: current.hash,
-    fingerprintParts: current.parts,
+    // THE COACH THAT ANSWERED, NOT THE ONE ON DISK. Found 25 Sep 2026:
+    // re-marking a run after the prompt had been edited stamped these scores
+    // with the EDITED coach — which had never taken the exam — and
+    // test:coach-exam-fresh then called them fresh. The transcripts say who
+    // answered; only when that is the coach on disk are its parts known.
+    fingerprint: answeredBy,
+    fingerprintParts: answeredBy === current.hash ? current.parts : {},
     rubric: rubricFingerprint(ROOT),
     model: current.model,
     judge: judged > 0 ? JUDGE_MODEL : null,

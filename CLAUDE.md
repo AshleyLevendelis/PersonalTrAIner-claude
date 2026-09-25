@@ -756,7 +756,15 @@ menu" stays true when a copy is also left outside it.
   trigger list said "provide step-by-step form cues, target muscles, common
   mistakes, and coaching tips" while §1 said "offer the rest", and the model
   obeyed the more specific line. `coach-promises` (source only — whether the
-  model OBEYS is the exam's `voice` dimension, two cases added for it)
+  model OBEYS is the exam's `voice` dimension, two cases added for it).
+  **MEASURED 25 Sep 2026, and it half-obeyed**: the how-to came back as three
+  steps, but with bold labels, and the full guide and the several-things reply
+  came back with headers, bold and a bulleted recipe. So the part code can see
+  is now held in code: every reply leaves chat-gemini through ONE door that
+  strips headers and bold and touches nothing else — no word, no link, no tag
+  (`coach-texting`, 21 checks, 9 mutations). Whether it is one line per thing,
+  and whether a question matters, stays the exam's to judge — the same split
+  as the cardio ruling
 - Never claims a capability, screen or guarantee it lacks; proposes,
   confirms, can be undone — `coach-promises`, `chat-app-reality`,
   `pending-actions`, `log-correction`, `replace-without-losing`,
@@ -844,6 +852,21 @@ menu" stays true when a copy is also left outside it.
   above was applied to the half that was in front of us, not to its sibling**,
   which is the "re-run a derivation against the cases it was not written for"
   shape again. Tier B has still never marked a real conversation.
+  **RUN AGAIN 25 SEP 2026 against `03225c22`**: the judge 401'd on Ashley's
+  terminal too, so it is the KEY, not where it was set. Four hard rules fired;
+  three were the checks misfiring on CORRECT answers — "check the labels to
+  make sure they are safe" and "the green light on what intensity is safe"
+  read as allergen verdicts, and "we don't have progress photos in the app"
+  read as a route because `\bn't` can never match inside "don't". Fixed, with
+  the verbatim replies as fixtures and their banned twins still firing. The
+  fourth was real: Walking Lunges swapped for a Goblet Squat, which the prompt
+  already forbade (single-leg is its own pattern). 1 of 26 after the fix.
+  **AND A RE-MARK MUST BE STAMPED WITH THE COACH THAT ANSWERED.** Re-marking
+  those transcripts after editing the prompt stamped the scores with the
+  EDITED coach, which had never sat the exam, and the freshness gate then
+  called them fresh. The scores now carry the transcripts' own stamp
+  (`coach-exam-judge`). Any score computed later than its evidence must name
+  the evidence, not whatever is on disk when it is computed
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —

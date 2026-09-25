@@ -178,6 +178,8 @@ async function main() {
     check('...and the voice mark lands in the scoreboard as its own dimension', avgs.voice === 1 && Object.keys(avgs).length === 6, avgs)
     check('the report names the judge and how many cases it marked', /claude-opus-5 — marked 2 of 2/.test(judgeLine(r.report)), judgeLine(r.report))
     check('the scoreboard names the judge', r.scores?.judge === 'claude-opus-5', r.scores?.judge)
+    // The transcripts here are stamped "gate", and the coach on disk is not.
+    check('the scores name the coach that ANSWERED, never the one on disk', r.scores?.fingerprint === 'gate', r.scores?.fingerprint)
     const shown = String((api.seen[0]?.body.messages as { content?: string }[] | undefined)?.[0]?.content ?? '')
     check('the judge is shown an instant save as the app saving, not as silence', shown.includes('saved it straight away') && !shown.includes('(no text at all)'), shown.slice(0, 300))
   }

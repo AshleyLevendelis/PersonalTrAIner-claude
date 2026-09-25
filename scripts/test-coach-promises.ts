@@ -988,6 +988,16 @@ if (failures > 0) {
     /SEVERAL THINGS ASKED IN ONE MESSAGE[\s\S]{0,500}never a header/.test(src), null)
   check('...and every other reply is still speech',
     /Everything else is speech/.test(src), null)
+  // 25 Sep 2026: the exam's several-things case came back as four paragraphs
+  // and a bulleted recipe, so the rule now carries the exact shape to copy —
+  // three lines, one per thing asked — and names the recipe list as wrong.
+  check('the several-things rule shows the shape: one line per thing, no ingredient list',
+    /ONE LINE EACH means one or two sentences per line/.test(src) && /never set out as an ingredient list/.test(src)
+      && /\n\s*Carbs — [^\n]+\n\s*Before training — [^\n]+\n\s*Stretching — [^\n]+/.test(src), null)
+  // A CSCS call, basis in BACKLOG: single-leg is its own pattern; a goblet
+  // squat for a lunge keeps the load and loses the one-leg work.
+  check('a lunge is swapped for a single-leg lift, never a two-legged squat',
+    /Single-leg is its own pattern, not a kind of squat/.test(src) && /never by a two-legged squat/.test(src), null)
   // The contradiction that produced the essays: §1 said "offer the rest", the
   // triggers section said "give step-by-step cues, target muscles, common
   // mistakes and coaching tips". The model obeyed the more specific one.
