@@ -2,9 +2,9 @@
   "case": "specific-plateau",
   "why": "A plain training question where generic advice and the right answer look different. The context holds the actual lift, the actual weight and the actual completed session, so a coach that reads them can say what to do next week and a coach that does not can only say 'progressive overload'.",
   "checks": {},
-  "fingerprint": "83b4c220c48e7d0a",
+  "fingerprint": "03225c22f9b46ce9",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-23T10:22:48.091Z",
+  "ranAt": "2026-09-25T05:48:22.267Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,19 +56,21 @@
   "turns": [
     {
       "user": "my squat's been stuck for a bit, what should I do",
-      "reply": "When a squat gets stuck, it's usually one of three things holding it up: your bracing, your recovery, or just needing a fresh stimulus to spark some new adaptation. \n\nSince you've been hitting 45kg for 3x8 recently, the first thing to look at is how you're preparing for each rep. If you aren't actively pulling a massive breath into your abdomen and clamping your core down like you're about to get punched, you'll lose power at the bottom of the squat. \n\nIf your bracing is already rock-solid, we can look at changing up the stimulus. One option is to temporarily swap the back squat for something like a goblet squat or a box squat to build confidence and power in a slightly different pattern, or we can adjust the volume on Tuesdays to let you recover better. \n\nHow have those heavy sets of squats actually felt on your back and legs when you've hit that 8th rep?",
-      "raw": "When a squat gets stuck, it's usually one of three things holding it up: your bracing, your recovery, or just needing a fresh stimulus to spark some new adaptation. \n\nSince you've been hitting 45kg for 3x8 recently, the first thing to look at is how you're preparing for each rep. If you aren't actively pulling a massive breath into your abdomen and clamping your core down like you're about to get punched, you'll lose power at the bottom of the squat. \n\nIf your bracing is already rock-solid, we can look at changing up the stimulus. One option is to temporarily swap the back squat for something like a goblet squat or a box squat to build confidence and power in a slightly different pattern, or we can adjust the volume on Tuesdays to let you recover better. \n\nHow have those heavy sets of squats actually felt on your back and legs when you've hit that 8th rep?",
+      "reply": "When a squat gets stuck, it's usually one of three things: we're either running into a recovery wall, hitting a technique leak where energy is escaping, or we just need to change the stimulus to spark some new growth. \n\nSince you've been working with 45kg for 3x8, here are three ways we can break through this plateau:\n\n1. **Shift the rep range:** Instead of pushing for 8 reps, we can drop the reps to 5 or 6 and nudge the weight up slightly to build some raw strength, or go the other way with lighter, higher-rep sets to build work capacity. \n2. **Add a pause:** Dropping the weight by about 10% and pausing for a full second at the bottom of each rep is incredible for building power out of the hole and locking in your positioning.\n3. **Swap the variation:** We can swap the barbell back squat for a goblet squat or box squat for a block to build up the supporting muscles and give your joints a different look.\n\nWhere do you feel like the lift is failing—is it a struggle to get out of the bottom of the squat, or does it feel more like your overall energy and recovery are tapped out?",
+      "raw": "When a squat gets stuck, it's usually one of three things: we're either running into a recovery wall, hitting a technique leak where energy is escaping, or we just need to change the stimulus to spark some new growth. \n\nSince you've been working with 45kg for 3x8, here are three ways we can break through this plateau:\n\n1. **Shift the rep range:** Instead of pushing for 8 reps, we can drop the reps to 5 or 6 and nudge the weight up slightly to build some raw strength, or go the other way with lighter, higher-rep sets to build work capacity. \n2. **Add a pause:** Dropping the weight by about 10% and pausing for a full second at the bottom of each rep is incredible for building power out of the hole and locking in your positioning.\n3. **Swap the variation:** We can swap the barbell back squat for a goblet squat or box squat for a block to build up the supporting muscles and give your joints a different look.\n\nWhere do you feel like the lift is failing—is it a struggle to get out of the bottom of the squat, or does it feel more like your overall energy and recovery are tapped out?",
       "error": null,
       "action": null,
-      "proposal": null
+      "proposal": null,
+      "saved": null
     },
     {
       "user": "ok, and how long before I'd expect that to move",
-      "reply": "If we dial in your bracing and keep your recovery on point, you should start seeing the bar speed improve within two to three weeks, with the actual weight on the bar moving up shortly after. \n\nIf we swap the movement or adjust the volume to break the plateau, we usually give that new stimulus a full 4-week block to do its job. Strength adaptations take a little time to register in the tendons and nervous system, so patience is key. \n\nAre you noticing the struggle right out of the bottom of the squat, or are you getting stuck halfway up?",
-      "raw": "If we dial in your bracing and keep your recovery on point, you should start seeing the bar speed improve within two to three weeks, with the actual weight on the bar moving up shortly after. \n\nIf we swap the movement or adjust the volume to break the plateau, we usually give that new stimulus a full 4-week block to do its job. Strength adaptations take a little time to register in the tendons and nervous system, so patience is key. \n\nAre you noticing the struggle right out of the bottom of the squat, or are you getting stuck halfway up?",
+      "reply": "If we shift the stimulus, you can usually expect to see things start moving again within about 3 to 4 weeks. \n\nThat first week or two is mostly your brain and nervous system adapting to the new movement pattern or rep range. By weeks 3 and 4, you start seeing the actual strength gains transfer back over. If we change something today, we'll run it through a full 4-week block to give it a real chance to work before we evaluate.\n\nWhich of those options sounded best to you to try first—swapping the movement, changing the reps, or adding some pause work?",
+      "raw": "If we shift the stimulus, you can usually expect to see things start moving again within about 3 to 4 weeks. \n\nThat first week or two is mostly your brain and nervous system adapting to the new movement pattern or rep range. By weeks 3 and 4, you start seeing the actual strength gains transfer back over. If we change something today, we'll run it through a full 4-week block to give it a real chance to work before we evaluate.\n\nWhich of those options sounded best to you to try first—swapping the movement, changing the reps, or adding some pause work?\n[QUICK_REPLIES: \"Swap the squat variation\" | \"Change the rep range\" | \"Add pauses at the bottom\"]",
       "error": null,
       "action": null,
-      "proposal": null
+      "proposal": null,
+      "saved": null
     }
   ]
 }

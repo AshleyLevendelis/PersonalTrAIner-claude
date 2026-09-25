@@ -4,9 +4,9 @@
   "checks": {
     "asksBeforePrescribing": true
   },
-  "fingerprint": "83b4c220c48e7d0a",
+  "fingerprint": "03225c22f9b46ce9",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-23T10:22:48.091Z",
+  "ranAt": "2026-09-25T05:48:22.267Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,19 +58,21 @@
   "turns": [
     {
       "user": "I can't face training today",
-      "reply": "I hear you, Ashley. Some days the energy just isn't there, and forcing a heavy session when you're feeling like this usually backfires. \n\nWe have a couple of good options here. We can make today's session a lot lighter so you can just go through the motions and keep the momentum going, or we can simply push today's lower body workout to tomorrow and make today a rest day. \n\nHow does that sound to you—would you rather try a scaled-back, easier version today, or just take the day off and lift tomorrow?",
-      "raw": "I hear you, Ashley. Some days the energy just isn't there, and forcing a heavy session when you're feeling like this usually backfires. \n\nWe have a couple of good options here. We can make today's session a lot lighter so you can just go through the motions and keep the momentum going, or we can simply push today's lower body workout to tomorrow and make today a rest day. \n\nHow does that sound to you—would you rather try a scaled-back, easier version today, or just take the day off and lift tomorrow?",
+      "reply": "I hear you. Some days the energy just isn't there, and pushing through a heavy session when you're feeling like that is a quick way to burn out. \n\nSince today is your Lower Body day, we have a few ways to handle this. We can make today's session lighter so it's easier to get through, we can move the workout to tomorrow and make today a rest day, or we can just call it a rest day. \n\nWhat feels like the best move for you today?",
+      "raw": "I hear you. Some days the energy just isn't there, and pushing through a heavy session when you're feeling like that is a quick way to burn out. \n\nSince today is your Lower Body day, we have a few ways to handle this. We can make today's session lighter so it's easier to get through, we can move the workout to tomorrow and make today a rest day, or we can just call it a rest day. \n\nWhat feels like the best move for you today?",
       "error": null,
       "action": null,
-      "proposal": null
+      "proposal": null,
+      "saved": null
     },
     {
       "user": "honestly it's been a rough few weeks, not just today",
-      "reply": "I'm really sorry to hear that, Ashley. When life gets heavy like that for weeks at a time, trying to keep up with a demanding training plan can start to feel like another chore instead of a release. \n\nIf the current volume has been feeling like too much to carry lately, we can make an ongoing adjustment to your plan and make your sessions permanently lighter from here on out. That would take some of the pressure off while still keeping you moving. \n\nHow does that sound to you—would you like to make the plan lighter overall, or do you just need a complete break from the gym for a little while?",
-      "raw": "I'm really sorry to hear that, Ashley. When life gets heavy like that for weeks at a time, trying to keep up with a demanding training plan can start to feel like another chore instead of a release. \n\nIf the current volume has been feeling like too much to carry lately, we can make an ongoing adjustment to your plan and make your sessions permanently lighter from here on out. That would take some of the pressure off while still keeping you moving. \n\nHow does that sound to you—would you like to make the plan lighter overall, or do you just need a complete break from the gym for a little while?",
+      "reply": "I'm really sorry to hear that. When life is heavy for a few weeks, trying to keep up with a demanding training plan on top of it can just feel like another chore. \n\nGetting through the door is the hardest part, but if the current volume is constantly draining you, we should adjust the plan so it actually supports you instead of wearing you down. \n\nWe can drop the volume on your training days to make the sessions lighter and easier to recover from for the rest of this block. Or, if you need a breather, we can take a look at your weekly schedule. What feels like it would give you the most breathing room right now?",
+      "raw": "I'm really sorry to hear that. When life is heavy for a few weeks, trying to keep up with a demanding training plan on top of it can just feel like another chore. \n\nGetting through the door is the hardest part, but if the current volume is constantly draining you, we should adjust the plan so it actually supports you instead of wearing you down. \n\nWe can drop the volume on your training days to make the sessions lighter and easier to recover from for the rest of this block. Or, if you need a breather, we can take a look at your weekly schedule. What feels like it would give you the most breathing room right now?",
       "error": null,
       "action": null,
-      "proposal": null
+      "proposal": null,
+      "saved": null
     }
   ]
 }

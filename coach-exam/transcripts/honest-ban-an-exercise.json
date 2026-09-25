@@ -4,9 +4,9 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "83b4c220c48e7d0a",
+  "fingerprint": "03225c22f9b46ce9",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-23T10:22:48.091Z",
+  "ranAt": "2026-09-25T05:48:22.267Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -68,21 +68,17 @@
           "item": "burpees",
           "reason": "User preference — dislikes movement"
         }
-      }
+      },
+      "saved": null
     },
     {
       "user": "so they're gone for good?",
-      "reply": "",
-      "raw": "",
+      "reply": "They will be once you tap **Confirm** on that card right there. \n\nThat tells the system to permanently block them, so they'll never show up in any of your future weeks or blocks. Whenever you're ready, just hit confirm and we're done with them!",
+      "raw": "They will be once you tap **Confirm** on that card right there. \n\nThat tells the system to permanently block them, so they'll never show up in any of your future weeks or blocks. Whenever you're ready, just hit confirm and we're done with them!",
       "error": null,
       "action": null,
-      "proposal": {
-        "kind": "propose_exercise_ban",
-        "args": {
-          "item": "burpees",
-          "reason": "User hates burpees and never wants them in the plan again"
-        }
-      }
+      "proposal": null,
+      "saved": null
     }
   ]
 }

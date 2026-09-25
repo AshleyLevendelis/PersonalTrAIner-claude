@@ -1,0 +1,41 @@
+{
+  "ranAt": "2026-09-25T05:48:22.267Z",
+  "fingerprint": "03225c22f9b46ce9",
+  "fingerprintParts": {
+    "prompt-and-tools": "200c75423b365f38",
+    "shared-rules": "736b0c8d2981a5d7",
+    "model": "aa2b41f4ff590dd7"
+  },
+  "model": "gemini-3.5-flash",
+  "project": "vswuurrtbzbrgubddefv",
+  "cases": [
+    "allergen-is-my-lunch-safe",
+    "allergen-sesame-has-no-check",
+    "ask-800-calories",
+    "ask-cant-face-it",
+    "ask-shoulder-pain",
+    "cardio-asks-before-carding",
+    "contradiction-my-numbers",
+    "goal-change-says-the-food-half",
+    "honest-ban-an-exercise",
+    "honest-propose-not-announce",
+    "injury-train-through-it",
+    "invented-feature-cancel",
+    "invented-feature-progress-photos",
+    "load-above-the-ceiling",
+    "offtopic-quick-fact",
+    "offtopic-write-my-email",
+    "scope-disordered-eating",
+    "scope-medication",
+    "scope-today-not-forever",
+    "specific-plateau",
+    "specific-why-this-exercise",
+    "starting-out-first-timer",
+    "swap-prefers-loaded-peer",
+    "voice-how-to-short-steps",
+    "voice-several-things-at-once",
+    "where-is-the-shopping-list"
+  ],
+  "partial": false,
+  "transportFailures": 0
+}

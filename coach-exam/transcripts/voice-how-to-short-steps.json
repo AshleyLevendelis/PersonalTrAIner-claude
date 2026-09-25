@@ -1,0 +1,76 @@
+{
+  "case": "voice-how-to-short-steps",
+  "why": "Ashley, 24 Sep 2026, after reading four paragraphs on how to deadlift: a how-to is up to three short steps, with the full guide one tap away (\"short steps\"). The first turn should be three lines or fewer plus the offer; the second, asked for, may be longer but still short lines, not paragraphs.",
+  "checks": {},
+  "fingerprint": "03225c22f9b46ce9",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-09-25T05:48:22.267Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "how do I do a deadlift",
+      "reply": "1. **Set your stance**: Stand with your feet hip-width apart, with the barbell cutting directly over the middle of your feet.\n2. **Hinge and grip**: Bend at your hips and knees to grab the bar with a shoulder-width grip, keeping your arms completely straight.\n3. **Brace and pull**: Flatten your back, pull your chest up to take the \"slack\" out of the bar, and push the floor away with your legs to stand up.\n\nThat setup is the foundation. Are you planning to do barbell deadlifts today, or are you working with dumbbells or a kettlebell?",
+      "raw": "1. **Set your stance**: Stand with your feet hip-width apart, with the barbell cutting directly over the middle of your feet.\n2. **Hinge and grip**: Bend at your hips and knees to grab the bar with a shoulder-width grip, keeping your arms completely straight.\n3. **Brace and pull**: Flatten your back, pull your chest up to take the \"slack\" out of the bar, and push the floor away with your legs to stand up.\n[BREAK]\nThat setup is the foundation. Are you planning to do barbell deadlifts today, or are you working with dumbbells or a kettlebell?\n[QUICK_REPLIES: \"Barbell\" | \"Dumbbells\" | \"Kettlebell\" | \"Just curious\"]",
+      "error": null,
+      "action": null,
+      "proposal": null,
+      "saved": null
+    },
+    {
+      "user": "Full form guide",
+      "reply": "[Watch Barbell Deadlift Tutorial on YouTube](www.youtube.com/results?search_query=barbell+deadlift+tutorial+form)\n\n### Setup & Stance\n- **Foot position**: Walk up to the bar and place your feet hip-width apart. The barbell should sit directly over the middle of your feet, about an inch away from your shins.\n- **The grip**: Hinge at your hips and bend your knees just enough to grip the bar just outside your shins. Keep your arms completely straight — they act as chains, not levers.\n\n### The Pull (Execution)\n- **Set your back**: Pull your chest up and push your hips back to flatten your spine. Think about squeezing your armpits tight (like you're trying to crush oranges under them) to engage your lats.\n- **Take the slack out**: Pull up slightly on the bar until you hear it click against the weights. This creates tension before the lift starts.\n- **Push the floor**: Do not yank the bar off the ground. Drive your feet hard into the floor, pushing the earth away, and stand up by driving your hips forward. Keep the bar touching your legs the entire way up.\n\n### The Lockout & Descent\n- **Lockout**: Stand tall, squeezing your glutes and quads at the top. Do not lean back or hyperextend your lower back.\n- **The descent**: Reverse the movement by pushing your hips back first. Once the bar clears your knees, bend your legs to lower it back to the floor. Reset completely before the next rep.\n\n### Common Mistakes\n- **Rounding the back**: This usually happens if you start with the bar too far forward or fail to brace your core. Keep the bar close.\n- **Bending the arms**: Pulling with your biceps can cause serious injury. Keep your arms dead straight throughout.\n- **Squatting the weight**: If your hips are too low, your shins will push the bar forward. Keep your hips higher than your knees.\n\n\nAre you getting ready to hit these in a session today, Ashley?",
+      "raw": "[Watch Barbell Deadlift Tutorial on YouTube](www.youtube.com/results?search_query=barbell+deadlift+tutorial+form)\n\n### Setup & Stance\n- **Foot position**: Walk up to the bar and place your feet hip-width apart. The barbell should sit directly over the middle of your feet, about an inch away from your shins.\n- **The grip**: Hinge at your hips and bend your knees just enough to grip the bar just outside your shins. Keep your arms completely straight — they act as chains, not levers.\n\n### The Pull (Execution)\n- **Set your back**: Pull your chest up and push your hips back to flatten your spine. Think about squeezing your armpits tight (like you're trying to crush oranges under them) to engage your lats.\n- **Take the slack out**: Pull up slightly on the bar until you hear it click against the weights. This creates tension before the lift starts.\n- **Push the floor**: Do not yank the bar off the ground. Drive your feet hard into the floor, pushing the earth away, and stand up by driving your hips forward. Keep the bar touching your legs the entire way up.\n\n### The Lockout & Descent\n- **Lockout**: Stand tall, squeezing your glutes and quads at the top. Do not lean back or hyperextend your lower back.\n- **The descent**: Reverse the movement by pushing your hips back first. Once the bar clears your knees, bend your legs to lower it back to the floor. Reset completely before the next rep.\n\n### Common Mistakes\n- **Rounding the back**: This usually happens if you start with the bar too far forward or fail to brace your core. Keep the bar close.\n- **Bending the arms**: Pulling with your biceps can cause serious injury. Keep your arms dead straight throughout.\n- **Squatting the weight**: If your hips are too low, your shins will push the bar forward. Keep your hips higher than your knees.\n\n[BREAK]\nAre you getting ready to hit these in a session today, Ashley?",
+      "error": null,
+      "action": null,
+      "proposal": null,
+      "saved": null
+    }
+  ]
+}
