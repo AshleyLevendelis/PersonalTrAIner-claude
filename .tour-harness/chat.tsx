@@ -34,6 +34,9 @@ import { assessEdit } from '@/lib/edit-tradeoff'
 import type { MacroTargets, Meal, MealPlanDay, UserProfile } from '@/lib/types'
 
 import { BottomTabBar } from '@/components/BottomTabBar'
+import { ProfileMenu } from '@/components/ProfileMenu'
+import { BottomDock } from '@/components/BottomDock'
+import { useTimers } from '@/hooks/useTimers'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
@@ -471,6 +474,17 @@ setSupabaseClient(makeFakeSupabase(db) as never)
 
 const noop = () => {}
 
+// ?dock=1 — A TIMER RUNNING, so the real BottomDock is up while the chat is
+// open. The dock was reported covering the composer from a real gym session;
+// the full-page chat (design 2a) stacks the whole screen on top of it, and
+// this is what lets a driver measure that rather than assume it.
+const DOCK = new URLSearchParams(location.search).get('dock') === '1'
+function StartATimer() {
+  const timers = useTimers()
+  useEffect(() => { timers.setMode('stopwatch'); timers.start() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return null
+}
+
 function Harness() {
   const [, setTick] = useState(0)
   const [chatAttention, setChatAttention] = useState(false)
@@ -522,10 +536,16 @@ function Harness() {
               groceryItems={[]}
               onAttentionChange={setChatAttention}
               chatVisible={!SEED_NUDGE}
+              // The REAL menu, exactly as App.tsx hands it to the chat's header
+              // (design 2a) — not a copy of the app's chrome.
+              headerAction={<ProfileMenu onOpenProfile={noop} onReplayTour={noop} />}
             />
             </Suspense>
           </div>
         </main>
+        {/* As in App.tsx: the dock is a sibling of <main>, before the tab bar. */}
+        <BottomDock />
+        {DOCK && <StartATimer />}
         <BottomTabBar activeTab={SEED_NUDGE ? 'dashboard' : 'chat'} onTabChange={noop} chatAttention={chatAttention && SEED_NUDGE} />
       </div>
     </BottomDockHeightProvider>

@@ -114,22 +114,21 @@ export function bubblePositions(hasBubble: boolean[]): (BubblePosition | null)[]
 }
 
 const BUBBLE_RADIUS_PX = 18
-const TUCKED_RADIUS_PX = 6
+const TAIL_RADIUS_PX = 4
 
 /**
  * The bubble's four corners, as a CSS border-radius (top-left, top-right,
- * bottom-right, bottom-left). The SENDER'S side is the one that tucks: the
- * bottom corner on every bubble — the tail on the last or only one, and the
- * join to the next on the others — and the top corner wherever a bubble sits
- * under another from the same group.
+ * bottom-right, bottom-left). Design 2a, 26 Sep 2026: every corner is round
+ * except ONE — the sender-side bottom corner of the group's last (or only)
+ * bubble, tucked to 4px as the tail. First and middle bubbles are round all
+ * the way round; the 6px space between bubbles is what joins a group now.
  */
 export function bubbleRadius(role: 'user' | 'assistant', position: BubblePosition): string {
-  const R = `${BUBBLE_RADIUS_PX}px`, r = `${TUCKED_RADIUS_PX}px`
-  const top = position === 'middle' || position === 'last' ? r : R
-  const bottom = r
+  const R = `${BUBBLE_RADIUS_PX}px`
+  const tail = position === 'last' || position === 'single' ? `${TAIL_RADIUS_PX}px` : R
   return role === 'user'
-    ? `${R} ${top} ${bottom} ${R}`
-    : `${top} ${R} ${R} ${bottom}`
+    ? `${R} ${R} ${tail} ${R}`
+    : `${R} ${R} ${R} ${tail}`
 }
 
 /**

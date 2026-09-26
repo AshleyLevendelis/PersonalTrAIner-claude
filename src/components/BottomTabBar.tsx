@@ -107,14 +107,20 @@ export function BottomTabBar({
             aria-current={activeTab === 'chat' ? 'page' : undefined}
             // The active-tab ring and the attention ring never co-occur:
             // App suppresses chatAttention while the chat is the open tab.
-            className={`relative -mt-6 flex size-14 shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
+            // FLUSH ON THE CHAT TAB (design 2a, 26 Sep 2026). Raised, the 56px
+            // disc stands 24px proud of the bar — straight into the middle of
+            // the chat's composer, which now sits directly on the bar. On
+            // every other tab it stays raised.
+            className={`relative flex shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
+              activeTab === 'chat' ? 'mt-0 size-11' : '-mt-6 size-14'
+            } ${
               chatAttention ? 'chat-unread' : ''
             } ${
               activeTab === 'chat' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-[color:var(--surface-deep)]' : ''
             }`}
             style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
           >
-            <MessageCircle className="size-6" />
+            <MessageCircle className={activeTab === 'chat' ? 'size-5' : 'size-6'} />
             {chatAttention && (
               <>
                 <span data-testid="chat-unread-ring" aria-hidden="true" className="chat-unread-ring" />

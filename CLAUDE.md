@@ -1011,16 +1011,23 @@ menu" stays true when a copy is also left outside it.
 - Safety ships correct or not at all — `injury-adaptation-safety`,
   `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`
-- **The coach chat is grouped bubbles** — Ashley, 26 Sep 2026, design agreed
-  before it was asked for, layout only. Same sender within five minutes is one
-  group, with 4px inside a group and 20px between groups. "Coach" and the avatar
-  appear once per coach group, and one time per group. Cards and the typing dots
-  sit inside the coach's group. **The ink on your bubble is the theme's own
+- **The coach chat is grouped bubbles on a full page** — Ashley, 26 Sep 2026,
+  twice that day, layout only both times. Same sender within five minutes is
+  one group, with 6px inside a group and 24px between. The avatar appears once
+  per coach group, and one time per group. Cards and the typing dots sit inside
+  the coach's group. Design 2a made the chat the whole page: a 56px header
+  (avatar, "Coach", "Personal TrAIner", clear, the gear, with App's floating
+  gear hidden meanwhile) replaces the per-group name. The composer is the
+  page's last row on the tab bar, and the tab bar's chat button lies flat on
+  that tab only. Coach bubbles are `--secondary` with no border. Every corner
+  is 18px except a 4px tail. Without the border the fill is all that separates
+  a bubble from the page: the dark themes sit at 1.25-1.39:1 and the three
+  light ones at 1.10-1.11:1, the faintest, held at 1.08 and asked of her. **The ink on your bubble is the theme's own
   text-on-main-colour, never a fixed white**: white on the default mint is
   1.5:1. Across 81 theme × accent pairs, 75 reach 4.5:1. Coral and rose on the
   three light themes are 3.4-3.9:1 with the app's OWN pair, the same one every
   main button uses there. That is named, held to 3:1, and hers to change.
-  `chat-groups`, `verify:chat-bubbles`
+  `chat-groups`, `chat-page`, `verify:chat-bubbles`, `verify:chat-shell`
 - Works one-handed on a phone on a gym floor — `verify:tap-targets`,
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
@@ -1303,6 +1310,14 @@ old — the commands were right and the context was missing.
   carries vite's `✓ built in 8s`, which a bare tick-counter happily counts.
   Same shape as the pgrep watcher: before believing a harness, prove its
   detector on a run whose answer you already know.
+- **A MUTATION HARNESS MUST REFUSE A BASELINE THAT ALREADY FAILS.** 26 Sep
+  2026: a new driver check guessed that the raised chat disc stands more than
+  10px proud of the tab bar; it stands 8px, so the check failed on correct code.
+  The harness counted any failure as a catch, so all 21 mutations read CAUGHT
+  and the round proved nothing. It was only noticed because the harness prints
+  its baseline line. The round was re-run after the threshold was measured, and
+  the harness now exits when its baseline fails. **A catch means MORE failures
+  than the baseline, and the baseline must be zero.**
 - **A MUTATION HARNESS KILLED MID-RUN LEAVES THE MUTATION IN THE TREE, AND THE
   SOURCE STILL LOOKS RIGHT.** 19 Sep 2026: I stopped a run with `pkill`, the
   `finally` that restores the file never executed, and the next browser run

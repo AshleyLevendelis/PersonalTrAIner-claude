@@ -2819,7 +2819,10 @@ function App() {
           tab is mounted. */}
       <div
         data-tour="settings"
-        className="fixed right-3 z-40"
+        // Hidden while the chat is open: the chat is a full page with its own
+        // header, and that header carries this same menu (design 2a), so the
+        // gear would otherwise show twice.
+        className={`fixed right-3 z-40 ${activeTab === 'chat' ? 'hidden' : ''}`}
         style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
       >
         {/* NEW PLAN LEFT THIS MENU on 6 Sep 2026 — it is Profile's
@@ -2989,6 +2992,12 @@ function App() {
               pendingLoadSuggestions={adaptationMessages.filter(m => m.loadSuggestionId).map(m => m.text)}
               onAttentionChange={setChatAttention}
               chatVisible={activeTab === 'chat'}
+              headerAction={
+                <ProfileMenu
+                  onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
+                  onReplayTour={replayAppTour}
+                />
+              }
             />
             </Suspense>
           </TabsContent>

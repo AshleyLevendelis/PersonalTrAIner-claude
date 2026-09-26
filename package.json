@@ -336,7 +336,8 @@
     "test:meal-favourite": "tsx scripts/test-meal-favourite.ts",
     "verify:meal-favourite": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-favourite.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
-    "test:chat-groups": "tsx scripts/test-chat-groups.ts"
+    "test:chat-groups": "tsx scripts/test-chat-groups.ts",
+    "test:chat-page": "tsx scripts/test-chat-page.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

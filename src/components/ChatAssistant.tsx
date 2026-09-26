@@ -1,8 +1,7 @@
-import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { buildCoachMealSummary, mealsContaining } from '@/lib/meal-ingredients'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
@@ -334,6 +333,13 @@ interface ChatAssistantProps {
   chatVisible?: boolean
   /** User's chat typewriter-reveal-speed preference (Settings → Profile). Defaults to 'normal' if omitted. */
   revealSpeed?: RevealSpeed
+  /**
+   * What sits at the right of the chat's own header after the clear button —
+   * App passes the ProfileMenu gear, because the chat covers the page (design
+   * 2a) and App hides its floating gear while the chat is open so it never
+   * shows twice. Optional: a screen that passes nothing simply has no gear.
+   */
+  headerAction?: React.ReactNode
   /** Vision Step 6 — any pending "start heavier next block?" suggestions currently showing on the dashboard banner, so the coach can discuss one if asked directly. Confirming/declining still only happens via the banner's own buttons, not from here (see load-suggestions.ts's own doc comment on why chat-driven confirm is out of scope for this pass). */
   pendingLoadSuggestions?: string[]
 }
@@ -351,7 +357,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -6209,63 +6215,59 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const { dockHeightPx } = useBottomDockHeight()
 
-  // Ride above BottomDock when it's showing, not underneath it. The dock is
-  // fixed to the same baseline as this composer and sits at z-50 against our
-  // z-40, so a running rest timer used to cover the input completely and a
-  // session chip clipped the placeholder — reported from a real gym session,
-  // where "ask the coach something mid-set" is exactly when the dock is up.
-  // dockHeightPx is measured by the dock itself (see useBottomDockHeight);
-  // it's 0 whenever the dock is hidden, so this collapses to the old value.
-  // The extra 12px matches the dock's own gap above the tab bar, keeping the
-  // two apart rather than flush.
-  const dockGapPx = dockHeightPx > 0 ? dockHeightPx + 12 : 0
-  const composerBottomStyle = composerKeyboardOpen
-    // Keyboard open: the tab bar hides and the dock rides the keyboard inset
-    // too, so stack above it there as well.
-    ? { bottom: composerInsetPx + 16 + dockGapPx }
-    : { bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockGapPx}px)` }
-
-  // HOW MUCH OF THE THREAD THE COMPOSER IS SITTING ON, MEASURED.
-  //
-  // The Card is `h-[600px] max-h-[80dvh]` — a fixed box — while the composer
-  // is `position: fixed` to the VIEWPORT. With the keyboard shut they don't
-  // meet (measured at 390x844: card ends 648, composer starts 704). Open the
-  // keyboard and the composer rides UP into the card: composer top 416
-  // against a card bottom of 648, so it covers 232px of the message list and
-  // the newest message — at 512-552 — is entirely behind it. The scroller
-  // reserved a static `pb-24`, 96px, which never grew.
-  //
-  // That is the same defect reported on the onboarding composer, on the other
-  // screen. Onboarding grows its padding by `insetPx + 112` because its
-  // scroller ends at the viewport bottom; this one ends at the CARD's bottom,
-  // which sits an unknown distance above that (it depends on App.tsx's own
-  // page padding). So the overlap is measured rather than derived from a
-  // constant that would silently go stale the moment that padding changes.
-  //
-  // No feedback loop: padding is inside the border box, so growing it does
-  // not move the scroller's own getBoundingClientRect().bottom.
-  const [composerClearancePx, setComposerClearancePx] = useState(0)
-  useLayoutEffect(() => {
-    const sc = scrollRef.current, box = composerBoxRef.current
-    if (!sc || !box) return
-    const overlap = sc.getBoundingClientRect().bottom - box.getBoundingClientRect().top
-    setComposerClearancePx(overlap > 0 ? Math.round(overlap + 12) : 0)
-  }, [composerKeyboardOpen, composerInsetPx, dockHeightPx])
+  // FULL-PAGE CHAT (design 2a, 26 Sep 2026). The chat is no longer a card
+  // inside the page with a composer floating over it: it IS the page, from
+  // the top of the screen down to whatever is below it, and the composer is
+  // its last row. So the one thing positioned is the screen's own BOTTOM:
+  //   - keyboard shut: on the tab bar;
+  //   - keyboard open: on the keyboard (the tab bar hides itself then);
+  //   - a rest timer or session dock showing: on top of the dock, which sits
+  //     12px above the tab bar (16px above the keyboard) — so the dock never
+  //     covers the input, the defect reported from a real gym session.
+  // The old measured "clearance" padding is gone with the overlay it paid
+  // for: a composer in the flow cannot sit on the thread.
+  const dockOffsetPx = dockHeightPx > 0 ? dockHeightPx + (composerKeyboardOpen ? 16 : 12) : 0
+  const chatScreenBottom = composerKeyboardOpen
+    ? `${composerInsetPx + dockOffsetPx}px`
+    : `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockOffsetPx}px)`
 
   return (
-    <>
-    <Card className="flex flex-col h-[600px] max-h-[80dvh]">
-      <CardContent className="relative flex-1 flex flex-col p-0 overflow-hidden">
-        <Button
-          variant={clearArmed ? 'destructive' : 'ghost'}
-          size={clearArmed ? 'sm' : 'icon-sm'}
-          onClick={handleClearChat}
-          aria-label={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
-          title={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
-          className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm"
-        >
-          {clearArmed ? <span className="text-xs">Tap again to clear</span> : <Trash2 className="size-3.5" />}
-        </Button>
+    <div
+      data-testid="chat-screen"
+      // z-30: over the page's own content, under the tab bar (z-40) and the
+      // dock (z-50). Inside a force-mounted tab whose inactive state is
+      // display:none, so it only covers the page while the chat is open.
+      className="fixed inset-x-0 top-0 z-30 mx-auto flex max-w-6xl flex-col bg-background"
+      style={{ bottom: chatScreenBottom }}
+    >
+      <header data-testid="chat-header" className="shrink-0 border-b border-[color:var(--hairline)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="flex h-14 items-center gap-2.5 pl-3.5 pr-1.5">
+          <span
+            aria-hidden
+            data-testid="chat-header-avatar"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-primary-foreground"
+            style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
+          >
+            <MessageCircle className="size-4" strokeWidth={2.4} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[0.9375rem] font-semibold leading-tight text-foreground">Coach</h2>
+            <p className="text-[0.6875rem] leading-tight text-muted-foreground">Personal TrAIner</p>
+          </div>
+          <Button
+            variant={clearArmed ? 'destructive' : 'ghost'}
+            size={clearArmed ? 'sm' : 'icon'}
+            onClick={handleClearChat}
+            aria-label={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
+            title={clearArmed ? 'Tap again to clear this conversation' : 'Clear chat'}
+            className={cn('hit-slop-44 shrink-0', !clearArmed && 'size-10 text-muted-foreground')}
+          >
+            {clearArmed ? <span className="text-xs">Tap again to clear</span> : <Trash2 className="size-4" />}
+          </Button>
+          {headerAction}
+        </div>
+      </header>
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           // min-h-0: a flex item defaults to min-height:auto and refuses to
           // shrink below its content, so `flex-1 overflow-y-auto` grows the box
@@ -6274,20 +6276,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           // scrollHeight === clientHeight, every scrollTo a no-op). Added here
           // by parity — this screen was NOT measured, because the tour
           // harness's chat tab is a stub rather than the real component.
-          className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 overscroll-contain"
-          // pb-24 stays as the floor for the keyboard-shut case; this only
-          // ever ADDS the measured overlap on top of it.
-          style={composerClearancePx > 0 ? { paddingBottom: composerClearancePx } : undefined}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pt-4 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          data-testid="chat-scroller"
           ref={scrollRef}
           onScroll={handleScroll}
         >
           {/* GROUPED BUBBLES — Ashley, 26 Sep 2026: messages were blurring
               together. Consecutive messages from one sender within five
               minutes form a group (src/lib/chat-groups.ts holds the rules);
-              groups sit 20px apart, bubbles 4px apart inside one. Layout
+              groups sit 24px apart, bubbles 6px apart inside one. Layout
               only: every message, card and handler below is the one that was
               here before, addressed by the same index. */}
-          <div ref={contentRef} className="flex flex-col gap-5" data-testid="chat-thread">
+          <div ref={contentRef} className="flex flex-col gap-6" data-testid="chat-thread">
             {hasMoreMessages && (
               <div className="flex justify-center">
                 <button
@@ -6346,11 +6346,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                   data-testid="chat-group"
                   data-role={row.role}
                 >
-                  {!isUserGroup && (
-                    <div className="mb-1 pl-9 text-[0.6875rem] font-medium leading-none text-muted-foreground" data-testid="chat-group-name">
-                      Coach
-                    </div>
-                  )}
                   <div className="flex items-end gap-2">
                     {!isUserGroup && (
                       <span
@@ -6362,7 +6357,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         <MessageCircle className="size-3.5" strokeWidth={2.4} />
                       </span>
                     )}
-                    <div className={`flex min-w-0 flex-1 flex-col gap-1 ${isUserGroup ? 'items-end' : 'items-start'}`}>
+                    <div className={`flex min-w-0 flex-1 flex-col gap-1.5 ${isUserGroup ? 'items-end' : 'items-start'}`}>
                       {row.items.map(({ message: msg, index: i }, k) => {
                         const bodyContent = msg.role === 'user' ? (
                           stripStreamingTags(msg.content)
@@ -6405,10 +6400,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                           />
                         )
                         const position = positions[k]
-                        // ~78% of the CHAT column for either sender. The coach's
-                        // column is narrowed by its avatar (28px + 8px gap), so
-                        // its share is worked back out to the full column.
-                        const widest = isUserGroup ? '78%' : 'calc((100% + 36px) * 0.78)'
+                        // Design 2a: the coach's bubbles get ~88% of the CHAT
+                        // column (its own column is narrowed by the avatar, 28px
+                        // + 8px gap, so the share is worked back out to the full
+                        // column), yours 82%.
+                        const widest = isUserGroup ? '82%' : 'calc((100% + 36px) * 0.88)'
                         return (
                           <Fragment key={msg.id || `msg-${i}`}>
                             {position && (
@@ -6419,7 +6415,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                                 className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
                                   msg.role === 'user'
                                     ? 'whitespace-pre-wrap bg-primary text-primary-foreground'
-                                    : 'border border-[color:var(--hairline)] bg-card text-card-foreground'
+                                    : 'bg-secondary text-foreground'
                                 }`}
                                 style={{ maxWidth: widest, borderRadius: bubbleRadius(msg.role, position) }}
                               >
@@ -6503,7 +6499,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                           key={option}
                           type="button"
                           onClick={() => handleQuickReply(option)}
-                          className="rounded-full bg-[color:var(--surface-raised)] px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
+                          className="hit-slop-44 rounded-full bg-[color:var(--surface-raised)] px-3.5 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[40px]"
                         >
                           {option}
                         </button>
@@ -6531,7 +6527,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           </div>
         </div>
         {showScrollPill && (
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
             <button
               type="button"
               onClick={() => {
@@ -6546,19 +6542,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             </button>
           </div>
         )}
-      </CardContent>
-    </Card>
-    {/* Turn 6: composer as a fixed-height pill (not three separate bordered
-        controls) — room for two lines before it grows past that, a visible
-        mint send target. Fixed (not sticky) and positioned exactly like
-        BottomDock rides above the tab bar / keyboard — see the comment by
-        useViewportInset's call above for why sticky never worked here. */}
-    <div
-      ref={composerBoxRef}
-      className="fixed left-0 right-0 z-40 mx-auto max-w-6xl px-4 bg-gradient-to-t from-[color:var(--background)] from-60% to-transparent pt-3 pb-3"
-      style={composerBottomStyle}
-    >
-      <div className="flex items-end gap-2.5 rounded-[20px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
+      </div>
+      {/* The composer is the screen's last row (design 2a): in the flow, on
+          the tab bar, so it can never sit on the thread. The pill inside is
+          unchanged — room for two lines, a visible mint send target. */}
+      <div
+        ref={composerBoxRef}
+        data-testid="chat-composer"
+        className="shrink-0 border-t border-[color:var(--hairline)] bg-[color:var(--surface-deep)] px-2.5 py-2"
+      >
+      <div className="flex items-end gap-2.5 rounded-[22px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
         <Textarea
           ref={composerRef}
           value={input}
@@ -6635,7 +6628,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           </div>
         </div>
       )}
+      </div>
     </div>
-    </>
   )
 }

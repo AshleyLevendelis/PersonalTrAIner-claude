@@ -91,13 +91,18 @@ function measure() {
     const s = getComputedStyle(e); return (s.overflowY === 'auto' || s.overflowY === 'scroll') && e.scrollHeight > 200
   })
   if (!scroller) return { error: 'no scrolling message list found' }
-  const composer = ta.closest('[class*="fixed"]')
+  // DESIGN 2a (26 Sep 2026): the composer is the chat screen's last row, not
+  // a fixed overlay, so it is found by name. Its closest fixed ancestor is now
+  // the whole chat screen, which would measure the wrong box.
+  const composer = document.querySelector('[data-testid="chat-composer"]')
+  if (!composer) return { error: 'no chat composer box rendered' }
   scroller.scrollTo({ top: scroller.scrollHeight })
   const last = scroller.firstElementChild ? scroller.firstElementChild.lastElementChild : null
   const r = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom) } }
   return {
     scrollable: scroller.scrollHeight > scroller.clientHeight + 1,
     padBottom: getComputedStyle(scroller).paddingBottom,
+    scrollerBottom: Math.round(scroller.getBoundingClientRect().bottom),
     composer: r(composer), lastMessage: r(last),
     // Positive means the composer is sitting ON TOP of the newest message.
     newestCoveredPx: last ? Math.round(last.getBoundingClientRect().bottom - composer.getBoundingClientRect().top) : null,
@@ -124,8 +129,12 @@ const open = await call(measure)
 check('the tab bar gets out of the way', open.tabBarPresent === false, open.tabBarPresent)
 check('the composer rides above the keyboard', open.composer.bottom <= 844 - 336, open.composer)
 check('THE NEWEST MESSAGE IS STILL VISIBLE — the whole point', open.newestCoveredPx < 0, open)
-check('...because the thread reserved room for the composer rather than a fixed 96px',
-  parseInt(open.padBottom, 10) > 96, open.padBottom)
+// RE-ANCHORED 26 Sep 2026 (design 2a). This asked whether the thread reserved
+// more than a fixed 96px of padding under an overlaid composer. The composer is
+// in the flow now, so there is nothing to reserve: the property is that the
+// thread ENDS where the composer begins, keyboard up or not.
+check('...because the thread ends where the composer begins, rather than running under it',
+  open.scrollerBottom !== null && open.scrollerBottom <= open.composer.top + 1, { scroller: open.scrollerBottom, composer: open.composer })
 console.log(`      composer ${open.composer.top}-${open.composer.bottom}, newest message ends ${open.lastMessage?.bottom}, pad ${open.padBottom}`)
 
 chrome.kill(); server.close()

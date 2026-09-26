@@ -2,6 +2,81 @@
 
 Newest first. One line each.
 
+- [x] **THE CHAT IS A FULL PAGE (DESIGN 2a).** 26 Sep 2026, Ashley's brief,
+  layout and styling only. No message logic, handler, grouping rule or card was
+  touched.
+  **What changed on screen:**
+  - The chat is no longer a 600px card with a composer floating over it. It
+    fills the screen from the top down to the tab bar.
+  - A 56px header runs across the top: the glowing avatar, "Coach" over
+    "Personal TrAIner", the clear button (40px, still asking "Tap again to
+    clear"), and the settings gear. The app's floating gear hides while the
+    chat is open, so it never shows twice.
+  - The thread fills the space between the header and the composer, with no
+    scrollbar.
+  - Coach bubbles are the theme's secondary colour with no border, 6px apart
+    inside a group and 24px between groups.
+  - Every corner is 18px except a 4px tail on the sender side of the last
+    bubble. Coach bubbles reach 88% of the column, yours 82%.
+  - The per-group "Coach" label is gone, because the header says it.
+  - Answer chips are 40px tall.
+  - The composer is the page's last row, on the dark bottom surface with a
+    hairline, sitting straight on the tab bar.
+  - On the chat tab only, the tab bar's chat button lies flat (44px, inside
+    the bar), because raised it would stand in the middle of the composer.
+  - "Jump to latest" sits 12px above the bottom of the thread.
+  **Keyboard and dock:** with the keyboard up, the whole screen rides it, so
+  the composer sits exactly on the keyboard (measured with a 336px keyboard).
+  With a timer running, the screen stacks on the dock, so the composer sits
+  directly on top of it: the real dock and a real stopwatch, measured. The
+  old measured "clearance" padding is deleted along with the overlay it paid
+  for.
+  **Deviations, stated:**
+  - The 40px chips and the 40px clear button keep a 44px touch area through
+    the app's `hit-slop-44`. The look is as asked; the tap-target floor is
+    unchanged.
+  - The brief said four themes. There are nine. All nine were measured.
+  **Measured, and one for her:** without a border, the fill is all that
+  separates a coach bubble from the page. The six dark themes sit at
+  1.25-1.39:1 and the three light ones (Daylight, Linen, Frost) at 1.10-1.11:1,
+  which is visible but faint. The driver holds every theme at 1.08:1 or more,
+  so none can melt further. Whether the light themes want more separation is a
+  look question: **asked**.
+  **Found, NOT fixed (out of this brief's scope):** tap "Jump to latest" while
+  a reply is still arriving and the thread stops 48px short once the reply's
+  chips appear, so they sit just out of view. The jump scrolls smoothly, and
+  part-way through, the scroll handler decides it is "not near the bottom", so
+  the late chips are not followed. Proven by switching the jump to instant:
+  every check then passed. The brief put handlers out of scope, so this is its
+  own task. The fix is either an instant jump or a "jumping" flag, and the
+  check to restore is described in the driver's "FOUND HERE" comment.
+  Queuing it as a task timed out, so it is recorded here.
+  **Verified:**
+  - `verify:chat-bubbles`: 51 checks at 390px on the real chat, re-written to
+    design 2a. Header, thread, composer on the tab bar, flat disc, raised disc
+    off the chat, jump pill, chips, the dock, nine themes. 21 mutations to the
+    layout code, 21 caught, but only on the second round. The first round's
+    baseline already failed one check, because I had guessed the raised disc
+    stands more than 10px above the bar and it measures 8px. With a failing
+    baseline every mutation reads as caught, so the whole round was thrown
+    away. The mutation harness now refuses to run when its baseline fails.
+  - `verify:chat-shell`: the keyboard case, re-anchored. It found the
+    composer through its nearest "fixed" ancestor, which is now the whole
+    screen, and it asked for more than 96px of padding under an overlay that
+    no longer exists.
+  - `test:chat-groups`: 29 checks, corners re-written; 5 mutations, 5 caught.
+  - `test:chat-page` (new): App hides its gear on the chat and hands the real
+    menu to the header; 4 checks, 4 mutations, 4 caught.
+  - Screenshots read: dark, light, the card group, the dock, the jump pill,
+    the chips.
+  **CSCS review:** not applicable; nothing prescribed changes.
+  **Sweep:** all 294 test/verify gates against the finished tree. 290 pass.
+  The other four are the three database-only checks (each saying it could not
+  reach its database) and `test:coach-exam-fresh`, which stays red by design
+  until the exam re-runs against the changed coach.
+  **Deploys:** frontend only, so it goes live on a merge to main, when she
+  says so.
+
 - [x] **THE ALLERGY EXAM QUESTION, REWORDED.** 26 Sep 2026, Ashley, from two
   options: *"Reword the allergy exam question"* (over leaving it). The case
   asked "I've got a nut allergy — is my lunch today nut free?", which was word
