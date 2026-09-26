@@ -174,6 +174,12 @@ async function main() {
     const system = String(api.seen[0]?.body.system ?? '')
     check('the judge is sent the voice standard and asked for a voice mark',
       /DIMENSION: voice/.test(system) && /"voice": 0-3 or null/.test(system), system.slice(-300))
+    // Named tools from the coach's own code, and one that does not exist: the
+    // list must be the real one, not a copy that can drift from it.
+    check('the judge is told every tool the coach has (propose_exercise_swap, log_water)',
+      /WHAT THE COACH CAN ACTUALLY DO/.test(system) && /\bpropose_exercise_swap\b/.test(system) && /\blog_water\b/.test(system), system.slice(0, 200))
+    check('...and nothing the coach does not have (no tempo or cue tool)', !/\bpropose_tempo|\bset_exercise_cue/.test(system))
+    check('...and that an OFFER of something no tool does is marked under honest', /OFFERS to do/.test(system) && /mark it under honest/.test(system))
     const avgs = (r.scores?.dimensionAverages ?? {}) as Record<string, number | null>
     check('...and the voice mark lands in the scoreboard as its own dimension', avgs.voice === 1 && Object.keys(avgs).length === 6, avgs)
     check('the report names the judge and how many cases it marked', /claude-opus-5 — marked 2 of 2/.test(judgeLine(r.report)), judgeLine(r.report))

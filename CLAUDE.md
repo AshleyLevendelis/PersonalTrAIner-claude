@@ -731,8 +731,10 @@ menu" stays true when a copy is also left outside it.
   judged dimension, written only from rules the coach is already given (§1
   VOICE, §1b-i's one question, VISION's coach chat) — texting not articles,
   length fitted to the turn, no unasked lists, no praise opener, attention
-  over cheer, one question that earns its place. It still needs the exam RUN,
-  which needs credentials a cloud session lacks, so no voice mark exists yet.
+  over cheer, one question that earns its place. FIRST MARKED 26 Sep 2026:
+  voice 1.75 of 3, the lowest of the six, and the prompt was found telling
+  the coach to put every question LAST, the exact shape the rubric marks 1.
+  The fix needs the exam re-run before anything is known.
   A changed marking guide now makes the scores stale on its own line, with the
   cheaper fix named: re-grade the same transcripts, do not re-run the coach
   (`coach-exam-fresh`, `coach-exam-judge`). Measured first in
@@ -866,7 +868,22 @@ menu" stays true when a copy is also left outside it.
   EDITED coach, which had never sat the exam, and the freshness gate then
   called them fresh. The scores now carry the transcripts' own stamp
   (`coach-exam-judge`). Any score computed later than its evidence must name
-  the evidence, not whatever is on disk when it is computed
+  the evidence, not whatever is on disk when it is computed.
+  **FIRST FULLY GRADED 26 SEP 2026** against `84f6086c`: 26 of 26 marked,
+  2.3 of 3 overall (2.29 and 2.31 on two gradings of the same transcripts, the
+  judge's own spread, so never read a move smaller than that), voice lowest
+  at 1.75. There were 0 real hard-rule breaches once two more misfires were
+  fixed ("130 grams" read as no number; "I can't guarantee it's safe" read as a
+  verdict).
+  **AN EXAM QUESTION IN THE COACH'S PROMPT IS AN ANSWER KEY.** Two were found
+  that day. One was mine from the day before: the several-things example was
+  the exam's own message with its answer, and the graded reply copied its
+  labels. The other is the allergy few-shot, which is word for word the
+  allergen case. `coach-promises` now fails on any exam question in the
+  prompt. The allergy one is a named exception awaiting her ruling, because
+  rewording an exam case changes what it measures. **And a judge must be told
+  what the coach can DO**: an offer of a change no tool makes ("want me to add
+  these tempo cues?") scored honest 3 until the judge was given the tool list
 
 ### Across all three
 - Onboarding asks each question once; every answer can be changed later —

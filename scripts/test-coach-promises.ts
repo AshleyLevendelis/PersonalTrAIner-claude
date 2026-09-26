@@ -973,8 +973,13 @@ if (failures > 0) {
     /CONFIRMING SOMETHING THAT JUST HAPPENED[\s\S]{0,400}ONE to THREE short sentences/.test(src), null)
   check('questions and advice are allowed to explain why',
     /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,400}say WHY/.test(src), null)
-  check('...with a ceiling of its own, so it cannot become an essay',
-    /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,600}two is the ceiling/.test(src), null)
+  // 26 Sep 2026: the ceiling was there and four-paragraph answers came back
+  // anyway, so it gained the same cut-before-sending default confirmations
+  // already had — a ceiling the model is told to enforce on its own draft.
+  check('...with a ceiling of its own, and a cut-before-sending default, so it cannot become an essay',
+    /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,700}two SHORT ones is the ceiling/.test(src)
+      && /if your draft runs to three paragraphs or more, cut it before sending/.test(src)
+      && /A caveat is a clause, never a paragraph of its own/.test(src), null)
   // AMENDED 24 Sep 2026, Ashley's "short steps": the ban on formatting stays,
   // with exactly two shapes let through — a how-to capped at three lines, and
   // one line per thing when several were asked. Each half is checked, because
@@ -991,9 +996,79 @@ if (failures > 0) {
   // 25 Sep 2026: the exam's several-things case came back as four paragraphs
   // and a bulleted recipe, so the rule now carries the exact shape to copy —
   // three lines, one per thing asked — and names the recipe list as wrong.
-  check('the several-things rule shows the shape: one line per thing, no ingredient list',
-    /ONE LINE EACH means one or two sentences per line/.test(src) && /never set out as an ingredient list/.test(src)
-      && /\n\s*Carbs — [^\n]+\n\s*Before training — [^\n]+\n\s*Stretching — [^\n]+/.test(src), null)
+  // RE-ANCHORED 26 Sep 2026 on the SHAPE, not on three labels: the example
+  // that stood here was the exam's own question with its answer, which is
+  // the exam grading the coach on its memory (see the integrity check below).
+  {
+    const at = src.indexOf('SEVERAL THINGS ASKED IN ONE MESSAGE')
+    const block = at < 0 ? '' : src.slice(at, src.indexOf('Everything else is speech', at))
+    check('the several-things rule shows the shape: three lines, one per thing, each opening with what it answers',
+      /ONE LINE EACH means one or two sentences per line/.test(block) && /never set out as an ingredient list/.test(block)
+        && /\n\s+[A-Z][^\n—]{2,30} — [^\n]+\n\s+[A-Z][^\n—]{2,30} — [^\n]+\n\s+[A-Z][^\n—]{2,30} — [^\n]+/.test(block), block.slice(0, 120))
+    check('...and each line leans on what the coach can see about them, not advice for anyone',
+      /leans on what you can SEE about them/.test(block), null)
+  }
+
+  // THE EXAM IS NOT IN THE COACH'S INSTRUCTIONS. 26 Sep 2026: the several-
+  // things example above was the exam's own message, paraphrased, with the
+  // answer written out — and the graded run's reply copied its three labels.
+  // An exam the coach has the answers to measures its memory. Seven-word runs
+  // after normalising, which caught that example (it shared "need more carbs
+  // what should i have before training") and nothing that is merely the same
+  // topic. The detector is proven on a planted copy first so it cannot go
+  // vacuous if the cases move.
+  {
+    const norm = (x: string) => x.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+    const runs = (x: string, n = 7) => { const w = norm(x).split(' '); const out: string[] = []; for (let i = 0; i + n <= w.length; i++) out.push(w.slice(i, i + n).join(' ')); return out }
+    // ONE KNOWN, NAMED EXCEPTION, awaiting Ashley. The allergy example in the
+    // prompt ("I've got a nut allergy — is my lunch today nut free?", with the
+    // WRONG and RIGHT replies) is word for word the exam's allergen case. It
+    // is safety wording, so it stays in the prompt; whether the EXAM question
+    // is reworded changes what that case measures, which is hers to decide.
+    // The exception must keep being true — once reworded, it must be removed.
+    const KNOWN_LEAKS = new Set(['allergen-is-my-lunch-safe'])
+    const caseDir = join(ROOT, 'scripts/exam-cases')
+    const cases = readdirSync(caseDir).filter(f => f.endsWith('.json') && !f.startsWith('_'))
+      .map(f => ({ name: f.replace(/\.json$/, ''), messages: (JSON.parse(readFileSync(join(caseDir, f), 'utf8')).messages ?? []) as string[] }))
+    const leaks = (text: string, pool: typeof cases) => { const hay = ' ' + norm(text) + ' '; return pool.filter(c => c.messages.some(m => runs(m).some(r => hay.includes(' ' + r + ' ')))).map(c => c.name) }
+    const open = cases.filter(c => !KNOWN_LEAKS.has(c.name))
+    const planted = src + '\n' + (open[0]?.messages[0] ?? '')
+    check('exam-integrity detector: finds an exam message planted in the prompt', cases.length >= 20 && leaks(planted, open).length >= 1, cases.length)
+    const found = leaks(src, open)
+    check('no exam question appears in the coach\'s instructions (bar the one named exception)', found.length === 0, found)
+    const stillKnown = leaks(src, cases.filter(c => KNOWN_LEAKS.has(c.name)))
+    check('...and the named exception is still real, so the list cannot rot', stillKnown.length === KNOWN_LEAKS.size, stillKnown)
+  }
+
+  // OPTIONS ARE NOT STEPS. 26 Sep 2026: "three ways to unstick it" and "a few
+  // ways to make 24kg heavy again" came back as numbered lists — neither of
+  // the two allowed shapes. A CSCS call as much as a voice one: a coach who
+  // can see the lift picks the lever, and asks when it can't tell.
+  check('a menu of options is not a list: pick the one that fits and say why',
+    /OPTIONS ARE NOT STEPS/.test(src) && /Pick the ONE that fits this person best/.test(src), null)
+  check('a route is one sentence, never a numbered list of the ways in',
+    /A ROUTE IS ONE SENTENCE/.test(src) && /never a numbered list of the ways in/.test(src), null)
+  check('the full form guide is still texting: no section titles, no nested bullets',
+    /still texting: short numbered lines, one cue per line — no section titles, no bullets under a line/.test(src), null)
+  // NEVER OFFER WHAT NO TOOL DOES — 26 Sep 2026, "want me to add these tempo
+  // cues to next week's session?" with no tool that writes one. And the prompt
+  // must name no tool that does not exist: it named "log_history" twice, a tool
+  // nothing declares, for as long as anyone can tell.
+  check('the coach may not offer a change no tool can make',
+    /4b\. NEVER OFFER WHAT NO TOOL DOES/.test(src) && /Before any "want me to…\?", know which of your tools would do it/.test(src), null)
+  {
+    const declared = new Set([...src.matchAll(/\bname:\s*"([a-z][a-z_]+)"/g)].map(m => m[1]))
+    const params = new Set([...src.matchAll(/\b([a-z][a-z_]+):\s*\{\s*type:/g)].map(m => m[1]))
+    const sp = src.indexOf('const systemPrompt = `')
+    const prompt = sp < 0 ? '' : src.slice(sp, src.indexOf('`;', sp))
+    const descs = [...src.matchAll(/description:\s*\n?\s*"((?:[^"\\]|\\.)*)"/g)].map(m => m[1]).join('\n')
+    const named = (text: string) => [...new Set([...text.matchAll(/\b(?:log|propose|record|ban|add|check|set)_[a-z_]*[a-z](?!_?\*)\b/g)].map(m => m[0]))]
+      .filter(t => !declared.has(t) && !params.has(t))
+    check('tool-name detector: finds a tool that does not exist when one is planted', named(prompt + ' call log_history ').includes('log_history'), null)
+    const ghosts = named(prompt + '\n' + descs)
+    check('the coach\'s instructions name no tool it does not have', ghosts.length === 0, ghosts)
+  }
+
   // A CSCS call, basis in BACKLOG: single-leg is its own pattern; a goblet
   // squat for a lunge keeps the load and loses the one-leg work.
   check('a lunge is swapped for a single-leg lift, never a two-legged squat',
@@ -1023,6 +1098,38 @@ if (failures > 0) {
       && !/End most turns with a SPECIFIC question/.test(src), null)
   check('...never more than one, and one tap where it can be',
     /NEVER MORE THAN ONE/.test(src) && /MAKE IT ONE TAP/.test(src), null)
+  // 26 Sep 2026: "every question goes LAST" was the prompt telling the coach
+  // to do what the rubric marks 1 — a full prescription with the deciding
+  // question hung on the end. The two kinds now go in two places.
+  check('a question that decides the answer goes FIRST and ALONE, with no prescription beside it',
+    /A QUESTION YOU NEED BEFORE YOU CAN ADVISE WELL[\s\S]{0,500}Ask it FIRST and ALONE/.test(src)
+      && /No\s+prescription in the same turn/.test(src), null)
+  check('...a follow-up after a complete answer goes last, and the blanket "it goes LAST" is gone',
+    /A FOLLOW-UP AFTER A COMPLETE ANSWER[\s\S]{0,160}goes LAST/.test(src)
+      && !/no list, no praise opener, and it goes LAST/.test(src), null)
+  check('...and what is already in their plan is used, not asked',
+    /If what decides the answer IS in their plan, logs or profile, do not ask it/.test(src), null)
+
+  // THE EXAMPLES TEACH MORE THAN THE RULES. 26 Sep 2026: 12 of the 16
+  // worked replies ended on a question, several of them filler under her 24
+  // Sep ruling, and the graded run ended nearly every reply the same way. The
+  // floor is a literal, not the count on the day it was written.
+  {
+    const a = src.indexOf('=== FEW-SHOT EXAMPLES ===')
+    const b = src.indexOf('=== TEMPORAL AWARENESS ===', a)
+    const sec = a < 0 || b < 0 ? '' : src.slice(a, b)
+    const endings = [...sec.matchAll(/\nAssistant(?:, RIGHT)?: ([\s\S]*?)(?=\n\s*\n|\nUser:|\nAssistant, |$)/g)].map(m => {
+      const lines = m[1].split('\n').map(l => l.trim()).filter(l => l && !/^\[(?:QUICK_REPLIES|BREAK|ACTION)/.test(l))
+      return /\?["”]?$/.test(lines[lines.length - 1] ?? '')
+    })
+    const onAnswer = endings.filter(q => !q).length
+    check('the worked examples mostly end on the answer (at least 40% of at least 12)',
+      endings.length >= 12 && onAnswer / endings.length >= 0.4, `${onAnswer} of ${endings.length}`)
+    const askFirst = sec.indexOf('A question that decides the answer goes FIRST and ALONE')
+    const next = askFirst < 0 ? '' : (sec.slice(askFirst).match(/\nAssistant: ([^\n]+)/) ?? ['', ''])[1]
+    check('...and one of them shows the deciding question asked first, with nothing prescribed',
+      /^[^.!]*\?/.test(next), next)
+  }
 }
 
 console.log('\nEVERY EDIT CARD SAYS WHAT IT COSTS THE WEEK — including the swap (14 Sep 2026)\n')
