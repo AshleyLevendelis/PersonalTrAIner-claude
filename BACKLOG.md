@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **PUT LIVE: THE GROUPED-BUBBLES CHAT.** 26 Sep 2026, Ashley: *"Put the
+  chat bubbles live."* Main fast-forwarded to the working branch. The only app
+  change in it is the chat layout. The other five commits are the coach's
+  instructions and the exam, and the coach does not go live until the separate
+  chat-gemini deploy, which waits for the exam re-run. No workflow deploys
+  functions on a push, so checked, not assumed.
+  **Pre-merge sweep:** all 293 test/verify gates plus `test:quality`. 288 of
+  293 passed first time. Three were the database-only checks, each printing its
+  own "could not reach it" sentence. `test:coach-exam-fresh` was red by design:
+  the coach changed and the exam has not been re-run. **`test:no-dead-code`
+  was real and mine**: the grouping module exported three constants only it
+  uses, taking unreferenced exports from 39 to 42 against a budget of 40. They
+  are module-private now (39), and the gates that read that file were re-run
+  after the fix: `test:chat-groups`, `test:no-dead-code`,
+  `verify:chat-bubbles`, `verify:chat-shell` and `test:bundle`.
+  `test:quality` passed: 0 of 9,216 plans below the 7.2 floor, average
+  11.72 of 12. The chat change touches no plan, so no score was expected to
+  move. Frontend only, so it ships on the main push through Vercel.
+
 - [x] **THE COACH CHAT IS GROUPED BUBBLES.** 26 Sep 2026, Ashley's request,
   with the design agreed beforehand: messages "blur together". It is layout
   only. chat-gemini, message data, tool calls and chat behaviour are

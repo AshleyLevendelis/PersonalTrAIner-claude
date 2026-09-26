@@ -22,7 +22,7 @@
 // they never move the day.
 // ---------------------------------------------------------------------------
 
-export const GROUP_WINDOW_MS = 5 * 60_000
+const GROUP_WINDOW_MS = 5 * 60_000
 
 export interface GroupableMessage {
   role: 'user' | 'assistant'
@@ -113,8 +113,8 @@ export function bubblePositions(hasBubble: boolean[]): (BubblePosition | null)[]
   })
 }
 
-export const BUBBLE_RADIUS_PX = 18
-export const TUCKED_RADIUS_PX = 6
+const BUBBLE_RADIUS_PX = 18
+const TUCKED_RADIUS_PX = 6
 
 /**
  * The bubble's four corners, as a CSS border-radius (top-left, top-right,
