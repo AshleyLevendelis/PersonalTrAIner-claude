@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **PUT LIVE: THE FULL-PAGE CHAT (DESIGN 2a).** 26 Sep 2026, Ashley:
+  *"Put it live"*. Main fast-forwarded to the working branch. The app change is
+  the chat layout alone. The one other commit rewords the allergy exam
+  question, which ships nothing to the phone.
+  **Pre-merge sweep:** the 294 test/verify gates ran against the settled tree
+  and 290 passed. Three were the database-only checks, each printing its own
+  "could not reach it" sentence. `test:coach-exam-fresh` was red by design,
+  because the coach changed and the exam has not been re-run. `test:quality`
+  then ran at the same commit: 0 of 9,216 plans below the 7.2 floor, average
+  11.72 of 12, identical to the last merge, as expected from a change that
+  touches no plan. Frontend only, so it ships on the main push through Vercel.
+  The coach's own changes still wait for the separate chat-gemini deploy after
+  the exam.
+
 - [x] **THE CHAT IS A FULL PAGE (DESIGN 2a).** 26 Sep 2026, Ashley's brief,
   layout and styling only. No message logic, handler, grouping rule or card was
   touched.
