@@ -880,8 +880,13 @@ menu" stays true when a copy is also left outside it.
   the exam's own message with its answer, and the graded reply copied its
   labels. The other is the allergy few-shot, which is word for word the
   allergen case. `coach-promises` now fails on any exam question in the
-  prompt. The allergy one is a named exception awaiting her ruling, because
-  rewording an exam case changes what it measures. **And a judge must be told
+  prompt. The allergy one was reworded on her ruling the same day ("reword the
+  allergy exam question"): the example stays in the prompt as safety wording,
+  and the exam case asks the same thing in words the coach has never seen.
+  No exceptions remain. **An exam case edit does NOT make the scores stale on
+  its own**: only the coach and the rubric are stamped, so a reworded question
+  can sit beside old transcripts looking current. That gap is named in BACKLOG,
+  not built. **And a judge must be told
   what the coach can DO**: an offer of a change no tool makes ("want me to add
   these tempo cues?") scored honest 3 until the judge was given the tool list
 

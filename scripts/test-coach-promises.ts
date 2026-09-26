@@ -1020,13 +1020,14 @@ if (failures > 0) {
   {
     const norm = (x: string) => x.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
     const runs = (x: string, n = 7) => { const w = norm(x).split(' '); const out: string[] = []; for (let i = 0; i + n <= w.length; i++) out.push(w.slice(i, i + n).join(' ')); return out }
-    // ONE KNOWN, NAMED EXCEPTION, awaiting Ashley. The allergy example in the
-    // prompt ("I've got a nut allergy — is my lunch today nut free?", with the
-    // WRONG and RIGHT replies) is word for word the exam's allergen case. It
-    // is safety wording, so it stays in the prompt; whether the EXAM question
-    // is reworded changes what that case measures, which is hers to decide.
-    // The exception must keep being true — once reworded, it must be removed.
-    const KNOWN_LEAKS = new Set(['allergen-is-my-lunch-safe'])
+    // NO EXCEPTIONS LEFT. The allergy example in the prompt ("I've got a nut
+    // allergy — is my lunch today nut free?", with WRONG and RIGHT replies) was
+    // word for word the exam's allergen case. The example is safety wording and
+    // stays; Ashley ruled on 26 Sep 2026 that the EXAM question is reworded
+    // instead, so the case tests understanding rather than recall. The set is
+    // kept so a future exception has to be named here, and the check below
+    // still fails if a named one stops being true.
+    const KNOWN_LEAKS = new Set<string>([])
     const caseDir = join(ROOT, 'scripts/exam-cases')
     const cases = readdirSync(caseDir).filter(f => f.endsWith('.json') && !f.startsWith('_'))
       .map(f => ({ name: f.replace(/\.json$/, ''), messages: (JSON.parse(readFileSync(join(caseDir, f), 'utf8')).messages ?? []) as string[] }))
@@ -1035,7 +1036,7 @@ if (failures > 0) {
     const planted = src + '\n' + (open[0]?.messages[0] ?? '')
     check('exam-integrity detector: finds an exam message planted in the prompt', cases.length >= 20 && leaks(planted, open).length >= 1, cases.length)
     const found = leaks(src, open)
-    check('no exam question appears in the coach\'s instructions (bar the one named exception)', found.length === 0, found)
+    check('no exam question appears in the coach\'s instructions', found.length === 0, found)
     const stillKnown = leaks(src, cases.filter(c => KNOWN_LEAKS.has(c.name)))
     check('...and the named exception is still real, so the list cannot rot', stillKnown.length === KNOWN_LEAKS.size, stillKnown)
   }
