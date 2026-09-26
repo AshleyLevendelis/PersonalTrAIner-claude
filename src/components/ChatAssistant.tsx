@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { buildCoachMealSummary, mealsContaining } from '@/lib/meal-ingredients'
@@ -9,6 +9,7 @@ import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, Mes
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
+import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
 import { supabase } from '@/lib/supabase'
 import { getRecentLogsWithWarmups, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
@@ -522,8 +523,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // runs that recovered were the ones where the plan missed the 2.5s deadline.
   const seededGreetingRef = useRef<string | null>(null)
   if (seededGreetingRef.current === null) seededGreetingRef.current = buildInitialGreeting()
+  // GROUPED BUBBLES show a time per group, and a reply that lands during the
+  // conversation carries no created_at until the thread is reloaded from the
+  // database. The screen therefore remembers when it FIRST DREW such a
+  // message — a view-only note, never written back to the message. Messages
+  // restored from the cache on mount are excluded: they arrived on some other
+  // day, and "now" would be a wrong time rather than a missing one.
+  const restoredKeysRef = useRef<Set<string>>(new Set())
+  const arrivedAtRef = useRef(new Map<string, string>())
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const cached = profile.id ? loadChatCache(profile.id) : null
+    if (cached) restoredKeysRef.current = new Set(cached.map((m, i) => m.id || `msg-${i}`))
     return cached ?? [
       {
         role: 'assistant',
@@ -6271,7 +6281,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           ref={scrollRef}
           onScroll={handleScroll}
         >
-          <div ref={contentRef} className="space-y-4">
+          {/* GROUPED BUBBLES — Ashley, 26 Sep 2026: messages were blurring
+              together. Consecutive messages from one sender within five
+              minutes form a group (src/lib/chat-groups.ts holds the rules);
+              groups sit 20px apart, bubbles 4px apart inside one. Layout
+              only: every message, card and handler below is the one that was
+              here before, addressed by the same index. */}
+          <div ref={contentRef} className="flex flex-col gap-5" data-testid="chat-thread">
             {hasMoreMessages && (
               <div className="flex justify-center">
                 <button
@@ -6284,155 +6300,216 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                 </button>
               </div>
             )}
-            {messages.map((msg, i) => {
-              const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1
+            {groupMessages(
+              messages.map((m, i) => {
+                if (m.created_at || m.status === 'pending' || m.status === 'streaming') return m
+                const key = m.id || `msg-${i}`
+                if (restoredKeysRef.current.has(key)) return m
+                let arrived = arrivedAtRef.current.get(key)
+                if (!arrived) { arrived = new Date().toISOString(); arrivedAtRef.current.set(key, arrived) }
+                return { ...m, created_at: arrived }
+              }),
+              getAppNow(profile.id),
+              (m, i) => m.id || `msg-${i}`,
+            ).map(row => {
+              if (row.kind === 'day') {
+                return (
+                  <div key={row.key} className="flex justify-center" data-testid="chat-day">
+                    <span className="rounded-full bg-[color:var(--surface-raised)] px-3 py-1 text-[0.6875rem] font-medium text-muted-foreground">
+                      {row.label}
+                    </span>
+                  </div>
+                )
+              }
+              const isUserGroup = row.role === 'user'
+              // A turn that is only a card (the card does the talking) draws
+              // no bubble, so it does not count when corners are tucked.
+              const drawsBubble = (m: ChatMessage) =>
+                m.role === 'user' || !!m.content || isInterrupted(m)
+              const positions = bubblePositions(row.items.map(({ message }) => drawsBubble(message)))
+              const stamp = groupTimestamp(row.items)
+              const tail = row.items[row.items.length - 1]
+              const tailIsLastAssistant = tail.message.role === 'assistant' && tail.index === messages.length - 1
               // Fix — quick-reply buttons must wait for the typewriter reveal
               // to finish (buttons popping in mid-sentence read as broken).
               // A message is still revealing exactly when its id equals
               // animatingMessageId; restored/cached messages never carry
               // that id in the first place, so they're never held back.
-              const stillRevealing = isLastAssistant && msg.id != null && msg.id === animatingMessageId
-              const quickReplies = isLastAssistant && !stillRevealing ? getQuickRepliesForLastMessage() : []
-              // Turn 6 ("Coach chat — borders out, input fixed"): the
-              // assistant no longer speaks from a bordered/tinted bubble —
-              // it's plain text on the canvas, identified by a small mint
-              // avatar mark instead. Only the user's own messages get a
-              // fill now (a tinted pill with a tail corner), matching the
-              // design doc's own bubble shape. Everything below the bubble
-              // (proposal/receipt/clarification/quick-replies) still
-              // belongs to this turn, so it gets the same left offset as
-              // the avatar column for assistant turns, keeping it aligned
-              // under the text rather than the avatar.
-              const bodyContent = msg.role === 'user' ? (
-                stripStreamingTags(msg.content)
-              ) : isInterrupted(msg) && !msg.content ? (
-                /* Pending placeholder — show loading dots */
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <div className="flex gap-1">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
-                  </div>
-                  {isRecalibrating ? (
-                    <span className="text-xs">Recalibrating your schedule...</span>
-                  ) : (
-                    <span className="text-xs">Thinking...</span>
-                  )}
-                </div>
-              ) : isInterrupted(msg) && msg.content ? (
-                /* Interrupted/failed with content — show content + retry */
-                <div>
-                  <ReactMarkdown components={markdownComponents}>
-                    {stripStreamingTags(msg.content)}
-                  </ReactMarkdown>
-                  <button
-                    className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
-                    onClick={() => retryMessage(i)}
-                    disabled={isLoading}
-                  >
-                    {msg.status === 'failed' ? <AlertCircle className="size-3" /> : <RotateCcw className="size-3" />}
-                    {msg.status === 'failed' ? 'Response failed — tap to retry' : 'Response interrupted — tap to retry'}
-                  </button>
-                </div>
-              ) : (
-                <TypewriterMarkdown
-                  text={stripStreamingTags(msg.content)}
-                  active={msg.id != null && msg.id === animatingMessageId}
-                  speed={revealSpeed}
-                  components={markdownComponents}
-                  onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
-                />
-              )
+              const tailStillRevealing = tailIsLastAssistant && tail.message.id != null && tail.message.id === animatingMessageId
+              const quickReplies = tailIsLastAssistant && !tailStillRevealing ? getQuickRepliesForLastMessage() : []
               return (
                 <div
-                  key={msg.id || `msg-${i}`}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  key={row.key}
+                  role="group"
+                  aria-label={isUserGroup ? 'You' : 'Coach'}
+                  className="flex flex-col"
+                  data-testid="chat-group"
+                  data-role={row.role}
                 >
-                  <div className="max-w-[80%]">
-                    {msg.role === 'user' ? (
-                      <div className="rounded-2xl rounded-br-md bg-[rgba(var(--glow-rgb),.14)] px-4 py-2.5 text-sm whitespace-pre-wrap text-foreground">
-                        {bodyContent}
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-2.5">
-                        <span
-                          className="flex size-[26px] shrink-0 items-center justify-center rounded-full text-[#08281F]"
-                          style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
-                        >
-                          <MessageCircle className="size-3.5" strokeWidth={2.4} />
-                        </span>
-                        <div className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">
-                          {bodyContent}
-                        </div>
-                      </div>
-                    )}
-                    <div className={msg.role === 'assistant' ? 'pl-9' : undefined}>
-                    {msg.pendingAction && msg.status !== 'failed' && (
-                      <ProposalCard
-                        pendingAction={msg.pendingAction}
-                        onConfirm={scope => handleConfirmProposal(i, scope)}
-                        onReject={() => handleRejectProposal(i)}
-                        onAlternative={handleQuickReply}
-                      />
-                    )}
-                    {msg.receipt && msg.status !== 'failed' && (
-                      <ReceiptCard
-                        title={msg.receipt.title}
-                        rows={msg.receipt.rows}
-                        summary={msg.receipt.summary}
-                        status={msg.receipt.status}
-                        receipt={msg.receipt.result}
-                        undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
-                        onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
-                        onViewProfile={
-                          msg.receipt.kind === 'memory_goal_saved' ? () => onOpenProfile?.('goals')
-                          : msg.receipt.kind === 'memory_fact_saved' ? () => onOpenProfile?.('facts')
-                          : msg.receipt.kind === 'memory_context_fact_saved' ? () => onOpenProfile?.('context')
-                          : undefined
-                        }
-                        onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
-                        onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
-                        onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
-                      />
-                    )}
-                    {msg.clarification && msg.status !== 'failed' && (
-                      <ClarificationCard
-                        contextLines={msg.clarification.contextLines}
-                        prompt={msg.clarification.prompt}
-                        options={msg.clarification.options}
-                        answerPlaceholder={msg.clarification.answerPlaceholder}
-                        onChoose={async value => {
-                          if (navigator.vibrate) navigator.vibrate(10)
-                          await handleClarificationChoice(i, value)
-                        }}
-                      />
-                    )}
-                    {/* Retry button for interrupted messages without content */}
-                    {isInterrupted(msg) && !msg.content && !isLoading && (
-                      <button
-                        className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
-                        onClick={() => retryMessage(i)}
+                  {!isUserGroup && (
+                    <div className="mb-1 pl-9 text-[0.6875rem] font-medium leading-none text-muted-foreground" data-testid="chat-group-name">
+                      Coach
+                    </div>
+                  )}
+                  <div className="flex items-end gap-2">
+                    {!isUserGroup && (
+                      <span
+                        aria-hidden
+                        data-testid="chat-avatar"
+                        className="mb-px flex size-7 shrink-0 items-center justify-center rounded-full text-primary-foreground"
+                        style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
                       >
-                        <RotateCcw className="size-3" />
-                        Response interrupted — tap to retry
-                      </button>
+                        <MessageCircle className="size-3.5" strokeWidth={2.4} />
+                      </span>
                     )}
-                    {quickReplies.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {quickReplies.map(option => (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => handleQuickReply(option)}
-                            className="rounded-full bg-[color:var(--surface-raised)] px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <div className={`flex min-w-0 flex-1 flex-col gap-1 ${isUserGroup ? 'items-end' : 'items-start'}`}>
+                      {row.items.map(({ message: msg, index: i }, k) => {
+                        const bodyContent = msg.role === 'user' ? (
+                          stripStreamingTags(msg.content)
+                        ) : isInterrupted(msg) && !msg.content ? (
+                          /* Pending placeholder — show loading dots */
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex gap-1">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+                            </div>
+                            {isRecalibrating ? (
+                              <span className="text-xs">Recalibrating your schedule...</span>
+                            ) : (
+                              <span className="text-xs">Thinking...</span>
+                            )}
+                          </div>
+                        ) : isInterrupted(msg) && msg.content ? (
+                          /* Interrupted/failed with content — show content + retry */
+                          <div>
+                            <ReactMarkdown components={markdownComponents}>
+                              {stripStreamingTags(msg.content)}
+                            </ReactMarkdown>
+                            <button
+                              className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
+                              onClick={() => retryMessage(i)}
+                              disabled={isLoading}
+                            >
+                              {msg.status === 'failed' ? <AlertCircle className="size-3" /> : <RotateCcw className="size-3" />}
+                              {msg.status === 'failed' ? 'Response failed — tap to retry' : 'Response interrupted — tap to retry'}
+                            </button>
+                          </div>
+                        ) : (
+                          <TypewriterMarkdown
+                            text={stripStreamingTags(msg.content)}
+                            active={msg.id != null && msg.id === animatingMessageId}
+                            speed={revealSpeed}
+                            components={markdownComponents}
+                            onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
+                          />
+                        )
+                        const position = positions[k]
+                        // ~78% of the CHAT column for either sender. The coach's
+                        // column is narrowed by its avatar (28px + 8px gap), so
+                        // its share is worked back out to the full column.
+                        const widest = isUserGroup ? '78%' : 'calc((100% + 36px) * 0.78)'
+                        return (
+                          <Fragment key={msg.id || `msg-${i}`}>
+                            {position && (
+                              <div
+                                data-testid="chat-bubble"
+                                data-position={position}
+                                data-role={msg.role}
+                                className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
+                                  msg.role === 'user'
+                                    ? 'whitespace-pre-wrap bg-primary text-primary-foreground'
+                                    : 'border border-[color:var(--hairline)] bg-card text-card-foreground'
+                                }`}
+                                style={{ maxWidth: widest, borderRadius: bubbleRadius(msg.role, position) }}
+                              >
+                                {bodyContent}
+                              </div>
+                            )}
+                            {/* The cards keep their own design; only the top
+                                margin each carries is dropped, so a card sits
+                                4px under its bubble like everything else in
+                                the group. */}
+                            <div data-testid="chat-cards" className="w-full empty:hidden [&>*:first-child]:mt-0" style={{ maxWidth: widest }}>
+                              {msg.pendingAction && msg.status !== 'failed' && (
+                                <ProposalCard
+                                  pendingAction={msg.pendingAction}
+                                  onConfirm={scope => handleConfirmProposal(i, scope)}
+                                  onReject={() => handleRejectProposal(i)}
+                                  onAlternative={handleQuickReply}
+                                />
+                              )}
+                              {msg.receipt && msg.status !== 'failed' && (
+                                <ReceiptCard
+                                  title={msg.receipt.title}
+                                  rows={msg.receipt.rows}
+                                  summary={msg.receipt.summary}
+                                  status={msg.receipt.status}
+                                  receipt={msg.receipt.result}
+                                  undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
+                                  onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
+                                  onViewProfile={
+                                    msg.receipt.kind === 'memory_goal_saved' ? () => onOpenProfile?.('goals')
+                                    : msg.receipt.kind === 'memory_fact_saved' ? () => onOpenProfile?.('facts')
+                                    : msg.receipt.kind === 'memory_context_fact_saved' ? () => onOpenProfile?.('context')
+                                    : undefined
+                                  }
+                                  onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
+                                  onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
+                                  onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
+                                />
+                              )}
+                              {msg.clarification && msg.status !== 'failed' && (
+                                <ClarificationCard
+                                  contextLines={msg.clarification.contextLines}
+                                  prompt={msg.clarification.prompt}
+                                  options={msg.clarification.options}
+                                  answerPlaceholder={msg.clarification.answerPlaceholder}
+                                  onChoose={async value => {
+                                    if (navigator.vibrate) navigator.vibrate(10)
+                                    await handleClarificationChoice(i, value)
+                                  }}
+                                />
+                              )}
+                              {/* Retry button for interrupted messages without content */}
+                              {isInterrupted(msg) && !msg.content && !isLoading && (
+                                <button
+                                  className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
+                                  onClick={() => retryMessage(i)}
+                                >
+                                  <RotateCcw className="size-3" />
+                                  Response interrupted — tap to retry
+                                </button>
+                              )}
+                            </div>
+                          </Fragment>
+                        )
+                      })}
                     </div>
                   </div>
+                  {stamp && (
+                    <time
+                      dateTime={stamp}
+                      data-testid="chat-group-time"
+                      className={`mt-1 text-[0.6875rem] leading-none text-muted-foreground ${isUserGroup ? 'self-end' : 'pl-9'}`}
+                    >
+                      {timeLabel(stamp)}
+                    </time>
+                  )}
+                  {quickReplies.length > 0 && (
+                    <div className={`flex flex-wrap gap-2 mt-2 ${isUserGroup ? '' : 'pl-9'}`}>
+                      {quickReplies.map(option => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => handleQuickReply(option)}
+                          className="rounded-full bg-[color:var(--surface-raised)] px-3 py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[44px]"
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}

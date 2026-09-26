@@ -370,7 +370,35 @@ const seeded = Array.from({ length: 14 }, (_, i) => ({
 // hands the plan over N ms later, which is the whole race in one knob.
 const OPENER = new URLSearchParams(location.search).get('seed') === 'opener'
 const PLAN_DELAY_MS = Number(new URLSearchParams(location.search).get('planDelay') ?? '0')
-if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(seeded))
+// ?seed=groups — GROUPED BUBBLES (verify:chat-bubbles), 26 Sep 2026. A thread
+// built to hit every grouping rule at once, timed off the harness anchor so
+// "Today" and "Yesterday" never depend on the machine's calendar: a day
+// change, two user messages 30s apart (one group), a coach reply whose second
+// turn is a CARD with no words between two bubbles (still one group, and the
+// card must not count as a bubble), then more than five minutes of silence
+// before the coach speaks again (a NEW group, same sender). The words are
+// only there to be shaped; nothing reads them.
+const GROUPS = new URLSearchParams(location.search).get('seed') === 'groups'
+// Midday on the anchor day, which is what getAppNow() answers under the dev
+// clock. anchorNowMs() is local MIDNIGHT, so "40 minutes ago" from it is the
+// previous evening — and the first run of this driver was the app correctly
+// calling that "Yesterday".
+const MIN = 60_000, DAY = 24 * 60 * MIN
+const at = (msAgo: number) => new Date(anchorNowMs() + 12 * 60 * MIN - msAgo).toISOString()
+const grouped = [
+  { id: 'g1', role: 'assistant', status: 'complete', created_at: at(DAY + 2 * MIN), content: 'Morning — deadlifts are first today.' },
+  { id: 'g2', role: 'user', status: 'complete', created_at: at(DAY + MIN), content: 'Done, felt strong.' },
+  { id: 'g3', role: 'assistant', status: 'complete', created_at: at(40 * MIN), content: 'How did today go?' },
+  { id: 'g4', role: 'user', status: 'complete', created_at: at(38 * MIN), content: 'Good, but my lower back was a bit tight on the rows.' },
+  { id: 'g5', role: 'user', status: 'complete', created_at: at(37.5 * MIN), content: 'Nothing sharp, just tight.' },
+  { id: 'g6', role: 'assistant', status: 'complete', created_at: at(37 * MIN), content: "Tight is worth keeping an eye on. If it's still there tomorrow, tell me before the session and we'll ease the rows off." },
+  { id: 'g7', role: 'assistant', status: 'complete', created_at: at(36.9 * MIN), content: '',
+    receipt: { kind: 'memory_context_fact_saved', title: 'Saved to your notes', rows: [{ label: 'Lower back', detail: 'tight on rows' }], status: 'done' } },
+  { id: 'g8', role: 'assistant', status: 'complete', created_at: at(36.8 * MIN), content: "I'll ask about it next time." },
+  { id: 'g9', role: 'assistant', status: 'complete', created_at: at(20 * MIN), content: "One more thing — you're under on water today." },
+  { id: 'g10', role: 'user', status: 'complete', created_at: at(2 * MIN), content: 'Will do.' },
+]
+if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(GROUPS ? grouped : seeded))
 else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 
 // ---------------------------------------------------------------------------

@@ -334,7 +334,9 @@
     "test:leftovers": "tsx scripts/test-leftovers.ts",
     "verify:leftovers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/leftovers.mjs",
     "test:meal-favourite": "tsx scripts/test-meal-favourite.ts",
-    "verify:meal-favourite": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-favourite.mjs"
+    "verify:meal-favourite": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-favourite.mjs",
+    "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
+    "test:chat-groups": "tsx scripts/test-chat-groups.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

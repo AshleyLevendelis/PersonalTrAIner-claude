@@ -1006,6 +1006,16 @@ menu" stays true when a copy is also left outside it.
 - Safety ships correct or not at all — `injury-adaptation-safety`,
   `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`
+- **The coach chat is grouped bubbles** — Ashley, 26 Sep 2026, design agreed
+  before it was asked for, layout only. Same sender within five minutes is one
+  group, with 4px inside a group and 20px between groups. "Coach" and the avatar
+  appear once per coach group, and one time per group. Cards and the typing dots
+  sit inside the coach's group. **The ink on your bubble is the theme's own
+  text-on-main-colour, never a fixed white**: white on the default mint is
+  1.5:1. Across 81 theme × accent pairs, 75 reach 4.5:1. Coral and rose on the
+  three light themes are 3.4-3.9:1 with the app's OWN pair, the same one every
+  main button uses there. That is named, held to 3:1, and hers to change.
+  `chat-groups`, `verify:chat-bubbles`
 - Works one-handed on a phone on a gym floor — `verify:tap-targets`,
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`

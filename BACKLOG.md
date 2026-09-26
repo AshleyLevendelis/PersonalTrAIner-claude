@@ -2,6 +2,67 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CHAT IS GROUPED BUBBLES.** 26 Sep 2026, Ashley's request,
+  with the design agreed beforehand: messages "blur together". It is layout
+  only. chat-gemini, message data, tool calls and chat behaviour are
+  untouched, and every card, button and handler is the same one addressed by
+  the same index.
+  **What changed on screen:** your messages sit on the right in the theme's
+  main colour, and the coach's on the left in a surface bubble with a 1px
+  hairline. Messages from the same sender within five minutes form one group,
+  with 4px between bubbles and 20px between groups. A coach group has "Coach"
+  above it and a 28px avatar level with its last bubble, once. Each group
+  shows one time under its last bubble (11px, muted). Corners are 18px, with
+  the sender-side bottom tucked to 6px and joins tucked. Width is capped at
+  ~78% of the column, with 15px text on a 1.45 line and 10/14 padding. A day
+  pill ("Today", "Yesterday", or "Mon 14 Sept") appears wherever the day
+  changes. Proposal, receipt and clarification cards keep their design and
+  sit inside the coach's group, lined up with its bubbles and 4px from them.
+  Only the 8px top margin each card carries is dropped there. The typing dots
+  are a bubble in the coach's group, and the reply replaces them in place.
+  **One deviation, measured, and one finding for her:** the request said
+  white text on the main colour. White on the default mint measures 1.5:1.
+  Every theme and accent already names its own ink for that colour, white
+  exactly where the app decided white reads, so the bubble uses it.
+  Measured across all 81 theme × accent pairs: 75 reach 4.5:1. **The six
+  that do not are coral and rose on the three light themes** (Daylight,
+  Linen, Frost), where the app's own pair is white on a mid-tone fill at
+  3.4-3.9:1. That is the same pair every main button uses there, so it is a
+  colour decision for the whole app and not something a layout change should
+  alter. It is named in the driver and held to a 3:1 floor. **Asked of her.**
+  **Decided here (mechanical, recorded):** the first bubble of a multi-bubble
+  group tucks its sender-side bottom corner (the spec named last and middle
+  only; this follows the same "joins are tucked" rule). A message with no
+  time never splits a group or moves the day. A reply that lands during the
+  conversation carries no created_at until the thread reloads, so the screen
+  shows the time it first drew it: a view-only note, never written back.
+  Messages restored from the cache with no time show none rather than a
+  wrong "now". A group shows no time while the coach is typing into it. A
+  day pill also sits above the first dated message. Quick-reply chips sit
+  under the group's time.
+  **Verified:** `test:chat-groups` (29 checks: the five-minute boundary from
+  both sides, day splits across midnight, undated messages, positions around
+  a card at the start, middle and end of a group, corners, time; 13
+  mutations, 13 caught, including one first MISSED because a card in the
+  MIDDLE gives the right answer by coincidence). `verify:chat-bubbles` (35
+  checks at 390px on the real ChatAssistant: grouping, 4px and 20px measured,
+  alignment, width, type, colours against the theme's own tokens, corners on
+  firsts and lasts for both senders, labels, avatars, times, the card, the
+  typing dots and the reply landing, and contrast in dark, light and
+  white-ink themes; 18 mutations to the screen code, 18 caught). Screenshots
+  read: dark, light, the card group, typing, reply. The first affected-gate
+  run found the new sizes written in px, which breaks the phone's own
+  text-size setting (`test:a11y`). They are now rem (15px is 0.9375rem, 11px
+  is 0.6875rem), and the whole set was run again after that fix.
+  **Harness note:** a message sent during a driver run is stamped with the
+  machine's clock while the seeded thread uses the harness anchor, so the
+  harness shows an extra date pill that the app never would. No check
+  depends on it.
+  **Named, not done:** a [BREAK] in a coach reply is still a paragraph break
+  inside one bubble, not a second bubble. The coach is told [BREAK] sends two
+  texts, and this layout is where that would land. It changes what the
+  screen does with message content, so it was left for a separate yes.
+
 - [x] **THE FIRST FULLY GRADED EXAM, READ BACK: 0 REAL BREACHES, AND A VOICE
   PASS AIMED AT WHAT MARKED IT DOWN.** 26 Sep 2026. Ashley's machine ran the
   exam against coach `84f6086c` with a working judge key: **26 of 26 marked,
