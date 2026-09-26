@@ -4,9 +4,9 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -73,8 +73,8 @@
     },
     {
       "user": "so they're gone for good?",
-      "reply": "They will be once you tap **Confirm** on that card right there. \n\nThat tells the system to permanently block them, so they'll never show up in any of your future weeks or blocks. Whenever you're ready, just hit confirm and we're done with them!",
-      "raw": "They will be once you tap **Confirm** on that card right there. \n\nThat tells the system to permanently block them, so they'll never show up in any of your future weeks or blocks. Whenever you're ready, just hit confirm and we're done with them!",
+      "reply": "They will be once you tap Confirm on the card I just put up. \n\nThat card is the final step to banish them from every week of your plan for good. Go ahead and tap that, and they're gone!",
+      "raw": "They will be once you tap Confirm on the card I just put up. \n\nThat card is the final step to banish them from every week of your plan for good. Go ahead and tap that, and they're gone!",
       "error": null,
       "action": null,
       "proposal": null,

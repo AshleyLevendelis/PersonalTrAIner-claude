@@ -1,8 +1,8 @@
 {
-  "ranAt": "2026-09-25T05:48:22.267Z",
-  "fingerprint": "03225c22f9b46ce9",
+  "ranAt": "2026-09-25T06:25:27.721Z",
+  "fingerprint": "84f6086cd0500f29",
   "fingerprintParts": {
-    "prompt-and-tools": "200c75423b365f38",
+    "prompt-and-tools": "3efaa3b0c4dbecce",
     "shared-rules": "736b0c8d2981a5d7",
     "model": "aa2b41f4ff590dd7"
   },

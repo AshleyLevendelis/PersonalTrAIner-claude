@@ -2,9 +2,9 @@
   "case": "where-is-the-shopping-list",
   "why": "The shopping list moved off the Tools tab on 12 Sep 2026 — it is its own screen now, reached from Nutrition and from a Home card on shop day. This case exists because a prompt that still says 'Tools: a stopwatch and the Grocery list' sends someone to a tab that no longer has it, and no static gate noticed. A tab-description drift is exactly what an exam catches that a text check does not.",
   "checks": {},
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +56,8 @@
   "turns": [
     {
       "user": "where's my shopping list?",
-      "reply": "You can find your shopping list in a couple of places depending on where you are in the app:\n\n* **Nutrition tab:** There is a direct link on this screen that will open up your full list.\n* **Tools tab:** Tap this at the bottom of your screen, and you'll see a row for \"Grocery list\" which takes you right to it. \n* **Home tab:** On your scheduled shopping days, a \"Shopping\" card will also pop up right on your main feed showing you how many items you have left to buy.\n\nAll of these doors lead to the exact same list, which is automatically built from the meals on your plan.",
-      "raw": "You can find your shopping list in a couple of places depending on where you are in the app:\n\n* **Nutrition tab:** There is a direct link on this screen that will open up your full list.\n* **Tools tab:** Tap this at the bottom of your screen, and you'll see a row for \"Grocery list\" which takes you right to it. \n* **Home tab:** On your scheduled shopping days, a \"Shopping\" card will also pop up right on your main feed showing you how many items you have left to buy.\n\nAll of these doors lead to the exact same list, which is automatically built from the meals on your plan.",
+      "reply": "Your shopping list has its own dedicated screen in the app. You can open it a few different ways:\n\n1. Head over to the Nutrition tab and tap the shopping list link.\n2. Go to the Tools tab and tap the Grocery list row.\n3. Since today is Tuesday (which is typically shopping day), you'll also see a Shopping card right on your Home screen showing how many items you have left to buy. Tap that to open the list directly.\n\nAre you heading out to grab your groceries now?",
+      "raw": "Your shopping list has its own dedicated screen in the app. You can open it a few different ways:\n\n1. Head over to the Nutrition tab and tap the shopping list link.\n2. Go to the Tools tab and tap the Grocery list row.\n3. Since today is Tuesday (which is typically shopping day), you'll also see a Shopping card right on your Home screen showing how many items you have left to buy. Tap that to open the list directly.\n\nAre you heading out to grab your groceries now?",
       "error": null,
       "action": null,
       "proposal": null,

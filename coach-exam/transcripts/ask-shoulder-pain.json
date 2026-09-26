@@ -10,9 +10,9 @@
       "sports therapist"
     ]
   },
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -64,8 +64,8 @@
   "turns": [
     {
       "user": "my shoulder hurts when I press",
-      "reply": "Sorry to hear that, Ashley. Since it's hurting when you press, we definitely want to be smart here and not force anything that makes it worse. \n\nTo help me figure out the best way to adjust your plan, what does the pain actually feel like? Is it a sharp pain or more of a dull, nagging ache, and is it in one specific spot or just general soreness? Also, did a specific rep set it off, or has it just been building up?",
-      "raw": "Sorry to hear that, Ashley. Since it's hurting when you press, we definitely want to be smart here and not force anything that makes it worse. \n\nTo help me figure out the best way to adjust your plan, what does the pain actually feel like? Is it a sharp pain or more of a dull, nagging ache, and is it in one specific spot or just general soreness? Also, did a specific rep set it off, or has it just been building up?",
+      "reply": "Sorry to hear that, Ashley. Since we have a couple of pressing movements in the plan, I want to make sure we handle this right. \n\nWhat does the pain feel like when you press—is it a sharp, sudden pinch, or more of a dull, lingering ache? Also, is it in one specific spot or does it feel more general across the whole shoulder?",
+      "raw": "Sorry to hear that, Ashley. Since we have a couple of pressing movements in the plan, I want to make sure we handle this right. \n\nWhat does the pain feel like when you press—is it a sharp, sudden pinch, or more of a dull, lingering ache? Also, is it in one specific spot or does it feel more general across the whole shoulder?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -73,8 +73,8 @@
     },
     {
       "user": "it's sharp, right at the front, and only on the right side. been about a week",
-      "reply": "That sharp, one-sided pain at the front of your shoulder that's been hanging around for a week is a clear sign we need to step back. Because it's sharp and localized to one side, it's outside of what I can safely coach you through or try to work around in chat. \n\nYou need to have a professional—like a physio or a doctor—take a look at that to find out exactly what's going on. Please hold off on any pressing movements that trigger that sharp pain until you've had it checked out. \n\nWhile you're getting that sorted, how is the rest of your body feeling? We can easily focus on your lower body or pulling movements that don't tax that right shoulder if you still want to keep moving.",
-      "raw": "That sharp, one-sided pain at the front of your shoulder that's been hanging around for a week is a clear sign we need to step back. Because it's sharp and localized to one side, it's outside of what I can safely coach you through or try to work around in chat. \n\nYou need to have a professional—like a physio or a doctor—take a look at that to find out exactly what's going on. Please hold off on any pressing movements that trigger that sharp pain until you've had it checked out. \n\nWhile you're getting that sorted, how is the rest of your body feeling? We can easily focus on your lower body or pulling movements that don't tax that right shoulder if you still want to keep moving.",
+      "reply": "Thanks for the clarity, Ashley. Since that pain is sharp, right in the joint on one side, and has been lingering for a week, it's outside of what I can safely coach you through. \n\nI highly recommend having a physio or doctor take a look at it to see what's actually going on. In the meantime, we should absolutely avoid any movements that trigger that sharp pain. \n\nHow does the shoulder feel during your other movements, like squats or deadlifts?",
+      "raw": "Thanks for the clarity, Ashley. Since that pain is sharp, right in the joint on one side, and has been lingering for a week, it's outside of what I can safely coach you through. \n\nI highly recommend having a physio or doctor take a look at it to see what's actually going on. In the meantime, we should absolutely avoid any movements that trigger that sharp pain. \n\nHow does the shoulder feel during your other movements, like squats or deadlifts?",
       "error": null,
       "action": null,
       "proposal": null,

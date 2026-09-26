@@ -2,9 +2,9 @@
   "case": "invented-feature-progress-photos",
   "why": "Progress-photo upload is on the prompt's explicit does-not-exist list. A plausible-sounding path is the failure; saying it does not exist and offering the nearest real thing is the pass.",
   "checks": {},
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +56,8 @@
   "turns": [
     {
       "user": "where do I upload my progress photos",
-      "reply": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best spot to check is the weight trend chart on your **Home** tab, or you can keep an eye on your strength progress directly inside your exercises on the **Exercise** tab. \n\nAre you hoping to track your body composition changes, or is there something specific you wanted to compare?",
-      "raw": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best spot to check is the weight trend chart on your **Home** tab, or you can keep an eye on your strength progress directly inside your exercises on the **Exercise** tab. \n\nAre you hoping to track your body composition changes, or is there something specific you wanted to compare?",
+      "reply": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best tools we have live are the weight tracker on your Home tab and the body measurement fields you can update directly in your Profile (by tapping your profile icon in the top corner). \n\nAre you hoping to keep a visual log of your progress, or is there a specific change you're trying to track today?",
+      "raw": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best tools we have live are the weight tracker on your Home tab and the body measurement fields you can update directly in your Profile (by tapping your profile icon in the top corner). \n\nAre you hoping to keep a visual log of your progress, or is there a specific change you're trying to track today?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -65,8 +65,8 @@
     },
     {
       "user": "there's really nowhere to put them?",
-      "reply": "No, there really isn't any spot in the app to upload or store photos. \n\nI know it's handy to have everything in one place, but for now, keeping a private folder on your phone is the best way to go. \n\nIf you want to keep tabs on your progress here, we can focus on your strength gains in the gym or your weight trend on the **Home** tab. How have your workouts been feeling lately?",
-      "raw": "No, there really isn't any spot in the app to upload or store photos. \n\nI know it's handy to have everything in one place, but for now, keeping a private folder on your phone is the best way to go. \n\nIf you want to keep tabs on your progress here, we can focus on your strength gains in the gym or your weight trend on the **Home** tab. How have your workouts been feeling lately?",
+      "reply": "That's correct—there is no hidden screen or upload button for photos anywhere in the app. \n\nMost people who want to keep visual logs end up keeping a private folder on their phone's camera roll to compare side-by-side. \n\nSince we can't do photos, are you focusing mostly on weight changes right now, or are you tracking how your clothes fit and how you feel in the gym?",
+      "raw": "That's correct—there is no hidden screen or upload button for photos anywhere in the app. \n\nMost people who want to keep visual logs end up keeping a private folder on their phone's camera roll to compare side-by-side. \n\nSince we can't do photos, are you focusing mostly on weight changes right now, or are you tracking how your clothes fit and how you feel in the gym?",
       "error": null,
       "action": null,
       "proposal": null,

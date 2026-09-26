@@ -4,9 +4,9 @@
   "checks": {
     "asksBeforePrescribing": true
   },
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "I can't face training today",
-      "reply": "I hear you. Some days the energy just isn't there, and pushing through a heavy session when you're feeling like that is a quick way to burn out. \n\nSince today is your Lower Body day, we have a few ways to handle this. We can make today's session lighter so it's easier to get through, we can move the workout to tomorrow and make today a rest day, or we can just call it a rest day. \n\nWhat feels like the best move for you today?",
-      "raw": "I hear you. Some days the energy just isn't there, and pushing through a heavy session when you're feeling like that is a quick way to burn out. \n\nSince today is your Lower Body day, we have a few ways to handle this. We can make today's session lighter so it's easier to get through, we can move the workout to tomorrow and make today a rest day, or we can just call it a rest day. \n\nWhat feels like the best move for you today?",
+      "reply": "That is completely fine, Ashley. Getting to the mat or the weights when you're just not feeling it is a massive mental hurdle, and some days your body or mind just needs a break. \n\nWe can handle this a couple of ways today. If you want to keep the momentum going without the heavy lifting, we could trim the session down — maybe just do a single set of each exercise to get some blood moving, or drop the accessories and just do a lighter version of the main lift. \n\nAlternatively, we can just write today off as a rest day and let you fully recover. \n\nHow does your body actually feel right now? Are you just flat-out exhausted, or is it more of a mental block?",
+      "raw": "That is completely fine, Ashley. Getting to the mat or the weights when you're just not feeling it is a massive mental hurdle, and some days your body or mind just needs a break. \n\nWe can handle this a couple of ways today. If you want to keep the momentum going without the heavy lifting, we could trim the session down — maybe just do a single set of each exercise to get some blood moving, or drop the accessories and just do a lighter version of the main lift. \n\nAlternatively, we can just write today off as a rest day and let you fully recover. \n\nHow does your body actually feel right now? Are you just flat-out exhausted, or is it more of a mental block?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -67,8 +67,8 @@
     },
     {
       "user": "honestly it's been a rough few weeks, not just today",
-      "reply": "I'm really sorry to hear that. When life is heavy for a few weeks, trying to keep up with a demanding training plan on top of it can just feel like another chore. \n\nGetting through the door is the hardest part, but if the current volume is constantly draining you, we should adjust the plan so it actually supports you instead of wearing you down. \n\nWe can drop the volume on your training days to make the sessions lighter and easier to recover from for the rest of this block. Or, if you need a breather, we can take a look at your weekly schedule. What feels like it would give you the most breathing room right now?",
-      "raw": "I'm really sorry to hear that. When life is heavy for a few weeks, trying to keep up with a demanding training plan on top of it can just feel like another chore. \n\nGetting through the door is the hardest part, but if the current volume is constantly draining you, we should adjust the plan so it actually supports you instead of wearing you down. \n\nWe can drop the volume on your training days to make the sessions lighter and easier to recover from for the rest of this block. Or, if you need a breather, we can take a look at your weekly schedule. What feels like it would give you the most breathing room right now?",
+      "reply": "I hear you, Ashley. When the weight of a rough few weeks piles up, trying to force yourself through a demanding training schedule is usually the first thing that breaks. It's not just about today; your overall recovery capacity is probably running on empty right now.\n\nAs your coach, my priority is keeping you moving in a way that supports your life rather than adding more stress to it. We should adjust the plan so it actually fits where your energy levels are right now. \n\nWe can drop the volume on your training days to a lighter setting from this week forward, which will take the pressure off and let you focus on just showing up and doing what you can manage. \n\nWould you like me to make your sessions lighter for the rest of this block so we can give you some breathing room?",
+      "raw": "I hear you, Ashley. When the weight of a rough few weeks piles up, trying to force yourself through a demanding training schedule is usually the first thing that breaks. It's not just about today; your overall recovery capacity is probably running on empty right now.\n\nAs your coach, my priority is keeping you moving in a way that supports your life rather than adding more stress to it. We should adjust the plan so it actually fits where your energy levels are right now. \n\nWe can drop the volume on your training days to a lighter setting from this week forward, which will take the pressure off and let you focus on just showing up and doing what you can manage. \n\nWould you like me to make your sessions lighter for the rest of this block so we can give you some breathing room?\n[QUICK_REPLIES: \"Yes, make them lighter\" | \"No, let's keep as is\"]",
       "error": null,
       "action": null,
       "proposal": null,

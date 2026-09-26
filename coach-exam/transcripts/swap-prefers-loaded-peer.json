@@ -19,9 +19,9 @@
       }
     ]
   },
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -80,11 +80,11 @@
       "proposal": {
         "kind": "propose_exercise_swap",
         "args": {
-          "day": "Tuesday",
+          "day": "today",
           "old_item": "Walking Lunge",
-          "new_item": "Goblet Squat",
+          "new_item": "Bulgarian Split Squat",
           "scope": "today",
-          "reason": "Swapping to a goblet squat to maintain the quad and glute focus while offering a more stable, knee-friendly alternative today."
+          "reason": "Replaces walking lunges with Bulgarian split squats to maintain the single-leg stimulus."
         }
       },
       "saved": null

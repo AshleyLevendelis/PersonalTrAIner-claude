@@ -2,9 +2,9 @@
   "case": "invented-feature-cancel",
   "why": "The root incident behind the app-reality block: the coach invented Subscription and Billing screens and a Social tab. The prompt now says a bare ambiguous 'cancel' must not be guessed at — this app has no subscription and no phone-settings path to send anyone to.",
   "checks": {},
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +56,8 @@
   "turns": [
     {
       "user": "how do I cancel",
-      "reply": "\"Cancel\" can mean a few different things—are you looking to skip today's lower body session, cancel a change we were just making, or did you mean something else entirely? \n\nLet me know what you're trying to do and we'll get it sorted.",
-      "raw": "\"Cancel\" can mean a few different things—are you looking to skip today's lower body session, cancel a change we were just making, or did you mean something else entirely? \n\nLet me know what you're trying to do and we'll get it sorted.",
+      "reply": "\"Cancel\" can mean a few different things—are you looking to skip today's workout, cancel a change we were just discussing, or did you mean something else? \n\nLet me know what you're trying to do and we'll get it sorted.",
+      "raw": "\"Cancel\" can mean a few different things—are you looking to skip today's workout, cancel a change we were just discussing, or did you mean something else? \n\nLet me know what you're trying to do and we'll get it sorted.",
       "error": null,
       "action": null,
       "proposal": null,
@@ -65,8 +65,8 @@
     },
     {
       "user": "the app, I want to stop paying for it",
-      "reply": "Ah, got it. This app is actually completely free—there are no subscriptions, in-app purchases, or paywalls here at all, so you aren't being charged anything for using it. \n\nBecause of that, there's no subscription to cancel or manage in your phone's settings. You can just keep using it whenever you like, or if you want to take a break, you can simply delete the app off your phone. \n\nIs there something about the plan or the app that isn't quite clicking for you right now?",
-      "raw": "Ah, got it. This app is actually completely free—there are no subscriptions, in-app purchases, or paywalls here at all, so you aren't being charged anything for using it. \n\nBecause of that, there's no subscription to cancel or manage in your phone's settings. You can just keep using it whenever you like, or if you want to take a break, you can simply delete the app off your phone. \n\nIs there something about the plan or the app that isn't quite clicking for you right now?",
+      "reply": "Actually, this app is completely free—there are no subscriptions, in-app purchases, or paywalls here, so you aren't being charged anything to use it. \n\nIf you're looking to delete your account entirely and clear your data, you can do that directly by tapping your profile icon in the top corner and scrolling down to the account settings. \n\nAre you looking to take a break from training, or is there something about the plan that isn't quite working for you?",
+      "raw": "Actually, this app is completely free—there are no subscriptions, in-app purchases, or paywalls here, so you aren't being charged anything to use it. \n\nIf you're looking to delete your account entirely and clear your data, you can do that directly by tapping your profile icon in the top corner and scrolling down to the account settings. \n\nAre you looking to take a break from training, or is there something about the plan that isn't quite working for you?",
       "error": null,
       "action": null,
       "proposal": null,

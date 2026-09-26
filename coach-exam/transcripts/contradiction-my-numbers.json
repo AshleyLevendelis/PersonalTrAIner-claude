@@ -17,9 +17,9 @@
       }
     ]
   },
-  "fingerprint": "03225c22f9b46ce9",
+  "fingerprint": "84f6086cd0500f29",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T05:48:22.267Z",
+  "ranAt": "2026-09-25T06:25:27.721Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,8 +71,8 @@
   "turns": [
     {
       "user": "what's my protein target again?",
-      "reply": "Your daily protein target is **130g**. \n\nThat's set to support your fat loss goal while keeping your lean muscle protected. \n\nSince it's 9:15 AM, are you planning out your meals for the day, or did you want some high-protein ideas that fit into your breakfast or lunch slots?",
-      "raw": "Your daily protein target is **130g**. \n\nThat's set to support your fat loss goal while keeping your lean muscle protected. \n\nSince it's 9:15 AM, are you planning out your meals for the day, or did you want some high-protein ideas that fit into your breakfast or lunch slots?",
+      "reply": "Your protein target is 130 grams a day. \n\nHow is the eating going today? If you're planning out your meals and want to see how to hit that number, let me know.",
+      "raw": "Your protein target is 130 grams a day. \n\nHow is the eating going today? If you're planning out your meals and want to see how to hit that number, let me know.",
       "error": null,
       "action": null,
       "proposal": null,
@@ -80,8 +80,8 @@
     },
     {
       "user": "and what am I squatting today?",
-      "reply": "You've got **Barbell Back Squats** on the schedule today for **3 sets of 8 reps at 45kg**. \n\nSince you hit 45kg for all your sets last Tuesday, the goal today is to lock in that same weight and really focus on keeping the depth and tempo consistent. \n\nHow are the knees and legs feeling for those squats today?",
-      "raw": "You've got **Barbell Back Squats** on the schedule today for **3 sets of 8 reps at 45kg**. \n\nSince you hit 45kg for all your sets last Tuesday, the goal today is to lock in that same weight and really focus on keeping the depth and tempo consistent. \n\nHow are the knees and legs feeling for those squats today?",
+      "reply": "You've got Barbell Back Squats on the schedule today for 3 sets of 8 at 45kg. \n\nHow are the legs feeling for those? If you're ready to head under the bar, let me know.",
+      "raw": "You've got Barbell Back Squats on the schedule today for 3 sets of 8 at 45kg. \n\nHow are the legs feeling for those? If you're ready to head under the bar, let me know.",
       "error": null,
       "action": null,
       "proposal": null,
