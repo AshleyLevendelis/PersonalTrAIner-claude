@@ -1019,10 +1019,15 @@ menu" stays true when a copy is also left outside it.
   (avatar, "Coach", "Personal TrAIner", clear, the gear, with App's floating
   gear hidden meanwhile) replaces the per-group name. The composer is the
   page's last row on the tab bar, and the tab bar's chat button lies flat on
-  that tab only. Coach bubbles are `--secondary` with no border. Every corner
-  is 18px except a 4px tail. Without the border the fill is all that separates
-  a bubble from the page: the dark themes sit at 1.25-1.39:1 and the three
-  light ones at 1.10-1.11:1, the faintest, held at 1.08 and asked of her. **The ink on your bubble is the theme's own
+  that tab only. **Coach bubbles wear their avatar's mint gradient** (her
+  request, 27 Sep 2026): one shared value for both avatars and the bubble, the
+  theme's own ink, no border, no glow. That stands 1.9:1 or more clear of the
+  page in every theme, which closed the 26 Sep question about faint light-theme
+  bubbles. The gradient runs lighter than the main colour at the top and darker
+  at the bottom, so in three themes on their own colours the text falls short
+  of 4.5:1: Graphite 3.3 and Midnight 4.0 at the bottom, Frost's white text 3.8
+  at the top. Named, held to 3:1, and asked of her. Every corner is 18px except
+  a 4px tail. **The ink on your bubble is the theme's own
   text-on-main-colour, never a fixed white**: white on the default mint is
   1.5:1. Across 81 theme × accent pairs, 75 reach 4.5:1. Coral and rose on the
   three light themes are 3.4-3.9:1 with the app's OWN pair, the same one every

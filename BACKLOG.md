@@ -2,6 +2,63 @@
 
 Newest first. One line each.
 
+- [ ] **THE COACH'S BUBBLE IS THE COLOUR OF ITS AVATAR — built; three themes
+  asked of her.** 27 Sep 2026, Ashley's brief (layout and colour only): the
+  coach's bubble takes the avatar's exact mint gradient, with the theme's own
+  dark ink on it, and no glow.
+  **What changed on screen:** every coach bubble, including the "Thinking…"
+  one, is the avatar's gradient: lighter mint at the top, the theme's second
+  colour at the bottom. The avatar (header and thread) and the bubble now read
+  ONE shared value, so they cannot drift apart. Links inside a coach bubble are
+  the dark ink and underlined (mint on mint would vanish). The "Thinking…"
+  words are the ink at 70% and the dots at 50%. The "tap to retry" line
+  INSIDE a bubble is the dark ink, medium weight, instead of amber. The retry
+  that sits under an empty turn, on the page, keeps its amber: it is not on
+  the mint. Your bubbles, the cards, the chips and the times are unchanged.
+  **Deviations, stated:**
+  - The brief quoted the coach bubble as it was BEFORE design 2a (a hairline
+    border on the card colour). Design 2a had already made it the theme's
+    secondary colour with no border. The change was applied to what is there
+    now; the intent is the same.
+  - The brief said four themes. There are nine, each with nine accents: all
+    81 pairs were measured.
+  **Measured, and one for her:** the brief asked for the avatar's exact
+  gradient AND 4.5:1 body text in every theme. Six of nine themes have both,
+  on their own colours (4.55 to 8.3:1 at the weaker end). Three cannot:
+  - Graphite: dark text on the darker bottom of the gradient, 3.3:1.
+  - Midnight: the same, 4.0:1.
+  - Frost: white text on the lighter top, 3.8:1.
+  The cause is the gradient itself: it runs from lighter than the main colour
+  to darker than it, so dark text loses at the bottom and white text at the
+  top. Your own bubbles are the flat main colour and pass in all nine. Across
+  every accent, 49 of 81 pairs reach 4.5:1 at both ends (lowest 2.73:1, rose
+  on the light themes, where the app's own pair is already short). The driver
+  names the three, holds them to 3:1 so they cannot get worse, and prints the
+  81-pair count on every run. **Asked**: exact gradient as briefed, or a flat
+  main-colour coach bubble that reads in all nine.
+  **Closed by this change:** the 26 Sep question about faint coach bubbles on
+  the light themes (1.10:1 against the page then). A mint bubble stands 1.92:1
+  or more clear of its page in every theme.
+  **Not changed and worth knowing:** the "Thinking…" words at 70% ink are
+  small, short-lived helper text and measure 2.5 to 6.1:1; they were set to
+  the brief's exact value.
+  **Verified:** `verify:chat-bubbles`, re-anchored and extended to 61 checks
+  on the real chat at 390px: the bubble's computed gradient equals the
+  avatar's; the theme's ink on it; no border and no glow; your bubbles still
+  flat; a real link and a real failed-turn retry inside a coach bubble in the
+  dark ink (the fixture gained one failed turn and one link to have them on
+  screen); the typing bubble on the gradient with its dots and words in the
+  ink; readability read off the BUBBLE's own gradient stops, not a copy of
+  the gradient, in every theme and all 81 accent pairs, with the colour reader
+  itself checked on known values first; separation from the page in every
+  theme. 12 mutations, 12 caught, among them a
+  gradient made darker on BOTH the bubble and the avatar, which only a reading
+  taken off the real bubble can see. Typecheck clean, and the 76 gates and
+  drivers that read the chat file or open the chat screen all pass. Screenshots read: dark, light,
+  Graphite and Frost.
+  **CSCS review:** not applicable; nothing prescribed changes.
+  **Deploys:** frontend only, live on a merge to main when she says so.
+
 - [x] **ONE LOGGING ROW ON THE ACTIVE RECOVERY CARD, NOT TWO.** 27 Sep 2026,
   Ashley, with a screenshot of Saturday's card: *"minutes and how hard are
   duplicated."*
