@@ -24,7 +24,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { getReplacementCandidates } from '../src/lib/mesocycle-edit'
 import { compileSoftExercisePreferences, compileSoftFoodPreferences } from '../src/lib/fact-compiler'
-import { assembleDay, SOFT_FOOD_MISS_PENALTY, type PoolOption } from '../src/lib/meal-generation'
+import { assembleDay, DAY_CALORIE_TOLERANCE, type PoolOption } from '../src/lib/meal-generation'
 import type { MealSlotName } from '../src/lib/meal-store'
 import type { UserProfile } from '../src/lib/types'
 import type { UserFactRow } from '../src/lib/memory-store'
@@ -160,39 +160,40 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
     ],
   }
   const fitWins = assembleDay(worseButLiked, targets, {}, ['salmon'])
-  check('a liked meal does NOT win when it fits the macros worse',
+  check('a liked meal does NOT win when it takes the day off target',
     fitWins.chosen.dinner?.name === 'Chicken and rice', fitWins.chosen.dinner?.name)
-  check('the penalty is small enough that it cannot outweigh macro fit',
-    SOFT_FOOD_MISS_PENALTY <= 0.01, SOFT_FOOD_MISS_PENALTY)
 
-  // WHERE EXACTLY IT STOPS MATTERING. 200 kcal out is an easy bar; the real
-  // boundary is arithmetic. Calories carry weight 1.0 in macroDistanceScore,
-  // so a relative miss of SOFT_FOOD_MISS_PENALTY costs exactly as much as the
-  // preference is worth — on a 1200 kcal day that is 12 kcal. Anything worse
-  // than that and macro fit wins outright, which is the property that makes
-  // this safe to ship on a nutrition path.
-  const boundaryKcal = Math.round(targets.calories * SOFT_FOOD_MISS_PENALTY)
-  const justOver = {
+  // FAVOURED, NOT A TIEBREAK — Ashley, 27 Sep 2026: "favoured when picking
+  // each day". Until then this section pinned the opposite: a liked dinner 16
+  // kcal worse LOST, because the like was a 0.01 penalty worth 12 kcal on this
+  // day. The boundary is now the tolerance band itself, read off the exported
+  // constant so a retune moves the check with it: inside the band a liked day
+  // wins however much closer the other one fits, outside it the like buys
+  // nothing.
+  const dinnerAt = (kcal: number) => ({
     breakfast: pools.breakfast,
     dinner: [
       opt('dinner', 'Chicken and rice', ['chicken breast', 'white rice'], [700, 55, 70, 20]),
-      opt('dinner', 'Salmon and rice', ['salmon', 'white rice'], [700 + boundaryKcal + 4, 55, 70, 20]),
+      opt('dinner', 'Salmon and rice', ['salmon', 'white rice'], [kcal, 55, 70, 20]),
     ],
-  }
-  const overResult = assembleDay(justOver, targets, {}, ['salmon'])
-  check(`a liked meal ${boundaryKcal + 4} kcal worse already loses (boundary is ~${boundaryKcal})`,
-    overResult.chosen.dinner?.name === 'Chicken and rice', overResult.chosen.dinner?.name)
+  })
+  const inside = 700 + Math.floor(targets.calories * (DAY_CALORIE_TOLERANCE - 0.01))
+  const outside = 700 + Math.ceil(targets.calories * (DAY_CALORIE_TOLERANCE + 0.01))
+  const insideDay = assembleDay(dinnerAt(inside), targets, {}, ['salmon'])
+  check(`a liked dinner ${inside - 700} kcal worse, the day still inside the band, now WINS`,
+    insideDay.chosen.dinner?.name === 'Salmon and rice' && insideDay.withinTolerance, insideDay.chosen.dinner?.name)
+  const outsideDay = assembleDay(dinnerAt(outside), targets, {}, ['salmon'])
+  check(`...and ${outside - 700} kcal worse, the day outside it, loses`,
+    outsideDay.chosen.dinner?.name === 'Chicken and rice' && outsideDay.withinTolerance, outsideDay.chosen.dinner?.name)
+  const neutralInside = assembleDay(dinnerAt(inside), targets, {}, [])
+  check('...and without the like, the closer dinner wins — so the like is what decided it',
+    neutralInside.chosen.dinner?.name === 'Chicken and rice', neutralInside.chosen.dinner?.name)
 
-  const justUnder = {
-    breakfast: pools.breakfast,
-    dinner: [
-      opt('dinner', 'Chicken and rice', ['chicken breast', 'white rice'], [700, 55, 70, 20]),
-      opt('dinner', 'Salmon and rice', ['salmon', 'white rice'], [700 + Math.max(1, boundaryKcal - 4), 55, 70, 20]),
-    ],
-  }
-  const underResult = assembleDay(justUnder, targets, {}, ['salmon'])
-  check(`...and one ${Math.max(1, boundaryKcal - 4)} kcal worse still wins, so the bias is real`,
-    underResult.chosen.dinner?.name === 'Salmon and rice', underResult.chosen.dinner?.name)
+  // VARIETY COMES FIRST. A dish she loves is served, eaten, and then rests like
+  // any other — the reason a like as a key is not a like as a rut.
+  const rested = assembleDay(dinnerAt(700), targets, { dinner: ['Salmon and rice'] }, ['salmon'])
+  check('a liked dinner eaten yesterday gives way to one she has not had',
+    rested.chosen.dinner?.name === 'Chicken and rice', rested.chosen.dinner?.name)
 
   // Only SOFT LIKES. A hard dislike is a generation-time filter and must
   // never arrive here as a ranking hint.

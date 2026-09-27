@@ -1522,7 +1522,7 @@ const toolDeclarations = [
   {
     name: "record_fact",
     description:
-      "Records a clearly-stated food/exercise preference, timing rule, or hard availability constraint (VISION-ARCHITECTURE.md §1 Part 2). Call ONLY when the user explicitly states the preference/constraint as a fact about themselves — NEVER infer one from incidental conversation (e.g. them mentioning they had eggs today is not 'likes eggs'). Under-capture is correct; a noisy memory list is worse than a missed one.",
+      "Records a clearly-stated food/exercise preference, timing rule, or hard availability constraint (VISION-ARCHITECTURE.md §1 Part 2). Call ONLY when the user explicitly states the preference/constraint as a fact about themselves — NEVER infer one from incidental conversation (e.g. them mentioning they had eggs today is not 'likes eggs'). Under-capture is correct; a noisy memory list is worse than a missed one. WHAT A FOOD LIKE DOES, so you can say it truthfully and no more (since 27 Sep 2026): it appears on their Profile under 'Foods and meals I like', new meals are generated with it in mind, and on any day their plan can include it without missing their targets or repeating a recent meal, that day comes first. It never overrides an allergy, restriction or dislike, and it does not change the meals already saved until they are regenerated — never promise a particular dish will turn up. A meal they heart counts as a like too.",
     parameters: {
       type: "object",
       properties: {

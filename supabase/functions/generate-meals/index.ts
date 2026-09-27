@@ -170,6 +170,23 @@ function breakfastStyleGuidance(style: string | undefined): string {
   return "";
 }
 
+/**
+ * WHAT SHE LIKES — Ashley, 27 Sep 2026: "new meals are made with your likes in
+ * mind". Steering, the same standing as the cuisine mix: the client already
+ * removed any like that clashes with a restriction or a dislike, and every
+ * dish that comes back is still verified. Asked for SOME options, not all, so
+ * a love of salmon does not turn every slot into salmon.
+ */
+function likesBlock(liked: string[], favourites: string[]): string {
+  const foods = (liked || []).filter(x => typeof x === "string" && x.trim()).slice(0, 12);
+  const meals = (favourites || []).filter(x => typeof x === "string" && x.trim()).slice(0, 8);
+  if (foods.length === 0 && meals.length === 0) return "";
+  const lines: string[] = [];
+  if (foods.length > 0) lines.push(`Foods and dishes they have told us they like: ${foods.join(", ")}.`);
+  if (meals.length > 0) lines.push(`Meals they have saved as favourites, for the kind of food they enjoy: ${meals.join("; ")}.`);
+  return `\n\nTHEY LIKE (build roughly a third to a half of each slot's options around these where they genuinely suit that meal — the rest should still vary; never break any other rule in this prompt to fit one in): ${lines.join(" ")}`;
+}
+
 function dislikedFoodsBlock(disliked: string[]): string {
   if (!disliked || disliked.length === 0) return "";
   return `\n\nAVOID (this user dislikes these — never include them): ${disliked.join(", ")}.`;
@@ -241,7 +258,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { slots, dietary_preferences, cooking_time_preference, favorite_cuisines, disliked_foods, breakfast_style, profile_id } = await req.json();
+    const { slots, dietary_preferences, cooking_time_preference, favorite_cuisines, disliked_foods, breakfast_style, profile_id, liked_foods, favourite_meals } = await req.json();
 
     // Audit §1.3. Generation is the most expensive call per request of the
     // four, so it gets the tightest burst window.
@@ -278,6 +295,7 @@ Deno.serve(async (req: Request) => {
 
     const macroGuidance = macroTargetGuidance(dietary_preferences || []);
     const avoidBlock = dislikedFoodsBlock(dislikedFoods);
+    const likedBlock = likesBlock(Array.isArray(liked_foods) ? liked_foods : [], Array.isArray(favourite_meals) ? favourite_meals : []);
 
     const slotDescriptions = typedSlots.map(
       (s) => `- ${s.slot} — ${slotGuidance(s.slot, breakfast_style)}\n  Propose ${s.count} DIFFERENT dish variants, each targeting ~${s.calories} kcal, ~${s.protein}g protein, ~${s.carbs}g carbs, ~${s.fat}g fat — hit all four as closely as you can; protein must not fall meaningfully short, but don't overshoot it at the expense of carbs/fat either`
@@ -286,7 +304,7 @@ Deno.serve(async (req: Request) => {
     const prompt = `You are a chef and sports nutritionist proposing meal options for an app that will independently verify every number — your job is variety and plausibility, not precision; code will re-measure and scale every ingredient you list.
 
 CUISINE: default to familiar, everyday food — most of your proposals across a slot should be recognisably ordinary (British/Western/simple international staples), with at most ONE dish per slot drawing from something more regional. Draw from this mix: ${selectedCuisines.join(", ")}. Variety should come from ingredients, protein source, and cooking style — not from touring a different continent every dish. Do not propose near-duplicate dishes within the same slot.
-${avoidBlock}
+${avoidBlock}${likedBlock}
 
 PREP TIME: ${cookingGuidance}
 ${dietaryBlock}

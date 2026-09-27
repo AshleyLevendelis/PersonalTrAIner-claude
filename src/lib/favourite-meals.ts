@@ -57,6 +57,23 @@ export function favouriteInputFromOption(option: PoolOption): FavouriteMealInput
   }
 }
 
+/**
+ * WHO IS TOLD WHEN A HEART CHANGES — 27 Sep 2026, when a heart started to
+ * count as a like (Ashley: "Hearting a meal counts as a like too"). App's
+ * likes list and the meal rows read favourites independently; without this a
+ * heart tapped on Nutrition, or set by the coach, would reach neither until a
+ * reload, and "favoured when picking each day" would quietly not be true for
+ * the meal she had just hearted.
+ */
+const listeners = new Set<() => void>()
+export function subscribeFavourites(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+function notifyFavourites(): void {
+  for (const l of listeners) l()
+}
+
 /** The names this profile has marked. Empty on a failed read — see below. */
 export async function readFavouriteNames(profileId: string): Promise<Set<string>> {
   const { data, error } = await supabase
@@ -119,6 +136,7 @@ export async function markFavourite(profileId: string, meal: FavouriteMealInput)
     return false
   }
   await tagPoolRow(profileId, meal.name, true)
+  notifyFavourites()
   return true
 }
 
@@ -135,6 +153,7 @@ export async function unmarkFavourite(profileId: string, name: string): Promise<
     return false
   }
   await tagPoolRow(profileId, name, false)
+  notifyFavourites()
   return true
 }
 

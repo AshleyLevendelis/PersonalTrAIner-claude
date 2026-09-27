@@ -29,7 +29,7 @@
 // ---------------------------------------------------------------------------
 
 import { supabase, resolveEnv } from './supabase'
-import { computeMealMacros, type Macros100g } from './food-db'
+import { computeMealMacros, lookupIngredient, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
@@ -152,6 +152,38 @@ export interface RawProposal {
   cuisine: string
 }
 
+/** What the generator is told she likes. */
+export interface SteeringLikes {
+  foods: string[]
+  favouriteMeals: string[]
+}
+
+/**
+ * HER LIKES, MINUS ANYTHING THE APP WOULD REFUSE ANYWAY — before the generator
+ * hears them.
+ *
+ * A like never outranks a restriction or a dislike: verifyProposal still
+ * rejects any proposal that breaks one, whatever the prompt said. But asking
+ * the generator for peanut butter on behalf of someone who is peanut-free
+ * spends a paid round on dishes that are refused on arrival, and is the
+ * wrong thing to have asked in the first place. So a like is left out when
+ * it matches a disliked food by the same matcher the dislike filter uses,
+ * or when it is a food the database knows and a restriction forbids. A like
+ * the database does not know ("Thai curry") is kept: it names a kind of
+ * dish, and the dish that comes back is checked like any other.
+ */
+export function steeringLikes(likedFoods: string[], favouriteMeals: string[], dislikedFoods: string[], dietaryPreferences: string[]): SteeringLikes {
+  const clashes = (phrase: string) => {
+    if (dislikedFoods.some(d => containsPhrase(phrase, [], d) || containsPhrase(d, [], phrase))) return true
+    if (dietaryPreferences.length > 0 && lookupIngredient(phrase)) {
+      return !validateMealAgainstDiet([{ name: phrase, quantity: 100, unit: 'g' }], dietaryPreferences).ok
+    }
+    return false
+  }
+  const clean = (xs: string[]) => [...new Set(xs.map(x => x.trim()).filter(x => x.length > 0))].filter(x => !clashes(x))
+  return { foods: clean(likedFoods), favouriteMeals: clean(favouriteMeals) }
+}
+
 async function requestProposals(
   slotCounts: Partial<Record<MealSlotName, number>>,
   budgets: Partial<Record<MealSlotName, MacroTargets>>,
@@ -161,6 +193,7 @@ async function requestProposals(
   dislikedFoods: string[],
   breakfastStyle: BreakfastStyle | undefined,
   profileId: string,
+  likes: SteeringLikes = { foods: [], favouriteMeals: [] },
 ): Promise<RawProposal[]> {
   const slots = (Object.entries(slotCounts) as [MealSlotName, number][])
     .filter(([, count]) => count > 0)
@@ -204,6 +237,11 @@ async function requestProposals(
         favorite_cuisines: favoriteCuisines,
         disliked_foods: dislikedFoods,
         breakfast_style: breakfastStyle,
+        // Steering, like the cuisines: the generator is ASKED to build some
+        // options around them, and verifyProposal still decides what is
+        // accepted. Already cleared of anything clashing — see steeringLikes.
+        liked_foods: likes.foods,
+        favourite_meals: likes.favouriteMeals,
       }),
       signal: controller.signal,
     })
@@ -534,6 +572,14 @@ export async function generateMealPools(params: {
   /** Steering only — nudges the breakfast slot's prompt guidance. */
   breakfastStyle?: BreakfastStyle
   /**
+   * Foods and dishes she has said she likes, and the names of meals she has
+   * hearted (Ashley, 27 Sep 2026: "new meals are made with your likes in
+   * mind"). Steering only, like the cuisines; see steeringLikes for what is
+   * left out before the generator hears them.
+   */
+  likedFoods?: string[]
+  favouriteMeals?: string[]
+  /**
    * ADD to the slot's existing pool instead of replacing it — the "you've seen
    * them all, want me to find some new ones?" path. The default (false) is a
    * regenerate: persistPools deletes the slot's rows first, which is right
@@ -626,6 +672,7 @@ export async function generateMealPools(params: {
         params.dislikedFoods ?? [],
         params.breakfastStyle,
         params.profileId,
+        steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences),
       )
       generatorReached = true
     } catch (err) {
@@ -1076,13 +1123,23 @@ export function macroDistanceScore(totals: MacroTargets, targets: MacroTargets):
 }
 
 /**
- * How much a day that works in nothing the user has said they LIKE is
- * penalised. Same magnitude as the day-to-day repeat penalty above it, and
- * for the same reason: a soft preference is a tiebreak between days that fit
- * equally well, never a reason to ship a worse-fitting day. A 5% calorie miss
- * already scores 0.05, five times this — so macro fit always wins.
+ * A LIKE IS A SORT KEY NOW, NOT A PENALTY — Ashley, 27 Sep 2026, from three
+ * options: "New meals are made with your likes in mind and FAVOURED when
+ * picking each day."
+ *
+ * Until then a day with nothing she liked cost SOFT_FOOD_MISS_PENALTY, 0.01 —
+ * the cost of a 1% calorie miss — against a macro-distance score whose gaps
+ * run several times that, so it could only win an almost exact tie: the
+ * shape CLAUDE.md says can never decide anything. "Favoured" is a decision,
+ * so it is a key: among correct days that repeat equally, one with something
+ * she likes wins (see rankCombo for the order).
+ *
+ * CORRECTED, not quietly reversed. rankCombo's note said lifting it to a key
+ * "makes a stated like ABSOLUTE within tolerance", and backed it out. Two
+ * things changed that: her ruling asks for exactly that preference, and it is
+ * not absolute — variety ranks AHEAD of it, so the dish she loves is served,
+ * eaten, and then rests for a few days like any other.
  */
-export const SOFT_FOOD_MISS_PENALTY = 0.01
 
 /**
  * Does this dish involve something they said they liked?
@@ -1142,12 +1199,18 @@ interface ComboRank {
   /** How many slots hold a meal seen in the last few days. */
   repeats: number
   /**
+   * 1 when she has said she likes something and the day holds none of it.
+   * Behind variety, ahead of the resize: a liked dish is favoured among
+   * correct days that repeat equally, and a small resize may be spent on it.
+   */
+  likeMiss: 0 | 1
+  /**
    * 1 when the day only reaches tolerance through a quiet resize, 0 when it
    * is served exactly as stored. Behind variety and ahead of fit, so a resize
    * is spent only where it buys a different day — never for a closer number.
    */
   resized: 0 | 1
-  /** Weighted relative macro distance, plus the soft-like and multi-exotic penalties. */
+  /** Weighted relative macro distance, plus the multi-exotic penalty. */
   fit: number
 }
 
@@ -1178,18 +1241,15 @@ interface BestCombo {
  * correct days, variety costs nothing real, so it should not be haggling with
  * macro fit in the same units at all.
  *
- * Hence the order below: tolerance, then variety, then fit.
+ * Hence the order below: tolerance, then variety, then fit. Since 27 Sep 2026
+ * a stated like and a quiet resize sit between variety and fit — see
+ * ComboRank.
  *
- * ONLY VARIETY IS PROMOTED, AND THAT IS DELIBERATE. The soft-food-like nudge
- * sits in `fit` exactly where it has always sat, still worth
- * SOFT_FOOD_MISS_PENALTY against macro distance and no more. Lifting it to a
- * key of its own was tried on the way to this change and backed out: it makes
- * a stated like ABSOLUTE within tolerance, which contradicts that penalty's
- * own recorded position — *"a soft preference is a tiebreak between days that
- * fit equally well, never a reason to ship a worse-fitting day"* — and
- * test:soft-preferences pins the boundary that says so. Variety was the
- * measured defect; a calibrated decision about somebody's food preferences is
- * not something to redefine in passing while fixing it.
+ * ONLY VARIETY WAS PROMOTED ON 19 SEP, AND THAT WAS DELIBERATE: a decision
+ * about somebody's food preferences was not to be redefined in passing while
+ * fixing variety. It was redefined on 27 Sep, on Ashley's own ruling, and
+ * below variety rather than beside it — see the like key's note above
+ * rankCombo's ComboRank.
  *
  * OUTSIDE TOLERANCE, VARIETY STAYS INSIDE A MARGIN. A day the app cannot
  * get right spends almost everything on getting it close: tier 1 ranks on fit
@@ -1200,9 +1260,9 @@ interface BestCombo {
  * What still holds is the point of the old line: a day that misses its targets
  * by more than the margin is never chosen for its novelty.
  */
-function rankCombo(inTolerance: boolean, repeats: number, fit: number, resized: 0 | 1 = 0): ComboRank {
-  if (inTolerance) return { tier: 0, repeats, resized, fit }
-  return { tier: 1, repeats: 0, resized: 0, fit }
+function rankCombo(inTolerance: boolean, repeats: number, fit: number, resized: 0 | 1 = 0, likeMiss: 0 | 1 = 0): ComboRank {
+  if (inTolerance) return { tier: 0, repeats, likeMiss, resized, fit }
+  return { tier: 1, repeats: 0, likeMiss: 0, resized: 0, fit }
 }
 
 /**
@@ -1322,6 +1382,7 @@ function betterOf(current: BestCombo | null, candidate: BestCombo): BestCombo {
   const b = current.rank
   if (a.tier !== b.tier) return a.tier < b.tier ? { ...candidate, combo: { ...candidate.combo } } : current
   if (a.repeats !== b.repeats) return a.repeats < b.repeats ? { ...candidate, combo: { ...candidate.combo } } : current
+  if (a.likeMiss !== b.likeMiss) return a.likeMiss < b.likeMiss ? { ...candidate, combo: { ...candidate.combo } } : current
   if (a.resized !== b.resized) return a.resized < b.resized ? { ...candidate, combo: { ...candidate.combo } } : current
   return a.fit < b.fit ? { ...candidate, combo: { ...candidate.combo } } : current
 }
@@ -1391,7 +1452,7 @@ export function assembleDay(
   const state: { best: BestCombo | null } = { best: null }
   // Every off-target day the search sees, for the margin choice after it —
   // only read when no day at all reaches tolerance.
-  const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; repeats: number; fit: number }[] = []
+  const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; repeats: number; likeMiss: 0 | 1; fit: number }[] = []
 
   function search(index: number, combo: Partial<Record<MealSlotName, PoolOption>>): void {
     if (index === slots.length) {
@@ -1407,13 +1468,13 @@ export function assembleDay(
       const exoticPenalty = exoticSlots > 1 ? (exoticSlots - 1) * 0.005 : 0
       // At least ONE liked thing in the day, not as many as possible: someone
       // who says they love salmon wants salmon once, not at every meal.
-      const missesEveryLikedFood = softLikedFoods.length > 0
-        && !slots.some(s => optionMatchesLikedFood(combo[s]!, softLikedFoods))
-      // The soft-like and multi-exotic nudges live INSIDE fit, at the
-      // magnitudes they have always had. See rankCombo.
-      const nudges = exoticPenalty + (missesEveryLikedFood ? SOFT_FOOD_MISS_PENALTY : 0)
+      const likeMiss: 0 | 1 = softLikedFoods.length > 0
+        && !slots.some(s => optionMatchesLikedFood(combo[s]!, softLikedFoods)) ? 1 : 0
+      // The multi-exotic nudge lives INSIDE fit, at the magnitude it has
+      // always had. A like is a key of its own — see rankCombo.
+      const nudges = exoticPenalty
       if (dayWithinTolerance(totals, targets)) {
-        state.best = betterOf(state.best, { combo, totals, rank: rankCombo(true, repeats, macroDistanceScore(totals, targets) + nudges) })
+        state.best = betterOf(state.best, { combo, totals, rank: rankCombo(true, repeats, macroDistanceScore(totals, targets) + nudges, 0, likeMiss) })
         return
       }
       // Off target as stored: judge the day it would be SERVED as, if a quiet
@@ -1423,11 +1484,11 @@ export function assembleDay(
         ? resizeLargestFreeSlot(combo, pinned, targets, QUIET_RESIZE_MIN, QUIET_RESIZE_MAX, true)
         : null
       if (quiet && dayWithinTolerance(quiet.totals, targets)) {
-        state.best = betterOf(state.best, { combo: quiet.chosen, totals: quiet.totals, rank: rankCombo(true, repeats, macroDistanceScore(quiet.totals, targets) + nudges, 1) })
+        state.best = betterOf(state.best, { combo: quiet.chosen, totals: quiet.totals, rank: rankCombo(true, repeats, macroDistanceScore(quiet.totals, targets) + nudges, 1, likeMiss) })
         return
       }
       const fit = macroDistanceScore(totals, targets) + nudges
-      offTarget.push({ combo: { ...combo }, totals, repeats, fit })
+      offTarget.push({ combo: { ...combo }, totals, repeats, likeMiss, fit })
       state.best = betterOf(state.best, { combo, totals, rank: rankCombo(false, repeats, fit) })
       return
     }
@@ -1445,7 +1506,8 @@ export function assembleDay(
   }
 
   // NO DAY REACHES TOLERANCE: among the off-target days within the margin of
-  // the closest, the one repeating least recent food, then the closest. See
+  // the closest, the one repeating least recent food, then one holding
+  // something she likes, then the closest. See
   // OFF_TARGET_VARIETY_MARGIN. The closest itself is always within the
   // margin, so with no history this is exactly the old choice.
   if (state.best.rank.tier === 1) {
@@ -1453,7 +1515,9 @@ export function assembleDay(
     let pick: (typeof offTarget)[number] | null = null
     for (const c of offTarget) {
       if (c.fit > closest + OFF_TARGET_VARIETY_MARGIN) continue
-      if (!pick || c.repeats < pick.repeats || (c.repeats === pick.repeats && c.fit < pick.fit)) pick = c
+      if (!pick || c.repeats < pick.repeats
+        || (c.repeats === pick.repeats && c.likeMiss < pick.likeMiss)
+        || (c.repeats === pick.repeats && c.likeMiss === pick.likeMiss && c.fit < pick.fit)) pick = c
     }
     if (pick) state.best = { combo: pick.combo, totals: pick.totals, rank: rankCombo(false, pick.repeats, pick.fit) }
   }

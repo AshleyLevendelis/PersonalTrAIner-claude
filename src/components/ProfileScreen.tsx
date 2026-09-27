@@ -19,7 +19,8 @@ import { Separator } from '@/components/ui/separator'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Pencil, Trash2, Check, X, Plus, ChevronDown } from 'lucide-react'
+import { Pencil, Trash2, Check, X, Plus, ChevronDown, Heart } from 'lucide-react'
+import { readFavouriteNames, subscribeFavourites, unmarkFavourite } from '@/lib/favourite-meals'
 import {
   getAllFacts, getAllGoals, getAllContextFacts, createFact,
   deleteFactPermanently, deleteGoalPermanently, deleteContextFactPermanently,
@@ -643,13 +644,79 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     await onMemoryChanged()
   }
 
+  /**
+   * WHAT SHE LIKES — Ashley, 27 Sep 2026, from three options: a "Foods and
+   * meals I like" list beside "Foods to avoid", and the coach can add to it.
+   * The same rows a "I love salmon" chat turn writes (food_preference, like,
+   * soft), so the two surfaces write one list. Until today the screen could
+   * only edit or delete a like the coach had recorded, never add one.
+   *
+   * Stored as typed, NOT resolved against the food database the way an
+   * exercise dislike is: a like names a food or a KIND of dish ("a good
+   * curry"), it steers rather than filters, and a like the database does not
+   * know is still useful to the generator. A dislike is different because it
+   * must match to take anything off a plate.
+   */
+  const foodLikes = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'like')
+  const foodLikeValues = foodLikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
+  const saveLikedFoods = async (next: string[]) => {
+    if (!profileId) return
+    const added = next.filter(v => !foodLikeValues.includes(v))
+    const removed = foodLikes.filter(f => !next.includes(f.resolved_refs?.[0] ?? f.display_text))
+    try {
+      await Promise.all([
+        ...added.map(v => createFact({
+          profileId, kind: 'food_preference', source: 'manual',
+          rawPhrase: v, displayText: `likes ${v}`,
+          polarity: 'like', hardness: 'soft', resolvedRefs: resolveFoodTarget(v),
+        })),
+        ...removed.map(f => deleteFactPermanently(f.id)),
+      ])
+    } catch (err) {
+      console.error('Saving foods you like failed:', err)
+      await reload().catch(() => {})
+      await Promise.resolve(onMemoryChanged()).catch(() => {})
+      setSaveError(added.length > 0
+        ? "That wasn't saved, so your meals don't know it yet. Check your connection and add it again."
+        : "That wasn't removed — it still counts as a like. Check your connection and try again.")
+      throw err
+    }
+    setSaveError(null)
+    await reload()
+    await onMemoryChanged()
+  }
+
+  /**
+   * THE MEALS SHE HAS HEARTED, beside the likes, because they count as likes
+   * too and "nothing is learnt behind your back" means nothing that counts is
+   * kept off this screen. Removing one here is the same unheart the meal row
+   * does, through the same function, so the two cannot disagree.
+   */
+  const [heartedMeals, setHeartedMeals] = useState<string[]>([])
+  const [heartError, setHeartError] = useState<string | null>(null)
+  // Read only while the sheet is open: it stays mounted closed, and App already
+  // reads the same table at start for the meals.
+  useEffect(() => {
+    if (!profileId || !open) return
+    let live = true
+    const read = () => { void readFavouriteNames(profileId).then(n => { if (live) setHeartedMeals([...n].sort()) }) }
+    read()
+    const unsubscribe = subscribeFavourites(read)
+    return () => { live = false; unsubscribe() }
+  }, [profileId, open])
+  const unheart = async (name: string) => {
+    if (!profileId) return
+    const ok = await unmarkFavourite(profileId, name)
+    setHeartError(ok ? null : `${name} is still hearted — that didn't reach the server. Try again in a moment.`)
+  }
+
   const grouped = (['food_preference', 'exercise_preference', 'timing_rule', 'hard_constraint'] as const)
     .map(kind => ({
       kind,
-      // Must exclude exactly what hardFoodDislikes now INCLUDES, or a softly
-      // filed dislike renders twice — once in the "won't eat" list and again
-      // here. Caught by the gate the moment that list widened.
-      items: facts.filter(f => f.kind === kind && !(kind === 'food_preference' && f.polarity === 'dislike')),
+      // Must exclude exactly what the two food lists above INCLUDE — every
+      // dislike, and since 27 Sep every like — or one renders twice. Caught by
+      // the gate the moment the dislike list widened.
+      items: facts.filter(f => f.kind === kind && !(kind === 'food_preference' && (f.polarity === 'dislike' || f.polarity === 'like'))),
     }))
     .filter(g => g.items.length > 0)
 
@@ -1104,6 +1171,35 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground/70">
                   {dietTargetCaveat(profile.dietary_preferences ?? [])}
                 </p>
+              )}
+            </div>
+            {/* BEFORE "Foods to avoid", not after: beside it, as her ruling asked,
+                without splitting the two avoid lists, which sit together on purpose. */}
+            <div className="space-y-1.5" data-testid="profile-food-likes">
+              <span className="text-muted-foreground">Foods and meals I like</span>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">New meals are made with these in mind, and days that include them come first. They never override what you avoid.</p>
+              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, a good curry" />
+              {heartedMeals.length > 0 && (
+                <div className="space-y-1 pt-1" data-testid="profile-hearted-meals">
+                  <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Meals you've hearted count too:</p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {heartedMeals.map(name => (
+                      <li key={name} className="flex items-center gap-1 rounded-full bg-[color:var(--surface-raised)] py-1 pl-2.5 pr-1 text-xs" data-hearted-meal={name}>
+                        <Heart className="size-3 fill-current text-primary" aria-hidden />
+                        <span>{name}</span>
+                        <button
+                          type="button"
+                          onClick={() => void unheart(name)}
+                          aria-label={`Remove ${name} from your hearted meals`}
+                          className="hit-slop-44 flex size-5 items-center justify-center rounded-full text-muted-foreground"
+                        >
+                          <X className="size-3" aria-hidden />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {heartError && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{heartError}</p>}
+                </div>
               )}
             </div>
             <div className="space-y-1.5">

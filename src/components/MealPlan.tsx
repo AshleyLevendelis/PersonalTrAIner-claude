@@ -25,7 +25,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 import type { MealMoveContext } from './nutrition/MealMoveSheet'
 import { COOK_ONCE } from '@/lib/coach-voice'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
-import { readFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
+import { readFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption, subscribeFavourites } from '@/lib/favourite-meals'
 const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -165,8 +165,11 @@ export function MealPlan({
   useEffect(() => {
     if (!profileId) { setFavouriteNames(new Set()); return }
     let live = true
-    void readFavouriteNames(profileId).then(names => { if (live) setFavouriteNames(names) })
-    return () => { live = false }
+    const read = () => { void readFavouriteNames(profileId).then(names => { if (live) setFavouriteNames(names) }) }
+    read()
+    // A heart set by the coach, or on another day of the strip, shows here too.
+    const unsubscribe = subscribeFavourites(read)
+    return () => { live = false; unsubscribe() }
   }, [profileId])
 
   const toggleFavourite = async (option: PoolOption, next: boolean): Promise<boolean | null> => {

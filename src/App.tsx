@@ -4,7 +4,6 @@ import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { ProfileMenu } from '@/components/ProfileMenu'
-import { ProfileScreen } from '@/components/ProfileScreen'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { loadOnboardingDraft, clearOnboardingDraft } from '@/lib/onboarding-draft-store'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
@@ -31,6 +30,7 @@ import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, cl
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
 import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { readFavouriteNames, subscribeFavourites } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -104,6 +104,16 @@ const ChatAssistant = lazy(() =>
 // it. The first open then costs nothing, online or off.
 const loadGroceryScreen = () => import('@/components/GroceryScreen')
 const GroceryScreen = lazy(() => loadGroceryScreen().then(m => ({ default: m.GroceryScreen })))
+
+// THE PROFILE SCREEN, OFF THE MAIN BUNDLE (27 Sep 2026). "Foods and meals I
+// like" took the app chunk 2 kB over a budget with none left, and the house
+// rule is to defer before raising. Profile is a sheet behind the gear, never
+// part of a first look, and it stays MOUNTED (closed) exactly as before, so its
+// chunk is fetched straight after start, the way the coach's is, and is cached
+// for offline before anyone opens it. Its own Suspense with no fallback, so a
+// sheet that is closed anyway never flashes the full-screen loader.
+const ProfileScreen = lazy(() =>
+  import('@/components/ProfileScreen').then(m => ({ default: m.ProfileScreen })))
 
 /** The one loading state this app has, reused so a lazy chunk never introduces a second. */
 function ScreenLoading() {
@@ -307,7 +317,25 @@ function App() {
   // MEMOISED, and not as a micro-optimisation: it is an input to the meal
   // rotation's memo below, and a fresh array every render would rebuild the
   // whole week's assembly on every keystroke anywhere in the app.
-  const compiledSoftFoodPreferences = useMemo(() => compileSoftFoodPreferences(memoryFacts), [memoryFacts])
+  // WHAT SHE LIKES, ALL OF IT — Ashley, 27 Sep 2026: "Hearting a meal counts
+  // as a like too." Typed likes (Profile or the coach) and hearted meal names,
+  // one list, so every day on the strip, the shopping list and the coach see
+  // the same likes. The generator hears the two halves separately.
+  const [favouriteMealNames, setFavouriteMealNames] = useState<string[]>([])
+  useEffect(() => {
+    if (!profile?.id) { setFavouriteMealNames([]); return }
+    const id = profile.id
+    let live = true
+    const read = () => { void readFavouriteNames(id).then(names => { if (live) setFavouriteMealNames([...names].sort()) }) }
+    read()
+    const unsubscribe = subscribeFavourites(read)
+    return () => { live = false; unsubscribe() }
+  }, [profile?.id])
+  const typedFoodLikes = useMemo(() => compileSoftFoodPreferences(memoryFacts), [memoryFacts])
+  const compiledSoftFoodPreferences = useMemo(
+    () => [...new Set([...typedFoodLikes, ...favouriteMealNames])],
+    [typedFoodLikes, favouriteMealNames],
+  )
 
   // THE TWO COMPILERS THAT WERE WRITTEN, DOCUMENTED, AND NEVER CALLED.
   //
@@ -1220,6 +1248,8 @@ function App() {
                     dislikedFoods: effectiveDislikedFoods,
                     timingRules: compiledTimingRules,
                     breakfastStyle: profile.breakfast_style,
+                    likedFoods: typedFoodLikes,
+                    favouriteMeals: favouriteMealNames,
                     onlySlots: [slot],
                     appendToExisting: true,
                   })
@@ -1281,6 +1311,8 @@ function App() {
       favoriteCuisines: forProfile.favorite_cuisines,
       dislikedFoods: forProfile.disliked_foods,
       breakfastStyle: forProfile.breakfast_style,
+      likedFoods: typedFoodLikes,
+      favouriteMeals: favouriteMealNames,
     })
       .then(result => {
         if (activeProfileIdRef.current !== profileId) return
@@ -1867,6 +1899,8 @@ function App() {
         dislikedFoods: effectiveDislikedFoods,
         timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
+        likedFoods: typedFoodLikes,
+        favouriteMeals: favouriteMealNames,
         onlySlots: [slot],
       })
       // Surfacing round — a dietary_preferences value the app can't enforce
@@ -1990,6 +2024,8 @@ function App() {
         dislikedFoods: effectiveDislikedFoods,
         timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
+        likedFoods: typedFoodLikes,
+        favouriteMeals: favouriteMealNames,
       })
       // Surfacing round — checked first and short-circuits, same reasoning
       // as the single-slot handler above: an unrecognised restriction fails
@@ -3067,6 +3103,7 @@ function App() {
         mealsPending={(isGeneratingMeals || initialMealBuild) && Object.keys(mealPools).length === 0}
         onRunningChange={setTourRunning}
       />
+      <Suspense fallback={null}>
       <ProfileScreen
         exercisePlan={exercisePlan}
         open={profileInfoOpen}
@@ -3086,6 +3123,7 @@ function App() {
           setNewPlanConfirmOpen(true)
         }}
       />
+      </Suspense>
       {/* ASK, NEVER SILENTLY (audit §2.1). A rebuild rewrites the weeks
           ahead, so it happens on an explicit yes and nowhere else. Declining
           leaves the plan exactly as it was — the profile change itself has

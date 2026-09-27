@@ -62,6 +62,10 @@ const KETO = new URLSearchParams(location.search).get('keto') === '1'
 // it reads today, and the Reminders section must say "not live yet" and offer
 // no switch. The column's PRESENCE is the signal, so it is the only thing set.
 const REMINDERS_LIVE = new URLSearchParams(location.search).get('reminders') === 'live'
+// ?likes=1 — FOODS AND MEALS SHE LIKES (27 Sep 2026). Two meals already
+// hearted, and a like the coach recorded, so the driver can see the screen
+// show both kinds, take one of each away, and add one of its own.
+const LIKES = new URLSearchParams(location.search).get('likes') === '1'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
 
@@ -115,7 +119,19 @@ const db: Db = {
   fitness_profiles: [{ ...baseProfile, ...(REMINDERS_LIVE ? { notification_switches: {} } : {}) }],
   daily_metrics: [], water_logs: [], exercise_set_logs: [], workout_sessions: [],
   cardio_logs: [], daily_steps: [], meal_events: [], user_facts: [], user_goals: [],
+  favorite_meals: LIKES ? [
+    { id: 'fav-1', profile_id: PROFILE_ID, name: 'Salmon traybake', meal_slot: 'dinner', calories: 700, protein: 45, carbs: 60, fat: 25, times_used: 1 },
+    { id: 'fav-2', profile_id: PROFILE_ID, name: 'Overnight oats', meal_slot: 'breakfast', calories: 450, protein: 25, carbs: 60, fat: 12, times_used: 1 },
+  ] : [],
+  meal_plan_slots: [],
 } as unknown as Db
+if (LIKES) {
+  ;(db.user_facts as unknown as Record<string, unknown>[]).push({
+    id: 'fact-like-1', profile_id: PROFILE_ID, kind: 'food_preference', status: 'active', source: 'chat',
+    raw_phrase: 'I love a good curry', display_text: 'likes curry', polarity: 'like', hardness: 'soft',
+    resolved_refs: ['curry'], retired_at: null, created_at: new Date(anchorNowMs() - 86400000).toISOString(),
+  })
+}
 setSupabaseClient(makeFakeSupabase(db) as never)
 // Read back by reminders.mjs: what the screen WROTE, not what it shows.
 ;(window as unknown as { __fakeDb: Db }).__fakeDb = db
