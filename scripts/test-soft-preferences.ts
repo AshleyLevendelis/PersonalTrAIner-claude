@@ -229,9 +229,17 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
   // Property, not the call's text: the horizon's assembly must be given the
   // soft likes. Pinning the exact argument list broke the day the call gained
   // a leftovers pin — the same re-anchoring as test:custom-meal above.
-  check('the grocery horizon passes them to assembleDay',
-    /assembleDay\((?:[^()]|\([^()]*\))*softLikedFoods/.test(grocery))
-  check('...and they reach it from the caller', /assembleHorizon\(input\.mealPools, input\.targets, days, input\.softLikedFoods/.test(grocery))
+  // RE-ANCHORED 27 Sep 2026: the list stopped walking its own days and now
+  // builds each date with the tab's own day function (the day strip's fix),
+  // so this reads that call. The property is unchanged: the list assembles
+  // with the same likes the tab does.
+  check('the grocery list passes them to the tab\'s own day function',
+    /assembleRotationDay\(rotation, date, pools, targets, softLikedFoods/.test(grocery))
+  check('...and they reach it from the caller, on Rebuild and when a day is added',
+    /assembleDates\(input\.mealPools, input\.targets, datesFrom\(input\.startDate, days\), input\.softLikedFoods/.test(grocery)
+    // BOTH the add and its undo: one line each, and a check satisfied by
+    // either would pass with the other one broken (it did, under mutation).
+    && (grocery.match(/assembleDates\(input\.mealPools, input\.targets, covered, input\.softLikedFoods/g) ?? []).length === 2)
   check('App gives the grocery tab the same value it gave assembleDay',
     /softLikedFoods=\{compiledSoftFoodPreferences\}/.test(app))
 }

@@ -129,7 +129,9 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     if (pinTimer.current) clearTimeout(pinTimer.current)
   }, [])
 
-  const datedCoverage = coverageSentence([...new Set(items.filter(r => r.source === 'generated').flatMap(r => (r.meal_refs ?? []).map(ref => ref.date).filter((d): d is string => !!d)))].sort())
+  const datedCoverage = profileId
+    ? coverageSentence(items.filter(r => r.source === 'generated').flatMap(r => (r.meal_refs ?? []).map(ref => ref.date).filter((d): d is string => !!d)), getSessionDateContext(profileId).date)
+    : null
 
   const handleGenerate = async () => {
     if (!profileId || !targets) return

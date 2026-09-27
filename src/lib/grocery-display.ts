@@ -10,7 +10,7 @@
 
 import { lookupIngredient } from '@/lib/food-db'
 import type { GroceryItemRow, MealRef } from '@/lib/grocery-store'
-import { weekdayShort } from '@/lib/day-labels'
+import { weekdayShort, weekdayLong, dayOfMonth } from '@/lib/day-labels'
 
 /**
  * The largest quantity one shopping line will hold. Line items are stored in
@@ -162,16 +162,45 @@ function isoPlus(m: RegExpExecArray, days: number): string {
 export const weekdayOf = weekdayShort
 
 /**
- * The list's own account of which days it covers, for the note under it:
- * "Built from the meals for Sat, Sun and Wed." Read off the rows' dates, so a
- * list that had one day added reads true where "your next 7 days" would not.
- * Null when no row carries a date (a list built before dates were kept).
+ * The list's own account of which days it covers, for the note under it, read
+ * off the rows' dates — so a list that had one day added reads true where
+ * "your next 7 days" would not. Null when no row carries a date (a list built
+ * before dates were kept), and the screen falls back to its rebuild memo.
+ *   a Rebuild from today      "Built from your next 7 days of meals."
+ *   one added day             "Built from Friday's meals."
+ *   one run, not from today   "Built from 3 days of meals, Fri 18 to Sun 20 Sep."
+ *   anything else             "Built from the meals for Fri 18 Sep and Mon 21 to Tue 22 Sep."
  */
-export function coverageSentence(dates: readonly string[]): string | null {
-  if (dates.length === 0) return null
-  const names = dates.map(weekdayOf)
-  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-  return `Built from the meals for ${list}.`
+export function coverageSentence(dates: readonly string[], today: string): string | null {
+  const sorted = [...new Set(dates)].sort()
+  if (sorted.length === 0) return null
+  const runs: [string, string, number][] = []
+  for (const d of sorted) {
+    const last = runs[runs.length - 1]
+    if (last && isoPlusDays(last[1], 1) === d) { last[1] = d; last[2]++ }
+    else runs.push([d, d, 1])
+  }
+  if (runs.length === 1) {
+    const [from, to, n] = runs[0]
+    if (from === today) return n === 1 ? "Built from today's meals." : `Built from your next ${n} days of meals.`
+    if (n === 1) return `Built from ${weekdayLong(from)}'s meals.`
+    return `Built from ${n} days of meals, ${runLabel(from, to)}.`
+  }
+  const labels = runs.map(([from, to]) => runLabel(from, to))
+  return `Built from the meals for ${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}.`
+}
+
+/** "Fri 18 Sep", or a run: "Fri 18 to Sun 20 Sep", "Mon 28 Sep to Sun 4 Oct". */
+function runLabel(from: string, to: string): string {
+  const month = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })
+  const head = (d: string) => `${weekdayShort(d)} ${dayOfMonth(d)}`
+  if (from === to) return `${head(from)} ${month(from)}`
+  return month(from) === month(to) ? `${head(from)} to ${head(to)} ${month(to)}` : `${head(from)} ${month(from)} to ${head(to)} ${month(to)}`
+}
+
+function isoPlusDays(date: string, n: number): string {
+  const m = DATE.exec(date)
+  return m ? isoPlus(m, n) : date
 }
 
 /**

@@ -160,11 +160,25 @@ console.log('\n4. The screen stays awake while a session is running')
 console.log('\n5. The shopping list buys what you actually chose')
 {
   const grocery = stripComments(readFileSync(join(ROOT, 'src/lib/grocery-store.ts'), 'utf8'))
-  check('today\'s real picks override the re-derived day', /day === 0 \? \{ \.\.\.chosen, \.\.\.todaysPicks \}/.test(grocery))
+  // RE-ANCHORED 27 Sep 2026, the day strip. Today's picks are now PINS on
+  // today's date, handed to the tab's own day function like every other
+  // date's — so the property is read off the pins, not off a day-0 branch.
+  check('today\'s real picks override the re-derived day',
+    /\[input\.startDate\]: \{ \.\.\.\(input\.pinsByDate\?\.\[input\.startDate\] \?\? \{\}\), \.\.\.\(input\.todaysPicks \?\? \{\}\) \}/.test(grocery))
+  // Every line that reads today's picks keys them to today's date and no
+  // other — on Rebuild, on adding a day and on taking one off.
+  const todaysLines = grocery.split('\n').filter(l => /input\.todaysPicks/.test(l))
   check('...only today — the rest of the week is genuinely undecided',
-    /day === 0 \?/.test(grocery) && !/todaysPicks \}\s*:\s*\{ \.\.\.chosen, \.\.\.todaysPicks/.test(grocery))
-  check('the override also feeds variety, so tomorrow does not repeat today',
-    /Object\.entries\(dayChosen\)/.test(grocery))
+    todaysLines.length >= 3 && todaysLines.every(l => /\[input\.(startDate|today)\]: \{/.test(l)), todaysLines)
+  // CORRECTED, not re-anchored. This said "the override also feeds variety, so
+  // tomorrow does not repeat today": the list threaded today's actual picks
+  // into tomorrow's history. The TAB never did — its tomorrow is the
+  // rotation's own tomorrow, and a pin is a fact about one date — so the list
+  // was shopping for a tomorrow the screen would not serve. The strip made
+  // that visible. The property now is the one that matters: the list's days
+  // are the tab's days, which test:meal-days §3 compares all seven of.
+  check('the list builds every day with the tab\'s own day function, so its tomorrow is the tab\'s tomorrow',
+    /assembleRotationDay\(rotation, date, pools, targets, softLikedFoods, pinsByDate\[date\] \?\? \{\}\)/.test(grocery))
 
   const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
   check('App passes the same chosenMeals the Nutrition tab renders',

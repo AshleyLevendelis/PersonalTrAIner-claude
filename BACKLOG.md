@@ -84,9 +84,24 @@ Newest first. One line each.
     throws; 2 of 2 mutations caught) and `test:meal-variety` §5 (the list's
     wiring, now the stronger property that it uses the tab's own day
     function; 2 of 2 caught).
-  - Full sweep: started after this commit, because the harness's fake
-    database and page reach every browser driver. Its result goes in the
-    follow-up.
+  - Full sweep at the day-strip commit: 299 gates, 292 passed. Four were the
+    usual ones (three database-only checks each printing "could not reach
+    it", and the exam freshness check red by design). Three were mine, fixed
+    in the follow-up:
+    - `verify:grocery`: a Rebuild's note listed all fourteen weekdays.
+      "Built from your next 14 days of meals." is back for a Rebuild; other
+      shapes name their days ("Built from Friday's meals.", "Built from 3 days
+      of meals, Fri 18 to Sun 20 Sept."). `test:grocery-display` holds the
+      wording, 4 of 4 mutations caught.
+    - `test:soft-preferences` and `test:session-continuity` pinned the list's
+      old private walk. Both were re-anchored on the new call, 5 of 5
+      mutations caught once one check was made to require BOTH the add and its
+      undo (a single match passed with one of them broken).
+    - ONE CORRECTION, NOT A RE-ANCHOR: session-continuity asserted "the
+      override also feeds variety, so tomorrow does not repeat today". The
+      list did thread today's actual picks into tomorrow; the TAB never did,
+      so the list shopped for a tomorrow the screen would not serve. The list
+      now follows the tab, and the check says so.
   - Screenshots read: today with the strip, an upcoming Friday, the receipt.
   **Not driven, and why:** the coach's side runs against a model and needs the
   `chat-gemini` deploy; its wiring is held in source by test:meal-days §8 and

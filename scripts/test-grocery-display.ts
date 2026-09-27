@@ -8,7 +8,7 @@
  * itself.
  */
 import {
-  formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines, slotLabel, gramStep,
+  formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines, slotLabel, gramStep, coverageSentence,
 } from '../src/lib/grocery-display'
 
 let ran = 0, failed = 0
@@ -54,6 +54,28 @@ check('the smallest amount has no minus: 5g of anything', stepQuantity(item('Har
 check('the ceiling holds: nothing steps past 100kg', stepQuantity(item('Rice', 100_000), 1) === null)
 check('a manual unit steps by one ("2 fillets" → 3, 1 → none)', stepQuantity(item('Salmon fillet', 2, 'fillets'), 1) === 3 && stepQuantity(item('Salmon fillet', 1, 'fillets'), -1) === null)
 check('a manual unit reads and labels as itself', stepperReadout(item('Salmon fillet', 2, 'fillets')) === '2 fillets' && exactLabel(item('Salmon fillet', 2, 'fillets')) === 'exact 2 fillets')
+
+
+console.log('\n[dates] A row that carries its date, and the note that names the days (27 Sep 2026)')
+// A REFERENCE WITH ITS OWN DATE WINS over the offset — a day added from the
+// strip has no build date to count from, and a list covering Friday and next
+// Tuesday has no single one.
+check('a dated reference names its own weekday, whatever the build memo says',
+  mealRefLines([{ day: 0, slot: 'dinner', mealName: 'Rice pot', date: '2026-09-18' }], '2026-09-01')[0] === 'Fri · Dinner · Rice pot',
+  mealRefLines([{ day: 0, slot: 'dinner', mealName: 'Rice pot', date: '2026-09-18' }], '2026-09-01'))
+check('...and dated references sort by their dates', mealRefLines([
+  { day: 0, slot: 'lunch', mealName: 'B', date: '2026-09-19' }, { day: 5, slot: 'lunch', mealName: 'A', date: '2026-09-18' },
+], null).map(l => l.split(' · ')[2]).join() === 'A,B')
+const T = '2026-09-16'
+const run = (from: number, n: number) => Array.from({ length: n }, (_, i) => `2026-09-${String(from + i).padStart(2, '0')}`)
+check('a Rebuild from today reads as it always did', coverageSentence(run(16, 7), T) === 'Built from your next 7 days of meals.', coverageSentence(run(16, 7), T))
+check('...and one day from today is "today\'s meals"', coverageSentence(run(16, 1), T) === "Built from today's meals.")
+check('one added day is named in full', coverageSentence(['2026-09-18'], T) === "Built from Friday's meals.", coverageSentence(['2026-09-18'], T))
+check('a run that does not start today says so, with its ends', coverageSentence(run(18, 3), T) === 'Built from 3 days of meals, Fri 18 to Sun 20 Sept.', coverageSentence(run(18, 3), T))
+check('...across a month end both months are named', coverageSentence(['2026-09-30', '2026-10-01'], T) === 'Built from 2 days of meals, Wed 30 Sept to Thu 1 Oct.', coverageSentence(['2026-09-30', '2026-10-01'], T))
+check('a gap is a separate run, not "3 days" stretched over it', coverageSentence(['2026-09-18', '2026-09-21', '2026-09-22'], T) === 'Built from the meals for Fri 18 Sept and Mon 21 to Tue 22 Sept.', coverageSentence(['2026-09-18', '2026-09-21', '2026-09-22'], T))
+check('...and a run that started before today is not "your next" days', coverageSentence(run(14, 4), T) === 'Built from 4 days of meals, Mon 14 to Thu 17 Sept.', coverageSentence(run(14, 4), T))
+check('no dated rows: no sentence, so the screen falls back to its memo', coverageSentence([], T) === null)
 
 console.log(`\n${ran} checks ran`)
 if (failed > 0) { console.error(`${failed} check(s) failed`); process.exit(1) }
