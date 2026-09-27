@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **PUT LIVE: THE GROCERY PAGE, THE FLAT MINT COACH BUBBLE AND ONE
+  RECOVERY ROW.** 27 Sep 2026, Ashley: *"Put it live"*. Main fast-forwarded
+  from the full-page chat to the working branch. Three changes reach her
+  phone: the active recovery card draws one Minutes / How hard row, not two;
+  coach bubbles are the flat main colour (her ruling that day); and the
+  grocery list is a full page with the tab bar's new icons (design 3a/3b).
+  **Pre-merge sweep**, against the settled tree at the branch head: 297
+  test/verify gates, 293 passed. The three database-only checks each printed
+  their own "could not reach it" sentence. `test:coach-exam-fresh` was red by
+  design, because the coach changed and the exam has not been re-run.
+  `test:quality` ran at the same commit: 0 of 9,216 plans below the 7.2
+  floor and an average of 11.72 of 12, identical to the last merge. That is
+  expected, since none of the three touches a plan. The sweep's rewritten
+  reports and screenshots were reverted.
+  **Deploys:** frontend only, through Vercel on the main push. The coach's
+  own changes still wait for the separate chat-gemini deploy after the exam.
+
 - [x] **THE GROCERY LIST IS A FULL PAGE (DESIGN 3a/3b), AND THE TAB BAR'S
   ICONS SAY WHAT IS BEHIND THEM.** 27 Sep 2026, Ashley's brief: presentation
   and interaction only. Every write still goes through the grocery store's own
