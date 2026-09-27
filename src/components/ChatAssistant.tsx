@@ -109,9 +109,9 @@ const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
 const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
 /**
- * The coach's colour: its avatars (header and thread) and, since 27 Sep 2026,
- * its bubbles. One constant, so a bubble can never drift from its avatar.
- * Every stop is a theme token, so it follows the theme and the accent.
+ * The coach's avatar colour (header and thread). One constant, so the two
+ * avatars can never drift apart. Every stop is a theme token, so it follows
+ * the theme and the accent. NOT the bubbles' — see the bubble's own note.
  */
 const COACH_GRADIENT = 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))'
 
@@ -6421,17 +6421,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                                 className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
                                   msg.role === 'user'
                                     ? 'whitespace-pre-wrap bg-primary text-primary-foreground'
-                                    : 'text-primary-foreground'
+                                    : 'bg-primary text-primary-foreground'
                                 }`}
-                                // THE COACH'S BUBBLE WEARS ITS AVATAR (Ashley, 27 Sep
-                                // 2026): the avatar's own gradient, from the one
-                                // constant both read, so they can never drift apart.
-                                // The avatar's glow stays on the avatar.
-                                style={{
-                                  maxWidth: widest,
-                                  borderRadius: bubbleRadius(msg.role, position),
-                                  ...(msg.role === 'assistant' && { background: COACH_GRADIENT }),
-                                }}
+                                // THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR (Ashley,
+                                // 27 Sep 2026). Her brief first gave it the avatar's
+                                // fade; measured, the fade's darker bottom and lighter
+                                // top left long messages under 4.5:1 in Graphite,
+                                // Midnight and Frost. From three options she chose one
+                                // solid colour, readable in all nine themes. The
+                                // avatar keeps the fade; yours is this colour too, so
+                                // the side says who sent what.
+                                style={{ maxWidth: widest, borderRadius: bubbleRadius(msg.role, position) }}
                               >
                                 {bodyContent}
                               </div>

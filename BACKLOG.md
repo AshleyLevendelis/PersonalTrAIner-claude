@@ -112,8 +112,33 @@ Newest first. One line each.
   **CSCS review:** not applicable; nothing prescribed changes.
   **Deploys:** frontend only, live on a merge to main when she says so.
 
-- [ ] **THE COACH'S BUBBLE IS THE COLOUR OF ITS AVATAR — built; three themes
-  asked of her.** 27 Sep 2026, Ashley's brief (layout and colour only): the
+- [x] **DECIDED: THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR.** 27 Sep 2026,
+  Ashley's answer to the question below, from three options: **flat mint**
+  (recommended), over keeping the exact fade (three themes hard to read on
+  long messages) and over the fade everywhere except those three (readable,
+  but the look would differ by theme). Her reason is the one the options put
+  to her: one solid colour reads in all nine themes. The avatar keeps its
+  fade. Your bubbles are the same colour, so the side says who sent what, as
+  her own brief had already noted and accepted.
+  **What changed:** the coach bubble (and the "Thinking…" bubble) is the
+  theme's main colour with its own ink, no fade, no border, no glow. The dark
+  links, the dark "tap to retry" and the 70%/50% placeholder stay as built.
+  **Measured, on the real chat at 390px:** coach text 5.24:1 or better in
+  every theme on its own colours (Frost the lowest; the fade's 3.3 in Graphite
+  is now 6.8), with no named exceptions. Against the page 2.27:1 or more
+  (Daylight the faintest; the separation floor moved to 2.2, just under it).
+  Across every accent, 75 of 81 pairs reach 4.5:1: exactly your bubbles' six,
+  coral and rose on the light themes, the app's own colour pair.
+  **Verified:** `verify:chat-bubbles` re-anchored from "wears the avatar's
+  fade" to "flat main colour, the same as yours", in every theme and all 81
+  pairs, and the reader still measures whatever the bubble draws, so a fade
+  coming back would be read at both ends. 60 checks, 5 mutations, 5 caught (no fill, the fade
+  back, the secondary colour, fixed white ink, the avatar's glow). The
+  affected gates and the notes' readers re-run green.
+  **Deploys:** frontend only.
+
+- [x] **THE COACH'S BUBBLE IS THE COLOUR OF ITS AVATAR — built; three themes
+  asked of her (answered above).** 27 Sep 2026, Ashley's brief (layout and colour only): the
   coach's bubble takes the avatar's exact mint gradient, with the theme's own
   dark ink on it, and no glow.
   **What changed on screen:** every coach bubble, including the "Thinking…"
