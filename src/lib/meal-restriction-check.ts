@@ -25,6 +25,8 @@
 
 import { validateMealAgainstDiet, type DietaryPreference } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
+import type { PoolOption } from './meal-generation'
+import type { MealSlotName } from './meal-store'
 
 export interface MealRestrictionIssue {
   /** 'diet' is a restriction from the picker (including every allergen tag); 'avoid' is the free-text avoid-list. */
@@ -139,4 +141,57 @@ function describeIssues(issues: MealRestrictionIssue[]): string {
   return named
     ? `Contains ${named}, which doesn't fit "${label}"${extra}.`
     : `Doesn't fit "${label}"${extra}.`
+}
+
+/**
+ * THE POOLS, WITH EVERY OPTION THAT BREAKS A CURRENT RESTRICTION MARKED — so
+ * a like never favours it (27 Sep 2026).
+ *
+ * A heart, or a meal asked for by name, survives a regenerate without being
+ * re-checked, so a pool can hold a meal that broke nothing when it was kept
+ * and breaks a restriction added since. The day ranking knows nothing about
+ * restrictions; before likes were a sort key that meal could only win on fit,
+ * and with them it would have won ON PURPOSE, which would make "they never
+ * override what you avoid" false. The same check the meal card runs, one
+ * place, applied to every pool the app assembles from.
+ *
+ * A fresh object only where the mark changes, so a clean option keeps its
+ * identity; and a stale mark is REMOVED, because a pool read back from a
+ * marked copy must not carry yesterday's restriction into today's.
+ */
+export function markRestrictionBreakers(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  dietaryPreferences: string[],
+  avoidFoods: string[],
+): Partial<Record<MealSlotName, PoolOption[]>> {
+  const out: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  for (const [slot, options] of Object.entries(pools) as [MealSlotName, PoolOption[] | undefined][]) {
+    if (!options) continue
+    out[slot] = options.map(o => {
+      const breaks = !checkMealAgainstRestrictions(o.name, o.ingredients, dietaryPreferences, avoidFoods).ok
+      if (breaks) return o.breaksRestriction ? o : { ...o, breaksRestriction: true as const }
+      if (!o.breaksRestriction) return o
+      const { breaksRestriction: _stale, ...rest } = o
+      return rest
+    })
+  }
+  return out
+}
+
+/**
+ * The hearted dishes the generator may be asked for: every one, minus any the
+ * pools mark as breaking a current restriction. A pure function so the rule
+ * can be run by a check rather than read off App's source.
+ */
+export function favouritesStillAllowed(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  favouriteNames: string[],
+): string[] {
+  const breaking = new Set(
+    (Object.values(pools) as (PoolOption[] | undefined)[])
+      .flatMap(opts => opts ?? [])
+      .filter(o => o.breaksRestriction)
+      .map(o => o.name.trim().toLowerCase()),
+  )
+  return favouriteNames.filter(n => !breaking.has(n.trim().toLowerCase()))
 }

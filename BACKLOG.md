@@ -2,6 +2,110 @@
 
 Newest first. One line each.
 
+- [x] **LIKES, AFTER REVIEW: FIVE THINGS THE FIRST BUILD GOT WRONG.** 27 Sep
+  2026, the same day. A regression review of my own diff, every finding
+  re-read against the code before anything was changed.
+  **Fixed:**
+  - **The coach hearted every meal it swapped in.** A confirmed chat swap
+    called the heart write, predating likes by a week. Once a heart counted as
+    a like, that became learning behind her back: the coach's pick became a
+    like, a favourite it was told to prioritise, and a meal that survived
+    regenerating. The same swap on screen hearted nothing. Removed.
+  - **A like could pick a meal that breaks what she avoids.** A kept meal (a
+    heart, or one asked for by name) survives a regenerate without being
+    re-checked, and the day ranking knows nothing about restrictions. With a
+    like as a sort key, such a meal would win on purpose, which made "they
+    never override what you avoid" false. Every pool the app assembles from is
+    now marked by the meal card's own restriction check, once, in one place;
+    a marked meal never counts as liked, and a hearted dish she can no longer
+    eat is not sent to the generator.
+  - **A strongly worded like was shown and read by nothing.** The likes list
+    read soft likes only; the coach may file "I always have salmon" as hard,
+    and Profile listed it. Every like counts now (the same repair the
+    dislikes list had). Its receipt also read as a ban ("excluded starting
+    your next meal regenerate"); it now says what a like does.
+  - **Likes matched as raw text**: "eggs" never found an egg, "curries" never
+    found a curry, "fish" never found cod. They now use the dislike filter's
+    own matcher. Likes sent to the generator were also over-filtered: a like
+    was dropped whenever a narrower dislike mentioned it ("chicken" against
+    "chicken liver"). Now only the like containing what she avoids is dropped,
+    categories included ("salmon" against "fish").
+  - **A failed heart read looked like "no hearts"**, and two quick hearts
+    could end on the first one's answer. Now there is one way to follow
+    hearts: a failed read keeps the last good list and says so on Profile,
+    and only the latest read applies.
+  **Smaller, fixed on the way:**
+  - A regenerate could store two meals of one name when the generator
+    proposed a kept dish back (it is now told hearted dishes by name). The
+    kept one wins, and the fresh duplicate is dropped. A one-slot regenerate
+    also showed the generator's answer instead of what was stored, which left
+    kept meals off the screen until a reload; it reads back now.
+  - Profile accepted a like of a food on her avoid list (the coach asks
+    first). It now refuses and says where to change it. **The refusal first
+    appeared in the error banner at the top of the sheet, a scroll away; the
+    driver's text check passed while the screenshot showed nothing on
+    screen.** It sits under the box now, and the driver checks that it is in
+    view. "Salmon" beside "salmon" no longer makes a second row.
+  - Profile's code now loads as its own file. If that file fails to arrive,
+    Profile shows nothing instead of the whole app hitting the error screen.
+    This covers a failed LOAD only; a render error still reaches the root
+    boundary.
+  - Profile's sentence said "days that include them come first", which left
+    out that variety ranks ahead. It now says "they're favoured when each
+    day's meals are picked", her own word from the ruling. The placeholder
+    "a good curry" could never match anything and is now "curry".
+  - Three stale comments corrected.
+  **CSCS review of the changes (decided under the delegation):**
+  - **Effect.** A like still only chooses among correct days. It can now
+    spend a quiet resize (0.75-1.35x), as variety already could. The old
+    check could not see this, because its dishes had invented macros that
+    no resize could recompute. The new check is built from real foods, so it
+    can.
+  - **What it takes away.** Nothing new. A meal that breaks a restriction is
+    served no more often than before (it can still win on fit, as it always
+    could), and is never favoured.
+  - **Fundamentals, floors and scope.** Targets and bands are untouched, and
+    so is the allergen path.
+  **Still named, not changed:** a kept meal that breaks a restriction added
+  later can still be SERVED (with the card's warning) when it wins on fit.
+  That is older than likes, it is in the allergen path, and removing it
+  changes what she is served, so it is hers to decide. Also named:
+  - the generator hears at most 12 likes and 8 hearted dishes, the hearts
+    in alphabetical order;
+  - a hearted breakfast can still clash with a timing rule and be refused
+    on arrival;
+  - the total bundle budget has **1 kB** left.
+  **Verified:**
+  - `test:meal-likes`: 62 checks (was 35). New cases cover:
+    - the one-direction and category filter, and case-blind dedupe;
+    - the heart watcher: a slow first read arriving after a fast second one
+      is never applied, a failed read keeps the list, and a stopped watch
+      hears nothing;
+    - hard likes;
+    - a real regenerate through the fake database with the generator
+      proposing the kept dish back;
+    - App's marked pools reaching every assembly, and the steering rule run
+      as a function;
+    - Profile's refusal and case-blind add;
+    - the coach's receipt, and that the coach no longer hearts.
+    21 mutations, 21 caught. Two checks missed on the first round (one found
+    the error line anywhere, one only looked for words) and were rewritten
+    before they counted.
+  - `test:soft-preferences` §4 was rebuilt on real food: a liked dinner
+    inside the band wins; one a quiet resize brings in wins, served resized;
+    one too far for a quiet resize loses; one whose shape no resize fixes
+    loses. It also covers "curries" and "fish", a hearted meal she now
+    avoids, stale marks and diet marks. 8 mutations, 8 caught.
+  - `verify:meal-likes`: 20 checks (was 15), including the refusal under the
+    box and on screen, nothing written, and no second "Salmon". 3 mutations,
+    3 caught. Screenshot read.
+  - `test:meal-favourite` re-anchored twice, to the opposite of what it
+    pinned: the coach now writes no favourite, and a failed read is null
+    rather than empty. The property it exists for, one writer of the
+    table, is unchanged.
+  **Deploys:** unchanged from the entry below. This changes nothing in
+  either edge function.
+
 - [x] **FOODS AND MEALS SHE LIKES NOW SHAPE THE MEALS.** 27 Sep 2026,
   Ashley: *"there's no way to let the app know what kind of meals a user likes
   so meals are tailored to what users actually eat."* Part 3 of three. Her

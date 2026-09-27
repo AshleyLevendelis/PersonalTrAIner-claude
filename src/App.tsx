@@ -30,7 +30,7 @@ import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, cl
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
 import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
-import { readFavouriteNames, subscribeFavourites } from '@/lib/favourite-meals'
+import { watchFavouriteNames } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -112,8 +112,19 @@ const GroceryScreen = lazy(() => loadGroceryScreen().then(m => ({ default: m.Gro
 // chunk is fetched straight after start, the way the coach's is, and is cached
 // for offline before anyone opens it. Its own Suspense with no fallback, so a
 // sheet that is closed anyway never flashes the full-screen loader.
+// A CHUNK THAT FAILS TO ARRIVE (no signal, or a file renamed by a deploy since
+// this page loaded) must not take the whole app down: mounted at start, a
+// rejected import would reach the root error screen before anyone touched the
+// gear. It renders nothing instead and says why in the console; a reload
+// fetches it again. Only the LOAD is caught — a render error inside Profile
+// still reaches the root boundary, as it always did.
 const ProfileScreen = lazy(() =>
-  import('@/components/ProfileScreen').then(m => ({ default: m.ProfileScreen })))
+  import('@/components/ProfileScreen')
+    .then(m => ({ default: m.ProfileScreen }))
+    .catch(err => {
+      console.error("Profile's code didn't load — the rest of the app carries on; a reload will fetch it again:", err)
+      return { default: (() => null) as unknown as typeof import('@/components/ProfileScreen').ProfileScreen }
+    }))
 
 /** The one loading state this app has, reused so a lazy chunk never introduces a second. */
 function ScreenLoading() {
@@ -132,6 +143,7 @@ import type { TrainerNudgeProps } from '@/components/TrainerNudge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { markRestrictionBreakers, favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
@@ -241,7 +253,9 @@ function App() {
   // single source of truth for meals. Replaces the old day-of-week
   // WeeklyMealPlan entirely (pool options aren't day-specific; any option is
   // valid for its slot any day, per the M0 architecture decision).
-  const [mealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
+  // THE POOLS AS STORED. Everything that assembles a day reads `mealPools`
+  // below, which is this with restriction breakers marked.
+  const [storedMealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
   const [isGeneratingMeals, setIsGeneratingMeals] = useState(false)
   /** True while the resize is being written. The card's button says so rather than looking dead. */
   const [mealRefitBusy, setMealRefitBusy] = useState(false)
@@ -305,11 +319,11 @@ function App() {
   /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
   const [manualMealPicks, setManualMealPicks] = useState<Partial<Record<MealSlotName, string>>>({})
 
-  // A LEAN, not a filter — "I love salmon" biases which combination of pool
-  // options gets picked for the day, and only when two combinations fit the
-  // macros about equally (SOFT_FOOD_MISS_PENALTY is a fifth of a 5% calorie
-  // miss). Hard dislikes are a different channel entirely: those are filtered
-  // out of the pool at generation time and never reach here.
+  // A LEAN, not a filter — "I love salmon" decides between days that are
+  // already correct (a sort key after variety, see meal-generation's
+  // rankCombo), never buys an off-target day, and never picks a meal that
+  // breaks what she avoids (mealPools below). Hard dislikes are a different
+  // channel entirely: filtered out at generation time.
   //
   // Declared above assembleDay rather than beside the other compilers further
   // down, because the assembled day is derived on this line and a const
@@ -324,17 +338,27 @@ function App() {
   const [favouriteMealNames, setFavouriteMealNames] = useState<string[]>([])
   useEffect(() => {
     if (!profile?.id) { setFavouriteMealNames([]); return }
-    const id = profile.id
-    let live = true
-    const read = () => { void readFavouriteNames(id).then(names => { if (live) setFavouriteMealNames([...names].sort()) }) }
-    read()
-    const unsubscribe = subscribeFavourites(read)
-    return () => { live = false; unsubscribe() }
+    return watchFavouriteNames(profile.id, names => setFavouriteMealNames([...names].sort()))
   }, [profile?.id])
   const typedFoodLikes = useMemo(() => compileSoftFoodPreferences(memoryFacts), [memoryFacts])
   const compiledSoftFoodPreferences = useMemo(
     () => [...new Set([...typedFoodLikes, ...favouriteMealNames])],
     [typedFoodLikes, favouriteMealNames],
+  )
+  // A LIKE NEVER OVERRIDES WHAT SHE AVOIDS. A kept meal (hearted, or asked
+  // for by name) survives a regenerate unchecked, so a pool can hold one that
+  // breaks a restriction added since; marked here, from the same check the
+  // meal card runs, it can never be the day a like picks. ONE derivation, and
+  // every assembly below (today, the strip, the shopping list, the refit)
+  // reads it, so they cannot disagree about which day a like chose.
+  const mealPools = useMemo(
+    () => markRestrictionBreakers(storedMealPools, profile?.dietary_preferences ?? [], compileFoodDislikes(memoryFacts)),
+    [storedMealPools, profile?.dietary_preferences, memoryFacts],
+  )
+  // And the generator is not asked for a hearted dish she can no longer eat.
+  const steerableFavouriteMeals = useMemo(
+    () => favouritesStillAllowed(mealPools, favouriteMealNames),
+    [mealPools, favouriteMealNames],
   )
 
   // THE TWO COMPILERS THAT WERE WRITTEN, DOCUMENTED, AND NEVER CALLED.
@@ -1249,7 +1273,7 @@ function App() {
                     timingRules: compiledTimingRules,
                     breakfastStyle: profile.breakfast_style,
                     likedFoods: typedFoodLikes,
-                    favouriteMeals: favouriteMealNames,
+                    favouriteMeals: steerableFavouriteMeals,
                     onlySlots: [slot],
                     appendToExisting: true,
                   })
@@ -1312,7 +1336,7 @@ function App() {
       dislikedFoods: forProfile.disliked_foods,
       breakfastStyle: forProfile.breakfast_style,
       likedFoods: typedFoodLikes,
-      favouriteMeals: favouriteMealNames,
+      favouriteMeals: steerableFavouriteMeals,
     })
       .then(result => {
         if (activeProfileIdRef.current !== profileId) return
@@ -1900,7 +1924,7 @@ function App() {
         timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
         likedFoods: typedFoodLikes,
-        favouriteMeals: favouriteMealNames,
+        favouriteMeals: steerableFavouriteMeals,
         onlySlots: [slot],
       })
       // Surfacing round — a dietary_preferences value the app can't enforce
@@ -1935,7 +1959,13 @@ function App() {
         )
         return
       }
-      setMealPools(prev => ({ ...prev, ...result.accepted }))
+      // READ BACK, not the generator's answer: what was stored also holds the
+      // meals that survive a regenerate (hearted, or asked for by name), and
+      // drops a fresh one sharing a kept one's name. Showing `accepted` left
+      // kept meals off the screen until the next reload. If the read fails,
+      // the generator's answer is still better than nothing.
+      const stored = await getPools(profile.id).catch(() => null)
+      setMealPools(prev => stored ?? ({ ...prev, ...result.accepted }))
       setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
       const todayDate = getSessionDateContext(profile.id).date
       await clearMealPick(profile.id, todayDate, slot)
@@ -2025,7 +2055,7 @@ function App() {
         timingRules: compiledTimingRules,
         breakfastStyle: profile.breakfast_style,
         likedFoods: typedFoodLikes,
-        favouriteMeals: favouriteMealNames,
+        favouriteMeals: steerableFavouriteMeals,
       })
       // Surfacing round — checked first and short-circuits, same reasoning
       // as the single-slot handler above: an unrecognised restriction fails

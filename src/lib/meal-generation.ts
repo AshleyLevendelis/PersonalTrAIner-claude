@@ -124,6 +124,17 @@ export interface PoolOption {
    */
   prep?: string
   /**
+   * Set when this option breaks one of her CURRENT restrictions or foods to
+   * avoid: a meal kept from before the change (a heart, or one she asked for
+   * by name, survives a regenerate unchecked). Derived fresh on every render
+   * (markRestrictionBreakers) and never persisted. What it does: a like never
+   * favours this option, so "they never override what you avoid" stays true.
+   * What it does NOT do: take the meal off the plan. That is the older,
+   * separate question of kept meals that break a later restriction, and it
+   * is in the allergen path, so it is not changed here.
+   */
+  breaksRestriction?: true
+  /**
    * Set when this option is a portion of another slot's meal — today's lunch
    * being last night's dinner, under the batch-cooking preference.
    *
@@ -173,14 +184,31 @@ export interface SteeringLikes {
  * dish, and the dish that comes back is checked like any other.
  */
 export function steeringLikes(likedFoods: string[], favouriteMeals: string[], dislikedFoods: string[], dietaryPreferences: string[]): SteeringLikes {
+  // ONE DIRECTION ONLY: the like contains what she avoids ("mushroom risotto"
+  // against "mushroom"), with the like itself as its own ingredient so a
+  // category dislike reaches it through the food database's tags ("salmon"
+  // against "fish"). Never the reverse: "chicken" is not inside "chicken
+  // liver" in any sense that matters, and dropping a broad like because a
+  // narrower dislike mentions it would silently lose the like.
   const clashes = (phrase: string) => {
-    if (dislikedFoods.some(d => containsPhrase(phrase, [], d) || containsPhrase(d, [], phrase))) return true
+    if (dislikedFoods.some(d => containsPhrase(phrase, [phrase], d))) return true
     if (dietaryPreferences.length > 0 && lookupIngredient(phrase)) {
       return !validateMealAgainstDiet([{ name: phrase, quantity: 100, unit: 'g' }], dietaryPreferences).ok
     }
     return false
   }
-  const clean = (xs: string[]) => [...new Set(xs.map(x => x.trim()).filter(x => x.length > 0))].filter(x => !clashes(x))
+  const clean = (xs: string[]) => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const raw of xs) {
+      const x = raw.trim()
+      const key = x.toLowerCase()
+      if (!x || seen.has(key)) continue
+      seen.add(key)
+      if (!clashes(x)) out.push(x)
+    }
+    return out
+  }
   return { foods: clean(likedFoods), favouriteMeals: clean(favouriteMeals) }
 }
 
@@ -909,7 +937,15 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
       continue
     }
 
-    const rows = options.map((opt, i) => ({
+    // A FRESH OPTION NAMED LIKE A KEPT ONE IS DROPPED, and the kept one wins:
+    // it is the meal she chose, at her portions. The generator is told her
+    // hearted dishes by name (27 Sep 2026), so asking for "Chicken tikka
+    // masala" can bring one back, and the duplicate check it would otherwise
+    // meet never sees kept rows on a plain regenerate. Two rows of one name in
+    // a slot is the swap-list breakage Fix 4.3 above exists to stop.
+    const keptNames = new Set(keep.map(row => row.name.trim().toLowerCase()))
+    const fresh = options.filter(opt => !keptNames.has(opt.name.trim().toLowerCase()))
+    const rows = fresh.map((opt, i) => ({
       profile_id: profileId,
       slot,
       pool_index: i,
@@ -925,7 +961,7 @@ async function persistPools(profileId: string, accepted: Partial<Record<MealSlot
     const keptRows = keep.map((row, i) => ({
       profile_id: profileId,
       slot,
-      pool_index: options.length + i,
+      pool_index: fresh.length + i,
       name: row.name,
       ingredients: row.ingredients,
       macros: row.macros,
@@ -1144,23 +1180,20 @@ export function macroDistanceScore(totals: MacroTargets, targets: MacroTargets):
 /**
  * Does this dish involve something they said they liked?
  *
- * Matches the option's NAME as well as its ingredients, which is deliberately
- * WIDER than the hard dislike filter in verifyProposal (ingredients only), and
- * the asymmetry is the point: a soft like is a nudge where a false positive
- * costs nothing, while a hard dislike is a filter where a false positive takes
- * food off someone's plate that they would happily have eaten. A like is also
- * far more likely to name a dish than an ingredient — "I love a curry",
- * "porridge is my go-to" — and a preference that can never match anything is
- * worse than not collecting it.
+ * THE SAME MATCHER THE DISLIKE FILTER USES (containsPhrase), over the dish
+ * name and its ingredients. Until 27 Sep 2026 this was a raw substring, so
+ * "eggs" never found an egg, "curries" never found a chicken curry and "fish"
+ * never found salmon: each like was accepted, listed, and did nothing. Two
+ * rules for "does this dish involve X" is the drift verifyProposal's own
+ * comment already names as a defect.
+ *
+ * An option that breaks a current restriction never counts as liked — a like
+ * must not be the reason a meal she now avoids gets served (breaksRestriction).
  */
 function optionMatchesLikedFood(option: PoolOption, liked: string[]): boolean {
-  if (liked.length === 0) return false
-  const name = option.name.toLowerCase()
-  const ingredientNames = option.ingredients.map(i => i.name.toLowerCase())
-  return liked.some(food => {
-    const f = food.trim().toLowerCase()
-    return f.length > 0 && (name.includes(f) || ingredientNames.some(n => n.includes(f)))
-  })
+  if (liked.length === 0 || option.breaksRestriction) return false
+  const ingredientNames = option.ingredients.map(i => i.name)
+  return liked.some(food => containsPhrase(option.name, ingredientNames, food))
 }
 
 /**
@@ -1413,11 +1446,10 @@ export function assembleDay(
   targets: MacroTargets,
   recentNames: Partial<Record<MealSlotName, string[]>> = {},
   /**
-   * Soft food LIKES (compileSoftFoodPreferences) — a tiebreak, nothing more.
-   * VISION-ARCHITECTURE.md §1.2 always named this as the consumer; until now
-   * the compiler had zero call sites, so "I love salmon" was recorded, shown
-   * back in the memory screen, and read by nothing. Hard dislikes are a
-   * different channel entirely (verifyProposal's dislikedFoods filter) and are
+   * Food LIKES (typed likes plus hearted meal names) — a sort key among
+   * correct days, ranked after variety (rankCombo). An option marked
+   * breaksRestriction never counts as liked. Hard dislikes are a different
+   * channel entirely (verifyProposal's dislikedFoods filter) and are
    * unaffected by this.
    */
   softLikedFoods: string[] = [],

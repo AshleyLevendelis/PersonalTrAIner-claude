@@ -20,13 +20,14 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Pencil, Trash2, Check, X, Plus, ChevronDown, Heart } from 'lucide-react'
-import { readFavouriteNames, subscribeFavourites, unmarkFavourite } from '@/lib/favourite-meals'
+import { watchFavouriteNames, unmarkFavourite } from '@/lib/favourite-meals'
 import {
   getAllFacts, getAllGoals, getAllContextFacts, createFact,
   deleteFactPermanently, deleteGoalPermanently, deleteContextFactPermanently,
   type UserFactRow, type UserGoalRow, type UserContextFactRow,
 } from '@/lib/memory-store'
 import { resolveFoodTarget } from '@/lib/fact-compiler'
+import { checkFactConflict } from '@/lib/memory-reconcile'
 import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { GoalWeightSetter } from '@/components/GoalWeightSetter'
@@ -658,11 +659,28 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
    * must match to take anything off a plate.
    */
   const foodLikes = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'like')
+  const [likeRefusal, setLikeRefusal] = useState<string | null>(null)
   const foodLikeValues = foodLikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
   const saveLikedFoods = async (next: string[]) => {
     if (!profileId) return
-    const added = next.filter(v => !foodLikeValues.includes(v))
+    // Case-blind, so "Salmon" beside "salmon" is the like she already has,
+    // not a second row.
+    const have = new Set(foodLikeValues.map(v => v.toLowerCase()))
+    const added = [...new Map(next.filter(v => !have.has(v.toLowerCase())).map(v => [v.toLowerCase(), v])).values()]
     const removed = foodLikes.filter(f => !next.includes(f.resolved_refs?.[0] ?? f.display_text))
+    // THE COACH'S RULE, ON THE SCREEN TOO: a like of something on her foods to
+    // avoid is a contradiction, and the coach already asks about it before
+    // writing. A tag list cannot ask, so it refuses and says where to change it.
+    // UNDER THE BOX, not in the banner at the top of the sheet: the banner is
+    // for a save that failed, and it sits a scroll away from here, so a
+    // refusal shown there looked like a + button that did nothing (found in
+    // the driver's screenshot, 27 Sep 2026).
+    const clash = added.find(v => checkFactConflict({ kind: 'food_preference', polarity: 'like', resolvedRefs: resolveFoodTarget(v) }, facts).needsConfirmation)
+    if (clash) {
+      setLikeRefusal(`${clash} is on your foods to avoid. Take it off that list first if you've changed your mind.`)
+      throw new Error('like conflicts with a food to avoid')
+    }
+    setLikeRefusal(null)
     try {
       await Promise.all([
         ...added.map(v => createFact({
@@ -698,11 +716,11 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // reads the same table at start for the meals.
   useEffect(() => {
     if (!profileId || !open) return
-    let live = true
-    const read = () => { void readFavouriteNames(profileId).then(n => { if (live) setHeartedMeals([...n].sort()) }) }
-    read()
-    const unsubscribe = subscribeFavourites(read)
-    return () => { live = false; unsubscribe() }
+    return watchFavouriteNames(
+      profileId,
+      n => { setHeartedMeals([...n].sort()); setHeartError(null) },
+      () => setHeartError("Couldn't read your hearted meals just now, so this list may be out of date."),
+    )
   }, [profileId, open])
   const unheart = async (name: string) => {
     if (!profileId) return
@@ -1177,8 +1195,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 without splitting the two avoid lists, which sit together on purpose. */}
             <div className="space-y-1.5" data-testid="profile-food-likes">
               <span className="text-muted-foreground">Foods and meals I like</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">New meals are made with these in mind, and days that include them come first. They never override what you avoid.</p>
-              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, a good curry" />
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">New meals are made with these in mind, and they're favoured when each day's meals are picked. They never override what you avoid.</p>
+              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" />
+              {likeRefusal && <p role="alert" data-testid="profile-like-refused" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">{likeRefusal}</p>}
               {heartedMeals.length > 0 && (
                 <div className="space-y-1 pt-1" data-testid="profile-hearted-meals">
                   <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Meals you've hearted count too:</p>
@@ -1198,9 +1217,11 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                       </li>
                     ))}
                   </ul>
-                  {heartError && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{heartError}</p>}
                 </div>
               )}
+              {/* Outside the list, so a read that failed before anything was
+                  shown still says so rather than looking like no hearts. */}
+              {heartError && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{heartError}</p>}
             </div>
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>

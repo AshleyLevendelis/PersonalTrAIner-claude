@@ -7,7 +7,7 @@ import { weekdayLong } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
-import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
+import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
@@ -104,7 +104,6 @@ import {
   rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
   type NudgeInput, type NudgeStore,
 } from '@/lib/coach-nudge'
-import { markFavourite } from '@/lib/favourite-meals'
 
 const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
@@ -1404,27 +1403,6 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       .order('times_used', { ascending: false })
       .limit(5)
     if (data) setFavorites(data)
-  }
-
-  const upsertFavorite = async (action: { new_item: string; meal_slot: string; protein: number; carbs: number; fat: number; portion_size?: string; prep?: string }) => {
-    if (!profile.id) return
-    // ONE WRITE PATH WITH THE MEAL CARD'S HEART. This used to be a private
-    // upsert living only here, so the screen had no way to name a favourite at
-    // all — the coach knew them and the Nutrition tab could not add one. When
-    // the heart was built on 19 Sep 2026 the obvious move was a second upsert
-    // beside this one, and two writers of one table drift. Both call
-    // markFavourite now.
-    await markFavourite(profile.id, {
-      name: action.new_item,
-      slot: action.meal_slot,
-      calories: calculateCalories(action.protein, action.carbs, action.fat),
-      protein: action.protein,
-      carbs: action.carbs,
-      fat: action.fat,
-      portionSize: action.portion_size,
-      prep: action.prep,
-    })
-    loadFavorites()
   }
 
   // Fix #4: System prompt context assembled once per call, separate from conversation window
@@ -3915,9 +3893,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // actually still has it, that's surfaced as its own row instead of
         // silently leaving the user to find out by eating it, mirroring the
         // same plain-substring match verifyProposal itself uses.
+        // A FOOD LIKE IS NEVER A BAN, whatever hardness it was filed at: "I
+        // always have salmon" filed hard used to read "excluded starting your
+        // next meal regenerate", the dislike's sentence.
         const effect = kind === 'exercise_preference' && hardness === 'hard'
           ? `excludes ${resolution.resolvedRefs.length} exercise${resolution.resolvedRefs.length === 1 ? '' : 's'} from your plan`
-          : hardness === 'hard' ? "recorded — excluded starting your next meal regenerate, doesn't touch today's plan" : 'recorded — biases suggestions, nothing removed'
+          : kind === 'food_preference' && polarity === 'like'
+            ? "recorded — new meals are made with it in mind, and it's favoured when each day is picked"
+            : hardness === 'hard' ? "recorded — excluded starting your next meal regenerate, doesn't touch today's plan" : 'recorded — biases suggestions, nothing removed'
         const rows: ChatReceiptView['rows'] = [{ label: displayText, detail: effect }]
         // NOT gated on hardness. Whatever level the app filed it at, if the
         // plan in front of them still contains the thing they just said they
@@ -5503,15 +5486,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
       title = ok ? RECEIPTS['propose_meal_swap'].done : RECEIPTS['propose_meal_swap'].failed
       rows = ok ? [{ label: payload.date ? `${weekdayLong(payload.date)} ${payload.slot}` : payload.slot, detail: `→ ${result.appliedName}` }] : []
-      if (ok && result.appliedMacros) {
-        await upsertFavorite({
-          new_item: result.appliedName!,
-          meal_slot: payload.slot,
-          protein: result.appliedMacros.protein,
-          carbs: result.appliedMacros.carbs,
-          fat: result.appliedMacros.fat,
-        })
-      }
+      // NO HEART. A confirmed swap used to heart the new meal as well, so the
+      // coach's own pick came back to it as a "favourite" to prioritise, and
+      // it survived a regenerate as if she had asked for it. Since 27 Sep 2026
+      // a heart is also a like, and her ruling was that nothing is learnt
+      // behind her back. The same swap on screen never hearted anything.
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_meal_pool_refresh') {
       const slot = (row.payload as { slot: MealSlotName }).slot

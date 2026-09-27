@@ -70,25 +70,53 @@ export function subscribeFavourites(listener: () => void): () => void {
   listeners.add(listener)
   return () => { listeners.delete(listener) }
 }
+/**
+ * Read this profile's hearted names now and again after every heart change,
+ * handing each good answer to `onNames`. The one way to follow favourites, so
+ * the three readers (the meal rows, App's likes, Profile) cannot each get the
+ * two hard parts differently:
+ *   - a FAILED read keeps the last good list (onError is told, if given);
+ *   - reads can finish out of order, and only the LATEST one started is
+ *     applied, so two quick hearts cannot end with the first one's answer.
+ */
+export function watchFavouriteNames(
+  profileId: string,
+  onNames: (names: Set<string>) => void,
+  onError?: () => void,
+): () => void {
+  let live = true
+  let latest = 0
+  const read = () => {
+    const ticket = ++latest
+    void readFavouriteNames(profileId).then(names => {
+      if (!live || ticket !== latest) return
+      if (names) onNames(names)
+      else onError?.()
+    })
+  }
+  read()
+  const unsubscribe = subscribeFavourites(read)
+  return () => { live = false; unsubscribe() }
+}
+
 function notifyFavourites(): void {
   for (const l of listeners) l()
 }
 
-/** The names this profile has marked. Empty on a failed read — see below. */
-export async function readFavouriteNames(profileId: string): Promise<Set<string>> {
+/** The names this profile has marked, or null when the read failed — see below. */
+export async function readFavouriteNames(profileId: string): Promise<Set<string> | null> {
   const { data, error } = await supabase
     .from('favorite_meals')
     .select('name')
     .eq('profile_id', profileId)
   if (error || !data) {
-    // A FAILED READ IS NOT AN EMPTY LIST, but here the two lead to the same
-    // screen: an unfilled heart. The alternative — showing every meal as
-    // favourited because the read failed — would have someone un-hearting
-    // meals they never marked. Logged rather than silent, so a read that
-    // fails every time is not indistinguishable from a profile with no
-    // favourites.
-    console.error('Reading favourite meals failed — hearts will show unfilled:', error)
-    return new Set()
+    // A FAILED READ IS NOT AN EMPTY LIST, and since 27 Sep 2026 the
+    // difference matters beyond the heart icons: hearts are likes, so "none"
+    // would change which day is served and what new meals are asked for.
+    // Null, and watchFavouriteNames keeps the last good answer. Logged, so a
+    // read that fails every time is not indistinguishable from no favourites.
+    console.error('Reading favourite meals failed — keeping the last good list:', error)
+    return null
   }
   return new Set((data as { name: string }[]).map(r => r.name))
 }

@@ -37,22 +37,31 @@ const bodies: Record<string, unknown>[] = []
 
 type Row = Record<string, unknown>
 const db: Record<string, Row[]> = { favorite_meals: [], meal_plan_slots: [] }
+/**
+ * The heart read (select 'name' on favorite_meals) can be made to fail, or to
+ * answer late. A late answer is the snapshot taken WHEN IT WAS ASKED, the way
+ * a real slow request returns the state it read, not the state at arrival.
+ */
+const heartRead = { fail: false, delays: [] as number[] }
 function fakeFrom(table: string) {
   const filters: ((r: Row) => boolean)[] = []
   let op: 'select' | 'insert' | 'update' | 'delete' = 'select'
-  let payload: Row | null = null
+  let payload: Row | Row[] | null = null
   let single = false
+  let cols = ''
+  const isHeartRead = () => table === 'favorite_meals' && op === 'select' && cols === 'name'
   const exec = () => {
     db[table] ??= []
-    if (op === 'insert') { db[table].push({ id: crypto.randomUUID(), ...payload }); return { data: null, error: null } }
+    if (isHeartRead() && heartRead.fail) return { data: null, error: { message: 'simulated read failure' } }
+    if (op === 'insert') { for (const r of Array.isArray(payload) ? payload : [payload]) db[table].push({ id: crypto.randomUUID(), created_at: new Date(0).toISOString(), ...r }); return { data: null, error: null } }
     if (op === 'update') { for (const r of db[table]) if (filters.every(f => f(r))) Object.assign(r, payload); return { data: null, error: null } }
     if (op === 'delete') { db[table] = db[table].filter(r => !filters.every(f => f(r))); return { data: null, error: null } }
     const rows = db[table].filter(r => filters.every(f => f(r))).map(r => ({ ...r }))
     return { data: single ? rows[0] ?? null : rows, error: null }
   }
   const api: Record<string, unknown> = {
-    select: () => api,
-    insert: (r: Row) => { op = 'insert'; payload = r; return api },
+    select: (c?: string) => { if (op === 'select') cols = c ?? '*'; return api },
+    insert: (r: Row | Row[]) => { op = 'insert'; payload = r; return api },
     update: (r: Row) => { op = 'update'; payload = r; return api },
     delete: () => { op = 'delete'; return api },
     eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return api },
@@ -60,7 +69,11 @@ function fakeFrom(table: string) {
     order: () => api,
     maybeSingle: () => { single = true; return api },
     single: () => { single = true; return api },
-    then: (res: (v: unknown) => void, rej?: (e: unknown) => void) => Promise.resolve().then(() => res(exec()), rej),
+    then: (res: (v: unknown) => void, rej?: (e: unknown) => void) => {
+      const delay = isHeartRead() ? (heartRead.delays.shift() ?? 0) : 0
+      const result = exec()
+      return new Promise(r => setTimeout(r, delay)).then(() => res(result), rej)
+    },
   }
   return api
 }
@@ -77,7 +90,11 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setSupabaseClient({ from: fakeFrom } as any)
   const { steeringLikes, generateMealPools } = await import('../src/lib/meal-generation')
-  const { markFavourite, unmarkFavourite, subscribeFavourites } = await import('../src/lib/favourite-meals')
+  const { favouritesStillAllowed } = await import('../src/lib/meal-restriction-check')
+  const { markFavourite, unmarkFavourite, subscribeFavourites, watchFavouriteNames } = await import('../src/lib/favourite-meals')
+  const { FAVOURITE_TAG } = await import('../src/lib/meal-store')
+  const { compileSoftFoodPreferences } = await import('../src/lib/fact-compiler')
+  const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
 
   console.log('meal likes — foods and meals she likes shape the meals')
 
@@ -92,6 +109,15 @@ async function main() {
     check('a hearted meal that clashes with nothing goes through', out.favouriteMeals.includes('Salmon traybake'), out.favouriteMeals)
     const none = steeringLikes(['peanut butter'], [], [], [])
     check('with no restriction, nothing is second-guessed', none.foods.includes('peanut butter'), none)
+    // ONE DIRECTION ONLY (27 Sep 2026 review): a broad like is not lost because
+    // a narrower dislike happens to mention it.
+    const broad = steeringLikes(['chicken', 'milk'], [], ['chicken liver', 'coconut milk'], [])
+    check('a broad like is kept when a narrower dislike merely mentions it', broad.foods.includes('chicken') && broad.foods.includes('milk'), broad.foods)
+    const category = steeringLikes(['salmon', 'peanut butter', 'rice'], [], ['fish', 'nuts'], [])
+    check('a category she avoids reaches a like through the food database ("fish" drops salmon, "nuts" drops peanut butter)',
+      !category.foods.includes('salmon') && !category.foods.includes('peanut butter') && category.foods.includes('rice'), category.foods)
+    const cased = steeringLikes(['Salmon', 'salmon', ' SALMON '], ['Oats', 'oats'], [], [])
+    check('once each, whatever the case', cased.foods.length === 1 && cased.favouriteMeals.length === 1, cased)
   }
 
   console.log('\n[2] The generator\'s request carries them, from the pool builder')
@@ -130,8 +156,37 @@ async function main() {
     unsubscribe()
     await markFavourite('p1', { name: 'Oats', slot: 'breakfast', calories: 400, protein: 20, carbs: 50, fat: 10 })
     check('...and an unsubscribed listener hears nothing more', told === 2, told)
+    // ONE WAY TO FOLLOW HEARTS, with the two hard parts done once
+    // (27 Sep 2026 review): a failed read keeps the last good list, because
+    // hearts are likes and "none" would change the meals; and only the latest
+    // read applies, so two quick hearts cannot end on the first one's answer.
+    db.favorite_meals = []
+    const seen: string[][] = []
+    let errors = 0
+    const stop = watchFavouriteNames('p2', n => seen.push([...n].sort()), () => { errors++ })
+    await wait(20)
+    check('it reads straight away', seen.length === 1 && seen[0].length === 0, seen)
+    heartRead.delays.push(80)
+    await markFavourite('p2', { name: 'Apple pie', slot: 'snack', calories: 300, protein: 4, carbs: 50, fat: 10 })
+    heartRead.delays.push(0)
+    await markFavourite('p2', { name: 'Beef stew', slot: 'dinner', calories: 600, protein: 40, carbs: 40, fat: 25 })
+    await wait(150)
+    check('the sanity check: the slow first read did arrive after the second', seen.length >= 2, seen)
+    check('the LATEST read wins, not the last to arrive', JSON.stringify(seen[seen.length - 1]) === JSON.stringify(['Apple pie', 'Beef stew']), seen)
+    check('...and the stale one was never applied', !seen.some(x => JSON.stringify(x) === JSON.stringify(['Apple pie'])), seen)
+    heartRead.fail = true
+    const before = seen.length
+    await unmarkFavourite('p2', 'Apple pie')
+    await wait(20)
+    heartRead.fail = false
+    check('a FAILED read keeps the last good list rather than emptying it', seen.length === before, seen.slice(before))
+    check('...and says it failed', errors === 1, errors)
+    stop()
+    await markFavourite('p2', { name: 'Chips', slot: 'snack', calories: 300, protein: 4, carbs: 40, fat: 14 })
+    await wait(20)
+    check('...and a stopped watch hears nothing more', seen.length === before, seen.length)
     const mealPlan = read('src/components/MealPlan.tsx')
-    check('the meal rows re-read favourites when told', /subscribeFavourites\(read\)/.test(mealPlan))
+    check('the meal rows follow hearts through it', /watchFavouriteNames\(profileId, setFavouriteNames\)/.test(mealPlan))
   }
 
   console.log('\n[5] One likes list in App, reaching everything')
@@ -139,11 +194,24 @@ async function main() {
     const app = read('src/App.tsx')
     check('App\'s likes are typed likes plus hearted meal names',
       /const compiledSoftFoodPreferences = useMemo\(\s*\(\) => \[\.\.\.new Set\(\[\.\.\.typedFoodLikes, \.\.\.favouriteMealNames\]\)\]/.test(app))
-    check('...hearts read on load and re-read when a heart changes', /subscribeFavourites\(read\)/.test(app) && /readFavouriteNames\(id\)/.test(app))
+    check('...hearts followed through the one watcher', /watchFavouriteNames\(profile\.id, /.test(app))
     const calls = app.match(/generateMealPools\(\{[\s\S]*?\}\)/g) ?? []
     check('the sanity check on this check: App generates meals in four places', calls.length === 4, calls.length)
-    check('...and every one of them is told the likes and the hearted meals',
-      calls.every(c => /likedFoods: typedFoodLikes/.test(c) && /favouriteMeals: favouriteMealNames/.test(c)), calls.map(c => c.slice(0, 60)))
+    check('...and every one of them is told the likes and the hearted meals she can still eat',
+      calls.every(c => /likedFoods: typedFoodLikes/.test(c) && /favouriteMeals: steerableFavouriteMeals/.test(c)), calls.map(c => c.slice(0, 60)))
+    check('...worked out by the shared rule, from the marked pools',
+      /const steerableFavouriteMeals = useMemo\(\s*\(\) => favouritesStillAllowed\(mealPools, favouriteMealNames\)/.test(app))
+    const opt = (name: string, breaks: boolean) => ({ slot: 'dinner' as const, name, ingredients: [], macros: { calories: 0, protein: 0, carbs: 0, fat: 0 }, tags: [], ...(breaks ? { breaksRestriction: true as const } : {}) })
+    const allowed = favouritesStillAllowed({ dinner: [opt('Satay noodles', true), opt('Beef stew', false)] }, ['satay noodles ', 'Beef stew', 'Apple pie'])
+    check('...which leaves out a hearted meal the pools mark as breaking a restriction, and keeps the rest',
+      JSON.stringify(allowed) === JSON.stringify(['Beef stew', 'Apple pie']), allowed)
+    // A LIKE NEVER OVERRIDES WHAT SHE AVOIDS, and every assembly must agree
+    // on it, or the strip and the shopping list could pick different days.
+    check('the pools every assembly reads are the stored pools with restriction breakers marked',
+      /const mealPools = useMemo\(\s*\(\) => markRestrictionBreakers\(storedMealPools, profile\?\.dietary_preferences \?\? \[\], compileFoodDislikes\(memoryFacts\)\)/.test(app))
+    check('...and nothing that assembles a day reads the unmarked ones',
+      /buildRotation\(mealPools,/.test(app) && /pools: mealPools,/.test(app) && /checkMealRefit\(mealPools,/.test(app) && /mealPools=\{mealPools\}/.test(app)
+      && !/(buildRotation|assembleRotationDay|checkMealRefit|useMealDays)\([^;]*storedMealPools/.test(app) && !/mealPools=\{storedMealPools\}/.test(app))
     check('the day, the strip and the list all take the same likes',
       /assembleRotationDay\(mealRotation, mealRotationDate, mealPools, macros, compiledSoftFoodPreferences/.test(app)
       && /softLikedFoods: compiledSoftFoodPreferences, todaysChosen/.test(app)
@@ -160,7 +228,23 @@ async function main() {
     check('the other preferences list leaves likes out, so none shows twice',
       /!\(kind === 'food_preference' && \(f\.polarity === 'dislike' \|\| f\.polarity === 'like'\)\)/.test(prof))
     check('hearted meals are listed and un-hearted through the meal row\'s own function',
-      /readFavouriteNames\(profileId\)/.test(prof) && /unmarkFavourite\(profileId, name\)/.test(prof) && /subscribeFavourites\(read\)/.test(prof))
+      /watchFavouriteNames\(\s*profileId,/.test(prof) && /unmarkFavourite\(profileId, name\)/.test(prof))
+    // The list only renders when there are hearts, so an error inside it is
+    // invisible exactly when the first read failed.
+    const listStart = prof.indexOf('{heartedMeals.length > 0 && (')
+    const listEnd = listStart < 0 ? -1 : prof.indexOf('\n              )}', listStart)
+    const listBlock = listStart >= 0 && listEnd > listStart ? prof.slice(listStart, listEnd) : ''
+    const likesEnd = prof.indexOf('<span className="text-muted-foreground">Foods to avoid</span>')
+    const errAt = prof.indexOf('{heartError && <p', listEnd)
+    check('...and a failed read of them says so OUTSIDE the list, so it shows even with nothing listed',
+      listBlock.length > 0 && !/heartError/.test(listBlock) && errAt > listEnd && errAt < likesEnd, { listBlock: listBlock.length, errAt, listEnd, likesEnd })
+    check('a like is compared case-blind, so "Salmon" beside "salmon" is not a second row',
+      /const have = new Set\(foodLikeValues\.map\(v => v\.toLowerCase\(\)\)\)/.test(save) && /!have\.has\(v\.toLowerCase\(\)\)/.test(save))
+    check('a like of something on her foods to avoid is refused BEFORE anything is written, by the coach\'s own rule',
+      /checkFactConflict\(\{ kind: 'food_preference', polarity: 'like'/.test(save) && save.indexOf('checkFactConflict(') < save.indexOf('createFact(')
+      && /setLikeRefusal\(`\$\{clash\} is on your foods to avoid/.test(save), save.slice(0, 300))
+    check('...shown under the likes box, not in the banner a scroll away',
+      /onSave=\{saveLikedFoods\}[^\n]*\/>\s*\{likeRefusal && <p role="alert"/.test(prof))
   }
 
   console.log('\n[7] The coach says what a like does, and no more')
@@ -171,6 +255,55 @@ async function main() {
     check('...that it never overrides an allergy, restriction or dislike', /never overrides an allergy, restriction or dislike/.test(recordFact))
     check('...and never to promise a particular dish', /never promise a particular dish/.test(recordFact))
     check('...and that a heart counts too', /A meal they heart counts as a like too/.test(recordFact))
+    const chat = read('src/components/ChatAssistant.tsx')
+    check('the receipt for a like never reads as a ban, whatever hardness it was filed at',
+      /kind === 'food_preference' && polarity === 'like'\s*\?\s*"recorded — new meals are made with it in mind/.test(chat))
+    check('a meal the coach swaps in is not hearted behind her back', !/markFavourite\(/.test(chat))
+  }
+
+  console.log('\n[8] Every like counts, whatever hardness the coach filed it at')
+  {
+    const facts = [
+      { kind: 'food_preference', polarity: 'like', hardness: 'hard', resolved_refs: ['salmon'], status: 'active' },
+      { kind: 'food_preference', polarity: 'like', hardness: 'soft', resolved_refs: ['curry'], status: 'active' },
+      { kind: 'food_preference', polarity: 'dislike', hardness: 'hard', resolved_refs: ['mushroom'], status: 'active' },
+    ] as unknown as Parameters<typeof compileSoftFoodPreferences>[0]
+    const likes = compileSoftFoodPreferences(facts)
+    check('a hard like reaches the meals, as Profile shows it does', likes.includes('salmon') && likes.includes('curry'), likes)
+    check('...and a dislike never does', !likes.includes('mushroom'), likes)
+  }
+
+  console.log('\n[9] A regenerate never leaves two meals of one name beside a kept one')
+  {
+    // The generator is told her hearted dishes by name now, so it can propose
+    // one back; the kept row is hers, at her portions, and must be the one
+    // that stays. Driven through generateMealPools against the fake database.
+    const lunchName = 'Verified Chicken Rice Bowl'
+    db.meal_plan_slots = [{
+      id: 'kept', profile_id: 'p3', slot: 'lunch', pool_index: 0, name: lunchName,
+      ingredients: [{ name: 'chicken breast', quantity: 150, unit: 'g' }], macros: { kcal: 500, protein: 45, carbs: 40, fat: 12 },
+      tags: [FAVOURITE_TAG], prep: '',
+    }]
+    let rounds = 0
+    ;(globalThis as { fetch: unknown }).fetch = async () => {
+      rounds++
+      return { ok: true, status: 200, json: async () => ({ meals: [
+        { slot: 'lunch', name: lunchName, ingredients: ['200g chicken breast', '220g cooked basmati rice', '1 tbsp olive oil', '100g broccoli'], prep: '20 min', cuisine: 'Other' },
+        { slot: 'lunch', name: `Turkey Rice Bowl ${rounds}`, ingredients: ['200g turkey breast', '220g cooked basmati rice', '1 tbsp olive oil', '100g broccoli'], prep: '20 min', cuisine: 'Other' },
+      ] }) }
+    }
+    const result = await generateMealPools({
+      profileId: 'p3', targets: { calories: 2200, protein: 150, carbs: 240, fat: 70 }, dietaryPreferences: [],
+      mealsPerDay: 3, includeSnacks: false, onlySlots: ['lunch'], poolSize: 3, favouriteMeals: [lunchName],
+    })
+    const lunch = db.meal_plan_slots.filter(r => r.profile_id === 'p3' && r.slot === 'lunch')
+    check('the sanity check: the generator really did propose the kept meal\'s name and it was accepted',
+      (result.accepted.lunch ?? []).some(o => o.name === lunchName), result.accepted.lunch?.map(o => o.name))
+    check('...and the slot was rewritten', lunch.some(r => String(r.name).startsWith('Turkey Rice Bowl')), lunch.map(r => r.name))
+    check('only ONE row of that name is stored', lunch.filter(r => r.name === lunchName).length === 1, lunch.map(r => r.name))
+    check('...and it is the kept one, her portions', lunch.find(r => r.name === lunchName)?.tags && (lunch.find(r => r.name === lunchName)!.tags as string[]).includes(FAVOURITE_TAG)
+      && (lunch.find(r => r.name === lunchName)!.macros as { kcal: number }).kcal === 500, lunch.find(r => r.name === lunchName))
+    check('...and the pool indexes stay contiguous', JSON.stringify(lunch.map(r => r.pool_index).sort((a, b) => Number(a) - Number(b))) === JSON.stringify(lunch.map((_, i) => i)), lunch.map(r => r.pool_index))
   }
 
   console.log(`\n${ran} checks ran`)

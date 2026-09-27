@@ -58,3 +58,13 @@ restriction or a dislike.
   hearted meals; driven on the real Profile screen.
 - App's likes list includes hearts and reaches assembly, the strip, the list
   and every generation call.
+
+## After review (same day)
+
+A regression review of the build found five real defects, each re-read in the
+code before fixing: the coach hearted every meal it swapped in (a heart is a
+like now); a like could favour a kept meal breaking a later restriction; hard
+likes were listed and ignored; likes matched as raw text; a failed heart read
+looked like no hearts. Fixed as recorded in BACKLOG, with the kept-meal
+restriction question itself left as it was and named: it is older than likes
+and in the allergen path.

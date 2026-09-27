@@ -82,7 +82,11 @@ console.log('\n3. One write path, so the two surfaces cannot drift')
   const card = strip(read('src/components/MealPlan.tsx'))
   const mod = read('src/lib/favourite-meals.ts')
 
-  check('the coach writes through the shared module', /markFavourite\(/.test(chat))
+  // RE-ANCHORED 27 Sep 2026: the coach used to heart every meal it swapped
+  // in, through this module. A heart is a like now, and nothing is learnt
+  // behind her back, so the coach writes no favourite at all. The property
+  // this section exists for, one writer of the table, is unchanged.
+  check('the coach does not heart a meal it swaps in (nothing learnt behind her back)', !/markFavourite\(/.test(chat))
   // THE POINT OF THE MODULE. Before it, the only writer was a closure inside
   // ChatAssistant; a heart could easily have become a second, subtly different
   // upsert of the same table.
@@ -104,8 +108,11 @@ console.log('\n3. One write path, so the two surfaces cannot drift')
   // then, so shouting about it would misdescribe what happened.
   check('the pool tag write is allowed to fail without failing the favourite',
     /FAILS QUIETLY AND ON PURPOSE/.test(read('src/lib/favourite-meals.ts')))
-  check('a read that fails shows unfilled hearts rather than every meal favourited',
-    /return new Set\(\)/.test(mod))
+  // RE-ANCHORED 27 Sep 2026: a failed read is null, not an empty list, and
+  // the watcher keeps the last good answer (hearts are likes now, so "none"
+  // would change the meals). Behaviour is held in test:meal-likes §4.
+  check('a read that fails is null rather than every meal favourited or none',
+    /return null/.test(mod) && !/return new Set\(\)/.test(mod))
 }
 
 // ===========================================================================

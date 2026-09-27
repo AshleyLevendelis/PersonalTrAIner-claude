@@ -84,6 +84,41 @@ check('it is saved as the same kind of row a "I love salmon" chat turn writes',
   !!salmon && salmon.kind === 'food_preference' && salmon.polarity === 'like' && salmon.hardness === 'soft' && salmon.status === 'active', salmon)
 check('...and it shows on the list', (await until(box, v => (v?.likes ?? []).includes('salmon')))?.likes?.includes('salmon'))
 
+console.log('\n[2b] A like of something she avoids is refused, not stored')
+const typeLike = async v => {
+  await ev(`(() => { const i = document.querySelector('[data-testid="profile-food-likes"] input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ${JSON.stringify(v)}); i.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+  await wait(150)
+  await ev(`document.querySelector('[data-testid="profile-food-likes"] button[aria-label="Add"]').click()`)
+}
+const factsBefore = (await table('user_facts')).length
+await typeLike('mushroom')
+// READ WHERE SHE IS LOOKING. The first version found the sentence anywhere in
+// the sheet and passed while it sat in the banner a scroll away, invisible;
+// only the screenshot showed it. So: inside the likes box, and on screen.
+const refusalAt = () => ev(`(() => {
+  const b = document.querySelector('[data-testid="profile-food-likes"]')
+  const p = b && [...b.querySelectorAll('p')].find(e => /is on your foods to avoid/.test(e.textContent || ''))
+  if (!p) return null
+  const r = p.getBoundingClientRect()
+  return { text: (p.textContent || '').trim(), onScreen: r.top >= 0 && r.bottom <= innerHeight && r.height > 0 }
+})()`)
+const refusal = await until(refusalAt, v => !!v)
+check('it says, under the box she typed in, that the food is on her foods to avoid and where to change that',
+  /^mushroom is on your foods to avoid\. Take it off that list first/.test(refusal?.text ?? ''), refusal)
+check('...where she can see it without scrolling', refusal?.onScreen === true, refusal)
+await wait(300)
+const factsAfter = await table('user_facts')
+check('...and nothing was written', factsAfter.length === factsBefore && !factsAfter.some(r => r.polarity === 'like' && (r.resolved_refs ?? []).includes('mushroom')), factsAfter.map(r => [r.polarity, r.resolved_refs]))
+check('...and it is not shown as a like', !((await box())?.likes ?? []).includes('mushroom'), (await box())?.likes)
+await shoot('meal-likes-refused')
+
+console.log('\n[2c] The same like typed in another case is the one she has')
+await ev(`(() => { const i = document.querySelector('[data-testid="profile-food-likes"] input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ''); i.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+await typeLike('Salmon')
+await wait(400)
+const salmonRows = (await table('user_facts')).filter(r => r.polarity === 'like' && (r.resolved_refs ?? []).some(x => String(x).toLowerCase() === 'salmon'))
+check('"Salmon" beside "salmon" adds no second row', salmonRows.length === 1, salmonRows.map(r => r.resolved_refs))
+
 console.log('\n[3] Taking things away')
 await ev(`document.querySelector('[data-testid="profile-food-likes"] button[aria-label="Remove curry"]').click()`)
 const facts2 = await until(() => table('user_facts'), rows => !rows.some(r => (r.resolved_refs ?? []).includes('curry')))

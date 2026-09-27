@@ -220,9 +220,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   replaced could only win a tie, the variety defect's shape, still sitting in
   the likes path. New meals are steered by it. A like that clashes with her
   diet or a dislike is left out before the generator sees it, and verification
-  is unchanged. `meal-likes` (35 checks, 13 mutations), `verify:meal-likes`
-  (15 checks, 6 mutations), `soft-preferences` §4. Needs the `generate-meals`
-  deploy for the steering; the ranking works without it
+  is unchanged. **And a like never picks a meal she now avoids**: kept meals
+  survive a regenerate unchecked, so every pool the app assembles from is
+  marked by the meal card's own restriction check, once, and a marked meal is
+  never liked. Every like counts whatever hardness the coach filed it at, and
+  likes match through the dislike filter's own matcher. `meal-likes` (62
+  checks, 34 mutations), `verify:meal-likes` (20 checks, 9 mutations),
+  `soft-preferences` §4 (real-food fixtures, 11 mutations). Needs the
+  `generate-meals` deploy for the steering; the ranking works without it
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
@@ -1777,6 +1782,21 @@ old — the commands were right and the context was missing.
   exactly like the app losing a write. A default the real schema supplies is
   part of what a fake must imitate, and a read that falls back on an error
   hides the fake's gap as well as the network's.
+- **A RECORD THAT GAINS A MEANING INHERITS EVERY OLD WRITER OF IT.** 27 Sep
+  2026: hearts became likes, and a week-old line in the coach's swap confirm
+  hearted every meal it swapped in. It had been a harmless bookkeeping write;
+  the moment a heart meant "she likes this", it became the app learning
+  behind her back, against her ruling, and nothing new had been written to
+  cause it. Found by a review, not by any gate. **When a stored thing starts
+  to mean more, grep every WRITER of it and ask whether each still says what
+  she meant**, the writer half of "a new column is a change to every reader
+  and writer".
+- **A MESSAGE IS ONLY SHOWN IF IT IS ON SCREEN WHERE THE TAP WAS.** The same
+  day: a driver found the refusal sentence in the page and passed, while the
+  screenshot showed a + button that did nothing, because the sentence was in
+  the sheet's banner a scroll away. A driver checking that a message exists
+  is checking the DOM; the claim is that she can SEE it. Assert where it is
+  and that it is inside the viewport.
 - **A FAKE THAT IGNORES FILTERS CANNOT SEE A MISSING FILTER — and on a
   service key, the filter IS the privacy.** 24 Sep 2026: the reach-out smoke
   test ran the real function against a fake database that returned the same

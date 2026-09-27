@@ -104,10 +104,18 @@ export function compileFoodDislikes(facts: UserFactRow[]): string[] {
   return [...new Set(disliked.flatMap(f => f.resolved_refs ?? []))]
 }
 
-/** Soft food likes → a scoring bias hook (meal-generation.ts's candidate ranking); no consumer wired to bias yet, so this is exported for a future ranking pass rather than silently dropped. */
+/**
+ * Food likes → the meal generator's steer and the day ranking's like key
+ * (meal-generation.ts). EVERY like, whatever its hardness — the same repair
+ * compileFoodDislikes made for dislikes. The coach may file "I always have
+ * salmon" as a hard like, Profile lists it beside the soft ones, and before
+ * 27 Sep 2026 this read soft only, so a strongly worded like was shown on
+ * screen and read by nothing. A like is never a ban, so hardness has nothing
+ * else to decide here.
+ */
 export function compileSoftFoodPreferences(facts: UserFactRow[]): string[] {
-  const soft = preferenceFacts(facts, 'food_preference', 'like', 'soft')
-  return [...new Set(soft.flatMap(f => f.resolved_refs ?? []))]
+  const likes = facts.filter(f => f.kind === 'food_preference' && f.polarity === 'like')
+  return [...new Set(likes.flatMap(f => f.resolved_refs ?? []))]
 }
 
 export interface CompiledTimingRule {

@@ -63,8 +63,9 @@ const KETO = new URLSearchParams(location.search).get('keto') === '1'
 // no switch. The column's PRESENCE is the signal, so it is the only thing set.
 const REMINDERS_LIVE = new URLSearchParams(location.search).get('reminders') === 'live'
 // ?likes=1 — FOODS AND MEALS SHE LIKES (27 Sep 2026). Two meals already
-// hearted, and a like the coach recorded, so the driver can see the screen
-// show both kinds, take one of each away, and add one of its own.
+// hearted, a like the coach recorded and a food she avoids, so the driver can
+// see the screen show both kinds of like, take one of each away, add one of
+// its own, and be refused a like of the food she avoids.
 const LIKES = new URLSearchParams(location.search).get('likes') === '1'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
@@ -130,6 +131,11 @@ if (LIKES) {
     id: 'fact-like-1', profile_id: PROFILE_ID, kind: 'food_preference', status: 'active', source: 'chat',
     raw_phrase: 'I love a good curry', display_text: 'likes curry', polarity: 'like', hardness: 'soft',
     resolved_refs: ['curry'], retired_at: null, created_at: new Date(anchorNowMs() - 86400000).toISOString(),
+  }, {
+    // A food she avoids, so the driver can try to like it and be refused.
+    id: 'fact-avoid-1', profile_id: PROFILE_ID, kind: 'food_preference', status: 'active', source: 'manual',
+    raw_phrase: 'mushrooms', display_text: "won't eat/do mushrooms", polarity: 'dislike', hardness: 'hard',
+    resolved_refs: ['mushroom'], retired_at: null, created_at: new Date(anchorNowMs() - 86400000).toISOString(),
   })
 }
 setSupabaseClient(makeFakeSupabase(db) as never)
