@@ -17,9 +17,9 @@
       }
     ]
   },
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "4e7e84145028fd04",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-09-28T17:42:20.050Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,8 +71,8 @@
   "turns": [
     {
       "user": "what's my protein target again?",
-      "reply": "Your protein target is 130 grams a day. \n\nHow is the eating going today? If you're planning out your meals and want to see how to hit that number, let me know.",
-      "raw": "Your protein target is 130 grams a day. \n\nHow is the eating going today? If you're planning out your meals and want to see how to hit that number, let me know.",
+      "reply": "Your daily protein target is 130 grams, Ashley. \n\nThat fits right into your overall daily target of 1660 calories. Do you want to check how that's split across your meals for today?",
+      "raw": "Your daily protein target is 130 grams, Ashley. \n\nThat fits right into your overall daily target of 1660 calories. Do you want to check how that's split across your meals for today?\n[QUICK_REPLIES: \"Yes, show me\" | \"No, I'm good\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -80,8 +80,8 @@
     },
     {
       "user": "and what am I squatting today?",
-      "reply": "You've got Barbell Back Squats on the schedule today for 3 sets of 8 at 45kg. \n\nHow are the legs feeling for those? If you're ready to head under the bar, let me know.",
-      "raw": "You've got Barbell Back Squats on the schedule today for 3 sets of 8 at 45kg. \n\nHow are the legs feeling for those? If you're ready to head under the bar, let me know.",
+      "reply": "You've got Barbell Back Squats on the schedule today for 3 sets of 8 reps at 45kg. \n\nHow are you feeling for those?",
+      "raw": "You've got Barbell Back Squats on the schedule today for 3 sets of 8 reps at 45kg. \n\nHow are you feeling for those?\n[QUICK_REPLIES: \"Feeling strong\" | \"A bit tired\" | \"Knee is sore\"]",
       "error": null,
       "action": null,
       "proposal": null,

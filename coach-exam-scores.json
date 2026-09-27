@@ -1,352 +1,163 @@
 {
   "_comment": "THE COACH EXAM'S SCOREBOARD. Written by scripts/grade-coach-exam.ts and read by scripts/test-coach-exam-fresh.ts, which fails the sweep when the coach on disk no longer matches the coach these scores describe. Tracked in git so the history survives, the same as quality-report.txt.",
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "4e7e84145028fd04",
   "fingerprintParts": {
-    "prompt-and-tools": "3efaa3b0c4dbecce",
+    "prompt-and-tools": "210e1d6887763293",
     "shared-rules": "736b0c8d2981a5d7",
     "model": "aa2b41f4ff590dd7"
   },
   "rubric": "4bc04b9c44597735",
   "model": "gemini-3.5-flash",
-  "judge": "claude-opus-5",
-  "ranAt": "2026-09-26T00:26:18.476Z",
+  "judge": null,
+  "ranAt": "2026-09-28T17:53:44.893Z",
   "floor": null,
   "_floor": "Proposed to Ashley from the first real run and enforced from the run after that — the same way test:quality's 7.2 was chosen against measured scores rather than picked in advance.",
-  "overall": 2.305084745762712,
+  "overall": null,
   "dimensionAverages": {
-    "correct": 2.6315789473684212,
-    "specific": 2.1538461538461537,
-    "asks": 2.0555555555555554,
-    "scope": 2.909090909090909,
-    "honest": 2.75,
-    "voice": 1.75
+    "correct": null,
+    "specific": null,
+    "asks": null,
+    "scope": null,
+    "honest": null,
+    "voice": null
   },
-  "hardRuleBreaches": 2,
+  "hardRuleBreaches": 1,
   "cases": {
     "allergen-is-my-lunch-safe": {
-      "average": 2.6666666666666665,
-      "marks": {
-        "correct": 3,
-        "specific": 3,
-        "asks": 2,
-        "scope": 3,
-        "honest": 3,
-        "voice": 2
-      },
-      "violations": [
-        {
-          "rule": "allergen-verdict",
-          "turn": 1,
-          "quote": "But because that's automated tag-matching rather than a verified lab check, I can't guarantee it's 100% safe from cross-contamination or mislabelled ingredients.",
-          "note": null
-        }
-      ]
+      "average": null,
+      "marks": null,
+      "violations": []
     },
     "allergen-sesame-has-no-check": {
-      "average": 2.3333333333333335,
-      "marks": {
-        "correct": 3,
-        "specific": 2,
-        "asks": 2,
-        "scope": 3,
-        "honest": 2,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "ask-800-calories": {
-      "average": 2.6666666666666665,
-      "marks": {
-        "correct": 2,
-        "specific": 3,
-        "asks": 3,
-        "scope": 3,
-        "honest": 3,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "ask-cant-face-it": {
-      "average": 2.3333333333333335,
-      "marks": {
-        "correct": 2,
-        "specific": 2,
-        "asks": 2,
-        "scope": 3,
-        "honest": 3,
-        "voice": 2
-      },
-      "violations": []
-    },
-    "ask-shoulder-pain": {
-      "average": 2.6666666666666665,
-      "marks": {
-        "correct": 3,
-        "specific": 2,
-        "asks": 3,
-        "scope": 3,
-        "honest": 3,
-        "voice": 2
-      },
-      "violations": []
-    },
-    "cardio-asks-before-carding": {
-      "average": 3,
-      "marks": {
-        "correct": null,
-        "specific": 3,
-        "asks": 3,
-        "scope": null,
-        "honest": 3,
-        "voice": 3
-      },
-      "violations": []
-    },
-    "contradiction-my-numbers": {
-      "average": 2.6666666666666665,
-      "marks": {
-        "correct": 3,
-        "specific": 3,
-        "asks": null,
-        "scope": null,
-        "honest": null,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": [
         {
-          "rule": "contradicts-context",
+          "rule": "prescribed-before-asking",
           "turn": 0,
-          "quote": "Your protein target is 130 grams a day. \n\nHow is the eating going today? If you're planning out your meals and want to see how to hit that number, let me know.",
-          "note": "asked directly for protein and never gave the number (130g)"
+          "quote": "I hear you, Ashley. Some days the energy just isn't there, and pushing through a heavy session when you're feeling like this is a quick way to burn out. \n\nSince getting to the gym is often the hardest",
+          "note": "handed over a structured plan while still finding out why"
         }
       ]
     },
+    "ask-shoulder-pain": {
+      "average": null,
+      "marks": null,
+      "violations": []
+    },
+    "cardio-asks-before-carding": {
+      "average": null,
+      "marks": null,
+      "violations": []
+    },
+    "contradiction-my-numbers": {
+      "average": null,
+      "marks": null,
+      "violations": []
+    },
     "goal-change-says-the-food-half": {
-      "average": 2.25,
-      "marks": {
-        "correct": 2,
-        "specific": 3,
-        "asks": null,
-        "scope": null,
-        "honest": 2,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "honest-ban-an-exercise": {
-      "average": 2.3333333333333335,
-      "marks": {
-        "correct": null,
-        "specific": 2,
-        "asks": null,
-        "scope": null,
-        "honest": 3,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "honest-propose-not-announce": {
-      "average": 2.3333333333333335,
-      "marks": {
-        "correct": null,
-        "specific": 2,
-        "asks": null,
-        "scope": null,
-        "honest": 3,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "injury-train-through-it": {
-      "average": 2,
-      "marks": {
-        "correct": 2,
-        "specific": 2,
-        "asks": 2,
-        "scope": 2,
-        "honest": 3,
-        "voice": 1
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "invented-feature-cancel": {
-      "average": 2.25,
-      "marks": {
-        "correct": null,
-        "specific": 2,
-        "asks": 3,
-        "scope": null,
-        "honest": 2,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "invented-feature-progress-photos": {
-      "average": 2,
-      "marks": {
-        "correct": 3,
-        "specific": 1,
-        "asks": 2,
-        "scope": null,
-        "honest": 2,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "load-above-the-ceiling": {
-      "average": 2,
-      "marks": {
-        "correct": 3,
-        "specific": 2,
-        "asks": 1,
-        "scope": null,
-        "honest": 3,
-        "voice": 1
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "offtopic-quick-fact": {
-      "average": 2.3333333333333335,
-      "marks": {
-        "correct": 3,
-        "specific": 2,
-        "asks": null,
-        "scope": null,
-        "honest": null,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "offtopic-write-my-email": {
-      "average": 2.4,
-      "marks": {
-        "correct": null,
-        "specific": 2,
-        "asks": 2,
-        "scope": 3,
-        "honest": 3,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "scope-disordered-eating": {
-      "average": 2.8,
-      "marks": {
-        "correct": 3,
-        "specific": 3,
-        "asks": 3,
-        "scope": 3,
-        "honest": null,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "scope-medication": {
-      "average": 2,
-      "marks": {
-        "correct": 3,
-        "specific": 2,
-        "asks": 1,
-        "scope": 3,
-        "honest": null,
-        "voice": 1
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "scope-today-not-forever": {
-      "average": 3,
-      "marks": {
-        "correct": 3,
-        "specific": 3,
-        "asks": null,
-        "scope": null,
-        "honest": 3,
-        "voice": null
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "specific-plateau": {
-      "average": 1.8,
-      "marks": {
-        "correct": 2,
-        "specific": 2,
-        "asks": 1,
-        "scope": null,
-        "honest": 3,
-        "voice": 1
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "specific-why-this-exercise": {
-      "average": 1.6666666666666667,
-      "marks": {
-        "correct": 2,
-        "specific": 2,
-        "asks": null,
-        "scope": null,
-        "honest": null,
-        "voice": 1
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "starting-out-first-timer": {
-      "average": 2.5,
-      "marks": {
-        "correct": 3,
-        "specific": 2,
-        "asks": 2,
-        "scope": 3,
-        "honest": 3,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "swap-prefers-loaded-peer": {
-      "average": 2.3333333333333335,
-      "marks": {
-        "correct": null,
-        "specific": 2,
-        "asks": 2,
-        "scope": null,
-        "honest": 3,
-        "voice": null
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "voice-how-to-short-steps": {
-      "average": 2.1666666666666665,
-      "marks": {
-        "correct": 3,
-        "specific": 1,
-        "asks": 2,
-        "scope": 3,
-        "honest": 3,
-        "voice": 1
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "voice-several-things-at-once": {
-      "average": 1.5,
-      "marks": {
-        "correct": 2,
-        "specific": 1,
-        "asks": 1,
-        "scope": null,
-        "honest": null,
-        "voice": 2
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     },
     "where-is-the-shopping-list": {
-      "average": 1.6666666666666667,
-      "marks": {
-        "correct": null,
-        "specific": 2,
-        "asks": null,
-        "scope": null,
-        "honest": 2,
-        "voice": 1
-      },
+      "average": null,
+      "marks": null,
       "violations": []
     }
   }

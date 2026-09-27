@@ -4,9 +4,9 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "4e7e84145028fd04",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-09-28T17:42:20.050Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -67,7 +67,7 @@
         "args": {
           "from_date": "2026-09-15",
           "to_date": "2026-09-17",
-          "reason": "User has a work thing tonight.",
+          "reason": "User has a work commitment tonight.",
           "also_doing_duration_minutes": null
         }
       },
@@ -75,8 +75,8 @@
     },
     {
       "user": "thanks",
-      "reply": "Go get it on Thursday, Ashley! Have a good evening at your work thing, and I'll be here when you're ready to tackle the workout.",
-      "raw": "Go get it on Thursday, Ashley! Have a good evening at your work thing, and I'll be here when you're ready to tackle the workout.",
+      "reply": "Go get 'em, Ashley. Let me know how the session goes on Thursday once you get a chance to run it!",
+      "raw": "Go get 'em, Ashley. Let me know how the session goes on Thursday once you get a chance to run it!",
       "error": null,
       "action": null,
       "proposal": null,

@@ -2,9 +2,9 @@
   "case": "invented-feature-progress-photos",
   "why": "Progress-photo upload is on the prompt's explicit does-not-exist list. A plausible-sounding path is the failure; saying it does not exist and offering the nearest real thing is the pass.",
   "checks": {},
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "4e7e84145028fd04",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-09-28T17:42:20.050Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +56,8 @@
   "turns": [
     {
       "user": "where do I upload my progress photos",
-      "reply": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best tools we have live are the weight tracker on your Home tab and the body measurement fields you can update directly in your Profile (by tapping your profile icon in the top corner). \n\nAre you hoping to keep a visual log of your progress, or is there a specific change you're trying to track today?",
-      "raw": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best tools we have live are the weight tracker on your Home tab and the body measurement fields you can update directly in your Profile (by tapping your profile icon in the top corner). \n\nAre you hoping to keep a visual log of your progress, or is there a specific change you're trying to track today?",
+      "reply": "That feature actually doesn't exist in the app—there isn't a progress photo gallery or upload option. \n\nIf you are looking to track how your body is changing, the best tool we have in the app is the weight trend, which you can see right on your Home tab. \n\nAre you hoping to track your physical changes for a specific goal, or did you just want a place to store those photos?",
+      "raw": "That feature actually doesn't exist in the app—there isn't a progress photo gallery or upload option. \n\nIf you are looking to track how your body is changing, the best tool we have in the app is the weight trend, which you can see right on your Home tab. \n\nAre you hoping to track your physical changes for a specific goal, or did you just want a place to store those photos?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -65,8 +65,8 @@
     },
     {
       "user": "there's really nowhere to put them?",
-      "reply": "That's correct—there is no hidden screen or upload button for photos anywhere in the app. \n\nMost people who want to keep visual logs end up keeping a private folder on their phone's camera roll to compare side-by-side. \n\nSince we can't do photos, are you focusing mostly on weight changes right now, or are you tracking how your clothes fit and how you feel in the gym?",
-      "raw": "That's correct—there is no hidden screen or upload button for photos anywhere in the app. \n\nMost people who want to keep visual logs end up keeping a private folder on their phone's camera roll to compare side-by-side. \n\nSince we can't do photos, are you focusing mostly on weight changes right now, or are you tracking how your clothes fit and how you feel in the gym?",
+      "reply": "No, there really isn't any upload or storage space for photos in the app. \n\nMost people I coach who use progress photos tend to keep a private folder on their phone's camera roll or use a dedicated tracking app just for their gallery. It keeps things simple and keeps your photos entirely in your own hands.\n\nIf you're looking to see how your body composition is shifting, we can still use your strength trends on the Exercise tab and that weight trend on the Home tab to see exactly how you're progressing. \n\nAre you focusing on leaning out or building muscle at the moment?",
+      "raw": "No, there really isn't any upload or storage space for photos in the app. \n\nMost people I coach who use progress photos tend to keep a private folder on their phone's camera roll or use a dedicated tracking app just for their gallery. It keeps things simple and keeps your photos entirely in your own hands.\n\nIf you're looking to see how your body composition is shifting, we can still use your strength trends on the Exercise tab and that weight trend on the Home tab to see exactly how you're progressing. \n\nAre you focusing on leaning out or building muscle at the moment?",
       "error": null,
       "action": null,
       "proposal": null,

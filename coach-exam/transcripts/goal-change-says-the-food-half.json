@@ -19,9 +19,9 @@
       "macros"
     ]
   },
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "4e7e84145028fd04",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-09-28T17:42:20.050Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -81,15 +81,15 @@
         "kind": "propose_goal_change",
         "args": {
           "goal": "hypertrophy",
-          "reason": "Wants to switch focus from fat loss to building muscle mass."
+          "reason": "Switching focus from fat loss to muscle growth (hypertrophy) to start building mass."
         }
       },
       "saved": null
     },
     {
       "user": "does that change what I'm eating as well, or just the training?",
-      "reply": "It absolutely changes what you're eating, Ashley. Building muscle requires a calorie surplus—meaning you'll be eating more to fuel that new growth—whereas cutting kept you in a deficit to lose fat. \n\nIf you confirm that goal change on the card, your daily targets will automatically shift from 1660 calories up to a surplus, and your meal portions will scale up to match. Your training will also rebuild to focus on the volume and rep ranges best suited for packing on muscle. \n\nIt updates both sides of the equation so they work together. Want to go ahead and make the switch?",
-      "raw": "It absolutely changes what you're eating, Ashley. Building muscle requires a calorie surplus—meaning you'll be eating more to fuel that new growth—whereas cutting kept you in a deficit to lose fat. \n\nIf you confirm that goal change on the card, your daily targets will automatically shift from 1660 calories up to a surplus, and your meal portions will scale up to match. Your training will also rebuild to focus on the volume and rep ranges best suited for packing on muscle. \n\nIt updates both sides of the equation so they work together. Want to go ahead and make the switch?",
+      "reply": "It changes both, Ashley. \n\nOn the training side, we'll rebuild the rest of your block to focus on hypertrophy—adjusting the volume, rep ranges, and conditioning to prioritize building muscle. \n\nFor your food, it's a direct shift. Since we're moving from a calorie deficit (fat loss) to a surplus or maintenance (muscle growth), your daily calorie target will go up, and your macro splits—especially your carbs and fats—will adjust to fuel that recovery and growth. \n\nThe card on your screen shows exactly what your new daily targets and training structure will look like before you make the switch.",
+      "raw": "It changes both, Ashley. \n\nOn the training side, we'll rebuild the rest of your block to focus on hypertrophy—adjusting the volume, rep ranges, and conditioning to prioritize building muscle. \n\nFor your food, it's a direct shift. Since we're moving from a calorie deficit (fat loss) to a surplus or maintenance (muscle growth), your daily calorie target will go up, and your macro splits—especially your carbs and fats—will adjust to fuel that recovery and growth. \n\nThe card on your screen shows exactly what your new daily targets and training structure will look like before you make the switch. \n\n[QUICK_REPLIES: \"Makes sense, let's do it\" | \"I need to think about it\"]",
       "error": null,
       "action": null,
       "proposal": null,

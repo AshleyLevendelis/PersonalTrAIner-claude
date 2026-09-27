@@ -2,9 +2,9 @@
   "case": "specific-why-this-exercise",
   "why": "VISION: a coach has a reason for every choice, and the app promises 'Why this exercise' on screen. Asked in chat, the answer must be about this session's actual order and this person's actual plan, not a textbook paragraph on compound lifts.",
   "checks": {},
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "4e7e84145028fd04",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-09-28T17:42:20.050Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +56,8 @@
   "turns": [
     {
       "user": "why are the romanian deadlifts after the squats and not before",
-      "reply": "Squats are programmed before your Romanian Deadlifts because of how much energy and core stability they demand. \n\nBack squats are your primary compound lift today (a Tier 1 lift). They require your entire nervous system, legs, and core to be completely fresh so you can safely handle the heavy load and maintain solid form. \n\nRomanian Deadlifts, while still a heavy compound movement, focus heavily on your hamstrings and glutes (a hip hinge pattern). If you did RDLs first, your lower back and hamstrings would already be fatigued, which would make it much harder—and riskier—to keep your torso upright and stable when you get under the squat barbell. \n\nPutting the biggest, most system-taxing lift first is the safest and most effective way to build strength. How has your lower back been feeling during those RDLs lately?",
-      "raw": "Squats are programmed before your Romanian Deadlifts because of how much energy and core stability they demand. \n\nBack squats are your primary compound lift today (a Tier 1 lift). They require your entire nervous system, legs, and core to be completely fresh so you can safely handle the heavy load and maintain solid form. \n\nRomanian Deadlifts, while still a heavy compound movement, focus heavily on your hamstrings and glutes (a hip hinge pattern). If you did RDLs first, your lower back and hamstrings would already be fatigued, which would make it much harder—and riskier—to keep your torso upright and stable when you get under the squat barbell. \n\nPutting the biggest, most system-taxing lift first is the safest and most effective way to build strength. How has your lower back been feeling during those RDLs lately?",
+      "reply": "Squats come first because they are the most demanding movement in today's session. They require a massive amount of central nervous system drive, core stability, and raw leg strength. Putting them first when you are completely fresh allows you to lift the heaviest weight with the best possible form. \n\nRomanian Deadlifts (RDLs) target your posterior chain—your hamstrings and glutes—but they also place a heavy structural load on your lower back and spinal erectors to keep your spine neutral. If you did heavy RDLs first, those lower back muscles would be pre-fatigued, which would make it much harder (and riskier) to keep your torso upright and stable when you get under the barbell for squats. \n\nBy squatting first, we maximize your main strength progression, and then we use the RDLs to specifically overload your hamstrings and glutes once the heavy quad-dominant work is out of the way. \n\nHow does your lower back usually feel by the time you transition from squats to RDLs?",
+      "raw": "Squats come first because they are the most demanding movement in today's session. They require a massive amount of central nervous system drive, core stability, and raw leg strength. Putting them first when you are completely fresh allows you to lift the heaviest weight with the best possible form. \n\nRomanian Deadlifts (RDLs) target your posterior chain—your hamstrings and glutes—but they also place a heavy structural load on your lower back and spinal erectors to keep your spine neutral. If you did heavy RDLs first, those lower back muscles would be pre-fatigued, which would make it much harder (and riskier) to keep your torso upright and stable when you get under the barbell for squats. \n\nBy squatting first, we maximize your main strength progression, and then we use the RDLs to specifically overload your hamstrings and glutes once the heavy quad-dominant work is out of the way. \n\nHow does your lower back usually feel by the time you transition from squats to RDLs?",
       "error": null,
       "action": null,
       "proposal": null,

@@ -4,9 +4,9 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "4e7e84145028fd04",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-09-28T17:42:20.050Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -66,18 +66,24 @@
         "kind": "propose_exercise_ban",
         "args": {
           "item": "burpees",
-          "reason": "User preference — dislikes movement"
+          "reason": "User dislikes movement"
         }
       },
       "saved": null
     },
     {
       "user": "so they're gone for good?",
-      "reply": "They will be once you tap Confirm on the card I just put up. \n\nThat card is the final step to banish them from every week of your plan for good. Go ahead and tap that, and they're gone!",
-      "raw": "They will be once you tap Confirm on the card I just put up. \n\nThat card is the final step to banish them from every week of your plan for good. Go ahead and tap that, and they're gone!",
+      "reply": "",
+      "raw": "",
       "error": null,
       "action": null,
-      "proposal": null,
+      "proposal": {
+        "kind": "propose_exercise_ban",
+        "args": {
+          "item": "burpees",
+          "reason": "User preference — dislikes movement"
+        }
+      },
       "saved": null
     }
   ]
