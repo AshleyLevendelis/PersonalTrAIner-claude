@@ -210,6 +210,19 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   its swap, and has `add_day_to_grocery_list`. `meal-days` (49 checks, 18
   mutations), `verify:meal-days` (40 checks, 8 mutations), `coach-parity`.
   Needs the `chat-gemini` deploy for chat
+- **And what she likes comes first** — both surfaces since 27 Sep 2026.
+  Her ruling, from three options: **a likes list plus hearts**. "Foods and
+  meals I like" sits on Profile above "Foods to avoid". The coach records the
+  same row, and a hearted meal counts as a like. Nothing is learnt from logs or
+  swaps: she ruled that out. A like is a SORT KEY, ranked after variety and
+  before the resize, so among correct days one with a like wins. It can never
+  buy an off-target day or the same day twice. The old 0.01 penalty it
+  replaced could only win a tie, the variety defect's shape, still sitting in
+  the likes path. New meals are steered by it. A like that clashes with her
+  diet or a dislike is left out before the generator sees it, and verification
+  is unchanged. `meal-likes` (35 checks, 13 mutations), `verify:meal-likes`
+  (15 checks, 6 mutations), `soft-preferences` §4. Needs the `generate-meals`
+  deploy for the steering; the ranking works without it
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the

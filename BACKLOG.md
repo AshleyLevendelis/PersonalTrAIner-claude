@@ -2,6 +2,102 @@
 
 Newest first. One line each.
 
+- [x] **FOODS AND MEALS SHE LIKES NOW SHAPE THE MEALS.** 27 Sep 2026,
+  Ashley: *"there's no way to let the app know what kind of meals a user likes
+  so meals are tailored to what users actually eat."* Part 3 of three. Her
+  ruling, from three options: **a likes list plus hearts**. She passed over a
+  list that leaves hearts as they are, and over learning from what she logs or
+  swaps. Plan: `docs/plans/meal-likes.md`.
+  **What changed on her phone:**
+  - Profile has **"Foods and meals I like"**, directly above "Foods to avoid".
+    She can type a like or remove one. It says what a like does: "New meals
+    are made with these in mind, and days that include them come first. They
+    never override what you avoid."
+  - The meals she has hearted are listed under it, each with a remove button
+    that un-hearts it. They count as likes, so they are not hidden.
+  - A like typed on Profile is the same record an "I love salmon" chat turn
+    writes, so the coach and the screen share one list. It shows once, not
+    again under the other preferences.
+  - When a day is picked, a correct day that includes something she likes
+    comes first. New meals are generated with her likes and hearted dishes in
+    mind (after the `generate-meals` deploy).
+  **What was there before, traced:**
+  - The coach could record a like. Profile could list, edit and delete one,
+    but could not add one.
+  - A like reached day assembly as a 0.01 penalty added to the fit score. That
+    is the shape CLAUDE.md says can only ever win an exact tie, the same one
+    that made variety inert before 19 Sep. It was still here for likes.
+  - The meal generator was never told a like.
+  - A heart protected one exact dish from a regenerate and did nothing else.
+  **How a like ranks, and why it cannot cost a correct day (CSCS review,
+  decided under the delegation):**
+  1. *Effect:* inside the tolerance bands, a day with a like beats a
+     closer-fitting day without one. Both are correct by the app's own
+     definition, so the targets are met either way.
+  2. *What it takes away:* the closest fit among correct days. Variety ranks
+     first, so a like cannot bring back the same day twice: a liked dinner
+     eaten yesterday gives way. Off target, the like ranks after repeats
+     inside the 3-point margin variety already had. The margin did not widen.
+  3. *Fundamentals:* no target, protein floor or split moved.
+  4. *Redefined?* Yes, and named: the fit score is now pure macro distance.
+     The old 0.01 like penalty is gone and became a sort key. A like no longer
+     nudges an off-target comparison outside the margin, where it did nothing
+     useful anyway.
+  5. *Scope:* no clinical nutrition. The allergen path is untouched. Every
+     proposal still passes the same verification and the display-time
+     re-check.
+  **What the generator is told:** her likes and hearted dishes, as steering.
+  A like that is a known food and clashes with her diet, or names something
+  she avoids, is left out before sending, rather than sent and then refused.
+  A dish name the food database does not know ("bibimbap") is kept as a
+  steer. The prompt asks for **roughly a third to a half of each slot's
+  options** built around them, and says never to break another rule to fit
+  one in. I set that fraction without asking her: "every option" would bring
+  back the sameness she reported in part 1.
+  **Found on the way:**
+  - **Profile re-read favourites at start with the sheet closed.** It stays
+    mounted while closed, and App already reads the same table at start. It
+    now reads only while open.
+  - **The app chunk went 2 kB over its budget** (987 of 985 kB). The house rule
+    is to defer before raising, so Profile now loads as its own chunk, still
+    mounted, so it is fetched straight after start and cached for offline.
+    After: app chunk 928 of 985 kB, first paint 416 of 437 kB gzipped (was
+    433), a deploy's re-download 261 of 280 (was 278). The total is 2,006 of
+    2,008 kB with **2 kB left**, one more than before because of the extra
+    chunk's header. It is not raised. The next change that adds code will
+    cross it, and should defer something too.
+  **Parity:** `docs/coach-screen-parity.md` gains "a food or meal they like":
+  BOTH. The coach records it by name, and the screen types it or hearts a
+  meal. The coach's `record_fact` description now says what a like does. It
+  never overrides an allergy, restriction or dislike, the coach must never
+  promise a particular dish, and a heart counts too.
+  **Verified:**
+  - `test:meal-likes` (new, 35 checks): what is left out of the steering; the
+    generator request really carries it from the pool builder; the prompt
+    wording and its place in the prompt; heart changes notify every reader;
+    App's one list (typed likes plus hearts) reaches all four generation
+    calls, the day, the strip and the shopping list; Profile's writes; the
+    coach's wording. 13 mutations, 13 caught.
+  - `verify:meal-likes` (new, 15 checks) at 390x844 on the real Profile screen
+    over the fake database. It covers the list's place and wording, the
+    coach's like and the hearts shown, and adding a like read back from the
+    table as the same record a chat turn writes. It also covers removing a
+    like (row deleted), un-hearting (row gone from favourites), hit-slop on
+    the small remove buttons, and no page errors. 6 mutations, 6 caught.
+    Screenshots read.
+  - `test:soft-preferences` §4 rewritten for the new ranking: in band a liked
+    dinner wins, out of band it loses, without the like the closer one wins,
+    and yesterday's liked dinner gives way. 3 mutations, 3 caught.
+  - `test:bundle` green after the deferral. The 109 gates and drivers that
+    read a changed file or open Profile: 109 passed, 0 failed. `tsc` clean.
+  **Named, not built:** learning likes from what is logged or swapped (she
+  ruled it out); the 1-in-8 pools with only one correct combination (part 1).
+  **Deploys:** frontend on a merge to main when she says so; `generate-meals`
+  (likes in the prompt) and `chat-gemini` (the like wording, and part 2's
+  coach half), both on her machine. Until `generate-meals` is deployed, likes
+  already rank the days. New meals are just not steered yet, and the old
+  function ignores the extra fields.
+
 - [x] **UPCOMING MEALS: THE DAY STRIP, ON SCREEN AND BY CHAT.** 27 Sep 2026,
   Ashley: *"I can only see today's meal, I can't see upcoming meals and I
   can't add things to the grocery list for future meals so I can plan
