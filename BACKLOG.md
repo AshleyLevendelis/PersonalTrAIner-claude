@@ -84,6 +84,11 @@ Newest first. One line each.
     list her avoid list, which the app always does. Also, the swap list now
     greys anything the day's pick will not serve, so the two cannot
     disagree.
+  - **Full sweep at this commit: 303 gates, 299 passed.** The four failures
+    are the expected ones: three database-only checks, each printing its own
+    "could not reach it" sentence, and the exam freshness check, red by
+    design because the coach's prompt changed today and the exam has not
+    been re-run.
   **Deploys:** frontend only, on a merge when she says. No edge function
   changes.
 
