@@ -104,7 +104,7 @@ function notifyFavourites(): void {
 }
 
 /** The names this profile has marked, or null when the read failed — see below. */
-export async function readFavouriteNames(profileId: string): Promise<Set<string> | null> {
+async function readFavouriteNames(profileId: string): Promise<Set<string> | null> {
   const { data, error } = await supabase
     .from('favorite_meals')
     .select('name')

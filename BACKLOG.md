@@ -103,6 +103,15 @@ Newest first. One line each.
     pinned: the coach now writes no favourite, and a failed read is null
     rather than empty. The property it exists for, one writer of the
     table, is unchanged.
+  - **Full sweep at the review commit: 301 gates, 296 passed.**
+    - Four failures are the usual ones: three database-only checks, each
+      printing its own "could not reach it" sentence, and the exam freshness
+      check, red by design because the coach's prompt changed today.
+    - The fifth was mine: `test:no-dead-code` counted 41 unreachable
+      exports against a budget of 40. The heart read is now used only
+      inside its own module, through the watcher, so it is no longer
+      exported. That gate, the two likes/favourites gates, `test:bundle`
+      and `tsc` were re-run green after the fix.
   **Deploys:** unchanged from the entry below. This changes nothing in
   either edge function.
 
