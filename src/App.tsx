@@ -143,7 +143,8 @@ import type { TrainerNudgeProps } from '@/components/TrainerNudge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
-import { markRestrictionBreakers, favouritesStillAllowed } from '@/lib/meal-restriction-check'
+import { favouritesStillAllowed } from '@/lib/meal-restriction-check'
+import { useServablePools } from '@/hooks/useServablePools'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
@@ -345,16 +346,14 @@ function App() {
     () => [...new Set([...typedFoodLikes, ...favouriteMealNames])],
     [typedFoodLikes, favouriteMealNames],
   )
-  // A LIKE NEVER OVERRIDES WHAT SHE AVOIDS. A kept meal (hearted, or asked
-  // for by name) survives a regenerate unchecked, so a pool can hold one that
-  // breaks a restriction added since; marked here, from the same check the
-  // meal card runs, it can never be the day a like picks. ONE derivation, and
-  // every assembly below (today, the strip, the shopping list, the refit)
-  // reads it, so they cannot disagree about which day a like chose.
-  const mealPools = useMemo(
-    () => markRestrictionBreakers(storedMealPools, profile?.dietary_preferences ?? [], compileFoodDislikes(memoryFacts)),
-    [storedMealPools, profile?.dietary_preferences, memoryFacts],
-  )
+  // NOTHING SHE NOW AVOIDS IS SERVED, AND A LIKE NEVER PICKS IT. A kept meal
+  // (hearted, or asked for by name) survives a regenerate unchecked, so a pool
+  // can hold one that breaks a restriction added since. Marked here by the
+  // meal card's own check; assembleDay never serves a marked meal (Ashley's
+  // ruling, 27 Sep 2026: "stop serving it"). ONE derivation, and every
+  // assembly below (today, the strip, the shopping list, the refit) reads it,
+  // so they cannot disagree about what a day holds.
+  const mealPools = useServablePools(storedMealPools, profile?.dietary_preferences, memoryFacts)
   // And the generator is not asked for a hearted dish she can no longer eat.
   const steerableFavouriteMeals = useMemo(
     () => favouritesStillAllowed(mealPools, favouriteMealNames),

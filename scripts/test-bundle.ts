@@ -469,7 +469,20 @@ console.log('\n3. Nothing has crept back up')
   // app chunk by 8, first paint by 2, a deploy's re-download by 3. Only the
   // total of everything shipped rises, because the code exists. 2,008 is 20
   // above the 1,988 measured today, the same shape as the 17 Sep entry.
-  const TOTAL_BUDGET_KB = 2008
+  // 27 Sep 2026, the same day: 2,008 -> 2,029, for Ashley's ruling that a kept
+  // meal breaking a restriction added since is not served. MEASURED BOTH ENDS
+  // through THIS gate, the base on a clean worktree of HEAD:
+  //     c9d56ebc, before   total 2007   app 929   paint 416   deploy 261
+  //     after              total 2009   app 929   paint 416   deploy 261
+  // THE 20 kB OF ROOM SET THIS MORNING WAS SPENT BY THE EVENING, on the three
+  // meal changes she asked for that day (different meals each day, the day
+  // strip, likes): 19 kB of real code, with the Profile screen moved off the
+  // main bundle on the way, so the app chunk FELL from 987 to 929. Deferring
+  // cannot help THIS number, which counts every byte shipped wherever it
+  // lives, and the unreachable exports are already tree-shaken. Every figure
+  // a person waits for is unchanged. 2,029 is 20 above the 2,009 measured
+  // today, the same shape as every entry above.
+  const TOTAL_BUDGET_KB = 2029
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

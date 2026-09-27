@@ -10,7 +10,7 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, useState, lazy, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +26,10 @@ import {
   deleteFactPermanently, deleteGoalPermanently, deleteContextFactPermanently,
   type UserFactRow, type UserGoalRow, type UserContextFactRow,
 } from '@/lib/memory-store'
-import { resolveFoodTarget } from '@/lib/fact-compiler'
+import { resolveFoodTarget, compileFoodDislikes } from '@/lib/fact-compiler'
+import { markRestrictionBreakers, favouritesStillAllowed } from '@/lib/meal-restriction-check'
+import { getPools, type MealSlotName } from '@/lib/meal-store'
+import type { PoolOption } from '@/lib/meal-generation'
 import { checkFactConflict } from '@/lib/memory-reconcile'
 import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
@@ -722,6 +725,23 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       () => setHeartError("Couldn't read your hearted meals just now, so this list may be out of date."),
     )
   }, [profileId, open])
+  // A HEART THAT NOW CLASHES STAYS LISTED, MARKED — Ashley's ruling, 27 Sep
+  // 2026: a kept meal that breaks a restriction added since is not served,
+  // "stays in your hearted list, marked as clashing", and comes back if the
+  // restriction is lifted. Worked out here from the stored pools and the
+  // same check the meal card and the day's pick use, when the sheet opens.
+  const [storedPools, setStoredPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
+  useEffect(() => {
+    if (!profileId || !open) return
+    let live = true
+    getPools(profileId).then(p => { if (live) setStoredPools(p) }).catch(err => console.error('Reading meal pools for the hearted list failed:', err))
+    return () => { live = false }
+  }, [profileId, open])
+  const clashingHearts = useMemo(() => {
+    const marked = markRestrictionBreakers(storedPools, profile.dietary_preferences ?? [], compileFoodDislikes(facts))
+    const allowed = new Set(favouritesStillAllowed(marked, heartedMeals).map(n => n.toLowerCase()))
+    return new Set(heartedMeals.filter(n => !allowed.has(n.toLowerCase())))
+  }, [storedPools, profile.dietary_preferences, facts, heartedMeals])
   const unheart = async (name: string) => {
     if (!profileId) return
     const ok = await unmarkFavourite(profileId, name)
@@ -1203,9 +1223,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Meals you've hearted count too:</p>
                   <ul className="flex flex-wrap gap-1.5">
                     {heartedMeals.map(name => (
-                      <li key={name} className="flex items-center gap-1 rounded-full bg-[color:var(--surface-raised)] py-1 pl-2.5 pr-1 text-xs" data-hearted-meal={name}>
-                        <Heart className="size-3 fill-current text-primary" aria-hidden />
-                        <span>{name}</span>
+                      <li key={name} className="flex items-center gap-1 rounded-full bg-[color:var(--surface-raised)] py-1 pl-2.5 pr-1 text-xs" data-hearted-meal={name} data-clashes={clashingHearts.has(name) ? 'yes' : 'no'}>
+                        <Heart className={`size-3 fill-current ${clashingHearts.has(name) ? 'text-muted-foreground' : 'text-primary'}`} aria-hidden />
+                        <span className={clashingHearts.has(name) ? 'text-muted-foreground line-through' : undefined}>{name}</span>
                         <button
                           type="button"
                           onClick={() => void unheart(name)}
@@ -1217,6 +1237,11 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                       </li>
                     ))}
                   </ul>
+                  {clashingHearts.size > 0 && (
+                    <p data-testid="profile-hearts-clash" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">
+                      {[...clashingHearts].join(', ')} {clashingHearts.size === 1 ? 'clashes' : 'clash'} with what you avoid, so {clashingHearts.size === 1 ? "it isn't" : "they aren't"} served. {clashingHearts.size === 1 ? 'It comes' : 'They come'} back if that changes.
+                    </p>
+                  )}
                 </div>
               )}
               {/* Outside the list, so a read that failed before anything was

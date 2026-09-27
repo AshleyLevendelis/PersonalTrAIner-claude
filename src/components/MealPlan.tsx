@@ -235,9 +235,14 @@ export function MealPlan({
   // (describeEatenBeforeChange). Declared here rather than beside
   // restrictionBySlot above because it needs loggedBySlot, which the state
   // hook below it owns.
-  const blockedSlots = SLOT_ORDER.filter(
-    s => restrictionBySlot[s] && !restrictionBySlot[s]!.ok && (loggedBySlot[s]?.length ?? 0) === 0,
-  )
+  // TWO WAYS A SLOT CAN NO LONGER FIT: the meal on it clashes, or (since
+  // 27 Sep 2026, when a clashing kept meal stopped being served) EVERY saved
+  // option clashes, so nothing is left to serve. The second used to be the
+  // first; without this it would be a slot that silently went empty.
+  const blockedSlots = SLOT_ORDER.filter(s => (loggedBySlot[s]?.length ?? 0) === 0 && (
+    (restrictionBySlot[s] && !restrictionBySlot[s]!.ok)
+    || (!chosen[s] && (pools[s]?.length ?? 0) > 0 && pools[s]!.every(o => o.breaksRestriction))
+  ))
 
   /**
    * Undo tapped, and the meal stayed logged. Local to this screen because it
@@ -868,7 +873,14 @@ function MealSlotRow({
               )}
             </>
           ) : (
-            <span className="text-sm text-muted-foreground">No option generated</span>
+            // Options WERE made; every one clashes with what she avoids, so
+            // none is served (Ashley's ruling, 27 Sep 2026). "No option
+            // generated" would be untrue.
+            <span className="text-sm text-muted-foreground" data-testid="meal-slot-all-clash-note">
+              {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction)
+                ? 'Nothing saved fits what you avoid'
+                : 'No option generated'}
+            </span>
           )}
         </div>
       </button>
@@ -1178,7 +1190,11 @@ function MealSlotRow({
               {otherOptions.map(alt => {
                 const calDelta = Math.round(alt.macros.calories - option.macros.calories)
                 const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
-                const verdict = checkAlternative(alt)
+                // A MEAL THE DAY'S PICK WILL NOT SERVE CANNOT BE CHOSEN HERE
+                // EITHER (breaksRestriction, set by the same check), so the two
+                // can never disagree; the reason still comes from the check.
+                const checked = checkAlternative(alt)
+                const verdict = !checked.ok || !alt.breaksRestriction ? checked : { ...checked, ok: false }
                 return (
                   <button
                     key={alt.name}

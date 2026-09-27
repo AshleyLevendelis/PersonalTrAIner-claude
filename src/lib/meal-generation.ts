@@ -1468,12 +1468,30 @@ export function assembleDay(
    * The repair-scale below must never touch a pinned slot: a custom meal's
    * quantities are the user's own stated facts, and "we adjusted your
    * breakfast" is exactly what this feature promises not to do.
+   *
+   * ONE EXCEPTION: a pinned meal marked breaksRestriction is set aside and
+   * the slot is chosen as if unpinned (see the top of the body).
    */
   pinned: Partial<Record<MealSlotName, PoolOption>> = {},
 ): AssembledDay {
+  // NEVER SERVED WHILE IT BREAKS A RESTRICTION — Ashley's ruling, 27 Sep 2026,
+  // from three options: "stop serving it". A kept meal (hearted, or asked for
+  // by name) survives a regenerate unchecked, so a pool can hold one that
+  // breaks a restriction added since; the caller marks it (breaksRestriction).
+  // It is left out of the search, and a pick for this date that names it is
+  // SET ASIDE for this slot rather than deleted, so lifting the restriction
+  // brings both back. `alternatives` still returns the whole pool: the swap
+  // list shows a clashing meal greyed, with the reason, as it always did.
+  const servable: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  for (const [s, opts] of Object.entries(pools) as [MealSlotName, PoolOption[] | undefined][]) {
+    servable[s] = (opts ?? []).filter(o => !o.breaksRestriction)
+  }
+  pinned = Object.fromEntries(
+    (Object.entries(pinned) as [MealSlotName, PoolOption | undefined][]).filter(([, o]) => o != null && !o.breaksRestriction),
+  ) as Partial<Record<MealSlotName, PoolOption>>
   const requestedSlots = Object.keys(pools) as MealSlotName[]
-  const slots = requestedSlots.filter(s => (pools[s]?.length ?? 0) > 0 || pinned[s] != null)
-  const missingSlots = requestedSlots.filter(s => (pools[s]?.length ?? 0) === 0 && pinned[s] == null)
+  const slots = requestedSlots.filter(s => (servable[s]?.length ?? 0) > 0 || pinned[s] != null)
+  const missingSlots = requestedSlots.filter(s => (servable[s]?.length ?? 0) === 0 && pinned[s] == null)
 
   if (slots.length === 0) {
     return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools, missingSlots }
@@ -1525,7 +1543,7 @@ export function assembleDay(
       return
     }
     const slot = slots[index]
-    const candidates = pinned[slot] != null ? [pinned[slot]!] : pools[slot]!
+    const candidates = pinned[slot] != null ? [pinned[slot]!] : servable[slot]!
     for (const option of candidates) {
       combo[slot] = option
       search(index + 1, combo)

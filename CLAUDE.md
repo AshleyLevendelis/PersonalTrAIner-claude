@@ -228,6 +228,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   checks, 34 mutations), `verify:meal-likes` (20 checks, 9 mutations),
   `soft-preferences` §4 (real-food fixtures, 11 mutations). Needs the
   `generate-meals` deploy for the steering; the ranking works without it
+- **A kept meal she now avoids is not served** — both surfaces since 27 Sep
+  2026. Her ruling, from three options: **stop serving it**, over keeping it
+  on the plan with the card's warning and over asking when the restriction is
+  added. A heart or a meal asked for by name survives a regenerate unchecked,
+  so the day's pick never serves one that breaks a CURRENT restriction. A pick
+  for a date naming it is set aside, not deleted, and lifting the restriction
+  brings both back. Both swap routes already refused it. The mark comes from
+  the meal card's own check, in ONE hook shared with the browser harness. A
+  slot where every saved option clashes says so and offers Redo, rather than
+  going quiet; Profile keeps the heart, marked, with a line saying why.
+  `kept-meal-restriction` (22 checks, 12 mutations), `verify:kept-meal`
+  (17 checks, 5 mutations)
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the

@@ -71,6 +71,10 @@ import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
 import { buildRotation, assembleRotationDay, rotationIndexFor } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { useServablePools } from '@/hooks/useServablePools'
+import { markRestrictionBreakers } from '@/lib/meal-restriction-check'
+import { compileFoodDislikes } from '@/lib/fact-compiler'
+import type { UserFactRow } from '@/lib/memory-store'
 import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
@@ -783,6 +787,18 @@ const LEFTOVERS = new URLSearchParams(location.search).get('leftovers') === '1'
 // the week is whatever the app's own rotation makes of it. Every option is a
 // row in the fake pool table too, because a swap reads the pool from there.
 const WEEK = new URLSearchParams(location.search).get('week') === '1'
+// ?kept=1 — A KEPT DINNER WITH MUSHROOMS IN IT (27 Sep 2026): a fourth dinner,
+// tagged as hearted, the way a heart survives a regenerate. ?avoid=<food> — a
+// food she avoids, added since. Ashley's ruling: a kept meal that breaks a
+// restriction added since is not served. The pools go through the app's OWN
+// useServablePools, so the marking under test is the app's, not a copy.
+const KEPT = new URLSearchParams(location.search).get('kept') === '1'
+const AVOID = new URLSearchParams(location.search).get('avoid')
+const AVOID_FACTS = (AVOID ? [{
+  id: 'avoid-1', profile_id: PROFILE_ID, kind: 'food_preference', status: 'active', source: 'manual',
+  raw_phrase: AVOID, display_text: `won't eat/do ${AVOID}`, polarity: 'dislike', hardness: 'hard',
+  resolved_refs: [AVOID], retired_at: null, created_at: '2026-09-01T00:00:00.000Z',
+}] : []) as never as UserFactRow[]
 
 const chosen = (REFIT ? refitChosen : {
   breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
@@ -824,9 +840,20 @@ const leftoverPools = (() => {
     // starves the very feature this run exists to show.
     breakfast: [dish('breakfast', 'Oats and yoghurt', 118, 440, 20), dish('breakfast', 'Eggs on toast', 124, 430, 21), dish('breakfast', 'Rice pudding bowl', 112, 450, 19)],
     lunch: [dish('lunch', 'Chicken salad bowl', 158, 587, 26), dish('lunch', 'Rice and greens', 165, 575, 27), dish('lunch', 'Warm grain salad', 152, 600, 25)],
-    dinner: [dish('dinner', 'Roast chicken tray bake', 118, 440, 20), dish('dinner', 'Chicken and rice pot', 124, 430, 21), dish('dinner', 'Baked chicken and rice', 112, 450, 19)],
+    dinner: [dish('dinner', 'Roast chicken tray bake', 118, 440, 20), dish('dinner', 'Chicken and rice pot', 124, 430, 21), dish('dinner', 'Baked chicken and rice', 112, 450, 19),
+      ...(KEPT ? [(() => {
+        const ingredients = [
+          { name: 'chicken breast', quantity: 115, unit: 'g' }, { name: 'cooked basmati rice', quantity: 420, unit: 'g' },
+          { name: 'olive oil', quantity: 19, unit: 'g' }, { name: 'mushrooms', quantity: 100, unit: 'g' },
+        ]
+        const m = computeMealMacros(ingredients)
+        return { slot: 'dinner', name: 'Chicken and mushroom risotto', ingredients, macros: { calories: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) }, tags: ['favourite'], prep: '' }
+      })()] : [])],
   }
 })()
+// What the app's hook would make of these pools for today, for the day's
+// first render. The hook itself runs in the page below.
+const servableAtStart = markRestrictionBreakers(leftoverPools as never, [], compileFoodDislikes(AVOID_FACTS))
 
 const leftoverRotation = LEFTOVERS && macros
   ? buildRotation(leftoverPools as never, macros, [], { mealsPerDay: 3, includeSnacks: false, batchCooking: true })
@@ -838,10 +865,10 @@ const leftoverDate = leftoverRotation
       .find(d => leftoverRotation.leftoverFor(rotationIndexFor(d)).lunch !== undefined) ?? today)
   : today
 const weekRotation = WEEK && macros
-  ? buildRotation(leftoverPools as never, macros, [], { mealsPerDay: 3, includeSnacks: false, batchCooking: false })
+  ? buildRotation(servableAtStart, macros, [], { mealsPerDay: 3, includeSnacks: false, batchCooking: false })
   : null
 const weekToday = weekRotation && macros
-  ? assembleRotationDay(weekRotation, today, leftoverPools as never, macros, [], {})
+  ? assembleRotationDay(weekRotation, today, servableAtStart, macros, [], {})
   : null
 if (WEEK) {
   for (const [slot, options] of Object.entries(leftoverPools)) {
@@ -886,13 +913,14 @@ function Harness() {
   // THE APP'S OWN HOOK for the strip, not a copy of its wiring: the rotation
   // the app would build from these pools, and the fake database underneath.
   const mealShape = { mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS }
+  const servablePools = useServablePools(livePools as never, profile.dietary_preferences, AVOID_FACTS)
   const stripRotation = useMemo(
-    () => (driftedMacros ? buildRotation(livePools as never, driftedMacros, [], mealShape) : null),
+    () => (driftedMacros ? buildRotation(servablePools, driftedMacros, [], mealShape) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [livePools],
+    [servablePools],
   )
   const mealDays = useMealDays({
-    profileId: PROFILE_ID, today, rotation: stripRotation, pools: livePools as never,
+    profileId: PROFILE_ID, today, rotation: stripRotation, pools: servablePools,
     targets: driftedMacros, softLikedFoods: [], todaysChosen: liveChosen as never, mealShape,
   })
   // What the shopping list holds, for verify:meal-days to read back after
@@ -1023,7 +1051,8 @@ function Harness() {
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
             latestWeightKg={80} profileId={PROFILE_ID} date={today}
-            pools={livePools as never} chosen={liveChosen as never} mealTotals={liveTotals}
+            pools={servablePools as never} chosen={liveChosen as never} mealTotals={liveTotals}
+            avoidFoods={compileFoodDislikes(AVOID_FACTS)}
             isGeneratingMeals={false} mealRegenerateError={null}
             onMealPickApplied={handleMealPickApplied as never}
             mealRefit={refit?.needed && !refitDeclined ? refit : null}

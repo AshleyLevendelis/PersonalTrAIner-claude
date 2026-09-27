@@ -2,6 +2,91 @@
 
 Newest first. One line each.
 
+- [x] **A KEPT MEAL SHE NOW AVOIDS IS NOT SERVED.** 27 Sep 2026. Ashley's
+  ruling, from three options, asked after the likes review named it: **stop
+  serving it**. It stays in her hearted list, marked as clashing, never appears
+  in a day while the restriction is on, and comes back if she lifts it. She
+  passed over keeping it on the plan with the card's warning (the behaviour
+  until today) and over being asked when the restriction is added. Plan:
+  `docs/plans/kept-meal-restriction.md`.
+  **What changed on her phone:**
+  - A hearted meal, or one she asked for by name, that breaks a restriction
+    she added later is no longer picked for any day: not today, not on the
+    strip, not on the shopping list.
+  - A meal she had picked for a particular day before adding the restriction
+    is set aside, not deleted. Lifting the restriction brings it back.
+  - In the swap list it is still there, greyed, saying why, as it always was.
+  - If EVERY saved option for a meal clashes, the day says so: "…no longer
+    fit your restrictions … Redo them". Each empty meal reads "Nothing saved
+    fits what you avoid", not "No option generated", which would be untrue.
+  - Profile keeps the heart, struck through, with a line: "… clashes with
+    what you avoid, so it isn't served. It comes back if that changes."
+  **Traced before building:**
+  - Both routes where she chooses a meal already refused it: the screen's
+    swap list greys it, and the coach's swap declines it.
+  - The two routes that could still serve it were the day's own pick, which
+    knows nothing about restrictions, and a pick made for a date before the
+    restriction, which the day's pick treats as the only candidate.
+  - Both now read one mark (`breaksRestriction`), set by the meal card's own
+    check in one shared hook. App uses the hook, and so does the browser
+    harness, so the driver measures the app's marking and not a copy of it.
+  **Applies to every kept meal, not only hearts.** A meal asked for by name
+  survives a regenerate the same way, and her reason (a restriction always
+  wins over an old choice) covers it equally. Decided unprompted, stated here.
+  **CSCS review:**
+  1. *Effect.* A day is made only from meals she can eat. When the clashing
+     meal was the best fit, the day may now fit slightly less closely; it
+     is still held to the same bands, or it is an honest miss.
+  2. *What it takes away.* The clashing meal, only while the restriction is
+     on. If a slot has nothing left, it says so and offers to redo it.
+  3. *Fundamentals.* No target, band or split moved.
+  4. *Redefined?* Yes, named. The "no longer fits your restrictions" notice
+     used to fire when the SERVED meal clashed, which can no longer happen.
+     It now fires when every saved option for a slot clashes.
+  5. *Scope.* This is a food filter, not clinical nutrition. It only ever
+     removes a meal from what is served, never adds a food, and weakens no
+     check. The disclosure stands: a meal with no recorded ingredients
+     cannot be checked, and "no issue found" has never meant "safe".
+  **The size budget, measured both ends** on a clean worktree of HEAD
+  through `test:bundle`:
+  - Total shipped went from 2,007 to 2,009 kB against a 2,008 budget.
+    Every figure a person waits for is unchanged: app chunk 929, first
+    paint 416, a deploy's re-download 261.
+  - The budget moves to 2,029, 20 above the measured value, the house
+    shape.
+  - The 20 kB set that morning for the grocery revamp went on the three
+    meal changes the same day. Deferring cannot lower this number, because
+    it counts every byte wherever it lives.
+  **Verified:**
+  - `test:kept-meal-restriction` (new, 22 checks), on real food:
+    - the best-fitting meal is not served once it clashes, nor the only
+      one (that slot is reported missing, the others still served);
+    - a pick for the day naming it is set aside, while a pick of a meal she
+      can eat is honoured;
+    - lifting the restriction brings both back, and a diet marks the same
+      way;
+    - none of seven days serves it;
+    - the wiring: App and the harness read one hook, the notice, the empty
+      row's words, the swap list, Profile, and the coach's existing refusal.
+    12 mutations, 12 caught.
+  - `verify:kept-meal` (new, 17 checks) at 390x844:
+    - the risotto is served on 1 of 7 days with nothing avoided (the sanity
+      check), and on 0 of 7 once mushrooms are avoided, every day still
+      full, with no notice;
+    - it is still in the swap list, greyed, with the reason;
+    - with every option clashing: nothing served, the notice on screen with
+      Redo, each row's words, and an upcoming day the same;
+    - Profile keeps the heart, marked, with its line.
+    5 mutations, 5 caught. Screenshots read, and one found the "No option
+    generated" wording, fixed before it counted.
+  - `test:meal-likes` re-anchored to the hook, 62 checks.
+  - One harness fix found by the driver: the test page never gave the swap
+    list her avoid list, which the app always does. Also, the swap list now
+    greys anything the day's pick will not serve, so the two cannot
+    disagree.
+  **Deploys:** frontend only, on a merge when she says. No edge function
+  changes.
+
 - [x] **LIKES, AFTER REVIEW: FIVE THINGS THE FIRST BUILD GOT WRONG.** 27 Sep
   2026, the same day. A regression review of my own diff, every finding
   re-read against the code before anything was changed.
@@ -69,7 +154,8 @@ Newest first. One line each.
   **Still named, not changed:** a kept meal that breaks a restriction added
   later can still be SERVED (with the card's warning) when it wins on fit.
   That is older than likes, it is in the allergen path, and removing it
-  changes what she is served, so it is hers to decide. Also named:
+  changes what she is served, so it is hers to decide. **CLOSED the same
+  day on her ruling ("stop serving it"), entry above.** Also named:
   - the generator hears at most 12 likes and 8 hearted dishes, the hearts
     in alphabetical order;
   - a hearted breakfast can still clash with a timing rule and be refused

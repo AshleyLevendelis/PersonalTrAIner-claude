@@ -207,8 +207,11 @@ async function main() {
       JSON.stringify(allowed) === JSON.stringify(['Beef stew', 'Apple pie']), allowed)
     // A LIKE NEVER OVERRIDES WHAT SHE AVOIDS, and every assembly must agree
     // on it, or the strip and the shopping list could pick different days.
+    // RE-ANCHORED the same day: the marking moved into useServablePools, a
+    // hook shared with the browser harness (test:kept-meal-restriction holds
+    // what the hook does).
     check('the pools every assembly reads are the stored pools with restriction breakers marked',
-      /const mealPools = useMemo\(\s*\(\) => markRestrictionBreakers\(storedMealPools, profile\?\.dietary_preferences \?\? \[\], compileFoodDislikes\(memoryFacts\)\)/.test(app))
+      /const mealPools = useServablePools\(storedMealPools, profile\?\.dietary_preferences, memoryFacts\)/.test(app))
     check('...and nothing that assembles a day reads the unmarked ones',
       /buildRotation\(mealPools,/.test(app) && /pools: mealPools,/.test(app) && /checkMealRefit\(mealPools,/.test(app) && /mealPools=\{mealPools\}/.test(app)
       && !/(buildRotation|assembleRotationDay|checkMealRefit|useMealDays)\([^;]*storedMealPools/.test(app) && !/mealPools=\{storedMealPools\}/.test(app))

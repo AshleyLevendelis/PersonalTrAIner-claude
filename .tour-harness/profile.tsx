@@ -67,6 +67,10 @@ const REMINDERS_LIVE = new URLSearchParams(location.search).get('reminders') ===
 // see the screen show both kinds of like, take one of each away, add one of
 // its own, and be refused a like of the food she avoids.
 const LIKES = new URLSearchParams(location.search).get('likes') === '1'
+// &keptclash=1 — a hearted dinner, kept in the pool the way a heart survives a
+// regenerate, with mushrooms in it: the food this seed already avoids. The
+// Profile list must keep it and mark it (Ashley's ruling, 27 Sep 2026).
+const KEPT_CLASH = LIKES && new URLSearchParams(location.search).get('keptclash') === '1'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
 
@@ -123,8 +127,16 @@ const db: Db = {
   favorite_meals: LIKES ? [
     { id: 'fav-1', profile_id: PROFILE_ID, name: 'Salmon traybake', meal_slot: 'dinner', calories: 700, protein: 45, carbs: 60, fat: 25, times_used: 1 },
     { id: 'fav-2', profile_id: PROFILE_ID, name: 'Overnight oats', meal_slot: 'breakfast', calories: 450, protein: 25, carbs: 60, fat: 12, times_used: 1 },
+    ...(KEPT_CLASH ? [{ id: 'fav-3', profile_id: PROFILE_ID, name: 'Chicken and mushroom risotto', meal_slot: 'dinner', calories: 760, protein: 40, carbs: 95, fat: 24, times_used: 1 }] : []),
   ] : [],
-  meal_plan_slots: [],
+  meal_plan_slots: KEPT_CLASH ? [
+    { id: 'slot-1', profile_id: PROFILE_ID, slot: 'dinner', pool_index: 0, name: 'Chicken and mushroom risotto',
+      ingredients: [{ name: 'chicken breast', quantity: 115, unit: 'g' }, { name: 'cooked basmati rice', quantity: 420, unit: 'g' }, { name: 'mushrooms', quantity: 100, unit: 'g' }],
+      macros: { kcal: 760, protein: 40, carbs: 95, fat: 24 }, tags: ['favourite'], prep: '' },
+    { id: 'slot-2', profile_id: PROFILE_ID, slot: 'breakfast', pool_index: 0, name: 'Overnight oats',
+      ingredients: [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'semi-skimmed milk', quantity: 250, unit: 'ml' }],
+      macros: { kcal: 450, protein: 25, carbs: 60, fat: 12 }, tags: ['favourite'], prep: '' },
+  ] : [],
 } as unknown as Db
 if (LIKES) {
   ;(db.user_facts as unknown as Record<string, unknown>[]).push({
