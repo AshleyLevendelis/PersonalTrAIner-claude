@@ -517,6 +517,17 @@ const loggedTarget = (() => {
   return { day: rest.day, date: nearestAnchorDate(rest.day) }
 })()
 
+// AN EMPTY ROW THAT CARRIES A SUGGESTION — ActiveRecoveryCard with its
+// "Suggested" cardio row, the card in Ashley's 27 Sep screenshot, for
+// verify:rest-day §8. Null when this plan has no such day.
+;(window as unknown as { __suggestedCardioDay: unknown }).__suggestedCardioDay = (() => {
+  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan
+  const day = liveDays.find(d => d.exercises.length === 0 && !d.plannedActivity && !!d.recommendedCardio)
+  if (!day) return null
+  return { day: day.day, date: nearestAnchorDate(day.day), activity: day.recommendedCardio!.activity }
+})()
+
 // TODAY'S FOCUS, from THIS page's plan — for verify:rest-day-race, 14 Sep 2026.
 // Its last check compared the coach's first bubble with Home's session name,
 // but read the coach off chat.html and Home off real.html: two harness pages,

@@ -1318,6 +1318,9 @@ old — the commands were right and the context was missing.
   its baseline line. The round was re-run after the threshold was measured, and
   the harness now exits when its baseline fails. **A catch means MORE failures
   than the baseline, and the baseline must be zero.**
+  **And a baseline that RAN nothing is refused too** (27 Sep 2026): a harness
+  counting `ok:` lines reads a driver that prints ✓ as zero checks, and every
+  mutation then comes back MISSED against a baseline of nothing.
 - **A MUTATION HARNESS KILLED MID-RUN LEAVES THE MUTATION IN THE TREE, AND THE
   SOURCE STILL LOOKS RIGHT.** 19 Sep 2026: I stopped a run with `pkill`, the
   `finally` that restores the file never executed, and the next browser run

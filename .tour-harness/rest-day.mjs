@@ -331,8 +331,61 @@ check('6b. the cardio row opens the standing-session form', sheet.length > 0, sh
 check('6c. ...which still states the scope inside itself too', /rest of this block/i.test(sheet), sheet.slice(0, 200))
 await shoot('rest-day-4a-cardio')
 
+// ---------------------------------------------------------------------------
+// 8. THE ACTIVE RECOVERY CARD WITH A SUGGESTION: ONE ROW AT REST.
+// Ashley, 27 Sep 2026, from her phone: "minutes and how hard are duplicated".
+// The Suggested cardio row sat above "Did you move today?", whose entry drew
+// a second Minutes / How hard row with nothing chosen: a row that could log
+// nothing. A different card from the one above (an EMPTY row, not a missing
+// one), so it gets its own day from the page and asserts it found one.
+// Every check runs every time, on a null-safe subject.
+// ---------------------------------------------------------------------------
+console.log('\n8. A suggested session and "did you move today?" do not both draw a row\n')
+await send('Page.navigate', { url: `${BASE}#/tab/exercise` })
+await wait(3500)
+const suggested = await ev('window.__suggestedCardioDay ?? null')
+check('8a. the fixture has an empty day carrying a suggestion — the card in the report', !!suggested && !!suggested.date, suggested)
+await send('Page.navigate', { url: `${BASE}&today=${suggested?.date ?? ''}#/tab/exercise` })
+await wait(4000)
+const rowsOnCard = () => ev(`(() => {
+  // The card is the nearest box holding BOTH the suggestion and the chips.
+  let card = document.querySelector('[data-testid="activity-quick-log"]')
+  while (card && !card.querySelector('[data-testid="cardio-planned"]')) card = card.parentElement
+  if (!card) return { found: false, minutes: -1, saves: -1, headers: -1, label: '', chips: [], lit: 0, receipts: 0 }
+  const planned = card.querySelector('[data-testid="cardio-planned"]')
+  const unplanned = card.querySelector('[data-testid="cardio-unplanned"]')
+  return {
+    found: true,
+    label: (planned?.innerText || '').split('\\n')[0].trim(),
+    minutes: card.querySelectorAll('input[data-field="minutes"]').length,
+    saves: card.querySelectorAll('[data-testid="cardio-save"]').length,
+    headers: [...card.querySelectorAll('span')].filter(s => s.textContent.trim() === 'How hard').length,
+    unplannedRows: unplanned ? unplanned.querySelectorAll('input[data-field="minutes"]').length : -1,
+    chips: [...card.querySelectorAll('[data-testid^="quick-log-"]')].map(n => n.textContent.trim().split(/\\d/)[0]),
+    lit: [...card.querySelectorAll('[data-testid="cardio-save"]')].filter(b => b.className.includes('glow-pulse')).length,
+    receipts: card.querySelectorAll('[data-testid="activity-logged"] [data-testid="cardio-readback"]').length,
+  }
+})()`)
+const atRest = await rowsOnCard()
+check('8b. the card holds the Suggested row and the chips', atRest.found && /suggested/i.test(atRest.label), atRest)
+check('8c. THE DEFECT: one Minutes box, one "How hard" and one ✓ on the card, not two',
+  atRest.minutes === 1 && atRest.headers === 1 && atRest.saves === 1, atRest)
+check('8d. ...the one being the suggestion\'s: "did you move today?" draws no row until something is chosen', atRest.unplannedRows === 0, atRest)
+check('8e. ...while every chip is still offered', ['Walk', 'Cycle', 'Swim', 'Other'].every(c => atRest.chips.includes(c)), atRest.chips)
+await shoot('rest-day-8-suggested-at-rest')
+await tap('[data-testid="quick-log-walk"]')
+await wait(400)
+const picked = await rowsOnCard()
+check('8f. choosing Walk brings its row, lit, under the chips', picked.unplannedRows === 1 && picked.minutes === 2 && picked.lit === 2, picked)
+await shoot('rest-day-8-suggested-walk')
+await tap('[data-testid="cardio-unplanned"] [data-testid="cardio-save"]')
+await wait(900)
+const afterLog = await rowsOnCard()
+check('8g. the ✓ logs the walk and it reads back', afterLog.receipts === 1, afterLog)
+check('8h. ...and the second row goes away again, back to the suggestion\'s alone', afterLog.unplannedRows === 0 && afterLog.minutes === 1, afterLog)
+
 const errs = await ev(`(window.__errors ?? []).length`)
-check('7. nothing on the page threw', !errs, errs)
+check('9. nothing on the page threw', !errs, errs)
 
 // COUNTED, not written down: a hardcoded total goes stale the first time a
 // check is added, and the mutation harness relies on this number being real.

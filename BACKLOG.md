@@ -2,6 +2,49 @@
 
 Newest first. One line each.
 
+- [x] **ONE LOGGING ROW ON THE ACTIVE RECOVERY CARD, NOT TWO.** 27 Sep 2026,
+  Ashley, with a screenshot of Saturday's card: *"minutes and how hard are
+  duplicated."*
+  **What was wrong:** an active recovery day with a suggested session showed
+  the suggestion's own row (41 min, Easy, lit ✓), and under "Did you move
+  today?" a second Minutes / How hard row with nothing chosen. That second
+  row could log nothing: its ✓ only ever answered "Pick what you did first",
+  because the chips above it had not been tapped. Walk is deliberately not
+  pre-chosen on a card that already has a suggestion (the 24 Sep "one lit ✓
+  per card" rule), and that is exactly the case that left the row empty.
+  **What changed:** the "did you move today?" row is drawn only once a chip
+  is chosen. At rest the card has one row, the suggestion's. Tap Walk, Cycle,
+  Swim or Other and its row appears under the chips; log it and it reads
+  back above, and the row goes away again. No extra taps: a chip was always
+  needed first. It is the same shared entry everywhere, so the same holds on
+  the rest-day card after a log, under a prescribed walk, and in "Add work →
+  Cardio" before a preset is picked. The rest day's pre-chosen Walk still
+  shows its row at once, so its one-tap walk is unchanged.
+  **Decided unprompted, and why:** the fix removes a row that could not act;
+  it changes no wording, no log and nothing the plan prescribes. Left alone,
+  and named for her: the heading still reads "Did you move today?" under a
+  suggested session, where a prescribed walk makes it read "Did anything
+  else?".
+  **Verified:** `verify:rest-day` §8 (new, 8 checks) on the real card at
+  390px, on an empty day carrying a suggestion that the page names, asserting
+  it found one: one Minutes box, one "How hard" and one ✓ at rest; every chip
+  still offered; Walk brings its row; the ✓ logs and reads back; the row goes
+  again. Screenshots read, at rest and with Walk chosen. 4 mutations, 4
+  caught: the fix reverted, the condition inverted, Walk pre-chosen on a
+  suggestion day (two rows by another road), and no reset after a save.
+  Typecheck clean; the gates reading these files and the drivers for these
+  screens all pass: bounds-and-boundaries, cardio-effort, planned-activity,
+  rest-day-card, round-logging, session-move, bundle, and verify:
+  planned-activity, cardio-session, round-presets, tools-timer, finisher,
+  mobility-filler, rest-day (56 checks).
+  **Found in the harness, fixed:** the driver mutation harness counted
+  `ok:` / `FAIL:` lines, and this driver prints ✓ / ✗, so every mutation would
+  have read MISSED against a baseline of zero checks. A copy counts the
+  driver's own "N checks ran" line and its ✗ lines, and both now refuse a
+  baseline that ran no checks at all.
+  **CSCS review:** not applicable; nothing prescribed changes.
+  **Deploys:** frontend only, live on a merge to main when she says so.
+
 - [x] **PUT LIVE: THE FULL-PAGE CHAT (DESIGN 2a).** 26 Sep 2026, Ashley:
   *"Put it live"*. Main fast-forwarded to the working branch. The app change is
   the chat layout alone. The one other commit rewords the allergy exam

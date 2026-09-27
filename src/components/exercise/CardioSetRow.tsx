@@ -409,7 +409,8 @@ export interface CardioPick {
  * same style as the others.
  *
  * After a save it resets to NOTHING chosen, never back to the pre-selection:
- * a second tap on a still-lit ✓ would otherwise log the same walk twice.
+ * a second tap on a still-lit ✓ would otherwise log the same walk twice. With
+ * nothing chosen the row is not drawn at all (27 Sep 2026): only the chips.
  */
 export function UnplannedCardioEntry({
   picks,
@@ -538,19 +539,27 @@ export function UnplannedCardioEntry({
           autoFocus={!prefill}
         />
       )}
-      <EntryBoxes
-        minutes={minutes}
-        onMinutes={v => { setMinutes(v); setError(null) }}
-        minutesHint={hint}
-        effort={effort}
-        onEffort={e => { setEffort(e); setError(null) }}
-        ready={ready}
-        saving={saving}
-        onSave={handleSave}
-        saveLabel={activityName ? `${saveVerb} ${activityName}` : `${saveVerb} activity`}
-        invalid={!!error && /minutes/i.test(error)}
-        subject={activityName || 'this activity'}
-      />
+      {/* NO ROW UNTIL A CHIP IS CHOSEN. Ashley, 27 Sep 2026, on an active
+          recovery day: "minutes and how hard are duplicated". A suggested
+          session's row sat directly above this one, and with nothing chosen
+          this one was a second "Minutes / How hard" that could log nothing —
+          its ✓ only ever answered "Pick what you did first". The chips ask the
+          question; the row appears once there is something for it to log. */}
+      {pick !== null && (
+        <EntryBoxes
+          minutes={minutes}
+          onMinutes={v => { setMinutes(v); setError(null) }}
+          minutesHint={hint}
+          effort={effort}
+          onEffort={e => { setEffort(e); setError(null) }}
+          ready={ready}
+          saving={saving}
+          onSave={handleSave}
+          saveLabel={activityName ? `${saveVerb} ${activityName}` : `${saveVerb} activity`}
+          invalid={!!error && /minutes/i.test(error)}
+          subject={activityName || 'this activity'}
+        />
+      )}
       {error && <p className="text-[0.625rem] text-destructive px-1">{error}</p>}
     </div>
   )
