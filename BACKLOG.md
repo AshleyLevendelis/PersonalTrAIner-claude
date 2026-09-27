@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **LIVE, 27 Sep 2026, on Ashley's "Make it live".** `main` was
+  fast-forwarded to the checked branch head: the day's three meal changes, the
+  likes review fixes and the kept-meal ruling, 299 of 303 in the full sweep
+  with the four expected failures.
+  - `personal-tr-a-iner-claude`: proven live. Its production alias serves the
+    exact main chunk that commit's build log produced, beside the
+    `ProfileScreen` chunk that exists only from today.
+  - `personal-tr-a-iner-claude-yco8`: READY on the same commit with aliases
+    assigned. Its pages are not readable from a cloud session, so this half is
+    proven by deployment state only.
+  **Not live until her machine runs them:** the `chat-gemini` and
+  `generate-meals` deploys, and a coach exam re-run. No migrations. The
+  prompt, with a pre-deploy check that the checkout holds the new code (both
+  strings present at the new main, absent at the previous one), is in
+  `docs/handoff-2026-09-27.md`.
+
 - [x] **A KEPT MEAL SHE NOW AVOIDS IS NOT SERVED.** 27 Sep 2026. Ashley's
   ruling, from three options, asked after the likes review named it: **stop
   serving it**. It stays in her hearted list, marked as clashing, never appears
