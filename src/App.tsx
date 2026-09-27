@@ -29,7 +29,8 @@ import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
-import { buildRotation, assembleRotationDay, rotationIndexFor, type MealShape } from '@/lib/meal-rotation'
+import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
+import { useMealDays } from '@/hooks/useMealDays'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
@@ -130,6 +131,7 @@ import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
 const LAST_TAB_KEY = 'fitplan_last_tab'
+
 
 function App() {
   const { hash, route } = useAppRoute()
@@ -292,6 +294,7 @@ function App() {
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
   const [manualMealPicks, setManualMealPicks] = useState<Partial<Record<MealSlotName, string>>>({})
+
   // A LEAN, not a filter — "I love salmon" biases which combination of pool
   // options gets picked for the day, and only when two combinations fit the
   // macros about equally (SOFT_FOOD_MISS_PENALTY is a fifth of a 5% calorie
@@ -346,14 +349,10 @@ function App() {
   // whatever the user pinned ("plan the rest of my meals" — Ashley, 1 Sep
   // 2026). A pick naming an option that no longer exists in the pool simply
   // doesn't pin, same as the old overlay's find-or-skip.
-  const pinnedMeals: Partial<Record<MealSlotName, PoolOption>> = useMemo(() => {
-    const out: Partial<Record<MealSlotName, PoolOption>> = {}
-    for (const [slot, name] of Object.entries(manualMealPicks) as [MealSlotName, string][]) {
-      const pick = mealPools[slot]?.find(o => o.name === name)
-      if (pick) out[slot] = pick
-    }
-    return out
-  }, [manualMealPicks, mealPools])
+  const pinnedMeals: Partial<Record<MealSlotName, PoolOption>> = useMemo(
+    () => pinsFromPicks(manualMealPicks, mealPools),
+    [manualMealPicks, mealPools],
+  )
 
   // THE DAY IS NOW A DAY OF THE WEEK, NOT THE ONE BEST DAY.
   //
@@ -391,6 +390,22 @@ function App() {
     [mealRotation, mealRotationDate, mealPools, macros, compiledSoftFoodPreferences, pinnedMeals],
   )
   const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
+  // THE STRIP'S DAYS (Ashley, 27 Sep 2026) — one hook, shared with the browser
+  // harness so a driver runs this code and not a copy of it.
+  const mealDays = useMealDays({
+    profileId: profile?.id, today: mealRotationDate, rotation: mealRotation, pools: mealPools,
+    targets: macros, softLikedFoods: compiledSoftFoodPreferences, todaysChosen: chosenMeals, mealShape,
+  })
+  // THE DATE MOVED ON WITH THE APP OPEN. Today's picks were only ever loaded
+  // on restore, so an app left open overnight kept serving yesterday's swaps
+  // as today's. The strip holds tomorrow's already; hand them across.
+  const lastMealDateRef = useRef(mealRotationDate)
+  useEffect(() => {
+    if (lastMealDateRef.current === mealRotationDate) return
+    lastMealDateRef.current = mealRotationDate
+    setManualMealPicks(mealDays.futurePicks[mealRotationDate] ?? {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mealRotationDate])
   const mealTotals: MacroTargets = Object.values(chosenMeals).reduce(
     (acc, o) => ({
       calories: acc.calories + (o?.macros.calories ?? 0),
@@ -2904,6 +2919,7 @@ function App() {
                 targets={macros}
                 softLikedFoods={compiledSoftFoodPreferences}
                 todaysPicks={chosenMeals}
+                pinsByDate={mealDays.pinsByDate}
                 onClose={() => { window.location.hash = tabHash('nutrition') }}
                 mealShape={mealShape}
                 headerAction={<ProfileMenu onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }} onReplayTour={replayAppTour} />}
@@ -2938,6 +2954,8 @@ function App() {
               mealRefitError={mealRefitError}
               onMealRefitConfirm={handleMealRefitConfirm}
               onMealRefitDecline={handleMealRefitDecline}
+              mealStrip={mealDays.strip}
+              upcomingDay={mealDays.openDay}
             />
             )}
           </TabsContent>
@@ -2995,6 +3013,10 @@ function App() {
               mealRefit={mealRefitOffer}
               onMealRefitConfirm={handleMealRefitConfirm}
               onMealSwapApplied={handleMealPickApplied}
+              upcomingMeals={mealDays.upcoming}
+              onUpcomingMealPickApplied={mealDays.applyPick}
+              onAddMealDayToGrocery={mealDays.addToGrocery}
+              onRemoveMealDayFromGrocery={mealDays.removeFromGrocery}
               onFindMoreMealOptions={handleFindMoreMealOptions}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}

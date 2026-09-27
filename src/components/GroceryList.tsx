@@ -27,6 +27,7 @@ import {
 } from '@/lib/grocery-store'
 import {
   MAX_GROCERY_QUANTITY, formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines,
+  coverageSentence, readGroceryBuildMemo, writeGroceryBuildMemo, type GroceryBuildMemo,
 } from '@/lib/grocery-display'
 import { parseIngredientLine } from '@/lib/portion-scaler'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -42,6 +43,8 @@ interface GroceryListProps {
   softLikedFoods: string[]
   /** Today's actual picks, swaps included (audit §5.1) — without these the list shops for the meal the user replaced. */
   todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
+  /** Swaps made on the strip's upcoming days, by date — the same reason as todaysPicks, one day along. */
+  pinsByDate?: Record<string, Partial<Record<MealSlotName, PoolOption>>>
   targets: MacroTargets | null
   /** Same object App gives the meal rotation — see GenerateGroceryListInput. */
   mealShape: MealShape
@@ -72,35 +75,12 @@ const TOAST_MS = 5000
 /** Breathing room between the sticky chips and an aisle a chip has scrolled to. */
 const AISLE_GAP_PX = 12
 
-/**
- * WHEN AND OVER HOW MANY DAYS THE LIST WAS LAST BUILT, on this phone.
- *
- * A meal reference stores a day OFFSET from the build date, and the list is
- * only ever rebuilt by hand, so the weekday a meal falls on — and the "next
- * N days" in the note at the bottom — are only true if the build date and
- * horizon are known. This is a note ABOUT the list, kept beside it; the list
- * itself is stored exactly as it was. Absent (built before this, or on
- * another phone), the screen says "Day 1" and leaves the number out.
- */
-interface BuiltMemo { startDate: string; days: number }
-const builtKey = (profileId: string) => `fitplan_grocery_built_v1:${profileId}`
-function readBuilt(profileId?: string): BuiltMemo | null {
-  if (!profileId) return null
-  try {
-    const v = JSON.parse(localStorage.getItem(builtKey(profileId)) ?? 'null')
-    return v && typeof v.startDate === 'string' && typeof v.days === 'number' ? v : null
-  } catch { return null }
-}
-function writeBuilt(profileId: string, memo: BuiltMemo) {
-  try { localStorage.setItem(builtKey(profileId), JSON.stringify(memo)) } catch { /* private window — the screen falls back to "Day 1" */ }
-}
-
-export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, refreshToken, mealShape, header }: GroceryListProps) {
+export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, pinsByDate, refreshToken, mealShape, header }: GroceryListProps) {
   const [items, setItems] = useState<GroceryItemRow[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [built, setBuilt] = useState<BuiltMemo | null>(() => readBuilt(profileId))
-  const [horizonDays, setHorizonDays] = useState(() => readBuilt(profileId)?.days ?? DEFAULT_HORIZON_DAYS)
+  const [built, setBuilt] = useState<GroceryBuildMemo | null>(() => readGroceryBuildMemo(profileId))
+  const [horizonDays, setHorizonDays] = useState(() => readGroceryBuildMemo(profileId)?.days ?? DEFAULT_HORIZON_DAYS)
   const [quickAdd, setQuickAdd] = useState('')
   // ONE ROW OPEN AT A TIME, replacing the old separate edit mode and "from N
   // meals" expander: the open row IS the editor.
@@ -149,6 +129,8 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     if (pinTimer.current) clearTimeout(pinTimer.current)
   }, [])
 
+  const datedCoverage = coverageSentence([...new Set(items.filter(r => r.source === 'generated').flatMap(r => (r.meal_refs ?? []).map(ref => ref.date).filter((d): d is string => !!d)))].sort())
+
   const handleGenerate = async () => {
     if (!profileId || !targets) return
     setGenerating(true)
@@ -156,10 +138,10 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       // generateGroceryList reads the current merged view then enqueues local
       // writes (it doesn't await the network) — reload picks up the merged
       // pending state immediately, no round-trip wait.
-      const input = { profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks, mealShape, startDate: getSessionDateContext(profileId).date }
+      const input = { profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks, pinsByDate, mealShape, startDate: getSessionDateContext(profileId).date }
       await generateGroceryList(input)
       const memo = { startDate: input.startDate, days: horizonDays }
-      writeBuilt(profileId, memo)
+      writeGroceryBuildMemo(profileId, memo)
       setBuilt(memo)
       await reload()
     } finally {
@@ -556,9 +538,14 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
             // of days is the one the list was BUILT with, not the one the pill
             // is set to for the next rebuild.
             <p className="text-[0.6875rem] leading-[1.45] text-muted-foreground" data-testid="grocery-note">
-              {built
-                ? `Built from your next ${built.days} days of meals. `
-                : 'Built from the meals on your Nutrition tab. '}
+              {/* THE ROWS' OWN DATES FIRST. A day added from the strip makes
+                  "your next N days" false, so a list whose rows carry dates
+                  names them; the memo is for lists built before they did. */}
+              {datedCoverage
+                ? `${datedCoverage} `
+                : built
+                  ? `Built from your next ${built.days} days of meals. `
+                  : 'Built from the meals on your Nutrition tab. '}
               Ingredients are filtered, not verified. Check labels if you have an allergy.
             </p>
           )}

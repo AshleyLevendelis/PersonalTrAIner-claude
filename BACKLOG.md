@@ -2,6 +2,104 @@
 
 Newest first. One line each.
 
+- [x] **UPCOMING MEALS: THE DAY STRIP, ON SCREEN AND BY CHAT.** 27 Sep 2026,
+  Ashley: *"I can only see today's meal, I can't see upcoming meals and I
+  can't add things to the grocery list for future meals so I can plan
+  ahead."* Part 2 of three. Her ruling, from three options: **a day strip**,
+  over a week list under today and a separate week page. Plan:
+  `docs/plans/meal-day-strip.md`.
+  **What changed on her phone:**
+  - Seven days across the top of Nutrition: "Today" and the next six, today
+    always named, the open day outlined.
+  - Tap a day and the rings and today's notes step aside. That day's meals
+    appear under "Monday's meals", with its planned total against target and
+    **Add Monday to the shopping list**.
+  - An upcoming meal can be opened, swapped for that day, and hearted. It
+    cannot be logged (nobody has eaten it). Editing its foods, moving it
+    between slots, regenerating and finding more stay on today's view,
+    because each changes the dish for every day.
+  - After adding, a receipt says "Monday's meals are on your shopping list",
+    with Undo and Open list. Opened again later, the day says it is already
+    on the list, before anything is tapped.
+  - The coach sees the next six days, can swap a meal on any of them (the card
+    says "Monday's dinner"), and can put a day on the list or take it off
+    (Undo on the receipt). If it isn't sure she asked, it offers a card.
+  **Traced before building (not assumed):** every day of the week was already
+  derivable by the same function as today, and per-date picks were already
+  stored (one row per profile, date and slot). Only today was ever asked
+  for, and React held one day of picks.
+  **Found on the way, and fixed:**
+  - **The shopping list honoured swaps on today only.** It walked its own days
+    and would have shopped for the meal a swapped Monday no longer had, the
+    audit §5.1 defect one day along. It now builds each date with the tab's own
+    function and that date's picks, so the list and the strip cannot disagree
+    (`test:meal-days` §3 compares all seven days, swaps on today and Monday
+    included).
+  - **A meal choice that failed to save was shown as saved.** The save ignored
+    the database's error, and refused a past date by returning quietly. Every
+    caller already had a catch meant to refuse the swap on screen, and none of
+    those catches ever ran. It throws now, so they do. The diary gate pinned
+    `return` and was re-anchored to "the refusal exits before the write".
+  - **An app left open overnight kept yesterday's swaps as today's.** Today's
+    picks were only loaded at start-up. When the date moves on, the new day's
+    picks now come across from the strip's.
+  - **The browser harness's fake database left `created_at` empty.** The real
+    database fills it; the list's read sorts on it and threw, so the list read
+    back EMPTY while the table held every row. The fake fills it now, from the
+    harness's own clock.
+  - Two sentences in the coach's prompt said no screen shows another day. Both
+    now say moving a meal between days is not something the app does, and
+    point at the dated swap. Neither says "yet".
+  **How a day goes on the list:** not an append. Each list row now carries the
+  date of the meals behind it, and adding a day recomputes the list for the
+  days it covers from today on, plus the new one. The recompute is the one
+  Rebuild uses, so:
+  - an ingredient two days share is one line with both amounts;
+  - adding a day twice changes nothing;
+  - ticked, edited, removed, hand-added and coach-added rows keep every
+    protection they had.
+  Undo is the same recompute without the day. Lists built before today date
+  their rows from the phone's rebuild memo, or from today without one.
+  **Parity:**
+  - `docs/coach-screen-parity.md` gains `add_day_to_grocery_list` (SCREEN) and
+    "see an upcoming day's meals" (BOTH).
+  - `propose_meal_swap` gains a date.
+  - `propose_meal_move` is corrected: its old reason was the missing screen.
+  - Moving a meal between days is built on neither surface, the same on both.
+  **Verified:**
+  - `test:meal-days` (new, 49 checks): dates across both clock changes; the
+    list equals the strip for all seven days; add-a-day is idempotent and never
+    double counts; every row protection holds; undo; legacy rows; the coach's
+    dated swap; a failed pick save; the App, chat-client and coach wiring.
+    18 mutations, 18 caught.
+  - `verify:meal-days` (new, 40 checks) at 390x844, on the real
+    NutritionDisplay and MealPlan through the app's own hook (shared with
+    App.tsx, so the harness runs the app's code, not a copy). It covers the
+    strip, all seven days read, a swap saved to that date only, every other day
+    and today untouched, adding two days and reading the list back through the
+    store, Undo, and the "already on the list" state. 8 mutations, 8 caught.
+  - `test:pending-actions` found the new offer card had no case and got one;
+    the card names the day ("Monday's meals").
+  - Re-anchored, not weakened: `test:diary-preservation` (the refusal now
+    throws; 2 of 2 mutations caught) and `test:meal-variety` §5 (the list's
+    wiring, now the stronger property that it uses the tab's own day
+    function; 2 of 2 caught).
+  - Full sweep: started after this commit, because the harness's fake
+    database and page reach every browser driver. Its result goes in the
+    follow-up.
+  - Screenshots read: today with the strip, an upcoming Friday, the receipt.
+  **Not driven, and why:** the coach's side runs against a model and needs the
+  `chat-gemini` deploy; its wiring is held in source by test:meal-days §8 and
+  test:coach-parity. App.tsx itself is not booted by any harness; the hook it
+  shares with the harness is.
+  **Named, not built:** moving a meal between days; editing an upcoming meal's
+  foods from its day; logging ahead.
+  **CSCS review:** not applicable. Nothing prescribed changes: the strip shows
+  the rotation the app already serves, and the list now shops for it
+  correctly.
+  **Deploys:** frontend on a merge to main when she says so, and
+  `chat-gemini` for the coach half (her machine).
+
 - [x] **THE SAME MEALS EVERY DAY: FIXED, AND WHY THE 19 SEP FIX DID NOT HOLD.**
   27 Sep 2026, Ashley: *"Currently every day is showing me the same meals."*
   Part 1 of three meal changes she asked for the same day (the day strip and

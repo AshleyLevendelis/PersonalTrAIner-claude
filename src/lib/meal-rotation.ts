@@ -70,6 +70,40 @@ export function epochDay(date: string): number {
   return Math.floor(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86_400_000)
 }
 
+/**
+ * `date` plus `n` calendar days, as `YYYY-MM-DD`. The same UTC-on-components
+ * arithmetic as epochDay, so a daylight-saving change can neither skip nor
+ * repeat a day. An unparseable date is returned unchanged rather than as NaN.
+ */
+export function addDays(date: string, n: number): string {
+  if (!DATE_PATTERN.test(date)) return date
+  const d = new Date((epochDay(date) + n) * 86_400_000)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+/** `count` consecutive dates starting at `from`, inclusive — the strip's days and a list's horizon. */
+export function datesFrom(from: string, count: number): string[] {
+  return Array.from({ length: Math.max(0, count) }, (_, i) => addDays(from, i))
+}
+
+/**
+ * The user's picks for one date (slot -> meal name) as the options assembly
+ * pins. A pick naming a meal no longer in the pool simply does not pin — the
+ * rule App has always applied to today's picks, now shared so the strip's
+ * upcoming days and the shopping list apply exactly the same one.
+ */
+export function pinsFromPicks(
+  picks: Partial<Record<MealSlotName, string>> | undefined,
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+): Partial<Record<MealSlotName, PoolOption>> {
+  const out: Partial<Record<MealSlotName, PoolOption>> = {}
+  for (const [slot, name] of Object.entries(picks ?? {}) as [MealSlotName, string][]) {
+    const pick = pools[slot]?.find(o => o.name === name)
+    if (pick) out[slot] = pick
+  }
+  return out
+}
+
 /** Which day of the rotation a date falls on. Always in [0, ROTATION_DAYS). */
 export function rotationIndexFor(date: string): number {
   const d = epochDay(date) % ROTATION_DAYS

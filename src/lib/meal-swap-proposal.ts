@@ -28,10 +28,12 @@ export interface MealSwapArgs {
   old_item?: unknown
   new_item?: unknown
   reason?: unknown
+  /** `YYYY-MM-DD` of an upcoming day on the strip; absent or today's date means today. */
+  date?: unknown
 }
 
 export type MealSwapProposalResult =
-  | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: { slot: MealSlotName; currentName: string; chooseName: string }; diff: ProposalDiff }
+  | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: { slot: MealSlotName; currentName: string; chooseName: string; date?: string }; diff: ProposalDiff }
   /** `exhausted` marks the case Ashley's ruling covers: they have seen everything in the pool, so the honest next move is to OFFER to find new ones rather than to keep re-serving what they have already turned down. */
   | { ok: false; reason: string; exhausted?: { slot: MealSlotName; poolSize: number } }
 
@@ -59,6 +61,14 @@ export interface BuildMealSwapInput {
   dislikedFoods?: string[]
   /** Their dietary restrictions, including allergies disclosed in chat. */
   dietaryPreferences?: string[]
+  /** The app's today, `YYYY-MM-DD`. */
+  today?: string
+  /**
+   * The strip's upcoming days, `YYYY-MM-DD` with their names — the only other
+   * dates a swap may land on. A date outside them is refused with a question
+   * rather than written somewhere nobody can see.
+   */
+  upcomingDays?: { date: string; dayName: string }[]
 }
 
 /**
@@ -109,6 +119,16 @@ function optionBlockedBy(
 export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<MealSwapProposalResult> {
   const slot = normaliseSlot(input.rawArgs.meal_slot)
   if (!slot) return { ok: false, reason: "Which meal did you want to change — breakfast, lunch, dinner or a snack?" }
+
+  // WHICH DAY (27 Sep 2026, the strip). Today unless a date is given; an
+  // upcoming day only if it is one the strip actually shows.
+  const rawDate = typeof input.rawArgs.date === 'string' ? input.rawArgs.date.trim() : ''
+  const upcomingDay = rawDate && rawDate !== input.today
+    ? input.upcomingDays?.find(d => d.date === rawDate) ?? null
+    : null
+  if (rawDate && rawDate !== input.today && !upcomingDay) {
+    return { ok: false, reason: "I can only change meals for today and the next six days — which day did you mean?" }
+  }
 
   const pools = await getPools(input.profileId)
   const options = pools[slot] ?? []
@@ -173,12 +193,17 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
 
   return {
     ok: true,
-    scopeKey: `${input.profileId}:propose_meal_swap:${slot}`,
-    preconditions: { slot, currentItemName: currentName },
-    payload: { slot, currentName, chooseName: chosen.name },
+    // THE DATE IS PART OF WHAT IS BEING CHANGED, so it is part of the key: a
+    // swap for Monday's dinner and one for tonight's are different proposals
+    // and must never supersede each other.
+    scopeKey: `${input.profileId}:propose_meal_swap:${slot}${upcomingDay ? `:${upcomingDay.date}` : ''}`,
+    preconditions: { slot, currentItemName: currentName, ...(upcomingDay ? { date: upcomingDay.date } : {}) },
+    payload: { slot, currentName, chooseName: chosen.name, ...(upcomingDay ? { date: upcomingDay.date } : {}) },
     diff: {
       rows: [
-        { field: 'Meal', before: currentName || slot, after: chosen.name },
+        // The day is named in the row itself ("Monday's dinner"), not as a
+        // row of its own that would read "Monday → Monday".
+        { field: upcomingDay ? `${upcomingDay.dayName}'s ${slot}` : 'Meal', before: currentName || slot, after: chosen.name },
         { field: 'Calories', before: `${Math.round(cm?.calories ?? 0)} kcal`, after: `${Math.round(nm.calories)} kcal` },
         { field: 'Protein', before: `${Math.round(cm?.protein ?? 0)}g`, after: `${Math.round(nm.protein)}g` },
       ],

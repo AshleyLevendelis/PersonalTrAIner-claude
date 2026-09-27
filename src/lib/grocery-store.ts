@@ -21,8 +21,8 @@
 
 import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
-import { assembleDay, type PoolOption } from './meal-generation'
-import { buildRotation, rotationIndexFor, type MealShape } from './meal-rotation'
+import type { PoolOption } from './meal-generation'
+import { buildRotation, assembleRotationDay, datesFrom, epochDay, addDays, type MealShape } from './meal-rotation'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
 
@@ -30,9 +30,18 @@ export type GroceryCategory = 'produce' | 'meat_fish' | 'dairy' | 'dry_goods' | 
 export type GrocerySource = 'generated' | 'manual' | 'chat'
 
 export interface MealRef {
+  /** Days after the date the list was built. Kept for lists built before `date` existed. */
   day: number
   slot: string
   mealName: string
+  /**
+   * The calendar date the meal is planned for (`YYYY-MM-DD`). Since 27 Sep
+   * 2026, when a single upcoming day can be added to the list: an offset needs
+   * a build date the store never recorded, and a list covering Saturday and
+   * next Wednesday has no single one. Readers prefer this; absent on rows
+   * written before it existed.
+   */
+  date?: string
 }
 
 export interface GroceryItemRow {
@@ -607,74 +616,36 @@ export const DEFAULT_HORIZON_DAYS = 7
 export const MAX_HORIZON_DAYS = 14
 
 /**
- * The pool model (M1) has no persisted "assembled week" — assembleDay is
- * pure and derives one day's picks fresh from pools+targets on every call
- * (App.tsx never stores anything day-specific; any pool option is valid
- * any day). There is therefore no "walk the assembled days" structure to
- * walk for a multi-day horizon in the literal sense §5.3 describes.
+ * THE SAME DAYS THE NUTRITION TAB SHOWS, BY CONSTRUCTION — 27 Sep 2026.
  *
- * The chosen approach: call assembleDay once per day in the horizon,
- * threading `recentNames` forward across the calls exactly the way a
- * real week of regenerating "today" would — so day 2 doesn't just repick
- * day 1's exact combo, and the aggregate reflects realistic variety
- * rather than every pool option at once (which would wildly overstate
- * quantities for options the user would never actually pick together).
- * This reuses assembleDay's own tolerance-fitting search unchanged; nothing
- * ad hoc is invented, and regenerating with the same pools+targets always
- * produces the same days (assembleDay is deterministic for fixed inputs).
+ * Each date's meals come from assembleRotationDay with that date's own picks
+ * pinned: the one function the tab calls for today and for every day on its
+ * strip. So the list cannot shop for a day the screen does not serve.
+ *
+ * This used to be a private walk (assembleHorizon) that honoured the user's
+ * swaps on day 0 only and threaded history its own way past the rotation's
+ * seam. Harmless while only today could be swapped; the moment the strip let
+ * Monday be swapped, the list would have shopped for the meal Monday no
+ * longer has — audit §5.1's defect, one day along.
  */
-function assembleHorizon(
+function assembleDates(
   pools: Partial<Record<MealSlotName, PoolOption[]>>,
   targets: MacroTargets,
-  days: number,
+  dates: string[],
   softLikedFoods: string[],
-  todaysPicks: Partial<Record<MealSlotName, PoolOption>>,
-  /**
-   * The app's own date for day 0, so this list walks the SAME rotation the
-   * Nutrition tab is showing rather than starting a private one at day 0.
-   *
-   * Before the rotation existed this function threaded `recentNames` forward
-   * from nothing and was documented as producing "realistic variety". It was
-   * not: measured over 500 profiles it produced 1.11 distinct days in seven,
-   * because the preference it leaned on was a 0.01 penalty against a gap
-   * three times that size. The tab and this list did not disagree — both were
-   * stuck on one repeated day. Now both call buildRotation with the same
-   * pools, targets and likes, so they cannot diverge.
-   */
-  startDate: string,
+  pinsByDate: Record<string, Partial<Record<MealSlotName, PoolOption>>>,
   /** Must be the SAME shape the Nutrition tab uses, or the two build different weeks. */
   shape: MealShape,
-): { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
-  const startIndex = rotationIndexFor(startDate)
+): { date: string; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
   const rotation = buildRotation(pools, targets, softLikedFoods, shape)
-  const recentNames: Partial<Record<MealSlotName, string[]>> = { ...rotation.historyFor(startIndex) }
-  const out: { day: number; chosen: Partial<Record<MealSlotName, PoolOption>> }[] = []
-  for (let day = 0; day < days; day++) {
-    // The rotation's own leftovers count as shopping too: a lunch that is
-    // last night's dinner is a real portion of food that has to be bought.
-    // Its ingredients are stored at LUNCH size, so summing dinner and lunch
-    // separately is already right and needs no special case here.
-    const { chosen } = assembleDay(pools, targets, recentNames, softLikedFoods, rotation.leftoverFor(startIndex + day))
-    // DAY 0 IS TODAY, AND TODAY IS ALREADY DECIDED (audit §5.1).
-    //
-    // This function re-derived every day from the pools, including today —
-    // so a meal the user had already swapped was ignored and the list
-    // shopped for the one they replaced. The comment on this module claimed
-    // the list "assembles the same days the Nutrition tab shows", which was
-    // true right up until the first swap.
-    //
-    // Only day 0 is overridden: days 1-6 genuinely are undecided, and
-    // assembleDay's own variety search is the right thing for them. The
-    // override also feeds recentNames below, so tomorrow does not simply
-    // repeat what was actually eaten today.
-    const dayChosen = day === 0 ? { ...chosen, ...todaysPicks } : chosen
-    out.push({ day, chosen: dayChosen })
-    for (const [slot, option] of Object.entries(dayChosen) as [MealSlotName, PoolOption][]) {
-      const list = recentNames[slot] ?? []
-      recentNames[slot] = [...list, option.name].slice(-3)
-    }
-  }
-  return out
+  // The rotation's own leftovers count as shopping too: a lunch that is last
+  // night's dinner is a real portion of food that has to be bought. Its
+  // ingredients are stored at LUNCH size, so summing dinner and lunch
+  // separately is already right and needs no special case here.
+  return dates.map(date => ({
+    date,
+    chosen: assembleRotationDay(rotation, date, pools, targets, softLikedFoods, pinsByDate[date] ?? {}).chosen,
+  }))
 }
 
 interface AggregatedIngredient {
@@ -707,6 +678,12 @@ export interface GenerateGroceryListInput {
    */
   todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
   /**
+   * The meals the user pinned on OTHER dates — a swap made on the strip's
+   * Monday. Keyed by `YYYY-MM-DD`; today's are `todaysPicks`, which win for
+   * today if both are given.
+   */
+  pinsByDate?: Record<string, Partial<Record<MealSlotName, PoolOption>>>
+  /**
    * The app's date for day 0 (`YYYY-MM-DD`, from dev-clock so the browser
    * harness can fix it). REQUIRED, not defaulted: a default would silently
    * shop for a different week than the tab shows, which is the exact defect
@@ -737,10 +714,28 @@ export interface GenerateGroceryListResult {
  */
 export async function generateGroceryList(input: GenerateGroceryListInput): Promise<GenerateGroceryListResult> {
   const days = Math.max(1, Math.min(MAX_HORIZON_DAYS, input.days ?? DEFAULT_HORIZON_DAYS))
-  const horizon = assembleHorizon(input.mealPools, input.targets, days, input.softLikedFoods ?? [], input.todaysPicks ?? {}, input.startDate, input.mealShape)
+  const pinsByDate = { ...(input.pinsByDate ?? {}), [input.startDate]: { ...(input.pinsByDate?.[input.startDate] ?? {}), ...(input.todaysPicks ?? {}) } }
+  const planned = assembleDates(input.mealPools, input.targets, datesFrom(input.startDate, days), input.softLikedFoods ?? [], pinsByDate, input.mealShape)
+  return reconcileGenerated(input.profileId, planned, input.startDate)
+}
 
+/**
+ * Sums the planned days' ingredients into grams per canonical ingredient and
+ * reconciles against existing 'generated' rows: new keys enqueue an insert,
+ * changed quantities/meal_refs enqueue an update in place (preserving id and
+ * checked state), and generated keys no longer present enqueue a delete.
+ * 'manual'/'chat' rows are never read or touched here. Shared by Rebuild and
+ * by adding one day, so both keep exactly the same protections.
+ */
+async function reconcileGenerated(
+  profileId: string,
+  planned: { date: string; chosen: Partial<Record<MealSlotName, PoolOption>> }[],
+  /** The date `MealRef.day` counts from, for readers that predate `date`. */
+  base: string,
+): Promise<GenerateGroceryListResult> {
   const aggregate = new Map<string, AggregatedIngredient>()
-  for (const { day, chosen } of horizon) {
+  for (const { date, chosen } of planned) {
+    const day = epochDay(date) - epochDay(base)
     for (const option of Object.values(chosen) as PoolOption[]) {
       for (const ing of option.ingredients) {
         // Fix 4.8 (ux-sweep): plain tap water used to cook/blend a meal
@@ -751,11 +746,11 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
         if (ing.name.trim().toLowerCase() === 'water') continue
         const target = resolveGroceryTarget(ing.name)
         const grams = target.toGrams(ing.quantity, ing.unit)
-        const ref: MealRef = { day, slot: option.slot, mealName: option.name }
+        const ref: MealRef = { day, slot: option.slot, mealName: option.name, date }
         const existing = aggregate.get(target.canonicalKey)
         if (existing) {
           existing.grams += grams
-          if (!existing.mealRefs.some(r => r.day === ref.day && r.slot === ref.slot && r.mealName === ref.mealName)) {
+          if (!existing.mealRefs.some(r => r.date === ref.date && r.slot === ref.slot && r.mealName === ref.mealName)) {
             existing.mealRefs.push(ref)
           }
         } else {
@@ -772,7 +767,7 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
   // canonical_key that's still in the aggregate is exactly the "user
   // deleted this, don't bring it back" case this reconciliation has to
   // respect rather than silently re-adding.
-  const currentItems = await getAllItemsIncludingDismissed(input.profileId)
+  const currentItems = await getAllItemsIncludingDismissed(profileId)
   const existingGenerated = new Map(currentItems.filter(r => r.source === 'generated').map(r => [r.canonical_key, r]))
 
   let added = 0
@@ -792,7 +787,7 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
       // keep their name/quantity/unit exactly as they set them.
       existingGenerated.delete(agg.canonicalKey)
       enqueueUpsert({
-        id: existing.id, profileId: input.profileId, canonicalKey: existing.canonical_key, displayName: existing.display_name,
+        id: existing.id, profileId: profileId, canonicalKey: existing.canonical_key, displayName: existing.display_name,
         quantity: existing.quantity, unit: existing.unit, category: existing.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: existing.checked, needsReview: existing.needs_review, createdAt: existing.created_at, attempts: 0,
         dismissed: false, userEdited: true,
@@ -803,7 +798,7 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
     if (existing) {
       existingGenerated.delete(agg.canonicalKey)
       enqueueUpsert({
-        id: existing.id, profileId: input.profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
+        id: existing.id, profileId: profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
         quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: existing.checked, needsReview: agg.needsReview, createdAt: existing.created_at, attempts: 0,
         dismissed: false, userEdited: false,
@@ -811,7 +806,7 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
       updated++
     } else {
       enqueueUpsert({
-        id: generateId(), profileId: input.profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
+        id: generateId(), profileId: profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
         quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: false, needsReview: agg.needsReview, createdAt: new Date().toISOString(), attempts: 0,
         dismissed: false, userEdited: false,
@@ -831,4 +826,93 @@ export async function generateGroceryList(input: GenerateGroceryListInput): Prom
   }
 
   return { added, updated, removed }
+}
+
+/**
+ * The dates a list's generated rows were planned for. A row written since 27
+ * Sep 2026 carries its dates; an older row carries only an offset from a build
+ * date the store never kept, which `legacyStartDate` supplies (the screen's
+ * own memo of when it last rebuilt) — falling back to `today`, which is what
+ * the screen printed for those rows before the memo existed.
+ */
+export function coveredDates(items: GroceryItemRow[], today: string, legacyStartDate?: string): string[] {
+  const dates = new Set<string>()
+  for (const row of items) {
+    if (row.source !== 'generated') continue
+    for (const ref of row.meal_refs ?? []) {
+      dates.add(ref.date ?? addDays(legacyStartDate ?? today, ref.day))
+    }
+  }
+  return [...dates].sort()
+}
+
+/**
+ * The dates from today on that the list covers — what "is Monday on the
+ * list?" asks. Reads removed rows too: a day whose onions she deleted is
+ * still a day the list was built for, and adding it again must not bring the
+ * onions back.
+ */
+export async function readGroceryCoverage(profileId: string, today: string, legacyStartDate?: string): Promise<string[]> {
+  const current = await getAllItemsIncludingDismissed(profileId)
+  return coveredDates(current, today, legacyStartDate).filter(d => d >= today)
+}
+
+export interface AddGroceryDaysInput extends Omit<GenerateGroceryListInput, 'days' | 'startDate'> {
+  /** The dates to add, `YYYY-MM-DD`. */
+  dates: string[]
+  /** The app's today. Covered dates before it are dropped, exactly as Rebuild drops them. */
+  today: string
+  /** See coveredDates. */
+  legacyStartDate?: string
+}
+
+export interface AddGroceryDaysResult extends GenerateGroceryListResult {
+  /** Every requested date was already on the list: nothing was written. */
+  alreadyCovered: boolean
+  /** The dates the list covers now. */
+  covered: string[]
+}
+
+/**
+ * ADD ONE UPCOMING DAY TO THE LIST — Ashley, 27 Sep 2026: "I can't add things
+ * to the grocery list for future meals so I can plan ahead."
+ *
+ * NOT an append. The list's generated rows are recomputed for the dates it
+ * already covers (from today on) plus the new ones, through the same
+ * reconciliation Rebuild uses — so an ingredient two days share is one line
+ * with both days' amount, adding a day twice changes nothing, and every
+ * protection a row has (ticked, hand-edited, removed, added by hand or by the
+ * coach) holds exactly as it does on Rebuild. An append would have counted a
+ * day twice the first time somebody tapped it twice.
+ */
+export async function addGroceryDays(input: AddGroceryDaysInput): Promise<AddGroceryDaysResult> {
+  const before = await readGroceryCoverage(input.profileId, input.today, input.legacyStartDate)
+  const wanted = input.dates.filter(d => d >= input.today)
+  if (wanted.length === 0 || wanted.every(d => before.includes(d))) {
+    return { added: 0, updated: 0, removed: 0, alreadyCovered: true, covered: before }
+  }
+  const covered = [...new Set([...before, ...wanted])].sort()
+  const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape)
+  const result = await reconcileGenerated(input.profileId, planned, input.today)
+  return { ...result, alreadyCovered: false, covered }
+}
+
+/**
+ * TAKE DAYS BACK OFF THE LIST — the undo for addGroceryDays. The same
+ * recompute in the other direction: the generated rows are rebuilt for the
+ * dates still covered, so an ingredient another day needs keeps that day's
+ * amount, and every row protection holds. Nothing the user added by hand or
+ * through the coach is read or touched.
+ */
+export async function removeGroceryDays(input: AddGroceryDaysInput): Promise<AddGroceryDaysResult> {
+  const before = await readGroceryCoverage(input.profileId, input.today, input.legacyStartDate)
+  if (!input.dates.some(d => before.includes(d))) {
+    return { added: 0, updated: 0, removed: 0, alreadyCovered: false, covered: before }
+  }
+  const covered = before.filter(d => !input.dates.includes(d))
+  const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape)
+  const result = await reconcileGenerated(input.profileId, planned, input.today)
+  return { ...result, alreadyCovered: false, covered }
 }

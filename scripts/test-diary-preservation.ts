@@ -125,8 +125,14 @@ console.log('\n[5] A meal choice cannot be written onto a day that has passed')
 check('the past-date test exists as its own named rule', /export function isPastDateForPicks/.test(store))
 check('...and compares against the app clock, not a raw Date',
   /date < getLocalDateString\(getAppNow\(profileId\)\)/.test(store))
+// THE REFUSAL EXITS BEFORE THE WRITE — by return or by throw. This pinned
+// `return`, and went red at the 27 Sep fix that made the refusal a throw so
+// its callers' catch blocks finally see it. The property is that the branch
+// leaves, not which keyword it leaves by.
 check('setMealPick refuses before it writes',
-  /if \(isPastDateForPicks\(date, profileId\)\) \{[\s\S]{0,220}return\s*\n?\s*\}[\s\S]{0,120}from\('meal_plan_picks'\)/.test(store))
+  /if \(isPastDateForPicks\(date, profileId\)\) \{[\s\S]{0,220}(?:return\s*\n?|throw [\s\S]{0,160}?)\s*\}[\s\S]{0,120}from\('meal_plan_picks'\)/.test(store))
+check('...and a failed write is thrown to its caller, not dropped',
+  /from\('meal_plan_picks'\)\s*\.upsert\([\s\S]{0,160}?\)\s*\n\s*if \(error\) throw error/.test(store))
 check('...and says so loudly rather than failing silently',
   /Refused to set a meal pick on a past date/.test(store))
 

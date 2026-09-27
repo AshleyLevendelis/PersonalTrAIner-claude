@@ -503,10 +503,16 @@ console.log('\n5. One rotation, both surfaces')
   // red within a day, when buildRotation gained the meal-shape argument. The
   // property is that the list gets its history from a rotation it BUILT, not
   // from one it started itself.
-  check('the shopping list seeds its week from the same rotation builder',
-    /buildRotation\(/.test(grocery) && /rotation\.historyFor\(/.test(grocery))
+  // RE-ANCHORED 27 Sep 2026, and the property got STRONGER. These pinned the
+  // list's private walk (historyFor, rotationIndexFor(startDate)), which went
+  // red at the day strip's fix: that walk honoured swaps on today only, so the
+  // list now builds every date with the tab's OWN day function instead. What
+  // is held is that the list and the tab derive a day the same way, from the
+  // date the caller is looking at — test:meal-days §3 compares all seven.
+  check('the shopping list builds each day with the tab\'s own day function',
+    /buildRotation\(/.test(grocery) && /assembleRotationDay\(rotation, date,/.test(grocery))
   check('...starting at the date the caller is actually looking at',
-    /rotationIndexFor\(startDate\)/.test(grocery) && /startDate: string/.test(grocery))
+    /datesFrom\(input\.startDate, days\)/.test(grocery) && /startDate: string/.test(grocery))
   check('...and its caller passes the app\'s date rather than defaulting one',
     /startDate: getSessionDateContext\([^)]*\)\.date/.test(read('src/components/GroceryList.tsx')))
 

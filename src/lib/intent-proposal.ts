@@ -15,9 +15,12 @@
 // ---------------------------------------------------------------------------
 
 import type { ProposalDiff } from './pending-actions-store'
+import { weekdayLong } from './day-labels'
 
 export const APPEND_PROPOSAL_KINDS = new Set([
   'record_fact', 'record_goal', 'add_to_grocery_list', 'check_off_grocery_item', 'log_water',
+  // A whole upcoming day onto the list (27 Sep 2026) — the strip's button.
+  'add_day_to_grocery_list',
   // log_steps is the only member that ALWAYS arrives here — the others land
   // on this path only when classifyImperative could not read the request as a
   // command. Ashley's ruling, 5 Sep 2026: a step count always gets a card.
@@ -36,6 +39,7 @@ export const INTENT_PROPOSAL_VERB: Record<string, string> = {
   record_fact: 'remember',
   record_goal: 'save',
   add_to_grocery_list: 'add',
+  add_day_to_grocery_list: 'add',
   check_off_grocery_item: 'check off',
   log_water: 'log',
   log_steps: 'log',
@@ -101,6 +105,12 @@ export function buildIntentProposal(
     field = 'Add to list'
     const items = Array.isArray(rawArgs.items) ? (rawArgs.items as { name?: string }[]).map(i => i.name).filter(Boolean).join(', ') : ''
     after = items || spoken
+  } else if (kind === 'add_day_to_grocery_list') {
+    // THE DAY'S NAME, never the raw date string: "Add to list — Monday's
+    // meals" is what the strip's own button says.
+    field = 'Add to list'
+    const date = typeof rawArgs.date === 'string' ? rawArgs.date.trim() : ''
+    after = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${weekdayLong(date)}'s meals` : spoken
   } else if (kind === 'check_off_grocery_item') {
     field = 'Check off'
     after = firstOf(rawArgs.item_phrase)

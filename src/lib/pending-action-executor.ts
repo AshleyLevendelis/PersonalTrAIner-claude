@@ -439,6 +439,8 @@ export interface MealSwapPayload {
   slot: MealSlotName
   currentName?: string
   chooseName?: string
+  /** An upcoming day from the strip; absent means today. The pick lands on this date and no other. */
+  date?: string
 }
 
 export interface MealSwapResult {

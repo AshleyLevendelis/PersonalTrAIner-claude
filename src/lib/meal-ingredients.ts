@@ -268,3 +268,18 @@ export function buildCoachMealSummary(mealPlan: MealPlanDay[]): string {
     })
     .join('\n')
 }
+
+/**
+ * THE STRIP'S NEXT SIX DAYS, for the coach (27 Sep 2026). Names only — each
+ * dish is one of their saved options, and today's section carries the
+ * ingredients of the ones on today's plate. One line a day, the date written
+ * out so a swap or a shopping request can name it exactly:
+ *   "Thursday (2026-09-17): breakfast Eggs on toast · lunch Rice and greens"
+ * Empty when there are no days to show, so the prompt section is left out.
+ */
+export function buildCoachUpcomingSummary(days: { date: string; dayName: string; meals: Partial<Record<string, string>> }[]): string {
+  const order = ['breakfast', 'lunch', 'dinner', 'snack']
+  return days
+    .map(d => `${d.dayName} (${d.date}): ${order.filter(s => d.meals[s]).map(s => `${s} ${d.meals[s]}`).join(' · ') || 'no meals yet'}`)
+    .join('\n')
+}

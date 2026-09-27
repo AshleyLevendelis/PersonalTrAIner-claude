@@ -1,3 +1,4 @@
+import { anchorNowMs } from './anchor.mjs'
 // ---------------------------------------------------------------------------
 // An in-memory stand-in for the Supabase client, for driving the REAL screens
 // in a browser.
@@ -75,7 +76,12 @@ export function makeFakeSupabase(db: Db) {
         for (const raw of payload) {
           const existing = onConflict ? rows0.find(r => onConflict!.every(c => r[c] === raw[c])) : undefined
           if (existing) { Object.assign(existing, raw); stored.push(existing) }
-          else { const row = { id: crypto.randomUUID(), ...raw }; rows0.push(row); stored.push(row) }
+          // AND `created_at`, which Postgres also fills in. Found 27 Sep 2026:
+          // a grocery row synced here with no created_at, the store's read
+          // sorts on it, and the sort threw — so the list read back EMPTY
+          // while the table held every row. Read off the harness's one clock,
+          // not the machine's, so a run gives the same answer on a Tuesday.
+          else { const row = { id: crypto.randomUUID(), created_at: new Date(anchorNowMs()).toISOString(), ...raw }; rows0.push(row); stored.push(row) }
         }
         const out = stored.map(r => ({ ...r }))
         return { data: single ? (out[0] ?? null) : out, error: null }

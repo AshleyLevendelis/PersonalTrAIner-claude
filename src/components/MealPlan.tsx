@@ -24,6 +24,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext } from './nutrition/MealMoveSheet'
 import { COOK_ONCE } from '@/lib/coach-voice'
+import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { readFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
@@ -35,6 +36,26 @@ export const SLOT_LABEL: Record<MealSlotName, string> = {
   lunch: 'Lunch',
   dinner: 'Dinner',
   snack: 'Snack',
+}
+
+/**
+ * AN UPCOMING DAY, opened from the strip (Ashley, 27 Sep 2026). The same list,
+ * with only what makes sense for a day that has not happened: open a meal,
+ * swap it for that day, heart it, and put the day on the shopping list.
+ * Logging is not offered — nobody has eaten it yet. Editing a meal's foods,
+ * moving it between slots, regenerating and finding more are not offered
+ * either: each changes the DISH or the pool, and so every day it appears on,
+ * and they stay on today's view where they already live.
+ */
+export interface UpcomingMealDay {
+  /** "Monday". */
+  dayName: string
+  /** Adds this day's meals to the shopping list. Null when it could not start (no targets yet). */
+  onAddToGrocery: () => Promise<AddGroceryDaysResult | null>
+  /** Takes the day back off — the undo, through the same recompute. */
+  onRemoveFromGrocery?: () => Promise<AddGroceryDaysResult | null>
+  /** Whether the list already covers this day — read when the day opens, so the button tells the truth before it is tapped. */
+  isOnGroceryList: () => Promise<boolean>
 }
 
 interface MealPlanProps {
@@ -96,6 +117,8 @@ interface MealPlanProps {
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAll: () => Promise<void>
+  /** Set when this list is an upcoming day from the strip rather than today. See UpcomingMealDay. */
+  upcoming?: UpcomingMealDay
 }
 
 /**
@@ -112,7 +135,7 @@ export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
-  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll,
+  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -324,7 +347,7 @@ export function MealPlan({
           <span>
             {blockedSlots.length === 1
               ? `Your ${SLOT_LABEL[blockedSlots[0]].toLowerCase()} no longer fits your restrictions.`
-              : `${blockedSlots.length} of today's meals no longer fit your restrictions.`}
+              : `${blockedSlots.length} of ${upcoming ? `${upcoming.dayName}'s` : "today's"} meals no longer fit your restrictions.`}
             {' '}They were built before you changed them.
           </span>
           <button
@@ -338,7 +361,7 @@ export function MealPlan({
         </InsightBanner>
       )}
       <div className="flex items-center justify-between gap-3">
-        <span className="ds-label">Today's meals</span>
+        <span className="ds-label" data-testid="meal-day-heading">{upcoming ? `${upcoming.dayName}'s meals` : "Today's meals"}</span>
         {/* TWO CONTROLS, not one. The handoff specifies "Grocery list ›" on
             this row and shows nothing else; Regenerate all is kept beside it
             because this header is its ONLY call site — dropping it to match
@@ -346,15 +369,17 @@ export function MealPlan({
             is a capability change, not a presentation one. Flagged in the
             commit rather than silently resolved either way. */}
         <span className="flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={onRegenerateAll}
-            disabled={isGenerating}
-            className="hit-slop-44 flex items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground disabled:opacity-50"
-          >
-            {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-            Regenerate all
-          </button>
+          {!upcoming && (
+            <button
+              type="button"
+              onClick={onRegenerateAll}
+              disabled={isGenerating}
+              className="hit-slop-44 flex items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground disabled:opacity-50"
+            >
+              {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+              Regenerate all
+            </button>
+          )}
           <button
             type="button"
             // THE LIST LEFT TOOLS on 12 Sep 2026 and this link did not follow
@@ -374,6 +399,8 @@ export function MealPlan({
 
       {targets && <TotalsHero totals={totals} targets={targets} />}
 
+      {upcoming && <AddDayToGrocery key={date} upcoming={upcoming} />}
+
       <div>
         {activeSlots.map((slot, idx) => (
           <MealSlotRow
@@ -388,8 +415,9 @@ export function MealPlan({
             expanded={expandedSlot === slot}
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
             onSwap={onSwapSlot}
-            onMealPickApplied={onMealPickApplied}
-            editContextFor={o => (profileId && targets && onMealPickApplied)
+            onMealPickApplied={upcoming ? undefined : onMealPickApplied}
+            upcoming={!!upcoming}
+            editContextFor={o => (profileId && targets && onMealPickApplied && !upcoming)
               ? {
                   profileId, date, slot, targets, fitnessGoal,
                   mealsPerDay, includeSnacks,
@@ -407,7 +435,7 @@ export function MealPlan({
                   dayTotals: totals,
                 }
               : null}
-            moveContext={(profileId && targets && onMealPickApplied)
+            moveContext={(profileId && targets && onMealPickApplied && !upcoming)
               ? {
                   profileId, date, fromSlot: slot, targets,
                   mealsPerDay, includeSnacks,
@@ -426,7 +454,7 @@ export function MealPlan({
                 }
               : null}
             onRegenerate={onRegenerateSlot}
-            onFindMore={onFindMoreOptions}
+            onFindMore={upcoming ? undefined : onFindMoreOptions}
             checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
             loggedEvents={loggedBySlot[slot] ?? []}
             restriction={restrictionBySlot[slot] ?? null}
@@ -456,6 +484,90 @@ export function MealPlan({
           <EmptySlotRow key={slot} slot={slot} isGenerating={isGenerating} onRegenerate={onRegenerateSlot} />
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * PUT THIS DAY ON THE SHOPPING LIST — the planning-ahead half of Ashley's
+ * 27 Sep report. It says what it did in the words of the day, and what it
+ * did NOT do: a day already on the list is not added twice, and the button
+ * says so before it is tapped rather than after.
+ */
+function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
+  const [state, setState] = useState<'checking' | 'ready' | 'busy' | 'added' | 'already' | 'failed'>('checking')
+  useEffect(() => {
+    let live = true
+    upcoming.isOnGroceryList()
+      .then(on => { if (live) setState(on ? 'already' : 'ready') })
+      .catch(() => { if (live) setState('ready') })
+    return () => { live = false }
+  // The day is the component's key, so this runs once per day opened.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const add = async () => {
+    setState('busy')
+    try {
+      const result = await upcoming.onAddToGrocery()
+      setState(result == null ? 'failed' : result.alreadyCovered ? 'already' : 'added')
+    } catch (err) {
+      console.error('Adding a day to the shopping list failed', err)
+      setState('failed')
+    }
+  }
+  const openList = (
+    <button
+      type="button"
+      onClick={() => { window.location.hash = groceryHash() }}
+      className="hit-slop-44 shrink-0 text-xs font-semibold text-primary-text"
+    >
+      Open list ›
+    </button>
+  )
+  const undo = async () => {
+    if (!upcoming.onRemoveFromGrocery) return
+    setState('busy')
+    try {
+      const result = await upcoming.onRemoveFromGrocery()
+      // A failed undo leaves the day ON the list and says so, rather than
+      // drawing the add button over rows that are still there.
+      setState(result == null ? 'added' : 'ready')
+    } catch (err) {
+      console.error('Taking a day off the shopping list failed', err)
+      setState('added')
+    }
+  }
+  if (state === 'added' || state === 'already') {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-3" data-testid="meal-day-grocery" data-state={state}>
+        <span className="flex items-center gap-1.5 text-xs">
+          <Check className="size-3.5 shrink-0 text-primary-text" />
+          {state === 'added' ? `${upcoming.dayName}'s meals are on your shopping list.` : `${upcoming.dayName} is already on your shopping list.`}
+        </span>
+        <span className="flex shrink-0 items-center gap-3">
+          {/* UNDO ONLY RIGHT AFTER THE ADD, not on a day that was already on
+              the list when it opened — that one was added some other way
+              (Rebuild, or another visit), and "undo" would be taking back
+              something this tap never did. */}
+          {state === 'added' && upcoming.onRemoveFromGrocery && (
+            <button type="button" onClick={() => void undo()} className="hit-slop-44 text-xs font-semibold text-muted-foreground" data-testid="meal-day-grocery-undo">
+              Undo
+            </button>
+          )}
+          {openList}
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="meal-day-grocery" data-state={state}>
+      <Button onClick={() => void add()} disabled={state === 'busy' || state === 'checking'} className="min-h-[44px] w-full" data-testid="meal-day-add-grocery">
+        {state === 'busy' ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+        Add {upcoming.dayName} to the shopping list
+      </Button>
+      {state === 'failed' && (
+        <p className="text-[0.71875rem] text-[color:var(--role-warn-text)]">That didn't go onto the list. Try again in a moment.</p>
+      )}
     </div>
   )
 }
@@ -557,8 +669,11 @@ function MealSlotRow({
   editContextFor,
   moveContext,
   onMealPickApplied,
+  upcoming,
 }: {
   profileId: string | undefined
+  /** An upcoming day's row: no logging, no regenerate — see UpcomingMealDay. */
+  upcoming: boolean
   /** Whether this meal is already hearted — owned by the parent so every row agrees. */
   isFavourite: boolean
   /** Returns the new state, or null when the write failed and the heart should not move. */
@@ -773,7 +888,7 @@ function MealSlotRow({
         </p>
       )}
 
-      {!option && (
+      {!option && !upcoming && (
         <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="mt-2 h-7 px-2 text-xs">
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : 'Generate'}
         </Button>
@@ -911,7 +1026,7 @@ function MealSlotRow({
             <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
               <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
               <span>
-                {restriction.message} Swap it, or regenerate this meal.
+                {restriction.message} {upcoming ? 'Swap it for that day.' : 'Swap it, or regenerate this meal.'}
               </span>
             </p>
           )}
@@ -934,6 +1049,7 @@ function MealSlotRow({
           )}
 
           <div className="flex items-center gap-2">
+            {!upcoming && (
             <button
               type="button"
               onClick={handleLogToggle}
@@ -950,6 +1066,7 @@ function MealSlotRow({
                 ? <><Check className="size-3.5" /> {duplicated ? `Clear ${loggedEvents.length} logs` : 'Logged'}</>
                 : 'Log this meal'}
             </button>
+            )}
             {/* THE HEART — Ashley, 19 Sep 2026, from four options. The app never
                 asks whether a meal was any good; she says so when she wants to.
                 She rejected asking after every meal, asking once a day, and
@@ -976,9 +1093,11 @@ function MealSlotRow({
                 <Heart className={`size-4 ${isFavourite ? 'fill-current text-primary' : 'text-muted-foreground'}`} />
               </button>
             )}
-            <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
-              {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-            </Button>
+            {!upcoming && (
+              <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
+                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              </Button>
+            )}
             {/* MOVE — beside Swap because they are the same kind of change to
                 the same meal, and because this is where she is already
                 looking when she decides she wants dinner as a snack. Hidden

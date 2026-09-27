@@ -1,7 +1,9 @@
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
-import { buildCoachMealSummary, mealsContaining } from '@/lib/meal-ingredients'
+import { buildCoachMealSummary, buildCoachUpcomingSummary, mealsContaining } from '@/lib/meal-ingredients'
+import type { AddGroceryDaysResult } from '@/lib/grocery-store'
+import { weekdayLong } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
@@ -280,6 +282,13 @@ interface ChatAssistantProps {
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
+  /** The Nutrition strip's next six days, by name (27 Sep 2026) — what the coach is told those days hold. */
+  upcomingMeals?: { date: string; dayName: string; meals: Partial<Record<MealSlotName, string>> }[]
+  /** A confirmed propose_meal_swap for an UPCOMING day — the strip's own write, so chat and tap cannot differ. */
+  onUpcomingMealPickApplied?: (date: string, slot: MealSlotName, chosenName: string) => Promise<boolean>
+  /** add_day_to_grocery_list and its undo — the strip's own two functions. */
+  onAddMealDayToGrocery?: (date: string) => Promise<AddGroceryDaysResult | null>
+  onRemoveMealDayFromGrocery?: (date: string) => Promise<AddGroceryDaysResult | null>
   /** Confirmed propose_meal_pool_refresh — generates ADDITIONAL options for one slot and keeps the existing ones. Lives in App.tsx because that's where every generation input (disliked foods, timing rules, cuisines) already is. Returns the names added, or an error string. */
   onFindMoreMealOptions: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   /** Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals/context, loaded by App.tsx alongside the profile. Read-only here: resolveAndSaveMemory writes through memory-store directly and calls onMemoryChanged so App.tsx re-fetches, the same "the client is the only writer, the caller reloads after" shape pending_actions uses. */
@@ -363,7 +372,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, onMealSwapApplied, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1639,6 +1648,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         ? buildFeelBrief(feelContext.awaiting, feelContext.run)
         : buildFeelBrief(null, feelRun([])),
       meal_summary: mealSummary,
+      upcoming_meal_summary: buildCoachUpcomingSummary(upcomingMeals ?? []),
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
       cardio_log_history: cardioLogHistory,
@@ -1823,7 +1833,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // VISION-ARCHITECTURE.md §5.4 — the first IMMEDIATE-action chat door
     // with no confirmation card (append-only ⇒ execute + receipt + undo).
     // Same I1 shape as memoryIntent: the server never writes grocery_items.
-    groceryIntent?: { tool: 'add_to_grocery_list' | 'check_off_grocery_item'; rawArgs: Record<string, unknown> }
+    groceryIntent?: { tool: 'add_to_grocery_list' | 'check_off_grocery_item' | 'add_day_to_grocery_list'; rawArgs: Record<string, unknown> }
     // Same I1/IMMEDIATE shape again, for water_logs.
     waterIntent?: { tool: 'log_water'; rawArgs: Record<string, unknown> }
     // How a finished session felt (session-feel.ts). Same I1 shape once more:
@@ -4083,10 +4093,36 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    * and `created` (JSON-encoded) since undo needs all three to reverse a
    * merge-onto-an-existing-line correctly, not just delete a row.
    */
-  const resolveAndSaveGrocery = async (intent: { tool: 'add_to_grocery_list' | 'check_off_grocery_item'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+  const resolveAndSaveGrocery = async (intent: { tool: 'add_to_grocery_list' | 'check_off_grocery_item' | 'add_day_to_grocery_list'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
     const args = intent.rawArgs
     const profileId = profile.id
     if (!profileId) return { text: "I can't update that yet — your profile hasn't finished setting up." }
+
+    if (intent.tool === 'add_day_to_grocery_list') {
+      // THE STRIP'S OWN BUTTON, BY CHAT (27 Sep 2026). Only a day the strip
+      // shows: the same seven dates, minus today, whose meals the list's own
+      // Rebuild already covers from today on.
+      const date = String(args.date ?? '').trim()
+      const day = (upcomingMeals ?? []).find(d => d.date === date)
+      if (!day || !onAddMealDayToGrocery) {
+        return { text: "I can put any of the next six days on your list — which day did you mean? Today's meals come from the list's own Rebuild." }
+      }
+      const result = await onAddMealDayToGrocery(date)
+      await onGroceryChanged?.()
+      if (!result) return { text: `I couldn't put ${day.dayName} on your list just now — try again in a moment.` }
+      if (result.alreadyCovered) return { text: `${day.dayName} is already on your shopping list.` }
+      return {
+        text: `Added ${day.dayName}'s meals to your shopping list.`,
+        receipt: {
+          kind: 'grocery_day_added',
+          title: 'Added to your list',
+          rows: [{ label: `${day.dayName}'s meals`, detail: Object.values(day.meals).join(', ') }],
+          status: 'done',
+          undoToken: date,
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    }
 
     if (intent.tool === 'check_off_grocery_item') {
       const phrase = String(args.item_phrase || '').trim().toLowerCase()
@@ -4523,6 +4559,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           // prop, so the two can't drift.
           dislikedFoods: compileFoodDislikes(memoryFacts),
           dietaryPreferences: profile.dietary_preferences ?? [],
+          today: getSessionDateContext(profile.id).date,
+          upcomingDays: (upcomingMeals ?? []).map(d => ({ date: d.date, dayName: d.dayName })),
         })
         if (swap.ok) {
           built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, diff: swap.diff }
@@ -5453,14 +5491,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // Awaited and checked: a receipt must never say "Swapped" for a
         // pick that didn't actually persist (fire-and-forget here would
         // reintroduce the exact bug the pool-level swap fix just closed).
-        const persisted = await onMealSwapApplied(payload.slot, result.appliedName)
+        // AN UPCOMING DAY'S SWAP LANDS ON THAT DATE, through the strip's own
+        // write; today's through today's. No date is today, as it always was.
+        const persisted = payload.date
+          ? (await onUpcomingMealPickApplied?.(payload.date, payload.slot, result.appliedName)) ?? false
+          : await onMealSwapApplied(payload.slot, result.appliedName)
         if (!persisted) {
           receipt = { ...receipt, failed: [...receipt.failed, { op: 'save', error: didNotSave('The swap') }] }
           ok = false
         }
       }
       title = ok ? RECEIPTS['propose_meal_swap'].done : RECEIPTS['propose_meal_swap'].failed
-      rows = ok ? [{ label: payload.slot, detail: `→ ${result.appliedName}` }] : []
+      rows = ok ? [{ label: payload.date ? `${weekdayLong(payload.date)} ${payload.slot}` : payload.slot, detail: `→ ${result.appliedName}` }] : []
       if (ok && result.appliedMacros) {
         await upsertFavorite({
           new_item: result.appliedName!,
@@ -5888,7 +5930,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // it shipped; the gate now pins the routing per kind.
       const saveResult = row.kind === 'record_fact' || row.kind === 'record_goal'
         ? await resolveAndSaveMemory(intent as Parameters<typeof resolveAndSaveMemory>[0])
-        : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item'
+        : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item' || row.kind === 'add_day_to_grocery_list'
         ? await resolveAndSaveGrocery(intent as Parameters<typeof resolveAndSaveGrocery>[0])
         : row.kind === 'log_steps'
         ? await resolveAndSaveSteps(intent as Parameters<typeof resolveAndSaveSteps>[0])
@@ -6008,6 +6050,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       else if (receipt.kind === 'memory_context_fact_saved') await retireContextFact(receipt.undoToken)
       else await abandonGoal(receipt.undoToken)
       await onMemoryChanged()
+    } else if (receipt.kind === 'grocery_day_added') {
+      // The strip's own undo: the list recomputed without that day, so an
+      // ingredient another day needs keeps that day's amount.
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (!receipt.undoToken || !onRemoveMealDayFromGrocery) return
+      const removed = await onRemoveMealDayFromGrocery(receipt.undoToken)
+      await onGroceryChanged?.()
+      if (!removed) return // leave the Undo button so the user can retry
     } else if (receipt.kind === 'grocery_item_added') {
       // §5.4/§2.5 — undoToken is a JSON-encoded list of {id, addedQuantity,
       // created} (one per item added this turn), since undoing a merge onto
@@ -6165,7 +6215,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
         if (!payload.currentName) return
-        const persisted = await onMealSwapApplied(payload.slot, payload.currentName)
+        const persisted = payload.date
+          ? (await onUpcomingMealPickApplied?.(payload.date, payload.slot, payload.currentName)) ?? false
+          : await onMealSwapApplied(payload.slot, payload.currentName)
         if (!persisted) return // leave the Undo button in place so the user can retry
       } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add'
                  || row.kind === 'propose_meal_food_remove' || row.kind === 'propose_meal_food_replace' || row.kind === 'propose_meal_food_resize') {
@@ -6464,7 +6516,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                                     : msg.receipt.kind === 'memory_context_fact_saved' ? () => onOpenProfile?.('context')
                                     : undefined
                                   }
-                                  onViewGrocery={msg.receipt.kind === 'grocery_item_added' ? onOpenGrocery : undefined}
+                                  onViewGrocery={msg.receipt.kind === 'grocery_item_added' || msg.receipt.kind === 'grocery_day_added' ? onOpenGrocery : undefined}
                                   onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
                                   onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
                                 />

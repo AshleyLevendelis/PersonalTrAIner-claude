@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calculator, Layers } from 'lucide-react'
-import { MealPlan, SLOT_ORDER, SLOT_LABEL } from '@/components/MealPlan'
+import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/components/MealPlan'
+import { MealDayStrip } from '@/components/nutrition/MealDayStrip'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { mealsDrifted } from '@/lib/coach-voice'
@@ -116,6 +117,21 @@ export interface NutritionDisplayProps {
    * WHEN to offer stays in one place a gate can read (meal-refit.ts).
    */
   mealRefit?: MealRefitOffer | null
+  /**
+   * The strip of days across the top (Ashley, 27 Sep 2026). Absent, the tab
+   * is today only, exactly as it was.
+   */
+  mealStrip?: { dates: string[]; today: string; selected: string; onSelect: (date: string) => void }
+  /**
+   * The day open on the strip, when it is not today: that date's meals, its
+   * swap, and putting it on the shopping list. Null means today is open.
+   */
+  upcomingDay?: {
+    date: string
+    chosen: Partial<Record<MealSlotName, PoolOption>>
+    totals: MacroTargets
+    onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
+  } & UpcomingMealDay | null
   mealRefitBusy?: boolean
   mealRefitError?: string | null
   onMealRefitConfirm?: () => void
@@ -136,6 +152,7 @@ export function NutritionDisplay({
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
+  mealStrip, upcomingDay = null,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
@@ -305,6 +322,14 @@ export function NutritionDisplay({
 
   return (
     <div className="space-y-6">
+      {mealStrip && (
+        <MealDayStrip dates={mealStrip.dates} today={mealStrip.today} selected={mealStrip.selected} onSelect={mealStrip.onSelect} />
+      )}
+      {/* TODAY'S PARTS ARE TODAY'S. The rings, the trainer's line and the
+          resize offer are about what has been eaten today and today's meals,
+          so with another day open they step aside rather than sit above a
+          list they do not describe. */}
+      {!upcomingDay && (<>
       {/* data-tour: the app tour spotlights the rings AND the water row as one
           unit — its copy names both, and water is the only quick-add the tour
           promises ("+250 / +500 log water in one tap"). */}
@@ -449,7 +474,33 @@ export function NutritionDisplay({
           <span className="min-w-0 flex-1">{mealRefitError}</span>
         </InsightBanner>
       )}
+      </>)}
 
+      {upcomingDay ? (
+        <MealPlan
+          key={upcomingDay.date}
+          fitnessGoal={profile.fitness_goal}
+          profileId={profileId}
+          date={upcomingDay.date}
+          pools={pools}
+          chosen={upcomingDay.chosen}
+          totals={upcomingDay.totals}
+          targets={macros}
+          isGenerating={isGeneratingMeals}
+          regenerateError={mealRegenerateError}
+          onDismissRegenerateError={onDismissRegenerateError}
+          unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
+          onFixDietaryRestrictions={onFixDietaryRestrictions}
+          dietaryPreferences={profile.dietary_preferences}
+          avoidFoods={avoidFoods}
+          mealsPerDay={profile.meals_per_day}
+          includeSnacks={profile.include_snacks}
+          onSwapSlot={upcomingDay.onSwap}
+          onRegenerateSlot={onRegenerateMealSlot}
+          onRegenerateAll={onRegenerateAllMeals}
+          upcoming={upcomingDay}
+        />
+      ) : (
       <MealPlan
         fitnessGoal={profile.fitness_goal}
         profileId={profileId}
@@ -473,6 +524,7 @@ export function NutritionDisplay({
         onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}
       />
+      )}
 
       {/* THE TARGET, AS ONE ROW. Until 6 Sep 2026 this tab ended in four
           stacked Cards — the BMR/TDEE strip, the macro-split control, the

@@ -28,7 +28,7 @@
 // holds the real one; if these two ever disagree, believe that gate.
 // ---------------------------------------------------------------------------
 
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { setSupabaseClient } from '@/lib/supabase'
@@ -70,6 +70,8 @@ import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } 
 import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
 import { buildRotation, assembleRotationDay, rotationIndexFor } from '@/lib/meal-rotation'
+import { useMealDays } from '@/hooks/useMealDays'
+import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
 
@@ -776,6 +778,11 @@ const nuttyBreakfast = {
 // the mistake verify:prep-weight spent weeks making, and the rule it left
 // behind — put the food in the pool, let the app decide what the slot carries.
 const LEFTOVERS = new URLSearchParams(location.search).get('leftovers') === '1'
+// ?week=1 — THE STRIP'S UPCOMING DAYS (27 Sep 2026). The same three-options-
+// a-slot pool the leftovers run uses, with batch cooking OFF, so each day of
+// the week is whatever the app's own rotation makes of it. Every option is a
+// row in the fake pool table too, because a swap reads the pool from there.
+const WEEK = new URLSearchParams(location.search).get('week') === '1'
 
 const chosen = (REFIT ? refitChosen : {
   breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
@@ -830,6 +837,21 @@ const leftoverDate = leftoverRotation
   ? (Array.from({ length: 14 }, (_, k) => `2026-09-${String(k + 1).padStart(2, '0')}`)
       .find(d => leftoverRotation.leftoverFor(rotationIndexFor(d)).lunch !== undefined) ?? today)
   : today
+const weekRotation = WEEK && macros
+  ? buildRotation(leftoverPools as never, macros, [], { mealsPerDay: 3, includeSnacks: false, batchCooking: false })
+  : null
+const weekToday = weekRotation && macros
+  ? assembleRotationDay(weekRotation, today, leftoverPools as never, macros, [], {})
+  : null
+if (WEEK) {
+  for (const [slot, options] of Object.entries(leftoverPools)) {
+    options.forEach((o, i) => db.meal_plan_slots.push({
+      profile_id: PROFILE_ID, slot, pool_index: i, name: o.name, ingredients: o.ingredients,
+      macros: { kcal: o.macros.calories, protein: o.macros.protein, carbs: o.macros.carbs, fat: o.macros.fat },
+      tags: [], prep: '',
+    }))
+  }
+}
 const leftoverDay = leftoverRotation && macros
   ? assembleRotationDay(leftoverRotation, leftoverDate, leftoverPools as never, macros, [], {})
   : null
@@ -844,7 +866,7 @@ const leftoverDay = leftoverRotation && macros
  * halves go through meal-store against this database. A screen whose meals
  * live only in a prop cannot be edited by the code that ships.
  */
-for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
+if (!WEEK) for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
   db.meal_plan_slots.push({
     profile_id: PROFILE_ID, slot, pool_index: 0, name: option.name,
     ingredients: option.ingredients,
@@ -859,8 +881,27 @@ function Harness() {
   // WHAT THE SCREEN IS SHOWING RIGHT NOW, so an edit can move it. App.tsx
   // holds the same two pieces of state and updates them in the same order:
   // persist the pick, re-read the pool, then move what is on screen.
-  const [liveChosen, setLiveChosen] = useState((leftoverDay ? leftoverDay.chosen : chosen) as Record<string, PoolOption>)
-  const [livePools, setLivePools] = useState((LEFTOVERS ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
+  const [liveChosen, setLiveChosen] = useState((weekToday ? weekToday.chosen : leftoverDay ? leftoverDay.chosen : chosen) as Record<string, PoolOption>)
+  const [livePools, setLivePools] = useState((LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
+  // THE APP'S OWN HOOK for the strip, not a copy of its wiring: the rotation
+  // the app would build from these pools, and the fake database underneath.
+  const mealShape = { mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS }
+  const stripRotation = useMemo(
+    () => (driftedMacros ? buildRotation(livePools as never, driftedMacros, [], mealShape) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [livePools],
+  )
+  const mealDays = useMealDays({
+    profileId: PROFILE_ID, today, rotation: stripRotation, pools: livePools as never,
+    targets: driftedMacros, softLikedFoods: [], todaysChosen: liveChosen as never, mealShape,
+  })
+  // What the shopping list holds, for verify:meal-days to read back after
+  // "Add Monday" — the store's own read, not the fake table's rows.
+  ;(window as unknown as { __groceryRows: unknown }).__groceryRows = () => getAllGroceryItems(PROFILE_ID)
+  // The saved picks, straight from the table a swap writes to — so the driver
+  // can tell "saved" from "shown", which a screen alone cannot.
+  ;(window as unknown as { __mealPicks: unknown }).__mealPicks = () => db.meal_plan_picks
+  ;(window as unknown as { __groceryTable: unknown }).__groceryTable = () => db.grocery_items
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
     const fresh = await getPools(PROFILE_ID)
@@ -989,7 +1030,8 @@ function Harness() {
             mealRefitError={refitError}
             onMealRefitConfirm={() => { void handleRefitConfirm() }}
             onMealRefitDecline={() => setRefitDeclined(true)}
-            onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop} />
+            onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop}
+            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} />
         )}
         {activeTab === 'exercise' && (
           <ExerciseTab plan={exercisePlan} mesocycle={editedMeso} exclusions={[]}

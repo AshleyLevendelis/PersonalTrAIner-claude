@@ -199,10 +199,25 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   targets can never disagree cannot see the commonest way variety dies.**
   Numbers before 27 Sep are not comparable (fixture changed).
   `meal-variety` (63 checks, 10 mutations), `measure:meal-variety`
+- **Upcoming days: see, swap, shop** — both surfaces since 27 Sep 2026.
+  Ashley: *"I can only see today's meal ... I can't add things to the grocery
+  list for future meals so I can plan ahead."* Her ruling, from three options:
+  a day strip across the top of Nutrition. Every day is the SAME derivation as
+  today (one hook, `useMealDays`, shared with the browser harness so a driver
+  runs the app's code), a swap pins that date only, and adding a day to the
+  list RECOMPUTES the list for the days it covers rather than appending, so
+  nothing is counted twice. The coach sees the same six days, takes a date on
+  its swap, and has `add_day_to_grocery_list`. `meal-days` (49 checks, 18
+  mutations), `verify:meal-days` (40 checks, 8 mutations), `coach-parity`.
+  Needs the `chat-gemini` deploy for chat
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
   screen will not serve. Parity by construction, the `meal-refit` pattern.
+  CORRECTED 27 Sep 2026: "by construction" held for today only. The list
+  walked its own days and honoured swaps on today alone, which the day strip
+  would have turned into shopping for a meal Monday no longer had. It now
+  builds every date with the tab's own day function and that date's picks.
   CORRECTED: this file and the module's own header credited the list with
   "realistic variety" it never had — it threaded the history forward correctly
   and got the same day seven times, like everything else
@@ -422,9 +437,10 @@ menu" stays true when a copy is also left outside it.
   options, **"they swap places"** (14 Sep) — dinner becomes the snack, the
   snack becomes dinner, both resized, both new sizes stated before the tap.
   `meal-move`, `verify:meal-move`, `coach-parity`.
-  Moving to another DAY stays `MISSING` and is now named with its reason: no
-  screen renders another day's meals, so the destination is somewhere she
-  cannot see, check or undo by looking. It needs a future-day meal view first.
+  Moving to another DAY stays `MISSING`, on both surfaces. CORRECTED 27 Sep
+  2026: the reason written here, that no screen renders another day's meals,
+  stopped being true when the day strip shipped. It is simply not built; a
+  different meal on another day is a swap with that day's date, on both.
   Meals per day and snacks — `screen only` (Profile)
 - Scale a portion — both surfaces since 12 Sep 2026, the same row menu;
   `meal-food-edit`, `verify:meal-food-edit`
@@ -1741,6 +1757,13 @@ old — the commands were right and the context was missing.
   Put the bell in the slot by name, then let the app decide what that slot
   carries. And when a driver's mutation comes back MISSED, suspect the fixture
   before the check.
+- **A FAKE MUST FILL WHAT THE DATABASE FILLS.** 27 Sep 2026: the harness's
+  fake inserted grocery rows with no `created_at`, which Postgres always
+  sets. The list's read sorts on it, threw, fell back to "nothing", and the
+  driver saw an EMPTY list while the table held every row — which reads
+  exactly like the app losing a write. A default the real schema supplies is
+  part of what a fake must imitate, and a read that falls back on an error
+  hides the fake's gap as well as the network's.
 - **A FAKE THAT IGNORES FILTERS CANNOT SEE A MISSING FILTER — and on a
   service key, the filter IS the privacy.** 24 Sep 2026: the reach-out smoke
   test ran the real function against a fake database that returned the same

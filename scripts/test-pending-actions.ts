@@ -761,6 +761,7 @@ async function main() {
     { kind: 'add_to_grocery_list', rawArgs: { origin_verbatim_quote: 'we might need eggs and milk', items: [{ name: 'eggs' }, { name: 'milk' }] } },
     { kind: 'log_water', rawArgs: { origin_verbatim_quote: 'had some water I guess', amount_ml: 300 } },
     { kind: 'log_steps', rawArgs: { origin_verbatim_quote: 'I walked 9000 steps today', steps: 9000 } },
+    { kind: 'add_day_to_grocery_list', rawArgs: { origin_verbatim_quote: 'maybe put monday on the list', date: '2026-09-28' } },
   ]
 
   // EVERY MEMBER, DERIVED — not just the ones someone remembered to list.
@@ -772,6 +773,13 @@ async function main() {
     check('every append-proposal kind with a case here is covered (list not left behind)',
       untested.length === 0, untested)
   }
+
+  // THE DAY'S NAME ON THE CARD, not the date string the model sends.
+  // 2026-09-28 is a Monday; the strip's own button says "Add Monday to the
+  // shopping list", so the confirm card says Monday too.
+  check('add_day_to_grocery_list: the card names the day, as the strip\'s button does',
+    buildIntentProposal('add_day_to_grocery_list', { origin_verbatim_quote: 'maybe put monday on the list', date: '2026-09-28' }, 'p').diff.rows[0].after === "Monday's meals",
+    buildIntentProposal('add_day_to_grocery_list', { origin_verbatim_quote: 'maybe put monday on the list', date: '2026-09-28' }, 'p').diff.rows[0])
 
   for (const { kind, rawArgs } of intentCases) {
     check(`${kind} is a recognized append-proposal kind`, APPEND_PROPOSAL_KINDS.has(kind))

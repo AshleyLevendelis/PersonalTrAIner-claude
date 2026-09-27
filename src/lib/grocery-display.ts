@@ -10,6 +10,7 @@
 
 import { lookupIngredient } from '@/lib/food-db'
 import type { GroceryItemRow, MealRef } from '@/lib/grocery-store'
+import { weekdayShort } from '@/lib/day-labels'
 
 /**
  * The largest quantity one shopping line will hold. Line items are stored in
@@ -127,20 +128,70 @@ export function purposeLine(refs: readonly MealRef[]): string {
 /**
  * The meals a line came from, one per line: "Mon · Lunch · Chicken rice bowl".
  *
- * A meal reference stores a DAY OFFSET from the date the list was built, not a
- * date. So the weekday is only named when that build date is known; otherwise
- * the line says "Day 1", "Day 2", which is what the offset actually is. Naming
- * weekdays from TODAY would print the wrong day for any list built earlier in
- * the week, and nothing rebuilds the list on its own.
+ * A reference written since 27 Sep 2026 carries its own date, and the weekday
+ * is read off that. An older one stores only a DAY OFFSET from the date the
+ * list was built, so its weekday is only named when that build date is known;
+ * otherwise the line says "Day 1", "Day 2", which is what the offset actually
+ * is. Naming weekdays from TODAY would print the wrong day for any list built
+ * earlier in the week, and nothing rebuilds the list on its own.
  */
 export function mealRefLines(refs: readonly MealRef[], builtOn: string | null): string[] {
   const order = ['breakfast', 'lunch', 'dinner', 'snack']
-  const sorted = [...refs].sort((a, b) => a.day - b.day || order.indexOf(a.slot.replace(/[_-]?\d+$/, '')) - order.indexOf(b.slot.replace(/[_-]?\d+$/, '')))
-  const m = builtOn ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(builtOn) : null
+  const m = builtOn ? DATE.exec(builtOn) : null
+  const dateOf = (r: MealRef): string | null => r.date ?? (m ? isoPlus(m, r.day) : null)
+  const sorted = [...refs].sort((a, b) => {
+    const da = dateOf(a), db = dateOf(b)
+    const byDay = da && db ? da.localeCompare(db) : a.day - b.day
+    return byDay || order.indexOf(a.slot.replace(/[_-]?\d+$/, '')) - order.indexOf(b.slot.replace(/[_-]?\d+$/, ''))
+  })
   return sorted.map(r => {
-    const when = m
-      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + r.day).toLocaleDateString('en-GB', { weekday: 'short' })
-      : `Day ${r.day + 1}`
+    const d = dateOf(r)
+    const when = d ? weekdayOf(d) : `Day ${r.day + 1}`
     return `${when} · ${slotLabel(r.slot)} · ${r.mealName}`
   })
+}
+
+const DATE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function isoPlus(m: RegExpExecArray, days: number): string {
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+/** "Mon", from a `YYYY-MM-DD` date — the one formatter the strip and its headings use too. */
+export const weekdayOf = weekdayShort
+
+/**
+ * The list's own account of which days it covers, for the note under it:
+ * "Built from the meals for Sat, Sun and Wed." Read off the rows' dates, so a
+ * list that had one day added reads true where "your next 7 days" would not.
+ * Null when no row carries a date (a list built before dates were kept).
+ */
+export function coverageSentence(dates: readonly string[]): string | null {
+  if (dates.length === 0) return null
+  const names = dates.map(weekdayOf)
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  return `Built from the meals for ${list}.`
+}
+
+/**
+ * WHEN AND OVER HOW MANY DAYS THE LIST WAS LAST REBUILT, on this phone.
+ *
+ * A meal reference written before 27 Sep 2026 stores only a day OFFSET from
+ * the build date, and the list is only ever rebuilt by hand, so the weekday
+ * such a meal falls on — and the "next N days" in the note — are only true if
+ * the build date is known. This is a note ABOUT the list, kept beside it. The
+ * Nutrition tab reads it too, when it adds a day, to date an older list's rows.
+ */
+export interface GroceryBuildMemo { startDate: string; days: number }
+const buildMemoKey = (profileId: string) => `fitplan_grocery_built_v1:${profileId}`
+export function readGroceryBuildMemo(profileId?: string): GroceryBuildMemo | null {
+  if (!profileId) return null
+  try {
+    const v = JSON.parse(localStorage.getItem(buildMemoKey(profileId)) ?? 'null')
+    return v && typeof v.startDate === 'string' && typeof v.days === 'number' ? v : null
+  } catch { return null }
+}
+export function writeGroceryBuildMemo(profileId: string, memo: GroceryBuildMemo): void {
+  try { localStorage.setItem(buildMemoKey(profileId), JSON.stringify(memo)) } catch { /* private window — the screen falls back to "Day 1" */ }
 }

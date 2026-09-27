@@ -27,6 +27,7 @@ export function GroceryScreen({
   targets,
   softLikedFoods,
   todaysPicks,
+  pinsByDate,
   mealShape,
   onClose,
   headerAction,
@@ -36,6 +37,8 @@ export function GroceryScreen({
   targets: MacroTargets | null
   softLikedFoods: string[]
   todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
+  /** Swaps made on the strip's upcoming days, so a Rebuild shops for them. */
+  pinsByDate?: Record<string, Partial<Record<MealSlotName, PoolOption>>>
   mealShape: MealShape
   onClose: () => void
   /** The settings menu, drawn in this screen's top bar; App hides its own floating one meanwhile. */
@@ -60,6 +63,7 @@ export function GroceryScreen({
         targets={targets}
         softLikedFoods={softLikedFoods}
         todaysPicks={todaysPicks}
+        pinsByDate={pinsByDate}
         mealShape={mealShape}
         header={({ left, compact }) => (
           <header data-testid="grocery-topbar" className="shrink-0 bg-background" style={{ paddingTop: 'env(safe-area-inset-top)' }}>

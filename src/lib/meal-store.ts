@@ -822,6 +822,25 @@ export async function getMealPicksForDate(profileId: string, date: string): Prom
 }
 
 /**
+ * Picks for several dates in one read — the strip's upcoming days. Keyed by
+ * date; a date with no picks is simply absent. An error reads as "no picks",
+ * the rule getMealPicksForDate already applies: the day then shows what the
+ * rotation serves, which is a correct plan, just not a customised one.
+ */
+export async function getMealPicksForDates(profileId: string, dates: string[]): Promise<Record<string, Partial<Record<MealSlotName, string>>>> {
+  if (dates.length === 0) return {}
+  const { data, error } = await supabase
+    .from('meal_plan_picks')
+    .select('date, slot, meal_name')
+    .eq('profile_id', profileId)
+    .in('date', dates)
+  if (error || !data) return {}
+  const out: Record<string, Partial<Record<MealSlotName, string>>> = {}
+  for (const row of data) (out[row.date] ??= {})[row.slot as MealSlotName] = row.meal_name
+  return out
+}
+
+/**
  * THE PAST IS NOT WRITEABLE — roadmap item 9.
  *
  * A pick says "this is the meal for this slot on this date". Writing one onto
@@ -832,9 +851,13 @@ export async function getMealPicksForDate(profileId: string, date: string): Prom
  * diary is built, and the chat's meal-food-add path can already reach it with
  * an arbitrary `date` argument.
  *
- * Refused rather than thrown: the callers treat this as a fire-and-forget
- * write, and a rejection here would surface as an unhandled promise rather
- * than as anything a user could act on. Logged loudly instead.
+ * THROWN, since 27 Sep 2026, along with a failed write. This said "refused
+ * rather than thrown" because the callers were fire-and-forget; every caller
+ * now awaits inside a try/catch whose catch reports the swap as not applied —
+ * and a returned refusal or an ignored upsert error walked straight past all
+ * of them, so a swap that never saved still showed on screen. The strip's
+ * upcoming days made that worth fixing: a swap there is only ever seen again
+ * after a reload, so a silent failure would read as the app forgetting.
  */
 export function isPastDateForPicks(date: string, profileId: string | undefined): boolean {
   return date < getLocalDateString(getAppNow(profileId))
@@ -842,12 +865,12 @@ export function isPastDateForPicks(date: string, profileId: string | undefined):
 
 export async function setMealPick(profileId: string, date: string, slot: MealSlotName, mealName: string): Promise<void> {
   if (isPastDateForPicks(date, profileId)) {
-    console.error(`Refused to set a meal pick on a past date (${date}) — history is not rewriteable.`)
-    return
+    throw new Error(`Refused to set a meal pick on a past date (${date}) — history is not rewriteable.`)
   }
-  await supabase
+  const { error } = await supabase
     .from('meal_plan_picks')
     .upsert({ profile_id: profileId, date, slot, meal_name: mealName }, { onConflict: 'profile_id,date,slot' })
+  if (error) throw error
 }
 
 export async function clearMealPick(profileId: string, date: string, slot: MealSlotName): Promise<void> {
