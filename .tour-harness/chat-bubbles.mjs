@@ -9,8 +9,8 @@
 //
 // DESIGN 2a, the same day: the chat is the whole page. A 56px header (avatar,
 // "Coach", "Personal TrAIner", clear, the settings gear) replaces the per-group
-// name; coach bubbles are the theme's secondary colour with no border; 6px
-// inside a group, 24px between; every corner 18px except a 4px tail on the
+// name; coach bubbles are the theme's secondary colour with no border (since
+// 27 Sep: the avatar's own mint gradient, her request); 6px inside a group, 24px between; every corner 18px except a 4px tail on the
 // sender side of the last bubble; coach bubbles up to 88% of the column, yours
 // 82%; the composer is the page's last row, sitting straight on the tab bar,
 // and the tab bar's chat button lies flat so it cannot cover it.
@@ -128,12 +128,15 @@ function read() {
             radius: [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius].map(px),
             fontSize: px(s.fontSize), lineHeight: px(s.lineHeight),
             pad: [s.paddingTop, s.paddingRight, s.paddingBottom, s.paddingLeft].map(px),
-            bg: s.backgroundColor, color: s.color, borderWidth: px(s.borderTopWidth), borderStyle: s.borderTopStyle,
+            bg: s.backgroundColor, bgImage: s.backgroundImage, shadow: s.boxShadow, color: s.color, borderWidth: px(s.borderTopWidth), borderStyle: s.borderTopStyle,
+            links: [...b.querySelectorAll('a')].map(a => { const t = getComputedStyle(a); return { color: t.color, underline: t.textDecorationLine } }),
+            retry: [...b.querySelectorAll('button')].filter(x => /retry/i.test(x.textContent)).map(x => { const t = getComputedStyle(x); return { color: t.color, weight: t.fontWeight } }),
           }
         }),
         cards: [...g.querySelectorAll('[data-testid="chat-cards"] > *')].filter(e => e.getBoundingClientRect().height > 0).map(e => ({ text: e.textContent.trim().slice(0, 40), box: box(e) })),
         names: names.map(n => ({ text: n.textContent.trim(), box: box(n) })),
         avatars: avatars.map(a => box(a)),
+        avatarImages: avatars.map(a => getComputedStyle(a).backgroundImage),
         times: times.map(t => { const s = getComputedStyle(t); return { text: t.textContent.trim(), box: box(t), fontSize: px(s.fontSize), color: s.color } }),
       }
     }),
@@ -200,7 +203,16 @@ check('...and a long one of EACH reaches its cap, so the cap is what stopped it'
 check('body text 15px on a ~1.45 line', all.every(b => b.fontSize === 15 && near(b.lineHeight, 21.75, 0.5)), all.map(b => [b.fontSize, b.lineHeight]))
 check('padding 10px 14px', all.every(b => b.pad.join() === '10,14,10,14'), all.map(b => b.pad))
 check('user bubbles are filled with the theme\'s main colour and its own ink', users.every(b => b.bg === R.tokens.primary && b.color === R.tokens.onPrimary), { users: users.map(b => [b.bg, b.color]), tokens: R.tokens })
-check('coach bubbles are the theme\'s secondary colour, with no border', coach.every(b => b.bg === R.tokens.secondary && b.borderWidth === 0), { coach: coach.map(b => [b.bg, b.borderWidth]), secondary: R.tokens.secondary })
+// THE COACH'S BUBBLE WEARS ITS AVATAR (Ashley, 27 Sep 2026): the avatar's own
+// gradient, compared as the browser computed it on the SAME screen, so the
+// check follows every theme and accent rather than pinning a colour.
+const avatarImage = R.groups.find(g => g.role === 'assistant')?.avatarImages[0] ?? null
+check('coach bubbles wear their avatar\'s own gradient, with the theme\'s ink on it', coach.length >= 5 && !!avatarImage && /gradient/.test(avatarImage) && coach.every(b => b.bgImage === avatarImage && b.color === R.tokens.onPrimary), { coach: coach.map(b => [b.bgImage.slice(0, 60), b.color]), avatarImage, ink: R.tokens.onPrimary })
+check('...with no border, and none of the avatar\'s glow', coach.every(b => b.borderWidth === 0 && b.shadow === 'none'), coach.map(b => [b.borderWidth, b.shadow]))
+check('...and your bubbles keep the flat main colour, no gradient', users.every(b => b.bgImage === 'none'), users.map(b => b.bgImage))
+const coachLinks = coach.flatMap(b => b.links), coachRetry = coach.flatMap(b => b.retry)
+check('a link inside a coach bubble is the dark ink, underlined — not mint on mint', coachLinks.length >= 1 && coachLinks.every(l => l.color === R.tokens.onPrimary && /underline/.test(l.underline)), coachLinks)
+check('a "tap to retry" inside a coach bubble is the dark ink too, not amber on mint', coachRetry.length >= 1 && coachRetry.every(r => r.color === R.tokens.onPrimary && Number(r.weight) >= 500), coachRetry)
 
 console.log('\n[4] Corners: 18px all round, one 4px tail on the sender side of the last bubble')
 const expectRadius = (role, pos) => {
@@ -275,6 +287,18 @@ for (let i = 0; i < 20 && !typing; i++) {
       times: g.querySelectorAll('[data-testid="chat-group-time"]').length,
       prevRole: groups[groups.length - 2]?.dataset.role,
       prevLast: groups[groups.length - 2]?.querySelector('[data-testid="chat-bubble"]:last-of-type')?.textContent.trim(),
+      // Colours on the mint (27 Sep 2026), each against a probe painted from
+      // the SAME token at the same strength, so the check follows the theme.
+      bubbleImage: getComputedStyle(dots.closest('[data-testid="chat-bubble"]')).backgroundImage,
+      avatarImage: g.querySelector('[data-testid="chat-avatar"]') ? getComputedStyle(g.querySelector('[data-testid="chat-avatar"]')).backgroundImage : null,
+      dot: getComputedStyle(dots).backgroundColor,
+      label: getComputedStyle(dots.parentElement.parentElement).color,
+      want: (() => {
+        const d = document.createElement('div'); document.body.appendChild(d)
+        d.style.backgroundColor = 'color-mix(in oklab, var(--primary-foreground) 50%, transparent)'
+        d.style.color = 'color-mix(in oklab, var(--primary-foreground) 70%, transparent)'
+        const cs = getComputedStyle(d), v = { dot: cs.backgroundColor, label: cs.color }; d.remove(); return v
+      })(),
     }
   })
 }
@@ -283,6 +307,7 @@ await wait(200)
 await shoot('chat-bubbles-typing')
 check('while the coach is typing, the dots are a bubble in a COACH group with its avatar', typing?.role === 'assistant' && typing?.names === 0 && typing?.avatars === 1, typing)
 check('...and the group shows no time until the reply lands', typing?.times === 0, typing)
+check('the typing bubble wears the avatar\'s gradient too, its dots and "Thinking" in the dark ink', !!typing && /gradient/.test(typing.bubbleImage) && typing.bubbleImage === typing.avatarImage && typing.dot === typing.want.dot && typing.label === typing.want.label, typing && { image: typing.bubbleImage?.slice(0, 50), dot: typing.dot, label: typing.label, want: typing.want })
 check('...and what she just sent is in the user group before it', typing?.prevRole === 'user', typing)
 // "Jump to latest" appears when something new arrives while she is scrolled
 // UP — so scroll up while the coach is typing, then let the reply land.
@@ -380,45 +405,99 @@ for (const [theme, accent, canvas] of THEMES) {
     return {
       theme: `${theme}/${accent}`,
       user: u ? Math.round(ratio(cs(u).color, cs(u).backgroundColor) * 10) / 10 : 0,
-      coach: a ? Math.round(ratio(cs(a).color, cs(a).backgroundColor) * 10) / 10 : 0,
       ink: u ? cs(u).color : null,
     }
   }, theme, accent, canvas)
   contrasts.push(c)
   if (theme === 'daylight') { await wait(250); await shoot('chat-bubbles-light') }
 }
-console.log('      ' + contrasts.map(c => `${c.theme}: you ${c.user}:1, coach ${c.coach}:1${KNOWN_SHORT.has(c.theme) ? '  (known: the app\'s own colour pair)' : ''}`).join('\n      '))
+console.log('      ' + contrasts.map(c => `${c.theme}: you ${c.user}:1${KNOWN_SHORT.has(c.theme) ? '  (known: the app\'s own colour pair)' : ''}`).join('\n      '))
 const main = contrasts.filter(c => !KNOWN_SHORT.has(c.theme))
 check('your bubbles read at 4.5:1 or better (dark, light, and a white-ink accent)', main.length === 3 && main.every(c => c.user >= 4.5), main)
-check('the coach\'s bubbles read at 4.5:1 or better in every theme tried', contrasts.length === 4 && contrasts.every(c => c.coach >= 4.5), contrasts)
 check('...where the app says white reads, the text IS white on the main colour', contrasts[2]?.ink === 'rgb(255, 255, 255)' && contrasts[2]?.user >= 4.5, contrasts[2])
 check('the named shortfall (rose on a light theme) is no worse than the 3:1 floor', contrasts[3] !== undefined && contrasts[3].user >= 3, contrasts[3])
 
-// WITHOUT A BORDER, THE FILL IS ALL THAT SEPARATES A COACH BUBBLE FROM THE
-// PAGE, so it is measured in every theme there is, read off the stylesheet
-// rather than a hand list. Measured 26 Sep 2026: the six dark themes sit at
-// 1.25-1.39:1, the three light ones at 1.10-1.11:1 — visible, and the faintest.
-// The floor is set under the faintest so that it fails if any theme's bubble
-// melts further into its page.
+// THE COACH'S BUBBLE IS ITS AVATAR'S GRADIENT (27 Sep 2026), so its text is
+// read against BOTH ends: the lighter mint at the top and the theme's second
+// colour at the bottom, where the last line of a long message sits. Measured
+// in every theme there is (read off the stylesheet, not a hand list), each on
+// its own accent. The stops are read off the bubble and resolved to sRGB
+// through a canvas, because the browser reports the lighter one in oklab.
+//
+// MEASURED 27 Sep 2026, AND IT FALLS SHORT IN THREE: the dark ink at the
+// bottom of the gradient is 3.3:1 in Graphite and 4.0:1 in Midnight, and
+// Frost's white ink at the lighter top is 3.8:1. The other six read at 4.55
+// to 8.3. The brief asked for the avatar's exact gradient AND 4.5:1 in every
+// theme; on these three it cannot have both, so they are named here, held to
+// 3:1 so they cannot get worse, and the choice is Ashley's.
+const KNOWN_SHORT_COACH = new Set(['frost', 'graphite', 'midnight'])
 const themeNames = await call(() => [...new Set([...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules] } catch { return [] } })
   .flatMap(r => (r.selectorText || '').split(',').map(x => x.trim().match(/^\[data-theme="([a-z]+)"\]$/)?.[1])).filter(Boolean))])
+// "theme" is the theme's own colour (no override rule of its own), then every
+// override the stylesheet defines.
+const accentNames = await call(() => [...new Set(['theme', ...[...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules] } catch { return [] } })
+  .flatMap(r => (r.selectorText || '').split(',').map(x => x.trim().match(/\[data-accent="([a-z]+)"\]$/)?.[1])).filter(Boolean)])])
 const LIGHT = new Set(['daylight', 'linen', 'frost'])
-const separation = []
-for (const theme of themeNames) {
-  separation.push(await call((theme, light) => {
-    const el = document.documentElement
-    el.setAttribute('data-theme', theme); el.setAttribute('data-accent', 'theme')
-    if (light) el.setAttribute('data-canvas', 'light'); else el.removeAttribute('data-canvas')
-    const lum = str => { const [r, g, b] = (str.match(/[\d.]+/g) || []).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
-    const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05) }
-    const bubble = document.querySelector('[data-testid="chat-bubble"][data-role="assistant"]'), page = document.querySelector('[data-testid="chat-screen"]')
-    const b = bubble ? getComputedStyle(bubble).backgroundColor : '', p = page ? getComputedStyle(page).backgroundColor : ''
-    return { theme, bubble: b, page: p, ratio: b && p ? Math.round(ratio(b, p) * 100) / 100 : 0, differs: !!b && b !== p }
-  }, theme, LIGHT.has(theme)))
+function readCoachInk(theme, accent, light) {
+  const el = document.documentElement
+  el.setAttribute('data-theme', theme); el.setAttribute('data-accent', accent)
+  if (light) el.setAttribute('data-canvas', 'light'); else el.removeAttribute('data-canvas')
+  const toRGB = css => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = css; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3) }
+  const probe = css => { const d = document.createElement('div'); d.style.backgroundColor = css; document.body.appendChild(d); const v = getComputedStyle(d).backgroundColor; d.remove(); return toRGB(v) }
+  const lum = rgb => rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0)
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return Math.round((x + 0.05) / (y + 0.05) * 100) / 100 }
+  const bubble = document.querySelector('[data-testid="chat-bubble"][data-role="assistant"]')
+  const avatar = document.querySelector('[data-testid="chat-avatar"]')
+  const page = document.querySelector('[data-testid="chat-screen"]')
+  if (!bubble || !avatar || !page) return { theme, accent, top: 0, bottom: 0, pageTop: 0, pageBottom: 0, same: false }
+  const ink = toRGB(getComputedStyle(bubble).color), bg = toRGB(getComputedStyle(page).backgroundColor)
+  // The stops are read off the BUBBLE as the browser computed it, never off a
+  // copy of the gradient written here, so a change to the gradient is a
+  // change to what is measured.
+  const image = getComputedStyle(bubble).backgroundImage
+  const inner = (image.match(/^linear-gradient\((.*)\)$/) || [])[1] || ''
+  const parts = []; let depth = 0, cur = ''
+  for (const ch of inner) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && depth === 0) { parts.push(cur.trim()); cur = '' } else cur += ch }
+  if (cur.trim()) parts.push(cur.trim())
+  const stops = parts.filter(t => !/deg|^to /.test(t)).map(t => t.replace(/\s+[\d.]+%$/, ''))
+  const top = stops.length >= 2 ? probe(stops[0]) : [0, 0, 0], bottom = stops.length >= 2 ? probe(stops[stops.length - 1]) : [0, 0, 0]
+  return {
+    theme, accent,
+    top: ratio(ink, top), bottom: ratio(ink, bottom),
+    pageTop: ratio(bg, top), pageBottom: ratio(bg, bottom),
+    same: /gradient/.test(getComputedStyle(bubble).backgroundImage) && getComputedStyle(bubble).backgroundImage === getComputedStyle(avatar).backgroundImage,
+  }
 }
-console.log('      coach bubble against the page: ' + separation.map(x => `${x.theme} ${x.ratio}:1`).join(', '))
-check('every theme there is was measured (9 in the stylesheet today)', separation.length >= 9, separation.map(x => x.theme))
-check('in every theme the coach bubble is a different colour from the page, at 1.08:1 or more', separation.length >= 9 && separation.every(x => x.differs && x.ratio >= 1.08), separation)
+// The canvas conversion is itself checked first, on colours whose answer is
+// known, so a browser that refused the colour could not pass as black text.
+const toRgbSanity = await call(() => {
+  const toRGB = css => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = css; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3).join() }
+  return [toRGB('rgb(10, 20, 30)'), toRGB('oklab(1 0 0)'), toRGB('color-mix(in oklab, rgb(0, 0, 0) 50%, white)')]
+})
+check('the colour reader turns rgb, oklab and a colour-mix into the right sRGB (sanity)', toRgbSanity[0] === '10,20,30' && toRgbSanity[1] === '255,255,255' && toRgbSanity[2] === '99,99,99', toRgbSanity)
+const ownAccent = []
+for (const theme of themeNames) ownAccent.push(await call(readCoachInk, theme, 'theme', LIGHT.has(theme)))
+console.log('      coach text on its bubble, top / bottom of the gradient: ' + ownAccent.map(x => `${x.theme} ${x.top}/${x.bottom}${KNOWN_SHORT_COACH.has(x.theme) ? ' (named)' : ''}`).join(', '))
+check('every theme there is was measured (9 in the stylesheet today)', ownAccent.length >= 9, ownAccent.map(x => x.theme))
+check('in every theme the coach bubble IS its avatar\'s gradient', ownAccent.length >= 9 && ownAccent.every(x => x.same), ownAccent.map(x => [x.theme, x.same]))
+check('the coach\'s text reads at 4.5:1 or better at BOTH ends of the gradient, in every theme but the named three', ownAccent.filter(x => !KNOWN_SHORT_COACH.has(x.theme)).length >= 6 && ownAccent.filter(x => !KNOWN_SHORT_COACH.has(x.theme)).every(x => Math.min(x.top, x.bottom) >= 4.5), ownAccent)
+check('...and the named three (Frost, Graphite, Midnight) are no worse than 3:1', ownAccent.filter(x => KNOWN_SHORT_COACH.has(x.theme)).length === 3 && ownAccent.filter(x => KNOWN_SHORT_COACH.has(x.theme)).every(x => Math.min(x.top, x.bottom) >= 3), ownAccent.filter(x => KNOWN_SHORT_COACH.has(x.theme)))
+// A MINT BUBBLE STANDS WELL CLEAR OF ITS PAGE, which settles the 26 Sep
+// question about the faint light-theme bubbles (1.10:1 then). Measured the
+// same day at 1.92:1 or more (Daylight's lighter top the faintest); held
+// just under it.
+check('in every theme the coach bubble stands clear of the page, 1.9:1 or more at both ends', ownAccent.length >= 9 && ownAccent.every(x => Math.min(x.pageTop, x.pageBottom) >= 1.9), ownAccent.map(x => [x.theme, x.pageTop, x.pageBottom]))
+// THE ACCENT OVERRIDE: every theme with every accent, so the bubble is shown
+// to follow the avatar wherever she has taken the colour. The readability of
+// each pair is printed rather than gated: 49 of 81 reach 4.5:1 at both ends
+// (27 Sep 2026), and the shortfall lives in the theme's own colour pair.
+const everyPair = []
+for (const theme of themeNames) for (const accent of accentNames) everyPair.push(await call(readCoachInk, theme, accent, LIGHT.has(theme)))
+const pairsOk = everyPair.filter(x => Math.min(x.top, x.bottom) >= 4.5).length
+console.log(`      every theme x accent: ${pairsOk} of ${everyPair.length} reach 4.5:1 at both ends; lowest ${Math.min(...everyPair.map(x => Math.min(x.top, x.bottom)))}:1`)
+check('every theme with every accent was tried (81 pairs today)', everyPair.length >= 81 && accentNames.length >= 9, [everyPair.length, accentNames])
+check('...and in every one of them the coach bubble matches its avatar', everyPair.length >= 81 && everyPair.every(x => x.same), everyPair.filter(x => !x.same).map(x => `${x.theme}/${x.accent}`))
+await call(() => { const el = document.documentElement; el.setAttribute('data-theme', 'nightshift'); el.setAttribute('data-accent', 'theme'); el.removeAttribute('data-canvas'); return true })
 
 console.log('\n[9] A running timer\'s dock never covers the composer')
 // A real stopwatch, started on the harness page, raises the REAL BottomDock

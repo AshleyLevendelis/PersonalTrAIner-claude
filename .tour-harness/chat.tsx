@@ -397,8 +397,11 @@ const grouped = [
   { id: 'g6', role: 'assistant', status: 'complete', created_at: at(37 * MIN), content: "Tight is worth keeping an eye on. If it's still there tomorrow, tell me before the session and we'll ease the rows off." },
   { id: 'g7', role: 'assistant', status: 'complete', created_at: at(36.9 * MIN), content: '',
     receipt: { kind: 'memory_context_fact_saved', title: 'Saved to your notes', rows: [{ label: 'Lower back', detail: 'tight on rows' }], status: 'done' } },
-  { id: 'g8', role: 'assistant', status: 'complete', created_at: at(36.8 * MIN), content: "I'll ask about it next time." },
-  { id: 'g9', role: 'assistant', status: 'complete', created_at: at(20 * MIN), content: "One more thing — you're under on water today." },
+  // g8 FAILED and g9 carries a LINK (27 Sep 2026): the coach's bubble is now
+  // the mint of its avatar, so the two things inside a bubble that had their
+  // own colour — the retry line and a link — are on screen to be measured.
+  { id: 'g8', role: 'assistant', status: 'failed', created_at: at(36.8 * MIN), content: "I'll ask about it next time." },
+  { id: 'g9', role: 'assistant', status: 'complete', created_at: at(20 * MIN), content: "One more thing — you're under on water today. [Why it matters](https://www.nhs.uk/live-well/eat-well/food-guidelines-and-food-labels/water-drinks-nutrition/)" },
   { id: 'g10', role: 'user', status: 'complete', created_at: at(2 * MIN), content: 'Will do.' },
 ]
 if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(GROUPS ? grouped : seeded))

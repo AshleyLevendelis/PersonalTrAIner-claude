@@ -108,6 +108,12 @@ const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
 const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
+/**
+ * The coach's colour: its avatars (header and thread) and, since 27 Sep 2026,
+ * its bubbles. One constant, so a bubble can never drift from its avatar.
+ * Every stop is a theme token, so it follows the theme and the accent.
+ */
+const COACH_GRADIENT = 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))'
 
 /**
  * How long the first bubble will wait for its inputs before saying what it
@@ -6208,7 +6214,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const normalized = normalizeExternalUrl(href)
       if (!normalized) return <>{children}</>
       return (
-        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-text underline hover:opacity-80">{children}</a>
+        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-foreground underline hover:opacity-80">{children}</a>
       )
     },
   }
@@ -6246,7 +6252,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             aria-hidden
             data-testid="chat-header-avatar"
             className="flex size-8 shrink-0 items-center justify-center rounded-full text-primary-foreground"
-            style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
+            style={{ background: COACH_GRADIENT, boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
           >
             <MessageCircle className="size-4" strokeWidth={2.4} />
           </span>
@@ -6352,7 +6358,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                         aria-hidden
                         data-testid="chat-avatar"
                         className="mb-px flex size-7 shrink-0 items-center justify-center rounded-full text-primary-foreground"
-                        style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
+                        style={{ background: COACH_GRADIENT, boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
                       >
                         <MessageCircle className="size-3.5" strokeWidth={2.4} />
                       </span>
@@ -6363,11 +6369,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                           stripStreamingTags(msg.content)
                         ) : isInterrupted(msg) && !msg.content ? (
                           /* Pending placeholder — show loading dots */
-                          <div className="flex items-center gap-2 text-muted-foreground">
+                          <div className="flex items-center gap-2 text-primary-foreground/70">
                             <div className="flex gap-1">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce [animation-delay:150ms]" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce [animation-delay:300ms]" />
                             </div>
                             {isRecalibrating ? (
                               <span className="text-xs">Recalibrating your schedule...</span>
@@ -6382,7 +6388,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                               {stripStreamingTags(msg.content)}
                             </ReactMarkdown>
                             <button
-                              className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
+                              className="mt-2 flex items-center gap-1.5 text-xs text-primary-foreground font-medium hover:underline"
                               onClick={() => retryMessage(i)}
                               disabled={isLoading}
                             >
@@ -6415,9 +6421,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                                 className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
                                   msg.role === 'user'
                                     ? 'whitespace-pre-wrap bg-primary text-primary-foreground'
-                                    : 'bg-secondary text-foreground'
+                                    : 'text-primary-foreground'
                                 }`}
-                                style={{ maxWidth: widest, borderRadius: bubbleRadius(msg.role, position) }}
+                                // THE COACH'S BUBBLE WEARS ITS AVATAR (Ashley, 27 Sep
+                                // 2026): the avatar's own gradient, from the one
+                                // constant both read, so they can never drift apart.
+                                // The avatar's glow stays on the avatar.
+                                style={{
+                                  maxWidth: widest,
+                                  borderRadius: bubbleRadius(msg.role, position),
+                                  ...(msg.role === 'assistant' && { background: COACH_GRADIENT }),
+                                }}
                               >
                                 {bodyContent}
                               </div>
