@@ -1033,6 +1033,20 @@ menu" stays true when a copy is also left outside it.
   three light themes are 3.4-3.9:1 with the app's OWN pair, the same one every
   main button uses there. That is named, held to 3:1, and hers to change.
   `chat-groups`, `chat-page`, `verify:chat-bubbles`, `verify:chat-shell`
+- **The grocery list is a full page too (design 3a/3b, 27 Sep 2026)** —
+  Ashley's brief, presentation only, every write through the store's own
+  functions. Hero with a trolley ring and items left, sticky aisle chips that
+  follow the aisle at the top, one row open at a time as a stepper (whole units
+  for counted items), a tick that waits a beat with Undo on a toast, the add
+  bar docked on the tab bar, and the tab bar's chat button flat there as on
+  the chat. Two rules came out of it that reach past this screen. **A stored
+  day OFFSET is not a date**: meal lines name a weekday only when the build
+  date is known, and say "Day 1" otherwise, because nothing rebuilds the list
+  on its own and weekdays counted from today would be wrong. **A screen split
+  out of the bundle is not offline until something fetches it**: the service
+  worker caches on fetch only, so the grocery chunk is warmed after start, the
+  way the coach is fetched by being mounted. `verify:grocery`,
+  `test:grocery-display`, `test:grocery-screen`
 - Works one-handed on a phone on a gym floor — `verify:tap-targets`,
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`

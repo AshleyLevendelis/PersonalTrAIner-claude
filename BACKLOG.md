@@ -2,6 +2,116 @@
 
 Newest first. One line each.
 
+- [x] **THE GROCERY LIST IS A FULL PAGE (DESIGN 3a/3b), AND THE TAB BAR'S
+  ICONS SAY WHAT IS BEHIND THEM.** 27 Sep 2026, Ashley's brief: presentation
+  and interaction only. Every write still goes through the grocery store's own
+  functions; how the list is built, merged and stored is untouched.
+  **What changed on her phone:**
+  - The list is the whole screen, from the top down to the tab bar, like the
+    coach chat. A slim top bar has "‹ Nutrition", Share and the settings gear
+    (the app's floating gear hides meanwhile, so it never shows twice).
+  - The hero: "Grocery", a ring showing how many are in the trolley ("3/15"),
+    the big number left, a "7 days ▾" pill (3, 7 or 14) and "Rebuild". The old
+    3d/7d/14d buttons, "Regenerate (Nd)" and the loose "Clear checked" are gone.
+  - Aisle chips stick under the top bar, one per aisle with something left,
+    each with its count. The lit chip follows the aisle at the top, and at the
+    very bottom the last aisle on screen lights; tapping a chip scrolls there.
+    Once the big title has scrolled away, "Grocery · 11 left" appears in
+    the top bar.
+  - Rows are quieter: a round tick, the name, what it is FOR ("Lunch ×5",
+    "Lunch ×3 · Dinner ×2") and the amount. A rough estimate says "Rough
+    estimate · tap to set the amount" in the warning colour instead of an
+    "unmatched" badge. The pencil, the bin and "from N meals" left the row.
+  - Tapping a row opens it, one at a time: a − / amount / + stepper (a counted
+    item like broccoli steps a whole head; a weight steps the amount it is
+    shown in; the minus stops at the smallest amount), "exact 1,180g" beside
+    it, the amount typeable exactly, the meals it came from ("Wed · Lunch ·
+    Chicken rice bowl", three then "+2 more"), Remove and Done. Tapping the
+    name renames it.
+  - A tick fills the circle with a glow, the row stays struck through for a
+    beat, then goes to the trolley. A toast above the add bar says "Salmon
+    fillet is in the trolley · Undo" for five seconds; a newer tick replaces it.
+  - The trolley is a block at the end: "In the trolley" over "3 items ·
+    Peanut butter, Frozen berries…", with Clear and the Put back list.
+  - The add bar is docked on the tab bar, and rides the keyboard when it is up.
+  - The tab bar: Home is a trend line, Nutrition a knife and fork, Exercise a
+    dumbbell. The chat button lies flat on the grocery screen, as on the chat.
+  **Deviations from the brief, each stated:**
+  - The weekday on a meal line and the "next N days" in the note are only
+    shown when the app knows when the list was built. A meal reference stores
+    a day OFFSET from the build date, and nothing rebuilds the list on its
+    own, so naming weekdays from TODAY would print the wrong day for any list
+    built earlier in the week. The screen now keeps a small note of the build
+    date and horizon on the phone when Rebuild runs (the list itself is stored
+    exactly as before). Without it (a list built before today's change, or on
+    another phone) the lines say "Day 1" and the note says "Built from the
+    meals on your Nutrition tab." with no number.
+  - The note gives the horizon the list was BUILT with, not the pill's
+    current setting, which only applies to the next Rebuild.
+  - The empty state said "tap Regenerate above"; the button is "Rebuild" now,
+    so it says that. Otherwise unchanged.
+  - The whole row is not one button: a button inside a button is invalid, so
+    the tick is its own button and everything else in the row is the second.
+  - The ring's radius is 42, not 44: an 8px stroke on r=44 overflows a 92px
+    box. It fills the box exactly as drawn.
+  - The add bar's pill is 48px as specified, made of a 44px field (a text
+    field cannot carry the invisible tap slop, per her 9 Sep ruling) and 2px
+    of padding, not 6px padding round a 36px field.
+  - The active chip follows the aisle from scroll positions rather than an
+    IntersectionObserver per heading: the rule is "the last heading that has
+    reached the chips", which one position sum answers directly, and it is
+    the same sum the chip tap scrolls to, so the two cannot disagree.
+  - The brief said four themes; there are nine, all measured, plus two accent
+    overrides.
+  **Found while building, and fixed:**
+  - The short last aisles can never reach the top, so on scrolling to the end
+    the lit chip stayed on an aisle already scrolled past. At the very bottom
+    the last aisle on screen lights now.
+  - A tapped chip held its highlight through later scrolling that was not a
+    finger (keyboard, focus jumps). It lets go once the list moves away from
+    where the tap left it.
+  - SIZE. The revamp is ~15 kB of screen code on an app chunk with 6.5 kB of
+    budget left. The screen now loads as its own chunk, but a shopping list is
+    opened in a shop, and the service worker only caches what has been
+    fetched, so the chunk is WARMED shortly after start: it is in the offline
+    cache before anyone needs it. Measured through test:bundle on a clean
+    worktree of HEAD and after: the app chunk 978 → 970 kB, first paint 430 →
+    428 kB, a deploy's download 275 → 272 kB. Only the total of everything
+    shipped rises (1,973 → 1,988), because the code exists; that budget moved
+    1,975 → 2,008, 20 above today's measurement, both ends recorded there.
+  **Verified:**
+  - `verify:grocery` (new, 59 checks) on the real screen at 390x844 over a
+    seeded week's shop, every write read back from the store's destination:
+    layout, sticky chips that follow and let go, the open row, stepper,
+    typed and rejected amounts, rename, Remove, tick-toast-Undo, trolley,
+    Put back, Clear, the horizon menu, Rebuild, the add bar with the
+    keyboard up, 44px targets, nine themes and two accents, the tab bar's
+    icons, the empty state and the no-note fallback. 29 mutations, 29
+    caught.
+  - `test:grocery-display` (new, 23 checks): purpose lines, weekday and
+    "Day N" lines, stepper steps for counted items, weights and manual units,
+    the floor and the ceiling. 12 mutations, 12 caught.
+  - `test:grocery-screen` (new, 18 checks): App hides its gear on the grocery
+    screen, hands the top bar the real menu, lays the disc flat on exactly
+    the grocery screen and the chat, loads the screen as its own chunk and
+    warms it; and the list writes only through the store. 9 mutations, 9 caught.
+  - Re-anchored, not weakened: `test:tools-grid` §4 (the old square box and
+    one-line trolley label, which the design changed) (4 mutations, 4 caught);
+    `test:chat-page` (the gear's hide condition gained the grocery screen)
+    (1 mutation, 1 caught); `test:bundle` (the total, above).
+  - Typecheck clean. Full sweep on the committed tree: 297 test/verify
+    gates, 293 pass. The four failures are the three database-only checks,
+    each printing its own "could not reach it" sentence, and
+    test:coach-exam-fresh, red by design until the exam is re-run.
+  - Screenshots read: at rest, a row open with the toast, the keyboard up,
+    the light theme.
+  **Not driven, and why:** App.tsx itself, which no harness boots; its three
+  lines for this screen are held by test:grocery-screen. Share opens the
+  phone's own share sheet, which a headless browser does not have; the button
+  is checked to be there and 40px.
+  **CSCS review:** not applicable; nothing prescribed changes.
+  **Deploys:** frontend only, live on a merge to main when she says so.
+
 - [ ] **THE COACH'S BUBBLE IS THE COLOUR OF ITS AVATAR — built; three themes
   asked of her.** 27 Sep 2026, Ashley's brief (layout and colour only): the
   coach's bubble takes the avatar's exact mint gradient, with the theme's own
