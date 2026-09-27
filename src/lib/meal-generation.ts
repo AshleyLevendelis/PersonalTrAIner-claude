@@ -32,7 +32,7 @@ import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
-import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor } from './portion-scaler'
+import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
 import { isMissingColumnError } from './missing-column'
@@ -1107,22 +1107,46 @@ function optionMatchesLikedFood(option: PoolOption, liked: string[]): boolean {
 }
 
 /**
- * How much a day that repeats a recent meal is penalised WHEN NO COMBINATION
- * REACHES TOLERANCE — the only case left where variety is a tiebreak rather
- * than a sort key. Unchanged in value and in meaning from when it was the
- * whole mechanism; see `rankCombo` for why it could never work as one.
+ * WHEN NO DAY CAN BE ON TARGET, HOW MUCH CLOSER THE REPEAT MUST FIT TO BE
+ * SERVED AGAIN — in macroDistanceScore's units, where a 1% calorie miss is
+ * 0.01. 27 Sep 2026 (CSCS delegation, basis in BACKLOG).
+ *
+ * This used to be REPEAT_TIEBREAK, a 0.01 penalty on a repeat that could only
+ * win an almost exact tie, so a pool with no correct day served the identical
+ * day all week: measured with dishes built from real foods, 35 of the 59
+ * identical weeks in 200 profiles were days no combination could get on
+ * target, most often because every dish overshoots protein. Such a day misses
+ * either way; the only question is by how much. Three points — about 3% of
+ * the day's calories, or 5% of its protein — is inside the day-to-day spread
+ * of anybody's real intake, and the same three meals seven days running is
+ * not a plan a coach would write. So among off-target days, any within this
+ * margin of the closest counts as close enough, and variety chooses between
+ * them; beyond it, fit decides exactly as it always did.
+ *
+ * IT NEVER REACHES AN ON-TARGET DAY. A correct day always outranks an
+ * off-target one (rankCombo's tier), so this cannot trade a day inside the
+ * bands for a novel one outside them — test:meal-variety §3b.
  */
-export const REPEAT_TIEBREAK = 0.01
+export const OFF_TARGET_VARIETY_MARGIN = 0.03
 
 /**
  * A combination's place in the order, compared field by field in the order
  * declared. Lower is better throughout.
  */
 interface ComboRank {
-  /** 0 = inside the day's tolerance bands, 1 = outside them. Never traded away. */
+  /**
+   * 0 = the day SERVED is inside the tolerance bands, 1 = it is not. Never
+   * traded away. "Served" includes a quiet resize (see QUIET_RESIZE_MIN).
+   */
   tier: 0 | 1
   /** How many slots hold a meal seen in the last few days. */
   repeats: number
+  /**
+   * 1 when the day only reaches tolerance through a quiet resize, 0 when it
+   * is served exactly as stored. Behind variety and ahead of fit, so a resize
+   * is spent only where it buys a different day — never for a closer number.
+   */
+  resized: 0 | 1
   /** Weighted relative macro distance, plus the soft-like and multi-exotic penalties. */
   fit: number
 }
@@ -1167,15 +1191,123 @@ interface BestCombo {
  * measured defect; a calibrated decision about somebody's food preferences is
  * not something to redefine in passing while fixing it.
  *
- * OUTSIDE TOLERANCE NOTHING CHANGES. A day the app cannot get right spends
- * everything on getting it as close as possible, with variety back to being
- * the old 0.01 tiebreak — which is why `repeats` is folded into `fit` for
- * tier 1 and left at zero. Do not "simplify" that: it is what keeps a day
- * that misses its targets from being chosen for its novelty.
+ * OUTSIDE TOLERANCE, VARIETY STAYS INSIDE A MARGIN. A day the app cannot
+ * get right spends almost everything on getting it close: tier 1 ranks on fit
+ * alone, and assembleDay then lets variety choose only among off-target days
+ * within OFF_TARGET_VARIETY_MARGIN of the closest. CORRECTED 27 Sep 2026: this
+ * said "outside tolerance nothing changes", with a 0.01 tiebreak, and that is
+ * what served one off-target day seven days running — see the margin's note.
+ * What still holds is the point of the old line: a day that misses its targets
+ * by more than the margin is never chosen for its novelty.
  */
-function rankCombo(inTolerance: boolean, repeats: number, fit: number): ComboRank {
-  if (inTolerance) return { tier: 0, repeats, fit }
-  return { tier: 1, repeats: 0, fit: fit + (repeats > 0 ? REPEAT_TIEBREAK : 0) }
+function rankCombo(inTolerance: boolean, repeats: number, fit: number, resized: 0 | 1 = 0): ComboRank {
+  if (inTolerance) return { tier: 0, repeats, resized, fit }
+  return { tier: 1, repeats: 0, resized: 0, fit }
+}
+
+/**
+ * HOW FAR ONE DISH MAY BE RESIZED FOR ITS DAY TO COUNT AS A CORRECT DAY IN
+ * THE SEARCH — 27 Sep 2026, after Ashley reported the same meals every day.
+ *
+ * Tier 0 above used to be judged on each combination's STORED macros, and the
+ * repair-scale below ran only afterwards, on the winner. Every option is sized
+ * to the targets of the day its pool was generated, so once the targets move
+ * (weigh-ins, a macro split, a goal) few or no stored combinations land inside
+ * the bands any more. Variety then fell back to the 0.01 tiebreak, the same
+ * day won every day, and the repair quietly pulled that one day on target —
+ * so `withinTolerance` read true, no resize offer appeared, and nothing on
+ * screen said anything was wrong. Measured with dishes built from real foods
+ * and sized the way verifyProposal accepts them (200 profiles, 7 days):
+ * 2.85 distinct days a week with NO drift and 30% of weeks identical; a 10%
+ * drift, 1.11 and 89.5%, with 73% of those days still reading on target.
+ *
+ * So a combination the app can bring on target by resizing its largest free
+ * dish now counts as the correct day it will be SERVED as — the same resize
+ * the app already applies, judged before the choice instead of after it.
+ *
+ * WHY A NARROWER RANGE THAN THE REPAIR'S OWN 0.4-2.5x (CSCS delegation, basis
+ * in BACKLOG). The repair's range is a sanity bound for a day with no better
+ * option; here a resize is being CHOSEN to buy a different day, and doubling a
+ * dinner so that it can be served on a Tuesday is not the same meal any more.
+ * Within about a quarter either way a dish is the same dish at a different
+ * portion — ordinary serving variation — so that is the whole of what variety
+ * may spend. Beyond it, the day is judged exactly as before.
+ */
+export const QUIET_RESIZE_MIN = 0.75
+export const QUIET_RESIZE_MAX = 1.35
+
+/**
+ * How far outside a band the ESTIMATED resized day may sit and still be worth
+ * resizing exactly. Rounding a counted ingredient (2 eggs scaled to 2.6 is 3)
+ * moves the real day away from the estimate, so the slack is generous; it only
+ * decides what gets looked at, never what gets served.
+ */
+const RESIZE_ESTIMATE_SLACK = 0.05
+
+/** dayWithinTolerance with every band widened by `slack` (a fraction of the target). */
+function dayNearTolerance(totals: MacroTargets, targets: MacroTargets, slack: number): boolean {
+  if (targets.calories <= 0) return true
+  const calOk = relDiff(totals.calories, targets.calories) <= DAY_CALORIE_TOLERANCE + slack
+  const proteinOk = targets.protein <= 0 || (totals.protein >= targets.protein * (DAY_PROTEIN_LOWER_RATIO - slack) && totals.protein <= targets.protein * (DAY_PROTEIN_UPPER_RATIO + slack))
+  const carbOk = relDiff(totals.carbs, targets.carbs) <= DAY_CARB_TOLERANCE + slack
+  const fatOk = relDiff(totals.fat, targets.fat) <= DAY_FAT_TOLERANCE + slack
+  return calOk && proteinOk && carbOk && fatOk
+}
+
+/**
+ * Resizes the largest unpinned dish in `chosen` so the day's calories close
+ * on the target, exactly as the post-search repair does. Null when there is
+ * no free dish or the resize is outside [minFactor, maxFactor] or absurd.
+ * Does not judge the result — callers decide what an acceptable day is.
+ */
+function resizeLargestFreeSlot(
+  chosen: Partial<Record<MealSlotName, PoolOption>>,
+  pinned: Partial<Record<MealSlotName, PoolOption>>,
+  targets: MacroTargets,
+  minFactor: number,
+  maxFactor: number,
+  /** True in the search: skip the food lookups for a day whose estimate is plainly off target. */
+  judgeFirst = false,
+): { chosen: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets } | null {
+  const entries = Object.entries(chosen) as [MealSlotName, PoolOption][]
+  const repairable = entries.filter(([s]) => pinned[s] == null)
+  if (repairable.length === 0) return null
+  const [largestSlot, largestOption] = repairable.reduce((a, b) => (b[1].macros.calories > a[1].macros.calories ? b : a))
+  const othersTotal = sumOptionMacros(entries.filter(([s]) => s !== largestSlot).map(([, o]) => o))
+  const neededKcal = Math.max(0, targets.calories - othersTotal.calories)
+  // Cheap first: the factor is known before a single ingredient is touched,
+  // and most combinations in a real search fall outside the quiet range.
+  const factor = largestOption.macros.calories > 0 ? neededKcal / largestOption.macros.calories : 1
+  if (!(factor >= minFactor && factor <= maxFactor)) return null
+  if (judgeFirst) {
+    // Still cheap: a resize multiplies every ingredient by one factor, so the
+    // day it would make is known to within rounding before a food is looked
+    // up. Skip the lookup when that estimate is plainly off target anyway —
+    // the exact day is judged again below by the caller, so the estimate can
+    // only ever turn a day away, never let one in.
+    const estimate: MacroTargets = {
+      calories: othersTotal.calories + largestOption.macros.calories * factor,
+      protein: othersTotal.protein + largestOption.macros.protein * factor,
+      carbs: othersTotal.carbs + largestOption.macros.carbs * factor,
+      fat: othersTotal.fat + largestOption.macros.fat * factor,
+    }
+    if (!dayNearTolerance(estimate, targets, RESIZE_ESTIMATE_SLACK)) return null
+  }
+  const scaleResult = scaleToTarget(
+    largestOption.ingredients,
+    { kcal: largestOption.macros.calories, protein: largestOption.macros.protein, carbs: largestOption.macros.carbs, fat: largestOption.macros.fat },
+    {
+      kcal: neededKcal,
+      protein: Math.max(0, targets.protein - othersTotal.protein),
+      carbs: Math.max(0, targets.carbs - othersTotal.carbs),
+      fat: Math.max(0, targets.fat - othersTotal.fat),
+    },
+  )
+  if (scaleResult.rejectedReason) return null
+  const recomputed = computeMealMacros(scaleResult.ingredients)
+  const adjustedOption: PoolOption = { ...largestOption, ingredients: scaleResult.ingredients, macros: macrosToTargets(recomputed) }
+  const resized = { ...chosen, [largestSlot]: adjustedOption }
+  return { chosen: resized, totals: sumOptionMacros(Object.values(resized) as PoolOption[]) }
 }
 
 /**
@@ -1190,6 +1322,7 @@ function betterOf(current: BestCombo | null, candidate: BestCombo): BestCombo {
   const b = current.rank
   if (a.tier !== b.tier) return a.tier < b.tier ? { ...candidate, combo: { ...candidate.combo } } : current
   if (a.repeats !== b.repeats) return a.repeats < b.repeats ? { ...candidate, combo: { ...candidate.combo } } : current
+  if (a.resized !== b.resized) return a.resized < b.resized ? { ...candidate, combo: { ...candidate.combo } } : current
   return a.fit < b.fit ? { ...candidate, combo: { ...candidate.combo } } : current
 }
 
@@ -1256,6 +1389,9 @@ export function assembleDay(
   // Held in a wrapper object (not a bare `let`) so TS's control-flow narrowing
   // doesn't get confused by the closure below mutating it across calls.
   const state: { best: BestCombo | null } = { best: null }
+  // Every off-target day the search sees, for the margin choice after it —
+  // only read when no day at all reaches tolerance.
+  const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; repeats: number; fit: number }[] = []
 
   function search(index: number, combo: Partial<Record<MealSlotName, PoolOption>>): void {
     if (index === slots.length) {
@@ -1275,13 +1411,24 @@ export function assembleDay(
         && !slots.some(s => optionMatchesLikedFood(combo[s]!, softLikedFoods))
       // The soft-like and multi-exotic nudges live INSIDE fit, at the
       // magnitudes they have always had. See rankCombo.
-      const fit = macroDistanceScore(totals, targets) + exoticPenalty
-        + (missesEveryLikedFood ? SOFT_FOOD_MISS_PENALTY : 0)
-      state.best = betterOf(state.best, {
-        combo,
-        totals,
-        rank: rankCombo(dayWithinTolerance(totals, targets), repeats, fit),
-      })
+      const nudges = exoticPenalty + (missesEveryLikedFood ? SOFT_FOOD_MISS_PENALTY : 0)
+      if (dayWithinTolerance(totals, targets)) {
+        state.best = betterOf(state.best, { combo, totals, rank: rankCombo(true, repeats, macroDistanceScore(totals, targets) + nudges) })
+        return
+      }
+      // Off target as stored: judge the day it would be SERVED as, if a quiet
+      // resize gets it there. See QUIET_RESIZE_MIN. Never with a slot missing,
+      // for the same reason the post-search repair refuses one.
+      const quiet = missingSlots.length === 0
+        ? resizeLargestFreeSlot(combo, pinned, targets, QUIET_RESIZE_MIN, QUIET_RESIZE_MAX, true)
+        : null
+      if (quiet && dayWithinTolerance(quiet.totals, targets)) {
+        state.best = betterOf(state.best, { combo: quiet.chosen, totals: quiet.totals, rank: rankCombo(true, repeats, macroDistanceScore(quiet.totals, targets) + nudges, 1) })
+        return
+      }
+      const fit = macroDistanceScore(totals, targets) + nudges
+      offTarget.push({ combo: { ...combo }, totals, repeats, fit })
+      state.best = betterOf(state.best, { combo, totals, rank: rankCombo(false, repeats, fit) })
       return
     }
     const slot = slots[index]
@@ -1297,6 +1444,20 @@ export function assembleDay(
     return { chosen: {}, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, withinTolerance: false, alternatives: pools, missingSlots }
   }
 
+  // NO DAY REACHES TOLERANCE: among the off-target days within the margin of
+  // the closest, the one repeating least recent food, then the closest. See
+  // OFF_TARGET_VARIETY_MARGIN. The closest itself is always within the
+  // margin, so with no history this is exactly the old choice.
+  if (state.best.rank.tier === 1) {
+    const closest = state.best.rank.fit
+    let pick: (typeof offTarget)[number] | null = null
+    for (const c of offTarget) {
+      if (c.fit > closest + OFF_TARGET_VARIETY_MARGIN) continue
+      if (!pick || c.repeats < pick.repeats || (c.repeats === pick.repeats && c.fit < pick.fit)) pick = c
+    }
+    if (pick) state.best = { combo: pick.combo, totals: pick.totals, rank: rankCombo(false, pick.repeats, pick.fit) }
+  }
+
   let chosen = state.best.combo
   let totals = state.best.totals
   let withinTolerance = dayWithinTolerance(totals, targets)
@@ -1309,35 +1470,15 @@ export function assembleDay(
   // function must not produce. A missing slot always ships as an honest
   // out-of-tolerance day instead.
   if (!withinTolerance && missingSlots.length === 0) {
-    const entries = Object.entries(chosen) as [MealSlotName, PoolOption][]
     // Only unpinned slots are candidates for repair — see pinned's doc
     // comment. A day that misses tolerance with every free slot already
     // optimal ships as the honest miss rather than editing the user's meal.
-    const repairable = entries.filter(([s]) => pinned[s] == null)
-    if (repairable.length === 0) {
-      return { chosen, totals, withinTolerance, alternatives: pools, missingSlots }
-    }
-    const [largestSlot, largestOption] = repairable.reduce((a, b) => (b[1].macros.calories > a[1].macros.calories ? b : a))
-
-    const othersTotal = sumOptionMacros(entries.filter(([s]) => s !== largestSlot).map(([, o]) => o))
-    const neededForLargest: Macros100g = {
-      kcal: Math.max(0, targets.calories - othersTotal.calories),
-      protein: Math.max(0, targets.protein - othersTotal.protein),
-      carbs: Math.max(0, targets.carbs - othersTotal.carbs),
-      fat: Math.max(0, targets.fat - othersTotal.fat),
-    }
-
-    const scaleResult = scaleToTarget(
-      largestOption.ingredients,
-      { kcal: largestOption.macros.calories, protein: largestOption.macros.protein, carbs: largestOption.macros.carbs, fat: largestOption.macros.fat },
-      neededForLargest,
-    )
-
-    if (!scaleResult.rejectedReason) {
-      const recomputed = computeMealMacros(scaleResult.ingredients)
-      const adjustedOption: PoolOption = { ...largestOption, ingredients: scaleResult.ingredients, macros: macrosToTargets(recomputed) }
-      const candidateChosen = { ...chosen, [largestSlot]: adjustedOption }
-      const candidateTotals = sumOptionMacros(Object.values(candidateChosen) as PoolOption[])
+    // The SAME resize the search's quiet resize uses, over the scaler's own
+    // sane-portion range rather than the quiet one: this is the last resort
+    // for a day with no better option, not a choice made to buy variety.
+    const candidate = resizeLargestFreeSlot(chosen, pinned, targets, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR)
+    if (candidate) {
+      const candidateTotals = candidate.totals
       // scaleToTarget is calorie-only — it has no way to bound protein, carbs
       // or fat individually, so scaling one dish up to also cover a shortfall
       // elsewhere can land well past target on any of them. Accept the
@@ -1351,7 +1492,7 @@ export function assembleDay(
       const proteinRatio = targets.protein > 0 ? candidateTotals.protein / targets.protein : 1
       const isCloser = macroDistanceScore(candidateTotals, targets) < macroDistanceScore(totals, targets)
       if (candidateWithinTolerance || (isCloser && proteinRatio <= DAY_PROTEIN_UPPER_RATIO)) {
-        chosen = candidateChosen
+        chosen = candidate.chosen
         totals = candidateTotals
         withinTolerance = candidateWithinTolerance
       }

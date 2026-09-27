@@ -4,43 +4,54 @@
  * WHY THIS EXISTS. On 19 Sep 2026 I reported that day-to-day meal variety was
  * "wired but switched off at the call site", and that passing the history in
  * was a one-line fix. The first half was true. The second was wrong: the
- * variety preference is a 0.01 penalty added to a macro-distance score, and
- * the gap it has to overcome is a median 0.033 — so threading the history in
+ * variety preference was a 0.01 penalty added to a macro-distance score, and
+ * the gap it had to overcome was a median 0.033 — so threading the history in
  * would have changed almost nothing. Nothing in the repo could have told
  * anyone that, because nobody had ever counted the days. This counts them.
  *
  * WHAT IT MEASURES. It walks a seven-day horizon through the app's OWN
  * assembleDay — threading recentNames exactly the way grocery-store's
  * assembleHorizon does — and counts how many of those seven days are
- * different from one another. It also reports what that costs in macro fit
- * and how many of the chosen days land inside the tolerance bands, because a
- * variety number on its own would say nothing about whether the days are any
- * good.
+ * different from one another. Beside that: how many weeks are the same day
+ * seven times (split into weeks whose one day is on target and weeks where no
+ * day could be), how many served days are on target, and the mean calorie
+ * miss — because variety bought with days that miss their targets would be a
+ * worse app, not a better one.
  *
- * THE FIXTURE IS DERIVED, NOT INVENTED. Real pools need a live database this
- * machine cannot reach, so each option is generated to satisfy exactly the
- * bands verifyProposal enforces on a real proposal and nothing tighter:
- * calories within CALORIE_TOLERANCE of the slot budget, protein at or above
- * the slot budget with NO ceiling (the per-meal protein ceiling was tried and
- * reverted — see portion-scaler.ts), carbs and fat unconstrained. The two
- * degrees of freedom that leaves — how widely carbs/fat spread, and how far
- * protein overshoots — are swept as a grid rather than guessed at, because a
- * single fixture's answer would be that fixture's opinion. If the grid
- * disagrees with itself, the conclusion is not safe to draw.
+ * THE FIXTURE CHANGED ON 27 SEP 2026, AND NUMBERS FROM BEFORE ARE NOT
+ * COMPARABLE. Ashley reported the same meals every day, eight days after this
+ * script had printed "3.98 to 4.51 distinct days". Two things about the old
+ * fixture hid it:
+ *   1. Every pool was built from the SAME targets it was then assembled
+ *      against. A real pool is sized to the targets of the day it was made,
+ *      and targets move (weigh-ins, a macro split, a goal). So this now
+ *      sweeps DRIFT: the pool is made for targets some percent away from the
+ *      ones the day is assembled against. At 10% drift the old code served
+ *      1.11 distinct days a week — the 19 Sep defect, back.
+ *   2. Its dishes were one chicken breast with invented macros, which a
+ *      resize (it recomputes a dish from its ingredients) turns into
+ *      nonsense. Dishes are now built from real foods — a protein, a carb, a
+ *      fat and a vegetable, amounts drawn at random — with macros computed
+ *      from those foods, then sized the way verifyProposal accepts a real
+ *      proposal: calories within CALORIE_TOLERANCE of the slot budget and
+ *      protein at or above it, with no ceiling. That no-ceiling overshoot is
+ *      real, and it is most of why some pools have no on-target day at all.
+ * Real pools need a live database this machine cannot reach, so this is
+ * still a model of them; it is a model with the two properties that mattered.
  */
 import {
   assembleDay,
   computeSlotBudgets,
-  macroDistanceScore,
   DEFAULT_POOL_SIZE,
   type PoolOption,
 } from '../src/lib/meal-generation'
-import { CALORIE_TOLERANCE } from '../src/lib/portion-scaler'
+import { CALORIE_TOLERANCE, scaleIngredients } from '../src/lib/portion-scaler'
+import { computeMealMacros, lookupIngredient, type MealIngredientLine } from '../src/lib/food-db'
 import type { MacroTargets } from '../src/lib/types'
 import type { MealSlotName } from '../src/lib/meal-store'
 
 const HORIZON = 7
-const PROFILES = 400
+const PROFILES = 200
 
 /** Seeded, so two runs of this script are comparable. Nothing here reads the clock. */
 function mulberry32(seed: number): () => number {
@@ -53,135 +64,133 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-interface FixtureSetting {
-  /** How far carbs and fat spread either side of the slot budget. Unconstrained per meal, so this is a free axis. */
-  spread: number
-  /** How far protein may overshoot the slot budget. A floor is enforced; no ceiling is. */
-  proteinOvershoot: number
+type Food = readonly [name: string, lo: number, hi: number, unit?: string]
+const PROTEIN: Food[] = [['chicken breast', 100, 200], ['salmon', 100, 180], ['tuna', 80, 160], ['beef mince', 100, 180], ['greek yogurt', 150, 300], ['eggs', 2, 4, 'whole'], ['tofu', 120, 220], ['turkey breast', 100, 200], ['cottage cheese', 100, 250]]
+const CARB: Food[] = [['white rice', 60, 150], ['oats', 40, 100], ['pasta', 60, 140], ['sweet potato', 150, 300], ['wholemeal bread', 2, 3, 'slice'], ['potatoes', 150, 350], ['quinoa', 50, 120], ['banana', 1, 2, 'medium'], ['lentils', 50, 120]]
+const FAT: Food[] = [['olive oil', 5, 15], ['peanut butter', 10, 30], ['avocado', 50, 120], ['cheddar', 15, 40], ['almonds', 10, 30]]
+const VEG: Food[] = [['broccoli', 60, 150], ['spinach', 30, 80], ['peppers', 50, 120], ['mixed berries', 50, 120], ['tomatoes', 60, 150]]
+
+/** How far the pool's targets sit from today's. 1.00 is the old fixture's only case. */
+const DRIFTS = [1.0, 0.95, 0.9, 1.1]
+
+const pick = <T,>(rnd: () => number, xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)]
+function line(rnd: () => number, [name, lo, hi, unit]: Food): MealIngredientLine {
+  const q = lo + rnd() * (hi - lo)
+  return { name, quantity: unit ? Math.max(1, Math.round(q)) : Math.round(q), unit: unit ?? 'g' }
+}
+function macrosOf(ings: MealIngredientLine[]): MacroTargets {
+  const c = computeMealMacros(ings)
+  return { calories: Math.round(c.kcal), protein: Math.round(c.protein), carbs: Math.round(c.carbs), fat: Math.round(c.fat) }
 }
 
-const GRID: FixtureSetting[] = [
-  { spread: 0.10, proteinOvershoot: 0.10 },
-  { spread: 0.10, proteinOvershoot: 0.40 },
-  { spread: 0.20, proteinOvershoot: 0.25 },
-  { spread: 0.40, proteinOvershoot: 0.40 },
-]
-
-function buildPools(
-  targets: MacroTargets,
-  mealsPerDay: number,
-  rnd: () => number,
-  f: FixtureSetting,
-): Partial<Record<MealSlotName, PoolOption[]>> {
-  const budgets = computeSlotBudgets(targets, mealsPerDay, false)
-  const pools: Partial<Record<MealSlotName, PoolOption[]>> = {}
-  for (const [slot, b] of Object.entries(budgets) as [MealSlotName, MacroTargets][]) {
-    pools[slot] = Array.from({ length: DEFAULT_POOL_SIZE }, (_, i) => ({
-      slot,
-      name: `${slot}-${i}`,
-      // One resolvable ingredient: this measurement is about SELECTION, and a
-      // realistic ingredient list would only make the run slower without
-      // changing which combination wins.
-      ingredients: [{ name: 'chicken breast', quantity: 100 + i, unit: 'g' }],
-      macros: {
-        calories: Math.round(b.calories * (1 + (rnd() * 2 - 1) * CALORIE_TOLERANCE)),
-        protein: Math.round(b.protein * (1 + rnd() * f.proteinOvershoot)),
-        carbs: Math.round(b.carbs * (1 + (rnd() * 2 - 1) * f.spread)),
-        fat: Math.round(b.fat * (1 + (rnd() * 2 - 1) * f.spread)),
-      },
-      tags: [],
-    }))
+/** One dish from real foods, sized the way verifyProposal accepts one, or null after enough tries. */
+function makeDish(rnd: () => number, slot: MealSlotName, i: number, budget: MacroTargets): PoolOption | null {
+  for (let tries = 0; tries < 200; tries++) {
+    let ings = [line(rnd, pick(rnd, PROTEIN)), line(rnd, pick(rnd, CARB)), line(rnd, pick(rnd, FAT)), line(rnd, pick(rnd, VEG))]
+    const first = macrosOf(ings)
+    if (first.calories <= 0) continue
+    ings = scaleIngredients(ings, budget.calories / first.calories)
+    const m = macrosOf(ings)
+    if (Math.abs(m.calories - budget.calories) / budget.calories > CALORIE_TOLERANCE) continue
+    if (m.protein < budget.protein) continue
+    return { slot, name: `${slot}-${i}`, ingredients: ings, macros: m, tags: [] }
   }
-  return pools
+  return null
 }
 
 interface Row {
-  label: string
-  meanDistinct: number
-  weeksAllOneDay: number
+  drift: number
   profiles: number
-  meanDistance: number
-  chosenInTolerance: number
-  chosenDays: number
+  meanDistinct: number
+  sameAllWeek: number
+  sameAllWeekOnTarget: number
+  daysOnTarget: number
+  days: number
+  meanCalorieMiss: number
 }
 
-function run(f: FixtureSetting): Row {
-  let profiles = 0
+function run(drift: number): Row {
+  const row: Row = { drift, profiles: 0, meanDistinct: 0, sameAllWeek: 0, sameAllWeekOnTarget: 0, daysOnTarget: 0, days: 0, meanCalorieMiss: 0 }
   let sumDistinct = 0
-  let weeksAllOneDay = 0
-  let sumDistance = 0
-  let chosenDays = 0
-  let inTolerance = 0
-
+  let sumMiss = 0
   for (let p = 0; p < PROFILES; p++) {
-    const rnd = mulberry32(1000 + p)
+    const rnd = mulberry32(5000 + p)
     const calories = 1600 + Math.round(rnd() * 1600)
     const protein = Math.round((calories * (0.25 + rnd() * 0.1)) / 4)
     const fat = Math.round((calories * (0.25 + rnd() * 0.1)) / 9)
     const carbs = Math.round((calories - protein * 4 - fat * 9) / 4)
-    const targets: MacroTargets = { calories, protein, carbs, fat }
+    const today: MacroTargets = { calories, protein, carbs, fat }
+    const whenMade: MacroTargets = {
+      calories: Math.round(calories * drift), protein: Math.round(protein * drift),
+      carbs: Math.round(carbs * drift), fat: Math.round(fat * drift),
+    }
     const mealsPerDay = [2, 3, 4][Math.floor(rnd() * 3)]
-    const pools = buildPools(targets, mealsPerDay, rnd, f)
-    if (Object.keys(pools).length === 0) continue
-    profiles++
+    const pools: Partial<Record<MealSlotName, PoolOption[]>> = {}
+    for (const [slot, b] of Object.entries(computeSlotBudgets(whenMade, mealsPerDay, false)) as [MealSlotName, MacroTargets][]) {
+      pools[slot] = Array.from({ length: DEFAULT_POOL_SIZE }, (_, i) => makeDish(rnd, slot, i, b)).filter((o): o is PoolOption => o !== null)
+    }
+    // A pool with fewer than three options in a slot is a different question
+    // (a shortfall), and would count as "no variety" for the wrong reason.
+    if (Object.values(pools).some(v => !v || v.length < 3)) continue
+    row.profiles++
 
     const recentNames: Partial<Record<MealSlotName, string[]>> = {}
-    const dayKeys: string[] = []
+    const keys: string[] = []
+    let firstOnTarget = false
     for (let d = 0; d < HORIZON; d++) {
-      const day = assembleDay(pools, targets, recentNames, [])
-      const slots = (Object.keys(day.chosen) as MealSlotName[]).sort()
-      dayKeys.push(slots.map(s => day.chosen[s]!.name).join('|'))
-      chosenDays++
-      sumDistance += macroDistanceScore(day.totals, targets)
-      if (day.withinTolerance) inTolerance++
+      const day = assembleDay(pools, today, recentNames, [])
+      keys.push((Object.keys(day.chosen) as MealSlotName[]).sort().map(s => day.chosen[s]!.name).join('|'))
+      row.days++
+      if (day.withinTolerance) row.daysOnTarget++
+      if (d === 0) firstOnTarget = day.withinTolerance
+      sumMiss += Math.abs(day.totals.calories - today.calories) / today.calories
       for (const [slot, o] of Object.entries(day.chosen) as [MealSlotName, PoolOption][]) {
-        const list = recentNames[slot] ?? []
-        recentNames[slot] = [...list, o.name].slice(-3)
+        recentNames[slot] = [...(recentNames[slot] ?? []), o.name].slice(-3)
       }
     }
-    const distinct = new Set(dayKeys).size
+    const distinct = new Set(keys).size
     sumDistinct += distinct
-    if (distinct === 1) weeksAllOneDay++
+    if (distinct === 1) {
+      row.sameAllWeek++
+      if (firstOnTarget) row.sameAllWeekOnTarget++
+    }
   }
-
-  return {
-    label: `carb/fat ±${(f.spread * 100).toFixed(0)}%, protein +0-${(f.proteinOvershoot * 100).toFixed(0)}%`,
-    meanDistinct: sumDistinct / profiles,
-    weeksAllOneDay,
-    profiles,
-    meanDistance: sumDistance / chosenDays,
-    chosenInTolerance: inTolerance,
-    chosenDays,
-  }
+  row.meanDistinct = sumDistinct / row.profiles
+  row.meanCalorieMiss = sumMiss / row.days
+  return row
 }
 
 function main(): void {
+  const missing = [...PROTEIN, ...CARB, ...FAT, ...VEG].filter(([n]) => !lookupIngredient(n)).map(([n]) => n)
+  if (missing.length > 0) {
+    // A food the database cannot find computes as nothing, and a fixture
+    // built on it measures nothing. One exit, and it says why.
+    console.error(`These fixture foods are not in the food database, so nothing below would mean anything: ${missing.join(', ')}`)
+    process.exit(1)
+  }
   console.log('MEAL VARIETY — how many of seven days are different from one another?')
-  console.log(`${PROFILES} profiles per fixture setting, ${HORIZON}-day horizon, pool size ${DEFAULT_POOL_SIZE}.`)
-  console.log('Fixture options satisfy exactly the bands verifyProposal enforces; the two free')
-  console.log('axes are swept so the answer is not one fixture\'s opinion.\n')
+  console.log(`${PROFILES} profiles per row, ${HORIZON}-day horizon, up to ${DEFAULT_POOL_SIZE} dishes a slot, built from real foods.`)
+  console.log('"Pool made at" is the targets the dishes were sized for, as a share of today\'s.\n')
 
-  const rows = GRID.map(run)
+  const rows = DRIFTS.map(run)
   const pad = (s: string, n: number) => s.padEnd(n)
-  console.log(pad('fixture', 38) + pad('distinct/7', 12) + pad('weeks all 1 day', 18) + pad('macro distance', 16) + 'chosen days in tolerance')
-  console.log('-'.repeat(38 + 12 + 18 + 16 + 24))
+  console.log(pad('pool made at', 14) + pad('distinct/7', 12) + pad('same day all week', 32) + pad('days on target', 20) + 'mean calorie miss')
+  console.log('-'.repeat(14 + 12 + 32 + 20 + 17))
   for (const r of rows) {
+    const same = `${r.sameAllWeek}/${r.profiles} (${((100 * r.sameAllWeek) / r.profiles).toFixed(1)}%), ${r.sameAllWeekOnTarget} on target`
     console.log(
-      pad(r.label, 38) +
-      pad(r.meanDistinct.toFixed(2), 12) +
-      pad(`${r.weeksAllOneDay}/${r.profiles} (${((100 * r.weeksAllOneDay) / r.profiles).toFixed(1)}%)`, 18) +
-      pad(r.meanDistance.toFixed(4), 16) +
-      `${((100 * r.chosenInTolerance) / r.chosenDays).toFixed(1)}%`,
+      pad(`${(r.drift * 100).toFixed(0)}%`, 14)
+      + pad(r.meanDistinct.toFixed(2), 12)
+      + pad(same, 32)
+      + pad(`${r.daysOnTarget}/${r.days} (${((100 * r.daysOnTarget) / r.days).toFixed(1)}%)`, 20)
+      + `${(100 * r.meanCalorieMiss).toFixed(2)}%`,
     )
   }
-
-  const best = Math.max(...rows.map(r => r.meanDistinct))
-  const worst = Math.min(...rows.map(r => r.meanDistinct))
   console.log('')
-  console.log(`Across the whole grid: ${worst.toFixed(2)} to ${best.toFixed(2)} distinct days out of ${HORIZON}.`)
-  console.log('A week that reads as ~1 is the same three meals every day; ~7 is a different day each day.')
-  console.log('Read the macro-distance and in-tolerance columns beside it — variety bought by')
-  console.log('shipping days that miss their targets would be a worse app, not a better one.')
+  console.log('A week that reads as ~1 is the same meals every day; ~7 is a different day each day.')
+  console.log('"On target" beside the identical weeks counts those whose one day is correct: a pool')
+  console.log('with exactly one on-target combination serves it every day, by design, because a')
+  console.log('correct day always outranks a novel one. More dishes, not a looser rule, fixes those.')
 }
 
 main()

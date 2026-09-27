@@ -2,6 +2,76 @@
 
 Newest first. One line each.
 
+- [x] **THE SAME MEALS EVERY DAY: FIXED, AND WHY THE 19 SEP FIX DID NOT HOLD.**
+  27 Sep 2026, Ashley: *"Currently every day is showing me the same meals."*
+  Part 1 of three meal changes she asked for the same day (the day strip and
+  likes follow).
+  **What was wrong, traced and then measured.** Variety is a sort key only
+  among days inside the tolerance bands, and the search judged each day on
+  its dishes' STORED numbers. Every dish is sized to the targets of the day
+  its pool was made; once targets move (weigh-ins, a split, a goal) few or no
+  stored combinations land in band, variety fell back to a 0.01 tiebreak, and
+  the same day won every day. The resize that pulls a day on target ran
+  afterwards, on the winner only, so the screen said "on target" and no resize
+  offer appeared. Nothing on screen said anything was wrong.
+  **How I reached the wrong number on 19 Sep:** `measure:meal-variety` built
+  each pool from the same targets it assembled against, from one chicken breast
+  with invented macros. A pool and targets that cannot disagree cannot show
+  this, and fake dishes cannot show a resize. The measurement is rebuilt on
+  dishes made from real foods, sized the way the app accepts a real proposal,
+  with the targets swept 5-10% away from the pool's. Numbers before today are
+  not comparable.
+  **What changed:**
+  - The search judges the day it will serve. If resizing the largest free
+    dish by 0.75-1.35x lands the day in band, that combination counts as a
+    correct day. A resize is spent only where it buys a different day: a dish
+    already on target as stored still wins a tie on variety.
+  - When no combination can be on target, variety picks among days within
+    0.03 (about 3% of calories) of the closest. It used to be a 0.01 tiebreak.
+  - The last-resort repair now uses the same resize function (range
+    unchanged, 0.4-2.5x), so there is one copy of it.
+  **Measured, same script before and after (200 profiles, 7 days):**
+  | pool made at | distinct days | identical weeks | days on target | calorie miss |
+  |---|---|---|---|---|
+  | 100% | 2.85 → 3.21 | 30.0% → 14.5% | 79.5% → 81.5% | 0.56% → 0.54% |
+  | 95% | 3.06 → 3.65 | 31.5% → 12.0% | 85.5% → 86.5% | 4.19% → 3.63% |
+  | 90% | 1.11 → 3.28 | 89.5% → 15.0% | 73.2% → 77.5% | 2.57% → 2.13% |
+  | 110% | 1.02 → 2.90 | 97.5% → 18.0% | 58.7% → 72.7% | 3.77% → 2.53% |
+  **Still true, and named:** about 1 in 8 pools (24-29 of 200) has exactly one
+  on-target combination and serves it daily. That is by design: a correct day
+  outranks a novel one, and letting variety buy an off-target day would also
+  raise the resize offer on alternate days. More dishes fix it; a looser rule
+  would not. It cannot be confirmed on Ashley's own account from here (no
+  database access), so this is the measured likeliest cause, not proven on her
+  data.
+  **CSCS review (nutrition at population level, delegated 18 Sep):**
+  1. Training effect: the day's targets are met MORE often (table), and the
+     week has more different meals. Micronutrient range and adherence both
+     favour variety; no dietitian writes the same three meals seven days
+     running.
+  2. What it takes away: some days show one dish at a different portion
+     (0.75-1.35x, the same dish in ordinary serving variation). Off target, a
+     day may sit up to 3 points further off than the closest to avoid a
+     repeat; measured mean calorie miss went DOWN at every drift.
+  3. Fundamentals: protein band, calorie band and the protein upper rail are
+     unchanged, and a correct day always outranks an off-target one.
+  4. No floor redefined: "on target" is the same bands on the served day. The
+     resize offer keys on the same verdict.
+  5. Scope: general performance nutrition only; no allergen or diet path is
+     touched (dishes are still filtered at generation and re-checked on show).
+  Basis for the numbers: a quarter either way is normal serving variation of a
+  home-cooked portion. 3 points of the app's distance score is about 3% of a
+  day's calories, well inside real day-to-day intake variation (label
+  tolerances alone allow ±20%).
+  **Verified:** `test:meal-variety` 63 checks (new §3c off-target margin, §3d
+  quiet resize, both ends of the range, wrong-shape and near-miss dishes, and
+  a stored dish outranking a resized one); 10 mutations, 10 caught, the four
+  constant mutations also each caught by a behaviour check.
+  `measure:meal-variety` rebuilt (above). Every gate reading the meal generator
+  and every meal-screen driver passed: 39 in all.
+  **Not verified:** Ashley's own pool (needs her data). **Deploys:** frontend
+  only, on a merge to main when she says so.
+
 - [x] **PUT LIVE: THE GROCERY PAGE, THE FLAT MINT COACH BUBBLE AND ONE
   RECOVERY ROW.** 27 Sep 2026, Ashley: *"Put it live"*. Main fast-forwarded
   from the full-page chat to the working branch. Three changes reach her

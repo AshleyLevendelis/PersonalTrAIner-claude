@@ -182,7 +182,23 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   fit-first could previously prefer a combination that scored well overall
   while busting one band. "Yesterday" comes from the DATE, not from what was
   logged, so somebody who never logs still gets a different dinner.
-  `meal-variety` (42 checks, 16 mutations), `measure:meal-variety`
+  **CORRECTED 27 Sep 2026: Ashley saw the same meals every day.** The 3.98-4.51
+  came from a fixture that built every pool from the SAME targets it was then
+  assembled against, out of one chicken breast with invented macros. Real pools
+  are sized to the targets of the day they were made, and targets move. With
+  dishes built from real foods and the targets 10% away, the 19 Sep code served
+  **1.11 distinct days and 89.5% identical weeks — the original defect, back —
+  while 126 of those 179 weeks still read "on target"**, because the resize ran
+  after the choice, on the one winner. Now the search judges the day it will
+  SERVE: a resize of 0.75-1.35x on the largest free dish can make a correct
+  day, and off target a different day within 3 points of the closest beats the
+  same day again. After: 3.28 distinct days at 10% drift, 15% identical weeks,
+  and MORE days on target, not fewer (73%→77.5%). Still named: about 1 pool in
+  8 has exactly one on-target combination and serves it daily, by design; more
+  dishes fix that, not a looser rule. **A variety measurement whose pool and
+  targets can never disagree cannot see the commonest way variety dies.**
+  Numbers before 27 Sep are not comparable (fixture changed).
+  `meal-variety` (63 checks, 10 mutations), `measure:meal-variety`
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
