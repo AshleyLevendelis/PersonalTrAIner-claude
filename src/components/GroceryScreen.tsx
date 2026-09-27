@@ -1,22 +1,24 @@
-import { X, Share2 } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { ChevronLeft, Share2 } from 'lucide-react'
 import { GroceryList } from '@/components/GroceryList'
+import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
+import { useViewportInset } from '@/hooks/useViewportInset'
 import type { MacroTargets } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MealShape } from '@/lib/meal-rotation'
 
 // ---------------------------------------------------------------------------
-// THE SHOPPING LIST, FULL SCREEN — design handoff 2b ›, 12 Sep 2026.
+// THE SHOPPING LIST, FULL SCREEN — design 3a/3b, 27 Sep 2026 (was 2b ›).
 //
-// It used to be a section at the bottom of the Tools tab, reached by a tile
-// that scrolled you down to it. Two problems with that: Tools is where the
-// utilities live and a shopping list is not one, and a list you shop from
-// wants the whole screen, not the bottom third of a tab about timers.
+// The list is the page now, the way the coach chat is (design 2a): fixed from
+// the top of the screen down to the tab bar, with three rows — a top bar, the
+// scrolling list, and an add bar docked on the tab bar. It no longer sits in
+// the tab's padded flow, where the add field scrolled away with the list.
 //
-// SAME COMPONENT, SAME STORE, SAME LIVE STATE. This is a shell — a header, a
-// title and a line saying where the list came from. GroceryList itself is
-// untouched, so checking an item behaves identically to how it did on Tools
-// and there is no second copy of the list's own rules to drift.
+// SAME COMPONENT, SAME STORE, SAME LIVE STATE. This is the shell: the way
+// back, Share and the settings menu. GroceryList owns the list and its rules,
+// so there is still no second copy of them to drift.
 // ---------------------------------------------------------------------------
 
 export function GroceryScreen({
@@ -27,6 +29,7 @@ export function GroceryScreen({
   todaysPicks,
   mealShape,
   onClose,
+  headerAction,
 }: {
   profileId?: string
   mealPools: Partial<Record<MealSlotName, PoolOption[]>>
@@ -35,44 +38,22 @@ export function GroceryScreen({
   todaysPicks?: Partial<Record<MealSlotName, PoolOption>>
   mealShape: MealShape
   onClose: () => void
+  /** The settings menu, drawn in this screen's top bar; App hides its own floating one meanwhile. */
+  headerAction?: ReactNode
 }) {
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  // WITH THE KEYBOARD UP THE WHOLE SCREEN RIDES IT, as the chat does: the tab
+  // bar hides itself then, so the add bar sits straight on the keyboard.
+  const { insetPx, isKeyboardOpen } = useViewportInset()
+  const bottom = isKeyboardOpen ? `${insetPx}px` : `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom))`
 
   return (
-    <div className="flex flex-col gap-4" data-grocery-screen>
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close the shopping list"
-          className="flex min-h-[44px] items-center gap-1.5 text-[0.8125rem] text-muted-foreground"
-        >
-          <X className="size-4" aria-hidden />
-          Nutrition
-        </button>
-        {canShare && (
-          <button
-            type="button"
-            className="flex min-h-[44px] items-center gap-1.5 text-[0.8125rem]"
-            style={{ color: 'var(--primary-text)' }}
-            onClick={() => {
-              // OFFERED ONLY WHERE IT WORKS. The button is not rendered at all
-              // without navigator.share, rather than rendered and silently
-              // doing nothing — the app's standing rule about controls that
-              // cannot do what they say.
-              void navigator.share({ title: 'Grocery list', text: 'My shopping list' }).catch(() => {})
-            }}
-          >
-            <Share2 className="size-4" aria-hidden />
-            Share
-          </button>
-        )}
-      </div>
-
-      <div>
-        <p className="text-[1.75rem] font-bold leading-none">Grocery</p>
-      </div>
-
+    <div
+      data-grocery-screen
+      data-testid="grocery-screen"
+      className="fixed inset-x-0 top-0 z-30 mx-auto flex max-w-6xl flex-col bg-background"
+      style={{ bottom }}
+    >
       <GroceryList
         profileId={profileId}
         mealPools={mealPools}
@@ -80,6 +61,50 @@ export function GroceryScreen({
         softLikedFoods={softLikedFoods}
         todaysPicks={todaysPicks}
         mealShape={mealShape}
+        header={({ left, compact }) => (
+          <header data-testid="grocery-topbar" className="shrink-0 bg-background" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+            <div className="relative flex h-[52px] items-center pl-3 pr-1.5">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Back to Nutrition"
+                className="flex min-h-11 items-center gap-1 pr-2 text-[0.8125rem] text-muted-foreground"
+              >
+                <ChevronLeft className="size-[18px]" aria-hidden />
+                Nutrition
+              </button>
+              {/* THE COMPACT TITLE, only once the big one has scrolled away —
+                  two titles on screen at once say the same thing twice. */}
+              <p
+                data-testid="grocery-compact-title"
+                aria-hidden={!compact}
+                className={`pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[0.8125rem] font-semibold transition-opacity duration-200 ${compact ? 'opacity-100' : 'opacity-0'}`}
+              >
+                Grocery · <span className="tabular-mono text-primary-text">{left} left</span>
+              </p>
+              <div className="ml-auto flex items-center">
+                {canShare && (
+                  <button
+                    type="button"
+                    aria-label="Share the list"
+                    data-testid="grocery-share"
+                    className="hit-slop-44 flex size-10 items-center justify-center"
+                    style={{ color: 'var(--primary-text)' }}
+                    onClick={() => {
+                      // OFFERED ONLY WHERE IT WORKS. The button is not rendered
+                      // at all without navigator.share, rather than rendered
+                      // and silently doing nothing.
+                      void navigator.share({ title: 'Grocery list', text: 'My shopping list' }).catch(() => {})
+                    }}
+                  >
+                    <Share2 className="size-4" aria-hidden />
+                  </button>
+                )}
+                {headerAction}
+              </div>
+            </div>
+          </header>
+        )}
       />
     </div>
   )

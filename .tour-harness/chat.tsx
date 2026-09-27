@@ -549,7 +549,8 @@ function Harness() {
         {/* As in App.tsx: the dock is a sibling of <main>, before the tab bar. */}
         <BottomDock />
         {DOCK && <StartATimer />}
-        <BottomTabBar activeTab={SEED_NUDGE ? 'dashboard' : 'chat'} onTabChange={noop} chatAttention={chatAttention && SEED_NUDGE} />
+        {/* As App.tsx does: flat on the chat tab, raised on any other. */}
+        <BottomTabBar activeTab={SEED_NUDGE ? 'dashboard' : 'chat'} onTabChange={noop} chatAttention={chatAttention && SEED_NUDGE} flatChatDisc={!SEED_NUDGE} />
       </div>
     </BottomDockHeightProvider>
     </TimersProvider>

@@ -458,7 +458,18 @@ console.log('\n3. Nothing has crept back up')
   // 1,975 is 34 kB above the measured 1,941, and the headroom line prints the
   // remainder every run so the next person sees it eroding rather than
   // crossing.
-  const TOTAL_BUDGET_KB = 1975
+  // 27 Sep 2026: 1,975 -> 2,008, for the grocery revamp (design 3a/3b).
+  // MEASURED BOTH ENDS through THIS gate the same hour, the base on a clean
+  // worktree of HEAD:
+  //     1489e9f7, before   total 1973   app 978   paint 430   deploy 275
+  //     after              total 1988   app 970   paint 428   deploy 272
+  // The base had 2 kB left. The revamp is ~15 kB of real screen code, and it
+  // went off the main bundle into its own chunk (warmed after start so the
+  // offline cache has it), so every figure a person WAITS for went down: the
+  // app chunk by 8, first paint by 2, a deploy's re-download by 3. Only the
+  // total of everything shipped rises, because the code exists. 2,008 is 20
+  // above the 1,988 measured today, the same shape as the 17 Sep entry.
+  const TOTAL_BUDGET_KB = 2008
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

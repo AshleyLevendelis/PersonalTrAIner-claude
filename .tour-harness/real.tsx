@@ -1009,7 +1009,8 @@ function Harness() {
         )}
       </main>
 
-      <BottomTabBar activeTab={activeTab} onTabChange={t => { window.location.hash = tabHash(t as Tab) }} />
+      {/* As App.tsx does (the grocery screen is not mounted on this page). */}
+      <BottomTabBar activeTab={activeTab} onTabChange={t => { window.location.hash = tabHash(t as Tab) }} flatChatDisc={activeTab === 'chat'} />
       {/* ?tour=off walks the screens on their own — the scrim covers most of
           the page, so a layout pass has to be able to take it away. */}
       {ready && new URLSearchParams(location.search).get('tour') !== 'off' && (

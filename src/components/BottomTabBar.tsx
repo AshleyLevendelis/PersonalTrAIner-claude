@@ -1,4 +1,4 @@
-import { LayoutDashboard, PieChart, Activity, Wrench, MessageCircle } from 'lucide-react'
+import { ChartSpline, Utensils, Dumbbell, Wrench, MessageCircle } from 'lucide-react'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import type { Tab } from '@/lib/app-route'
 
@@ -32,10 +32,13 @@ const TOUR_KEY: Record<Tab, string> = {
   chat: 'chatfab',
 }
 
-const SIDE_TABS: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-  { tab: 'dashboard', label: 'Home', icon: LayoutDashboard },
-  { tab: 'nutrition', label: 'Nutrition', icon: PieChart },
-  { tab: 'exercise', label: 'Exercise', icon: Activity },
+// THE ICONS SAY WHAT IS BEHIND THEM (27 Sep 2026, with the grocery revamp):
+// a trend line for Home's progress, a knife and fork for food, a dumbbell for
+// training. The old dashboard grid, pie chart and pulse line were generic.
+const SIDE_TABS: { tab: Tab; label: string; icon: typeof ChartSpline }[] = [
+  { tab: 'dashboard', label: 'Home', icon: ChartSpline },
+  { tab: 'nutrition', label: 'Nutrition', icon: Utensils },
+  { tab: 'exercise', label: 'Exercise', icon: Dumbbell },
   { tab: 'tools', label: 'Tools', icon: Wrench },
 ]
 
@@ -43,9 +46,17 @@ export function BottomTabBar({
   activeTab,
   onTabChange,
   chatAttention = false,
+  flatChatDisc = false,
 }: {
   activeTab: Tab
   onTabChange: (tab: string) => void
+  /**
+   * Lay the chat button flat inside the bar (44px) instead of raising it 24px
+   * proud. Raised, it stands in the middle of anything docked on the bar — the
+   * chat's composer (design 2a) and the grocery add bar (design 3a) — so App
+   * sets this on exactly those two screens.
+   */
+  flatChatDisc?: boolean
   /**
    * The coach has something that wants an answer — an unreviewed session or a
    * missed day (coach-opener.ts, `attention`), or a reply the trainee has not
@@ -107,12 +118,12 @@ export function BottomTabBar({
             aria-current={activeTab === 'chat' ? 'page' : undefined}
             // The active-tab ring and the attention ring never co-occur:
             // App suppresses chatAttention while the chat is the open tab.
-            // FLUSH ON THE CHAT TAB (design 2a, 26 Sep 2026). Raised, the 56px
-            // disc stands 24px proud of the bar — straight into the middle of
-            // the chat's composer, which now sits directly on the bar. On
-            // every other tab it stays raised.
+            // FLUSH WHERE SOMETHING IS DOCKED ON THE BAR (design 2a, 26 Sep;
+            // design 3a, 27 Sep). Raised, the 56px disc stands 24px proud of
+            // the bar — straight into the middle of a composer or add bar
+            // sitting directly on it. Everywhere else it stays raised.
             className={`relative flex shrink-0 items-center justify-center rounded-full text-primary-foreground transition-shadow glow-mint-box ${
-              activeTab === 'chat' ? 'mt-0 size-11' : '-mt-6 size-14'
+              flatChatDisc ? 'mt-0 size-11' : '-mt-6 size-14'
             } ${
               chatAttention ? 'chat-unread' : ''
             } ${
@@ -120,7 +131,7 @@ export function BottomTabBar({
             }`}
             style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' }}
           >
-            <MessageCircle className={activeTab === 'chat' ? 'size-5' : 'size-6'} />
+            <MessageCircle className={flatChatDisc ? 'size-5' : 'size-6'} />
             {chatAttention && (
               <>
                 <span data-testid="chat-unread-ring" aria-hidden="true" className="chat-unread-ring" />
@@ -153,7 +164,7 @@ function SideTabButton({
 }: {
   tab: Tab
   label: string
-  icon: typeof LayoutDashboard
+  icon: typeof ChartSpline
   active: boolean
   onClick: () => void
 }) {

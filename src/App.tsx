@@ -28,7 +28,6 @@ import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity }
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
-import { GroceryScreen } from '@/components/GroceryScreen'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
 import { buildRotation, assembleRotationDay, rotationIndexFor, type MealShape } from '@/lib/meal-rotation'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
@@ -94,6 +93,17 @@ const DevTestPage = lazy(() =>
 const ChatAssistant = lazy(() =>
   import('@/components/ChatAssistant').then(m => ({ default: m.ChatAssistant })))
 
+// THE GROCERY SCREEN, OFF THE MAIN BUNDLE AND STILL THERE OFFLINE (design 3a,
+// 27 Sep 2026). The revamp added ~14 kB to an app chunk with 6.5 kB of its
+// budget left, and the screen is reached only by its own route, so it loads as
+// its own chunk. But a shopping list is opened in a shop, where signal is
+// worst, and the service worker caches a file only once it has been fetched —
+// so the chunk is WARMED shortly after start (below), exactly as the coach is
+// fetched at start by being mounted, and is in the cache before anyone needs
+// it. The first open then costs nothing, online or off.
+const loadGroceryScreen = () => import('@/components/GroceryScreen')
+const GroceryScreen = lazy(() => loadGroceryScreen().then(m => ({ default: m.GroceryScreen })))
+
 /** The one loading state this app has, reused so a lazy chunk never introduces a second. */
 function ScreenLoading() {
   return (
@@ -132,6 +142,18 @@ function App() {
   // section of Tools on 12 Sep 2026.
   const groceryFullScreen = route.kind === 'grocery'
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  // WARM THE GROCERY CHUNK once there is a profile to shop for, while the
+  // browser is idle, so the service worker has it before the shop (see
+  // loadGroceryScreen). A failure here is harmless: opening the list fetches
+  // it again.
+  useEffect(() => {
+    if (!profile?.id) return
+    const warm = () => { void loadGroceryScreen().catch(() => {}) }
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
+    if (w.requestIdleCallback) { w.requestIdleCallback(warm, { timeout: 4000 }); return }
+    const t = setTimeout(warm, 2500)
+    return () => clearTimeout(t)
+  }, [profile?.id])
   const [macros, setMacros] = useState<MacroTargets | null>(null)
   /** Latest daily_metrics weigh-in — DISPLAY only ("your current weight is X"). Null until the user first weighs in. Target computation uses targetWeightAnchorKg instead (see its own doc comment) — the two intentionally diverge: this always shows the real latest reading, the anchor only moves once that reading's 7-day average has shifted enough to matter. */
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null)
@@ -2822,7 +2844,9 @@ function App() {
         // Hidden while the chat is open: the chat is a full page with its own
         // header, and that header carries this same menu (design 2a), so the
         // gear would otherwise show twice.
-        className={`fixed right-3 z-40 ${activeTab === 'chat' ? 'hidden' : ''}`}
+        // Hidden on the grocery screen for the same reason (design 3a): its
+        // top bar carries the menu too.
+        className={`fixed right-3 z-40 ${activeTab === 'chat' || groceryFullScreen ? 'hidden' : ''}`}
         style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
       >
         {/* NEW PLAN LEFT THIS MENU on 6 Sep 2026 — it is Profile's
@@ -2873,6 +2897,7 @@ function App() {
 
           <TabsContent value="nutrition" className="space-y-6">
             {groceryFullScreen ? (
+              <Suspense fallback={<ScreenLoading />}>
               <GroceryScreen
                 profileId={profile.id}
                 mealPools={mealPools}
@@ -2881,7 +2906,9 @@ function App() {
                 todaysPicks={chosenMeals}
                 onClose={() => { window.location.hash = tabHash('nutrition') }}
                 mealShape={mealShape}
+                headerAction={<ProfileMenu onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }} onReplayTour={replayAppTour} />}
               />
+              </Suspense>
             ) : (
             <NutritionDisplay
               profile={profile}
@@ -3004,7 +3031,7 @@ function App() {
         </Tabs>
       </main>
       <BottomDock />
-      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && activeTab !== 'chat'} />
+      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && activeTab !== 'chat'} flatChatDisc={groceryFullScreen || activeTab === 'chat'} />
       {/* Sibling of <main>, like BottomDock, so it overlays every tab AND the
           tab bar — the tour's nav stops spotlight the real tab buttons, which
           it could not reach from inside a tab's own subtree. */}

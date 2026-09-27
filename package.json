@@ -335,8 +335,11 @@
     "verify:leftovers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/leftovers.mjs",
     "test:meal-favourite": "tsx scripts/test-meal-favourite.ts",
     "verify:meal-favourite": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-favourite.mjs",
+    "verify:grocery": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/grocery.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
     "test:chat-groups": "tsx scripts/test-chat-groups.ts",
+    "test:grocery-display": "tsx scripts/test-grocery-display.ts",
+    "test:grocery-screen": "tsx scripts/test-grocery-screen.ts",
     "test:chat-page": "tsx scripts/test-chat-page.ts"
   },
   "dependencies": {

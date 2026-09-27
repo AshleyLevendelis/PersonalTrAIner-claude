@@ -33,7 +33,11 @@ console.log('full-page chat — the App.tsx half')
 const at = app.indexOf('data-tour="settings"')
 const gearOpen = at < 0 ? '' : app.slice(app.lastIndexOf('<div', at), app.indexOf('>', app.indexOf('style=', at)) + 1)
 check('the floating settings gear is still there for every other tab (and for the tour)', at >= 0 && /<ProfileMenu\b/.test(app.slice(at, at + 1200)), at)
-check('...and it is hidden while the chat is the open tab', /activeTab\s*===\s*'chat'\s*\?\s*'hidden'/.test(gearOpen), gearOpen.slice(0, 240))
+// RE-ANCHORED 27 Sep 2026 on the condition, not its wording: the grocery
+// screen joined the chat in hiding the gear, so the ternary grew a second
+// clause. What must hold is that the chat is one of the conditions.
+const hideCond = (gearOpen.match(/\$\{([^}]*?)\?\s*'hidden'/) || [])[1] ?? ''
+check('...and it is hidden while the chat is the open tab', /activeTab\s*===\s*'chat'/.test(hideCond), gearOpen.slice(0, 240))
 
 const chatAt = app.indexOf('<ChatAssistant')
 const chatProps = chatAt < 0 ? '' : app.slice(chatAt, app.indexOf('/>\n            </Suspense>', chatAt))

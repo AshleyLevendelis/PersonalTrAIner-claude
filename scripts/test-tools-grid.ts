@@ -243,17 +243,20 @@ console.log('\n4. The list is a screen, grouped by aisle, and the trolley is out
   // What is still worth guarding is the shopping behaviour underneath.
   check('the preview and its expander are gone', !/COLLAPSED_COUNT/.test(grocery))
   check('items are grouped by aisle', /CATEGORY_ORDER/.test(grocery) && /CATEGORY_LABEL\[category\]/.test(grocery))
-  check('...with a count on each heading, so a detour can be judged', /\{catItems\.length\}/.test(grocery))
+  // RE-ANCHORED 27 Sep 2026 for design 3a/3b, which renamed the count and
+  // made the trolley two lines and the tick a circle. The rules are the same
+  // and verify:grocery now measures each of them on the real screen.
+  check('...with a count on each heading, so a detour can be judged', /data-testid="grocery-aisle-heading"[\s\S]{0,300}\{count\}/.test(grocery))
   // CHECKED ITEMS LEAVE THE AISLES. A struck-through line still occupying its
   // slot is a thing you read past every time you look down.
   check('a checked item leaves its group', /i\.category === cat && !i\.checked/.test(grocery))
-  check('...and collects in one trolley row', /data-trolley/.test(grocery) && /In the trolley · \{inTrolley\.length\}/.test(grocery))
+  check('...and collects in one trolley block', /data-trolley/.test(grocery) && />In the trolley</.test(grocery) && /\{trolley\.length\} item/.test(grocery))
   check('...which can be opened to undo a mis-tap', /Put back/.test(grocery) && /toggleChecked\(item\)/.test(grocery))
   // Rows and checkbox, unchanged in kind: hairline, not a bordered box.
-  check('rows are hairline-separated', /borderBottom: '1px solid var\(--hairline\)'/.test(grocery))
-  check('...and the checkbox is a token-coloured 24px box',
-    /size-6 shrink-0 rounded-md/.test(grocery)
-    && /border: item\.checked \? '1\.5px solid var\(--primary\)' : '1\.5px solid var\(--border\)'/.test(grocery))
+  check('rows are hairline-separated', /data-expanded="false"[\s\S]{0,200}border-b border-hairline/.test(grocery))
+  check('...and the tick is a token-coloured 24px circle',
+    /size-6 shrink-0 items-center justify-center rounded-full/.test(grocery)
+    && /border: '1\.5px solid var\(--primary\)'/.test(grocery) && /border: '1\.5px solid var\(--border\)'/.test(grocery))
   check('a checked row reads as done', /line-through opacity-60/.test(grocery))
   // The screen above it names the list, so the component must not.
   check('the component does not repeat the section heading', !/>\s*Grocery List\s*</.test(grocery))
