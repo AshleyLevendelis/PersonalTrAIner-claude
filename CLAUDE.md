@@ -1088,12 +1088,18 @@ menu" stays true when a copy is also left outside it.
   over the fade and over a per-theme split. The avatar keeps the fade. Coach
   text is 5.2:1 or better in every theme on its own colours, and 2.27:1 or
   more clear of the page, which also closed the 26 Sep question about faint
-  light-theme bubbles. Your bubbles are the same colour; the side says who
-  sent what. Every corner is 18px except a 4px tail. **The ink on your bubble is the theme's own
-  text-on-main-colour, never a fixed white**: white on the default mint is
-  1.5:1. Across 81 theme × accent pairs, 75 reach 4.5:1. Coral and rose on the
-  three light themes are 3.4-3.9:1 with the app's OWN pair, the same one every
-  main button uses there. That is named, held to 3:1, and hers to change.
+  light-theme bubbles. **Your bubbles are PLAIN** — her ruling 28 Sep 2026,
+  from three options, once both being mint left the side alone to say who
+  spoke: the panel colour, its own text and the panels' hairline. Your text
+  is 13.97:1 or better in all 81 theme × accent pairs; your fill and the
+  coach's are 2.26:1 apart or more (gold on the light themes the closest);
+  the hairline is 1.32:1 off the page in Frost, as faint as every panel
+  there. Every corner is 18px except a 4px tail. **The ink on the coach's
+  bubble is the theme's own text-on-main-colour, never a fixed white**:
+  white on the default mint is 1.5:1. Across 81 pairs, 75 reach 4.5:1. Coral
+  and rose on the three light themes are 3.4-3.9:1 with the app's OWN pair,
+  the same one every main button uses there. That is named, held to 3:1, and
+  hers to change.
   `chat-groups`, `chat-page`, `verify:chat-bubbles`, `verify:chat-shell`
 - **The grocery list is a full page too (design 3a/3b, 27 Sep 2026)** —
   Ashley's brief, presentation only, every write through the store's own

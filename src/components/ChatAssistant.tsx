@@ -6451,7 +6451,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                                 data-role={msg.role}
                                 className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
                                   msg.role === 'user'
-                                    ? 'whitespace-pre-wrap bg-primary text-primary-foreground'
+                                    ? 'whitespace-pre-wrap border border-border bg-card text-card-foreground'
                                     : 'bg-primary text-primary-foreground'
                                 }`}
                                 // THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR (Ashley,
@@ -6460,8 +6460,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
                                 // top left long messages under 4.5:1 in Graphite,
                                 // Midnight and Frost. From three options she chose one
                                 // solid colour, readable in all nine themes. The
-                                // avatar keeps the fade; yours is this colour too, so
-                                // the side says who sent what.
+                                // avatar keeps the fade.
+                                // YOURS IS PLAIN — Ashley, 28 Sep 2026, from three
+                                // options, once both bubbles were the same mint and
+                                // who said what was down to the side alone: the app's
+                                // panel colour and its own text, with the hairline its
+                                // panels use, because in the light themes the panel
+                                // and the page are almost the same colour.
                                 style={{ maxWidth: widest, borderRadius: bubbleRadius(msg.role, position) }}
                               >
                                 {bodyContent}

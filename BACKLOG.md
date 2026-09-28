@@ -2,6 +2,44 @@
 
 Newest first. One line each.
 
+- [x] **YOUR CHAT BUBBLES ARE PLAIN; THE COACH STAYS MINT.** 28 Sep 2026,
+  Ashley on the live app: *"the coach and user text bubbles are both the same
+  colour."* They were, and by design: her 27 Sep brief kept her own bubbles
+  on the main colour and moved the coach to the avatar's fade. When she then
+  chose FLAT mint for the coach, the two matched, which that entry recorded as
+  "the side says who sent what". Seen on a phone, the side alone was not
+  enough. Her ruling, from three options: **mine plain, coach mint**, over
+  coach plain with hers mint (it would undo her coach ruling) and over a paler
+  mint for hers (the two could look close in some themes).
+  **What changed on her phone:** her messages sit on the app's panel colour,
+  in its normal text colour, with the thin outline its panels use. The coach
+  is unchanged.
+  **Measured through the real chat in every theme and all 81 theme × accent
+  pairs:**
+  - Her text reads at 13.97:1 or better (the standard is 4.5).
+  - Her fill and the coach's are 2.26:1 apart or more. The closest is the
+    pale gold accent on the three light themes.
+  - Her outline stands 1.32:1 off the page in Frost, the faintest, the same
+    hairline every panel there uses. In the light themes the panel is almost
+    the page colour, which is why the outline is there.
+  - The accent no longer touches her bubble. The six named shortfalls
+    (coral and rose on the light themes, the app's own colour pair) are now
+    the coach bubble's alone.
+  **Verified:** `verify:chat-bubbles` re-anchored from "the same as yours" to
+  "not the same as yours" in every theme and pair. New checks:
+  - her fill, ink and hairline against the theme's own tokens;
+  - her text at 4.5:1 or better in all 81 pairs;
+  - one fill and one ink per theme, whatever the accent;
+  - her bubble and the coach's at least 2.2:1 apart (floor under the 2.26
+    measured);
+  - the outline at least 1.3:1 off the page (floor under the 1.32 measured).
+  The sampled-theme checks moved the white-ink and rose checks onto the
+  coach's bubble, where the accent still applies. 65 checks. 5 mutations,
+  5 caught: hers mint again, no outline, the secondary colour, muted text,
+  an outline in the main colour. Light and dark screenshots read. Every gate
+  that reads the chat, plus `test:bundle` and both chat drivers: 62 of 62.
+  **Deploys:** frontend only, when she says.
+
 - [x] **LIVE, 27 Sep 2026, on Ashley's "Make it live".** `main` was
   fast-forwarded to the checked branch head: the day's three meal changes, the
   likes review fixes and the kept-meal ruling, 299 of 303 in the full sweep
