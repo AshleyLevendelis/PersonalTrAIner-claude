@@ -1229,7 +1229,13 @@ interface ComboRank {
    * traded away. "Served" includes a quiet resize (see QUIET_RESIZE_MIN).
    */
   tier: 0 | 1
-  /** How many slots hold a meal seen in the last few days. */
+  /**
+   * How many slots hold YESTERDAY's meal in that slot. Ahead of every other
+   * variety key (28 Sep 2026): a day that has to repeat something repeats the
+   * oldest thing it can, never last night's plate.
+   */
+  backToBack: number
+  /** How many slots hold a meal seen in the last VARIETY_REST_DAYS days. */
   repeats: number
   /**
    * 1 when she has said she likes something and the day holds none of it.
@@ -1237,6 +1243,15 @@ interface ComboRank {
    * correct days that repeat equally, and a small resize may be spent on it.
    */
   likeMiss: 0 | 1
+  /**
+   * How RECENTLY this day's meals were last served, summed across slots: a
+   * meal from yesterday weighs VARIETY_MEMORY_DAYS, one from a week ago 1,
+   * one not served in that time 0. Behind the like, so a like keeps the place
+   * she ruled on, and ahead of the resize: among correct days that repeat
+   * equally, the one whose meals have rested longest wins, so a week uses the
+   * whole pool rather than cycling the same four.
+   */
+  recency: number
   /**
    * 1 when the day only reaches tolerance through a quiet resize, 0 when it
    * is served exactly as stored. Behind variety and ahead of fit, so a resize
@@ -1293,9 +1308,45 @@ interface BestCombo {
  * What still holds is the point of the old line: a day that misses its targets
  * by more than the margin is never chosen for its novelty.
  */
-function rankCombo(inTolerance: boolean, repeats: number, fit: number, resized: 0 | 1 = 0, likeMiss: 0 | 1 = 0): ComboRank {
-  if (inTolerance) return { tier: 0, repeats, likeMiss, resized, fit }
-  return { tier: 1, repeats: 0, likeMiss: 0, resized: 0, fit }
+interface VarietyCost { backToBack: number; repeats: number; recency: number }
+const NO_VARIETY_COST: VarietyCost = { backToBack: 0, repeats: 0, recency: 0 }
+
+function rankCombo(inTolerance: boolean, variety: VarietyCost, fit: number, resized: 0 | 1 = 0, likeMiss: 0 | 1 = 0): ComboRank {
+  if (inTolerance) return { tier: 0, ...variety, likeMiss, resized, fit }
+  return { tier: 1, ...NO_VARIETY_COST, likeMiss: 0, resized: 0, fit }
+}
+
+/**
+ * VARIETY, IN THREE STEPS — Ashley, 28 Sep 2026, on the live day strip: "a
+ * lot of the days just repeat meals in a slightly different order."
+ * measure:meal-repeats found why: with one count for "seen in the last three
+ * days", a day that had to repeat something treated last night's dinner the
+ * same as one from three days ago, so 7.8 of 28 servings a week came straight
+ * back the next day (leftovers off; the leftovers she chose add their own on
+ * top). Now: never yesterday's if avoidable, then nothing from the last
+ * VARIETY_REST_DAYS, then her likes, then the meals that have rested longest
+ * across VARIETY_MEMORY_DAYS.
+ */
+export const VARIETY_REST_DAYS = 3
+export const VARIETY_MEMORY_DAYS = 6
+
+/** Days since each slot's meal was last served there (1 = yesterday, 0 = not in the history). */
+function varietyCost(
+  slots: MealSlotName[],
+  combo: Partial<Record<MealSlotName, PoolOption>>,
+  recentNames: Partial<Record<MealSlotName, string[]>>,
+): VarietyCost {
+  let backToBack = 0, repeats = 0, recency = 0
+  for (const s of slots) {
+    const history = recentNames[s] ?? []
+    const i = history.lastIndexOf(combo[s]!.name)
+    if (i < 0) continue
+    const age = history.length - i
+    if (age === 1) backToBack++
+    if (age <= VARIETY_REST_DAYS) repeats++
+    recency += Math.max(0, VARIETY_MEMORY_DAYS + 1 - age)
+  }
+  return { backToBack, repeats, recency }
 }
 
 /**
@@ -1414,8 +1465,10 @@ function betterOf(current: BestCombo | null, candidate: BestCombo): BestCombo {
   const a = candidate.rank
   const b = current.rank
   if (a.tier !== b.tier) return a.tier < b.tier ? { ...candidate, combo: { ...candidate.combo } } : current
+  if (a.backToBack !== b.backToBack) return a.backToBack < b.backToBack ? { ...candidate, combo: { ...candidate.combo } } : current
   if (a.repeats !== b.repeats) return a.repeats < b.repeats ? { ...candidate, combo: { ...candidate.combo } } : current
   if (a.likeMiss !== b.likeMiss) return a.likeMiss < b.likeMiss ? { ...candidate, combo: { ...candidate.combo } } : current
+  if (a.recency !== b.recency) return a.recency < b.recency ? { ...candidate, combo: { ...candidate.combo } } : current
   if (a.resized !== b.resized) return a.resized < b.resized ? { ...candidate, combo: { ...candidate.combo } } : current
   return a.fit < b.fit ? { ...candidate, combo: { ...candidate.combo } } : current
 }
@@ -1502,13 +1555,13 @@ export function assembleDay(
   const state: { best: BestCombo | null } = { best: null }
   // Every off-target day the search sees, for the margin choice after it —
   // only read when no day at all reaches tolerance.
-  const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; repeats: number; likeMiss: 0 | 1; fit: number }[] = []
+  const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; variety: VarietyCost; likeMiss: 0 | 1; fit: number }[] = []
 
   function search(index: number, combo: Partial<Record<MealSlotName, PoolOption>>): void {
     if (index === slots.length) {
       const chosenOptions = slots.map(s => combo[s]!)
       const totals = sumOptionMacros(chosenOptions)
-      const repeats = slots.filter(s => recentNames[s]?.includes(combo[s]!.name)).length
+      const variety = varietyCost(slots, combo, recentNames)
       // Cuisine coherence (meal-realism round): each slot's pool already
       // caps at one exotic option, but nothing previously stopped a day from
       // picking THAT exotic option in every slot at once. Soft tiebreak only
@@ -1524,7 +1577,7 @@ export function assembleDay(
       // always had. A like is a key of its own — see rankCombo.
       const nudges = exoticPenalty
       if (dayWithinTolerance(totals, targets)) {
-        state.best = betterOf(state.best, { combo, totals, rank: rankCombo(true, repeats, macroDistanceScore(totals, targets) + nudges, 0, likeMiss) })
+        state.best = betterOf(state.best, { combo, totals, rank: rankCombo(true, variety, macroDistanceScore(totals, targets) + nudges, 0, likeMiss) })
         return
       }
       // Off target as stored: judge the day it would be SERVED as, if a quiet
@@ -1534,12 +1587,12 @@ export function assembleDay(
         ? resizeLargestFreeSlot(combo, pinned, targets, QUIET_RESIZE_MIN, QUIET_RESIZE_MAX, true)
         : null
       if (quiet && dayWithinTolerance(quiet.totals, targets)) {
-        state.best = betterOf(state.best, { combo: quiet.chosen, totals: quiet.totals, rank: rankCombo(true, repeats, macroDistanceScore(quiet.totals, targets) + nudges, 1, likeMiss) })
+        state.best = betterOf(state.best, { combo: quiet.chosen, totals: quiet.totals, rank: rankCombo(true, variety, macroDistanceScore(quiet.totals, targets) + nudges, 1, likeMiss) })
         return
       }
       const fit = macroDistanceScore(totals, targets) + nudges
-      offTarget.push({ combo: { ...combo }, totals, repeats, likeMiss, fit })
-      state.best = betterOf(state.best, { combo, totals, rank: rankCombo(false, repeats, fit) })
+      offTarget.push({ combo: { ...combo }, totals, variety, likeMiss, fit })
+      state.best = betterOf(state.best, { combo, totals, rank: rankCombo(false, variety, fit) })
       return
     }
     const slot = slots[index]
@@ -1565,11 +1618,16 @@ export function assembleDay(
     let pick: (typeof offTarget)[number] | null = null
     for (const c of offTarget) {
       if (c.fit > closest + OFF_TARGET_VARIETY_MARGIN) continue
-      if (!pick || c.repeats < pick.repeats
-        || (c.repeats === pick.repeats && c.likeMiss < pick.likeMiss)
-        || (c.repeats === pick.repeats && c.likeMiss === pick.likeMiss && c.fit < pick.fit)) pick = c
+      // The same order as a correct day's, fit last.
+      const key = (x: typeof c) => [x.variety.backToBack, x.variety.repeats, x.likeMiss, x.variety.recency, x.fit]
+      const better = (x: typeof c, y: typeof c) => {
+        const [kx, ky] = [key(x), key(y)]
+        for (let k = 0; k < kx.length; k++) if (kx[k] !== ky[k]) return kx[k] < ky[k]
+        return false
+      }
+      if (!pick || better(c, pick)) pick = c
     }
-    if (pick) state.best = { combo: pick.combo, totals: pick.totals, rank: rankCombo(false, pick.repeats, pick.fit) }
+    if (pick) state.best = { combo: pick.combo, totals: pick.totals, rank: rankCombo(false, pick.variety, pick.fit) }
   }
 
   let chosen = state.best.combo

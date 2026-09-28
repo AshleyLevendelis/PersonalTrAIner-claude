@@ -31,7 +31,7 @@
 // fixed on 15 Sep 2026 cannot come back through this door.
 // ---------------------------------------------------------------------------
 
-import { assembleDay, computeSlotBudgets, type AssembledDay, type PoolOption } from './meal-generation'
+import { assembleDay, computeSlotBudgets, VARIETY_MEMORY_DAYS, type AssembledDay, type PoolOption } from './meal-generation'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
 import type { MealSlotName } from './meal-store'
@@ -46,8 +46,13 @@ import type { MacroTargets } from './types'
  */
 export const ROTATION_DAYS = 7
 
-/** How many days back counts as "recent" when avoiding a repeat. */
-export const RECENT_WINDOW = 3
+/**
+ * How many days of history the rotation keeps per slot. Since 28 Sep 2026 this
+ * is the whole of VARIETY_MEMORY_DAYS rather than the three days a repeat
+ * counts as "recent" (VARIETY_REST_DAYS): the ranking now prefers the meal
+ * that has rested LONGEST, which needs the rest of the week to see.
+ */
+export const RECENT_WINDOW = VARIETY_MEMORY_DAYS
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 

@@ -532,5 +532,77 @@ console.log('\n5. One rotation, both surfaces')
     !/new Date\(\)|Date\.now\(\)/.test(strip(read('src/lib/meal-rotation.ts'))))
 }
 
+// ===========================================================================
+console.log('\n6. Variety in three steps: never yesterday\'s, then nothing recent, then the longest rested')
+// ===========================================================================
+{
+  // Ashley, 28 Sep 2026, on the live strip: "a lot of the days just repeat
+  // meals in a slightly different order." measure:meal-repeats: 7.8 of 28
+  // servings a week were back the very next day (leftovers off), because one
+  // count for "seen in the last three days" treated last night's dinner the
+  // same as one from three days ago. Every dinner below has IDENTICAL macros,
+  // built from the same real foods, so every day is inside the bands and only
+  // the variety keys can separate them; each case is ordered so the OLD rule
+  // (first found on a tie) would pick the wrong one.
+  const L = (name: string, quantity: number, unit = 'g'): MealIngredientLine => ({ name, quantity, unit })
+  const porridge = dish('breakfast', 'Porridge', [L('oats', 80), L('semi-skimmed milk', 250, 'ml')])
+  const same = (n: string) => dish('dinner', n, [L('chicken breast', 200), L('white rice', 200), L('broccoli', 100), L('olive oil', 10)])
+  const [A, B, C, D, E] = ['Dinner A', 'Dinner B', 'Dinner C', 'Dinner D', 'Dinner E'].map(same)
+  const t = plus(porridge.macros, A.macros)
+  const pick = (dinners: PoolOption[], history: string[], likes: string[] = []) =>
+    assembleDay({ breakfast: [porridge], dinner: dinners }, t, { dinner: history }, likes).chosen.dinner?.name
+
+  // History is oldest first; the last entry is yesterday.
+  check('when every dinner was eaten in the last three days, the one from three days ago is served, not yesterday\'s',
+    pick([C, B, A], ['Dinner A', 'Dinner B', 'Dinner C']) === 'Dinner A', pick([C, B, A], ['Dinner A', 'Dinner B', 'Dinner C']))
+  check('a repeat from two days ago beats one from yesterday, even listed second', pick([B, A], ['Dinner A', 'Dinner B']) === 'Dinner A', pick([B, A], ['Dinner A', 'Dinner B']))
+  check('beyond the last three days, the dinner that has rested LONGEST wins (six days over five)',
+    pick([B, A], ['Dinner A', 'Dinner B', 'Dinner C', 'Dinner D', 'Dinner E', 'Other']) === 'Dinner A',
+    pick([B, A], ['Dinner A', 'Dinner B', 'Dinner C', 'Dinner D', 'Dinner E', 'Other']))
+  check('...but a dinner she likes still wins among those, as she ruled (likes ahead of how long it rested)',
+    pick([A, B], ['Dinner A', 'Dinner B', 'Dinner C', 'Dinner D', 'Dinner E', 'Other'], ['dinner b']) === 'Dinner B')
+  check('...and a like never brings back yesterday\'s dinner while another is free',
+    pick([A, B], ['Dinner A', 'Dinner B'], ['dinner b']) === 'Dinner A')
+
+  check('a liked dinner eaten two days ago still rests: one that has rested five days wins',
+    pick([A, B], ['Dinner B', 'Other', 'Other 2', 'Dinner A', 'Other 3'], ['dinner a']) === 'Dinner B',
+    pick([A, B], ['Dinner B', 'Other', 'Other 2', 'Dinner A', 'Other 3'], ['dinner a']))
+
+  // AVOIDING YESTERDAY OUTRANKS REPEATING FEWER. One family of food at four
+  // sizes, so only two days are in the bands: a small breakfast with a big
+  // dinner, or the reverse. (Neither mismatch reaches the bands even with a
+  // quiet resize: 1.375x and 0.727x, both outside 0.75-1.35.) Yesterday's
+  // dinner was the big one; the other day repeats TWO meals from two days
+  // ago. The old single count took the day with one repeat, yesterday's.
+  const sized = (slot: MealSlotName, n: string, k: number) => dish(slot, n, [L('chicken breast', 100 * k), L('white rice', 100 * k), L('broccoli', 50 * k), L('olive oil', 5 * k)])
+  const P1 = sized('breakfast', 'Small breakfast', 1.0), P2 = sized('breakfast', 'Big breakfast', 1.6)
+  const BIG = sized('dinner', 'Big dinner', 2.2), SMALL = sized('dinner', 'Small dinner', 1.6)
+  const tt = plus(P1.macros, BIG.macros)
+  check('the sanity check: only small+big and big+small are in the bands',
+    inBands(plus(P1.macros, BIG.macros), tt) && inBands(plus(P2.macros, SMALL.macros), tt) && !inBands(plus(P1.macros, SMALL.macros), tt) && !inBands(plus(P2.macros, BIG.macros), tt))
+  const traded = assembleDay({ breakfast: [P1, P2], dinner: [BIG, SMALL] }, tt,
+    { breakfast: ['Big breakfast', 'Other'], dinner: ['Small dinner', 'Big dinner'] }, []).chosen
+  check('a day repeating two meals from two days ago beats one repeating yesterday\'s dinner',
+    traded.breakfast?.name === 'Big breakfast' && traded.dinner?.name === 'Small dinner', traded)
+
+  // Off target: the same order applies inside the margin. Unreachable
+  // targets, identical dishes, so every day fits equally badly.
+  const far = { calories: t.calories * 3, protein: t.protein * 3, carbs: t.carbs * 3, fat: t.fat * 3 }
+  const offPick = assembleDay({ breakfast: [porridge], dinner: [A, B] }, far, { dinner: ['Dinner B', 'Dinner A'] }, []).chosen.dinner?.name
+  check('off target too, yesterday\'s dinner gives way to the older repeat', offPick === 'Dinner B', offPick)
+
+  // THE WEEK: five dinners, seven days. The old rule cycled four of them
+  // (A B C D A B C); the week now uses all five and never serves one two
+  // days running.
+  const rotation = buildRotation({ breakfast: [porridge], dinner: [A, B, C, D, E] }, t, [], { mealsPerDay: 2, includeSnacks: false, batchCooking: false })
+  const dinners = rotation.days.map(d => d.chosen.dinner?.name)
+  check('a seven-day week serves all five dinners, not a cycle of four', new Set(dinners).size === 5, dinners)
+  check('...and never the same dinner two days running', dinners.every((n, i) => i === 0 || n !== dinners[i - 1]), dinners)
+  check('...every day still inside the bands', rotation.days.every(d => d.withinTolerance))
+  const hist = rotation.historyFor(ROTATION_DAYS - 1).dinner ?? []
+  // A LITERAL, not the constant: the property is "the whole week before".
+  check('the rotation remembers six days back, the whole week before', hist.length === 6, hist)
+}
+
 console.log(failures === 0 ? '\nAll meal-variety checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)
