@@ -38,7 +38,16 @@ import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from '
 import { isMissingColumnError } from './missing-column'
 
 export const MIN_COVERAGE = 0.8
-export const DEFAULT_POOL_SIZE = 5
+/**
+ * SEVEN OPTIONS A MEAL — Ashley's ruling, 28 Sep 2026, from three options
+ * (keep five, seven, ten). At five, a week of 28 servings was 11 dishes and
+ * about 3 of every 4 remaining next-day repeats were FORCED: the pool simply
+ * had no other dish that fitted the day. Measured on the modelled pools
+ * (measure:meal-repeats): seven gives about 15 dishes a week, next-day
+ * repeats roughly halved, and more days on target, not fewer. Ten was
+ * rejected as twice the generation for a little more.
+ */
+export const DEFAULT_POOL_SIZE = 7
 export const MAX_GENERATION_ROUNDS = 3
 
 const ALL_SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -210,6 +219,53 @@ export function steeringLikes(likedFoods: string[], favouriteMeals: string[], di
     return out
   }
   return { foods: clean(likedFoods), favouriteMeals: clean(favouriteMeals) }
+}
+
+/**
+ * THE MOST DISHES ONE REQUEST ASKS FOR. The meal function's reply has a fixed
+ * length, and a reply cut off mid-dish cannot be read at all, so the WHOLE
+ * round is lost, not its last dish. Every round asks the same size, so a
+ * plan that overflows once overflows three times and arrives empty. 28 is
+ * what the first round asked for at five options a meal with three meals and
+ * a snack (seven a slot, spares included), the size live plans have come back
+ * whole from. Seven options asks 36, which goes as two requests sent at once
+ * instead: each well inside the limit, and quicker than one long reply.
+ */
+export const MAX_DISHES_PER_REQUEST = 28
+
+/**
+ * Splits one round's per-slot counts into as few requests as keep each at or
+ * under `max` dishes, as evenly as possible (two requests of 18, never 27 and
+ * 9, because the longest reply sets how long the round takes). A slot is
+ * never split across requests: the model is asked for "N different dishes"
+ * per slot, and two halves of that would not know about each other.
+ */
+export function splitSlotRequests(
+  slotCounts: Partial<Record<MealSlotName, number>>,
+  max = MAX_DISHES_PER_REQUEST,
+): Partial<Record<MealSlotName, number>>[] {
+  const slots = (Object.entries(slotCounts) as [MealSlotName, number][]).filter(([, n]) => n > 0)
+  const total = slots.reduce((sum, [, n]) => sum + n, 0)
+  if (total === 0) return []
+  const bySize = [...slots].sort((a, b) => b[1] - a[1])
+  for (let parts = Math.max(1, Math.ceil(total / max)); parts <= slots.length; parts++) {
+    const chunks: [MealSlotName, number][][] = Array.from({ length: parts }, () => [])
+    const sums = new Array<number>(parts).fill(0)
+    for (const entry of bySize) {
+      const k = sums.indexOf(Math.min(...sums))
+      chunks[k].push(entry)
+      sums[k] += entry[1]
+    }
+    const fits = chunks.every((c, k) => sums[k] <= max || c.length === 1)
+    if (fits || parts === slots.length) {
+      // Each request keeps the slots in the order they were asked for.
+      const order = slots.map(([s]) => s)
+      return chunks
+        .filter(c => c.length > 0)
+        .map(c => Object.fromEntries([...c].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0])))) as Partial<Record<MealSlotName, number>>[]
+    }
+  }
+  return [Object.fromEntries(slots)]
 }
 
 async function requestProposals(
@@ -689,24 +745,34 @@ export async function generateMealPools(params: {
     // propagate out of generateMealPools) so one bad round doesn't lose
     // whatever earlier rounds already accepted — MAX_GENERATION_ROUNDS
     // already exists to smooth over exactly this kind of transient blip.
-    let proposals: RawProposal[] = []
-    try {
-      proposals = await requestProposals(
-        requestCounts,
-        budgets,
-        params.dietaryPreferences,
-        params.cookingTimePreference,
-        params.favoriteCuisines ?? [],
-        params.dislikedFoods ?? [],
-        params.breakfastStyle,
-        params.profileId,
-        steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences),
-      )
-      generatorReached = true
-    } catch (err) {
-      rejectionLog.push(`[round ${round + 1}] generate-meals call failed: ${err instanceof Error ? err.message : String(err)}`)
-      continue
-    }
+    //
+    // SPLIT WHEN THE ROUND IS BIG (see MAX_DISHES_PER_REQUEST). One request
+    // failing costs only ITS slots: the others' meals are still used, the
+    // same "keep what it got" rule the rounds already follow.
+    const chunks = splitSlotRequests(requestCounts)
+    const likes = steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences)
+    const settled = await Promise.allSettled(chunks.map(chunk => requestProposals(
+      chunk,
+      budgets,
+      params.dietaryPreferences,
+      params.cookingTimePreference,
+      params.favoriteCuisines ?? [],
+      params.dislikedFoods ?? [],
+      params.breakfastStyle,
+      params.profileId,
+      likes,
+    )))
+    const proposals: RawProposal[] = []
+    settled.forEach((r, k) => {
+      if (r.status === 'fulfilled') {
+        proposals.push(...r.value)
+        generatorReached = true
+      } else {
+        const which = chunks.length > 1 ? ` (${Object.keys(chunks[k]).join(', ')})` : ''
+        rejectionLog.push(`[round ${round + 1}] generate-meals call failed${which}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`)
+      }
+    })
+    if (settled.every(r => r.status === 'rejected')) continue
     for (const proposal of proposals) {
       const slot = proposal.slot as MealSlotName
       if (!activeSlots.includes(slot)) continue

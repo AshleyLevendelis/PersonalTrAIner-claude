@@ -332,6 +332,7 @@
     "test:meal-variety": "tsx scripts/test-meal-variety.ts",
     "test:meal-days": "tsx scripts/test-meal-days.ts",
     "test:meal-likes": "tsx scripts/test-meal-likes.ts",
+    "test:meal-pool-size": "tsx scripts/test-meal-pool-size.ts",
     "test:meal-method": "tsx scripts/test-meal-method.ts",
     "verify:meal-method": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-method.mjs",
     "test:leftovers": "tsx scripts/test-leftovers.ts",
