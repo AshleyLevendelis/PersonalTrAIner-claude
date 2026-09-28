@@ -26,6 +26,7 @@ import type { MealMoveContext } from './nutrition/MealMoveSheet'
 import { COOK_ONCE } from '@/lib/coach-voice'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
+import { displayTags } from '@/lib/meal-new-from'
 const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -1012,9 +1013,10 @@ function MealSlotRow({
               Defensive filter here too, so an already-onboarded profile
               stops seeing the leak immediately rather than waiting on its
               next regenerate. */}
-          {option.tags.filter(t => t !== 'slot_appropriate').slice(0, 2).length > 0 && (
+          {/* And never the app's own bookkeeping (a new meal's first day). */}
+          {displayTags(option.tags).length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {option.tags.filter(t => t !== 'slot_appropriate').slice(0, 2).map(t => (
+              {displayTags(option.tags).map(t => (
                 <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[0.625rem] text-muted-foreground">{t}</span>
               ))}
             </div>

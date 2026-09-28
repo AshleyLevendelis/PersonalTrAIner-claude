@@ -197,6 +197,12 @@ async function main() {
     check('...hearts followed through the one watcher', /watchFavouriteNames\(profile\.id, /.test(app))
     const calls = app.match(/generateMealPools\(\{[\s\S]*?\}\)/g) ?? []
     check('the sanity check on this check: App generates meals in four places', calls.length === 4, calls.length)
+    // AND A FIFTH, since 28 Sep 2026: "Get more meal options" generates
+    // through topUpMealPlan, handed the same likes by App.
+    const topUp = app.match(/topUpMealPlan\(\{[\s\S]*?\n    \}\)/)?.[0] ?? ''
+    check('..."Get more meal options" is told the same likes and hearted meals',
+      /likedFoods: typedFoodLikes/.test(topUp) && /favouriteMeals: steerableFavouriteMeals/.test(topUp), topUp.slice(0, 80))
+    check('...and passes them on to the generator untouched', /\.\.\.input\.generation,/.test(read('src/lib/meal-top-up.ts')))
     check('...and every one of them is told the likes and the hearted meals she can still eat',
       calls.every(c => /likedFoods: typedFoodLikes/.test(c) && /favouriteMeals: steerableFavouriteMeals/.test(c)), calls.map(c => c.slice(0, 60)))
     check('...worked out by the shared rule, from the marked pools',
@@ -213,11 +219,14 @@ async function main() {
     check('the pools every assembly reads are the stored pools with restriction breakers marked',
       /const mealPools = useServablePools\(storedMealPools, profile\?\.dietary_preferences, memoryFacts\)/.test(app))
     check('...and nothing that assembles a day reads the unmarked ones',
-      /buildRotation\(mealPools,/.test(app) && /pools: mealPools,/.test(app) && /checkMealRefit\(mealPools,/.test(app) && /mealPools=\{mealPools\}/.test(app)
+      /buildRotation\(mealPools,/.test(app) && /pools: mealPools,/.test(app) && /checkMealRefit\(mealDays\.today\?\.pools \?\? mealPools,/.test(app) && /mealPools=\{mealPools\}/.test(app)
       && !/(buildRotation|assembleRotationDay|checkMealRefit|useMealDays)\([^;]*storedMealPools/.test(app) && !/mealPools=\{storedMealPools\}/.test(app))
+    // RE-ANCHORED 28 Sep 2026: today is the first day of the strip's run, so
+    // "the day and the strip" are one call and take one likes list.
     check('the day, the strip and the list all take the same likes',
-      /assembleRotationDay\(mealRotation, mealRotationDate, mealPools, macros, compiledSoftFoodPreferences/.test(app)
-      && /softLikedFoods: compiledSoftFoodPreferences, todaysChosen/.test(app)
+      /buildRotation\(mealPools, macros, compiledSoftFoodPreferences/.test(app)
+      && /softLikedFoods: compiledSoftFoodPreferences, todaysPins/.test(app)
+      && /const assembledMeals = mealDays\.today\?\.day\b/.test(app)
       && /softLikedFoods=\{compiledSoftFoodPreferences\}/.test(app))
   }
 

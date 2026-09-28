@@ -2,6 +2,113 @@
 
 Newest first. One line each.
 
+- [x] **SEVEN OPTIONS A MEAL, AND A BUTTON THAT ADDS THEM WITHOUT MOVING
+  TODAY.** 28 Sep 2026. Two rulings of Ashley's, both from three options:
+  **seven options a meal** (over keeping five, and over ten), and then, for
+  plans already made at five, **"Button, keep today"**: a button adds more to
+  each meal, while today and any day already on the shopping list stay
+  exactly as they are. She rejected re-picking everything (today included,
+  list rebuilt) and having no button. It also follows her standing ruling on
+  running out of swaps: new meals are OFFERED, never fetched unasked.
+  **Measured, seven against five** (`measure:meal-repeats`, 200 profiles,
+  three meals and a snack, leftovers off): 11.1 → 14.9 dishes a week,
+  next-day repeats 6.2 → 3.2, days on target 85% → 92%. With leftovers on:
+  10.5 → 13.4 dishes, on target 73.5% → 87.1%.
+  **Three pieces, each shipped separately:**
+  1. *The day search, about 44 times faster, with not one choice changed.*
+     A dump of every choice across 640 weeks (five and seven options,
+     leftovers on and off, drift, likes, swaps, restriction marks) is
+     byte-identical before and after; 241,962 ms → 5,498 ms. One week at
+     seven options: median 6 ms, worst 24 ms. Three changes: the food
+     lookup remembers its answers; "holds a like" and "is exotic" are
+     worked out once per dish, not once per combination; and today is taken
+     from the rotation already built when every input is the identical
+     object. `test:meal-variety` §7 (17 checks, 12 mutations, 12 caught).
+     Two came back MISSED first: every simple plural is found by the partial
+     match before the plural retry, so the probe now uses one only the retry
+     resolves ("ground turkeys"); and the one-exotic-dish-a-day nudge had no
+     gate that runs outside a live database.
+  2. *Seven, asked for in pieces that fit.* The number alone would have been
+     a trap: the meal function's reply is capped at 6,144 tokens, the first
+     round at seven asks for 36 dishes against the 28 live plans have come
+     back whole from, and a reply cut off mid-dish cannot be read, so the
+     WHOLE round is lost. Every round asks the same size, so a plan that
+     overflowed once would overflow three times and arrive empty. A round
+     now goes as requests of at most 28, split evenly (18 + 18), never
+     splitting a meal, sent at once; one failing request costs only its own
+     meals, named in the log. Five options is still exactly one request. No
+     edge-function deploy needed. `test:meal-pool-size` (22 checks, 11
+     mutations, 11 caught).
+  3. *The button.* Measured before it was designed: holding a day by saving
+     its dish names is NOT holding it. 66% of days at 10% target drift carry
+     a dish the search quietly resized (median 1.27x), and a name brings back
+     the stored portion; and a lunch that is last night's dinner cannot be
+     named at all. So new meals carry their FIRST DAY (a `new-from:` tag), and
+     every day before it is worked out from the pool as it was, through the
+     rotation that pool builds: same dishes, same portions, same leftovers.
+     A start date and not a list of held days, because days are a chain (a
+     lunch is last night's dinner): the start is the day after today and the
+     last shopping-list day, and a gap in the list is held too. **Deviation
+     from her wording, named:** with list days Monday and Friday, Tuesday to
+     Thursday are held as well: more held than she asked for, never less.
+     The list is read STRICTLY: the ordinary read falls back to "nothing" on
+     a network error, which here would have moved the start to tomorrow and
+     changed days she had shopped for. `docs/plans/meal-top-up.md`.
+  **Found and fixed on the way, both pre-existing:**
+  - *"Last night's dinner" could be false.* Swap tonight's dinner and
+    tomorrow's lunch still said "Last night's dinner." about the dish
+    swapped away. A lunch the rotation planned as a leftover is now
+    re-made from the dinner actually served the night before, or cooked
+    fresh when it cannot honestly be one. "Cook both portions together"
+    follows the next day's actual lunch. To make that possible, today and
+    the strip are now ONE run (`serveMealWeek`), and the shopping list
+    serves its days as a run from today, so Friday's lunch is the same on
+    the list as on the tab even when Thursday is not on the list.
+  - *The same dish twice in one day, by a swap.* Swapping tonight's dinner
+    to the dish her lunch already was served it twice. The rotation's own
+    rule (the leftover gives way) now applies to every day.
+  - *The resize offer judged a different day.* Its trial left out today's
+    leftover lunch, so on about four days a week it quoted totals for a
+    lunch not on the screen. The leftover is now pinned in, as a fact.
+  - *`test:grocery` never passed the start date* the list requires. The old
+    code shopped the same undefined day twice, which happened to satisfy it.
+  - *`test:no-dead-code` was left red by the previous commit* (`801923e0`,
+    41 of 40): a constant was exported that nothing else uses. I ran the
+    gates that read the files I changed, and this gate reads none of them.
+  **CSCS review.** 1. *Effect:* which correct day is served and how many
+  dishes a week offer; targets, bands, portions and verification unchanged,
+  every new meal through the same `verifyProposal`. 2. *What it takes away:*
+  nothing measured: on-target days went UP. The cost is generation: about
+  40% more meals made per plan, and two requests where there was one. 3.
+  *Fundamentals:* protein targets and the day's bands are unchanged. 4.
+  *Redefined?* `DEFAULT_POOL_SIZE` is a count of options, not a floor on
+  food, and nothing on screen compares against five; `MIN_COVERAGE`, next to
+  it, is about ingredient recognition and is untouched.
+  `measure:meal-variety` and `measure:meal-repeats` now report at seven by
+  default, so their numbers before 28 Sep are at five and not comparable. 5.
+  *Scope:* not clinical.
+  **Verified:** `test:meal-top-up` (69 checks, 25 mutations, 25 caught after
+  three fixes: a redundant filter removed, a throw that crashed the gate now
+  a failed check, and the card's labels made one function the gate calls);
+  `verify:meal-top-up` (31 checks at 390x844, 9 mutations, 8 caught; the
+  ninth, the cook-both re-check, needs a swap to matter and is caught by
+  `test:meal-top-up`). Two driver mutations first came back MISSED on a
+  FIXTURE: the fake generator's dishes were a different mix from the plan's,
+  no day with them fitted, one new meal was served all week and the edge of
+  the held days was never exercised; the broken code then named the fixture
+  that does (Thursday to Saturday on the list). `test:meal-days` §3b (the
+  list after a gap with a swap, batch cooking on) and the week function,
+  4 mutations, 4 caught. The sweep of the 84 gates that read the changed
+  files found two more checks pinned to the old wiring's text
+  (`meal-variety` §5, `session-continuity` §5); re-anchored on the week
+  function and the list's run, 3 mutations, 3 caught. Screens read: the offer, the receipt ("They start
+  on Friday; every day before then stays as it was."), and the failure
+  ("...so nothing has changed").
+  **Not built, named:** the coach cannot top up every meal in one go. It can
+  find more for one meal when she runs out of swaps. Recorded as a
+  screen-only gap in `docs/coach-screen-parity.md`, not as an exception.
+  **Needs:** the frontend deploy only. No edge function, no migration.
+
 - [x] **THE SAME DISHES, DAY AFTER DAY: THE RANKING FIXED, THE REST
   MEASURED.** 28 Sep 2026, Ashley on the live day strip: *"a lot of the days
   just repeat meals in a slightly different order."*

@@ -253,6 +253,23 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   going quiet; Profile keeps the heart, marked, with a line saying why.
   `kept-meal-restriction` (22 checks, 12 mutations), `verify:kept-meal`
   (17 checks, 5 mutations)
+- **Seven options a meal, and more for a plan that already exists** — since
+  28 Sep 2026, her two rulings that day, each from three options: **seven**
+  (over five and ten) and **"Button, keep today"** (over re-picking
+  everything, and over no button). New plans ask for seven, in requests of at
+  most 28 dishes, because a reply cut off mid-dish loses the whole round. A
+  plan made at five is OFFERED the rest on Nutrition, never topped up
+  unasked; the new meals carry a first day (the day after today and the last
+  shopping-list day), and every day before it is worked out from the pool as
+  it was, so today and the shopped-for days do not move by a gram. **Holding
+  a day by its dish names was measured and rejected**: two days in three at
+  10% drift carry a dish the search resized, and a name brings back the
+  stored portion. A leftover lunch now always comes from the dinner actually
+  served the night before, which also fixed a swap leaving "Last night's
+  dinner" on a dish nobody cooked. All-at-once is `screen only`; the coach
+  finds more one meal at a time. `meal-pool-size` (22 checks, 11 mutations),
+  `meal-top-up` (69 checks, 25 mutations), `verify:meal-top-up` (31 checks,
+  9 mutations), `meal-days` §3b
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
@@ -1806,6 +1823,28 @@ old — the commands were right and the context was missing.
   Put the bell in the slot by name, then let the app decide what that slot
   carries. And when a driver's mutation comes back MISSED, suspect the fixture
   before the check.
+- **HOLDING SOMETHING BY ITS NAME IS NOT HOLDING IT WHEN THE APP TRANSFORMS
+  IT ON THE WAY OUT.** 28 Sep 2026, "keep today" as meals were added: the
+  obvious hold (save each dish's name as a pick) would have changed most held
+  days, because the day search quietly resizes a dish on two days in three at
+  10% drift and a name brings back the stored portion, and a leftover lunch
+  has no name of its own to save. What held exactly was the INPUT: new meals
+  carry a first day, earlier days see the pool as it was, and the same pure
+  derivation reproduces the same output. **Before choosing how to freeze a
+  derived thing, measure how often the derivation transforms it.** And where
+  the derived things form a chain (a lunch is last night's dinner), holding a
+  link means holding the links before it.
+- **A REPLY WITH A FIXED LENGTH FAILS WHOLE, AND A RETRY FAILS THE SAME WAY.**
+  Also 28 Sep: raising the meals asked for per request from 28 to 36 would
+  have run past the meal function's reply cap. A reply cut off mid-dish is
+  unreadable, not short, so the whole round is lost, and every round asks
+  the same size. Whenever a model is asked for MORE, check the reply cap in
+  the same change, and split the ask rather than trusting the retry.
+- **NAVIGATING TO THE ADDRESS ALREADY OPEN RELOADS NOTHING.** A driver's
+  "fresh load" to the same URL is a same-page jump to its #fragment: the
+  state from before is still there, and a check reading "the offer comes
+  back on a fresh plan" failed on correct code. Give each load its own
+  address (a load counter, never the clock).
 - **A FAKE MUST FILL WHAT THE DATABASE FILLS.** 27 Sep 2026: the harness's
   fake inserted grocery rows with no `created_at`, which Postgres always
   sets. The list's read sorts on it, threw, fell back to "nothing", and the
@@ -1909,7 +1948,9 @@ old — the commands were right and the context was missing.
   `test:bundle`**, and the catalogue (`exercise-db.ts`) is read by nearly every
   gate, so a catalogue change is a full sweep, not a derived set: the six
   machines shipped after 15 hand-picked gates and six more were red at the
-  next sweep.
+  next sweep. **`test:no-dead-code` is the same kind**: it scans every export
+  in `src/`, so a change that adds or removes an export runs it. 28 Sep 2026:
+  one new exported constant left it red for a commit.
 - **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
   2026: yesterday's sweep found two real failures, both were fixed, and the
   sweep was reported clean without being re-run. One of those fixes — pulling a

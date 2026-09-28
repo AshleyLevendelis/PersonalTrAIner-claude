@@ -136,6 +136,18 @@ export interface NutritionDisplayProps {
   mealRefitError?: string | null
   onMealRefitConfirm?: () => void
   onMealRefitDecline?: () => void
+  /**
+   * MORE MEALS TO CHOOSE FROM (Ashley, 28 Sep 2026, "Button, keep today"):
+   * the offer's sentence, or null when there is nothing to offer. WHEN to
+   * offer lives in App and meal-top-up.ts; this only shows it.
+   */
+  mealTopUp?: string | null
+  mealTopUpBusy?: boolean
+  /** What happened after the tap, from the phrasebook; `failed` when nothing changed. */
+  mealTopUpNote?: { text: string; failed: boolean } | null
+  onMealTopUp?: () => void
+  onMealTopUpDecline?: () => void
+  onDismissMealTopUpNote?: () => void
 }
 
 /** Only the parts of a refit this screen shows. Narrower than MealRefit on purpose: a component that cannot see the resized pools cannot accidentally render one as if it were saved. */
@@ -152,6 +164,7 @@ export function NutritionDisplay({
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
+  mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote,
   mealStrip, upcomingDay = null,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
@@ -472,6 +485,33 @@ export function NutritionDisplay({
       {mealRefitError && (
         <InsightBanner tone="warning" data-testid="meal-refit-error">
           <span className="min-w-0 flex-1">{mealRefitError}</span>
+        </InsightBanner>
+      )}
+
+      {/* MORE MEALS TO CHOOSE FROM. Offered, never done unasked, and it says
+          before the tap what it will not touch: today and the days already on
+          the shopping list. The receipt replaces it and says what changed. */}
+      {mealTopUp && !mealTopUpNote && (
+        <div data-testid="meal-top-up-offer">
+          <TrainerNudge
+            text={mealTopUp}
+            actions={[
+              { label: mealTopUpBusy ? 'Finding meals…' : 'Get more options', onClick: () => onMealTopUp?.(), disabled: mealTopUpBusy },
+              { label: 'Not now', onClick: () => onMealTopUpDecline?.(), disabled: mealTopUpBusy, secondary: true },
+            ]}
+          />
+        </div>
+      )}
+      {mealTopUpNote && (
+        <InsightBanner tone={mealTopUpNote.failed ? 'warning' : 'ai'} data-testid="meal-top-up-note" data-failed={mealTopUpNote.failed ? 'true' : 'false'}>
+          <span className="min-w-0 flex-1">{mealTopUpNote.text}</span>
+          <button
+            type="button"
+            onClick={() => onDismissMealTopUpNote?.()}
+            className="shrink-0 text-xs font-semibold underline opacity-80 hover:opacity-100"
+          >
+            Dismiss
+          </button>
         </InsightBanner>
       )}
       </>)}

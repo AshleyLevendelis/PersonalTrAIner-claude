@@ -36,6 +36,7 @@ import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsPro
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
 import { isMissingColumnError } from './missing-column'
+import { tagsNewFrom } from './meal-new-from'
 
 export const MIN_COVERAGE = 0.8
 /**
@@ -673,6 +674,13 @@ export async function generateMealPools(params: {
    * "find me something new" could return the four meals already sitting there.
    */
   appendToExisting?: boolean
+  /**
+   * With appendToExisting: the first date the added meals may be served on
+   * (`YYYY-MM-DD`). Every day before it is worked out from the pool as it
+   * was, so it stays exactly as shown — Ashley's "Button, keep today",
+   * 28 Sep 2026. See meal-new-from.ts.
+   */
+  servedFrom?: string
 }): Promise<GenerateMealPoolsResult> {
   const poolSize = params.poolSize ?? DEFAULT_POOL_SIZE
   const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks)
@@ -812,7 +820,11 @@ export async function generateMealPools(params: {
         .map(r => r.subject)
       const effectiveDislikes = [...(params.dislikedFoods ?? []), ...slotTimingDislikes]
       const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences)
-      if (option) accepted[slot]!.push(option)
+      if (option) {
+        accepted[slot]!.push(params.appendToExisting && params.servedFrom
+          ? { ...option, tags: tagsNewFrom(option.tags, params.servedFrom) }
+          : option)
+      }
     }
 
     // The whole point: this round's meals are on disk before the next request

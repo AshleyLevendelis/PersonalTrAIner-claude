@@ -261,13 +261,14 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
   // Property, not the call's text — see the same re-anchoring in
   // test-custom-meal.ts. The old literal included the empty variety history,
   // so fixing that on 19 Sep 2026 reddened this check for no good reason.
+  // RE-ANCHORED 28 Sep 2026: today is the first day of the strip's run, so
+  // the likes reach it through the hook's own arguments.
   const assemblyDeclSP = (() => {
-    const a = app.indexOf('const assembledMeals')
-    const b = app.indexOf('const chosenMeals', a)
-    return a < 0 ? '' : (b < 0 ? app.slice(a) : app.slice(a, b))
+    const a = app.indexOf('useMealDays({')
+    return a < 0 ? '' : app.slice(a, app.indexOf('})', a) + 2)
   })()
   check('...and the assembled day is built with them',
-    /\bcompiledSoftFoodPreferences\b/.test(assemblyDeclSP), assemblyDeclSP.slice(0, 120))
+    /softLikedFoods: compiledSoftFoodPreferences\b/.test(assemblyDeclSP) && /const assembledMeals = mealDays\.today\?\.day\b/.test(app), assemblyDeclSP.slice(0, 160))
 
   // The shopping list assembles the SAME days the Nutrition tab shows.
   // Withhold the preferences from one and the two diverge — a list for meals
@@ -280,8 +281,9 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
   // builds each date with the tab's own day function (the day strip's fix),
   // so this reads that call. The property is unchanged: the list assembles
   // with the same likes the tab does.
+  // AND AGAIN 28 Sep 2026: the tab's own day function is now serveDates.
   check('the grocery list passes them to the tab\'s own day function',
-    /assembleRotationDay\(rotation, date, pools, targets, softLikedFoods/.test(grocery))
+    /serveDates\(\{ dates: run, pools, targets, softLikedFoods,/.test(grocery))
   check('...and they reach it from the caller, on Rebuild and when a day is added',
     /assembleDates\(input\.mealPools, input\.targets, datesFrom\(input\.startDate, days\), input\.softLikedFoods/.test(grocery)
     // BOTH the add and its undo: one line each, and a check satisfied by

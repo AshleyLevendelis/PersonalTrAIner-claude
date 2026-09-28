@@ -177,8 +177,12 @@ console.log('\n5. The shopping list buys what you actually chose')
   // was shopping for a tomorrow the screen would not serve. The strip made
   // that visible. The property now is the one that matters: the list's days
   // are the tab's days, which test:meal-days §3 compares all seven of.
+  // RE-ANCHORED 28 Sep 2026: the tab's day function is now serveDates, over a
+  // run of days, because tomorrow's lunch can be tonight's dinner (so the
+  // tab's tomorrow DOES follow today's actual dinner now, and the list's with
+  // it, by the same call). test:meal-days §3b holds the list after a gap.
   check('the list builds every day with the tab\'s own day function, so its tomorrow is the tab\'s tomorrow',
-    /assembleRotationDay\(rotation, date, pools, targets, softLikedFoods, pinsByDate\[date\] \?\? \{\}\)/.test(grocery))
+    /serveDates\(\{ dates: run, pools, targets, softLikedFoods, shape, pinsByDate \}\)/.test(grocery))
 
   const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
   check('App passes the same chosenMeals the Nutrition tab renders',

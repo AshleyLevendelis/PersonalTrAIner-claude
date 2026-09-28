@@ -75,8 +75,9 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Five screen-only, as of 22 Sep 2026** — the pre-session tightness check,
-macro mode, macro split, logging a build-up set, and logging a drop set. The
+**Six screen-only, as of 28 Sep 2026** — the pre-session tightness check,
+macro mode, macro split, logging a build-up set, logging a drop set, and
+topping every meal up to seven in one tap. The
 calorie target below is a sixth entry but a different kind: it is on NEITHER
 surface and cannot be, because it is derived rather than set.
 CORRECTED 22 Sep 2026: this said "Four... as of 17 Sep 2026" while the
@@ -157,6 +158,17 @@ the difference.
   35kg" about a lift taken to 47.5, and resolving an unstated weight to the
   drop. That is the same class as the coach quoting a different weight from the
   plan, which this app has had once already. Held by `coach-plan-context` §7.
+- **Topping every meal up to seven options in one tap.** `screen only`,
+  added 28 Sep 2026 the day it was built, by the person building it. Ashley's
+  rulings that day: seven options a meal, and "Button, keep today" for plans
+  made at five. The Nutrition offer adds to every short meal at once, and the
+  new meals start the day after today and the last shopping-list day, so
+  nothing she has planned or shopped for moves. **The coach half that exists**
+  is narrower: when she runs out of swaps for one meal, the coach offers to
+  find more for THAT meal (`handleFindMoreMealOptions`), which is right there
+  because she is choosing today's meal and holding today would defeat it.
+  Closing the gap means a coach tool calling the same `topUpMealPlan`, which
+  needs a `chat-gemini` change and deploy; not built.
 - **The calorie target itself.** On NEITHER surface, and not a gap that can be
   closed as written: there is no control because the number is derived by
   `computeTargets`, not stored as an intention. Changing "targets" means

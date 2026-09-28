@@ -27,8 +27,10 @@ import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity }
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
-import { generateMealPools, chosenToMealPlanDays, persistResizedPools, type PoolOption } from '@/lib/meal-generation'
-import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
+import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
+import { topUpNeeds, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
+import { readGroceryBuildMemo } from '@/lib/grocery-display'
+import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
 import { watchFavouriteNames } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
@@ -434,19 +436,17 @@ function App() {
     () => (macros ? buildRotation(mealPools, macros, compiledSoftFoodPreferences, mealShape) : null),
     [mealPools, macros, compiledSoftFoodPreferences, mealShape],
   )
-  const assembledMeals = useMemo(
-    () => (macros && mealRotation
-      ? assembleRotationDay(mealRotation, mealRotationDate, mealPools, macros, compiledSoftFoodPreferences, pinnedMeals)
-      : null),
-    [mealRotation, mealRotationDate, mealPools, macros, compiledSoftFoodPreferences, pinnedMeals],
-  )
-  const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
   // THE STRIP'S DAYS (Ashley, 27 Sep 2026) — one hook, shared with the browser
-  // harness so a driver runs this code and not a copy of it.
+  // harness so a driver runs this code and not a copy of it. TODAY IS ONE OF
+  // THEM since 28 Sep 2026: served in the same run as the strip, so tomorrow's
+  // lunch knows tonight's dinner, and on the pool as it stood today, so meals
+  // added by "Get more meal options" never reach a day that was held.
   const mealDays = useMealDays({
     profileId: profile?.id, today: mealRotationDate, rotation: mealRotation, pools: mealPools,
-    targets: macros, softLikedFoods: compiledSoftFoodPreferences, todaysChosen: chosenMeals, mealShape,
+    targets: macros, softLikedFoods: compiledSoftFoodPreferences, todaysPins: pinnedMeals, mealShape,
   })
+  const assembledMeals = mealDays.today?.day ?? null
+  const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
   // THE DATE MOVED ON WITH THE APP OPEN. Today's picks were only ever loaded
   // on restore, so an app left open overnight kept serving yesterday's swaps
   // as today's. The strip holds tomorrow's already; hand them across.
@@ -485,16 +485,25 @@ function App() {
   // which is exactly the day worth paying for.
   const mealRefit: MealRefit | null =
     macros && assembledMeals && !assembledMeals.withinTolerance
-      ? checkMealRefit(mealPools, macros, {
+      ? checkMealRefit(mealDays.today?.pools ?? mealPools, macros, {
         mealsPerDay: profile?.meals_per_day,
         includeSnacks: profile?.include_snacks,
-        pinned: pinnedMeals,
+        // A LEFTOVER LUNCH IS PART OF TODAY, and a fact like her own picks:
+        // its size comes from last night's pan. Left out, the trial worked
+        // out a different lunch than the screen shows on about four days a
+        // week and quoted totals for a day that was not in front of her.
+        pinned: {
+          ...(assembledMeals.chosen.lunch?.leftoverFrom === 'dinner' ? { lunch: assembledMeals.chosen.lunch } : {}),
+          ...pinnedMeals,
+        },
         softLikedFoods: compiledSoftFoodPreferences,
         // THE SAME DAY THE SCREEN IS SHOWING. Without this the trial
         // assembles the rotation's day 0 while the tab shows day 4, so the
         // offer would quote before/after numbers for meals that are not on
         // the screen — and could offer to resize a day that already fits.
-        recentNames: mealRotation?.historyFor(rotationIndexFor(mealRotationDate)),
+        // The pool and rotation are the ones that SERVED today, which differ
+        // from the whole pool while newer meals are still held back.
+        recentNames: mealDays.today?.rotation.historyFor(rotationIndexFor(mealRotationDate)),
       })
       : null
   // Keyed on the TARGETS, so a decline covers the numbers she saw and nothing
@@ -507,6 +516,27 @@ function App() {
   )
   /** What the Nutrition tab actually shows: a needed refit she has not already turned down. */
   const mealRefitOffer = mealRefit?.needed && !mealRefitDeclined ? mealRefit : null
+
+  // ---------------------------------------------------------------------
+  // MORE MEALS TO CHOOSE FROM — Ashley, 28 Sep 2026: "Button, keep today".
+  // ---------------------------------------------------------------------
+  // Plans made at five options a meal stay at five until she asks; this is
+  // the asking. Only the meals she can be SERVED count (topUpNeeds), and the
+  // offer waits while the first plan is still being built.
+  const activeMealSlots = useMemo(
+    () => (macros ? Object.keys(computeSlotBudgets(macros, profile?.meals_per_day, profile?.include_snacks)) as MealSlotName[] : []),
+    [macros, profile?.meals_per_day, profile?.include_snacks],
+  )
+  const mealTopUpNeeds = useMemo(() => topUpNeeds(mealPools, activeMealSlots), [mealPools, activeMealSlots])
+  const [mealTopUpBusy, setMealTopUpBusy] = useState(false)
+  const [mealTopUpNote, setMealTopUpNote] = useState<{ text: string; failed: boolean } | null>(null)
+  const [mealTopUpDismissTick, setMealTopUpDismissTick] = useState(0)
+  const mealTopUpDismissed = useMemo(
+    () => (profile?.id ? isTopUpDismissed(profile.id) : false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profile?.id, mealTopUpDismissTick],
+  )
+  const mealTopUpOffer = !initialMealBuild && !mealTopUpDismissed ? topUpOffer(mealTopUpNeeds) : null
 
   const mealPlan = chosenToMealPlanDays(chosenMeals)
   const [isRestoring, setIsRestoring] = useState(true)
@@ -1244,6 +1274,42 @@ function App() {
           setAdaptationMessages(prev => [...prev, { text: moved }])
         }
       })
+  }
+
+  /**
+   * "Get more options": every short meal topped up to seven, first served the
+   * day after today and the last day on the shopping list, so neither moves.
+   * The same generator settings as "find more options" below; the list is
+   * read strictly, because "could not read it" must never pass for "empty".
+   */
+  const handleMealTopUp = async () => {
+    if (!profile?.id || !macros || initialMealBuild || mealTopUpBusy) return
+    const profileId = profile.id
+    setMealTopUpBusy(true)
+    setMealTopUpNote(null)
+    const r = await topUpMealPlan({
+      profileId,
+      today: mealRotationDate,
+      needs: mealTopUpNeeds,
+      legacyStartDate: readGroceryBuildMemo(profileId)?.startDate,
+      generation: {
+        targets: macros,
+        dietaryPreferences: profile.dietary_preferences,
+        mealsPerDay: profile.meals_per_day,
+        includeSnacks: profile.include_snacks,
+        cookingTimePreference: profile.cooking_time_preference,
+        favoriteCuisines: profile.favorite_cuisines,
+        dislikedFoods: effectiveDislikedFoods,
+        timingRules: compiledTimingRules,
+        breakfastStyle: profile.breakfast_style,
+        likedFoods: typedFoodLikes,
+        favouriteMeals: steerableFavouriteMeals,
+      },
+    })
+    if (r.unrecognised.length > 0) setUnrecognisedDietaryRestrictions(r.unrecognised)
+    if (r.added > 0) setMealPools(await getPools(profileId))
+    setMealTopUpNote(r.note)
+    setMealTopUpBusy(false)
   }
 
   const handleFindMoreMealOptions = async (slot: MealSlotName): Promise<{ added: string[]; error?: string }> => {
@@ -3019,6 +3085,12 @@ function App() {
               mealRefitError={mealRefitError}
               onMealRefitConfirm={handleMealRefitConfirm}
               onMealRefitDecline={handleMealRefitDecline}
+              mealTopUp={mealTopUpOffer}
+              mealTopUpBusy={mealTopUpBusy}
+              mealTopUpNote={mealTopUpNote}
+              onMealTopUp={handleMealTopUp}
+              onMealTopUpDecline={() => { if (profile?.id) dismissTopUp(profile.id); setMealTopUpDismissTick(t => t + 1) }}
+              onDismissMealTopUpNote={() => setMealTopUpNote(null)}
               mealStrip={mealDays.strip}
               upcomingDay={mealDays.openDay}
             />

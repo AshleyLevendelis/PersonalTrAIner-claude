@@ -32,6 +32,7 @@
 // ---------------------------------------------------------------------------
 
 import { assembleDay, computeSlotBudgets, VARIETY_MEMORY_DAYS, type AssembledDay, type PoolOption } from './meal-generation'
+import { newFromDate } from './meal-new-from'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
 import type { MealSlotName } from './meal-store'
@@ -92,6 +93,24 @@ export function datesFrom(from: string, count: number): string[] {
 }
 
 /**
+ * The pool as it stands on `date`: every option whose first day has come.
+ * Returns THE SAME OBJECT when nothing is held back — the rotation's
+ * same-inputs shortcut, and every memo keyed on the pools, depend on that.
+ */
+export function poolsServedOn(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  date: string,
+): Partial<Record<MealSlotName, PoolOption[]>> {
+  const held = (o: PoolOption) => { const from = newFromDate(o); return from !== null && from > date }
+  if (!Object.values(pools).some(opts => opts?.some(held))) return pools
+  const out: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  for (const [slot, opts] of Object.entries(pools) as [MealSlotName, PoolOption[] | undefined][]) {
+    if (opts) out[slot] = opts.filter(o => !held(o))
+  }
+  return out
+}
+
+/**
  * The user's picks for one date (slot -> meal name) as the options assembly
  * pins. A pick naming a meal no longer in the pool simply does not pin — the
  * rule App has always applied to today's picks, now shared so the strip's
@@ -131,7 +150,7 @@ export interface Rotation {
    * a day with THE SAME inputs gets the day already worked out (see
    * assembleRotationDay). Compared by identity, never by value.
    */
-  builtFrom: { pools: Partial<Record<MealSlotName, PoolOption[]>>; targets: MacroTargets; softLikedFoods: string[] }
+  builtFrom: { pools: Partial<Record<MealSlotName, PoolOption[]>>; targets: MacroTargets; softLikedFoods: string[]; shape: MealShape }
   /**
    * The slots this day serves as leftovers from the day before — empty on most
    * days, and always empty when batch cooking is off or at the rotation's
@@ -215,13 +234,17 @@ export function leftoverLunchFrom(
   const recomputed = computeMealMacros(scaled.ingredients)
   if (!meetsProteinFloor(recomputed.protein, lunchBudget.protein)) return null
 
-  return {
+  const lunch: PoolOption = {
     ...dinner,
     slot: 'lunch',
     ingredients: scaled.ingredients,
     macros: asTargets(recomputed),
     leftoverFrom: 'dinner',
   }
+  // The dinner's own "cook both portions" line belongs to the dinner. A lunch
+  // made from a dinner that carries it must not say it too.
+  delete lunch.reusedTomorrow
+  return lunch
 }
 
 /**
@@ -310,7 +333,7 @@ export function buildRotation(
 
   return {
     days,
-    builtFrom: { pools, targets, softLikedFoods },
+    builtFrom: { pools, targets, softLikedFoods, shape },
     historyFor(index: number) {
       const w = wrap(index)
       return w < 0 ? {} : histories[w]
@@ -339,13 +362,40 @@ export function assembleRotationDay(
   targets: MacroTargets,
   softLikedFoods: string[] = [],
   pinned: Partial<Record<MealSlotName, PoolOption>> = {},
+  opts: {
+    /**
+     * The dinner actually served the night before, when the caller knows it;
+     * undefined when it does not (today, whose yesterday is not worked out).
+     */
+    previousDinner?: PoolOption | null
+  } = {},
 ): AssembledDay {
   const index = rotationIndexFor(date)
+  // A LEFTOVER COMES FROM THE DINNER ACTUALLY COOKED (28 Sep 2026). The
+  // rotation planned this lunch as the leftover of the dinner IT chose. When
+  // the dinner served last night was a different dish (a swap, or the last
+  // day before newer meals start), the card would have said "Last night's
+  // dinner." about food nobody cooked. The lunch is now that real dinner's
+  // leftover instead, re-portioned the same way; if it cannot honestly be one,
+  // lunch is cooked fresh. Only a lunch the rotation planned as a leftover is
+  // re-made: a day it planned fresh (the weekly seam, batch cooking off) stays
+  // fresh.
+  const planned = rotation.leftoverFor(index)
+  let leftover = planned
+  const replanned = opts.previousDinner !== undefined
+    && planned.lunch !== undefined
+    && planned.lunch.name !== opts.previousDinner?.name
+  if (replanned) {
+    const shape = rotation.builtFrom.shape
+    const lunchBudget = batchCookingOn(shape) ? computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks).lunch : undefined
+    const fromActual = leftoverLunchFrom(opts.previousDinner, lunchBudget)
+    leftover = fromActual ? { lunch: fromActual } : {}
+  }
   // THE LEFTOVER IS PART OF THE DAY, so today has to get the one the rotation
   // already decided on rather than re-deriving a different answer. A meal the
   // USER pinned still wins — their choice outranks the plan's, which is the
   // rule everywhere else in the app.
-  const withLeftover = { ...rotation.leftoverFor(index), ...pinned }
+  const withLeftover = { ...leftover, ...pinned }
   // THE SAME CALCULATION, NOT A SECOND PATH (28 Sep 2026). With no pin of the
   // caller's own and the very inputs the rotation was built from, assembleDay
   // would be handed exactly what buildRotation handed it for this index, and
@@ -354,10 +404,18 @@ export function assembleRotationDay(
   // most of a week's cost on a phone. Identity, not value, is the test: any
   // doubt about an input and the day is worked out afresh.
   const b = rotation.builtFrom
-  const sameInputs = Object.keys(pinned).length === 0 && b.pools === pools && b.targets === targets && b.softLikedFoods === softLikedFoods
-  const day = sameInputs && rotation.days[index]
+  const sameInputs = !replanned && Object.keys(pinned).length === 0 && b.pools === pools && b.targets === targets && b.softLikedFoods === softLikedFoods
+  let day = sameInputs && rotation.days[index]
     ? rotation.days[index]
     : assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, withLeftover)
+  // COOK ONCE, EAT TWICE — NOT TWICE TODAY, the rule buildRotation keeps for
+  // its own leftovers, now kept for every day: the leftover yields rather than
+  // sit beside the same dish at dinner. Reached by a re-made leftover, and by
+  // a dinner she swapped to the very dish her lunch is — which served it
+  // twice in one day before 28 Sep 2026.
+  if (leftover.lunch && !pinned.lunch && day.chosen.dinner?.name === leftover.lunch.name) {
+    day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, { ...pinned })
+  }
 
   // PROMISE TOMORROW'S LUNCH ONLY WHEN IT IS ACTUALLY PROMISED. The rotation
   // worked out tomorrow's leftover from the dinner IT chose; if the user has
@@ -371,4 +429,115 @@ export function assembleRotationDay(
     return { ...day, chosen: { ...day.chosen, dinner: { ...dinner, reusedTomorrow: true } } }
   }
   return day
+}
+
+/** One date's meals, and the pool and rotation that served them. */
+export interface ServedDay {
+  date: string
+  day: AssembledDay
+  /** The pool as it stood on this date (see poolsServedOn). */
+  pools: Partial<Record<MealSlotName, PoolOption[]>>
+  /** The rotation that served this date: its history is what a trial of this day must use. */
+  rotation: Rotation
+}
+
+/**
+ * EVERY SURFACE'S DAYS, FROM ONE FUNCTION — the Nutrition tab (today and the
+ * strip), the shopping list, the coach's view of the week and the resize
+ * offer. Each date gets the pool as it stood that day and the rotation that
+ * pool builds, and a run of dates is served in order so each day knows the
+ * dinner actually served the night before.
+ *
+ * `rotation` is the one already built from `pools` with these inputs; when
+ * given, it is reused rather than rebuilt. A date that holds back newer
+ * options gets a rotation of its own, built once per distinct pool.
+ */
+export function serveDates(input: {
+  dates: string[]
+  pools: Partial<Record<MealSlotName, PoolOption[]>>
+  targets: MacroTargets
+  softLikedFoods?: string[]
+  shape?: MealShape
+  pinsByDate?: Record<string, Partial<Record<MealSlotName, PoolOption>>>
+  rotation?: Rotation | null
+  /** The dinner served the night before the first date, when known. */
+  previousDinner?: PoolOption | null
+}): ServedDay[] {
+  const { dates, pools, targets, softLikedFoods = [], shape = {}, pinsByDate = {} } = input
+  const rotations = new Map<Partial<Record<MealSlotName, PoolOption[]>>, Rotation>()
+  // Reused only when it was built from these very inputs; anything else and
+  // the whole pool builds its own, exactly as a held-back pool does.
+  const given = input.rotation?.builtFrom
+  if (input.rotation && given && given.pools === pools && given.targets === targets && given.softLikedFoods === softLikedFoods && given.shape === shape) {
+    rotations.set(pools, input.rotation)
+  }
+  // Pools held back on different dates are different objects with the same
+  // contents; keyed by what they hold so each distinct pool builds once.
+  const byContent = new Map<string, Partial<Record<MealSlotName, PoolOption[]>>>()
+  const canonical = (p: Partial<Record<MealSlotName, PoolOption[]>>) => {
+    if (p === pools) return p
+    const key = (Object.keys(p) as MealSlotName[]).sort().map(s => `${s}:${(p[s] ?? []).map(o => o.name).join('|')}`).join('#')
+    const known = byContent.get(key)
+    if (known) return known
+    byContent.set(key, p)
+    return p
+  }
+
+  const served: ServedDay[] = []
+  let previousDinner = input.previousDinner
+  dates.forEach((date, i) => {
+    // Only a CONSECUTIVE run chains; after a gap, last night is unknown.
+    if (i > 0 && addDays(dates[i - 1], 1) !== date) previousDinner = undefined
+    const dayPools = canonical(poolsServedOn(pools, date))
+    let rotation = rotations.get(dayPools)
+    if (!rotation) {
+      rotation = buildRotation(dayPools, targets, softLikedFoods, shape)
+      rotations.set(dayPools, rotation)
+    }
+    const day = assembleRotationDay(rotation, date, dayPools, targets, softLikedFoods, pinsByDate[date] ?? {}, { previousDinner })
+    served.push({ date, day, pools: dayPools, rotation })
+    previousDinner = day.chosen.dinner ?? null
+  })
+
+  // "COOK BOTH PORTIONS TOGETHER" FOLLOWS THE NEXT DAY ACTUALLY SERVED. Where
+  // the next date is in this run, the dinner carries the line only when that
+  // day's lunch really is this dinner's leftover; the last date keeps the
+  // rotation's own answer, the only one there is.
+  for (let i = 0; i + 1 < served.length; i++) {
+    if (addDays(served[i].date, 1) !== served[i + 1].date) continue
+    const dinner = served[i].day.chosen.dinner
+    if (!dinner) continue
+    const lunch = served[i + 1].day.chosen.lunch
+    const reused = lunch?.leftoverFrom === 'dinner' && lunch.name === dinner.name
+    if ((dinner.reusedTomorrow === true) === reused) continue
+    const plain: PoolOption = { ...dinner }
+    delete plain.reusedTomorrow
+    served[i] = { ...served[i], day: { ...served[i].day, chosen: { ...served[i].day.chosen, dinner: reused ? { ...plain, reusedTomorrow: true } : plain } } }
+  }
+  return served
+}
+
+/**
+ * THE NUTRITION TAB'S WEEK — today and the strip's upcoming days, served in
+ * ONE run so tomorrow's lunch knows tonight's dinner, with today's own pins
+ * (her swaps) on today. useMealDays memoises this and App reads today from
+ * it; it lives here, not in the hook, so a gate can call it.
+ */
+export function serveMealWeek(input: {
+  today: string
+  dates: string[]
+  todaysPins: Partial<Record<MealSlotName, PoolOption>>
+  pinsByDate: Record<string, Partial<Record<MealSlotName, PoolOption>>>
+  pools: Partial<Record<MealSlotName, PoolOption[]>>
+  targets: MacroTargets | null
+  softLikedFoods: string[]
+  shape: MealShape
+  rotation: Rotation | null
+}): ServedDay[] {
+  if (!input.targets) return []
+  return serveDates({
+    dates: input.dates, pools: input.pools, targets: input.targets, softLikedFoods: input.softLikedFoods,
+    shape: input.shape, rotation: input.rotation,
+    pinsByDate: { ...input.pinsByDate, [input.today]: input.todaysPins },
+  })
 }

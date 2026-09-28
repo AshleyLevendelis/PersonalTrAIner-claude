@@ -166,6 +166,38 @@ export function mealsDrifted(mealCalories: number, targetCalories: number): stri
 }
 
 /**
+ * MORE MEALS TO CHOOSE FROM — Ashley's ruling, 28 Sep 2026: "Button, keep
+ * today". Offered, never done unasked (her standing ruling on running out of
+ * swaps), and the offer states the promise that makes it safe to tap: today
+ * and the days already shopped for do not move.
+ *
+ * `counts` are how many options each short meal has now.
+ */
+export function moreMealOptionsOffer(counts: number[], target: number): string {
+  const fewest = Math.min(...counts)
+  const have = counts.every(c => c === counts[0])
+    ? `Your meals have ${fewest} options each.`
+    : `Some of your meals have only ${fewest} options.`
+  return `${have} I can top each one up to ${target}, so your week repeats less. Today, and any day on your shopping list, stay exactly as they are.`
+}
+
+/**
+ * What happened when she tapped it. Every outcome says whether anything
+ * changed, because "nothing has changed" is the fact she needs when it fails.
+ * `startLabel` is "tomorrow", "on Thursday" or "on Monday 6 October".
+ */
+export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string }): string {
+  if (r.listUnreadable) return "I couldn't check your shopping list just then, so nothing has changed. Try again in a moment."
+  if (r.added === 0) {
+    return r.reached
+      ? "I couldn't find new meals that fit your targets, so nothing has changed."
+      : "I couldn't reach the meal generator just then, so nothing has changed. Try again in a moment."
+  }
+  const lead = `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}; every day before then stays as it was.`
+  return r.added < r.asked ? `${lead} That's fewer than I asked for, so the offer stays for another go.` : lead
+}
+
+/**
  * WHAT A NOTIFICATION SAYS, and it is the coach saying it.
  *
  * Ashley chose notifications on 17 Sep 2026. These live here rather than beside

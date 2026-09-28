@@ -178,9 +178,11 @@ console.log('\n5. The chain is wired, end to end')
   // ENFORCING the defect, exactly the shape CLAUDE.md warns about. What must
   // hold is that the pins are an INPUT to the day's assembly and are not
   // patched onto its result afterwards.
-  const assemblyDecl = sliceBetween(app, 'const assembledMeals', 'const chosenMeals')
+  // RE-ANCHORED 28 Sep 2026: today is the first day of the strip's run, so
+  // the pins are an argument of that hook call, and the day is its output.
+  const assemblyDecl = sliceBetween(app, 'useMealDays({', 'const chosenMeals')
   check('manual picks are PINNED into assembly, not overlaid after',
-    /\bpinnedMeals\b/.test(assemblyDecl), assemblyDecl.slice(0, 120))
+    /todaysPins: pinnedMeals\b/.test(assemblyDecl) && /const assembledMeals = mealDays\.today\?\.day\b/.test(assemblyDecl), assemblyDecl.slice(0, 200))
   const afterAssembly = sliceBetween(app, 'const chosenMeals', 'const mealTotals')
   check('...and nothing patches a pick onto the assembled day afterwards',
     !/manualMealPicks|pinnedMeals/.test(afterAssembly), afterAssembly)

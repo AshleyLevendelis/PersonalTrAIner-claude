@@ -478,27 +478,26 @@ console.log('\n5. One rotation, both surfaces')
   const refit = read('src/lib/meal-refit.ts')
 
   // The tab derives its day from the rotation rather than assembling a bare
-  // best day. Anchored on the assembled-day declaration, not on the argument
-  // list — the previous generation of these checks pinned the literal
-  // arguments and went red at the fix.
-  const assemblyDecl = (() => {
-    const i = app.indexOf('const assembledMeals')
-    const j = app.indexOf('const chosenMeals', i)
-    return i < 0 ? '' : (j < 0 ? app.slice(i) : app.slice(i, j))
+  // best day. RE-ANCHORED 28 Sep 2026: today is now the first day of the
+  // strip's run (useMealDays -> serveDates), so tomorrow's lunch knows
+  // tonight's dinner. The previous generation of these checks pinned App's
+  // own assembleRotationDay call and went red at that fix, as the one before
+  // pinned the literal arguments and went red at the last.
+  const hook = read('src/hooks/useMealDays.ts')
+  const hookCall = (() => {
+    const i = app.indexOf('useMealDays({')
+    return i < 0 ? '' : app.slice(i, app.indexOf('})', i) + 2)
   })()
-  check('the Nutrition tab builds its day from the rotation', /assembleRotationDay\(/.test(assemblyDecl), assemblyDecl.slice(0, 160))
-  // READ OFF THE CALL'S OWN ARGUMENTS. Testing the whole declaration for the
-  // name was satisfied by the memo's dependency array, so replacing the date
-  // argument with a literal passed — an "it is mentioned" check standing in
-  // for a "it is used" one.
-  const rotationCall = (() => {
-    const i = assemblyDecl.indexOf('assembleRotationDay(')
-    return i < 0 ? '' : assemblyDecl.slice(i, assemblyDecl.indexOf(')', i) + 1)
-  })()
+  check('the Nutrition tab\'s day is the first day of the hook\'s run', /const assembledMeals = mealDays\.today\?\.day\b/.test(app), hookCall.slice(0, 160))
+  const rotationSrc = read('src/lib/meal-rotation.ts')
+  check('...which serves its dates through the rotation, by the week function', /serveMealWeek\(\{ today, dates, todaysPins,/.test(hook) && /today: week\[0\]/.test(hook)
+    && /export function serveMealWeek[\s\S]*?return serveDates\(\{/.test(rotationSrc))
+  // READ OFF THE CALL'S OWN ARGUMENTS, not the file: "it is mentioned"
+  // standing in for "it is used" is what let a literal date pass once.
   check('...keyed on the app\'s own date, not on a bare clock read or a fixed one',
-    /\bmealRotationDate\b/.test(rotationCall) && /getSessionDateContext\([^)]*\)\.date/.test(app), rotationCall)
+    /today: mealRotationDate\b/.test(hookCall) && /getSessionDateContext\([^)]*\)\.date/.test(app), hookCall)
   check('...and the pinned meals are an argument to it, not overlaid afterwards',
-    /\bpinnedMeals\b/.test(rotationCall), rotationCall)
+    /todaysPins: pinnedMeals\b/.test(hookCall) && /\[input\.today\]: input\.todaysPins/.test(rotationSrc), hookCall)
   check('...and the tab no longer assembles a day without a history',
     !/assembleDay\(mealPools/.test(strip(app)))
 
@@ -512,8 +511,9 @@ console.log('\n5. One rotation, both surfaces')
   // list now builds every date with the tab's OWN day function instead. What
   // is held is that the list and the tab derive a day the same way, from the
   // date the caller is looking at — test:meal-days §3 compares all seven.
+  // AND AGAIN 28 Sep 2026: the tab's own day function is now serveDates.
   check('the shopping list builds each day with the tab\'s own day function',
-    /buildRotation\(/.test(grocery) && /assembleRotationDay\(rotation, date,/.test(grocery))
+    /serveDates\(\{ dates: run,/.test(grocery) && !/assembleRotationDay\(/.test(strip(grocery)))
   check('...starting at the date the caller is actually looking at',
     /datesFrom\(input\.startDate, days\)/.test(grocery) && /startDate: string/.test(grocery))
   check('...and its caller passes the app\'s date rather than defaulting one',
@@ -525,8 +525,9 @@ console.log('\n5. One rotation, both surfaces')
     /recentNames\?: Partial<Record<MealSlotName, string\[\]>>/.test(refit)
     && /assembleDay\(pools, targets, recentNames,/.test(refit)
     && /assembleDay\(next, targets, recentNames,/.test(refit))
-  check('...and the app actually passes it, from the rotation, for today\'s index',
-    /recentNames: mealRotation\?\.historyFor\(rotationIndexFor\(mealRotationDate\)\)/.test(app))
+  check('...and the app actually passes it, from the rotation that SERVED today, for today\'s index',
+    /recentNames: mealDays\.today\?\.rotation\.historyFor\(rotationIndexFor\(mealRotationDate\)\)/.test(app)
+    && /checkMealRefit\(mealDays\.today\?\.pools \?\? mealPools,/.test(app))
 
   // The rotation must not learn to read the clock itself — that is what makes
   // a browser driver reproducible and a check give the same answer on a
@@ -625,6 +626,18 @@ console.log('\n7. The day already worked out is the day a fresh calculation give
     d.totals, d.withinTolerance,
   ])
   const shape = { mealsPerDay: 3, includeSnacks: true, batchCooking: true }
+  /**
+   * A day worked out from scratch the way the rotation's day function must:
+   * its leftover pinned, and the leftover yielding when the dinner is the
+   * same dish (the "not twice today" rule, kept for every day since 28 Sep).
+   */
+  const freshDay = (rot: ReturnType<typeof buildRotation>, i: number, p: Partial<Record<MealSlotName, PoolOption[]>>, t: MacroTargets, l: string[], pin: Partial<Record<MealSlotName, PoolOption>>) => {
+    const leftover = rot.leftoverFor(i)
+    const day = assembleDay(p, t, rot.historyFor(i), l, { ...leftover, ...pin })
+    return leftover.lunch && !pin.lunch && day.chosen.dinner?.name === leftover.lunch.name
+      ? assembleDay(p, t, rot.historyFor(i), l, { ...pin })
+      : day
+  }
   let compared = 0
   let reused = 0
   let leftoverDays = 0
@@ -648,7 +661,7 @@ console.log('\n7. The day already worked out is the day a fresh calculation give
       const i = rotationIndexFor(date)
       const stored = rotation.days[i]
       const got = assembleRotationDay(rotation, date, pools, targets, likes, {})
-      const fresh = assembleDay(pools, targets, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i) })
+      const fresh = freshDay(rotation, i, pools, targets, likes, {})
       compared++
       if (key(got) !== key(fresh)) mismatched.push(`${p}/${date}`)
       if (got.totals === stored.totals) reused++
@@ -661,18 +674,18 @@ console.log('\n7. The day already worked out is the day a fresh calculation give
       // A NEW pools object without today's dinner: the day must not serve it.
       const dinner = stored.chosen.dinner?.name
       const fewer = { ...pools, dinner: (pools.dinner ?? []).filter(o => o.name !== dinner) }
-      tally('pools', assembleRotationDay(rotation, date, fewer, targets, likes, {}), assembleDay(fewer, targets, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i) }))
+      tally('pools', assembleRotationDay(rotation, date, fewer, targets, likes, {}), freshDay(rotation, i, fewer, targets, likes, {}))
       // New targets, well away from the ones the rotation was built for.
       const bigger: MacroTargets = { calories: targets.calories * 1.6, protein: targets.protein * 1.6, carbs: targets.carbs * 1.6, fat: targets.fat * 1.6 }
-      tally('targets', assembleRotationDay(rotation, date, pools, bigger, likes, {}), assembleDay(pools, bigger, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i) }))
+      tally('targets', assembleRotationDay(rotation, date, pools, bigger, likes, {}), freshDay(rotation, i, pools, bigger, likes, {}))
       // A new likes list naming the main food of a dinner not being served.
       const other = (pools.dinner ?? []).find(o => o.name !== dinner)
       const newLikes = [other?.ingredients[0]?.name ?? 'tofu']
-      tally('likes', assembleRotationDay(rotation, date, pools, targets, newLikes, {}), assembleDay(pools, targets, rotation.historyFor(i), newLikes, { ...rotation.leftoverFor(i) }))
+      tally('likes', assembleRotationDay(rotation, date, pools, targets, newLikes, {}), freshDay(rotation, i, pools, targets, newLikes, {}))
       // A meal she pinned for this date, with everything else the same.
       const pinnedBreakfast = (pools.breakfast ?? []).find(o => o.name !== stored.chosen.breakfast?.name)
       const pin = pinnedBreakfast ? { breakfast: pinnedBreakfast } : {}
-      tally('pin', assembleRotationDay(rotation, date, pools, targets, likes, pin), assembleDay(pools, targets, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i), ...pin }))
+      tally('pin', assembleRotationDay(rotation, date, pools, targets, likes, pin), freshDay(rotation, i, pools, targets, likes, pin))
     }
   }
   // LITERAL: twelve profiles, seven dates. A crash or an empty pool reads as

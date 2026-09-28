@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { assembleRotationDay, datesFrom, pinsFromPicks, ROTATION_DAYS, type MealShape, type Rotation } from '@/lib/meal-rotation'
+import { datesFrom, pinsFromPicks, serveMealWeek, ROTATION_DAYS, type MealShape, type Rotation, type ServedDay } from '@/lib/meal-rotation'
 import { getMealPicksForDates, setMealPick, swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
 import { addGroceryDays, removeGroceryDays, readGroceryCoverage, type AddGroceryDaysResult } from '@/lib/grocery-store'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
@@ -17,10 +17,12 @@ import type { MacroTargets } from '@/lib/types'
 // else. A copy of this wiring in the harness would be a driver measuring the
 // copy — the rule `verify:prep-weight` learned the expensive way.
 //
-// EVERY DAY IS THE SAME DERIVATION AS TODAY: assembleRotationDay with that
-// date's own picks pinned. The shopping list is handed the same pins
-// (`pinsByDate`) and calls the same function, so the strip and the list
-// cannot disagree about what a day holds.
+// EVERY DAY IS THE SAME DERIVATION AS TODAY, AND TODAY IS ONE OF THEM: the
+// seven dates are served in one run by serveDates, each with its own picks
+// pinned and the pool as it stood that day, so each day knows the dinner
+// actually served the night before (28 Sep 2026). The shopping list is handed
+// the same pins (`pinsByDate`) and calls the same function, so the strip and
+// the list cannot disagree about what a day holds.
 // ---------------------------------------------------------------------------
 
 export interface MealDaysInput {
@@ -31,8 +33,11 @@ export interface MealDaysInput {
   pools: Partial<Record<MealSlotName, PoolOption[]>>
   targets: MacroTargets | null
   softLikedFoods: string[]
-  /** What today actually serves, swaps included — so adding a day never re-shops today differently. */
-  todaysChosen: Partial<Record<MealSlotName, PoolOption>>
+  /**
+   * Today's pinned meals (her swaps). Today is worked out HERE, in the same
+   * run as the strip, so tomorrow's lunch knows tonight's dinner.
+   */
+  todaysPins: Partial<Record<MealSlotName, PoolOption>>
   mealShape: MealShape
 }
 
@@ -61,7 +66,7 @@ export function sumChosenMacros(chosen: Partial<Record<MealSlotName, PoolOption>
 }
 
 export function useMealDays(input: MealDaysInput) {
-  const { profileId, today, rotation, pools, targets, softLikedFoods, todaysChosen, mealShape } = input
+  const { profileId, today, rotation, pools, targets, softLikedFoods, todaysPins, mealShape } = input
   /** Picks made on the strip's UPCOMING days, keyed by date. Today's live in App's manualMealPicks. */
   const [futurePicks, setFuturePicks] = useState<Record<string, Partial<Record<MealSlotName, string>>>>({})
   /** The day open on the strip when it is not today. Null means today. */
@@ -94,24 +99,22 @@ export function useMealDays(input: MealDaysInput) {
    * shows. The same derivation as the open day, so the coach cannot describe
    * a Monday the screen would not serve.
    */
+  const week: ServedDay[] = useMemo(
+    () => serveMealWeek({ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation }),
+    [dates, pools, targets, softLikedFoods, mealShape, rotation, pinsByDate, today, todaysPins],
+  )
+  const todaysChosen = useMemo(() => week[0]?.day.chosen ?? {}, [week])
+
   const upcoming = useMemo(
-    () => (targets && rotation
-      ? dates.slice(1).map(date => {
-          const day = assembleRotationDay(rotation, date, pools, targets, softLikedFoods, pinsByDate[date] ?? {})
-          const meals: Partial<Record<MealSlotName, string>> = {}
-          for (const [slot, o] of Object.entries(day.chosen) as [MealSlotName, PoolOption][]) meals[slot] = o.name
-          return { date, dayName: weekdayLong(date), meals }
-        })
-      : []),
-    [rotation, dates, pools, targets, softLikedFoods, pinsByDate],
+    () => week.slice(1).map(({ date, day }) => {
+      const meals: Partial<Record<MealSlotName, string>> = {}
+      for (const [slot, o] of Object.entries(day.chosen) as [MealSlotName, PoolOption][]) meals[slot] = o.name
+      return { date, dayName: weekdayLong(date), meals }
+    }),
+    [week],
   )
 
-  const openAssembled = useMemo(
-    () => (targets && rotation && openDate
-      ? assembleRotationDay(rotation, openDate, pools, targets, softLikedFoods, pinsByDate[openDate] ?? {})
-      : null),
-    [rotation, openDate, pools, targets, softLikedFoods, pinsByDate],
-  )
+  const openAssembled = openDate ? week.find(w => w.date === openDate)?.day ?? null : null
 
   /**
    * A swap on an upcoming day: the pool's own swap, then the pick saved for
@@ -179,6 +182,8 @@ export function useMealDays(input: MealDaysInput) {
   } : null
 
   return {
+    /** Today's meals and the pool and rotation that served them, or null before targets exist. */
+    today: week[0] ?? null,
     /** Props for NutritionDisplay's strip. */
     strip: {
       dates,

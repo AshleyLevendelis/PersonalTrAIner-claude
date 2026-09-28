@@ -76,6 +76,8 @@ import { markRestrictionBreakers } from '@/lib/meal-restriction-check'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import type { UserFactRow } from '@/lib/memory-store'
 import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
+import { computeSlotBudgets } from '@/lib/meal-generation'
+import { topUpNeeds, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
 
@@ -800,6 +802,41 @@ const AVOID_FACTS = (AVOID ? [{
   resolved_refs: [AVOID], retired_at: null, created_at: '2026-09-01T00:00:00.000Z',
 }] : []) as never as UserFactRow[]
 
+// ?topup=1 — MORE MEAL OPTIONS (28 Sep 2026, Ashley: "Button, keep today").
+// A plan made at five options a meal, batch cooking on so leftovers are in
+// play, TODAY TAKEN FROM THE APP'S OWN HOOK rather than from a hand-held
+// state, and the button running the app's own topUpMealPlan against the fake
+// database. The meal generator is the one thing faked: ?topupfail=1 makes it
+// answer 502, the way a cut-off reply does.
+const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
+const TOPUP_FAIL = new URLSearchParams(location.search).get('topupfail') === '1'
+const NO_PINS = {}
+if (TOPUP) {
+  const realFetch = window.fetch.bind(window)
+  let made = 0
+  window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input)
+    if (!url.includes('/functions/v1/generate-meals')) return realFetch(input as RequestInfo, init)
+    if (TOPUP_FAIL) return new Response(JSON.stringify({ error: 'simulated cut-off reply' }), { status: 502 })
+    const body = JSON.parse(String(init?.body ?? '{}')) as { slots: { slot: string; count: number }[] }
+    // Shaped like generate-meals' output; the app verifies and sizes them.
+    // THE SAME MIX AS THE PLAN'S OWN DISHES (chicken, rice and oil in the
+    // proportions leftoverPools uses), so a day holding one can land on
+    // target. A first version used a different mix, no day with it fitted,
+    // one new meal was served all week, and the edge of the held days was
+    // never exercised: two mutations came back MISSED on a fixture, not a
+    // check.
+    const meals = body.slots.flatMap(({ slot, count }) => Array.from({ length: count }, () => {
+      made++
+      return {
+        slot, name: `Fresh ${slot} plate ${made}`, cuisine: 'British / Classic', prep: 'Grill the chicken, warm the rice, serve.',
+        ingredients: ['120g chicken breast', '440g cooked basmati rice', '20g olive oil'],
+      }
+    }))
+    return new Response(JSON.stringify({ meals }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+}
+
 const chosen = (REFIT ? refitChosen : {
   breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
   lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720, METHOD_WITH_AN_AMOUNT),
@@ -851,6 +888,29 @@ const leftoverPools = (() => {
       })()] : [])],
   }
 })()
+// Five a meal for ?topup=1: the three above and two more of each at other
+// portions, their macros computed from the food, as every real option is.
+const topUpPools = (() => {
+  const variant = (o: { slot: string; name: string; ingredients: { name: string; quantity: number; unit: string }[] }, name: string, k: number) => {
+    const ingredients = o.ingredients.map(i => ({ ...i, quantity: Math.round(i.quantity * k) }))
+    const m = computeMealMacros(ingredients)
+    return { slot: o.slot, name, ingredients, macros: { calories: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) }, tags: [], prep: '' }
+  }
+  const out: Record<string, unknown[]> = {}
+  for (const [slot, options] of Object.entries(leftoverPools)) {
+    out[slot] = [...options, variant(options[0], `${options[0].name}, lighter`, 0.95), variant(options[1], `${options[1].name}, larger`, 1.05)]
+  }
+  return out
+})()
+if (TOPUP) {
+  for (const [slot, options] of Object.entries(topUpPools)) {
+    (options as { name: string; ingredients: unknown; macros: { calories: number; protein: number; carbs: number; fat: number } }[]).forEach((o, i) => db.meal_plan_slots.push({
+      profile_id: PROFILE_ID, slot, pool_index: i, name: o.name, ingredients: o.ingredients,
+      macros: { kcal: o.macros.calories, protein: o.macros.protein, carbs: o.macros.carbs, fat: o.macros.fat },
+      tags: [], prep: '',
+    }))
+  }
+}
 // What the app's hook would make of these pools for today, for the day's
 // first render. The hook itself runs in the page below.
 const servableAtStart = markRestrictionBreakers(leftoverPools as never, [], compileFoodDislikes(AVOID_FACTS))
@@ -893,7 +953,7 @@ const leftoverDay = leftoverRotation && macros
  * halves go through meal-store against this database. A screen whose meals
  * live only in a prop cannot be edited by the code that ships.
  */
-if (!WEEK) for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
+if (!WEEK && !TOPUP) for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
   db.meal_plan_slots.push({
     profile_id: PROFILE_ID, slot, pool_index: 0, name: option.name,
     ingredients: option.ingredients,
@@ -909,10 +969,10 @@ function Harness() {
   // holds the same two pieces of state and updates them in the same order:
   // persist the pick, re-read the pool, then move what is on screen.
   const [liveChosen, setLiveChosen] = useState((weekToday ? weekToday.chosen : leftoverDay ? leftoverDay.chosen : chosen) as Record<string, PoolOption>)
-  const [livePools, setLivePools] = useState((LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
+  const [livePools, setLivePools] = useState((TOPUP ? topUpPools : LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
   // THE APP'S OWN HOOK for the strip, not a copy of its wiring: the rotation
   // the app would build from these pools, and the fake database underneath.
-  const mealShape = { mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS }
+  const mealShape = useMemo(() => ({ mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS || TOPUP }), [])
   const servablePools = useServablePools(livePools as never, profile.dietary_preferences, AVOID_FACTS)
   const stripRotation = useMemo(
     () => (driftedMacros ? buildRotation(servablePools, driftedMacros, [], mealShape) : null),
@@ -921,8 +981,28 @@ function Harness() {
   )
   const mealDays = useMealDays({
     profileId: PROFILE_ID, today, rotation: stripRotation, pools: servablePools,
-    targets: driftedMacros, softLikedFoods: [], todaysChosen: liveChosen as never, mealShape,
+    targets: driftedMacros, softLikedFoods: [], todaysPins: (TOPUP ? NO_PINS : liveChosen) as never, mealShape,
   })
+  // ?topup=1: the button, through the app's own function. What App.tsx adds
+  // around it (the first-build gate) is held by test:meal-top-up.
+  const topUpSlots = driftedMacros ? Object.keys(computeSlotBudgets(driftedMacros, mealShape.mealsPerDay, mealShape.includeSnacks)) as never[] : []
+  const topUpNeedsNow = TOPUP ? topUpNeeds(servablePools as never, topUpSlots) : {}
+  const [topUpBusy, setTopUpBusy] = useState(false)
+  const [topUpNote, setTopUpNote] = useState<{ text: string; failed: boolean } | null>(null)
+  const [, setTopUpDismissTick] = useState(0)
+  const topUpShown = TOPUP && !isTopUpDismissed(PROFILE_ID) ? topUpOffer(topUpNeedsNow) : null
+  const handleTopUp = async () => {
+    if (!driftedMacros || topUpBusy) return
+    setTopUpBusy(true)
+    setTopUpNote(null)
+    const r = await topUpMealPlan({
+      profileId: PROFILE_ID, today, needs: topUpNeedsNow,
+      generation: { targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks },
+    })
+    if (r.added > 0) setLivePools(await getPools(PROFILE_ID) as never)
+    setTopUpNote(r.note)
+    setTopUpBusy(false)
+  }
   // What the shopping list holds, for verify:meal-days to read back after
   // "Add Monday" — the store's own read, not the fake table's rows.
   ;(window as unknown as { __groceryRows: unknown }).__groceryRows = () => getAllGroceryItems(PROFILE_ID)
@@ -972,7 +1052,7 @@ function Harness() {
 
   const liveTotals = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
     (acc, sl) => {
-      const m = liveChosen[sl]?.macros
+      const m = (TOPUP ? (mealDays.today?.day.chosen ?? {}) as Record<string, PoolOption> : liveChosen)[sl]?.macros
       return m ? { calories: acc.calories + m.calories, protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat } : acc
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 },
@@ -1051,7 +1131,7 @@ function Harness() {
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
             latestWeightKg={80} profileId={PROFILE_ID} date={today}
-            pools={servablePools as never} chosen={liveChosen as never} mealTotals={liveTotals}
+            pools={servablePools as never} chosen={(TOPUP ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
             avoidFoods={compileFoodDislikes(AVOID_FACTS)}
             isGeneratingMeals={false} mealRegenerateError={null}
             onMealPickApplied={handleMealPickApplied as never}
@@ -1060,6 +1140,10 @@ function Harness() {
             onMealRefitConfirm={() => { void handleRefitConfirm() }}
             onMealRefitDecline={() => setRefitDeclined(true)}
             onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop}
+            mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
+            onMealTopUp={() => { void handleTopUp() }}
+            onMealTopUpDecline={() => { dismissTopUp(PROFILE_ID); setTopUpDismissTick(t => t + 1) }}
+            onDismissMealTopUpNote={() => setTopUpNote(null)}
             mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} />
         )}
         {activeTab === 'exercise' && (

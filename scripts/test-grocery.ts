@@ -147,7 +147,7 @@ async function main() {
       { name: 'chicken breast', quantity: 150, unit: 'g' },
     ] }],
   }
-  const genResult = await generateGroceryList({ profileId, mealPools, targets, days: 2 })
+  const genResult = await generateGroceryList({ profileId, mealPools, targets, startDate: '2026-09-28', days: 2 })
   check('generation reports 3 new lines added (oats, olive oil, chicken breast)', genResult.added === 3, genResult)
   await flushPending()
   const afterGen = await getAllItems(profileId)
@@ -170,7 +170,7 @@ async function main() {
   // ones in the pools passed to it).
   const spinachProfileId = crypto.randomUUID()
   const spinachPools = { lunch: [{ slot: 'lunch' as const, name: 'Spinach Side', macros: targets, tags: [], ingredients: [{ name: 'spinach', quantity: 100, unit: 'g' }] }] }
-  await generateGroceryList({ profileId: spinachProfileId, mealPools: spinachPools, targets, days: 1 })
+  await generateGroceryList({ profileId: spinachProfileId, mealPools: spinachPools, targets, startDate: '2026-09-28', days: 1 })
   await flushPending()
   const beforeChatSpinach = await getAllItems(spinachProfileId)
   const rowCountBefore = beforeChatSpinach.filter(i => i.canonical_key === 'spinach').length
@@ -195,7 +195,7 @@ async function main() {
 
   // Regenerate WITHOUT the breakfast slot (oats/breakfast-olive-oil drop out of the horizon entirely).
   const mealPoolsNoBreakfast = { lunch: mealPools.lunch }
-  const regenResult = await generateGroceryList({ profileId, mealPools: mealPoolsNoBreakfast, targets, days: 2 })
+  const regenResult = await generateGroceryList({ profileId, mealPools: mealPoolsNoBreakfast, targets, startDate: '2026-09-28', days: 2 })
   check('regeneration reports the oats line removed (no longer in any selected meal)', regenResult.removed === 1, regenResult)
   check('regeneration reports the chicken/oil lines updated in place, not re-added', regenResult.updated === 2 && regenResult.added === 0, regenResult)
   await flushPending()
@@ -218,7 +218,7 @@ async function main() {
   check('chat row has the identical field shape to the manual row (same keys)', JSON.stringify(Object.keys(chatRow).sort()) === JSON.stringify(Object.keys(manualRow).sort()), chatRow)
   check('chat row is tagged source=chat (provenance preserved, structure identical)', chatRow.source === 'chat')
 
-  const regenAgain = await generateGroceryList({ profileId, mealPools: mealPoolsNoBreakfast, targets, days: 2 })
+  const regenAgain = await generateGroceryList({ profileId, mealPools: mealPoolsNoBreakfast, targets, startDate: '2026-09-28', days: 2 })
   check('a further regenerate touches neither the chat nor the manual row (only source=generated is ever written)', regenAgain.added === 0 && regenAgain.removed === 0)
   await flushPending()
   const afterSecondRegen = await getAllItems(profileId)
@@ -273,7 +273,7 @@ async function main() {
   console.log('\n[6] regenerate respects a deleted generated row and a hand-edited generated row')
   const dismissProfileId = crypto.randomUUID()
   const oatsPools = { breakfast: [{ slot: 'breakfast' as const, name: 'Oats Bowl', macros: targets, tags: [], ingredients: [{ name: 'oats', quantity: 80, unit: 'g' }] }] }
-  await generateGroceryList({ profileId: dismissProfileId, mealPools: oatsPools, targets, days: 1 })
+  await generateGroceryList({ profileId: dismissProfileId, mealPools: oatsPools, targets, startDate: '2026-09-28', days: 1 })
   await flushPending()
   const oatsRow = (await getAllItems(dismissProfileId)).find(i => i.canonical_key === 'oats')!
   check('oats was generated', !!oatsRow, oatsRow)
@@ -281,19 +281,19 @@ async function main() {
   await flushPending()
   check('deleting a generated row hides it from getAllItems', !(await getAllItems(dismissProfileId)).some(i => i.canonical_key === 'oats'))
   check('but the row still exists in the DB, soft-deleted rather than removed', db.grocery_items.some(r => r.canonical_key === 'oats' && r.dismissed === true))
-  const rerunSamePools = await generateGroceryList({ profileId: dismissProfileId, mealPools: oatsPools, targets, days: 1 })
+  const rerunSamePools = await generateGroceryList({ profileId: dismissProfileId, mealPools: oatsPools, targets, startDate: '2026-09-28', days: 1 })
   check('regenerating with oats still in the plan does NOT resurrect the dismissed row', rerunSamePools.added === 0 && rerunSamePools.updated === 0, rerunSamePools)
   check('oats is still absent after the regenerate', !(await getAllItems(dismissProfileId)).some(i => i.canonical_key === 'oats'))
 
   const editProfileId = crypto.randomUUID()
   const chickenPools = { lunch: [{ slot: 'lunch' as const, name: 'Chicken Bowl', macros: targets, tags: [], ingredients: [{ name: 'chicken breast', quantity: 150, unit: 'g' }] }] }
-  await generateGroceryList({ profileId: editProfileId, mealPools: chickenPools, targets, days: 1 })
+  await generateGroceryList({ profileId: editProfileId, mealPools: chickenPools, targets, startDate: '2026-09-28', days: 1 })
   await flushPending()
   const chickenRow = (await getAllItems(editProfileId)).find(i => i.canonical_key === 'chicken breast')!
   const editedChicken = editItemLocal(chickenRow, { displayName: 'Chicken breast (family pack)', quantity: 1000 })
   check('editItemLocal marks a generated row user_edited', editedChicken.user_edited === true, editedChicken)
   await flushPending()
-  const regenAfterEdit = await generateGroceryList({ profileId: editProfileId, mealPools: chickenPools, targets, days: 1 })
+  const regenAfterEdit = await generateGroceryList({ profileId: editProfileId, mealPools: chickenPools, targets, startDate: '2026-09-28', days: 1 })
   check('regenerate still reports the row touched (meal_refs refresh)', regenAfterEdit.updated === 1 && regenAfterEdit.added === 0, regenAfterEdit)
   const editedChickenAfterRegen = (await getAllItems(editProfileId)).find(i => i.id === chickenRow.id)
   check("the user's hand-edited name and quantity survive the regenerate untouched", editedChickenAfterRegen?.display_name === 'Chicken breast (family pack)' && editedChickenAfterRegen?.quantity === 1000, editedChickenAfterRegen)

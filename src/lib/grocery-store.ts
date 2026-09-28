@@ -22,7 +22,7 @@
 import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
 import type { PoolOption } from './meal-generation'
-import { buildRotation, assembleRotationDay, datesFrom, epochDay, addDays, type MealShape } from './meal-rotation'
+import { serveDates, datesFrom, epochDay, addDays, type MealShape } from './meal-rotation'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
 
@@ -315,7 +315,7 @@ function mergePendingForProfile(profileId: string, serverRows: GroceryItemRow[])
 }
 
 /** Server + pending merged, including dismissed rows — only the regenerate reconciliation needs to see a dismissed row (to avoid resurrecting it), so this stays module-private rather than a second public read API. */
-async function getAllItemsIncludingDismissed(profileId: string): Promise<GroceryItemRow[]> {
+async function getAllItemsIncludingDismissed(profileId: string, opts: { strict?: boolean } = {}): Promise<GroceryItemRow[]> {
   try {
     const { data, error } = await supabase
       .from('grocery_items')
@@ -324,7 +324,8 @@ async function getAllItemsIncludingDismissed(profileId: string): Promise<Grocery
       .order('created_at', { ascending: true })
     if (error) throw error
     return mergePendingForProfile(profileId, (data ?? []) as GroceryItemRow[])
-  } catch {
+  } catch (err) {
+    if (opts.strict) throw err
     return mergePendingForProfile(profileId, [])
   }
 }
@@ -618,9 +619,9 @@ export const MAX_HORIZON_DAYS = 14
 /**
  * THE SAME DAYS THE NUTRITION TAB SHOWS, BY CONSTRUCTION — 27 Sep 2026.
  *
- * Each date's meals come from assembleRotationDay with that date's own picks
- * pinned: the one function the tab calls for today and for every day on its
- * strip. So the list cannot shop for a day the screen does not serve.
+ * Each date's meals come from serveDates with that date's own picks pinned:
+ * the one function the tab calls for today and for every day on its strip.
+ * So the list cannot shop for a day the screen does not serve.
  *
  * This used to be a private walk (assembleHorizon) that honoured the user's
  * swaps on day 0 only and threaded history its own way past the rotation's
@@ -636,16 +637,27 @@ function assembleDates(
   pinsByDate: Record<string, Partial<Record<MealSlotName, PoolOption>>>,
   /** Must be the SAME shape the Nutrition tab uses, or the two build different weeks. */
   shape: MealShape,
+  /**
+   * The app's today. The days are served as ONE RUN from here, the way the
+   * tab serves its week, because a lunch can be last night's dinner and only
+   * a run knows what last night was (28 Sep 2026). Serving just the listed
+   * dates would give Friday a different lunch whenever Thursday is not on
+   * the list.
+   */
+  runFrom: string,
 ): { date: string; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
-  const rotation = buildRotation(pools, targets, softLikedFoods, shape)
+  if (dates.length === 0) return []
+  const first = dates.reduce((a, b) => (b < a ? b : a), runFrom)
+  const last = dates.reduce((a, b) => (b > a ? b : a))
+  const run = datesFrom(first, epochDay(last) - epochDay(first) + 1)
   // The rotation's own leftovers count as shopping too: a lunch that is last
   // night's dinner is a real portion of food that has to be bought. Its
   // ingredients are stored at LUNCH size, so summing dinner and lunch
   // separately is already right and needs no special case here.
-  return dates.map(date => ({
-    date,
-    chosen: assembleRotationDay(rotation, date, pools, targets, softLikedFoods, pinsByDate[date] ?? {}).chosen,
-  }))
+  const wanted = new Set(dates)
+  return serveDates({ dates: run, pools, targets, softLikedFoods, shape, pinsByDate })
+    .filter(s => wanted.has(s.date))
+    .map(s => ({ date: s.date, chosen: s.day.chosen }))
 }
 
 interface AggregatedIngredient {
@@ -715,7 +727,7 @@ export interface GenerateGroceryListResult {
 export async function generateGroceryList(input: GenerateGroceryListInput): Promise<GenerateGroceryListResult> {
   const days = Math.max(1, Math.min(MAX_HORIZON_DAYS, input.days ?? DEFAULT_HORIZON_DAYS))
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.startDate]: { ...(input.pinsByDate?.[input.startDate] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, datesFrom(input.startDate, days), input.softLikedFoods ?? [], pinsByDate, input.mealShape)
+  const planned = assembleDates(input.mealPools, input.targets, datesFrom(input.startDate, days), input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.startDate)
   return reconcileGenerated(input.profileId, planned, input.startDate)
 }
 
@@ -852,8 +864,19 @@ export function coveredDates(items: GroceryItemRow[], today: string, legacyStart
  * still a day the list was built for, and adding it again must not bring the
  * onions back.
  */
-export async function readGroceryCoverage(profileId: string, today: string, legacyStartDate?: string): Promise<string[]> {
-  const current = await getAllItemsIncludingDismissed(profileId)
+export async function readGroceryCoverage(
+  profileId: string,
+  today: string,
+  legacyStartDate?: string,
+  /**
+   * Throw when the list cannot be read, instead of answering from what is
+   * queued on this device. For a caller that must not mistake "could not
+   * read" for "nothing is on the list" — the meal top-up would otherwise
+   * change days she has already shopped for.
+   */
+  opts: { strict?: boolean } = {},
+): Promise<string[]> {
+  const current = await getAllItemsIncludingDismissed(profileId, opts)
   return coveredDates(current, today, legacyStartDate).filter(d => d >= today)
 }
 
@@ -893,7 +916,7 @@ export async function addGroceryDays(input: AddGroceryDaysInput): Promise<AddGro
   }
   const covered = [...new Set([...before, ...wanted])].sort()
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape)
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today)
   const result = await reconcileGenerated(input.profileId, planned, input.today)
   return { ...result, alreadyCovered: false, covered }
 }
@@ -912,7 +935,7 @@ export async function removeGroceryDays(input: AddGroceryDaysInput): Promise<Add
   }
   const covered = before.filter(d => !input.dates.includes(d))
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape)
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today)
   const result = await reconcileGenerated(input.profileId, planned, input.today)
   return { ...result, alreadyCovered: false, covered }
 }

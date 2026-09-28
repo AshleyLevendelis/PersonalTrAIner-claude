@@ -103,7 +103,7 @@ async function main() {
   const { setSupabaseClient } = await import('../src/lib/supabase')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setSupabaseClient({ from: fakeFrom } as any)
-  const { addDays, datesFrom, pinsFromPicks, buildRotation, assembleRotationDay } = await import('../src/lib/meal-rotation')
+  const { addDays, datesFrom, pinsFromPicks, buildRotation, assembleRotationDay, serveDates, serveMealWeek } = await import('../src/lib/meal-rotation')
   const { generateGroceryList, addGroceryDays, removeGroceryDays, coveredDates, getAllItems, addItemLocal, deleteItemLocal, flushPending } = await import('../src/lib/grocery-store')
   const { computeMealMacros } = await import('../src/lib/food-db')
   const { buildMealSwapProposal } = await import('../src/lib/meal-swap-proposal')
@@ -169,8 +169,13 @@ async function main() {
     await flushPending()
     const refs = (await getAllItems(profileId)).flatMap(r => r.meal_refs)
     const mismatched: string[] = []
-    for (const date of days) {
-      const strip = assembleRotationDay(rotation, date, pools, targets, [], date === today ? todays : (pinsByDate[date] ?? {}))
+    // THE TAB'S OWN DERIVATION since 28 Sep 2026: the week served in one run,
+    // by the very function the hook memoises.
+    const week = serveMealWeek({ today, dates: days, todaysPins: todays, pinsByDate, pools, targets, softLikedFoods: [], shape, rotation })
+    check('the tab\'s today honours today\'s own swap', week[0]?.day.chosen.breakfast?.name === todays.breakfast?.name, week[0]?.day.chosen.breakfast?.name)
+    check('...and the hook serves its week through that function, with today\'s swaps', /serveMealWeek\(\{ today, dates, todaysPins,/.test(read('src/hooks/useMealDays.ts')))
+    for (const [n, date] of days.entries()) {
+      const strip = week[n].day
       const want = Object.values(strip.chosen).map(o => `${o!.slot}:${o!.name}`).sort()
       const got = [...new Set(refs.filter(r => r.date === date).map(r => `${r.slot}:${r.mealName}`))].sort()
       if (JSON.stringify(want) !== JSON.stringify(got)) mismatched.push(`${date} want ${want} got ${got}`)
@@ -179,6 +184,31 @@ async function main() {
     check('...including the swapped dinner, on its own day', refs.some(r => r.date === days[2] && r.slot === 'dinner' && r.mealName === swappedDinner.name))
     check('...and not the dinner it replaced, on that day', !refs.some(r => r.date === days[2] && r.slot === 'dinner' && r.mealName === unpinnedD2.chosen.dinner?.name))
     check('every reference carries its date', refs.length > 0 && refs.every(r => typeof r.date === 'string' && days.includes(r.date!)))
+  }
+
+  console.log('\n[3b] With batch cooking on, a list day after a gap shops for the lunch the tab serves')
+  {
+    // A lunch can be last night's dinner, so a day's lunch depends on the day
+    // before. The list used to work out only the days it covers; with a
+    // swapped dinner the day before an uncovered gap, it would shop for a
+    // leftover of the dinner she swapped away (28 Sep 2026).
+    const shapeBC = { mealsPerDay: 3, includeSnacks: false, batchCooking: true }
+    const tab0 = serveDates({ dates: days, pools, targets, shape: shapeBC })
+    const k = tab0.findIndex((s, i) => i >= 1 && i + 1 < tab0.length && tab0[i + 1].day.chosen.lunch?.leftoverFrom === 'dinner')
+    check('the fixture is under pressure: a day after today hands its dinner on as the next lunch', k >= 1, tab0.map(s => s.day.chosen.lunch?.leftoverFrom ?? '-'))
+    const kk = Math.max(1, k)
+    const swappedAway = tab0[kk].day.chosen.dinner?.name
+    const other = pools.dinner.find(o => o.name !== swappedAway)!
+    const pinsBC = { [days[kk]]: { dinner: other } }
+    const tab = serveDates({ dates: days, pools, targets, shape: shapeBC, pinsByDate: pinsBC })
+    const pidBC = crypto.randomUUID()
+    await addGroceryDays({ profileId: pidBC, mealPools: pools, targets, softLikedFoods: [], pinsByDate: pinsBC, mealShape: shapeBC, today, dates: [days[kk + 1]], todaysPicks: tab[0].day.chosen })
+    await flushPending()
+    const refs = (await getAllItems(pidBC)).flatMap(r => r.meal_refs).filter(r => r.date === days[kk + 1])
+    const want = Object.values(tab[kk + 1].day.chosen).map(o => `${o!.slot}:${o!.name}`).sort()
+    const got = [...new Set(refs.map(r => `${r.slot}:${r.mealName}`))].sort()
+    check('the list shops that day for exactly the meals the tab serves, lunch included', want.length > 0 && JSON.stringify(want) === JSON.stringify(got), { want, got })
+    check('...and that lunch is not a leftover of the dinner she swapped away', !got.includes(`lunch:${swappedAway}`), got)
   }
 
   console.log('\n[4] Adding a day recomputes; it never appends')
@@ -293,8 +323,13 @@ async function main() {
   {
     const app = read('src/App.tsx')
     const call = app.match(/useMealDays\(\{([\s\S]*?)\}\)/)?.[1] ?? ''
-    const assembled = app.match(/assembleRotationDay\(mealRotation, mealRotationDate, ([^)]*)\)/)?.[1] ?? ''
-    check('the sanity check on this check: App assembles today from mealPools, macros and the likes', /mealPools, macros, compiledSoftFoodPreferences/.test(assembled), assembled)
+    // RE-ANCHORED 28 Sep 2026. This pinned App's own assembleRotationDay call
+    // for today, which went away when today became the first day of the
+    // strip's run (so tomorrow's lunch knows tonight's dinner). The property
+    // is stronger now: there is no second derivation of today to agree with.
+    check('today IS the first day of the strip\'s own run, with her pins for today',
+      /const assembledMeals = mealDays\.today\?\.day\b/.test(app) && /todaysPins: pinnedMeals\b/.test(call), call)
+    check('...and nothing in App works out a day on its own any more', !/assembleRotationDay\(|assembleDay\(/.test(app))
     check('App builds the strip from the SAME rotation, pools, targets, likes and shape as today',
       /rotation: mealRotation\b/.test(call) && /pools: mealPools\b/.test(call) && /targets: macros\b/.test(call)
       && /softLikedFoods: compiledSoftFoodPreferences\b/.test(call) && /\bmealShape\b/.test(call) && /today: mealRotationDate\b/.test(call), call)
