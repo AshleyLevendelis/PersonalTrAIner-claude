@@ -2,6 +2,75 @@
 
 Newest first. One line each.
 
+- [x] **THE SAME DISHES, DAY AFTER DAY: THE RANKING FIXED, THE REST
+  MEASURED.** 28 Sep 2026, Ashley on the live day strip: *"a lot of the days
+  just repeat meals in a slightly different order."*
+  **Why nothing had seen it.** `measure:meal-variety` counts whole DAYS, and a
+  day is "different" if any one slot differs, so a day whose lunch is
+  yesterday's dinner, or a week cycling four days, both read as varied. It
+  also called the assembler directly, so it never ran the leftovers at all.
+  The leftovers decision of 19 Sep ("4.58 -> 4.45 distinct days") was made on
+  that metric, which could not see the cost. `measure:meal-repeats` (new)
+  counts DISHES through the app's own rotation, with the app's default shape.
+  **Measured before** (200 profiles, three meals and a snack, 5 options a
+  slot, per week of 28 servings):
+  - About 10.5 distinct dishes.
+  - About 17.5 servings are a dish already served that week.
+  - 7.8 servings are back the very next day with leftovers off, 9.8 with
+    them on (lunch = last night's dinner about 3.6 days a week, by her
+    19 Sep ruling).
+  **Cause 1, fixed:** one count for "seen in the last three days" treated
+  last night's dinner the same as one from three days ago, so a day that had
+  to repeat often repeated yesterday's. The ranking, after tolerance, is now:
+  1. no dish from yesterday;
+  2. nothing from the last 3 days;
+  3. her likes, in the place she ruled on;
+  4. the dish that has rested longest across 6 days (the rotation now keeps
+     the whole week before);
+  5. the resize;
+  6. fit.
+  The same order applies off target, inside the margin. After: next-day
+  repeats 7.8 -> 6.2, distinct dishes 10.6 -> 11.1, on-target days
+  unchanged, and a 5-dinner week now uses all 5 rather than cycling 4.
+  **Cause 2, measured, not changed:** 74% of the next-day repeats that remain
+  are FORCED by the targets. Without that dish, no combination of the saved
+  options is a correct day. Only more options per meal cure that. At 7 a
+  slot: 14.9 distinct dishes, 3.2 next-day repeats (leftovers off), and MORE
+  days on target (85% -> 92%). **But it is not ready**: the day search tries
+  every combination on the phone, and a week took median 55 ms / max 266 ms
+  at 5 options and median 190 ms / max 789 ms at 7 on this machine. A phone
+  is several times slower. 10 a slot did not finish its measurement in 15
+  minutes. Deeper pools also mean the generator makes 40% more meals, which
+  is more model cost and a longer first build: hers to decide.
+  **Cause 3, her own setting:** leftovers make lunch last night's dinner about
+  four days a week, deliberately, with the card saying so. It can be switched
+  off per person on Profile.
+  **CSCS review:**
+  1. *Effect.* Which correct day is served, nothing else. Targets, bands and
+     portions are unchanged.
+  2. *What it takes away.* Nothing measurable: on-target days did not move.
+  3. *Fundamentals.* Survive.
+  4. *Redefined?* Yes, named: `RECENT_WINDOW`, the history the rotation
+     keeps, is now 6 days, not 3. "Recent" for the repeat count is
+     `VARIETY_REST_DAYS` = 3, as before.
+  5. *Scope.* Not clinical.
+  **Verified:** `test:meal-variety` §6 (new, 13 checks). Every dinner has
+  identical real-food macros and each case is ordered so the OLD rule
+  picks the wrong dish. It covers:
+  - three days ago over yesterday;
+  - two days ago over yesterday;
+  - rested six over rested five;
+  - a like ahead of rest time, but never bringing back yesterday's, and a
+    liked dish from two days ago still resting;
+  - avoiding yesterday outranking repeating fewer (a two-size fixture where
+    only two days are correct);
+  - off target, the same;
+  - a 7-day week using all 5 dinners, never two days running.
+  8 mutations, 8 caught. All 26 gates reading the ranking or the rotation
+  are green. The fixture moved to `scripts/meal-fixture.ts`, shared by both
+  measurements, and `measure:meal-variety` reproduces its recorded 3.28.
+  **Deploys:** frontend only, when she says.
+
 - [x] **YOUR CHAT BUBBLES ARE PLAIN; THE COACH STAYS MINT.** 28 Sep 2026,
   Ashley on the live app: *"the coach and user text bubbles are both the same
   colour."* They were, and by design: her 27 Sep brief kept her own bubbles

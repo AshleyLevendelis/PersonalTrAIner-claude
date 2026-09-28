@@ -328,6 +328,7 @@
     "report:rest-floors": "tsx scripts/measure-rest-floors.ts",
     "test:rest-floors": "tsx scripts/test-rest-floors.ts",
     "measure:meal-variety": "tsx scripts/measure-meal-variety.ts",
+    "measure:meal-repeats": "tsx scripts/measure-meal-repeats.ts",
     "test:meal-variety": "tsx scripts/test-meal-variety.ts",
     "test:meal-days": "tsx scripts/test-meal-days.ts",
     "test:meal-likes": "tsx scripts/test-meal-likes.ts",

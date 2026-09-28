@@ -198,7 +198,20 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   dishes fix that, not a looser rule. **A variety measurement whose pool and
   targets can never disagree cannot see the commonest way variety dies.**
   Numbers before 27 Sep are not comparable (fixture changed).
-  `meal-variety` (63 checks, 10 mutations), `measure:meal-variety`
+  **CORRECTED AGAIN 28 Sep 2026: "distinct days" cannot see a dish come
+  back.** A day counts as different if any one slot differs, so Ashley saw
+  "the same meals in a slightly different order" on a strip that metric
+  scored 4.3-5.5 of 7. Measured by DISH (`measure:meal-repeats`): about 10.5
+  dishes in 28 servings a week, and 7.8 back the very next day with
+  leftovers off. The ranking now avoids yesterday's dish first, then the
+  last three days, then her likes, then prefers the longest rested across
+  six days: 6.2 next-day repeats, and a 5-dinner week uses all 5. 74% of
+  what remains is forced by the targets, and only deeper pools cure that; at
+  7 options a slot the on-phone search is about 3.5x slower, so that is not
+  built. **A variety number must count the thing the person sees**: here,
+  the dish on the plate, not the day's label.
+  `meal-variety` (76 checks, 18 mutations), `measure:meal-variety`,
+  `measure:meal-repeats`
 - **Upcoming days: see, swap, shop** — both surfaces since 27 Sep 2026.
   Ashley: *"I can only see today's meal ... I can't add things to the grocery
   list for future meals so I can plan ahead."* Her ruling, from three options:
