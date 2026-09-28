@@ -596,7 +596,28 @@ function depluralizeToken(token: string): string {
  * nutritional profile for an unresolved ingredient (see diet-rules.ts's
  * fail-closed handling).
  */
+/**
+ * REMEMBERED, because the day search asks the same few names thousands of
+ * times (28 Sep 2026: 1.2 of 2.8 seconds of a week's search was this scan).
+ * LOOKUP is filled once at load and never changes, so the answer for a name
+ * never changes either. Capped so a long session cannot grow it without end.
+ */
+const LOOKUP_MEMO = new Map<string, FoodEntry | null>()
+const LOOKUP_MEMO_CAP = 5000
+
 export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntry | null {
+  if (!_isPluralRetry) {
+    const known = LOOKUP_MEMO.get(name)
+    if (known !== undefined) return known
+    const found = lookupIngredientUncached(name, false)
+    if (LOOKUP_MEMO.size >= LOOKUP_MEMO_CAP) LOOKUP_MEMO.clear()
+    LOOKUP_MEMO.set(name, found)
+    return found
+  }
+  return lookupIngredientUncached(name, true)
+}
+
+function lookupIngredientUncached(name: string, _isPluralRetry: boolean): FoodEntry | null {
   const key = normalize(name)
   if (!key) return null
 
@@ -636,7 +657,7 @@ export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntr
 
   if (!_isPluralRetry) {
     const depluralized = keyTokens.map(depluralizeToken).join(' ')
-    if (depluralized !== key) return lookupIngredient(depluralized, true)
+    if (depluralized !== key) return lookupIngredientUncached(depluralized, true)
   }
   return null
 }

@@ -41,9 +41,12 @@ import {
   DAY_CARB_TOLERANCE,
   DAY_FAT_TOLERANCE,
   macroDistanceScore,
+  computeSlotBudgets,
+  type AssembledDay,
   type PoolOption,
 } from '../src/lib/meal-generation'
-import { computeMealMacros, type MealIngredientLine } from '../src/lib/food-db'
+import { computeMealMacros, lookupIngredient, type MealIngredientLine } from '../src/lib/food-db'
+import { mulberry32, makeDish } from './meal-fixture'
 import {
   buildRotation,
   assembleRotationDay,
@@ -602,6 +605,116 @@ console.log('\n6. Variety in three steps: never yesterday\'s, then nothing recen
   const hist = rotation.historyFor(ROTATION_DAYS - 1).dinner ?? []
   // A LITERAL, not the constant: the property is "the whole week before".
   check('the rotation remembers six days back, the whole week before', hist.length === 6, hist)
+}
+
+// ===========================================================================
+console.log('\n7. The day already worked out is the day a fresh calculation gives')
+// ===========================================================================
+{
+  // 28 Sep 2026, for Ashley's ruling of seven options a meal. The tab asks for
+  // today with the very inputs the rotation was built from, and that day used
+  // to be worked out twice — most of a week's cost on a phone at seven
+  // options. It is now handed the rotation's own day, but ONLY when every
+  // input is the identical object. These hold both halves: the shortcut gives
+  // exactly the answer a fresh calculation would, and it is never taken when
+  // anything has changed. Pools are seven real-food dishes a slot, leftovers
+  // on, likes on half the profiles, so every branch of a day is in play.
+  const dates = Array.from({ length: ROTATION_DAYS }, (_, i) => new Date(Date.UTC(2026, 8, 28 + i)).toISOString().slice(0, 10))
+  const key = (d: AssembledDay) => JSON.stringify([
+    (Object.keys(d.chosen) as MealSlotName[]).sort().map(s => [s, d.chosen[s]!.name, d.chosen[s]!.macros, d.chosen[s]!.leftoverFrom ?? null]),
+    d.totals, d.withinTolerance,
+  ])
+  const shape = { mealsPerDay: 3, includeSnacks: true, batchCooking: true }
+  let compared = 0
+  let reused = 0
+  let leftoverDays = 0
+  const mismatched: string[] = []
+  // Each change of input: does the day follow it, and did it actually change
+  // the day somewhere (so the check has teeth)?
+  const changed = { pools: { wrong: [] as string[], moved: 0 }, targets: { wrong: [] as string[], moved: 0 }, likes: { wrong: [] as string[], moved: 0 }, pin: { wrong: [] as string[], moved: 0 } }
+  for (let p = 0; p < 12; p++) {
+    const rnd = mulberry32(900 + p)
+    const calories = 1700 + Math.round(rnd() * 1300)
+    const protein = Math.round((calories * (0.25 + rnd() * 0.1)) / 4)
+    const fat = Math.round((calories * (0.25 + rnd() * 0.1)) / 9)
+    const targets: MacroTargets = { calories, protein, carbs: Math.round((calories - protein * 4 - fat * 9) / 4), fat }
+    const pools: Partial<Record<MealSlotName, PoolOption[]>> = {}
+    for (const [slot, b] of Object.entries(computeSlotBudgets(targets, 3, true)) as [MealSlotName, MacroTargets][]) {
+      pools[slot] = Array.from({ length: 7 }, (_, i) => makeDish(rnd, slot, i, b)).filter((o): o is PoolOption => o !== null)
+    }
+    const likes = p % 2 === 0 ? ['salmon'] : []
+    const rotation = buildRotation(pools, targets, likes, shape)
+    for (const date of dates) {
+      const i = rotationIndexFor(date)
+      const stored = rotation.days[i]
+      const got = assembleRotationDay(rotation, date, pools, targets, likes, {})
+      const fresh = assembleDay(pools, targets, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i) })
+      compared++
+      if (key(got) !== key(fresh)) mismatched.push(`${p}/${date}`)
+      if (got.totals === stored.totals) reused++
+      if (Object.keys(rotation.leftoverFor(i)).length > 0) leftoverDays++
+
+      const tally = (what: keyof typeof changed, day: AssembledDay, expected: AssembledDay) => {
+        if (key(day) !== key(expected)) changed[what].wrong.push(`${p}/${date}`)
+        if (key(expected) !== key(stored)) changed[what].moved++
+      }
+      // A NEW pools object without today's dinner: the day must not serve it.
+      const dinner = stored.chosen.dinner?.name
+      const fewer = { ...pools, dinner: (pools.dinner ?? []).filter(o => o.name !== dinner) }
+      tally('pools', assembleRotationDay(rotation, date, fewer, targets, likes, {}), assembleDay(fewer, targets, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i) }))
+      // New targets, well away from the ones the rotation was built for.
+      const bigger: MacroTargets = { calories: targets.calories * 1.6, protein: targets.protein * 1.6, carbs: targets.carbs * 1.6, fat: targets.fat * 1.6 }
+      tally('targets', assembleRotationDay(rotation, date, pools, bigger, likes, {}), assembleDay(pools, bigger, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i) }))
+      // A new likes list naming the main food of a dinner not being served.
+      const other = (pools.dinner ?? []).find(o => o.name !== dinner)
+      const newLikes = [other?.ingredients[0]?.name ?? 'tofu']
+      tally('likes', assembleRotationDay(rotation, date, pools, targets, newLikes, {}), assembleDay(pools, targets, rotation.historyFor(i), newLikes, { ...rotation.leftoverFor(i) }))
+      // A meal she pinned for this date, with everything else the same.
+      const pinnedBreakfast = (pools.breakfast ?? []).find(o => o.name !== stored.chosen.breakfast?.name)
+      const pin = pinnedBreakfast ? { breakfast: pinnedBreakfast } : {}
+      tally('pin', assembleRotationDay(rotation, date, pools, targets, likes, pin), assembleDay(pools, targets, rotation.historyFor(i), likes, { ...rotation.leftoverFor(i), ...pin }))
+    }
+  }
+  // LITERAL: twelve profiles, seven dates. A crash or an empty pool reads as
+  // "nothing mismatched" unless the count is held.
+  check('all 84 days were compared', compared === 84, compared)
+  check('with the rotation\'s own inputs, every day is exactly what a fresh calculation gives', mismatched.length === 0, mismatched)
+  check('...including days whose lunch is last night\'s leftover', leftoverDays > 0, leftoverDays)
+  check('...and none of those days was worked out a second time (the speed-up is real)', reused === compared, { reused, compared })
+  for (const [what, r] of Object.entries(changed)) {
+    check(`a changed ${what === 'pin' ? 'pinned meal' : what} gives the day a fresh calculation gives, never the stored one`, r.wrong.length === 0, r.wrong)
+    check(`...and that change really did move the day somewhere (${r.moved} of 84), so the check has teeth`, r.moved > 0, r.moved)
+  }
+
+  // THE FOOD LOOKUP REMEMBERS ITS ANSWERS (same day, same reason: it was 1.2
+  // of 2.8 seconds of a week). A remembered answer must be the answer:
+  // names that share a start must not share an entry, a plural must still
+  // find its singular, and a food the database lacks stays missing.
+  // "ground turkeys" is found ONLY by the plural retry — measured: every
+  // simpler plural ("chicken breasts") is caught by the partial match first,
+  // and a mutation skipping the retry sailed past a check built on those.
+  const names = ['chicken breast', 'chicken thigh', 'ground turkey', 'ground turkeys', 'zzqx not a food', 'white rice']
+  const once = names.map(n => lookupIngredient(n)?.name ?? null)
+  const twice = names.map(n => lookupIngredient(n)?.name ?? null)
+  check('the food lookup gives the same answer asked twice', JSON.stringify(once) === JSON.stringify(twice), { once, twice })
+  check('...names that share a start find different foods', once[0] !== null && once[1] !== null && once[0] !== once[1], once.slice(0, 2))
+  check('...a plural only the retry can resolve still finds its singular, asked twice', once[2] !== null && once[3] === once[2] && twice[3] === once[2], once)
+  check('...and a food it does not know stays unknown', once[4] === null && twice[4] === null, once[4])
+
+  // AT MOST ONE EXOTIC DISH A DAY, when a familiar one fits as well. Worked
+  // out once per dish now rather than once per combination, and the only
+  // gate that watched it (meal-quality) needs a live database, so a mutation
+  // breaking the cache went unseen. Identical macros, exotic listed first in
+  // both slots, so only the nudge can keep the day to one.
+  const L = (name: string, quantity: number, unit = 'g'): MealIngredientLine => ({ name, quantity, unit })
+  const plate = (slot: MealSlotName, name: string, cuisine: string) =>
+    ({ ...dish(slot, name, [L('chicken breast', 150), L('white rice', 150), L('broccoli', 80)]), tags: [cuisine] })
+  const lunches = [plate('lunch', 'Thai lunch', 'Thai'), plate('lunch', 'Plain lunch', 'British')]
+  const dinners = [plate('dinner', 'Thai dinner', 'Thai'), plate('dinner', 'Plain dinner', 'British')]
+  const tx = plus(lunches[0].macros, dinners[0].macros)
+  const d = assembleDay({ lunch: lunches, dinner: dinners }, tx, {}, []).chosen
+  const exotic = [d.lunch, d.dinner].filter(o => o?.tags[0] === 'Thai').length
+  check('a day holds at most one exotic dish when a familiar one fits as well', exotic <= 1, [d.lunch?.name, d.dinner?.name])
 }
 
 console.log(failures === 0 ? '\nAll meal-variety checks passed.\n' : `\n${failures} check(s) FAILED.\n`)

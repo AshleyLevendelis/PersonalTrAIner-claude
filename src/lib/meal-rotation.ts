@@ -127,6 +127,12 @@ export interface Rotation {
    */
   historyFor(index: number): Partial<Record<MealSlotName, string[]>>
   /**
+   * The exact inputs this rotation was assembled from, so a caller asking for
+   * a day with THE SAME inputs gets the day already worked out (see
+   * assembleRotationDay). Compared by identity, never by value.
+   */
+  builtFrom: { pools: Partial<Record<MealSlotName, PoolOption[]>>; targets: MacroTargets; softLikedFoods: string[] }
+  /**
    * The slots this day serves as leftovers from the day before — empty on most
    * days, and always empty when batch cooking is off or at the rotation's
    * seam. Returned as a pin map so a caller re-assembling one day gets the
@@ -304,6 +310,7 @@ export function buildRotation(
 
   return {
     days,
+    builtFrom: { pools, targets, softLikedFoods },
     historyFor(index: number) {
       const w = wrap(index)
       return w < 0 ? {} : histories[w]
@@ -319,10 +326,11 @@ export function buildRotation(
  * Today's assembled day: the rotation's day for this date, re-assembled so any
  * meals pinned for today are honoured.
  *
- * ONE CODE PATH whether or not anything is pinned. Returning `rotation.days[i]`
- * when `pinned` is empty and re-assembling otherwise would be two paths that
- * are supposed to agree, which is the shape that lets them quietly stop
- * agreeing. One extra cartesian search over a handful of options is cheap.
+ * ONE CALCULATION. The worry that stood here was that returning
+ * `rotation.days[i]` would be a second path that could quietly stop agreeing
+ * with re-assembly. It is only returned when every input is the IDENTICAL
+ * object the rotation was assembled from, which makes it the same pure call's
+ * answer rather than a second path; test:meal-variety proves the two agree.
  */
 export function assembleRotationDay(
   rotation: Rotation,
@@ -338,7 +346,18 @@ export function assembleRotationDay(
   // USER pinned still wins — their choice outranks the plan's, which is the
   // rule everywhere else in the app.
   const withLeftover = { ...rotation.leftoverFor(index), ...pinned }
-  const day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, withLeftover)
+  // THE SAME CALCULATION, NOT A SECOND PATH (28 Sep 2026). With no pin of the
+  // caller's own and the very inputs the rotation was built from, assembleDay
+  // would be handed exactly what buildRotation handed it for this index, and
+  // it is pure, so its answer is the day the rotation already holds. The note
+  // that stood here called the repeat "cheap"; at seven options a slot it was
+  // most of a week's cost on a phone. Identity, not value, is the test: any
+  // doubt about an input and the day is worked out afresh.
+  const b = rotation.builtFrom
+  const sameInputs = Object.keys(pinned).length === 0 && b.pools === pools && b.targets === targets && b.softLikedFoods === softLikedFoods
+  const day = sameInputs && rotation.days[index]
+    ? rotation.days[index]
+    : assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, withLeftover)
 
   // PROMISE TOMORROW'S LUNCH ONLY WHEN IT IS ACTUALLY PROMISED. The rotation
   // worked out tomorrow's leftover from the dinner IT chose; if the user has

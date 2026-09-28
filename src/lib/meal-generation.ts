@@ -1327,7 +1327,7 @@ function rankCombo(inTolerance: boolean, variety: VarietyCost, fit: number, resi
  * VARIETY_REST_DAYS, then her likes, then the meals that have rested longest
  * across VARIETY_MEMORY_DAYS.
  */
-export const VARIETY_REST_DAYS = 3
+const VARIETY_REST_DAYS = 3
 export const VARIETY_MEMORY_DAYS = 6
 
 /** Days since each slot's meal was last served there (1 = yesterday, 0 = not in the history). */
@@ -1557,6 +1557,19 @@ export function assembleDay(
   // only read when no day at all reaches tolerance.
   const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; variety: VarietyCost; likeMiss: 0 | 1; fit: number }[] = []
 
+  // WORKED OUT ONCE PER OPTION, not once per combination: whether a dish holds
+  // something she likes, and whether it is exotic, depend on the dish alone,
+  // and the search visits each dish in every combination it is part of
+  // (28 Sep 2026: the like check alone was 0.6 of 2.8 seconds of a week).
+  const likedOption = new Map<PoolOption, boolean>()
+  const exoticOption = new Map<PoolOption, boolean>()
+  for (const s of slots) {
+    for (const o of pinned[s] != null ? [pinned[s]!] : servable[s] ?? []) {
+      likedOption.set(o, softLikedFoods.length > 0 && optionMatchesLikedFood(o, softLikedFoods))
+      exoticOption.set(o, isExoticOption(o))
+    }
+  }
+
   function search(index: number, combo: Partial<Record<MealSlotName, PoolOption>>): void {
     if (index === slots.length) {
       const chosenOptions = slots.map(s => combo[s]!)
@@ -1567,12 +1580,12 @@ export function assembleDay(
       // picking THAT exotic option in every slot at once. Soft tiebreak only
       // — a day with 2+ exotic picks is a mild penalty, not excluded, since
       // calorie/protein fit always wins first.
-      const exoticSlots = slots.filter(s => isExoticOption(combo[s]!)).length
+      const exoticSlots = slots.filter(s => exoticOption.get(combo[s]!)).length
       const exoticPenalty = exoticSlots > 1 ? (exoticSlots - 1) * 0.005 : 0
       // At least ONE liked thing in the day, not as many as possible: someone
       // who says they love salmon wants salmon once, not at every meal.
       const likeMiss: 0 | 1 = softLikedFoods.length > 0
-        && !slots.some(s => optionMatchesLikedFood(combo[s]!, softLikedFoods)) ? 1 : 0
+        && !slots.some(s => likedOption.get(combo[s]!)) ? 1 : 0
       // The multi-exotic nudge lives INSIDE fit, at the magnitude it has
       // always had. A like is a key of its own — see rankCombo.
       const nudges = exoticPenalty
