@@ -17,6 +17,16 @@ Newest first. One line each.
   no edge function or migration in this release. Still owed from her
   machine: the two function deploys of 27 Sep, the exam re-run, and revoking
   the old key.
+  **Proven live** for `personal-tr-a-iner-claude`: its production address
+  resolves to the deployment built from `6f82075d` on main (READY, no alias
+  error), and the page it serves loads `index-Fvdvlyzt.js`, a different main
+  file from the 27 Sep release's. The bundle itself could not be read from
+  this session (direct downloads are refused by the proxy, and it is too big
+  for Vercel's page reader), so no new sentence was matched inside it.
+  **Not verified:** `personal-tr-a-iner-claude-yco8`. Last release its
+  deployments were readable; today listing them is refused (403) and the
+  project reads as not found (404), so whether it built this commit is not
+  known from here.
 
 - [x] **SEVEN OPTIONS A MEAL, AND A BUTTON THAT ADDS THEM WITHOUT MOVING
   TODAY.** 28 Sep 2026. Two rulings of Ashley's, both from three options:
