@@ -37,6 +37,7 @@ import { computeMealMacros, type Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
+import { sameDish } from './meal-dish-identity'
 
 /**
  * How many days the rotation runs before it comes round again. Seven because
@@ -318,7 +319,9 @@ export function buildRotation(
     // module's own gate fixtures, not one day changed. A mutation removing it
     // came back MISSED against every check, which is what sent me to measure.
     // Two mechanisms for one property, one of them inert, is worse than one.
-    if (leftover && day.chosen.dinner?.name === leftover.name) {
+    // THE SAME DISH, not the same name: a dinner she edited is a copy of its
+    // base and would serve the leftover's dish twice all the same.
+    if (leftover && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.name)) {
       delete pinned.lunch
       leftovers[leftovers.length - 1] = {}
       day = assembleDay(pools, targets, history, softLikedFoods, pinned)
@@ -413,7 +416,7 @@ export function assembleRotationDay(
   // sit beside the same dish at dinner. Reached by a re-made leftover, and by
   // a dinner she swapped to the very dish her lunch is — which served it
   // twice in one day before 28 Sep 2026.
-  if (leftover.lunch && !pinned.lunch && day.chosen.dinner?.name === leftover.lunch.name) {
+  if (leftover.lunch && !pinned.lunch && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.lunch.name)) {
     day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, { ...pinned })
   }
 

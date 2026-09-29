@@ -37,6 +37,7 @@ import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './type
 import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
 import { isMissingColumnError } from './missing-column'
 import { tagsNewFrom } from './meal-new-from'
+import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
 
 export const MIN_COVERAGE = 0.8
 /**
@@ -1408,16 +1409,22 @@ function rankCombo(inTolerance: boolean, variety: VarietyCost, fit: number, resi
 const VARIETY_REST_DAYS = 3
 export const VARIETY_MEMORY_DAYS = 6
 
-/** Days since each slot's meal was last served there (1 = yesterday, 0 = not in the history). */
+/**
+ * Days since each slot's meal was last served there (1 = yesterday, 0 = not in
+ * the history). Compared by DISH, not by name (29 Sep 2026): `history` holds
+ * dish identities (see meal-dish-identity.ts) and `dishOf` gives each option's,
+ * so "the bowl" and "the bowl + honey" are one dish that was served yesterday.
+ */
 function varietyCost(
   slots: MealSlotName[],
   combo: Partial<Record<MealSlotName, PoolOption>>,
-  recentNames: Partial<Record<MealSlotName, string[]>>,
+  recentDishes: Partial<Record<MealSlotName, string[]>>,
+  dishOf: Map<PoolOption, string>,
 ): VarietyCost {
   let backToBack = 0, repeats = 0, recency = 0
   for (const s of slots) {
-    const history = recentNames[s] ?? []
-    const i = history.lastIndexOf(combo[s]!.name)
+    const history = recentDishes[s] ?? []
+    const i = history.lastIndexOf(dishOf.get(combo[s]!) ?? combo[s]!.name)
     if (i < 0) continue
     const age = history.length - i
     if (age === 1) backToBack++
@@ -1641,10 +1648,17 @@ export function assembleDay(
   // (28 Sep 2026: the like check alone was 0.6 of 2.8 seconds of a week).
   const likedOption = new Map<PoolOption, boolean>()
   const exoticOption = new Map<PoolOption, boolean>()
+  // WHICH DISH each option is, and which dishes were served lately (29 Sep
+  // 2026): an option she edited is a copy of its base and counts as it.
+  const dishOf = new Map<PoolOption, string>()
+  const recentDishes: Partial<Record<MealSlotName, string[]>> = {}
   for (const s of slots) {
+    const keys = dishKeysFor(pools[s])
+    recentDishes[s] = (recentNames[s] ?? []).map(n => dishKeyOf(keys, n))
     for (const o of pinned[s] != null ? [pinned[s]!] : servable[s] ?? []) {
       likedOption.set(o, softLikedFoods.length > 0 && optionMatchesLikedFood(o, softLikedFoods))
       exoticOption.set(o, isExoticOption(o))
+      dishOf.set(o, dishKeyOf(keys, o.name))
     }
   }
 
@@ -1652,7 +1666,7 @@ export function assembleDay(
     if (index === slots.length) {
       const chosenOptions = slots.map(s => combo[s]!)
       const totals = sumOptionMacros(chosenOptions)
-      const variety = varietyCost(slots, combo, recentNames)
+      const variety = varietyCost(slots, combo, recentDishes, dishOf)
       // Cuisine coherence (meal-realism round): each slot's pool already
       // caps at one exotic option, but nothing previously stopped a day from
       // picking THAT exotic option in every slot at once. Soft tiebreak only

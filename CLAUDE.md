@@ -210,8 +210,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   7 options a slot the on-phone search is about 3.5x slower, so that is not
   built. **A variety number must count the thing the person sees**: here,
   the dish on the plate, not the day's label.
-  `meal-variety` (76 checks, 18 mutations), `measure:meal-variety`,
-  `measure:meal-repeats`
+  **CORRECTED AGAIN 29 Sep 2026: an EDITED COPY of a dish is not a different
+  dish.** An edit stores a new option beside the meal ("Bowl + 1 sachet
+  honey"), and every variety rule compared dishes by name, so the copy read as
+  a change from its base. Measured: an edited copy made the same dish repeat
+  back to back 601 times in 1,080 days against 524 without it, while the count
+  of identical names FELL to 395: variety scored better and got worse. Dishes
+  now have an identity (`meal-dish-identity.ts`): a copy shares its base's,
+  found by name so it reaches the plan she already has, and only for options
+  tagged `user-requested` with an edit connector after the base's name, so two
+  GENERATED dishes named alike stay two. `docs/plans/dish-identity.md`.
+  `meal-variety` (122 checks; the identity section has 12 mutations),
+  `measure:meal-variety`, `measure:meal-repeats`
 - **Upcoming days: see, swap, shop** — both surfaces since 27 Sep 2026.
   Ashley: *"I can only see today's meal ... I can't add things to the grocery
   list for future meals so I can plan ahead."* Her ruling, from three options:

@@ -46,6 +46,7 @@ import {
   type PoolOption,
 } from '../src/lib/meal-generation'
 import { computeMealMacros, lookupIngredient, type MealIngredientLine } from '../src/lib/food-db'
+import { dishKeysFor, dishKeyOf, sameDish } from '../src/lib/meal-dish-identity'
 import { mulberry32, makeDish } from './meal-fixture'
 import {
   buildRotation,
@@ -728,6 +729,159 @@ console.log('\n7. The day already worked out is the day a fresh calculation give
   const d = assembleDay({ lunch: lunches, dinner: dinners }, tx, {}, []).chosen
   const exotic = [d.lunch, d.dinner].filter(o => o?.tags[0] === 'Thai').length
   check('a day holds at most one exotic dish when a familiar one fits as well', exotic <= 1, [d.lunch?.name, d.dinner?.name])
+}
+
+// ===========================================================================
+console.log('\n8. An edited meal is the same dish as the meal it was made from')
+// ===========================================================================
+{
+  // Ashley, 29 Sep 2026: "a meal with a food added (your yoghurt bowl with
+  // honey) counts as a different dish, so the app thinks it's giving variety
+  // when it isn't." An edit never changes a meal; it stores a NEW option
+  // beside it, named "<meal> + <food>" (or without / with / (as dinner)), and
+  // the variety code compared dishes by name. Measured on 60 seeded pools with
+  // one edited variant a slot: consecutive identical NAMES fell from 524 to
+  // 395 while the same DISH on consecutive days rose from 524 to 601.
+  const asked = (slot: MealSlotName, name: string, requested = true): PoolOption =>
+    ({ slot, name, ingredients: [], macros: { calories: 0, protein: 0, carbs: 0, fat: 0 }, tags: requested ? ['user-requested'] : [] })
+  const keyOf = (options: PoolOption[], name: string) => dishKeyOf(dishKeysFor(options), name)
+
+  // --- who is a copy of whom ------------------------------------------------
+  const bowl = asked('breakfast', 'Greek Yoghurt Berry Power Bowl', false)
+  const withHoney = asked('breakfast', 'Greek Yoghurt Berry Power Bowl + 1 sachet honey')
+  check('a meal with a food added is the same dish as the meal', keyOf([bowl, withHoney], withHoney.name) === bowl.name, keyOf([bowl, withHoney], withHoney.name))
+  check('...and the plain meal is still itself', keyOf([bowl, withHoney], bowl.name) === bowl.name)
+  const twice = asked('breakfast', 'Greek Yoghurt Berry Power Bowl + 1 sachet honey + a banana')
+  check('an edit of an edit is still the original dish', keyOf([bowl, withHoney, twice], twice.name) === bowl.name, keyOf([bowl, withHoney, twice], twice.name))
+  check('...whatever order the pool lists them in', keyOf([twice, withHoney, bowl], twice.name) === bowl.name)
+  for (const suffix of [' without berries', ' with granola instead of berries', ' with 30g granola', ' (as lunch)']) {
+    const edit = asked('breakfast', bowl.name + suffix)
+    check(`"${suffix.trim()}" is an edit of the meal too`, keyOf([bowl, edit], edit.name) === bowl.name, keyOf([bowl, edit], edit.name))
+  }
+  // THE FALSE POSITIVES, each with its twin that must merge, so a rule that
+  // merged everything or nothing fails one side.
+  const salmon = asked('dinner', 'Salmon', false)
+  const salmonPotatoes = asked('dinner', 'Salmon with New Potatoes', false)
+  check('two GENERATED dishes, one named after the other, stay two dishes', keyOf([salmon, salmonPotatoes], salmonPotatoes.name) === salmonPotatoes.name, keyOf([salmon, salmonPotatoes], salmonPotatoes.name))
+  const salmonBowl = asked('dinner', 'Salmon bowl')
+  check('a requested dish that only STARTS with another\'s name, with no connector, is its own', keyOf([salmon, salmonBowl], salmonBowl.name) === salmonBowl.name)
+  const salmonAdded = asked('dinner', 'Salmon + rice')
+  check('...while the same request WITH the connector is an edit of it', keyOf([salmon, salmonAdded], salmonAdded.name) === salmon.name)
+  // The LONGEST name it extends is its base: a requested "Salmon with New
+  // Potatoes + rice" is a copy of the generated "Salmon with New Potatoes", not
+  // of the shorter generated "Salmon" that both of them happen to start with.
+  const salmonRice = asked('dinner', 'Salmon with New Potatoes + rice')
+  check('an edit is a copy of the longest dish it extends, not the shortest', keyOf([salmon, salmonPotatoes, salmonRice], salmonRice.name) === salmonPotatoes.name, keyOf([salmon, salmonPotatoes, salmonRice], salmonRice.name))
+  check('an edit whose base is no longer in the pool is its own dish', keyOf([withHoney], withHoney.name) === withHoney.name)
+  check('a name the pool does not hold is its own', keyOf([bowl], 'Something else') === 'Something else')
+  check('an empty pool is not an error', dishKeyOf(dishKeysFor(undefined), 'X') === 'X' && dishKeyOf(dishKeysFor([]), 'X') === 'X')
+  check('two names compare as one dish through sameDish', sameDish([bowl, withHoney], bowl.name, withHoney.name) && !sameDish([salmon, salmonPotatoes], salmon.name, salmonPotatoes.name))
+
+  // --- the ranking: yesterday's dish is yesterday's, honey or not ----------
+  const L = (name: string, quantity: number, unit = 'g'): MealIngredientLine => ({ name, quantity, unit })
+  const chicken = (n: string) => dish('dinner', n, [L('chicken breast', 200), L('white rice', 200), L('broccoli', 100), L('olive oil', 10)])
+  const A = chicken('Dinner A')
+  const V = { ...dish('dinner', 'Dinner A + 3g olive oil', [L('chicken breast', 200), L('white rice', 200), L('broccoli', 100), L('olive oil', 13)]), tags: ['user-requested'] }
+  const Y = chicken('Dinner Y')
+  const oats = dish('breakfast', 'Porridge', [L('oats', 80), L('semi-skimmed milk', 250, 'ml')])
+  // The edit is the CLOSEST fit, so only the variety key can keep it out.
+  const tv = plus(oats.macros, V.macros)
+  check('the sanity check: all three dinners are inside the bands, the edit the closest',
+    [A, V, Y].every(o => inBands(plus(oats.macros, o.macros), tv))
+    && macroDistanceScore(plus(oats.macros, V.macros), tv) < macroDistanceScore(plus(oats.macros, A.macros), tv)
+    && macroDistanceScore(plus(oats.macros, V.macros), tv) < macroDistanceScore(plus(oats.macros, Y.macros), tv))
+  const served = (dinners: PoolOption[], history: string[]) =>
+    assembleDay({ breakfast: [oats], dinner: dinners }, tv, { dinner: history }, []).chosen.dinner?.name
+  check('yesterday it was the plain dish: the edited copy is NOT offered as a change', served([V, A, Y], ['Dinner A']) === 'Dinner Y', served([V, A, Y], ['Dinner A']))
+  check('...and the same the other way round: yesterday it was the edited copy, the plain dish is not a change', served([A, V, Y], ['Dinner A + 3g olive oil']) === 'Dinner Y', served([A, V, Y], ['Dinner A + 3g olive oil']))
+  check('...with nothing else to serve it still serves one of them (a repeat is allowed, only ranked)', ['Dinner A', 'Dinner A + 3g olive oil'].includes(served([V, A], ['Dinner A']) ?? ''), served([V, A], ['Dinner A']))
+  // The twin: a GENERATED dish that only has a longer name is a different dish.
+  const AR = dish('dinner', 'Dinner A with rice', [L('chicken breast', 200), L('white rice', 230), L('broccoli', 100), L('olive oil', 10)])
+  const ta = plus(oats.macros, A.macros)
+  check('the sanity check: the generated look-alike is inside the bands but a worse fit', inBands(plus(oats.macros, AR.macros), ta) && macroDistanceScore(plus(oats.macros, AR.macros), ta) > macroDistanceScore(plus(oats.macros, A.macros), ta))
+  check('a generated dish named after another is a real change from it',
+    assembleDay({ breakfast: [oats], dinner: [A, AR] }, ta, { dinner: ['Dinner A'] }, []).chosen.dinner?.name === 'Dinner A with rice')
+
+  // --- the week: an edited copy no longer reads as variety ------------------
+  const week = { calories: 2400, protein: 170, carbs: 260, fat: 75 }
+  const budgets = computeSlotBudgets(week, 3, false)
+  const macrosOf = (ings: MealIngredientLine[]) => { const c = computeMealMacros(ings); return { calories: Math.round(c.kcal), protein: Math.round(c.protein), carbs: Math.round(c.carbs), fat: Math.round(c.fat) } }
+  /** Consecutive days serving the same dish, counted by an oracle that shares no code with the app: the name before " + ". */
+  const consecutiveSameDish = (withVariants: boolean) => {
+    let repeats = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      const rnd = mulberry32(seed)
+      const pools: Partial<Record<MealSlotName, PoolOption[]>> = {}
+      for (const slot of ['breakfast', 'lunch', 'dinner'] as MealSlotName[]) {
+        const opts: PoolOption[] = []
+        for (let i = 0; i < 4; i++) { const d = makeDish(rnd, slot, i, budgets[slot]!); if (d) opts.push(d) }
+        if (withVariants && opts[0]) {
+          const ings = [...opts[0].ingredients, { name: 'honey', quantity: 10, unit: 'g' }]
+          opts.push({ ...opts[0], name: `${opts[0].name} + 10g honey`, ingredients: ings, macros: macrosOf(ings), tags: ['user-requested'] })
+        }
+        pools[slot] = opts
+      }
+      const rot = buildRotation(pools, week, [], { mealsPerDay: 3, includeSnacks: false, batchCooking: false })
+      for (const slot of ['breakfast', 'lunch', 'dinner'] as MealSlotName[]) {
+        const dishes = rot.days.map(d => (d.chosen[slot]?.name ?? '').split(' + ')[0])
+        for (let i = 1; i < dishes.length; i++) if (dishes[i] === dishes[i - 1]) repeats++
+      }
+    }
+    return repeats
+  }
+  const without = consecutiveSameDish(false)
+  const withV = consecutiveSameDish(true)
+  check('the sanity check: the fixture repeats a good deal without any edits (it is under pressure)', without > 300, without)
+  // A LITERAL BOUND, measured: 601 - 524 = +77 before the fix, +12 after.
+  check('adding an edited copy of one dish per meal does not make the week repeat more', withV - without <= 30, { without, withV })
+
+  // With batch cooking on, a leftover lunch must never sit beside a dinner
+  // that is the same dish, edited or not: counted by the same oracle.
+  const twiceInADay = () => {
+    let days = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      const rnd = mulberry32(seed)
+      const pools: Partial<Record<MealSlotName, PoolOption[]>> = {}
+      for (const slot of ['breakfast', 'lunch', 'dinner'] as MealSlotName[]) {
+        const opts: PoolOption[] = []
+        for (let i = 0; i < 4; i++) { const d = makeDish(rnd, slot, i, budgets[slot]!); if (d) opts.push(d) }
+        if (slot === 'dinner' && opts[0]) {
+          const ings = [...opts[0].ingredients, { name: 'honey', quantity: 10, unit: 'g' }]
+          opts.push({ ...opts[0], name: `${opts[0].name} + 10g honey`, ingredients: ings, macros: macrosOf(ings), tags: ['user-requested'] })
+        }
+        pools[slot] = opts
+      }
+      const rot = buildRotation(pools, week, [], { mealsPerDay: 3, includeSnacks: false, batchCooking: true })
+      for (const d of rot.days) {
+        if (d.chosen.lunch?.leftoverFrom === 'dinner' && (d.chosen.lunch.name).split(' + ')[0] === (d.chosen.dinner?.name ?? '').split(' + ')[0]) days++
+      }
+    }
+    return days
+  }
+  check('across 60 weeks with batch cooking on, no day serves a dish as leftovers and again at dinner, edited copy or not', twiceInADay() === 0, twiceInADay())
+
+  // --- the leftover: not the same dish twice in one day ---------------------
+  const lunchOf = (n: string, requested = false) => ({ ...dish('lunch', n, [L('chicken breast', 150), L('white rice', 200), L('broccoli', 80)]), tags: requested ? ['user-requested'] : [] }) as PoolOption
+  const dOne = chicken('Tray bake')
+  const dEdit = { ...dish('dinner', 'Tray bake + 3g olive oil', [L('chicken breast', 200), L('white rice', 200), L('broccoli', 100), L('olive oil', 13)]), tags: ['user-requested'] } as PoolOption
+  const dOther = chicken('Rice pot')
+  const pool = { breakfast: [oats], lunch: [lunchOf('Chicken salad'), lunchOf('Rice and greens')], dinner: [dOne, dEdit, dOther] }
+  const targetsL = { calories: 2200, protein: 150, carbs: 240, fat: 70 }
+  const shapeOn = { mealsPerDay: 3, includeSnacks: false, batchCooking: true }
+  const rotL = buildRotation(pool, targetsL, [], shapeOn)
+  // Last night's dinner was the plain tray bake, so lunch is its leftover; the
+  // day's dinner is pinned to the EDITED tray bake, which is the same dish.
+  // A date whose lunch the rotation planned as a leftover; without one both
+  // checks below would pass having tested nothing.
+  const leftoverDate = Array.from({ length: ROTATION_DAYS }, (_, i) => new Date(Date.UTC(2026, 8, 28 + i)).toISOString().slice(0, 10))
+    .find(d => rotL.leftoverFor(rotationIndexFor(d)).lunch !== undefined)
+  check('the sanity check: the rotation plans a leftover lunch on some day', !!leftoverDate)
+  const on = leftoverDate ?? '2026-09-30'
+  const day = assembleRotationDay(rotL, on, pool, targetsL, [], { dinner: dEdit }, { previousDinner: dOne })
+  const day2 = assembleRotationDay(rotL, on, pool, targetsL, [], { dinner: dOther }, { previousDinner: dOne })
+  check('with a different dinner the leftover stands (the sanity check for the next one)', day2.chosen.lunch?.leftoverFrom === 'dinner' && day2.chosen.lunch?.name === dOne.name, [day2.chosen.lunch?.name, day2.chosen.lunch?.leftoverFrom])
+  check('a leftover lunch gives way to a dinner that is an edited copy of the same dish',
+    day.chosen.dinner?.name === dEdit.name && day.chosen.lunch?.leftoverFrom !== 'dinner', [day.chosen.lunch?.name, day.chosen.lunch?.leftoverFrom, day.chosen.dinner?.name])
 }
 
 console.log(failures === 0 ? '\nAll meal-variety checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
