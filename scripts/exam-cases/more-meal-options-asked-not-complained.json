@@ -1,0 +1,14 @@
+{
+  "name": "more-meal-options-asked-not-complained",
+  "why": "29 Sep 2026, the coach got propose_meal_top_up (more options for EVERY meal, today and shopped-for days untouched). Four things sit next to it and are easy to confuse: a swap (one day), an addition (one named dish), a regeneration (throws the options away) and a plain complaint. The prompt's rule is that a COMPLAINT IS NOT AN ASK: 'it's the same dinners every night' gets a reply and an offer, and the card comes only when she says yes (her 24 Sep 'a coach wouldn't send a card'). The app cannot enforce that direction in code, because a coach that cards a complaint has still built a well-formed card, so this is the only thing that can see it. Turn one is the complaint with NO card; turn two is the ask, which gets this card and not a swap or a regeneration.",
+  "messages": [
+    "I keep getting the same dinners every single night, it's so boring",
+    "yes please, give me more meal options to pick from"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": [] },
+      { "turn": 1, "oneOf": ["propose_meal_top_up"] }
+    ]
+  }
+}

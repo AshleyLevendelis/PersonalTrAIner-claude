@@ -344,6 +344,7 @@
     "verify:meal-likes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-likes.mjs",
     "verify:kept-meal": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kept-meal.mjs",
     "verify:meal-top-up": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-top-up.mjs",
+    "verify:chat-top-up": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-top-up.mjs",
     "test:kept-meal-restriction": "tsx scripts/test-kept-meal-restriction.ts",
     "verify:grocery": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/grocery.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",

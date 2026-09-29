@@ -31,6 +31,10 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { removeExerciseFromSession } from '@/lib/session-edit'
 import { assessEdit } from '@/lib/edit-tradeoff'
+import { getPools } from '@/lib/meal-store'
+import { computeMealMacros } from '@/lib/food-db'
+import { computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
+import { topUpNeeds, topUpMealPlan, previewTopUpStart } from '@/lib/meal-top-up'
 import type { MacroTargets, Meal, MealPlanDay, UserProfile } from '@/lib/types'
 
 import { BottomTabBar } from '@/components/BottomTabBar'
@@ -460,11 +464,45 @@ const finishedSession = SEED_NUDGE
     }]
   : []
 
+// ?topup=1 — MORE OPTIONS FOR EVERY MEAL, ASKED OF THE COACH (29 Sep 2026).
+// A plan made at five options a meal (three meals a day, no snack), and two
+// days of shopping already on the list. The fixture chooses only the INPUT:
+// which meals are short comes from the app's own topUpNeeds over the pools
+// the app reads back, the start day from the app's own preview over the
+// list, and the run is the app's own topUpMealPlan. The one thing faked is
+// the meal generator, in the driver, at the fetch boundary.
+const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
+const TOPUP_SLOTS = ['breakfast', 'lunch', 'dinner'] as const
+const topUpSeed = (() => {
+  if (!TOPUP) return { slots: [] as Record<string, unknown>[], list: [] as Record<string, unknown>[] }
+  const dish = (slot: string, name: string, chicken: number, rice: number, oil: number) => {
+    const ingredients = [
+      { name: 'chicken breast', quantity: chicken, unit: 'g' },
+      { name: 'cooked basmati rice', quantity: rice, unit: 'g' },
+      { name: 'olive oil', quantity: oil, unit: 'g' },
+    ]
+    const m = computeMealMacros(ingredients)
+    return { profile_id: PROFILE_ID, slot, name, ingredients, tags: [], prep: '',
+      macros: { kcal: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) } }
+  }
+  const slots = TOPUP_SLOTS.flatMap(slot => [0, 1, 2, 3, 4].map(i => ({
+    ...dish(slot, `${slot[0].toUpperCase()}${slot.slice(1)} plate ${i + 1}`, 100 + i * 8, 220 + i * 12, 10 + i), pool_index: i,
+  })))
+  // Today and tomorrow are already shopped for, so the app must start the
+  // new meals the day after: a start the driver can name in advance.
+  const list = [0, 1].map(d => ({
+    id: `g${d}`, client_id: `g${d}`, profile_id: PROFILE_ID, source: 'generated', canonical_key: `oats${d}`, display_name: 'oats',
+    quantity: 80, unit: 'g', category: 'dry_goods', checked: false, dismissed: false, needs_review: false, user_edited: false,
+    created_at: '2026-09-27T00:00:00.000Z', meal_refs: [{ day: d, date: iso(d), slot: 'breakfast', mealName: 'x' }],
+  }))
+  return { slots, list }
+})()
+
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
   daily_metrics: [], exercise_set_logs: [], workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession], cardio_logs: [],
-  daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: [],
-  favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
+  daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
+  favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: seededRows, exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
@@ -506,6 +544,15 @@ function Harness() {
   }, [planArrived])
   const livePlan = planArrived ? mesocycle[0].days : []
   const liveMeso = planArrived ? mesocycle : []
+  // ?topup=1: the pools the app reads back, re-read after a top-up lands, so
+  // what is "short" is always the app's own answer and never a fixture's.
+  const [pools, setPools] = useState<Partial<Record<string, PoolOption[]>>>({})
+  const reloadPools = async () => setPools(await getPools(PROFILE_ID) as never)
+  useEffect(() => { if (TOPUP) void reloadPools() }, [])
+  const topUpSlots = macros ? Object.keys(computeSlotBudgets(macros, 3, false)) : []
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__topUpPools = () => Object.fromEntries(Object.entries(pools).map(([k, v]) => [k, (v ?? []).length]))
+  }, [pools])
   return (
     <AppearanceProvider>
     <ActiveSessionProvider profileId={PROFILE_ID} planCreatedAt={profile.created_at} totalWeeks={mesocycle.length} refreshToken={0}>
@@ -532,6 +579,16 @@ function Harness() {
               onProfileChanged={noop}
               onMealSwapApplied={async () => true}
               onFindMoreMealOptions={async () => ({ added: [] })}
+              mealTopUp={TOPUP && macros ? { needs: topUpNeeds(pools as never, topUpSlots as never), building: false } : null}
+              onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}
+              onMealTopUpConfirm={TOPUP && macros ? async () => {
+                const r = await topUpMealPlan({
+                  profileId: PROFILE_ID, today: isoOf(anchorDate()), needs: topUpNeeds(pools as never, topUpSlots as never),
+                  generation: { targets: macros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: 3, includeSnacks: false },
+                })
+                if (r.added > 0) await reloadPools()
+                return r
+              } : undefined}
               memoryFacts={[]}
               memoryGoals={[]}
               memoryContextFacts={[]}

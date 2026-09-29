@@ -28,7 +28,7 @@ import { computeSlotBudgets, type AssembledDay, type PoolOption } from '../src/l
 import { buildRotation, serveDates, addDays, datesFrom, poolsServedOn } from '../src/lib/meal-rotation'
 import { newFromDate, tagsNewFrom, isBookkeepingTag, displayTags, NEW_FROM_TAG_PREFIX } from '../src/lib/meal-new-from'
 import { topUpNeeds, topUpStartDate, topUpStartLabel, runMealTopUp, topUpOffer } from '../src/lib/meal-top-up'
-import { moreMealOptionsOffer, moreMealOptionsDone } from '../src/lib/coach-voice'
+import { moreMealOptionsOffer, moreMealOptionsDone, moreMealOptionsWhy, MORE_MEALS } from '../src/lib/coach-voice'
 import type { MealSlotName } from '../src/lib/meal-store'
 import type { MacroTargets } from '../src/lib/types'
 import { mulberry32, makeDish } from './meal-fixture'
@@ -393,8 +393,11 @@ async function main() {
     check('the offer counts only the meals she can be served (the marked pools)', /topUpNeeds\(mealPools, activeMealSlots\)/.test(app) && /const mealPools = useServablePools\(/.test(app))
     check('...waits while the first plan is being built, and respects "Not now"', /const mealTopUpOffer = !initialMealBuild && !mealTopUpDismissed \? topUpOffer\(mealTopUpNeeds\) : null/.test(app))
     check('...and there is no offer when nothing is short', topUpOffer({}) === null && topUpOffer({ dinner: 2 }) === moreMealOptionsOffer([5], 7))
-    const handler = app.slice(app.indexOf('const handleMealTopUp'), app.indexOf('const handleFindMoreMealOptions'))
-    check('App\'s button calls the shared function, with today and what is short', /topUpMealPlan\(\{\s*profileId,\s*today: mealRotationDate,\s*needs: mealTopUpNeeds,/.test(handler), handler.slice(0, 200))
+    // RE-ANCHORED 29 Sep 2026: the run moved into runMealTopUpNow so the
+    // coach's confirm and the button share it. The property is unchanged: the
+    // run calls the shared function with today and what is short.
+    const handler = app.slice(app.indexOf('const runMealTopUpNow'), app.indexOf('const handleFindMoreMealOptions'))
+    check('App\'s run calls the shared function, with today and what is short', /topUpMealPlan\(\{\s*profileId,\s*today: mealRotationDate,\s*needs: mealTopUpNeeds,/.test(handler), handler.slice(0, 200))
     check('...with the likes and hearted meals she can still eat, like every other generation', /likedFoods: typedFoodLikes/.test(handler) && /favouriteMeals: steerableFavouriteMeals/.test(handler))
     check('...and reloads the pools only when something was added', /if \(r\.added > 0\) setMealPools\(await getPools\(profileId\)\)/.test(handler))
     check('the strict read really throws where the ordinary one falls back', /if \(opts\.strict\) throw err/.test(grocery))
@@ -406,6 +409,96 @@ async function main() {
     const nd = read('src/components/NutritionDisplay.tsx')
     check('the screen shows the offer only until there is a receipt, and the receipt says whether it failed',
       /mealTopUp && !mealTopUpNote/.test(nd) && /data-failed=\{mealTopUpNote\.failed/.test(nd))
+  }
+
+  console.log('\n7. The coach can do it too, through the same run')
+  {
+    const fn = read('supabase/functions/chat-gemini/index.ts')
+    const chat = read('src/components/ChatAssistant.tsx')
+    const app = read('src/App.tsx')
+    const voice = read('src/lib/coach-voice.ts')
+
+    check('the coach declares the tool, taking only the words she used', /name: "propose_meal_top_up"/.test(fn)
+      && /required: \["origin_verbatim_quote"\]/.test(fn.slice(fn.indexOf('name: "propose_meal_top_up"'), fn.indexOf('name: "propose_exercise_swap"'))))
+    // THE THINNEST COURIER, like the resize: which meals are short, by how
+    // many and from when are questions about pools and a shopping list that
+    // only the client holds, so the handler may carry no number, no meal name.
+    const handlerStart = fn.indexOf('if (name === "propose_meal_top_up")')
+    const handlerBody = handlerStart < 0 ? '' : fn.slice(handlerStart, fn.indexOf('if (name === "propose_session_move")', handlerStart))
+    check('...its handler only forwards the words: no number and no meal named', handlerBody.length > 0
+      && /kind: "propose_meal_top_up"/.test(handlerBody) && !/kcal|calories|breakfast|\b7\b|\bseven\b/i.test(strip(handlerBody).replace(/propose_meal_top_up/g, '')), handlerBody.slice(0, 200))
+    const rule = fn.slice(fn.indexOf('MORE MEALS TO CHOOSE FROM IS A SEVENTH THING'), fn.indexOf('MORE MEALS TO CHOOSE FROM IS A SEVENTH THING') + 2600)
+    check('the prompt separates it from a swap, an addition and a regeneration',
+      /not a swap/.test(rule) && /not an addition/.test(rule) && /not a regeneration/.test(rule) && /never offer to regenerate/.test(rule), rule.slice(0, 300))
+    check('...says the days already shopped for do not change, so the coach cannot promise this week will look different',
+      /EVERY DAY ALREADY ON THEIR SHOPPING LIST DO NOT CHANGE/.test(rule) && /never tell them this week will look different/.test(rule))
+    check('...and that a complaint is not an ask: talk first, call on a yes (her 24 Sep "a coach wouldn\'t send a card")',
+      /A COMPLAINT IS NOT AN ASK/.test(rule) && /only when they say so/.test(rule))
+    check('...and never points at a control or states a number', !/Get more options|Nutrition tab|the button/i.test(rule) && /Never state how many options/.test(rule), rule.slice(0, 200))
+    check('...and it is in the list of cards that bring their own Confirm buttons, so no quick-reply chips are added on top',
+      /propose_meal_refit, propose_meal_top_up, propose_cardio_session\)/.test(fn))
+
+    check('the chat builds the card from what App hands it: nothing the model said', /const buildMealTopUpProposal = async/.test(chat)
+      && /buildMealTopUpProposal\(result\.proposal\.rawArgs \?\? \{\}\)/.test(chat))
+    const builder = chat.slice(chat.indexOf('const buildMealTopUpProposal'), chat.indexOf('const buildGoalChangeProposal'))
+    check('...it refuses with a reason in three places: no body details, first plan still building, everything full',
+      /MORE_MEALS\.refusals\.noBody/.test(builder) && /MORE_MEALS\.refusals\.building/.test(builder) && /MORE_MEALS\.refusals\.full\(DEFAULT_POOL_SIZE\)/.test(builder))
+    check('...and a fourth: it will not state a start day off a shopping list it could not read', /if \(!start\) return \{ ok: false, refusal: MORE_MEALS\.refusals\.listUnreadable \}\s*return \{\s*ok: true/.test(builder), builder.slice(builder.indexOf('onMealTopUpStart'), builder.indexOf('onMealTopUpStart') + 260))
+    check('...the card says what stays, and when the new meals start, from the phrasebook',
+      /unchanged: \[MORE_MEALS\.unchanged\]/.test(builder) && /MORE_MEALS\.starts\(start\.label\)/.test(builder))
+    check('...and lists the meals in the order of the day', /\['breakfast', 'lunch', 'dinner', 'snack'\] as MealSlotName\[\]\)\.filter/.test(builder))
+    const confirm = chat.slice(chat.indexOf("row.kind === 'propose_meal_top_up'"), chat.indexOf("row.kind === 'propose_injury_adaptation'"))
+    check('confirming calls the ONE shared run, not a copy of it', /await onMealTopUpConfirm\(\)/.test(confirm))
+    check('...a partial landing is reported as partial, and a failure says what the run said',
+      /failed: outcome\.added < outcome\.asked\s*\?/.test(confirm) && /outcome\?\.why/.test(confirm), confirm.slice(0, 300))
+    check('the button and the coach go through ONE run in App',
+      (app.match(/await runMealTopUpNow\(\)/g) ?? []).length === 2 && /onMealTopUpConfirm=\{handleMealTopUpFromChat\}/.test(app))
+    check('...the coach is told the needs the app computes for the button, not its own', /mealTopUp=\{macros \? \{ needs: mealTopUpNeeds, building: initialMealBuild \} : null\}/.test(app))
+    check('...and its receipt is in the chat, without setting the Nutrition tab\'s banner',
+      !/setMealTopUpNote/.test(app.slice(app.indexOf('const handleMealTopUpFromChat'), app.indexOf('const previewMealTopUpStart'))))
+    const card = read('src/components/chat/ReceiptCard.tsx')
+    check('a receipt never prints an internal tool name, and a cause never gets a doubled full stop',
+      /\/\^propose_\/\.test\(f\.op\) \? f\.error/.test(card) && /\.replace\(\/\[\.!\?\]\+\$\/, ''\)/.test(card), card.slice(card.indexOf('Didn'), card.indexOf('Didn') + 200))
+    const why = moreMealOptionsWhy({ reached: false, listUnreadable: false })
+    check('the cause-only line is one clause with no full stop, for a receipt that already says "Nothing was applied"',
+      why === "I couldn't reach the meal generator just then" && !/[.!?]$/.test(why)
+      && !/[.!?]$/.test(moreMealOptionsWhy({ reached: true, listUnreadable: false })) && !/[.!?]$/.test(moreMealOptionsWhy({ reached: true, listUnreadable: true })), why)
+    check('...and the screen banner is that clause plus "so nothing has changed", retried only when a connection failed',
+      moreMealOptionsDone({ added: 0, asked: 2, reached: false, listUnreadable: false, startLabel: '' }) === "I couldn't reach the meal generator just then, so nothing has changed. Try again in a moment."
+      && !/Try again/.test(moreMealOptionsDone({ added: 0, asked: 2, reached: true, listUnreadable: false, startLabel: '' })))
+    check('the phrasebook has the receipt words', /propose_meal_top_up: \{ done: 'Added', failed: "I couldn't add more meals" \}/.test(voice))
+    const refusals = Object.values(MORE_MEALS.refusals).map(r => typeof r === 'function' ? r(7) : r)
+    check('every refusal is a full sentence that names no control', refusals.length === 4
+      && refusals.every(r => /[.]$/.test(r) && !/button|tab\b|Regenerate|Get more options|Profile screen/i.test(r.replace('you can add them in Profile', ''))), refusals)
+    check('...the "full" one names the size and offers to swap instead', /Every meal already has 7 options, so there's nothing to add\./.test(MORE_MEALS.refusals.full(7)) && /I'll swap them/.test(MORE_MEALS.refusals.full(7)))
+    check('...and the card\'s "unchanged" is ONE item with no full stop of its own (the card joins items with commas)',
+      MORE_MEALS.unchanged.split('—').length === 2 && !/\.\s*$/.test(MORE_MEALS.unchanged.slice(0, -1)) )
+
+    // THE START DAY THE CARD STATES, read off a real list: and null off a
+    // list that cannot be read, so the card refuses rather than promise days.
+    const { setSupabaseClient } = await import('../src/lib/supabase')
+    const { previewTopUpStart } = await import('../src/lib/meal-top-up')
+    const rows = [{
+      id: 'g1', profile_id: 'pv', source: 'generated', canonical_key: 'oats', display_name: 'oats', quantity: 80, unit: 'g', category: 'dry_goods',
+      checked: false, dismissed: false, needs_review: false, user_edited: false, client_id: 'g1', created_at: '2026-09-27T00:00:00.000Z',
+      meal_refs: [{ day: 0, date: TODAY, slot: 'breakfast', mealName: 'x' }, { day: 1, date: '2026-09-29', slot: 'lunch', mealName: 'y' }],
+    }]
+    let listFails = false
+    const client = {
+      from: () => {
+        const api: Record<string, unknown> = {
+          select: () => api, eq: () => api, order: () => api,
+          then: (res: (v: unknown) => void, rej?: (e: unknown) => void) => Promise.resolve(listFails ? { data: null, error: { message: 'offline' } } : { data: rows, error: null }).then(res, rej),
+        }
+        return api
+      },
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setSupabaseClient(client as any)
+    const ok = await previewTopUpStart({ profileId: 'pv', today: TODAY })
+    check('the preview names the day after the last list day, and how the card says it', ok?.from === '2026-09-30' && ok.label === 'on Wednesday', ok)
+    listFails = true
+    check('...and is null when the list cannot be read (the card then refuses)', (await previewTopUpStart({ profileId: 'pv', today: TODAY })) === null)
   }
 
   console.log(`\n${ran} checks ran`)

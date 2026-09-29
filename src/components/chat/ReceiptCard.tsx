@@ -101,7 +101,13 @@ export function ReceiptCard({
           <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">Didn't land:</p>
           {receipt.failed.map((f, i) => (
             <div key={i} className="flex items-center justify-between gap-2 text-[0.6875rem]">
-              <span>{f.op} — {f.error}</span>
+              {/* AN INTERNAL TOOL NAME IS NEVER SHOWN (29 Sep 2026). Receipts
+                  from the executor name the failed step by its tool
+                  (propose_meal_refit, propose_exercise_swap...), which read
+                  aloud as "propose_meal_top_up — 4 of the 6 didn't come back".
+                  The title above already says what was being done, so a
+                  tool-shaped name is dropped and the sentence stands alone. */}
+              <span>{/^propose_/.test(f.op) ? f.error : `${f.op} — ${f.error}`}</span>
               {onRetryFailed && (
                 <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[0.625rem]" disabled={busy != null} onClick={() => handleRetry(f.op)}>
                   {busy === f.op ? '…' : 'Retry'}
@@ -113,7 +119,7 @@ export function ReceiptCard({
       )}
 
       {status === 'failed' && (
-        <p className="text-xs text-destructive">Nothing was applied — {receipt?.failed[0]?.error ?? 'the write failed'}.</p>
+        <p className="text-xs text-destructive">Nothing was applied — {(receipt?.failed[0]?.error ?? 'the write failed').replace(/[.!?]+$/, '')}.</p>
       )}
 
       <div className="flex items-center justify-between pt-0.5">

@@ -2,6 +2,65 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAN TOP EVERY MEAL UP TO SEVEN IN ONE GO — 29 Sep 2026,
+  Ashley's list, item 1 of 3** ("fix these in order"). Until today the coach
+  could only find more options for ONE meal, and only once she had run out of
+  swaps; the Nutrition tab's button (28 Sep) did all of them. That left a
+  screen-only entry in `docs/coach-screen-parity.md` written by me the day I
+  built the button, and it is closed: `propose_meal_top_up`.
+  **No new ruling was needed** — the coach proposes and she taps (promise 2),
+  and the card says before the tap what it will not touch, which is her
+  28 Sep "Button, keep today" applied to the second surface. Two choices were
+  mine and are named: (1) **a complaint is not an ask**: "it's the same
+  dinners" gets a reply and an offer, and the card comes on her yes, because
+  her 24 Sep ruling was "a coach wouldn't send a card" for suggestions; only a
+  request ("give me more options") gets one; (2) **the coach does not guess a
+  cause.** I first wrote "the usual cause is that few of her saved meals fit
+  her numbers" into the prompt and took it out again: I could not confirm it
+  from here, and a guess in the coach's prompt is a claim the coach then
+  repeats as fact.
+  **Built as the resize is: one answer, both surfaces.** App works out which
+  meals are short once and hands it to both; the button and the coach confirm
+  through ONE function (`runMealTopUpNow`), so the coach cannot top up what the
+  button would refuse and the two cannot drift. The edge function is the
+  thinnest courier (the words she used, no number, no meal name). The card
+  states the day the new meals start off the same strict read of the shopping
+  list, and a list it cannot read is a refusal, never a guess. No card, and a
+  reason, when the first plan is still building, when body details are
+  missing, and when every meal is already full (the last one names no control:
+  the coach never points at one).
+  **Found on the way, by reading the screenshots, both pre-existing in this
+  card's neighbours:** (a) every partial receipt in the app printed an
+  INTERNAL TOOL NAME to the user ("propose_meal_refit — 3 didn't save...",
+  "propose_exercise_swap — ..."): about a dozen executor receipts shared it,
+  fixed once in the card that draws them; (b) the all-failed receipt read
+  "Nothing was applied — ...so nothing has changed. Try again in a moment.."
+  (a doubled stop, and "nothing" twice), because the card supplies its own
+  opening and full stop. The top-up now hands it a cause-only clause; the
+  card strips a trailing stop for every receipt. None of the 29 checks I had
+  written at the time was about either.
+  **CSCS review:** not a prescription change: no exercise, load, set or rest,
+  and the meals, their macros and their verification are untouched (every new
+  option goes through the same `verifyProposal`). Scope: not clinical.
+  **Verified:** `test:meal-top-up` §7 (95 checks; 46 mutations across both
+  halves, 46 caught after a bad mutation and a weak check were each redone:
+  one added a line without removing the refusal, one matched text that stayed
+  in the file after the condition was switched off); `verify:chat-top-up`
+  (38 checks at 390x844: the card, the meals in the order of the day, what
+  stays and the start day named before the tap, NOTHING generated or stored
+  until the tap, the receipt, the refusal when everything is full, the
+  generator down, a partial landing; 11 mutations, 10 caught by the driver and
+  the 11th by the source gate). `coach-parity` (the row), `coach-promises`,
+  `chat-app-reality`, `coach-voice` green. **The exam:** one case added
+  (an ask gets this card; a complaint alone gets none). It is 27 cases and 49
+  turns now, and the scores are stale twice over: the coach's prompt changed on
+  27 Sep and again today, and an exam-case edit does not make them stale on its
+  own (the gap named 26 Sep, still not built).
+  **Needs:** the frontend on merge, and **the `chat-gemini` deploy**: until it
+  runs the coach cannot call the tool. That is the same deploy still owed from
+  27 Sep, so one deploy covers both. **Not verified live:** nothing here is
+  live yet.
+
 - [ ] **"ALL THE DAYS' MEALS LOOK VERY SIMILAR" — 29 Sep 2026, Ashley, on
   the live release, with a screenshot of every day.** What the screens show:
   six dishes in the week. The same breakfast every day (and once a copy of it

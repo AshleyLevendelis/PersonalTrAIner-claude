@@ -53,6 +53,7 @@ it is wrong.
 | favourite a meal | BOTH, since 19 Sep 2026 | The coach has written `favorite_meals` since July and the screen could not add to it — the coach knew your favourites and the Nutrition tab had no way to name one. A heart on the meal row now marks it, through the same `markFavourite` the coach calls, so the two cannot drift. A favourite survives a regenerate, like a meal asked for by name. |
 | `propose_meal_move` | SCREEN | The meal row's Move control, since 14 Sep 2026. Same day only on BOTH surfaces alike. CORRECTED 27 Sep 2026: the reason written here was that no screen renders another day's meals, and the day strip now does. Moving a meal BETWEEN days is still built on neither surface; changing an upcoming day's meal is a swap with that day's date, on both. |
 | `propose_meal_refit` | SCREEN | Nutrition → the "Resize them" offer above the meal list, since 17 Sep 2026. Ashley's two rulings that day: tell her and offer to refit, and stay quiet until the drift is real. **The strongest parity row in this table, and by construction rather than by inspection**: App computes the verdict ONCE and hands the same object to the Nutrition tab and to the coach, and both confirm through one function. The coach cannot offer a resize the screen would not offer, cannot state a number the screen would not state, and cannot write by a different path — there is one answer and one write, read twice. |
+| `propose_meal_top_up` | SCREEN | Nutrition → the "Get more options" offer above the meal list, since 28 Sep 2026 (Ashley: "Button, keep today"); the coach's card since 29 Sep 2026, when she asked for the coach's half. **By construction, the `meal-refit` pattern**: App works out which meals are short ONCE, hands the same answer to the tab and to the coach, and both confirm through one function (`runMealTopUpNow`), so the coach cannot top up something the button would refuse, and both keep today and every day on the shopping list exactly as they were. The card states the day the new meals start before the tap, off the same strict read of the list; a list it cannot read is a refusal, not a guess. **A complaint is not an ask**: "it's the same dinners" gets a reply and an offer, and the card comes on her yes (her 24 Sep "a coach wouldn't send a card"). Distinct from the per-meal "find new ones" offer, which stays: it fires when she has run out of swaps for a meal she is choosing TODAY, where holding today would defeat it. |
 | `propose_meal_swap` | SCREEN | The meal row's swap control, on today and, since 27 Sep 2026, on any day of the Nutrition strip (the tool takes that day's `date`). One write for both: the strip's own pick for that date. |
 | see an upcoming day's meals | BOTH, since 27 Sep 2026 | The Nutrition tab's day strip; the coach is given the same six days by name (UPCOMING MEALS), from the same derivation the strip draws, so it cannot describe a Monday the screen would not serve. |
 | `propose_missed_session` | SCREEN | The day menu → "What happened?". |
@@ -75,9 +76,8 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Six screen-only, as of 28 Sep 2026** — the pre-session tightness check,
-macro mode, macro split, logging a build-up set, logging a drop set, and
-topping every meal up to seven in one tap. The
+**Five screen-only, as of 29 Sep 2026** — the pre-session tightness check,
+macro mode, macro split, logging a build-up set, and logging a drop set. The
 calorie target below is a sixth entry but a different kind: it is on NEITHER
 surface and cannot be, because it is derived rather than set.
 CORRECTED 22 Sep 2026: this said "Four... as of 17 Sep 2026" while the
@@ -158,17 +158,14 @@ the difference.
   35kg" about a lift taken to 47.5, and resolving an unstated weight to the
   drop. That is the same class as the coach quoting a different weight from the
   plan, which this app has had once already. Held by `coach-plan-context` §7.
-- **Topping every meal up to seven options in one tap.** `screen only`,
-  added 28 Sep 2026 the day it was built, by the person building it. Ashley's
-  rulings that day: seven options a meal, and "Button, keep today" for plans
-  made at five. The Nutrition offer adds to every short meal at once, and the
-  new meals start the day after today and the last shopping-list day, so
-  nothing she has planned or shopped for moves. **The coach half that exists**
-  is narrower: when she runs out of swaps for one meal, the coach offers to
-  find more for THAT meal (`handleFindMoreMealOptions`), which is right there
-  because she is choosing today's meal and holding today would defeat it.
-  Closing the gap means a coach tool calling the same `topUpMealPlan`, which
-  needs a `chat-gemini` change and deploy; not built.
+- ~~**Topping every meal up to seven options in one tap.**~~ **CLOSED 29 Sep
+  2026** — `propose_meal_top_up` in chat, with a row in the table above. It sat
+  here for one day, written by the person who built the button, which is the
+  entry this section exists for. Closing it needed no new decision: the coach
+  proposes, she taps, and the card says before the tap what it will not touch
+  (Ashley's 28 Sep "Button, keep today"), so this is her own ruling applied to
+  the second surface. It costs a `chat-gemini` deploy, and the coach exam is
+  stale until it is re-run.
 - **The calorie target itself.** On NEITHER surface, and not a gap that can be
   closed as written: there is no control because the number is derived by
   `computeTargets`, not stored as an intention. Changing "targets" means

@@ -35,11 +35,13 @@ import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
 import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
 import type { MealRefit } from '@/lib/meal-refit'
+import type { TopUpOutcome } from '@/lib/meal-top-up'
+import { DEFAULT_POOL_SIZE } from '@/lib/meal-generation'
 import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS } from '@/lib/coach-voice'
 import { isHedged } from '@/lib/definite-mention'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
@@ -278,6 +280,17 @@ interface ChatAssistantProps {
   mealRefit?: MealRefit | null
   /** The one write path, shared with the screen's own Resize button. Reports what actually landed so the receipt can say so. */
   onMealRefitConfirm?: () => Promise<{ updated: number; failed: number } | null>
+  /**
+   * MORE OPTIONS FOR EVERY MEAL (29 Sep 2026): which meals are short and by how
+   * many, computed once in App.tsx and handed to BOTH surfaces, the same
+   * parity-by-construction the resize has. Null only when the body details the
+   * targets need are missing. `building` is the first plan still being made.
+   */
+  mealTopUp?: { needs: Partial<Record<MealSlotName, number>>; building: boolean } | null
+  /** The day the new meals would start, read from the shopping list; null when the list cannot be read. */
+  onMealTopUpStart?: () => Promise<{ from: string; label: string } | null>
+  /** The one run, shared with the Nutrition tab's own button. Null when it could not start. */
+  onMealTopUpConfirm?: () => Promise<TopUpOutcome | null>
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
@@ -371,7 +384,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -3606,6 +3619,49 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  /**
+   * THE CARD FOR "MORE OPTIONS FOR EVERY MEAL". Nothing about which meals are
+   * short, by how many, or when the new ones start comes from the model: the
+   * app holds the pools and the shopping list, so the coach cannot offer a
+   * top-up the Nutrition tab's button would refuse. No card, and a reason,
+   * when there is nothing to add or the list cannot be read.
+   */
+  const buildMealTopUpProposal = async (rawArgs: Record<string, unknown>): Promise<
+    | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: Record<string, unknown>; diff: import('@/lib/pending-actions-store').ProposalDiff }
+    | { ok: false; refusal: string }
+  > => {
+    if (!mealTopUp) return { ok: false, refusal: MORE_MEALS.refusals.noBody }
+    if (mealTopUp.building) return { ok: false, refusal: MORE_MEALS.refusals.building }
+    // Meal order, not alphabetical: breakfast, lunch, dinner, snack.
+    const slots = (['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]).filter(s => (mealTopUp.needs[s] ?? 0) > 0)
+    if (slots.length === 0) return { ok: false, refusal: MORE_MEALS.refusals.full(DEFAULT_POOL_SIZE) }
+    const start = onMealTopUpStart ? await onMealTopUpStart() : null
+    if (!start) return { ok: false, refusal: MORE_MEALS.refusals.listUnreadable }
+    return {
+      ok: true,
+      // Keyed on the meals and the day, so two asks for the same top-up
+      // collapse onto one card instead of stacking two.
+      scopeKey: `${profile.id}:propose_meal_top_up:${slots.join(',')}:${start.from}`,
+      preconditions: { slots, from: start.from },
+      payload: { slots, needs: mealTopUp.needs, from: start.from, startLabel: start.label },
+      diff: {
+        lead: ask(MORE_MEALS.lead),
+        rows: slots.map(slot => ({
+          field: REFIT_SLOT_LABEL[slot],
+          before: MORE_MEALS.options(DEFAULT_POOL_SIZE - (mealTopUp.needs[slot] ?? 0)),
+          after: MORE_MEALS.options(DEFAULT_POOL_SIZE),
+        })),
+        unchanged: [MORE_MEALS.unchanged],
+        implications: [
+          { severity: 'info', text: MORE_MEALS.starts(start.label) },
+          { severity: 'info', text: MORE_MEALS.takesAMoment },
+        ],
+        rationale: typeof rawArgs.origin_verbatim_quote === 'string' ? rawArgs.origin_verbatim_quote : undefined,
+        reversible: false,
+      },
+    }
+  }
+
   const buildGoalChangeProposal = (rawArgs: Record<string, unknown>): {
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -4844,6 +4900,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             ? "Resizing wouldn't fix these — they're the wrong shape for your numbers rather than the wrong size, so the portions can't get there. Want me to build you a new set of meals around your current targets instead?"
             : "Your meals already add up to your targets, near enough — nothing to resize. If a particular meal feels off, tell me which and I'll look at that one."
         }
+      } else if (result.proposal.kind === 'propose_meal_top_up') {
+        const topUp = await buildMealTopUpProposal(result.proposal.rawArgs ?? {})
+        if (topUp.ok) built = { scopeKey: topUp.scopeKey, preconditions: topUp.preconditions, payload: topUp.payload, diff: topUp.diff }
+        else refusal = topUp.refusal
       } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs) {
         const activity = buildConcurrentActivityProposal(result.proposal.rawArgs)
         if (activity) built = { scopeKey: activity.scopeKey, preconditions: activity.preconditions, payload: activity.payload as unknown as Record<string, unknown>, preImage: activity.preImage, diff: activity.diff }
@@ -5621,6 +5681,38 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // stored pre-image this proposal deliberately does not carry — the
       // payload is three numbers precisely so the write reads live state.
       // Asking again after a target move re-offers, which is the way back.
+      undoToken = undefined
+    } else if (row.kind === 'propose_meal_top_up') {
+      // ONE RUN FOR BOTH SURFACES. The Nutrition tab's "Get more options"
+      // calls exactly this function; the coach has no second copy, so the two
+      // cannot drift. It reads the shopping list and the pools as they stand
+      // NOW, not as they stood when the card was built: the card promised
+      // which days stay, and the run keeps that promise against the live list.
+      const outcome = onMealTopUpConfirm ? await onMealTopUpConfirm() : null
+      const ok = !!outcome && outcome.added > 0
+      receipt = ok
+        ? {
+          landed: [`${outcome.added} new meal${outcome.added === 1 ? '' : 's'}`],
+          // A PARTIAL LANDING IS REPORTED AS PARTIAL, for the reason the
+          // resize receipt does: a plain "Added" over fewer meals than asked
+          // for would be the receipt lying by omission.
+          failed: outcome.added < outcome.asked
+            ? [{ op: 'propose_meal_top_up', error: `${outcome.asked - outcome.added} of the ${outcome.asked} didn't come back, so there's room to try again` }]
+            : [],
+        }
+        : { landed: [], failed: [{ op: 'propose_meal_top_up', error: outcome?.why ?? didNotSave('The top-up') }] }
+      title = ok ? RECEIPTS['propose_meal_top_up'].done : RECEIPTS['propose_meal_top_up'].failed
+      rows = ok && outcome
+        ? [
+          ...(Object.entries(outcome.addedBy) as [MealSlotName, number][])
+            .filter(([, n]) => n > 0)
+            .map(([slot, n]) => ({ label: REFIT_SLOT_LABEL[slot], detail: `+${n} option${n === 1 ? '' : 's'}` })),
+          { label: 'Starting', detail: outcome.startLabel.replace(/^on /, '') },
+        ]
+        : []
+      // NO UNDO, named: generating already cost a model call, and undoing
+      // would only delete options she can ignore for free. The pool refresh
+      // makes the same call for the same reason.
       undoToken = undefined
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload

@@ -266,10 +266,15 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   10% drift carry a dish the search resized, and a name brings back the
   stored portion. A leftover lunch now always comes from the dinner actually
   served the night before, which also fixed a swap leaving "Last night's
-  dinner" on a dish nobody cooked. All-at-once is `screen only`; the coach
-  finds more one meal at a time. `meal-pool-size` (22 checks, 11 mutations),
-  `meal-top-up` (69 checks, 25 mutations), `verify:meal-top-up` (31 checks,
-  9 mutations), `meal-days` §3b
+  dinner" on a dish nobody cooked. **Both surfaces since 29 Sep 2026** (she
+  asked for the coach's half the day after the button): `propose_meal_top_up`
+  runs the same function as the button, App works out what is short once and
+  hands it to both, and the card names what stays and the day the new meals
+  start before the tap. A complaint ("it's the same dinners") gets a reply and
+  an offer; the card comes on her yes. Needs the `chat-gemini` deploy for chat.
+  `meal-pool-size` (22 checks, 11 mutations), `meal-top-up` (95 checks, 46
+  mutations), `verify:meal-top-up` (31 checks, 9 mutations),
+  `verify:chat-top-up` (38 checks, 11 mutations), `meal-days` §3b
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
@@ -879,8 +884,10 @@ menu" stays true when a copy is also left outside it.
   next day. So the 13 Sep scores measure a coach and a grader that both no
   longer exist, and the number to act on is the one from the first run AFTER
   the deploy. Keep the commit — it is the only record of what the exam said
-  before any of this was fixed, and the comparison is the point. **26 cases and
-  47 turns** since 24 Sep 2026 (two voice cases for her "short steps" and
+  before any of this was fixed, and the comparison is the point. **27 cases and
+  49 turns** since 29 Sep 2026 (one more, for the coach's top-up card: an ASK
+  gets it and a complaint alone gets none, the direction no code can enforce;
+  26 and 47 since 24 Sep 2026, with two voice cases for her "short steps" and
   "question only when it matters" rulings; 23 and 43 on 20 Sep, up from 20 and
   37): the exam was written on
   13 Sep and the coach has gained tools since, so it was measuring a surface
@@ -1788,6 +1795,16 @@ old — the commands were right and the context was missing.
   the session. Neither is visible from the data or the source; both are obvious
   in one screenshot. When something new appears on a screen, the driver is not
   the last step after the gates pass — it is the step that finds the defect.
+- **READ THE FAILURE-STATE SCREENSHOTS TOO — THE HAPPY PATH WAS FINE AND BOTH
+  FAILURE PATHS HAD A DEFECT.** 29 Sep 2026, the coach's top-up card: all 29
+  checks passed first time, and the two screenshots nobody asked a check
+  about showed an internal tool name printed to the user ("propose_meal_top_up
+  — 4 of the 6 didn't come back") and a receipt reading "...nothing has
+  changed. Try again in a moment..", the card's own "Nothing was applied —"
+  and a doubled full stop. Neither is a property any check I had written was
+  about; both were obvious in a picture, and the first was app-wide (about a
+  dozen executor receipts shared it). **Take a screenshot of every state a
+  driver reaches, partial and failed included, and read it.**
 - **A `verify:` DRIVER ONLY SEES WHAT ITS HARNESS PAGE RENDERS, AND THE
   HARNESS IS NOT THE APP.** 16 Sep 2026: I added two checks asking whether the
   rebuild offer was visible and whether anything was stacked on top of it. Both

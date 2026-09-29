@@ -186,16 +186,52 @@ export function moreMealOptionsOffer(counts: number[], target: number): string {
  * changed, because "nothing has changed" is the fact she needs when it fails.
  * `startLabel` is "tomorrow", "on Thursday" or "on Monday 6 October".
  */
+export function moreMealOptionsWhy(r: { reached: boolean; listUnreadable: boolean }): string {
+  if (r.listUnreadable) return "I couldn't check your shopping list just then"
+  return r.reached ? "I couldn't find new meals that fit your targets" : "I couldn't reach the meal generator just then"
+}
+
 export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string }): string {
-  if (r.listUnreadable) return "I couldn't check your shopping list just then, so nothing has changed. Try again in a moment."
   if (r.added === 0) {
-    return r.reached
-      ? "I couldn't find new meals that fit your targets, so nothing has changed."
-      : "I couldn't reach the meal generator just then, so nothing has changed. Try again in a moment."
+    // Every failure says nothing changed, and the two that are about a
+    // connection say to try again; "no meal fits" would not get better.
+    const retry = r.listUnreadable || !r.reached ? ' Try again in a moment.' : ''
+    return `${moreMealOptionsWhy(r)}, so nothing has changed.${retry}`
   }
   const lead = `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}; every day before then stays as it was.`
-  return r.added < r.asked ? `${lead} That's fewer than I asked for, so the offer stays for another go.` : lead
+  // "There's room to try again" holds on both surfaces: the screen still
+  // offers it, and the coach can be asked. Neither has to point at a control.
+  return r.added < r.asked ? `${lead} That's fewer than I asked for, so there's room to try again.` : lead
 }
+
+/**
+ * THE COACH'S CARD FOR "MORE OPTIONS FOR EVERY MEAL" (29 Sep 2026) — the same
+ * change the Nutrition tab's "Get more options" makes, through the same
+ * function, so the two are worded from one place. The card states before the
+ * tap what it will NOT touch, because that promise is what makes it safe to
+ * tap (Ashley's ruling of 28 Sep, "Button, keep today").
+ */
+export const MORE_MEALS = {
+  /** Completes "Do you want me to ...". */
+  lead: 'add more options to each of your meals',
+  /**
+   * Said on the card before the tap, as ONE item: the card prints its
+   * unchanged items joined with commas after "Unchanged:", so two full
+   * sentences read as ".,". This is the promise that makes the tap safe.
+   */
+  unchanged: 'Today and every day on your shopping list, and every option you already have — nothing is removed or resized.',
+  starts: (startLabel: string) => `The new meals start ${startLabel}; every day before then stays as it was.`,
+  takesAMoment: 'Finding new meals takes a moment.',
+  /** A row's before and after. */
+  options: (n: number) => `${n} option${n === 1 ? '' : 's'}`,
+  /** No card, and why: the three days the request cannot be met. */
+  refusals: {
+    full: (size: number) => `Every meal already has ${size} options, so there's nothing to add. If the same ones keep coming up, tell me which and I'll swap them.`,
+    building: "I'm still building your first set of meals — give me a moment and ask me again.",
+    noBody: "I need your height, weight, age and sex before I can build meals around your targets — you can add them in Profile.",
+    listUnreadable: "I couldn't check your shopping list just then, so I can't say which days would stay as they are. Try again in a moment.",
+  },
+} as const
 
 /**
  * WHAT A NOTIFICATION SAYS, and it is the coach saying it.
@@ -630,6 +666,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_meal_food_resize: { done: 'Resized', failed: "I couldn't change the amount" },
   propose_custom_meal: { done: 'Saved', failed: "I couldn't save that meal" },
   propose_meal_refit: { done: 'Resized', failed: "I couldn't resize your meals" },
+  propose_meal_top_up: { done: 'Added', failed: "I couldn't add more meals" },
 }
 
 // ---------------------------------------------------------------------------

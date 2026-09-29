@@ -21,7 +21,7 @@ import { DEFAULT_POOL_SIZE, generateMealPools, type PoolOption } from './meal-ge
 import { addDays, epochDay } from './meal-rotation'
 import { weekdayLong, longDate } from './day-labels'
 import { readGroceryCoverage } from './grocery-store'
-import { moreMealOptionsOffer, moreMealOptionsDone } from './coach-voice'
+import { moreMealOptionsOffer, moreMealOptionsDone, moreMealOptionsWhy } from './coach-voice'
 import type { MealSlotName } from './meal-store'
 
 /**
@@ -150,6 +150,47 @@ export function topUpOffer(needs: Partial<Record<MealSlotName, number>>): string
 export type TopUpGeneration = Omit<Parameters<typeof generateMealPools>[0], 'profileId' | 'onlySlots' | 'poolSize' | 'appendToExisting' | 'servedFrom'>
 
 /**
+ * WHEN THE NEW MEALS WOULD START, read from the shopping list the same strict
+ * way the run reads it. For the coach's card, which states the day before the
+ * tap (the screen's offer states the rule and its receipt names the day). Null
+ * when the list cannot be read: a card promising "tomorrow" off a failed read
+ * would promise days it might then change.
+ */
+export async function previewTopUpStart(input: {
+  profileId: string
+  today: string
+  legacyStartDate?: string
+}): Promise<{ from: string; label: string } | null> {
+  try {
+    const covered = await readGroceryCoverage(input.profileId, input.today, input.legacyStartDate, { strict: true })
+    const from = topUpStartDate(input.today, covered)
+    return { from, label: topUpStartLabel(input.today, from) }
+  } catch {
+    return null
+  }
+}
+
+/** What the top-up did, for whichever surface asked. */
+export interface TopUpOutcome {
+  /** New meals stored, all meals together. */
+  added: number
+  /** New meals stored, per meal. */
+  addedBy: Partial<Record<MealSlotName, number>>
+  /** New meals asked for, all meals together. A partial landing is `added < asked`. */
+  asked: number
+  /** "tomorrow", "on Thursday", ... or '' when nothing was asked. */
+  startLabel: string
+  note: { text: string; failed: boolean }
+  /**
+   * Why nothing landed, as a clause with no full stop ("I couldn't reach the
+   * meal generator just then"), or null when something did. For a receipt
+   * that opens with "Nothing was applied —" and so must not say it twice.
+   */
+  why: string | null
+  unrecognised: string[]
+}
+
+/**
  * THE BUTTON. One function that App and the browser harness both call, so a
  * driver runs this and not a copy of it. Reads the list STRICTLY (a failed
  * read must never pass for an empty list), appends rather than replaces, and
@@ -163,7 +204,7 @@ export async function topUpMealPlan(input: {
   /** The shopping list's older rows carry a day offset from this date (see coveredDates). */
   legacyStartDate?: string
   generation: TopUpGeneration
-}): Promise<{ added: number; note: { text: string; failed: boolean }; unrecognised: string[] }> {
+}): Promise<TopUpOutcome> {
   const unrecognised = new Set<string>()
   try {
     const result = await runMealTopUp({
@@ -185,13 +226,17 @@ export async function topUpMealPlan(input: {
     })
     const added = Object.values(result.added).reduce((a, b) => a + (b ?? 0), 0)
     const asked = Object.values(result.asked).reduce((a, b) => a + (b ?? 0), 0)
+    const startLabel = result.from ? topUpStartLabel(input.today, result.from) : ''
     return {
       added,
+      addedBy: result.added,
+      asked,
+      startLabel,
+      why: added === 0 ? moreMealOptionsWhy({ reached: result.reached, listUnreadable: result.listUnreadable }) : null,
       unrecognised: [...unrecognised],
       note: {
         text: moreMealOptionsDone({
-          added, asked, reached: result.reached, listUnreadable: result.listUnreadable,
-          startLabel: result.from ? topUpStartLabel(input.today, result.from) : '',
+          added, asked, reached: result.reached, listUnreadable: result.listUnreadable, startLabel,
         }),
         failed: added === 0,
       },
@@ -199,6 +244,10 @@ export async function topUpMealPlan(input: {
   } catch {
     return {
       added: 0,
+      addedBy: {},
+      asked: 0,
+      startLabel: '',
+      why: moreMealOptionsWhy({ reached: false, listUnreadable: false }),
       unrecognised: [...unrecognised],
       note: { text: moreMealOptionsDone({ added: 0, asked: 0, reached: false, listUnreadable: false, startLabel: '' }), failed: true },
     }

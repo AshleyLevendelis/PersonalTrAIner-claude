@@ -28,7 +28,7 @@ import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
-import { topUpNeeds, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
+import { topUpNeeds, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
@@ -1281,12 +1281,14 @@ function App() {
    * day after today and the last day on the shopping list, so neither moves.
    * The same generator settings as "find more options" below; the list is
    * read strictly, because "could not read it" must never pass for "empty".
+   *
+   * ONE RUN FOR BOTH SURFACES (29 Sep 2026): the Nutrition button and the
+   * coach's confirm both call this, and only differ in where the receipt is
+   * shown. The coach cannot top up something the button would refuse.
    */
-  const handleMealTopUp = async () => {
-    if (!profile?.id || !macros || initialMealBuild || mealTopUpBusy) return
+  const runMealTopUpNow = async (): Promise<TopUpOutcome | null> => {
+    if (!profile?.id || !macros || initialMealBuild) return null
     const profileId = profile.id
-    setMealTopUpBusy(true)
-    setMealTopUpNote(null)
     const r = await topUpMealPlan({
       profileId,
       today: mealRotationDate,
@@ -1308,9 +1310,36 @@ function App() {
     })
     if (r.unrecognised.length > 0) setUnrecognisedDietaryRestrictions(r.unrecognised)
     if (r.added > 0) setMealPools(await getPools(profileId))
-    setMealTopUpNote(r.note)
-    setMealTopUpBusy(false)
+    return r
   }
+  /** The Nutrition tab's button: the receipt is the banner on that tab. */
+  const handleMealTopUp = async () => {
+    if (mealTopUpBusy) return
+    setMealTopUpBusy(true)
+    setMealTopUpNote(null)
+    try {
+      const r = await runMealTopUpNow()
+      if (r) setMealTopUpNote(r.note)
+    } finally {
+      setMealTopUpBusy(false)
+    }
+  }
+  /** The coach's confirm: same run, and the receipt is in the chat, not on the Nutrition tab. */
+  const handleMealTopUpFromChat = async (): Promise<TopUpOutcome | null> => {
+    if (mealTopUpBusy) return null
+    setMealTopUpBusy(true)
+    try {
+      return await runMealTopUpNow()
+    } finally {
+      setMealTopUpBusy(false)
+    }
+  }
+  /** The day the new meals would start, for the coach's card to state before the tap. */
+  const previewMealTopUpStart = () => (
+    profile?.id
+      ? previewTopUpStart({ profileId: profile.id, today: mealRotationDate, legacyStartDate: readGroceryBuildMemo(profile.id)?.startDate })
+      : Promise.resolve(null)
+  )
 
   const handleFindMoreMealOptions = async (slot: MealSlotName): Promise<{ added: string[]; error?: string }> => {
                 // Ashley's ruling on running out of swaps: OFFER to find new
@@ -3155,6 +3184,9 @@ function App() {
               onAddMealDayToGrocery={mealDays.addToGrocery}
               onRemoveMealDayFromGrocery={mealDays.removeFromGrocery}
               onFindMoreMealOptions={handleFindMoreMealOptions}
+              mealTopUp={macros ? { needs: mealTopUpNeeds, building: initialMealBuild } : null}
+              onMealTopUpStart={previewMealTopUpStart}
+              onMealTopUpConfirm={handleMealTopUpFromChat}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}
