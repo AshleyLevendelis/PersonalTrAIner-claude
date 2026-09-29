@@ -2,6 +2,54 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL WITH A FOOD ADDED COUNTS AS THE SAME DISH FOR VARIETY — 29 Sep
+  2026, Ashley's list, item 3 of 3** ("a meal with a food added (your yoghurt
+  bowl with honey) counts as a different dish, so the app thinks it's giving
+  variety when it isn't"). Mechanical, so no ruling was asked for. An edit
+  never changes a meal, it stores a NEW option beside it ("Bowl + 1 sachet
+  honey"), and every variety rule compared dishes by NAME, so the plain bowl
+  on Monday and the honey bowl on Tuesday read as two dishes.
+  **Measured, and the number is the reason to have done it:** on 60 seeded
+  pools with one edited copy of a dish per meal, the same dish was served on
+  back-to-back days 601 times in 1,080 days against 524 with no copy, while
+  identical NAMES back to back fell from 524 to 395. Variety scored better and
+  got worse. After: 536 (500 by name), the residue being the copy giving the
+  search more combinations that fit.
+  **What changed:** a dish has an identity (`meal-dish-identity.ts`) and an
+  edited copy shares its base's. Found by NAME, not by a tag, so it reaches
+  the plan she already has (a tag would only cover meals edited from now on).
+  Two guards keep it from misfiring: only options tagged user-requested are
+  ever read as edits, and the base's name must be followed by one of the edit
+  builders' own connectors (` + `, ` without `, ` with `, ` (as dinner)`), the
+  longest base winning. So two GENERATED dishes named alike ("Salmon" and
+  "Salmon with New Potatoes") stay two, and a requested "Salmon bowl" is not a
+  copy of "Salmon". Used by the variety cost (history and options mapped to
+  identities once per day, not once per combination, so the 28 Sep speed-up
+  holds: median 3 ms a week either side) and by the two places a leftover
+  lunch yields to a dinner that is the same dish. Nothing is merged or
+  deleted: the copy is still a separate option she can pick or swap to.
+  **CSCS review.** 1. *Effect:* she eats a more varied week; no set of foods
+  is added or removed, and the targets and tolerance bands are the assembler's
+  own. 2. *What it takes away:* an edited copy no longer counts as a fresh
+  dish, so on a small pool a day may now serve the plain version where the
+  copy used to look "different"; that is the point. 3. *Fundamentals:* protein
+  and calorie bands untouched, variety stays a sort key inside the bands and
+  cannot buy an off-target day. 4. *Redefined?* No number changed; the
+  measurement of variety by dish (28 Sep) now counts an edit as its base, which
+  is the definition it already claimed. 5. *Scope:* not clinical.
+  **Verified:** `test:meal-variety` 122 checks; the identity section
+  mutation-tested, 12 of 12 caught (every connector, the tag rule, the
+  connector rule, longest base, both directions of the ranking, both leftover
+  rules, the population, the wrong slot's pool). A derived 39-gate set (every
+  gate that reads the three changed modules plus the meal drivers, with
+  `test:bundle` and `test:no-dead-code`) and `tsc`: all green.
+  **Not verified:** not browser-driven. I built a harness variation and threw
+  it away: the harness week never picks the edited copy, so a driver check on
+  it would not bind, and the screen renders whatever the derivation returns
+  and is unchanged. The `measure:meal-*` scripts are unchanged and cannot see
+  this (their fixtures have no edited options), so their numbers are as before.
+  **Needs:** the frontend on merge; no edge function.
+
 - [x] **A MEAL CAN MOVE TO ANOTHER DAY, ON THE SCREEN AND BY THE COACH — 29 Sep
   2026, Ashley's list, item 2 of 3** ("Moving a meal to another day. Neither
   the screen nor the coach can do this yet."). **Her ruling, from three
