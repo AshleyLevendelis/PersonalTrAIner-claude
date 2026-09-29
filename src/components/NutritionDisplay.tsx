@@ -13,6 +13,7 @@ import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, type WaterLogR
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
+import type { MealDayMoveController } from '@/lib/meal-day-move'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
 import { macroShortfallLine } from '@/lib/macro-shortfall'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -123,6 +124,12 @@ export interface NutritionDisplayProps {
    */
   mealStrip?: { dates: string[]; today: string; selected: string; onSelect: (date: string) => void }
   /**
+   * Swapping a meal with another day's (Ashley, 29 Sep 2026: they swap
+   * places). One controller from App, the same one the coach's card uses.
+   * Absent, the Move control offers only the meal slots, as it did.
+   */
+  dayMove?: MealDayMoveController
+  /**
    * The day open on the strip, when it is not today: that date's meals, its
    * swap, and putting it on the shopping list. Null means today is open.
    */
@@ -165,7 +172,7 @@ export function NutritionDisplay({
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
   mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote,
-  mealStrip, upcomingDay = null,
+  mealStrip, upcomingDay = null, dayMove,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
@@ -539,6 +546,7 @@ export function NutritionDisplay({
           onRegenerateSlot={onRegenerateMealSlot}
           onRegenerateAll={onRegenerateAllMeals}
           upcoming={upcomingDay}
+          dayMove={dayMove}
         />
       ) : (
       <MealPlan
@@ -563,6 +571,7 @@ export function NutritionDisplay({
         onRegenerateSlot={onRegenerateMealSlot}
         onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}
+        dayMove={dayMove}
       />
       )}
 

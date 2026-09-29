@@ -233,6 +233,77 @@ export const MORE_MEALS = {
   },
 } as const
 
+const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
+const poss = (day: string) => `${day}'s`
+
+/**
+ * SWAPPING A MEAL WITH ANOTHER DAY'S — Ashley's ruling, 29 Sep 2026, from three
+ * options: they SWAP PLACES (Monday's dinner goes to Wednesday and Wednesday's
+ * comes to Monday), over giving the emptied day a fresh dinner and over eating
+ * the same dish on both. One phrasebook for the Move sheet and the coach's
+ * card, because both are the same change through the same builder.
+ *
+ * `day` is a possessive that already reads as a sentence opener: "Today's",
+ * "Wednesday's". Nothing here states a number the trial did not produce.
+ */
+export const DAY_MOVE = {
+  /** Completes "Want me to ...". `day` is a plain label: "today" or "Wednesday". */
+  lead: (slot: string, day: string, otherDay: string) => `swap ${poss(day)} ${slot} with ${poss(otherDay)}`,
+  swapped: (slot: string, day: string, otherDay: string) =>
+    `${cap(poss(day))} ${slot} and ${poss(otherDay)} swap places, so both days keep a ${slot}.`,
+  /** One item: the card prints these after "Unchanged:". */
+  unchanged: 'The meals themselves, their foods and their amounts — only which day each one is on',
+  /** A card row's label: "Today's dinner", "Wednesday's dinner". */
+  rowLabel: (day: string, slot: string) => `${cap(poss(day))} ${slot}`,
+  stillOnTarget: 'Both days are re-fitted around the swap and still land on your target.',
+  offTarget: (day: string, kcal: number, offBy: number) =>
+    `${cap(day)} would come to ${kcal.toLocaleString('en-GB')} kcal, about ${Math.abs(offBy).toLocaleString('en-GB')} ${offBy > 0 ? 'over' : 'under'} your target.`,
+  /** A meal OTHER than the two named that changes with the swap: a different dish. */
+  alsoLeftover: (day: string, slot: string, to: string) =>
+    `${cap(poss(day))} ${slot} becomes ${to}, the leftovers of the dinner the night before.`,
+  alsoFresh: (day: string, slot: string, to: string) =>
+    `${cap(poss(day))} ${slot} becomes ${to}, cooked fresh instead of leftovers.`,
+  alsoRefit: (day: string, slot: string, to: string) =>
+    `${cap(poss(day))} ${slot} becomes ${to}, so the day still fits.`,
+  /** ...or the same dish at a different size. */
+  alsoResized: (day: string, slot: string, from: number, to: number) =>
+    `${cap(poss(day))} ${slot} goes from ${from.toLocaleString('en-GB')} to ${to.toLocaleString('en-GB')} kcal so the day still fits.`,
+  andMore: (n: number) => `${n} more ${n === 1 ? 'meal changes' : 'meals change'} too.`,
+  listStale: (days: string[]) =>
+    `${cap(days.join(' and '))} ${days.length === 1 ? 'is' : 'are'} on your shopping list, so rebuild the list afterwards to match.`,
+  listUnknown: "I couldn't check your shopping list. If either day is on it, rebuild the list afterwards to match.",
+  /** The receipt's per-day row detail. */
+  became: (to: string) => `→ ${to}`,
+  done: (slot: string, day: string, otherDay: string) =>
+    `${cap(poss(day))} ${slot} and ${poss(otherDay)} have swapped places.`,
+  /** No card, and why. None of these points at a control. */
+  refusals: {
+    noBody: "I need your height, weight, age and sex before I can work out how your days fit together — you can add them in Profile.",
+    whichSlot: 'Which meal did you want to swap — breakfast, lunch, dinner or a snack?',
+    whichDays: "Which two days did you mean? For example, Monday's dinner with Wednesday's.",
+    outOfRange: 'I can only swap meals between today and the next six days — which days did you mean?',
+    sameDay: "Those are the same day, so there's nothing to swap.",
+    nothingThere: (slot: string, day: string) => `There's no ${slot} planned for ${day} to swap with.`,
+    sameDish: (slot: string, day: string, otherDay: string) =>
+      `${cap(poss(day))} ${slot} and ${poss(otherDay)} are already the same meal, so there's nothing to swap.`,
+    leftover: (day: string) =>
+      `${cap(poss(day))} lunch is leftovers of the dinner the night before, so it can't be moved on its own. Move that dinner and the leftovers are worked out again from it.`,
+    eaten: (slot: string) => `You've already logged today's ${slot} as eaten, so it can't move.`,
+    ledgerUnreadable: "I couldn't check what you've eaten today just then, so I can't move today's meals. Try again in a moment.",
+    notInPlan: (day: string, slot: string) => `${cap(poss(day))} ${slot} isn't one of your saved options any more, so I can't move it.`,
+    wouldNotHold: "I can't make that swap fit your plan.",
+  },
+  /** The sheet's line under a failed tap. `partial`: something did land, so it must not say "nothing". */
+  failureLine: (why: string, partial: boolean) =>
+    partial ? `${cap(why.replace(/[.!?]+$/, ''))}.` : `Nothing was swapped — ${why.replace(/[.!?]+$/, '')}.`,
+  /** Why nothing changed, as a clause with no full stop (see moreMealOptionsWhy). */
+  why: {
+    changed: 'your meals changed since I asked',
+    saveFailed: "the swap didn't save",
+    halfSaved: 'only half of the swap saved — try it again to finish it',
+  },
+} as const
+
 /**
  * WHAT A NOTIFICATION SAYS, and it is the coach saying it.
  *
@@ -667,6 +738,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_custom_meal: { done: 'Saved', failed: "I couldn't save that meal" },
   propose_meal_refit: { done: 'Resized', failed: "I couldn't resize your meals" },
   propose_meal_top_up: { done: 'Added', failed: "I couldn't add more meals" },
+  propose_meal_day_move: { done: 'Swapped over', failed: "I couldn't swap those meals" },
 }
 
 // ---------------------------------------------------------------------------

@@ -873,7 +873,14 @@ export async function setMealPick(profileId: string, date: string, slot: MealSlo
   if (error) throw error
 }
 
-export async function clearMealPick(profileId: string, date: string, slot: MealSlotName): Promise<void> {
-  await supabase.from('meal_plan_picks').delete().eq('profile_id', profileId).eq('date', date).eq('slot', slot)
+/**
+ * Removes a pick, and SAYS whether it did. Most callers are clearing a pick that
+ * regeneration made meaningless and ignore the answer; a caller putting a
+ * pick back after a failed write (a meal swapped with another day's) must not
+ * report "nothing changed" over a delete that did not happen.
+ */
+export async function clearMealPick(profileId: string, date: string, slot: MealSlotName): Promise<boolean> {
+  const { error } = await supabase.from('meal_plan_picks').delete().eq('profile_id', profileId).eq('date', date).eq('slot', slot)
+  return !error
 }
 

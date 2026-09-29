@@ -50,7 +50,13 @@ the resize actually bites: the default splits are breakfast 30%, lunch 40%,
 dinner 30%, snack 15% of the day (`computeSlotBudgets`, `BASE_RATIOS`), so a
 dinner moved to the snack slot is a real halving, not a rounding.
 
-**NOT BUILT — moving to another day**, and named rather than quietly dropped.
+**NOT BUILT HERE — moving to another day. BUILT 29 Sep 2026:** see
+`moving-a-meal-to-another-day.md`. The reason below (no screen renders another
+day's meals) stopped being true on 27 Sep when the day strip shipped, and the
+day move needed none of this file's resize: same slot, same budget, two picks.
+What follows is kept as written, because it is the record of why it waited.
+
+Originally, named rather than quietly dropped:
 The destination would be a day no screen displays (fact 2 above), so the
 control would change something the person cannot see, check, or undo by
 looking. That is the one thing the must-have list forbids outright. It needs a

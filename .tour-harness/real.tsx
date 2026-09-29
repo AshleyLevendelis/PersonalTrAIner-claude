@@ -69,7 +69,7 @@ import { prescribeLoad, isExternallyLoaded } from '@/lib/load-prescription'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
-import { buildRotation, assembleRotationDay, rotationIndexFor } from '@/lib/meal-rotation'
+import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
 import { useServablePools } from '@/hooks/useServablePools'
 import { markRestrictionBreakers } from '@/lib/meal-restriction-check'
@@ -810,6 +810,15 @@ const AVOID_FACTS = (AVOID ? [{
 // answer 502, the way a cut-off reply does.
 const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
 const TOPUP_FAIL = new URLSearchParams(location.search).get('topupfail') === '1'
+// ?daymove=1 — SWAPPING A MEAL WITH ANOTHER DAY'S (29 Sep 2026, Ashley: they
+// swap places). Five options a meal (the top-up run's pools, so the week has
+// real variety to swap between), batch cooking ON so a lunch can be last
+// night's dinner and the swap's knock-on shows, and TODAY'S picks held the way
+// App.tsx holds them: a map of saved picks, pinned into the hook's own week.
+// The hook, the builder, the sheet and the executor are the app's own; only
+// the database underneath is fake, and a driver can make a write fail
+// (window.__failWrite) to prove a half-saved swap is put back.
+const DAYMOVE = new URLSearchParams(location.search).get('daymove') === '1'
 const NO_PINS = {}
 if (TOPUP) {
   const realFetch = window.fetch.bind(window)
@@ -902,7 +911,7 @@ const topUpPools = (() => {
   }
   return out
 })()
-if (TOPUP) {
+if (TOPUP || DAYMOVE) {
   for (const [slot, options] of Object.entries(topUpPools)) {
     (options as { name: string; ingredients: unknown; macros: { calories: number; protein: number; carbs: number; fat: number } }[]).forEach((o, i) => db.meal_plan_slots.push({
       profile_id: PROFILE_ID, slot, pool_index: i, name: o.name, ingredients: o.ingredients,
@@ -953,7 +962,7 @@ const leftoverDay = leftoverRotation && macros
  * halves go through meal-store against this database. A screen whose meals
  * live only in a prop cannot be edited by the code that ships.
  */
-if (!WEEK && !TOPUP) for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
+if (!WEEK && !TOPUP && !DAYMOVE) for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
   db.meal_plan_slots.push({
     profile_id: PROFILE_ID, slot, pool_index: 0, name: option.name,
     ingredients: option.ingredients,
@@ -969,10 +978,12 @@ function Harness() {
   // holds the same two pieces of state and updates them in the same order:
   // persist the pick, re-read the pool, then move what is on screen.
   const [liveChosen, setLiveChosen] = useState((weekToday ? weekToday.chosen : leftoverDay ? leftoverDay.chosen : chosen) as Record<string, PoolOption>)
-  const [livePools, setLivePools] = useState((TOPUP ? topUpPools : LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
+  const [livePools, setLivePools] = useState((TOPUP || DAYMOVE ? topUpPools : LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
+  // ?daymove=1: today's saved picks, as App holds them (manualMealPicks).
+  const [dayMovePicks, setDayMovePicks] = useState<Record<string, string>>({})
   // THE APP'S OWN HOOK for the strip, not a copy of its wiring: the rotation
   // the app would build from these pools, and the fake database underneath.
-  const mealShape = useMemo(() => ({ mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS || TOPUP }), [])
+  const mealShape = useMemo(() => ({ mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS || TOPUP || DAYMOVE }), [])
   const servablePools = useServablePools(livePools as never, profile.dietary_preferences, AVOID_FACTS)
   const stripRotation = useMemo(
     () => (driftedMacros ? buildRotation(servablePools, driftedMacros, [], mealShape) : null),
@@ -981,7 +992,10 @@ function Harness() {
   )
   const mealDays = useMealDays({
     profileId: PROFILE_ID, today, rotation: stripRotation, pools: servablePools,
-    targets: driftedMacros, softLikedFoods: [], todaysPins: (TOPUP ? NO_PINS : liveChosen) as never, mealShape,
+    targets: driftedMacros, softLikedFoods: [],
+    todaysPins: (DAYMOVE ? pinsFromPicks(dayMovePicks as never, servablePools as never) : TOPUP ? NO_PINS : liveChosen) as never, mealShape,
+    // What App.tsx gives the hook so a meal swapped with another day's can land on today's row.
+    showTodaysPick: DAYMOVE ? (slot, name) => setDayMovePicks(prev => { const next = { ...prev }; if (name) next[slot] = name; else delete next[slot]; return next }) : undefined,
   })
   // ?topup=1: the button, through the app's own function. What App.tsx adds
   // around it (the first-build gate) is held by test:meal-top-up.
@@ -1012,6 +1026,7 @@ function Harness() {
   ;(window as unknown as { __groceryTable: unknown }).__groceryTable = () => db.grocery_items
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
+    if (DAYMOVE) setDayMovePicks(prev => ({ ...prev, [slot]: chosenName }))
     const fresh = await getPools(PROFILE_ID)
     const option = (fresh[slot as never] as PoolOption[] | undefined)?.find(o => o.name === chosenName)
     if (!option) return false
@@ -1052,7 +1067,7 @@ function Harness() {
 
   const liveTotals = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
     (acc, sl) => {
-      const m = (TOPUP ? (mealDays.today?.day.chosen ?? {}) as Record<string, PoolOption> : liveChosen)[sl]?.macros
+      const m = (TOPUP || DAYMOVE ? (mealDays.today?.day.chosen ?? {}) as Record<string, PoolOption> : liveChosen)[sl]?.macros
       return m ? { calories: acc.calories + m.calories, protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat } : acc
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 },
@@ -1131,7 +1146,7 @@ function Harness() {
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
             latestWeightKg={80} profileId={PROFILE_ID} date={today}
-            pools={servablePools as never} chosen={(TOPUP ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
+            pools={servablePools as never} chosen={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
             avoidFoods={compileFoodDislikes(AVOID_FACTS)}
             isGeneratingMeals={false} mealRegenerateError={null}
             onMealPickApplied={handleMealPickApplied as never}
@@ -1144,7 +1159,7 @@ function Harness() {
             onMealTopUp={() => { void handleTopUp() }}
             onMealTopUpDecline={() => { dismissTopUp(PROFILE_ID); setTopUpDismissTick(t => t + 1) }}
             onDismissMealTopUpNote={() => setTopUpNote(null)}
-            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} />
+            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove} />
         )}
         {activeTab === 'exercise' && (
           <ExerciseTab plan={exercisePlan} mesocycle={editedMeso} exclusions={[]}

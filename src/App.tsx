@@ -444,6 +444,14 @@ function App() {
   const mealDays = useMealDays({
     profileId: profile?.id, today: mealRotationDate, rotation: mealRotation, pools: mealPools,
     targets: macros, softLikedFoods: compiledSoftFoodPreferences, todaysPins: pinnedMeals, mealShape,
+    // A meal swapped with another day's can land on TODAY's row; today's picks
+    // live here, so the hook is handed the way to show one.
+    showTodaysPick: (slot, name) => setManualMealPicks(prev => {
+      const next = { ...prev }
+      if (name) next[slot] = name
+      else delete next[slot]
+      return next
+    }),
   })
   const assembledMeals = mealDays.today?.day ?? null
   const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
@@ -3122,6 +3130,7 @@ function App() {
               onDismissMealTopUpNote={() => setMealTopUpNote(null)}
               mealStrip={mealDays.strip}
               upcomingDay={mealDays.openDay}
+              dayMove={mealDays.dayMove}
             />
             )}
           </TabsContent>
@@ -3184,6 +3193,8 @@ function App() {
               onAddMealDayToGrocery={mealDays.addToGrocery}
               onRemoveMealDayFromGrocery={mealDays.removeFromGrocery}
               onFindMoreMealOptions={handleFindMoreMealOptions}
+              onMealDayMovePlan={mealDays.dayMove.plan}
+              onMealDayMoveConfirm={mealDays.dayMove.confirm}
               mealTopUp={macros ? { needs: mealTopUpNeeds, building: initialMealBuild } : null}
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { datesFrom, pinsFromPicks, serveMealWeek, ROTATION_DAYS, type MealShape, type Rotation, type ServedDay } from '@/lib/meal-rotation'
-import { getMealPicksForDates, setMealPick, swapPoolMeal, type MealSlotName } from '@/lib/meal-store'
+import { getMealPicksForDates, setMealPick, swapPoolMeal, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { addGroceryDays, removeGroceryDays, readGroceryCoverage, type AddGroceryDaysResult } from '@/lib/grocery-store'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { weekdayLong } from '@/lib/day-labels'
 import type { PoolOption } from '@/lib/meal-generation'
+import type { MealDayMoveArgs, MealDayMoveController, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
+import type { PendingActionReceipt } from '@/lib/pending-actions-store'
+import { DAY_MOVE } from '@/lib/coach-voice'
 import type { MacroTargets } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -39,7 +42,16 @@ export interface MealDaysInput {
    */
   todaysPins: Partial<Record<MealSlotName, PoolOption>>
   mealShape: MealShape
+  /**
+   * Puts a saved pick for TODAY on screen (`null`: no pick). Today's picks
+   * live with the app, not here, so a meal swapped with another day's can
+   * reach today's row. Absent, only the upcoming days update.
+   */
+  showTodaysPick?: (slot: MealSlotName, name: string | null) => void
 }
+
+/** One saved pick, to be shown. `null` clears it. */
+export interface ShownPick { date: string; slot: MealSlotName; name: string | null }
 
 export interface OpenMealDay {
   date: string
@@ -66,7 +78,7 @@ export function sumChosenMacros(chosen: Partial<Record<MealSlotName, PoolOption>
 }
 
 export function useMealDays(input: MealDaysInput) {
-  const { profileId, today, rotation, pools, targets, softLikedFoods, todaysPins, mealShape } = input
+  const { profileId, today, rotation, pools, targets, softLikedFoods, todaysPins, mealShape, showTodaysPick } = input
   /** Picks made on the strip's UPCOMING days, keyed by date. Today's live in App's manualMealPicks. */
   const [futurePicks, setFuturePicks] = useState<Record<string, Partial<Record<MealSlotName, string>>>>({})
   /** The day open on the strip when it is not today. Null means today. */
@@ -145,6 +157,77 @@ export function useMealDays(input: MealDaysInput) {
     return true
   }
 
+  /**
+   * Shows picks that are ALREADY SAVED. State only, no write: the swap across
+   * days writes both picks first and shows them together, so the screen never
+   * serves one dish on two days while the second write is in flight.
+   */
+  const showPicks = (updates: ShownPick[]) => {
+    const future = updates.filter(u => u.date > today)
+    for (const u of updates) if (u.date === today) showTodaysPick?.(u.slot, u.name)
+    if (future.length === 0) return
+    setFuturePicks(prev => {
+      const next = { ...prev }
+      for (const u of future) {
+        const day = { ...(next[u.date] ?? {}) }
+        if (u.name) day[u.slot] = u.name
+        else delete day[u.slot]
+        next[u.date] = day
+      }
+      return next
+    })
+  }
+
+  /**
+   * SWAP A MEAL WITH ANOTHER DAY'S (Ashley, 29 Sep 2026: they swap places).
+   * The whole decision is buildMealDayMoveProposal, run over THIS hook's week
+   * so the trial is the week the screen serves. What it cannot know itself is
+   * read here: which of today's meals are already eaten, and which days are on
+   * the shopping list. Either read failing is passed as `null`, never as
+   * "nothing", so an unreadable ledger or list is said on the card rather than
+   * treated as empty. Imported lazily: first paint never needs it.
+   */
+  const planDayMove = async (rawArgs: MealDayMoveArgs): Promise<MealDayMoveResult> => {
+    const { buildMealDayMoveProposal } = await import('@/lib/meal-day-move')
+    let loggedTodaySlots: MealSlotName[] | null = null
+    let listDates: string[] | null = null
+    if (profileId && targets) {
+      try {
+        const ledger = await getTodayLedger(profileId, today, targets)
+        const logged = loggedEventsBySlot(ledger.events)
+        loggedTodaySlots = (Object.keys(logged) as MealSlotName[]).filter(s => (logged[s]?.length ?? 0) > 0)
+      } catch { /* stays null: the builder refuses a move involving today */ }
+      try {
+        listDates = await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate, { strict: true })
+      } catch { /* stays null: the card says the list could not be checked */ }
+    }
+    return buildMealDayMoveProposal({
+      profileId: profileId ?? '',
+      rawArgs,
+      serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation },
+      loggedTodaySlots,
+      listDates,
+    })
+  }
+
+  /**
+   * Confirm re-plans against the live week and writes only if every day still
+   * gets the dish the card named. A dish swapped on either day since the card
+   * was built would otherwise be overwritten by a pick for a card she read
+   * before it changed.
+   */
+  const confirmDayMove = async (payload: MealDayMovePayload): Promise<PendingActionReceipt> => {
+    const failed = (error: string): PendingActionReceipt => ({ landed: [], failed: [{ op: 'propose_meal_day_move', error }] })
+    if (!profileId) return failed(DAY_MOVE.why.saveFailed)
+    const [{ sameMealDayMove }, { executeMealDayMove }] = await Promise.all([
+      import('@/lib/meal-day-move'),
+      import('@/lib/pending-action-executor'),
+    ])
+    const live = await planDayMove({ meal_slot: payload.slot, from_date: payload.legs[0].date, to_date: payload.legs[1].date })
+    if (!live.ok || !sameMealDayMove(live.payload, payload)) return failed(DAY_MOVE.why.changed)
+    return executeMealDayMove(profileId, live.payload, showPicks)
+  }
+
   const addToGrocery = async (date: string): Promise<AddGroceryDaysResult | null> => {
     if (!profileId || !targets) return null
     return addGroceryDays({
@@ -204,5 +287,10 @@ export function useMealDays(input: MealDaysInput) {
     /** Put a day on the shopping list, or take it back off — the coach's path too. */
     addToGrocery,
     removeFromGrocery,
+    /**
+     * Swap a meal with another day's: what the Move sheet and the coach both
+     * call, so the coach cannot offer a swap the sheet would refuse.
+     */
+    dayMove: { dates, today, plan: planDayMove, confirm: confirmDayMove } satisfies MealDayMoveController,
   }
 }

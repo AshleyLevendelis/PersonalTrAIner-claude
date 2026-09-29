@@ -64,6 +64,14 @@ export function makeFakeSupabase(db: Db) {
 
     const exec = () => {
       const rows0 = table(name)
+      // A WRITE A DRIVER WANTS TO FAIL. Opt-in: a driver sets window.__failWrite
+      // to a predicate over (table, operation, row); nothing sets it by
+      // default, so every other run is unchanged. It is how a half-saved swap
+      // is proved put back, which no happy path can show.
+      const failWrite = (window as unknown as { __failWrite?: (t: string, o: string, r: Row) => boolean }).__failWrite
+      if (failWrite && (op === 'insert' || op === 'upsert' || op === 'delete') && (op === 'delete' ? failWrite(name, op, {}) : payload.some(r => failWrite(name, op, r)))) {
+        return { data: null, error: { code: '08006', message: 'simulated write failure' } }
+      }
       if (op === 'insert' || op === 'upsert') {
         // RETURN THE STORED ROWS, not the payload. The payload has no `id` —
         // Postgres generates it — so returning it made `.insert().select()

@@ -219,7 +219,32 @@ console.log('\n5. A SCREEN claim is derived, not merely asserted\n')
     }
   }
   check(`the tabs reach real components (${reachable.size}) (sanity check on this check)`, reachable.size > 5, reachable.size)
-  const screenSources = [...reachable].map(f => readFileSync(f, 'utf8'))
+  // A HOOK APP WIRES TO THE SCREENS IS PART OF THE SCREEN PATH (29 Sep 2026).
+  // A control whose decision is shared with the coach by CONSTRUCTION does not
+  // import the builder itself: it is handed a controller by a hook (App calls
+  // useMealDays once and gives the same plan/confirm to the Move sheet and to
+  // the coach), so the builder is named in the hook and in no component. The
+  // hooks counted are the ones App.tsx or a reachable component imports, read
+  // the same way as the components above, so a hook nobody wires up counts for
+  // nothing. The coach client is still excluded.
+  const hookFiles = new Set<string>()
+  for (const src of [app, ...[...reachable].map(f => readFileSync(f, 'utf8'))]) {
+    for (const m of src.matchAll(/from\s*['"]@\/hooks\/([\w-]+)['"]/g)) {
+      for (const ext of ['.ts', '.tsx']) {
+        const cand = join('src', 'hooks', m[1] + ext)
+        if (existsSync(cand)) hookFiles.add(cand)
+      }
+    }
+  }
+  check(`the tabs reach real hooks (${hookFiles.size}) (sanity check on this check)`, hookFiles.size >= 1, [...hookFiles])
+  // COMMENTS STRIPPED FROM THE HOOKS. A hook's header comment names the
+  // builder to explain it (this one does), and a presence check that a comment
+  // can satisfy proves the note, not the wiring.
+  const uncommented = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const screenSources = [
+    ...[...reachable].map(f => readFileSync(f, 'utf8')),
+    ...[...hookFiles].map(f => uncommented(readFileSync(f, 'utf8'))),
+  ]
 
   let derived = 0
   const notDerivable: string[] = []
@@ -228,7 +253,7 @@ console.log('\n5. A SCREEN claim is derived, not merely asserted\n')
     const builder = builderFor(tool)
     if (!libBuilders.has(builder)) { notDerivable.push(tool); continue }
     derived++
-    check(`${tool}: a SCREEN component (not the chat) imports ${builder}`,
+    check(`${tool}: a SCREEN component (not the chat), or the hook App wires to it, imports ${builder}`,
       screenSources.some(src => src.includes(builder)))
   }
   // NAMED, NOT SILENTLY PASSED. A tool without a shared builder rests on its

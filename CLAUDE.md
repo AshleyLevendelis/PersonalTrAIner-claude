@@ -502,11 +502,53 @@ menu" stays true when a copy is also left outside it.
   options, **"they swap places"** (14 Sep) — dinner becomes the snack, the
   snack becomes dinner, both resized, both new sizes stated before the tap.
   `meal-move`, `verify:meal-move`, `coach-parity`.
-  Moving to another DAY stays `MISSING`, on both surfaces. CORRECTED 27 Sep
-  2026: the reason written here, that no screen renders another day's meals,
-  stopped being true when the day strip shipped. It is simply not built; a
-  different meal on another day is a swap with that day's date, on both.
   Meals per day and snacks — `screen only` (Profile)
+- **Swap a meal with the same meal on another day** — both surfaces since
+  29 Sep 2026, her list's item 2 ("Moving a meal to another day. Neither the
+  screen nor the coach can do this yet."). Her ruling, from three options:
+  **they swap places** (Monday's dinner goes to Wednesday and Wednesday's
+  comes to Monday), over a fresh dinner for the emptied day and over the same
+  dish on both. Her 14 Sep slot-move ruling, across days.
+  CORRECTED, and the correction is why this was cheap: it was `MISSING` on the
+  reason that no screen renders another day's meals, which stopped being true
+  on 27 Sep when the strip shipped. A day's meals are not stored at all
+  (`meal_plan_picks` names a dish per date and slot over the dateless pool),
+  so a move is TWO PICKS, same slot on both days, the same budget: **no
+  resize, no new pool option**, which is what the slot move has to do and this
+  does not.
+  **THE CARD IS READ OFF A TRIAL, NOT ASSERTED.** One builder runs the very
+  week derivation the screen runs, once as it stands and once with the two
+  picks in, and reports the difference. That matters because a pin re-fits
+  the rest of its day, and a lunch that is last night's dinner is re-made from
+  whichever dinner is now served the night before (28 Sep), so a swap can
+  change a meal on a day nobody named. Before the tap the card says: each
+  day's dish, every OTHER meal that changes and WHY (the leftovers of the
+  dinner, cooked fresh instead, a different dish so the day still fits, or the
+  same dish at a size she would notice), any day the move took off target (a
+  day already off is not blamed on it), and that the shopping list needs
+  rebuilding when a changed day is on it. The list is not rebuilt behind her
+  back (her refit and top-up rulings) and an unreadable list is said, never
+  passed off as empty. Refused in plain words: a day outside today plus six,
+  the same dish on both days, a **leftover lunch** (move the dinner and the
+  leftovers are worked out again), and **today's meal once it is logged as
+  eaten**, either way round. Both picks or neither: a second write that fails
+  puts the first back, and a put-back that fails is reported as half saved
+  with the screen showing what the store now holds.
+  **Parity by construction, the `meal-refit` pattern**: `useMealDays` builds
+  one controller (`plan`, `confirm`) that App hands to the Move sheet and to
+  the coach, and the confirm RE-PLANS against the live week and writes only if
+  every day still holds the dish the card named. **Named, not built:** a meal
+  to a DIFFERENT meal on another day (Monday's dinner to Wednesday's lunch),
+  because it needs the slot move's resize on a day and nobody asked.
+  **A COMMENT CANNOT SATISFY A PRESENCE CHECK, and a control wired through a
+  hook has no component that names its builder**: the parity gate derives
+  "a screen imports the builder" from components, so this row failed until the
+  gate was taught that a hook App wires to the tabs is part of the screen path
+  (comments stripped from the hooks it counts, mutation-tested).
+  `test:meal-day-move` (110 checks, 44 mutations), `verify:meal-day-move`
+  (43 checks, 17 mutations), `verify:chat-day-move` (46 checks, 8
+  mutations), `coach-parity`. Needs the `chat-gemini` deploy
+  for chat
 - Scale a portion — both surfaces since 12 Sep 2026, the same row menu;
   `meal-food-edit`, `verify:meal-food-edit`
 - Resize the WHOLE DAY back onto the targets — both surfaces since 17 Sep
@@ -884,8 +926,11 @@ menu" stays true when a copy is also left outside it.
   next day. So the 13 Sep scores measure a coach and a grader that both no
   longer exist, and the number to act on is the one from the first run AFTER
   the deploy. Keep the commit — it is the only record of what the exam said
-  before any of this was fixed, and the comparison is the point. **27 cases and
-  49 turns** since 29 Sep 2026 (one more, for the coach's top-up card: an ASK
+  before any of this was fixed, and the comparison is the point. **28 cases and
+  51 turns** since 29 Sep 2026 (one more, for the coach's day swap: a swap
+  between two days is not a move between meals on one day, and the pair makes
+  the days and the wording differ so a coach keying on "swap" or "move" cannot
+  pass by accident; 27 and 49 the same day, for the top-up card: an ASK
   gets it and a complaint alone gets none, the direction no code can enforce;
   26 and 47 since 24 Sep 2026, with two voice cases for her "short steps" and
   "question only when it matters" rulings; 23 and 43 on 20 Sep, up from 20 and

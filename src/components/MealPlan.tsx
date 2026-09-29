@@ -23,6 +23,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // day they were added — the honest fix is to defer them, not to raise the
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext } from './nutrition/MealMoveSheet'
+import type { MealDayMoveController } from '@/lib/meal-day-move'
 import { COOK_ONCE } from '@/lib/coach-voice'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
@@ -120,6 +121,12 @@ interface MealPlanProps {
   onRegenerateAll: () => Promise<void>
   /** Set when this list is an upcoming day from the strip rather than today. See UpcomingMealDay. */
   upcoming?: UpcomingMealDay
+  /**
+   * Swapping a meal with another day's (Ashley, 29 Sep 2026). From App, and
+   * the same controller the coach's card uses. Absent, Move offers only the
+   * meal slots.
+   */
+  dayMove?: MealDayMoveController
 }
 
 /**
@@ -136,7 +143,7 @@ export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
-  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming,
+  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming, dayMove,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -458,6 +465,8 @@ export function MealPlan({
                     }])),
                 }
               : null}
+            date={date}
+            dayMove={dayMove}
             onRegenerate={onRegenerateSlot}
             onFindMore={upcoming ? undefined : onFindMoreOptions}
             checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
@@ -675,6 +684,8 @@ function MealSlotRow({
   moveContext,
   onMealPickApplied,
   upcoming,
+  date,
+  dayMove,
 }: {
   profileId: string | undefined
   /** An upcoming day's row: no logging, no regenerate — see UpcomingMealDay. */
@@ -713,6 +724,10 @@ function MealSlotRow({
   /** Null for the same reasons editContextFor is — the Move control then doesn't render either. */
   moveContext: MealMoveContext | null
   onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
+  /** The day this list is for. */
+  date: string
+  /** Swapping this meal with another day's. Absent: no day to swap with. */
+  dayMove?: MealDayMoveController
 }) {
   const [busy, setBusy] = useState(false)
   const [favouriteBusy, setFavouriteBusy] = useState(false)
@@ -1117,7 +1132,7 @@ function MealSlotRow({
                 when the screen cannot finish the job (no profile, no targets,
                 no pick path), on the same rule the food edits follow: a
                 control that cannot finish is worse than no control. */}
-            {moveContext && onMealPickApplied && (
+            {((moveContext && onMealPickApplied) || dayMove) && (
               <button
                 type="button"
                 onClick={() => { setMoveOpen(prev => !prev); setMoveNote(null) }}
@@ -1175,17 +1190,18 @@ function MealSlotRow({
           })()}
           {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
 
-          {moveOpen && moveContext && onMealPickApplied && (
+          {moveOpen && ((moveContext && onMealPickApplied) || dayMove) && (
             <Suspense fallback={null}>
               <MealMoveSheet
-                ctx={moveContext}
+                ctx={moveContext && onMealPickApplied ? moveContext : null}
+                dayMove={dayMove ? { controller: dayMove, date, slot } : null}
                 onPick={onMealPickApplied}
                 onDone={summary => { setMoveOpen(false); setMoveNote(summary) }}
                 onCancel={() => setMoveOpen(false)}
               />
             </Suspense>
           )}
-          {moveNote && <p className="text-[0.71875rem] text-muted-foreground">{moveNote}. Both were resized to fit where they landed.</p>}
+          {moveNote && <p className="text-[0.71875rem] text-muted-foreground" data-testid="meal-move-note">{moveNote}</p>}
 
           {swapOpen && (
             <div className="flex flex-col gap-1">

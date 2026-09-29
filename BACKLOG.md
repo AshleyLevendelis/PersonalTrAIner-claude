@@ -2,6 +2,97 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL CAN MOVE TO ANOTHER DAY, ON THE SCREEN AND BY THE COACH — 29 Sep
+  2026, Ashley's list, item 2 of 3** ("Moving a meal to another day. Neither
+  the screen nor the coach can do this yet."). **Her ruling, from three
+  options: THEY SWAP PLACES** (Monday's dinner goes to Wednesday and
+  Wednesday's comes to Monday), over a fresh dinner for the emptied day and
+  over the same dish on both. Her 14 Sep slot-move ruling, applied across
+  days. Nothing else needed asking: the rest is mechanical or already ruled
+  (ask first, then allow; tell her rather than rebuild the list behind her).
+  **CORRECTED, measured: it was never blocked.** CLAUDE.md carried it as
+  `MISSING` on the reason that no screen renders another day's meals, which
+  stopped being true on 27 Sep when the strip shipped. A day's meals are not
+  stored at all (`meal_plan_picks` names a dish per date and slot over the
+  dateless pool), so a move is TWO PICKS. Same slot on both days means the
+  same budget: **no resize and no new pool option**, which is what the
+  slot-to-slot move has to do and this does not.
+  **Built as the resize and the top-up are: one answer, both surfaces.**
+  `useMealDays` builds one controller (`plan`, `confirm`) that App hands to
+  the Move sheet and to the coach, so the coach cannot offer a swap the sheet
+  would refuse. The card is READ OFF A TRIAL: the builder runs the same week
+  derivation the screen runs, once as it stands and once with the two picks
+  in, and reports the difference. That matters because pinning a dinner
+  re-fits the rest of its day, and a lunch that is last night's dinner is
+  re-made from whichever dinner is now served the night before (28 Sep), so a
+  swap can change a meal on a day nobody named. Before the tap the card says:
+  each day's dish and how its size moves; every OTHER meal that changes and
+  why (leftovers of the dinner, cooked fresh instead, a different dish so the
+  day still fits, or the same dish at a size she would notice: 50 kcal and a
+  tenth of the meal); any day the move took off target (a day already off is
+  not blamed on it); and that the shopping list needs rebuilding when a
+  changed day is on it (an unreadable list is said, never passed off as
+  empty). The confirm RE-PLANS against the live week and writes only if both
+  days still hold the dish the card named.
+  **Refused, in plain words:** a day outside today plus six, the same day
+  twice, the same dish on both days, a slot with no dish, a **leftover lunch**
+  (it is last night's dinner: move the dinner and the leftovers are worked out
+  again), and **today's meal once it is logged as eaten**, either way round
+  (an unreadable ledger refuses a move involving today).
+  **Both picks or neither.** The second write failing takes the first back
+  (to the pick it replaced, or to none); a put-back that itself fails is
+  reported as half saved and the screen shows what the store holds.
+  `clearMealPick` used to swallow its error and now says whether it worked.
+  **Decisions that were mine, named.** (1) Same meal on both days only:
+  Monday's dinner to Wednesday's LUNCH needs the slot move's resize on a day,
+  nobody asked, and it is named in the parity list rather than dropped. (2) No
+  undo token: asking for the same swap again puts them back, as the slot move
+  does. (3) The shopping list is told, not rebuilt: her refit and top-up
+  rulings were "tell her".
+  **Found on the way.** (a) The card, a refusal and a failure all appear
+  BELOW the buttons that were tapped, and on a phone that is under the tab
+  bar: the driver found the Swap button half hidden, so the sheet now scrolls
+  its result into view. `scrollIntoView` with a scroll margin was tried and
+  left it hidden in Chromium; the arithmetic is done by hand against the tab
+  bar. (b) Six day buttons wrapped onto two rows; now one. (c) The parity gate
+  derived "a screen imports the builder" from components only, so a control
+  wired through a HOOK (App calls the hook once and hands the same controller
+  to both) failed it. Hooks App wires to the tabs now count, with comments
+  stripped (the hook's own header comment named the builder, which a
+  presence check accepted), 3 of 3 mutations caught. (d) `verify:meal-days`
+  asserted "an upcoming meal offers no moving", true until today; re-anchored
+  on what still holds (no move to another MEAL, no food edits).
+  **CSCS review.** 1. *Effect:* which meals are eaten on which day; each day
+  is re-fitted to the same targets, so the protein and calorie bands are held
+  per day, and the card warns when a swap takes a day out of them. Meal timing
+  is unchanged (same slot). 2. *What it takes away:* the days' other meals can
+  change to re-fit, or become leftovers or fresh: all stated before the tap.
+  3. *Fundamentals:* the tolerance bands, including protein 0.95-1.15x, are
+  the assembler's own and unchanged. 4. *Redefined?* Nothing; the two new
+  numbers (50 kcal and 10%) decide what the card MENTIONS, not what is served.
+  5. *Scope:* not clinical. No new food is created: both dishes were already
+  being served under her current restrictions, and a dish the assembler would
+  set aside (one marked as breaking a restriction) is refused rather than
+  shown as swapped.
+  **Verified:** `test:meal-day-move` 110 checks, 44 mutations, 44 caught (three
+  first came back MISSED or as crashes: an unreachable duplicate refusal was
+  deleted, a size threshold was extracted so the gate can bind it with
+  literals, and a builder throw is now a failed check rather than a dead run);
+  `verify:meal-day-move` 43 checks at 390x844, 17 of 17 caught, every state
+  screenshot read (the days, the card, the note, today, eaten, leftover, the
+  failed swap); `verify:chat-day-move` 46 checks at 390x844, 8 of 8 caught (the card, the receipt, four refusals, the week changing under the card, a failed second write, today), every state screenshot read; `coach-parity`;
+  one coach exam case (a swap between days and a move between meals on one
+  day, worded so neither matches the prompt): 28 cases and 51 turns, not run.
+  **Not verified:** the coach's real behaviour (the model is stubbed at the
+  fetch boundary in the driver, and the exam needs credentials this session
+  lacks); App.tsx itself (no harness page boots it: `showTodaysPick` and the
+  two prop hand-offs are held by source checks and the harness's copy of them).
+  The ledger read (`getTodayLedger`) answers "nothing eaten" rather than
+  throwing when the network is down, so offline it can miss a meal logged on
+  another device; that is the ledger's existing behaviour, not new here.
+  **Needs:** the frontend on merge, and the `chat-gemini` deploy (the same one
+  still owed since 27 Sep). Coach exam scores are stale until it is re-run.
+
 - [x] **THE COACH CAN TOP EVERY MEAL UP TO SEVEN IN ONE GO — 29 Sep 2026,
   Ashley's list, item 1 of 3** ("fix these in order"). Until today the coach
   could only find more options for ONE meal, and only once she had run out of

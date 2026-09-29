@@ -118,7 +118,17 @@ check('the day has an add-to-list button, in its own words',
 await openSlot('dinner')
 const controls = await buttonTexts()
 check('an upcoming meal offers no logging', !controls.some(t => /Log this meal/.test(t)), controls)
-check('...no moving and no food edits', !(await has('[data-testid="meal-move-open"]')) && !(await has('[data-testid="meal-food-add-open"]')) && !(await has('[data-ingredient-row]')))
+// RE-ANCHORED 29 Sep 2026: this said "no moving", true until Ashley's ruling
+// that a meal can be swapped with another day's. What is still true, and is
+// what this check now holds, is that an upcoming meal offers no move to
+// another MEAL (that resize is today's, and needs today's budgets) and no
+// food edits. verify:meal-day-move drives the day swap itself.
+check('...no food edits, and no moving to another meal (only to another day)', !(await has('[data-testid="meal-food-add-open"]')) && !(await has('[data-ingredient-row]')) && (await has('[data-testid="meal-move-open"]')))
+await ev(`document.querySelector('[data-testid="meal-move-open"]').click()`)
+await wait(300)
+check('...its Move sheet offers days and no meals', (await has('[data-testid^="meal-move-day-"]')) && !(await has('[data-testid^="meal-move-to-"]')))
+await ev(`document.querySelector('[data-testid="meal-move-open"]').click()`)
+await wait(200)
 check('...but it can be swapped', controls.some(t => /^Swap/.test(t)), controls)
 await shoot('meal-days-upcoming')
 

@@ -12,7 +12,7 @@
 // guard against double-execution, that's the claim's job.
 // ---------------------------------------------------------------------------
 
-import { didNotSave } from './coach-voice'
+import { didNotSave, DAY_MOVE } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
@@ -25,13 +25,14 @@ import { rebuildDayAroundMainLift } from './session-rebuild'
 import { shortenDayTo } from './exercise-plan'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
-import { swapPoolMeal, clearMealPick, getMealPicksForDate, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
+import { swapPoolMeal, clearMealPick, getMealPicksForDate, setMealPick, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
 import { setSessionMove, setDeliberateRest, setMarkedMissed, setSwappedForActivity } from './daily-tracking'
 import { saveCardioLog } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
 import type { MealMovePayload } from './meal-move'
+import type { MealDayMovePayload, MealDayMoveLeg } from './meal-day-move'
 import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slots'
 import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
 import type { PendingActionReceipt } from './pending-actions-store'
@@ -664,6 +665,62 @@ export async function executeMealMove(
   }
 
   return { landed, failed: [] }
+}
+
+/**
+ * TWO DAYS TRADE A MEAL — Ashley's ruling, 29 Sep 2026: "they swap places",
+ * across days. Two picks, BOTH OR NEITHER: a swap that lands one half is the
+ * same dish on two days and the other one gone, which is worse than not
+ * moving anything, and she would find out by looking at her own week.
+ *
+ * Writes go to the database first, both of them; `show` then puts them on
+ * screen. Showing after the first write would leave the screen serving the
+ * same dish on two days for as long as the second takes, and a rollback would
+ * have to unshow it. A leg that fails puts back every leg already written,
+ * and if a put-back itself fails the receipt says the swap is half saved and
+ * names it, rather than "nothing has changed".
+ *
+ * No new writer: the pick is the one every swap, addition and edit already
+ * makes (`setMealPick`), which also refuses a past date.
+ */
+export async function executeMealDayMove(
+  profileId: string,
+  payload: MealDayMovePayload,
+  show: (updates: { date: string; slot: MealSlotName; name: string | null }[]) => void,
+): Promise<PendingActionReceipt> {
+  const written: MealDayMoveLeg[] = []
+  for (const leg of payload.legs) {
+    try {
+      await setMealPick(profileId, leg.date, payload.slot, leg.name)
+      written.push(leg)
+    } catch (err) {
+      console.error('executeMealDayMove: a pick did not save — putting back what did', err)
+      // Every leg already written goes back to what it was. A leg that will
+      // not go back is left standing, SHOWN (the screen must match the store)
+      // and named in the receipt as the half that landed.
+      const stuck: MealDayMoveLeg[] = []
+      for (const prior of written) {
+        try {
+          const back = prior.previous
+            ? (await setMealPick(profileId, prior.date, payload.slot, prior.previous), true)
+            : await clearMealPick(profileId, prior.date, payload.slot)
+          if (!back) stuck.push(prior)
+        } catch {
+          stuck.push(prior)
+        }
+      }
+      if (stuck.length === 0) {
+        return { landed: [], failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.why.saveFailed }] }
+      }
+      show(stuck.map(l => ({ date: l.date, slot: payload.slot, name: l.name })))
+      return {
+        landed: stuck.map(l => `${l.date} ${payload.slot}: ${l.name}`),
+        failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.why.halfSaved }],
+      }
+    }
+  }
+  show(payload.legs.map(l => ({ date: l.date, slot: payload.slot, name: l.name })))
+  return { landed: payload.legs.map(l => `${l.date} ${payload.slot}: ${l.name}`), failed: [] }
 }
 
 export interface InjuryAdaptationPayload {

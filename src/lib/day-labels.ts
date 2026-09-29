@@ -39,3 +39,13 @@ export function longDate(date: string): string {
   const d = utc(date)
   return d ? d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }) : date
 }
+
+/**
+ * A day as a sentence names it: "today", or the weekday ("Wednesday"). One
+ * function because the Move sheet, the coach's card and its receipt all name
+ * the same two days, and a sentence that says "Tuesday" on one and "today" on
+ * the other about the same date is the disagreement this file exists to stop.
+ */
+export function dayLabel(date: string, today: string): string {
+  return date === today ? 'today' : weekdayLong(date)
+}

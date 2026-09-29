@@ -21,7 +21,7 @@
 // If App.tsx's wrapper changes, this diverges silently. `test:chat-shell`
 // is what holds the two together.
 // ---------------------------------------------------------------------------
-import { StrictMode, useEffect, useState, lazy, Suspense } from 'react'
+import { StrictMode, useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { setSupabaseClient } from '@/lib/supabase'
@@ -35,6 +35,8 @@ import { getPools } from '@/lib/meal-store'
 import { computeMealMacros } from '@/lib/food-db'
 import { computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { topUpNeeds, topUpMealPlan, previewTopUpStart } from '@/lib/meal-top-up'
+import { buildRotation, pinsFromPicks } from '@/lib/meal-rotation'
+import { useMealDays } from '@/hooks/useMealDays'
 import type { MacroTargets, Meal, MealPlanDay, UserProfile } from '@/lib/types'
 
 import { BottomTabBar } from '@/components/BottomTabBar'
@@ -472,9 +474,15 @@ const finishedSession = SEED_NUDGE
 // list, and the run is the app's own topUpMealPlan. The one thing faked is
 // the meal generator, in the driver, at the fetch boundary.
 const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
+// ?daymove=1 — SWAPPING A MEAL WITH ANOTHER DAY'S, ASKED OF THE COACH (29 Sep
+// 2026). The same five-options-a-meal pools and shopping list the top-up run
+// uses, and the week served by the app's OWN useMealDays hook, whose plan and
+// confirm are handed to the coach exactly as App.tsx hands them. Batch cooking
+// is ON, so a lunch can be last night's dinner and the swap's knock-on shows.
+const DAYMOVE = new URLSearchParams(location.search).get('daymove') === '1'
 const TOPUP_SLOTS = ['breakfast', 'lunch', 'dinner'] as const
 const topUpSeed = (() => {
-  if (!TOPUP) return { slots: [] as Record<string, unknown>[], list: [] as Record<string, unknown>[] }
+  if (!TOPUP && !DAYMOVE) return { slots: [] as Record<string, unknown>[], list: [] as Record<string, unknown>[] }
   const dish = (slot: string, name: string, chicken: number, rice: number, oil: number) => {
     const ingredients = [
       { name: 'chicken breast', quantity: chicken, unit: 'g' },
@@ -548,7 +556,34 @@ function Harness() {
   // what is "short" is always the app's own answer and never a fixture's.
   const [pools, setPools] = useState<Partial<Record<string, PoolOption[]>>>({})
   const reloadPools = async () => setPools(await getPools(PROFILE_ID) as never)
-  useEffect(() => { if (TOPUP) void reloadPools() }, [])
+  useEffect(() => { if (TOPUP || DAYMOVE) void reloadPools() }, [])
+  // ?daymove=1: today's saved picks as App holds them, and the app's own hook.
+  const [dayMovePicks, setDayMovePicks] = useState<Record<string, string>>({})
+  const dayMoveShape = useMemo(() => ({ mealsPerDay: 3, includeSnacks: false, batchCooking: true }), [])
+  const dayMoveRotation = useMemo(
+    () => (DAYMOVE && macros && Object.keys(pools).length > 0 ? buildRotation(pools as never, macros, [], dayMoveShape) : null),
+    [pools, dayMoveShape],
+  )
+  const mealDays = useMealDays({
+    profileId: DAYMOVE ? PROFILE_ID : undefined, today: isoOf(anchorDate()), rotation: dayMoveRotation, pools: pools as never,
+    targets: DAYMOVE ? macros : null, softLikedFoods: [],
+    todaysPins: pinsFromPicks(dayMovePicks as never, pools as never), mealShape: dayMoveShape,
+    showTodaysPick: (slot, name) => setDayMovePicks(prev => { const next = { ...prev }; if (name) next[slot] = name; else delete next[slot]; return next }),
+  })
+  useEffect(() => {
+    if (!DAYMOVE) return
+    const w = window as unknown as Record<string, unknown>
+    w.__mealPicks = () => db.meal_plan_picks
+    w.__applyPick = mealDays.applyPick
+    // The week as the app serves it, by date: the names the driver asserts on.
+    w.__weekMeals = () => {
+      const out: Record<string, Record<string, string>> = {}
+      const t = mealDays.today
+      if (t) out[t.date] = Object.fromEntries(Object.entries(t.day.chosen).map(([s, o]) => [s, (o as PoolOption).name]))
+      for (const d of mealDays.upcoming) out[d.date] = d.meals as Record<string, string>
+      return Object.keys(out).length === 7 ? out : {}
+    }
+  })
   const topUpSlots = macros ? Object.keys(computeSlotBudgets(macros, 3, false)) : []
   useEffect(() => {
     ;(window as unknown as Record<string, unknown>).__topUpPools = () => Object.fromEntries(Object.entries(pools).map(([k, v]) => [k, (v ?? []).length]))
@@ -579,6 +614,10 @@ function Harness() {
               onProfileChanged={noop}
               onMealSwapApplied={async () => true}
               onFindMoreMealOptions={async () => ({ added: [] })}
+              upcomingMeals={DAYMOVE ? mealDays.upcoming : undefined}
+              onUpcomingMealPickApplied={DAYMOVE ? mealDays.applyPick : undefined}
+              onMealDayMovePlan={DAYMOVE ? mealDays.dayMove.plan : undefined}
+              onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
               mealTopUp={TOPUP && macros ? { needs: topUpNeeds(pools as never, topUpSlots as never), building: false } : null}
               onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}
               onMealTopUpConfirm={TOPUP && macros ? async () => {

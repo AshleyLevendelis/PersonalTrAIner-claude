@@ -671,7 +671,7 @@ const toolDeclarations = [
   {
     name: "propose_meal_move",
     description:
-      "PROPOSES moving a whole meal into a different slot TODAY — this does NOT apply the change, they tap Confirm. Call this for 'I'll have dinner as my snack instead', 'move lunch to breakfast', 'can I have my snack for dinner'. The meal is RESIZED to fit the slot it lands in, and if that slot already has a meal the two SWAP places, both resized. The card carries both new sizes; never state them yourself. This is SAME DAY ONLY — the app cannot move a meal from one day to another, so if they ask for that, say so plainly rather than moving it somewhere else; if what they want is a different meal on that day, propose_meal_swap with that day's date does it. Not for swapping a meal for a different dish (propose_meal_swap) and not for changing one food inside a meal (propose_meal_food_*).",
+      "PROPOSES moving a whole meal into a different slot TODAY — this does NOT apply the change, they tap Confirm. Call this for 'I'll have dinner as my snack instead', 'move lunch to breakfast', 'can I have my snack for dinner'. The meal is RESIZED to fit the slot it lands in, and if that slot already has a meal the two SWAP places, both resized. The card carries both new sizes; never state them yourself. This is SAME DAY ONLY and moves between MEALS; to move a meal to another DAY use propose_meal_day_move, and if what they want is a different meal on one day, propose_meal_swap with that day's date does it. Not for swapping a meal for a different dish (propose_meal_swap) and not for changing one food inside a meal (propose_meal_food_*).",
     parameters: {
       type: "object",
       properties: {
@@ -689,6 +689,33 @@ const toolDeclarations = [
         },
       },
       required: ["from_slot", "to_slot", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_meal_day_move",
+    description:
+      "PROPOSES swapping one meal with the SAME meal on another day — this does NOT apply the change, they tap Confirm. Call this for 'move Monday's dinner to Wednesday', 'swap tonight's dinner with tomorrow's', 'can I have Thursday's lunch on Friday instead'. The two days swap places: each keeps a meal and each gets the other's, so nothing disappears and nothing is eaten twice. It must be the same meal on both days (dinner with dinner) and both days must be today or one of the next six. The card carries the app's own account of what else that week changes and whether either day drifts off target — never state calories or what else will change yourself. Not for moving a meal to a different MEAL on the same day (propose_meal_move), not for choosing a different dish for ONE day (propose_meal_swap), and it cannot move a meal already logged as eaten.",
+    parameters: {
+      type: "object",
+      properties: {
+        meal_slot: {
+          type: "string",
+          description: "Which meal is being swapped between the two days: breakfast, lunch, dinner or snack.",
+        },
+        from_date: {
+          type: "string",
+          description: "The day the meal is coming FROM, as YYYY-MM-DD (from UPCOMING MEALS, or today's date), or the word 'today'.",
+        },
+        to_date: {
+          type: "string",
+          description: "The day the meal is going TO, as YYYY-MM-DD (from UPCOMING MEALS, or today's date), or the word 'today'. The meal already there comes back the other way.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for the swap. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["meal_slot", "from_date", "to_date", "origin_verbatim_quote"],
     },
   },
   {
@@ -2249,7 +2276,7 @@ NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_refit, propose_meal_top_up, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_top_up, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -2401,9 +2428,10 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - When someone asks to swap a meal AGAIN because they didn't like the alternative either, just call propose_meal_swap again — the app tracks what it has already shown them for that slot and, once they have been through the lot, offers to go and find new ones instead of re-serving the same list. Never tell them they have run out of options yourself; you can't see the pool.
 - ADDING A MEAL vs SWAPPING ONE. A swap changes which of their EXISTING options is picked; propose_meal_addition puts a NEW dish into the plan. "Add salmon to my dinners", "can I have overnight oats for breakfast", "put a curry in for Friday" are ADDITIONS — use propose_meal_addition. "Swap my lunch", "change breakfast to something else", "give me the other one" are SWAPS. If they name a dish that isn't already one of their options, it is an addition, not a swap.
 - A FOOD JOINING A MEAL IS NEITHER. "Add a banana to my breakfast", "put 100g of rice with my dinner", "can I have an egg with lunch" — the meal on the plan stays as it is and the food joins it: call propose_meal_food_add with the food and its amount. Do not route these to propose_meal_addition (that would try to portion "Banana" as a whole meal and refuse) or to propose_custom_meal (that replaces the meal). If no amount is stated, ask how much — one question — then call it.
-- MOVING A WHOLE MEAL TO A DIFFERENT SLOT IS A FIFTH THING, and it is not a swap. "I'll have dinner as my snack instead", "move lunch to breakfast" is propose_meal_move. The meal keeps its foods and is RESIZED to fit the slot it lands in, and if that slot already has a meal the two swap places with both resized — so never describe it as one meal disappearing. The card carries both new sizes; do not state kcal yourself. SAME DAY ONLY: the app cannot move a meal from one day to another, so if they ask for that, say so plainly — do not move it somewhere else instead and do not imply you have. If what they want is a different meal on another day, propose_meal_swap with that day's date from UPCOMING MEALS does it.
+- MOVING A WHOLE MEAL TO A DIFFERENT SLOT IS A FIFTH THING, and it is not a swap. "I'll have dinner as my snack instead", "move lunch to breakfast" is propose_meal_move. The meal keeps its foods and is RESIZED to fit the slot it lands in, and if that slot already has a meal the two swap places with both resized — so never describe it as one meal disappearing. The card carries both new sizes; do not state kcal yourself. THIS MOVES BETWEEN MEALS ON ONE DAY. Moving a meal to another DAY is propose_meal_day_move, an EIGHTH THING below. If what they want is a different dish on a day, propose_meal_swap with that day's date from UPCOMING MEALS does it.
 - MAKING THE WHOLE DAY ADD UP AGAIN IS A SIXTH THING, and it is the one to reach for when nothing is wrong with any INDIVIDUAL meal. A calorie target is worked out from bodyweight, activity, goal and macro split, so it moves on its own while the meals sit still; a few weeks into a cut the day genuinely no longer fits. "My meals are 300 over", "these don't add up to my calories any more", "can you make my food match my new targets" is propose_meal_refit. The meals, their names and their foods are untouched — only the AMOUNTS change, which is exactly why it is not a swap, not a food edit and not a regeneration. NEVER offer to regenerate their meals as the answer to a targets-drifted question: that costs them their picks, their meal names and a grocery list that still matches. THE APP DECIDES WHETHER IT WOULD HELP: some days are the wrong SHAPE rather than the wrong SIZE (a goal change moves calories and leaves protein alone, so resizing would drag protein further out than it started) and the card is refused in that case. So offer it, never promise it, and never state the new portions yourself.
 - MORE MEALS TO CHOOSE FROM IS A SEVENTH THING, and it is none of the six above. Each meal on their plan has a handful of saved options (seven, once topped up), and the week is drawn from those, so a plan with few options repeats. "Give me more meal options", "can you add more variety to my meals", "I want more to pick from" is propose_meal_top_up. It ADDS options to EVERY meal and removes nothing. TODAY AND EVERY DAY ALREADY ON THEIR SHOPPING LIST DO NOT CHANGE — the new options only start after those days, and the card names the day, so never tell them this week will look different. It is not a swap (that changes what is on one day), not an addition (that is one specific dish they name), and not a regeneration (that throws their options away) — never offer to regenerate. THE APP DECIDES whether there is anything to add: when every meal is already full there is no card, and you must not promise more variety from it. A COMPLAINT IS NOT AN ASK: "it's the same dinners every night" gets a plain-text reply that says you can add more options if they want them; call the tool only when they say so. Never state how many options will be added, and never name the meals — the card carries the app's own numbers.
+- MOVING A MEAL TO ANOTHER DAY IS AN EIGHTH THING, and it is a swap between two days, not a move that leaves a hole. "Move Monday's dinner to Wednesday", "swap tonight's dinner with tomorrow's", "can I have Thursday's lunch on Friday instead" is propose_meal_day_move, with the meal and both days (dates from UPCOMING MEALS, or today's). Ashley's ruling, 29 Sep 2026: THE TWO DAYS SWAP PLACES — Wednesday's dinner comes to Monday — so never describe it as one dinner disappearing or a day going without. It is always the SAME meal on both days: "Monday's dinner to Wednesday's lunch" is not something the app does, so say so plainly and offer the same-meal swap instead. The card carries the app's own account of which other meals that week the swap changes (a lunch that is the leftovers of a dinner follows it), whether either day drifts off target, and whether their shopping list needs rebuilding to match — never state any of that yourself. A meal they have already logged as eaten today cannot move; the app says so. It is not propose_meal_move (that is between meals on one day) and not propose_meal_swap (that picks a different dish for one day).
 - CHANGING ONE FOOD ALREADY IN A MEAL IS A FOURTH THING, and there are three of them. The meal keeps its place on the plan and everything else in it keeps its exact amount; only the one food moves. "Take the chicken out of my lunch", "I don't want the olive oil in that" is propose_meal_food_remove. "Swap the rice for potato", "use turkey instead" is propose_meal_food_replace. "Make it 150g of rice", "halve the chicken" is propose_meal_food_resize. Say which food they mean in THEIR words — "the chicken", not "122g raw chicken breast" — and the app finds the line; if two things in the meal could match it will come back and ask, which is the right answer, not a failure.
 - WHICH OF THE FOUR. Joining = propose_meal_food_add. Leaving = remove. One for another = replace. Same food, different amount = resize. If they say "swap X for Y" they mean replace, NOT remove followed by add: two cards for one change is the app arguing with itself.
 - A REMOVAL COSTS SOMETHING AND THE CARD SAYS SO, so you must not. Never state what comes out in protein or calories, and never reassure them it "won't make much difference" — you cannot see the number and the card can. It also offers two or three specific swaps that would close the gap, already checked against their allergies and dislikes, so do not list alternatives of your own beside it. If they take none of them the day comes in lighter and that is a fine outcome; say so plainly if they ask, without talking them into a replacement.
@@ -2599,7 +2627,7 @@ WHEN THEIR PLAN STILL HAS SOMETHING THEY HAVE JUST SAID THEY DON'T WANT, say so 
 Two limits, both honesty rules. (a) A dish marked "ingredients not recorded for this dish" has NO list — say that plainly rather than reading the absence as "contains nothing". (b) A list ending "+N more not listed" is TRUNCATED: you can confirm what IS shown, and you cannot rule anything out from what is missing. In both cases the honest answer names the limit and offers to swap anyway if they'd rather not risk it.
 ${context.meal_summary}
 ${context.upcoming_meal_summary ? `
-UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip shows them (tap a day, see its meals). NAMES ONLY: each is one of their saved options, and the ingredient rule above holds — a dish name is not a list of what it contains, so for "is there X in Monday's dinner?" answer from the ingredients above if that dish is on today's plate, and otherwise say you can see its name but not its ingredients from here, and offer to swap it anyway. To change one of these meals, call propose_meal_swap with that day's date. To shop for a whole day, add_day_to_grocery_list with its date. Never move a meal from one day to another — the app does not do that.
+UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip shows them (tap a day, see its meals). NAMES ONLY: each is one of their saved options, and the ingredient rule above holds — a dish name is not a list of what it contains, so for "is there X in Monday's dinner?" answer from the ingredients above if that dish is on today's plate, and otherwise say you can see its name but not its ingredients from here, and offer to swap it anyway. To change one of these meals, call propose_meal_swap with that day's date. To shop for a whole day, add_day_to_grocery_list with its date. To swap a meal with the same meal on another day, propose_meal_day_move with both dates.
 ${context.upcoming_meal_summary}` : ''}
 ${buildDietarySafetyBlock(context.dietary_preferences || [])}
 ${ALLERGEN_HONESTY_BLOCK}
@@ -3067,6 +3095,31 @@ Keep this context in mind to ensure your greetings and questions naturally align
               rawArgs: {
                 from_slot: args.from_slot,
                 to_slot: args.to_slot,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_day_move") {
+        // Forwarded, not decided. Which two dishes trade places, what else in
+        // the week that changes, which day drifts off target and whether the
+        // shopping list needs rebuilding are all questions about the user's
+        // live week, which the client holds and this function does not — and
+        // it means the coach cannot offer a swap the Move sheet would refuse,
+        // because both ask the same function. The model supplies a meal and
+        // two days, and no numbers.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_day_move",
+              rawArgs: {
+                meal_slot: args.meal_slot,
+                from_date: args.from_date,
+                to_date: args.to_date,
                 origin_verbatim_quote: args.origin_verbatim_quote,
               },
             },
