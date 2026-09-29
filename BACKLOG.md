@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **PUT LIVE, 29 Sep 2026, on Ashley's "Put it live".** The meal work of
+  28 Sep: your chat bubbles plain, never yesterday's dish, the day search
+  about 44 times faster, seven options a meal, and the "Get more options"
+  button that keeps today and the shopping-list days as they are. Full sweep
+  at `5e970078`: 307 gates, 302 green in the sweep; `test:quality` was cut
+  off by the runner's own 10-minute limit (it takes about 22) and passed run
+  alone (11.72 of 12, 0 of 9,216 below the 7.2 floor). The four still red
+  are the expected ones, each saying so in its own output: `test:meal-quality`
+  ("VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY must be set"),
+  `test:schema-parity` ("Failed to link to TEST"), `verify:rls` ("No
+  database to read, and no key given"), and `test:coach-exam-fresh` (the
+  coach changed on 27 Sep; the exam has not been re-run). **Frontend only**:
+  no edge function or migration in this release. Still owed from her
+  machine: the two function deploys of 27 Sep, the exam re-run, and revoking
+  the old key.
+
 - [x] **SEVEN OPTIONS A MEAL, AND A BUTTON THAT ADDS THEM WITHOUT MOVING
   TODAY.** 28 Sep 2026. Two rulings of Ashley's, both from three options:
   **seven options a meal** (over keeping five, and over ten), and then, for
