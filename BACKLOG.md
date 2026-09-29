@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [ ] **"ALL THE DAYS' MEALS LOOK VERY SIMILAR" — 29 Sep 2026, Ashley, on
+  the live release, with a screenshot of every day.** What the screens show:
+  six dishes in the week. The same breakfast every day (and once a copy of it
+  with a sachet of honey added, which the ranking counts as a different
+  dish), the same snack every day, and dinner alternating cod / turkey
+  burger, with lunch mostly last night's dinner (batch cooking on). Thursday
+  serves cod two nights running and is off target.
+  **Measured, not the release:** on the modelled pools, the week as the tab
+  now serves it (one chained run) is identical to the old per-day walk when
+  nothing is swapped (pool 5: 10.46 dishes, 5.77 next-day repeats, both
+  ways). Swapping today's breakfast to one that does not fit makes TODAY off
+  target (54 -> 136 of 200 weeks) and leaves the rest of the week alone
+  (tomorrow 62 -> 59, later days unchanged), so the chain does not spread a
+  swap's cost. Her week (6 dishes) is well below the model's 10.5, so the
+  likeliest cause is that only a couple of her saved dinners and one
+  breakfast fit her current targets (1967 kcal, 171 g protein); her saved
+  meals cannot be read from a cloud session, so this is NOT confirmed.
+  **And the new button cannot help this week, by her own ruling:** every
+  day from Wednesday to Monday is on her shopping list, so "Get more options"
+  holds them all and new meals start Tuesday 6 Oct. Named to her, with the
+  routes that work now (Regenerate all; or take unshopped days off the list
+  first). Asked for a screenshot of the dinner swap list to confirm how many
+  dinners she has and which fit.
+
 - [x] **PUT LIVE, 29 Sep 2026, on Ashley's "Put it live".** The meal work of
   28 Sep: your chat bubbles plain, never yesterday's dish, the day search
   about 44 times faster, seven options a meal, and the "Get more options"
