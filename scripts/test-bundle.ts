@@ -482,7 +482,18 @@ console.log('\n3. Nothing has crept back up')
   // lives, and the unreachable exports are already tree-shaken. Every figure
   // a person waits for is unchanged. 2,029 is 20 above the 2,009 measured
   // today, the same shape as every entry above.
-  const TOTAL_BUDGET_KB = 2029
+  // 29 Sep 2026: 2,029 -> 2,055, for the meal swap between days (Ashley's list,
+  // item 2). MEASURED BOTH ENDS through THIS gate, the base on a clean
+  // worktree of the previous commit:
+  //     ded2b670, before   total 2021   app 940   paint 420   deploy 265
+  //     after              total 2035   app 946   paint 423   deploy 267
+  // The base had 8 kB left, so 14 kB of new code failed it by 6, and it was
+  // red at the sweep, not at the commit. What is new: the builder, its
+  // sentences, a day picker in the Move sheet, the coach's card and receipt,
+  // and the hook's plan and confirm. The builder and the sheet are lazy; the
+  // three figures a person WAITS for moved by 6, 3 and 2 kB. 2,055 is 20 above
+  // the 2,035 measured, the same shape as every entry above.
+  const TOTAL_BUDGET_KB = 2055
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

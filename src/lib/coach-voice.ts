@@ -257,7 +257,7 @@ export const DAY_MOVE = {
   rowLabel: (day: string, slot: string) => `${cap(poss(day))} ${slot}`,
   stillOnTarget: 'Both days are re-fitted around the swap and still land on your target.',
   offTarget: (day: string, kcal: number, offBy: number) =>
-    `${cap(day)} would come to ${kcal.toLocaleString('en-GB')} kcal, about ${Math.abs(offBy).toLocaleString('en-GB')} ${offBy > 0 ? 'over' : 'under'} your target.`,
+    `${cap(day)} would come to ${grouped(kcal)} kcal, about ${grouped(Math.abs(offBy))} ${offBy > 0 ? 'over' : 'under'} your target.`,
   /** A meal OTHER than the two named that changes with the swap: a different dish. */
   alsoLeftover: (day: string, slot: string, to: string) =>
     `${cap(poss(day))} ${slot} becomes ${to}, the leftovers of the dinner the night before.`,
@@ -267,7 +267,7 @@ export const DAY_MOVE = {
     `${cap(poss(day))} ${slot} becomes ${to}, so the day still fits.`,
   /** ...or the same dish at a different size. */
   alsoResized: (day: string, slot: string, from: number, to: number) =>
-    `${cap(poss(day))} ${slot} goes from ${from.toLocaleString('en-GB')} to ${to.toLocaleString('en-GB')} kcal so the day still fits.`,
+    `${cap(poss(day))} ${slot} goes from ${grouped(from)} to ${grouped(to)} kcal so the day still fits.`,
   andMore: (n: number) => `${n} more ${n === 1 ? 'meal changes' : 'meals change'} too.`,
   listStale: (days: string[]) =>
     `${cap(days.join(' and '))} ${days.length === 1 ? 'is' : 'are'} on your shopping list, so rebuild the list afterwards to match.`,
