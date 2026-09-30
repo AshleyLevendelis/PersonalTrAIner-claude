@@ -452,6 +452,12 @@ function App() {
       else delete next[slot]
       return next
     }),
+    // A swap of two DIFFERENT meals adds a resized copy of each to the options,
+    // and a pick can only be shown once the screen knows the option it names.
+    reloadPools: async () => { if (profile?.id) setMealPools(await getPools(profile.id)) },
+    dietaryPreferences: profile?.dietary_preferences,
+    // A getter: the dislikes are worked out further down this component, and are only read when a swap is planned.
+    dislikedFoods: () => effectiveDislikedFoods,
   })
   const assembledMeals = mealDays.today?.day ?? null
   const chosenMeals: Partial<Record<MealSlotName, PoolOption>> = { ...assembledMeals?.chosen }
@@ -3207,6 +3213,7 @@ function App() {
               onFindMoreMealOptions={handleFindMoreMealOptions}
               onMealDayMovePlan={mealDays.dayMove.plan}
               onMealDayMoveConfirm={mealDays.dayMove.confirm}
+              onMealDayMoveUndo={mealDays.dayMove.undo}
               mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}

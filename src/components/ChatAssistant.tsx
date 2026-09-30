@@ -301,6 +301,8 @@ interface ChatAssistantProps {
    */
   onMealDayMovePlan?: (args: MealDayMoveArgs) => Promise<MealDayMoveResult>
   onMealDayMoveConfirm?: (payload: MealDayMovePayload) => Promise<import('@/lib/pending-actions-store').PendingActionReceipt>
+  /** Puts a confirmed swap back (the same function the Move sheet's Undo calls). */
+  onMealDayMoveUndo?: (payload: MealDayMovePayload) => Promise<import('@/lib/pending-actions-store').PendingActionReceipt>
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
@@ -394,7 +396,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -4931,7 +4933,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (!onMealDayMovePlan) {
           refusal = DAY_MOVE.refusals.noBody
         } else {
-          const moved = await onMealDayMovePlan({ meal_slot: String(raw.meal_slot ?? ''), from_date: String(raw.from_date ?? ''), to_date: String(raw.to_date ?? '') })
+          const moved = await onMealDayMovePlan({ meal_slot: String(raw.meal_slot ?? ''), from_date: String(raw.from_date ?? ''), to_date: String(raw.to_date ?? ''), to_slot: String(raw.to_meal_slot ?? '') })
           if (moved.ok) built = { scopeKey: moved.scopeKey, preconditions: moved.preconditions, payload: moved.payload as unknown as Record<string, unknown>, diff: moved.diff }
           else refusal = moved.reason
         }
@@ -5757,12 +5759,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_meal_day_move'].done : RECEIPTS['propose_meal_day_move'].failed
       rows = receipt.landed.length > 0
-        ? payload.legs.map(l => ({ label: DAY_MOVE.rowLabel(dayLabel(l.date, today), payload.slot), detail: DAY_MOVE.became(l.name) }))
+        ? payload.legs.map(l => ({ label: DAY_MOVE.rowLabel(dayLabel(l.date, today), l.slot), detail: DAY_MOVE.became(l.name) }))
         : []
-      // NO UNDO TOKEN: undoing means restoring two picks, and the receipt
-      // carries one opaque token. Asking for the same swap again puts the two
-      // meals back, which is the way the slot move answers it too.
-      undoToken = undefined
+      // UNDO IS THE PENDING ACTION'S OWN ROW (30 Sep 2026): its payload names
+      // what each day held before and what the swap wrote, which is the whole
+      // record an undo needs, so the token is the row id like every other card.
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload
       const result = await executeInjuryAdaptation(profile, mesocycle, payload)
@@ -6332,6 +6334,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       } else if (row.kind === 'propose_session_move') {
         await undoSessionMove(profile.id, row.payload as unknown as SessionMovePayload)
         onLogsUpdated?.()
+      } else if (row.kind === 'propose_meal_day_move') {
+        // PUTTING A DAY SWAP BACK. The same function the Move sheet's Undo
+        // calls. It leaves both days alone and says why when either has
+        // changed since (or a meal of today's was eaten), so a refusal keeps
+        // the button and adds its reason to the receipt.
+        const payload = row.payload as unknown as MealDayMovePayload
+        const today = getSessionDateContext(profile.id).date
+        const back = onMealDayMoveUndo
+          ? await onMealDayMoveUndo(payload)
+          : { landed: [], failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.undo.saveFailed }] }
+        const backOk = back.failed.length === 0
+        setMessages(prev => prev.map((m, i) => {
+          if (i !== msgIndex || !m.receipt) return m
+          return backOk
+            ? { ...m, receipt: { ...m.receipt, title: 'Put back', rows: [{ label: 'Swap', detail: DAY_MOVE.undo.asTheyWere(payload.legs[0].slot, dayLabel(payload.legs[0].date, today), payload.legs[1].slot, dayLabel(payload.legs[1].date, today)) }], undoToken: undefined } }
+            : { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== "Couldn't undo"), { label: "Couldn't undo", detail: back.failed[0].error }] } }
+        }))
+        return
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
         if (!payload.currentName) return

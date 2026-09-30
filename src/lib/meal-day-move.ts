@@ -1,7 +1,10 @@
-import { serveMealWeek, pinsFromPicks, type ServedDay } from './meal-rotation'
+import { serveMealWeek, pinsFromPicks, addDays, type ServedDay } from './meal-rotation'
 import { weekdayLong, dayLabel } from './day-labels'
 import { ask, DAY_MOVE } from './coach-voice'
-import type { PoolOption } from './meal-generation'
+import { computeSlotBudgets, type PoolOption } from './meal-generation'
+import { movedOptionFor } from './meal-move'
+import { tagsNewFrom } from './meal-new-from'
+import type { CurrentMealForSlot } from './meal-food-add'
 import type { MealSlotName } from './meal-store'
 import type { PendingActionReceipt, ProposalDiff } from './pending-actions-store'
 
@@ -28,6 +31,15 @@ import type { PendingActionReceipt, ProposalDiff } from './pending-actions-store
 // re-made from whichever dinner is now served the night before (28 Sep), so a
 // move can change a meal on a day nobody named. Said before the tap.
 //
+// TWO DIFFERENT MEALS ON TWO DAYS (30 Sep 2026): "Monday's dinner to
+// Wednesday's lunch". Her 14 Sep slot-move ruling applied across days: they
+// swap places and EACH IS RESIZED to fit the meal it lands in, both new sizes
+// stated before the tap. The resized copies are new pool options ("X (as
+// lunch)"), so they are written the way the slot move writes them, and they
+// carry a first day just past the strip: served from a pick by name, never
+// found by any other day's search, so the swap cannot reshuffle a day nobody
+// named (the top-up's own device, meal-new-from.ts).
+//
 // ONE BUILDER FOR BOTH SURFACES. The Move sheet and the coach's card call this
 // with the same inputs from App, so the coach cannot offer a swap the sheet
 // would refuse. It is imported lazily: the first paint never needs it.
@@ -41,22 +53,31 @@ export type MealDayMoveServing = Parameters<typeof serveMealWeek>[0]
 export interface MealDayMoveLeg {
   /** The day whose meal changes. */
   date: string
+  /** Which of that day's meals changes. The two legs share one for the same meal on two days, and differ for two different meals. */
+  slot: MealSlotName
   /** The dish that becomes that day's meal for the slot. */
   name: string
   /** The pick stored for that day and slot beforehand, so a failed write can be put back. Null: none. */
   previous: string | null
+  /**
+   * Only for two DIFFERENT meals: the other meal, resized to this slot, that
+   * must be added to the slot's options before it can be picked. Absent for
+   * the same meal on two days, where both dishes are already options.
+   */
+  option?: PoolOption
 }
 
 export interface MealDayMovePayload {
-  slot: MealSlotName
   legs: [MealDayMoveLeg, MealDayMoveLeg]
 }
 
-/** What the Move sheet and the coach hand in: the meal and the two days. */
+/** What the Move sheet and the coach hand in: the meal, and the day (and meal) to swap it with. */
 export interface MealDayMoveArgs {
   meal_slot: MealSlotName | string
   from_date: string
   to_date: string
+  /** The meal on `to_date` to swap with. Absent or equal to `meal_slot`: the same meal on the other day. */
+  to_slot?: MealSlotName | string
 }
 
 /**
@@ -67,14 +88,25 @@ export interface MealDayMoveController {
   /** The strip's days, today first. */
   dates: string[]
   today: string
+  /** The meals this profile has, in the order of the day: what a swap between different meals can choose from. */
+  slots: MealSlotName[]
   plan: (args: MealDayMoveArgs) => Promise<MealDayMoveResult>
   confirm: (payload: MealDayMovePayload) => Promise<PendingActionReceipt>
+  /**
+   * Puts a confirmed swap back. Only when both days still hold what the swap
+   * wrote (something changed since, and it says so and leaves them alone), and
+   * both picks or neither, like the swap itself.
+   */
+  undo: (payload: MealDayMovePayload) => Promise<PendingActionReceipt>
 }
 
 export interface BuildMealDayMoveInput {
   profileId: string
-  rawArgs: { meal_slot?: unknown; from_date?: unknown; to_date?: unknown }
+  rawArgs: { meal_slot?: unknown; from_date?: unknown; to_date?: unknown; to_slot?: unknown }
   serving: MealDayMoveServing
+  /** What a resized meal is verified against, like every meal the app adds. Only used to swap two different meals. */
+  dietaryPreferences?: string[]
+  dislikedFoods?: string[]
   /** Slots of TODAY already logged as eaten. Null when the ledger could not be read. */
   loggedTodaySlots: MealSlotName[] | null
   /** Dates on the shopping list from today on. Null when the list could not be read. */
@@ -140,6 +172,12 @@ export function isNoticeableResize(was: number, now: number): boolean {
   return change >= RESIZE_NOTICE_KCAL && change >= was * RESIZE_NOTICE_SHARE
 }
 
+const mealAsCurrent = (o: PoolOption): CurrentMealForSlot => ({
+  name: o.name,
+  ingredients: o.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`),
+  macros: o.macros,
+})
+
 export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayMoveResult {
   const { serving } = input
   const { today, dates, targets, pools } = serving
@@ -147,8 +185,14 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
 
   if (!targets) return refuse(DAY_MOVE.refusals.noBody)
 
-  const slot = normaliseSlot(input.rawArgs.meal_slot)
-  if (!slot) return refuse(DAY_MOVE.refusals.whichSlot)
+  const slotA = normaliseSlot(input.rawArgs.meal_slot)
+  if (!slotA) return refuse(DAY_MOVE.refusals.whichSlot)
+  // The meal on the OTHER day. Absent, or the same meal: the same meal on two
+  // days, which needs no resize and no new option.
+  const rawTo = String(input.rawArgs.to_slot ?? '').trim()
+  const slotB = rawTo === '' ? slotA : normaliseSlot(rawTo)
+  if (!slotB) return refuse(DAY_MOVE.refusals.whichSlot)
+  const across = slotA !== slotB
 
   const from = resolveDay(input.rawArgs.from_date, today, dates)
   const to = resolveDay(input.rawArgs.to_date, today, dates)
@@ -157,7 +201,7 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
       ? DAY_MOVE.refusals.outOfRange
       : DAY_MOVE.refusals.whichDays)
   }
-  if (from.date === to.date) return refuse(DAY_MOVE.refusals.sameDay)
+  if (from.date === to.date) return refuse(across ? DAY_MOVE.refusals.sameDayOtherMeal : DAY_MOVE.refusals.sameDay)
   const dateA = from.date
   const dateB = to.date
   const labelA = dayLabel(dateA, today)
@@ -171,45 +215,71 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
 
   // A MEAL ALREADY EATEN CANNOT MOVE — either way round. Its row would still
   // show the logged name, and the plan would say she is about to eat it again.
-  if ((dateA === today || dateB === today)) {
+  if (dateA === today || dateB === today) {
     if (input.loggedTodaySlots === null) return refuse(DAY_MOVE.refusals.ledgerUnreadable)
-    if (input.loggedTodaySlots.includes(slot)) return refuse(DAY_MOVE.refusals.eaten(slot))
+    if (dateA === today && input.loggedTodaySlots.includes(slotA)) return refuse(DAY_MOVE.refusals.eaten(slotA))
+    if (dateB === today && input.loggedTodaySlots.includes(slotB)) return refuse(DAY_MOVE.refusals.eaten(slotB))
   }
 
-  const optA = dayA.day.chosen[slot]
-  const optB = dayB.day.chosen[slot]
-  if (!optA) return refuse(DAY_MOVE.refusals.nothingThere(slot, labelA))
-  if (!optB) return refuse(DAY_MOVE.refusals.nothingThere(slot, labelB))
+  const optA = dayA.day.chosen[slotA]
+  const optB = dayB.day.chosen[slotB]
+  if (!optA) return refuse(DAY_MOVE.refusals.nothingThere(slotA, labelA))
+  if (!optB) return refuse(DAY_MOVE.refusals.nothingThere(slotB, labelB))
 
   // A LEFTOVER LUNCH IS NOT A DISH OF ITS OWN: it is last night's dinner,
   // re-made each day from whatever dinner was actually served. It follows the
   // dinner; moving the dinner is how to move it.
-  if (slot === 'lunch') {
-    if (optA.leftoverFrom === 'dinner') return refuse(DAY_MOVE.refusals.leftover(labelA))
-    if (optB.leftoverFrom === 'dinner') return refuse(DAY_MOVE.refusals.leftover(labelB))
+  if (slotA === 'lunch' && optA.leftoverFrom === 'dinner') return refuse(DAY_MOVE.refusals.leftover(labelA))
+  if (slotB === 'lunch' && optB.leftoverFrom === 'dinner') return refuse(DAY_MOVE.refusals.leftover(labelB))
+  if (!across && optA.name === optB.name) return refuse(DAY_MOVE.refusals.sameDish(slotA, labelA, labelB))
+
+  // WHAT LANDS IN EACH CELL. The same meal on two days: the other day's dish
+  // itself, already an option. Two different meals: the other meal RESIZED to
+  // the budget of the meal it lands in (her 14 Sep ruling), as a new option
+  // that no day's search can find before the strip ends.
+  let landsInA: PoolOption
+  let landsInB: PoolOption
+  if (across) {
+    const budgets = computeSlotBudgets(targets, serving.shape.mealsPerDay, serving.shape.includeSnacks)
+    const budgetA = budgets[slotA]
+    const budgetB = budgets[slotB]
+    if (!budgetA) return refuse(DAY_MOVE.refusals.noSuchMeal(slotA))
+    if (!budgetB) return refuse(DAY_MOVE.refusals.noSuchMeal(slotB))
+    const rules = { dietaryPreferences: input.dietaryPreferences ?? [], dislikedFoods: input.dislikedFoods ?? [] }
+    const intoA = movedOptionFor(mealAsCurrent(optB), slotA, budgetA, rules)
+    if ('err' in intoA) return refuse(intoA.err)
+    const intoB = movedOptionFor(mealAsCurrent(optA), slotB, budgetB, rules)
+    if ('err' in intoB) return refuse(intoB.err)
+    const heldUntil = addDays(dates[dates.length - 1], 1)
+    landsInA = { ...intoA.option, tags: tagsNewFrom(intoA.option.tags, heldUntil) }
+    landsInB = { ...intoB.option, tags: tagsNewFrom(intoB.option.tags, heldUntil) }
+    // The copies are NOT put in the trial's pools: they are held until the
+    // strip ends, so no day's search could find them there anyway, and a pin
+    // is served as given. That is also what keeps every other day where it is.
+  } else {
+    // The pins are resolved the way the app resolves every stored pick, by name
+    // against the whole pool, so the trial is the week the screen will serve.
+    const pinForA = pinsFromPicks({ [slotA]: optB.name }, pools)[slotA]
+    const pinForB = pinsFromPicks({ [slotA]: optA.name }, pools)[slotA]
+    if (!pinForA) return refuse(DAY_MOVE.refusals.notInPlan(labelB, slotA))
+    if (!pinForB) return refuse(DAY_MOVE.refusals.notInPlan(labelA, slotA))
+    landsInA = pinForA
+    landsInB = pinForB
   }
-  if (optA.name === optB.name) return refuse(DAY_MOVE.refusals.sameDish(slot, labelA, labelB))
 
-  // The pins are resolved the way the app resolves every stored pick, by name
-  // against the whole pool, so the trial is the week the screen will serve.
-  const pinForA = pinsFromPicks({ [slot]: optB.name }, pools)[slot]
-  const pinForB = pinsFromPicks({ [slot]: optA.name }, pools)[slot]
-  if (!pinForA) return refuse(DAY_MOVE.refusals.notInPlan(labelB, slot))
-  if (!pinForB) return refuse(DAY_MOVE.refusals.notInPlan(labelA, slot))
-
-  const previousOf = (date: string): string | null =>
+  const previousOf = (date: string, slot: MealSlotName): string | null =>
     (date === today ? serving.todaysPins[slot] : serving.pinsByDate[date]?.[slot])?.name ?? null
-  const previousA = previousOf(dateA)
-  const previousB = previousOf(dateB)
+  const previousA = previousOf(dateA, slotA)
+  const previousB = previousOf(dateB, slotB)
 
   const todaysPins = { ...serving.todaysPins }
   const pinsByDate = { ...serving.pinsByDate }
-  const put = (date: string, option: PoolOption) => {
+  const put = (date: string, slot: MealSlotName, option: PoolOption) => {
     if (date === today) todaysPins[slot] = option
     else pinsByDate[date] = { ...(pinsByDate[date] ?? {}), [slot]: option }
   }
-  put(dateA, pinForA)
-  put(dateB, pinForB)
+  put(dateA, slotA, landsInA)
+  put(dateB, slotB, landsInB)
   const after = serveMealWeek({ ...serving, todaysPins, pinsByDate })
 
   const afterA = after.find(d => d.date === dateA)
@@ -217,17 +287,17 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   // The trial must serve the two dishes it was asked to. A pinned meal the
   // day assembler sets aside (one marked as breaking a restriction) would
   // otherwise read as a swap that happened.
-  if (afterA?.day.chosen[slot]?.name !== optB.name || afterB?.day.chosen[slot]?.name !== optA.name) {
+  if (afterA?.day.chosen[slotA]?.name !== landsInA.name || afterB?.day.chosen[slotB]?.name !== landsInB.name) {
     return refuse(DAY_MOVE.refusals.wouldNotHold)
   }
 
   const rows: ProposalDiff['rows'] = [
-    { field: DAY_MOVE.rowLabel(labelA, slot), before: optA.name, after: optB.name, note: kcalNote(optA, afterA.day.chosen[slot]!) },
-    { field: DAY_MOVE.rowLabel(labelB, slot), before: optB.name, after: optA.name, note: kcalNote(optB, afterB.day.chosen[slot]!) },
+    { field: DAY_MOVE.rowLabel(labelA, slotA), before: optA.name, after: landsInA.name, note: kcalNote(optA, afterA.day.chosen[slotA]!) },
+    { field: DAY_MOVE.rowLabel(labelB, slotB), before: optB.name, after: landsInB.name, note: kcalNote(optB, afterB.day.chosen[slotB]!) },
   ]
 
   const implications: { severity: 'info' | 'warn'; text: string }[] = [
-    { severity: 'info', text: DAY_MOVE.swapped(slot, labelA, labelB) },
+    { severity: 'info', text: across ? DAY_MOVE.swappedAcross(slotA, labelA, slotB, labelB) : DAY_MOVE.swapped(slotA, labelA, labelB) },
   ]
 
   // A DAY THAT FALLS OUT OF TARGET BECAUSE OF THE MOVE. One that was already
@@ -254,7 +324,7 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   for (const served of after) {
     const wasDay = before.find(b => b.date === served.date)!
     for (const s of SLOTS) {
-      if ((served.date === dateA || served.date === dateB) && s === slot) continue
+      if ((served.date === dateA && s === slotA) || (served.date === dateB && s === slotB)) continue
       const now = served.day.chosen[s]
       const was = wasDay.day.chosen[s]
       if (!now) continue
@@ -289,25 +359,26 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
     if (onList.length > 0) implications.push({ severity: 'info', text: DAY_MOVE.listStale(onList.map(d => dayLabel(d, today))) })
   }
 
+  const legA: MealDayMoveLeg = { date: dateA, slot: slotA, name: landsInA.name, previous: previousA, ...(across ? { option: landsInA } : {}) }
+  const legB: MealDayMoveLeg = { date: dateB, slot: slotB, name: landsInB.name, previous: previousB, ...(across ? { option: landsInB } : {}) }
   return {
     ok: true,
-    // The two dates are part of what is being changed, so a second ask about
-    // the same pair replaces the pending card instead of stacking on it.
-    scopeKey: `${input.profileId}:propose_meal_day_move:${slot}:${[dateA, dateB].sort().join(':')}`,
-    preconditions: { slot, dates: [dateA, dateB], served: [optA.name, optB.name] },
-    payload: {
-      slot,
-      legs: [
-        { date: dateA, name: optB.name, previous: previousA },
-        { date: dateB, name: optA.name, previous: previousB },
-      ],
-    },
+    // The two days (and meals) are part of what is being changed, so a second
+    // ask about the same pair replaces the pending card instead of stacking on
+    // it. The same-meal key is unchanged from before two meals could differ.
+    scopeKey: across
+      ? `${input.profileId}:propose_meal_day_move:${[`${slotA}@${dateA}`, `${slotB}@${dateB}`].sort().join(':')}`
+      : `${input.profileId}:propose_meal_day_move:${slotA}:${[dateA, dateB].sort().join(':')}`,
+    preconditions: across
+      ? { cells: [{ slot: slotA, date: dateA }, { slot: slotB, date: dateB }], served: [optA.name, optB.name] }
+      : { slot: slotA, dates: [dateA, dateB], served: [optA.name, optB.name] },
+    payload: { legs: [legA, legB] },
     diff: {
-      lead: ask(DAY_MOVE.lead(slot, labelA, labelB)),
+      lead: ask(across ? DAY_MOVE.leadAcross(slotA, labelA, slotB, labelB) : DAY_MOVE.lead(slotA, labelA, labelB)),
       rows,
-      unchanged: [DAY_MOVE.unchanged],
+      unchanged: [across ? DAY_MOVE.unchangedAcross : DAY_MOVE.unchanged],
       implications,
-      reversible: false,
+      reversible: true,
     },
     after,
   }
@@ -320,6 +391,8 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
  * pick for a card she read before it changed.
  */
 export function sameMealDayMove(a: MealDayMovePayload, b: MealDayMovePayload): boolean {
-  const key = (p: MealDayMovePayload) => `${p.slot}|${p.legs.map(l => `${l.date}:${l.name}`).join('|')}`
+  // The pick each day held before is part of what the card described: it is
+  // what an undo puts back, so a card read before that pick changed is stale.
+  const key = (p: MealDayMovePayload) => p.legs.map(l => `${l.slot}@${l.date}:${l.name}:${l.previous ?? ''}`).join('|')
   return key(a) === key(b)
 }

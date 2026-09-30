@@ -1,17 +1,34 @@
 {
   "name": "meal-day-swap-not-slot-move",
-  "why": "29 Sep 2026, the coach got propose_meal_day_move (swap a meal with the SAME meal on another day; Ashley's ruling: they swap places). Its two nearest neighbours are one word apart and cost different things: propose_meal_move puts a meal in a different SLOT on ONE day (resized), propose_meal_swap picks a different DISH for one day. Until today the prompt told the coach the app could not move a meal between days at all, so a coach that still says so, or that reaches for a slot move or a swap, is the regression this case exists to see. The pair makes the days and the wording differ on the two turns, so a coach keying on the word 'swap' or 'move' alone cannot pass by accident: turn one names two DAYS and one meal; turn two names one DAY and two MEALS.",
+  "why": "29 Sep 2026, the coach got propose_meal_day_move (swap a meal with the SAME meal on another day; Ashley's ruling: they swap places). Its two nearest neighbours are one word apart and cost different things: propose_meal_move puts a meal in a different SLOT on ONE day (resized), propose_meal_swap picks a different DISH for one day. Until today the prompt told the coach the app could not move a meal between days at all, so a coach that still says so, or that reaches for a slot move or a swap, is the regression this case exists to see. The pair makes the days and the wording differ on the two turns, so a coach keying on the word 'swap' or 'move' alone cannot pass by accident: turn one names two DAYS and one meal; turn two names one DAY and two MEALS. Since 30 Sep 2026 the swap can also be between two DIFFERENT meals on two days (Monday's dinner with Wednesday's lunch, each resized), so a third turn names a different meal for the other day: it must reach propose_meal_day_move too, not propose_meal_move (that is between meals on ONE day) and not a refusal saying the app only swaps the same meal.",
   "contextOverrides": {
     "upcoming_meal_summary": "Wednesday (2026-09-16): breakfast Greek yoghurt with berries · lunch Chicken and rice bowl · dinner Beef chilli with rice\nThursday (2026-09-17): breakfast Peanut-free granola bowl · lunch Tuna pasta salad · dinner Baked salmon with potatoes\nFriday (2026-09-18): breakfast Scrambled eggs on toast · lunch Turkey wrap · dinner Chicken stir-fry with noodles\nSaturday (2026-09-19): breakfast Overnight oats · lunch Chicken and rice bowl · dinner Lamb koftas with couscous\nSunday (2026-09-20): breakfast Greek yoghurt with berries · lunch Tuna pasta salad · dinner Salmon, potatoes, green beans\nMonday (2026-09-21): breakfast Scrambled eggs on toast · lunch Turkey wrap · dinner Beef chilli with rice"
   },
   "messages": [
     "I'm out on Thursday evening so can we trade Thursday's dinner with Saturday's",
-    "never mind that, could I have tonight's dinner at lunchtime today instead"
+    "never mind that, could I have tonight's dinner at lunchtime today instead",
+    "actually forget that, could you put Thursday's dinner in Saturday's lunch instead"
   ],
   "checks": {
     "expectsProposalKind": [
-      { "turn": 0, "oneOf": ["propose_meal_day_move"] },
-      { "turn": 1, "oneOf": ["propose_meal_move"] }
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_meal_day_move"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_meal_move"
+        ]
+      },
+      {
+        "turn": 2,
+        "oneOf": [
+          "propose_meal_day_move"
+        ]
+      }
     ]
   }
 }

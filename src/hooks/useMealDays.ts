@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { datesFrom, pinsFromPicks, serveMealWeek, ROTATION_DAYS, type MealShape, type Rotation, type ServedDay } from '@/lib/meal-rotation'
+import { computeSlotBudgets } from '@/lib/meal-generation'
 import { getMealPicksForDates, setMealPick, swapPoolMeal, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { addGroceryDays, removeGroceryDays, readGroceryCoverage, type AddGroceryDaysResult } from '@/lib/grocery-store'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
@@ -48,6 +49,17 @@ export interface MealDaysInput {
    * reach today's row. Absent, only the upcoming days update.
    */
   showTodaysPick?: (slot: MealSlotName, name: string | null) => void
+  /**
+   * Re-reads the meal options. Only a swap of two DIFFERENT meals needs it: it
+   * adds a resized copy of each, and a pick can only be shown once the screen
+   * knows the option it names. Absent, that kind of swap still saves and the
+   * screen catches up on its next read.
+   */
+  reloadPools?: () => Promise<void>
+  /** What a resized meal is verified against (only a swap of two different meals resizes one). */
+  dietaryPreferences?: string[]
+  /** A getter, because a caller may work its dislikes out after it calls the hook. */
+  dislikedFoods?: () => string[]
 }
 
 /** One saved pick, to be shown. `null` clears it. */
@@ -78,7 +90,7 @@ export function sumChosenMacros(chosen: Partial<Record<MealSlotName, PoolOption>
 }
 
 export function useMealDays(input: MealDaysInput) {
-  const { profileId, today, rotation, pools, targets, softLikedFoods, todaysPins, mealShape, showTodaysPick } = input
+  const { profileId, today, rotation, pools, targets, softLikedFoods, todaysPins, mealShape, showTodaysPick, reloadPools, dietaryPreferences, dislikedFoods } = input
   /** Picks made on the strip's UPCOMING days, keyed by date. Today's live in App's manualMealPicks. */
   const [futurePicks, setFuturePicks] = useState<Record<string, Partial<Record<MealSlotName, string>>>>({})
   /** The day open on the strip when it is not today. Null means today. */
@@ -178,6 +190,18 @@ export function useMealDays(input: MealDaysInput) {
     })
   }
 
+  /** Which of today's meals are logged as eaten. Null when the ledger cannot be read: never "nothing". */
+  const readLoggedToday = async (): Promise<MealSlotName[] | null> => {
+    if (!profileId || !targets) return null
+    try {
+      const ledger = await getTodayLedger(profileId, today, targets)
+      const logged = loggedEventsBySlot(ledger.events)
+      return (Object.keys(logged) as MealSlotName[]).filter(s => (logged[s]?.length ?? 0) > 0)
+    } catch {
+      return null
+    }
+  }
+
   /**
    * SWAP A MEAL WITH ANOTHER DAY'S (Ashley, 29 Sep 2026: they swap places).
    * The whole decision is buildMealDayMoveProposal, run over THIS hook's week
@@ -189,14 +213,12 @@ export function useMealDays(input: MealDaysInput) {
    */
   const planDayMove = async (rawArgs: MealDayMoveArgs): Promise<MealDayMoveResult> => {
     const { buildMealDayMoveProposal } = await import('@/lib/meal-day-move')
-    let loggedTodaySlots: MealSlotName[] | null = null
+    // Null (never "nothing") when the ledger or the list cannot be read: the
+    // builder refuses a move involving today, and the card says the list could
+    // not be checked.
+    const loggedTodaySlots = await readLoggedToday()
     let listDates: string[] | null = null
     if (profileId && targets) {
-      try {
-        const ledger = await getTodayLedger(profileId, today, targets)
-        const logged = loggedEventsBySlot(ledger.events)
-        loggedTodaySlots = (Object.keys(logged) as MealSlotName[]).filter(s => (logged[s]?.length ?? 0) > 0)
-      } catch { /* stays null: the builder refuses a move involving today */ }
       try {
         listDates = await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate, { strict: true })
       } catch { /* stays null: the card says the list could not be checked */ }
@@ -207,6 +229,8 @@ export function useMealDays(input: MealDaysInput) {
       serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation },
       loggedTodaySlots,
       listDates,
+      dietaryPreferences,
+      dislikedFoods: dislikedFoods?.(),
     })
   }
 
@@ -223,9 +247,24 @@ export function useMealDays(input: MealDaysInput) {
       import('@/lib/meal-day-move'),
       import('@/lib/pending-action-executor'),
     ])
-    const live = await planDayMove({ meal_slot: payload.slot, from_date: payload.legs[0].date, to_date: payload.legs[1].date })
+    const live = await planDayMove({
+      meal_slot: payload.legs[0].slot, from_date: payload.legs[0].date,
+      to_date: payload.legs[1].date, to_slot: payload.legs[1].slot,
+    })
     if (!live.ok || !sameMealDayMove(live.payload, payload)) return failed(DAY_MOVE.why.changed)
-    return executeMealDayMove(profileId, live.payload, showPicks)
+    return executeMealDayMove(profileId, live.payload, { show: showPicks, reloadPools })
+  }
+
+  /**
+   * Puts a confirmed swap back (30 Sep 2026). The payload IS the record of
+   * what the swap wrote and what was there before, so the sheet and the coach
+   * hand back the payload they already hold. It reads the ledger again: a meal
+   * of today's eaten since the swap is left alone.
+   */
+  const undoDayMove = async (payload: MealDayMovePayload): Promise<PendingActionReceipt> => {
+    if (!profileId) return { landed: [], failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.undo.saveFailed }] }
+    const { undoMealDayMove } = await import('@/lib/pending-action-executor')
+    return undoMealDayMove(profileId, payload, { show: showPicks, reloadPools, today, loggedTodaySlots: await readLoggedToday() })
   }
 
   const addToGrocery = async (date: string): Promise<AddGroceryDaysResult | null> => {
@@ -291,6 +330,10 @@ export function useMealDays(input: MealDaysInput) {
      * Swap a meal with another day's: what the Move sheet and the coach both
      * call, so the coach cannot offer a swap the sheet would refuse.
      */
-    dayMove: { dates, today, plan: planDayMove, confirm: confirmDayMove } satisfies MealDayMoveController,
+    dayMove: {
+      dates, today,
+      slots: targets ? (Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]) : [],
+      plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove,
+    } satisfies MealDayMoveController,
   }
 }

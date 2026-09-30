@@ -561,18 +561,31 @@ menu" stays true when a copy is also left outside it.
   **Parity by construction, the `meal-refit` pattern**: `useMealDays` builds
   one controller (`plan`, `confirm`) that App hands to the Move sheet and to
   the coach, and the confirm RE-PLANS against the live week and writes only if
-  every day still holds the dish the card named. **Named, not built:** a meal
-  to a DIFFERENT meal on another day (Monday's dinner to Wednesday's lunch),
-  because it needs the slot move's resize on a day and nobody asked.
+  every day still holds the dish the card named.
   **A COMMENT CANNOT SATISFY A PRESENCE CHECK, and a control wired through a
   hook has no component that names its builder**: the parity gate derives
   "a screen imports the builder" from components, so this row failed until the
   gate was taught that a hook App wires to the tabs is part of the screen path
   (comments stripped from the hooks it counts, mutation-tested).
-  `test:meal-day-move` (110 checks, 44 mutations), `verify:meal-day-move`
-  (43 checks, 17 mutations), `verify:chat-day-move` (46 checks, 8
-  mutations), `coach-parity`. Needs the `chat-gemini` deploy
-  for chat
+  **And a DIFFERENT meal on the other day, and an Undo — both surfaces since
+  30 Sep 2026**, her "finish the day swap" (Monday's dinner with Wednesday's
+  lunch). Her 14 Sep slot-move ruling across days: they swap places and EACH
+  IS RESIZED to fit the meal it lands in, both new sizes on the card. The two
+  picks are the same two picks; what is new is two resized copies ("X (as
+  lunch)") made by the slot move's own function, held until the strip ends so
+  no other day moves. The sheet shows the other day's meals as chips (the same
+  meal already picked); the coach's tool takes `to_meal_slot`. **Undo** puts the
+  picks back only when BOTH days still hold what the swap wrote (else it says
+  so and touches nothing), leaves a meal of today's she has since logged as
+  eaten alone, and removes a copy only once no pick names it. The sheet's Undo
+  lives on the row and goes when she taps another day; the coach receipt's
+  stays on screen. Same controller for both (`plan`, `confirm`, `undo`).
+  `docs/plans/moving-a-meal-to-another-day.md`. Needs the `chat-gemini` deploy.
+  `test:meal-day-move` (169 checks; 44 mutations on the swap, 33 more on the
+  different-meal swap and Undo), `verify:meal-day-move` (76 checks; 17 + 13
+  mutations), `verify:chat-day-move` (69 checks; 8 + 6 mutations), all caught,
+  one only after the driver gained a check for the option count an Undo left
+  behind; `coach-parity`
 - Scale a portion — both surfaces since 12 Sep 2026, the same row menu;
   `meal-food-edit`, `verify:meal-food-edit`
 - Resize the WHOLE DAY back onto the targets — both surfaces since 17 Sep
@@ -951,7 +964,9 @@ menu" stays true when a copy is also left outside it.
   longer exist, and the number to act on is the one from the first run AFTER
   the deploy. Keep the commit — it is the only record of what the exam said
   before any of this was fixed, and the comparison is the point. **28 cases and
-  51 turns** since 29 Sep 2026 (one more, for the coach's day swap: a swap
+  52 turns** since 30 Sep 2026 (a third turn on the day-swap case: a swap of two
+  DIFFERENT meals on two days is neither a slot move nor a same-meal swap; 51
+  since 29 Sep, one more case, for the coach's day swap: a swap
   between two days is not a move between meals on one day, and the pair makes
   the days and the wording differ so a coach keying on "swap" or "move" cannot
   pass by accident; 27 and 49 the same day, for the top-up card: an ASK
@@ -1840,6 +1855,16 @@ old — the commands were right and the context was missing.
   **Anything stored outside React that a screen must react to needs a state
   mirror beside the durable copy** — and the way to find the next one is to
   tap the control and look, not to read the handler.
+- **A FUNCTION HANDED TO A STATE SETTER IS CALLED, NOT STORED.** 30 Sep 2026: a
+  swap's Undo was kept in row state with `setUndo(undo ?? null)`. React reads
+  a function argument as an UPDATER and runs it, so every swap was undone the
+  instant it was written, while the note beside it went on saying it had
+  happened. Typecheck was clean (an updater and a value are both legal), the
+  logic gate passed (it never renders the row), and the only thing that saw it
+  was a browser driver whose next line read the table and found it empty.
+  Store a function as `setUndo(() => undo)`. **The tell is a write followed by
+  nothing there**: a confirm that reports success and leaves no row is either
+  an undone write or an unwritten one, and asking the table settles which.
 - **TWO ROWS MUST NOT SHARE ONE SPOKEN NAME.** The same day: the tick button
   said "Save set 2" on both the warm-up row and the working row, because its
   label keyed on the number alone. Identical for a screen reader, and

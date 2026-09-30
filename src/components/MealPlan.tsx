@@ -22,7 +22,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // opens never reach. Caught by test:bundle going 11 kB over its ceiling the
 // day they were added — the honest fix is to defer them, not to raise the
 // budget, which is the one thing that check exists to stop.
-import type { MealMoveContext } from './nutrition/MealMoveSheet'
+import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
 import { COOK_ONCE } from '@/lib/coach-voice'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
@@ -736,6 +736,9 @@ function MealSlotRow({
   const [addOpen, setAddOpen] = useState(false)
   const [addNote, setAddNote] = useState<string | null>(null)
   const [moveNote, setMoveNote] = useState<string | null>(null)
+  /** Set while a swap between days can still be put back from this row (30 Sep 2026). */
+  const [moveUndo, setMoveUndo] = useState<MealMoveUndo | null>(null)
+  const [undoBusy, setUndoBusy] = useState(false)
   /** Which ingredient line has its edit open, by index. One at a time. */
   const [editingLine, setEditingLine] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string | null>(null)
@@ -1196,12 +1199,42 @@ function MealSlotRow({
                 ctx={moveContext && onMealPickApplied ? moveContext : null}
                 dayMove={dayMove ? { controller: dayMove, date, slot } : null}
                 onPick={onMealPickApplied}
-                onDone={summary => { setMoveOpen(false); setMoveNote(summary) }}
+                // `() => undo ?? null`, not `undo ?? null`: a function handed
+                // straight to a state setter is CALLED as an updater, which ran
+                // the Undo the instant the swap was written (found by the
+                // driver: nothing saved, and the note still said it had).
+                onDone={(summary, undo) => { setMoveOpen(false); setMoveNote(summary); setMoveUndo(() => undo ?? null) }}
                 onCancel={() => setMoveOpen(false)}
               />
             </Suspense>
           )}
-          {moveNote && <p className="text-[0.71875rem] text-muted-foreground" data-testid="meal-move-note">{moveNote}</p>}
+          {moveNote && (
+            <div className="flex items-center gap-2" data-testid="meal-move-note-row">
+              <p className="min-w-0 flex-1 text-[0.71875rem] text-muted-foreground" data-testid="meal-move-note">{moveNote}</p>
+              {moveUndo && (
+                <button
+                  type="button"
+                  disabled={undoBusy}
+                  onClick={async () => {
+                    setUndoBusy(true)
+                    try {
+                      const back = await moveUndo()
+                      setMoveNote(back.text)
+                      // Put back: nothing left to undo. Refused: the button
+                      // stays, and the note says why nothing changed.
+                      if (back.ok) setMoveUndo(null)
+                    } finally {
+                      setUndoBusy(false)
+                    }
+                  }}
+                  className="min-h-[44px] shrink-0 px-2 text-xs font-semibold text-primary"
+                  data-testid="meal-move-undo"
+                >
+                  {undoBusy ? 'Putting back…' : 'Undo'}
+                </button>
+              )}
+            </div>
+          )}
 
           {swapOpen && (
             <div className="flex flex-col gap-1">

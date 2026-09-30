@@ -601,6 +601,10 @@ function Harness() {
     targets: DAYMOVE ? macros : null, softLikedFoods: [],
     todaysPins: pinsFromPicks(dayMovePicks as never, pools as never), mealShape: dayMoveShape,
     showTodaysPick: (slot, name) => setDayMovePicks(prev => { const next = { ...prev }; if (name) next[slot] = name; else delete next[slot]; return next }),
+    // What App.tsx gives the hook for a swap of two DIFFERENT meals.
+    reloadPools: DAYMOVE ? reloadPools : undefined,
+    dietaryPreferences: profile.dietary_preferences,
+    dislikedFoods: () => [],
   })
   useEffect(() => {
     if (!DAYMOVE) return
@@ -653,6 +657,7 @@ function Harness() {
               onUpcomingMealPickApplied={DAYMOVE ? mealDays.applyPick : undefined}
               onMealDayMovePlan={DAYMOVE ? mealDays.dayMove.plan : undefined}
               onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
+              onMealDayMoveUndo={DAYMOVE ? mealDays.dayMove.undo : undefined}
               mealTopUp={TOPUP && macros ? { ...topUpPlan(pools as never, topUpSlots as never, macros), building: false } : null}
               onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}
               onMealTopUpConfirm={TOPUP && macros ? async () => {

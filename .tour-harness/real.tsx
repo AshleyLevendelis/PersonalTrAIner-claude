@@ -1014,6 +1014,10 @@ function Harness() {
     todaysPins: (DAYMOVE ? pinsFromPicks(dayMovePicks as never, servablePools as never) : TOPUP ? NO_PINS : liveChosen) as never, mealShape,
     // What App.tsx gives the hook so a meal swapped with another day's can land on today's row.
     showTodaysPick: DAYMOVE ? (slot, name) => setDayMovePicks(prev => { const next = { ...prev }; if (name) next[slot] = name; else delete next[slot]; return next }) : undefined,
+    // What App.tsx gives the hook for a swap of two DIFFERENT meals: re-read the options after a resized copy is added or taken away.
+    reloadPools: DAYMOVE ? async () => { setLivePools(await getPools(PROFILE_ID) as never) } : undefined,
+    dietaryPreferences: profile.dietary_preferences,
+    dislikedFoods: () => [],
   })
   // ?topup=1: the button, through the app's own function. What App.tsx adds
   // around it (the first-build gate) is held by test:meal-top-up.
@@ -1049,6 +1053,8 @@ function Harness() {
   // can tell "saved" from "shown", which a screen alone cannot.
   ;(window as unknown as { __mealPicks: unknown }).__mealPicks = () => db.meal_plan_picks
   ;(window as unknown as { __groceryTable: unknown }).__groceryTable = () => db.grocery_items
+  // The options each slot holds, by name, so a driver can see a resized copy added and taken away again.
+  ;(window as unknown as { __mealOptions: unknown }).__mealOptions = () => db.meal_plan_slots.map(r => ({ slot: r.slot, name: r.name }))
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
     if (DAYMOVE) setDayMovePicks(prev => ({ ...prev, [slot]: chosenName }))

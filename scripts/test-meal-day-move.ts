@@ -46,18 +46,27 @@ Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, config
 
 // --- Fake Supabase: just meal_plan_picks, with failures we can aim -------------
 type Row = Record<string, unknown>
-const db: Record<string, Row[]> = { meal_plan_picks: [] }
+const db: Record<string, Row[]> = { meal_plan_picks: [], meal_plan_slots: [] }
 /** Fail an upsert when this returns true for the row being written. */
 let failUpsertWhen: ((row: Row) => boolean) | null = null
+/** Fail an insert into the options when this returns true for the row being added. */
+let failInsertWhen: ((row: Row) => boolean) | null = null
 let failDeletes = false
 const writes: string[] = []
 function fakeFrom(table: string) {
   const filters: ((r: Row) => boolean)[] = []
-  let op: 'select' | 'upsert' | 'delete' = 'select'
+  let op: 'select' | 'upsert' | 'delete' | 'insert' = 'select'
   let payload: Row[] = []
   let onConflict: string[] | null = null
+  let orderBy: { col: string; asc: boolean } | null = null
+  let limitN: number | null = null
   const exec = () => {
     db[table] ??= []
+    if (op === 'insert') {
+      if (failInsertWhen && payload.some(failInsertWhen)) return { data: null, error: { code: '08006', message: 'connection failure' } }
+      for (const raw of payload) { writes.push(`insert ${table}/${raw.slot}/${raw.name}`); db[table].push({ ...raw }) }
+      return { data: null, error: null }
+    }
     if (op === 'upsert') {
       if (failUpsertWhen && payload.some(failUpsertWhen)) return { data: null, error: { code: '08006', message: 'connection failure' } }
       for (const raw of payload) {
@@ -74,7 +83,10 @@ function fakeFrom(table: string) {
       writes.push('delete')
       return { data: null, error: null }
     }
-    return { data: db[table].filter(r => filters.every(f => f(r))).map(r => ({ ...r })), error: null }
+    let rows = db[table].filter(r => filters.every(f => f(r))).map(r => ({ ...r }))
+    if (orderBy) rows = rows.sort((x, y) => ((x[orderBy!.col] as number) - (y[orderBy!.col] as number)) * (orderBy!.asc ? 1 : -1))
+    if (limitN !== null) rows = rows.slice(0, limitN)
+    return { data: rows, error: null }
   }
   const api: Record<string, unknown> = {
     select: () => api,
@@ -84,6 +96,9 @@ function fakeFrom(table: string) {
       return api
     },
     delete: () => { op = 'delete'; return api },
+    insert: (rows: Row | Row[]) => { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return api },
+    order: (col: string, opts?: { ascending?: boolean }) => { orderBy = { col, asc: opts?.ascending !== false }; return api },
+    limit: (n: number) => { limitN = n; return api },
     eq: (c: string, v: unknown) => { filters.push(r => r[c] === v); return api },
     in: (c: string, vs: unknown[]) => { filters.push(r => vs.includes(r[c])); return api },
     then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => Promise.resolve().then(() => resolve(exec()), reject),
@@ -106,6 +121,7 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setSupabaseClient({ from: fakeFrom } as any)
   const { datesFrom, buildRotation, serveMealWeek, pinsFromPicks } = await import('../src/lib/meal-rotation')
+  const { dayLabel } = await import('../src/lib/day-labels')
   const { computeMealMacros } = await import('../src/lib/food-db')
   const { buildMealDayMoveProposal, sameMealDayMove, isNoticeableResize } = await import('../src/lib/meal-day-move')
   const { executeMealDayMove } = await import('../src/lib/pending-action-executor')
@@ -249,8 +265,11 @@ async function main() {
     if (dupDay >= 1 && otherDay >= 1) {
       check('a dish the assembler would set aside is refused rather than shown as swapped',
         refused({ meal_slot: 'dinner', from_date: dates[otherDay], to_date: dates[dupDay] }, undefined, dup) === DAY_MOVE.refusals.wouldNotHold)
+      check('...on either side of the swap, not just the first',
+        refused({ meal_slot: 'dinner', from_date: dates[dupDay], to_date: dates[otherDay] }, undefined, dup) === DAY_MOVE.refusals.wouldNotHold)
     } else {
       check('the duplicate-name fixture found two days to swap', false, wk.map(d => d.day.chosen.dinner?.name))
+      check('...on either side of the swap, not just the first', false)
     }
   }
 
@@ -429,14 +448,16 @@ async function main() {
     setDevClockOverride('p1', today)
     const shown: { date: string; slot: string; name: string | null }[][] = []
     const show = (u: { date: string; slot: string; name: string | null }[]) => { shown.push(u) }
-    const payload = { slot: 'dinner' as const, legs: [
-      { date: dates[1], name: 'Rice pot', previous: null },
-      { date: dates[2], name: 'Tray bake', previous: 'Baked chicken' },
-    ] as [{ date: string; name: string; previous: string | null }, { date: string; name: string; previous: string | null }] }
-    const reset = () => { db.meal_plan_picks = [{ profile_id: 'p1', date: dates[2], slot: 'dinner', meal_name: 'Baked chicken' }]; writes.length = 0; shown.length = 0; failUpsertWhen = null; failDeletes = false }
+    type Leg = { date: string; slot: Slot; name: string; previous: string | null }
+    const payload = { legs: [
+      { date: dates[1], slot: 'dinner', name: 'Rice pot', previous: null },
+      { date: dates[2], slot: 'dinner', name: 'Tray bake', previous: 'Baked chicken' },
+    ] as [Leg, Leg] }
+    const deps = { show: show as never }
+    const reset = () => { db.meal_plan_picks = [{ profile_id: 'p1', date: dates[2], slot: 'dinner', meal_name: 'Baked chicken' }]; db.meal_plan_slots = []; writes.length = 0; shown.length = 0; failUpsertWhen = null; failInsertWhen = null; failDeletes = false }
 
     reset()
-    const ok = await executeMealDayMove('p1', payload, show as never)
+    const ok = await executeMealDayMove('p1', payload, deps)
     const stored = (d: string) => db.meal_plan_picks.find(r => r.date === d && r.slot === 'dinner')?.meal_name
     check('both picks are saved', stored(dates[1]) === 'Rice pot' && stored(dates[2]) === 'Tray bake', db.meal_plan_picks)
     check('the receipt lands both and fails nothing', ok.landed.length === 2 && ok.failed.length === 0, ok)
@@ -445,7 +466,7 @@ async function main() {
     // The SECOND write fails: the first is put back to nothing.
     reset()
     failUpsertWhen = row => row.date === dates[2]
-    const half = await executeMealDayMove('p1', payload, show as never)
+    const half = await executeMealDayMove('p1', payload, deps)
     check('when the second pick will not save, the first is taken back off', stored(dates[1]) === undefined && stored(dates[2]) === 'Baked chicken', db.meal_plan_picks)
     check('...the receipt says nothing changed and names why, in the phrasebook\'s words',
       half.landed.length === 0 && half.failed[0]?.error === DAY_MOVE.why.saveFailed, half)
@@ -454,7 +475,7 @@ async function main() {
     // The FIRST fails: nothing was written, nothing to put back.
     reset()
     failUpsertWhen = row => row.date === dates[1]
-    const first = await executeMealDayMove('p1', payload, show as never)
+    const first = await executeMealDayMove('p1', payload, deps)
     check('when the first pick will not save, nothing is written at all', !writes.some(w => w.startsWith('upsert')) && first.landed.length === 0, writes)
 
     // A first pick that replaced an earlier one is put back to it, not cleared.
@@ -462,20 +483,20 @@ async function main() {
     db.meal_plan_picks.push({ profile_id: 'p1', date: dates[1], slot: 'dinner', meal_name: 'Tray bake' })
     failUpsertWhen = row => row.date === dates[2]
     const withPrev = { ...payload, legs: [{ ...payload.legs[0], previous: 'Tray bake' }, payload.legs[1]] as typeof payload.legs }
-    await executeMealDayMove('p1', withPrev, show as never)
+    await executeMealDayMove('p1', withPrev, deps)
     check('a first day that had its own pick gets that pick back', stored(dates[1]) === 'Tray bake', db.meal_plan_picks)
 
     // Putting back fails too: the receipt says half of it saved, and the screen shows the store's truth.
     reset()
     failUpsertWhen = row => row.date === dates[2]
     failDeletes = true
-    const stuck = await executeMealDayMove('p1', payload, show as never)
+    const stuck = await executeMealDayMove('p1', payload, deps)
     check('when the put-back fails as well, the receipt says only half saved and names it', stuck.failed[0]?.error === DAY_MOVE.why.halfSaved && stuck.landed.length === 1, stuck)
     check('...and the screen shows what the store now holds, not what was asked', shown.length === 1 && shown[0].length === 1 && shown[0][0].date === dates[1] && shown[0][0].name === 'Rice pot', shown)
 
     // The past is not writeable.
     reset()
-    const past = await executeMealDayMove('p1', { ...payload, legs: [{ date: '2026-09-20', name: 'Rice pot', previous: null }, payload.legs[1]] }, show as never)
+    const past = await executeMealDayMove('p1', { ...payload, legs: [{ date: '2026-09-20', slot: 'dinner', name: 'Rice pot', previous: null }, payload.legs[1]] }, deps)
     check('a leg on a past date changes nothing and says so', past.failed.length === 1 && stored(dates[2]) === 'Baked chicken' && !writes.some(w => w.startsWith('upsert')), { past, writes })
     setDevClockOverride('p1', null)
   }
@@ -490,7 +511,12 @@ async function main() {
     const changed = servingFor(shapeOff, { pinsByDate: { [dates[2]]: { dinner: pools.dinner.find(o => o.name !== dinnerB && o.name !== dinnerA)! } } })
     const now = build(changed, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] })
     check('a dish changed on either day since the card was built is not the same swap', a.ok && now.ok && !sameMealDayMove(a.payload, now.payload), now.ok ? now.payload.legs : now)
-    check('a different meal is not the same swap', a.ok && sameMealDayMove(a.payload, { ...a.payload, slot: 'lunch' }) === false)
+    // Only what a day HELD BEFORE differs: the same dishes are served, but one day now has its own pick, which is what an undo would put back.
+    const picked = servingFor(shapeOff, { pinsByDate: { [dates[2]]: { dinner: pools.dinner.find(o => o.name === dinnerB)! } } })
+    const withPick = build(picked, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] })
+    check('...and a card read before a day gained a pick of its own is stale too, though the same dishes are served',
+      a.ok && withPick.ok && a.payload.legs.every((l, i) => l.name === withPick.payload.legs[i].name) && !sameMealDayMove(a.payload, withPick.payload), withPick.ok ? withPick.payload.legs : withPick)
+    check('a different meal is not the same swap', a.ok && sameMealDayMove(a.payload, { legs: a.payload.legs.map(l => ({ ...l, slot: 'lunch' as const })) as typeof a.payload.legs }) === false)
     // The order the two days were named in is decided by the payload, not the ask.
     check('the payload names its own two days, in an order it keeps', a.ok && a.payload.legs[0].date === dates[1] && a.payload.legs[1].date === dates[2])
   }
@@ -504,16 +530,17 @@ async function main() {
     check('...reading the ledger, and the shopping list STRICTLY, before it plans',
       /getTodayLedger\(profileId, today, targets\)/.test(hook) && /readGroceryCoverage\([\s\S]*?\{ strict: true \}\)/.test(hook))
     check('...and an unreadable one is passed on as unreadable, never as empty',
-      /let loggedTodaySlots: MealSlotName\[\] \| null = null/.test(hook) && /let listDates: string\[\] \| null = null/.test(hook))
+      /const loggedTodaySlots = await readLoggedToday\(\)/.test(hook) && /let listDates: string\[\] \| null = null/.test(hook)
+      && /const readLoggedToday = async \(\): Promise<MealSlotName\[\] \| null> => \{[\s\S]*?\} catch \{\s*return null\s*\}/.test(hook))
     check('the confirm re-plans and compares with the card before it writes',
-      /const live = await planDayMove\(/.test(hook) && /!sameMealDayMove\(live\.payload, payload\)/.test(hook) && /executeMealDayMove\(profileId, live\.payload, showPicks\)/.test(hook))
-    check('the hook hands out the controller both surfaces use', /dayMove: \{ dates, today, plan: planDayMove, confirm: confirmDayMove \}/.test(hook))
+      /const live = await planDayMove\(/.test(hook) && /!sameMealDayMove\(live\.payload, payload\)/.test(hook) && /executeMealDayMove\(profileId, live\.payload, \{ show: showPicks, reloadPools \}\)/.test(hook))
+    check('the hook hands out the controller both surfaces use', /plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove/.test(hook))
     check('today\'s row is updated through the way App gives the hook, not a second store', /showTodaysPick\?\.\(u\.slot, u\.name\)/.test(hook))
 
     const app = read('src/App.tsx')
     check('App gives the hook the way to show today\'s pick', /showTodaysPick: \(slot, name\) => setManualMealPicks\(/.test(app))
     check('App hands the SAME controller to the Nutrition tab and to the coach',
-      /dayMove=\{mealDays\.dayMove\}/.test(app) && /onMealDayMovePlan=\{mealDays\.dayMove\.plan\}/.test(app) && /onMealDayMoveConfirm=\{mealDays\.dayMove\.confirm\}/.test(app))
+      /dayMove=\{mealDays\.dayMove\}/.test(app) && /onMealDayMovePlan=\{mealDays\.dayMove\.plan\}/.test(app) && /onMealDayMoveConfirm=\{mealDays\.dayMove\.confirm\}/.test(app) && /onMealDayMoveUndo=\{mealDays\.dayMove\.undo\}/.test(app))
 
     const nd = read('src/components/NutritionDisplay.tsx')
     check('the Nutrition tab passes the controller to BOTH day views (today and an upcoming day)', (nd.match(/dayMove=\{dayMove\}/g) ?? []).length === 2, (nd.match(/dayMove=\{dayMove\}/g) ?? []).length)
@@ -524,7 +551,7 @@ async function main() {
       /moveOpen && \(\(moveContext && onMealPickApplied\) \|\| dayMove\)/.test(mp) && /dayMove=\{dayMove \? \{ controller: dayMove, date, slot \} : null\}/.test(mp))
     const sheet = read('src/components/nutrition/MealMoveSheet.tsx')
     check('the sheet plans a day when it is tapped, and confirms through the controller',
-      /dayMove\.controller\.plan\(\{ meal_slot: dayMove\.slot, from_date: dayMove\.date, to_date: toDate \}\)/.test(sheet) && /dayMove!\.controller\.confirm\(plan\.payload\)/.test(sheet))
+      /dayMove\.controller\.plan\(\{ meal_slot: dayMove\.slot, from_date: dayMove\.date, to_date: toDate, to_slot: toMeal \?\? dayMove\.slot \}\)/.test(sheet) && /controller\.confirm\(plan\.payload\)/.test(sheet))
 
     const chat = read('src/components/ChatAssistant.tsx')
     const dayBranch = chat.slice(chat.indexOf("result.proposal.kind === 'propose_meal_day_move'"), chat.indexOf("result.proposal.kind === 'propose_concurrent_activity'"))
@@ -547,6 +574,289 @@ async function main() {
 
     const parity = readFileSync(join(ROOT, 'docs/coach-screen-parity.md'), 'utf8')
     check('the parity list records the tool with a screen counterpart', /\| `propose_meal_day_move` \| SCREEN \|/.test(parity))
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // TWO DIFFERENT MEALS ON TWO DAYS (30 Sep 2026): Monday's dinner with
+  // Wednesday's lunch. Her 14 Sep slot-move ruling applied across days: they
+  // swap places and EACH IS RESIZED to fit the meal it lands in.
+  // ---------------------------------------------------------------------------
+  console.log('\n[11] Two different meals: swap places, each resized, and no other day moves')
+  const across = build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'lunch' })
+  const acrossOk = okOf(across)
+  // A failed build must FAIL the checks below, not end the run: fall back to a swap that builds.
+  const sameMealSwap = okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }))!.payload
+  const acrossPayload = acrossOk?.payload ?? sameMealSwap
+  const lunchB = nameOf(before, 2, 'lunch')!
+  {
+    const [a, b] = acrossOk?.payload.legs ?? []
+    check('it builds, with a leg for each meal on its own day', across.ok && a?.date === dates[1] && a?.slot === 'dinner' && b?.date === dates[2] && b?.slot === 'lunch', across)
+    check('...each leg carries the OTHER meal resized to its slot, named the way the slot move names one',
+      a?.name === `${lunchB} (as dinner)` && b?.name === `${dinnerA} (as lunch)` && a?.option?.name === a?.name && b?.option?.name === b?.name, [a?.name, b?.name])
+    const budgets = (await import('../src/lib/meal-generation')).computeSlotBudgets(targets, 3, false)
+    check('...and the resize really lands near the slot it goes to (within the calorie tolerance of that slot\'s budget)',
+      !!a?.option && !!b?.option
+      && Math.abs(a.option.macros.calories - budgets.dinner!.calories) / budgets.dinner!.calories < 0.06
+      && Math.abs(b.option.macros.calories - budgets.lunch!.calories) / budgets.lunch!.calories < 0.06,
+      [a?.option?.macros.calories, budgets.dinner?.calories, b?.option?.macros.calories, budgets.lunch?.calories])
+    const lastDay = dates[dates.length - 1]
+    const held = (o?: Opt) => (o?.tags ?? []).find(t => t.startsWith('new-from:'))
+    check('...and each copy is held until the day after the strip, so no other day\'s search can find it',
+      held(a?.option) === `new-from:${(await import('../src/lib/meal-rotation')).addDays(lastDay, 1)}` && held(b?.option) === held(a?.option), [held(a?.option), held(b?.option)])
+    check('the card says both new sizes, in the phrasebook\'s words, and that each is resized',
+      acrossOk?.diff.rows.length === 2 && /Tomorrow's dinner|^Thursday's dinner|dinner/.test(acrossOk.diff.rows[0].field)
+      && acrossOk.diff.rows.every(r => /kcal|same size/.test(r.note ?? ''))
+      && acrossOk.diff.implications?.[0].text.includes('swap places, and each is resized to fit the meal it lands in'), acrossOk?.diff)
+    check('...each row shows the dish that will be on the plate (the resized copy\'s own name), and the card offers an Undo',
+      acrossOk?.diff.rows[0].after === a?.name && acrossOk?.diff.rows[1].after === b?.name && acrossOk?.diff.reversible === true, acrossOk?.diff.rows)
+    check('...its lead names both meals and both days', /swap .*dinner with .*lunch/.test(acrossOk?.diff.lead ?? ''), acrossOk?.diff.lead)
+    check('...and "Unchanged" does not claim the amounts stay, because they do not',
+      acrossOk?.diff.unchanged?.[0] === DAY_MOVE.unchangedAcross && /only how much of each changes/.test(DAY_MOVE.unchangedAcross))
+
+    // NO OTHER DAY MOVES: every cell except the two is the dish it was.
+    const afterWeek = acrossOk?.after ?? []
+    const moved = afterWeek.flatMap((d, i) => (['breakfast', 'lunch', 'dinner'] as Slot[])
+      .filter(sl => !((i === 1 && sl === 'dinner') || (i === 2 && sl === 'lunch')))
+      .filter(sl => d.day.chosen[sl]?.name !== before[i].day.chosen[sl]?.name)
+      .map(sl => `${d.date}/${sl}`))
+    check('no other meal on any day changes: the copies are invisible to every other day\'s search', afterWeek.length === 7 && moved.length === 0, moved)
+    check('the two days serve the two copies', afterWeek[1]?.day.chosen.dinner?.name === a?.name && afterWeek[2]?.day.chosen.lunch?.name === b?.name)
+    check('scope: the key names both meals and both days, in an order that does not depend on which was asked first',
+      (() => {
+        const rev = build(serving, { meal_slot: 'lunch', from_date: dates[2], to_date: dates[1], to_slot: 'dinner' })
+        return across.ok && rev.ok && across.scopeKey === rev.scopeKey && across.scopeKey !== (okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }))?.scopeKey ?? '')
+      })())
+    check('the confirm sameness includes the meal each day gives up: a card for one pair is not the card for another',
+      !!acrossOk && !sameMealDayMove(acrossOk.payload, okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[3], to_slot: 'lunch' }))?.payload ?? acrossOk.payload))
+
+    // REFUSALS, each in the phrasebook's words and each with no card.
+    const reason = (r: Proposed) => (r.ok ? 'CARD' : r.reason)
+    check('two different meals on the SAME day is the slot move\'s job, and says so', reason(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[1], to_slot: 'lunch' })) === DAY_MOVE.refusals.sameDayOtherMeal)
+    check('an unknown second meal asks which', reason(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'brunch' })) === DAY_MOVE.refusals.whichSlot)
+    check('a meal the plan does not serve on that day is named (no snack planned)', reason(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'snack' })) === DAY_MOVE.refusals.nothingThere('snack', dayLabel(dates[2], today)))
+    {
+      // A meal with dishes but no BUDGET in this plan's shape (snacks switched off): named, never resized against nothing.
+      const stray = { ...pools, snack: [dish('snack', 'Rice cake', 30, 40, 3), dish('snack', 'Yoghurt pot', 25, 30, 2)] } as unknown as typeof pools
+      const r = build(servingFor(shapeOff, { pools: stray }), { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'snack' })
+      check('a meal that has dishes but no budget in this plan\'s shape is named, not resized against nothing', !r.ok && r.reason === DAY_MOVE.refusals.noSuchMeal('snack'), r)
+    }
+    check('today\'s meal already eaten cannot move, whichever of the two it is',
+      reason(build(serving, { meal_slot: 'dinner', from_date: today, to_date: dates[2], to_slot: 'lunch' }, { logged: ['dinner'] })) === DAY_MOVE.refusals.eaten('dinner')
+      && reason(build(serving, { meal_slot: 'dinner', from_date: dates[2], to_date: today, to_slot: 'lunch' }, { logged: ['lunch'] })) === DAY_MOVE.refusals.eaten('lunch'))
+    check('...but a meal of today\'s that is NOT one of the two is none of its business',
+      build(serving, { meal_slot: 'dinner', from_date: today, to_date: dates[2], to_slot: 'lunch' }, { logged: ['breakfast'] }).ok)
+    check('...and an unreadable ledger refuses a swap that touches today', reason(build(serving, { meal_slot: 'dinner', from_date: today, to_date: dates[2], to_slot: 'lunch' }, { logged: null })) === DAY_MOVE.refusals.ledgerUnreadable)
+    {
+      // A leftover lunch on either side is refused by name; batch cooking on.
+      const on = servingFor(shapeOn)
+      const week = serveMealWeek(on)
+      const leftoverIdx = week.findIndex((d, i) => i > 0 && d.day.chosen.lunch?.leftoverFrom === 'dinner')
+      const freshIdx = week.findIndex((d, i) => i > 0 && i !== leftoverIdx && !!d.day.chosen.dinner)
+      check('the fixture has a leftover lunch to refuse', leftoverIdx > 0 && freshIdx > 0, week.map(d => d.day.chosen.lunch?.leftoverFrom))
+      check('a leftover lunch cannot be the meal that moves, on either side',
+        reason(build(on, { meal_slot: 'dinner', from_date: dates[freshIdx], to_date: dates[leftoverIdx], to_slot: 'lunch' })) === DAY_MOVE.refusals.leftover(dayLabel(dates[leftoverIdx], today))
+        && reason(build(on, { meal_slot: 'lunch', from_date: dates[leftoverIdx], to_date: dates[freshIdx], to_slot: 'dinner' })) === DAY_MOVE.refusals.leftover(dayLabel(dates[leftoverIdx], today)))
+    }
+    {
+      // A meal that would have to change size past what is sensible is refused, not served.
+      const tiny = { ...pools, dinner: [dish('dinner', 'Sliver', 8, 12, 1), ...pools.dinner] } as typeof pools
+      const tinyServing = servingFor(shapeOff, { pools: tiny, pinsByDate: { [dates[1]]: { dinner: tiny.dinner[0] } } })
+      const r = build(tinyServing, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'lunch' })
+      check('a meal that would have to be blown up past a sensible size is refused with the slot move\'s own reason',
+        !r.ok && /can't become lunch — it would have to more than double to fill that slot/.test(r.reason), r)
+    }
+    {
+      // ...and the other direction: a tiny lunch that would have to become a dinner.
+      const tinyLunch = dish('lunch', 'Crumb', 6, 10, 1)
+      const stray = { ...pools, lunch: [tinyLunch, ...pools.lunch] } as typeof pools
+      const r = build(servingFor(shapeOff, { pools: stray, pinsByDate: { [dates[2]]: { lunch: tinyLunch } } }), { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'lunch' })
+      check('...in either direction (a tiny lunch cannot become a dinner)', !r.ok && /can't become dinner — it would have to more than double to fill that slot/.test(r.reason), r)
+    }
+    check('the same-meal swap is untouched: no copies, no held tags, the payload carries no options',
+      okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }))?.payload.legs.every(l => l.option === undefined) === true)
+  }
+
+
+  // ---------------------------------------------------------------------------
+  console.log('\n[12] Two different meals: the options and the picks, all or nothing')
+  const { USER_REQUESTED_TAG } = await import('../src/lib/meal-store')
+  const { undoMealDayMove } = await import('../src/lib/pending-action-executor')
+  const seedPool = () => (['dinner', 'lunch'] as Slot[]).flatMap(sl => pools[sl].map((o, i) => ({ profile_id: 'p1', slot: sl, pool_index: i, name: o.name, tags: [] })))
+  const poolNames = () => db.meal_plan_slots.map(r => `${r.slot}/${r.pool_index}/${r.name}`).sort()
+  const seededNames = seedPool().map(r => `${r.slot}/${r.pool_index}/${r.name}`).sort()
+  {
+    setDevClockOverride('p1', today)
+    const swap = acrossPayload
+    const log: string[] = []
+    let reloads = 0
+    const deps = { show: (u: unknown) => { log.push(`show:${(u as unknown[]).length}`) }, reloadPools: async () => { reloads++; log.push('reload') } }
+    const reset = () => {
+      db.meal_plan_picks = []; db.meal_plan_slots = seedPool() as Row[]
+      writes.length = 0; log.length = 0; reloads = 0; failUpsertWhen = null; failInsertWhen = null; failDeletes = false
+    }
+    const pickOf = (d: string, sl: Slot) => db.meal_plan_picks.find(r => r.date === d && r.slot === sl)?.meal_name
+
+    reset()
+    const ok = await executeMealDayMove('p1', swap, deps)
+    check('both resized copies are added to their meals\' options, and both picks name them',
+      db.meal_plan_slots.length === seededNames.length + 2 && pickOf(dates[1], 'dinner') === swap.legs[0].name && pickOf(dates[2], 'lunch') === swap.legs[1].name, [poolNames(), db.meal_plan_picks])
+    check('...each stored as the user\'s own request AND held until the strip ends, so a regenerate keeps it and no day\'s search finds it',
+      db.meal_plan_slots.filter(r => (r.tags as string[]).includes(USER_REQUESTED_TAG) && (r.tags as string[]).some(t => t.startsWith('new-from:'))).length === 2, db.meal_plan_slots.slice(-2))
+    check('...the receipt lands both, fails nothing, and the options are re-read BEFORE the screen is told (a pick cannot be shown before its option is known)',
+      ok.landed.length === 2 && ok.failed.length === 0 && log.join(',') === 'reload,show:2', { ok, log })
+
+    // The SECOND pick fails: everything comes back out.
+    reset()
+    failUpsertWhen = row => row.date === dates[2]
+    const secondPick = await executeMealDayMove('p1', swap, deps)
+    check('when the second pick will not save, BOTH copies are gone again and neither day has a pick',
+      poolNames().join('|') === seededNames.join('|') && db.meal_plan_picks.length === 0, [poolNames(), db.meal_plan_picks])
+    check('...the receipt says nothing changed, and the screen is never told', secondPick.landed.length === 0 && secondPick.failed[0]?.error === DAY_MOVE.why.saveFailed && log.length === 0, { secondPick, log })
+
+    // The SECOND copy fails to save: the first leg is taken all the way back.
+    reset()
+    failInsertWhen = row => row.slot === 'lunch'
+    const secondCopy = await executeMealDayMove('p1', swap, deps)
+    check('when the second copy will not save, the first leg\'s copy and pick are both taken back',
+      poolNames().join('|') === seededNames.join('|') && db.meal_plan_picks.length === 0 && secondCopy.failed[0]?.error === DAY_MOVE.why.saveFailed, [poolNames(), db.meal_plan_picks, secondCopy])
+
+    // The FIRST copy fails: nothing at all was written.
+    reset()
+    failInsertWhen = row => row.slot === 'dinner'
+    await executeMealDayMove('p1', swap, deps)
+    check('when the first copy will not save nothing is written', !writes.some(w => w.startsWith('upsert')) && poolNames().join('|') === seededNames.join('|'), writes)
+
+    // Putting back fails as well: half saved, and the screen shows the store's truth.
+    reset()
+    failUpsertWhen = row => row.date === dates[2]
+    failDeletes = true
+    const stuck = await executeMealDayMove('p1', swap, deps)
+    check('when the put-back fails too, the receipt says only half saved and the screen is told what stands',
+      stuck.failed[0]?.error === DAY_MOVE.why.halfSaved && stuck.landed.length >= 1 && log.includes('reload') && log[log.length - 1].startsWith('show:'), { stuck, log })
+
+    // The same meal on two days adds nothing and re-reads nothing.
+    reset()
+    await executeMealDayMove('p1', sameMealSwap, deps)
+    check('the same meal on two days adds no options and does not re-read them', db.meal_plan_slots.length === seededNames.length && reloads === 0 && log.join(',') === 'show:2', { rows: db.meal_plan_slots.length, log })
+    setDevClockOverride('p1', null)
+  }
+
+  // ---------------------------------------------------------------------------
+  console.log('\n[13] Putting a swap back')
+  {
+    setDevClockOverride('p1', today)
+    const swap = acrossPayload
+    const shown: { date: string; slot: string; name: string | null }[][] = []
+    let reloads = 0
+    const order: string[] = []
+    const deps = {
+      show: (u: { date: string; slot: string; name: string | null }[]) => { order.push('show'); shown.push(u) },
+      reloadPools: async () => { reloads++; order.push('reload') },
+    }
+    const undoDeps = { ...deps, today, loggedTodaySlots: [] as Slot[] | null }
+    const pickOf = (d: string, sl: Slot) => db.meal_plan_picks.find(r => r.date === d && r.slot === sl)?.meal_name
+    /** The swap done for real, over a lunch that already had a pick of its own on the second day. */
+    const done = async (legs: typeof swap.legs = [{ ...swap.legs[0] }, { ...swap.legs[1], previous: 'Grain bowl' }]) => {
+      db.meal_plan_picks = [{ profile_id: 'p1', date: dates[2], slot: 'lunch', meal_name: 'Grain bowl' }]
+      db.meal_plan_slots = seedPool() as Row[]
+      writes.length = 0; shown.length = 0; order.length = 0; reloads = 0; failUpsertWhen = null; failInsertWhen = null; failDeletes = false
+      const payload = { legs }
+      await executeMealDayMove('p1', payload, deps)
+      shown.length = 0; order.length = 0; reloads = 0; writes.length = 0
+      return payload
+    }
+
+    let payload = await done()
+    const back = await undoMealDayMove('p1', payload, undoDeps)
+    check('undo puts each day back to what it held: cleared where nothing was picked, the earlier pick where there was one',
+      pickOf(dates[1], 'dinner') === undefined && pickOf(dates[2], 'lunch') === 'Grain bowl', db.meal_plan_picks)
+    check('...and takes the two resized copies out of the options', poolNames().join('|') === seededNames.join('|'), poolNames())
+    check('...the receipt lands both and fails nothing; the options are re-read before the screen is told, and it is shown the earlier picks',
+      back.landed.length === 2 && back.failed.length === 0 && order.join(',') === 'reload,show'
+      && shown[0]?.some(u => u.date === dates[1] && u.name === null) && shown[0]?.some(u => u.date === dates[2] && u.name === 'Grain bowl'), { back, order, shown })
+
+    // ONLY WHEN BOTH DAYS STILL HOLD WHAT THE SWAP WROTE.
+    payload = await done()
+    db.meal_plan_picks.find(r => r.date === dates[2] && r.slot === 'lunch')!.meal_name = 'Rice and greens'
+    const changed = await undoMealDayMove('p1', payload, undoDeps)
+    check('a day swapped again since is left alone, and it says so in the phrasebook\'s words',
+      changed.failed[0]?.error === DAY_MOVE.undo.changed && changed.landed.length === 0
+      && pickOf(dates[2], 'lunch') === 'Rice and greens' && pickOf(dates[1], 'dinner') === payload.legs[0].name && !writes.some(w => w.startsWith('upsert') || w === 'delete'), { changed, writes })
+    check('...and the copies stay while the picks stand', poolNames().length === seededNames.length + 2, poolNames())
+
+    // A meal of TODAY'S eaten since is left alone, for the reason the swap refuses to move one.
+    const todaySwap = okOf(build(serving, { meal_slot: 'dinner', from_date: today, to_date: dates[2], to_slot: 'lunch' }))?.payload ?? sameMealSwap
+    payload = await done([{ ...todaySwap.legs[0] }, { ...todaySwap.legs[1] }])
+    const eaten = await undoMealDayMove('p1', payload, { ...undoDeps, loggedTodaySlots: ['dinner'] })
+    check('a meal of today\'s logged as eaten since is left alone', eaten.failed[0]?.error === DAY_MOVE.undo.eaten('dinner') && pickOf(today, 'dinner') === payload.legs[0].name, eaten)
+    const unreadable = await undoMealDayMove('p1', payload, { ...undoDeps, loggedTodaySlots: null })
+    check('...and an unreadable ledger leaves it alone too, saying nothing has changed', unreadable.failed[0]?.error === DAY_MOVE.undo.ledgerUnreadable && pickOf(today, 'dinner') === payload.legs[0].name, unreadable)
+    const fine = await undoMealDayMove('p1', payload, { ...undoDeps, loggedTodaySlots: ['breakfast'] })
+    check('...but a meal of today\'s that is not one of the two does not stop it', fine.failed.length === 0, fine)
+
+    // BOTH PICKS OR NEITHER: the second restore fails, so the first is swapped again and the pair still agree.
+    payload = await done()
+    failUpsertWhen = row => row.date === dates[2] && row.meal_name === 'Grain bowl'
+    const partial = await undoMealDayMove('p1', payload, undoDeps)
+    check('when the second pick will not go back, the first is swapped again so the two days still agree',
+      partial.failed[0]?.error === DAY_MOVE.undo.saveFailed && pickOf(dates[1], 'dinner') === payload.legs[0].name && pickOf(dates[2], 'lunch') === payload.legs[1].name, { partial, picks: db.meal_plan_picks })
+    check('...and the copies are kept, because the picks still name them', poolNames().length === seededNames.length + 2, poolNames())
+
+    // The same meal on two days: no copies, no re-read.
+    const sameSwap = sameMealSwap
+    payload = await done([{ ...sameSwap.legs[0] }, { ...sameSwap.legs[1] }])
+    db.meal_plan_picks = db.meal_plan_picks.filter(r => r.slot !== 'lunch')
+    const sameBack = await undoMealDayMove('p1', payload, undoDeps)
+    check('a same-meal swap goes back without touching the options or re-reading them',
+      sameBack.failed.length === 0 && pickOf(dates[1], 'dinner') === undefined && reloads === 0 && db.meal_plan_slots.length === seededNames.length, { sameBack, reloads })
+    setDevClockOverride('p1', null)
+  }
+
+  // ---------------------------------------------------------------------------
+  console.log('\n[14] The wiring for two different meals and for Undo')
+  {
+    const hook = read('src/hooks/useMealDays.ts')
+    check('the hook plans the second meal, and hands the builder what a resized meal is checked against',
+      /to_slot: payload\.legs\[1\]\.slot/.test(hook) && /dietaryPreferences,\s*dislikedFoods: dislikedFoods\?\.\(\)/.test(hook))
+    check('...its undo reads the ledger again and passes the SAME show and re-read as the swap',
+      /undoMealDayMove\(profileId, payload, \{ show: showPicks, reloadPools, today, loggedTodaySlots: await readLoggedToday\(\) \}\)/.test(hook))
+    check('...and the controller lists the meals this profile has, for the sheet to choose from',
+      /slots: targets \? \(Object\.keys\(computeSlotBudgets\(targets, mealShape\.mealsPerDay, mealShape\.includeSnacks\)\) as MealSlotName\[\]\) : \[\]/.test(hook))
+
+    const app = read('src/App.tsx')
+    check('App gives the hook the way to re-read the options, and what a resized meal is verified against',
+      /reloadPools: async \(\) => \{ if \(profile\?\.id\) setMealPools\(await getPools\(profile\.id\)\) \}/.test(app) && /dietaryPreferences: profile\?\.dietary_preferences/.test(app) && /dislikedFoods: \(\) => effectiveDislikedFoods/.test(app))
+
+    const sheet = read('src/components/nutrition/MealMoveSheet.tsx')
+    check('the sheet offers the other day\'s meals once a day is chosen, the same meal preselected',
+      /dayMove\.controller\.slots\.map\(m =>/.test(sheet) && /\(toMeal \?\? dayMove\.slot\) === m/.test(sheet) && /data-testid=\{`meal-move-day-meal-\$\{m\}`\}/.test(sheet))
+    check('...and hands the row the undo it just made possible: the controller\'s own, on the plan that was confirmed',
+      /await controller\.undo\(plan\.payload\)/.test(sheet) && /onDone\(\s*a\.slot === b\.slot \? DAY_MOVE\.done\(a\.slot, dayA, dayB\) : DAY_MOVE\.doneAcross\(a\.slot, dayA, b\.slot, dayB\)/.test(sheet))
+    const mp = read('src/components/MealPlan.tsx')
+    check('the row shows an Undo beside the summary while there is one, calls it, and keeps the button when it is refused',
+      /data-testid="meal-move-undo"/.test(mp) && /const back = await moveUndo\(\)/.test(mp) && /if \(back\.ok\) setMoveUndo\(null\)/.test(mp) && /setMoveNote\(back\.text\)/.test(mp))
+
+    const chat = read('src/components/ChatAssistant.tsx')
+    const confirmStart = chat.indexOf('const payload = row.payload as unknown as MealDayMovePayload\n      const today')
+    const confirmBranch = confirmStart < 0 ? '' : chat.slice(confirmStart, chat.indexOf("row.kind === 'propose_injury_adaptation'", confirmStart))
+    check('the coach\'s receipt carries Undo when the swap landed, and labels each row by its own meal',
+      /undoToken = ok \? row\.id : undefined/.test(confirmBranch) && /DAY_MOVE\.rowLabel\(dayLabel\(l\.date, today\), l\.slot\)/.test(confirmBranch), confirmBranch.slice(0, 200))
+    const undoAt = chat.indexOf('await onMealDayMoveUndo(payload)')
+    const undoBranch = undoAt < 0 ? '' : chat.slice(Math.max(0, undoAt - 300), undoAt + 1200)
+    check('...its Undo calls the controller\'s (the sheet\'s), keeps the button and says why when it is refused',
+      undoBranch.length > 100 && /await onMealDayMoveUndo\(payload\)/.test(undoBranch) && /back\.failed\[0\]\.error/.test(undoBranch) && /undoToken: undefined/.test(undoBranch), undoBranch.slice(0, 200))
+    check('...and it reaches the second meal to the builder as to_slot', /to_slot: String\(raw\.to_meal_slot \?\? ''\)/.test(chat))
+
+    const fn = read('supabase/functions/chat-gemini/index.ts')
+    const decl = fn.slice(fn.indexOf('name: "propose_meal_day_move"'), fn.indexOf('name: "propose_meal_refit"'))
+    check('the coach may name a different meal for the other day, and the handler forwards it without deciding anything',
+      /to_meal_slot: \{/.test(decl) && /to_meal_slot: args\.to_meal_slot,/.test(decl.length ? fn : '') && !/required: \[[^\]]*to_meal_slot/.test(decl))
+    check('the prompt no longer says the app only swaps the same meal, and separates it from the slot move',
+      !/It is always the SAME meal on both days/.test(fn) && /to_meal_slot \(lunch\)/.test(fn) && /Two meals on the SAME day \(dinner to the snack slot\) is propose_meal_move, not this/.test(fn))
+    const exam = JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases/meal-day-swap-not-slot-move.json'), 'utf8'))
+    check('the coach exam has a turn for the different-meal swap, which must reach the day-move tool',
+      exam.messages.length === 3 && exam.checks.expectsProposalKind.some((c: { turn: number; oneOf: string[] }) => c.turn === 2 && c.oneOf.join() === 'propose_meal_day_move'), exam.checks)
   }
 
   console.log(failed === 0 ? `\nAll ${ran} meal-day-move checks passed.` : `\n${failed} of ${ran} check(s) failed.`)

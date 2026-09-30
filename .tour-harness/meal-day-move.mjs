@@ -267,6 +267,156 @@ await ev(`document.querySelector('[data-testid="meal-move-confirm"]').click()`)
 for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-note"]')) break; await wait(150) }
 check('and asking again, once the connection is back, works', (await meals()).dinner === w8[fB].dinner && (await ev(`window.__mealPicks()`)).length === 2, await meals())
 
+
+console.log("\n[9] Two DIFFERENT meals: a dinner for another day's breakfast")
+// The other day's lunch is left out on purpose: in this fixture every lunch is
+// last night's dinner and is refused on its own ([7] shows that), so the pair
+// is a dinner and a breakfast, and the leftover lunch that follows the dinner
+// is the knock-on the card has to name.
+const acrossSetup = async () => {
+  await open()
+  const dd = await strip()
+  const w = await readWeek(dd)
+  const aDate = dd[1].date, bDate = dd[2].date
+  await tapDay(aDate)
+  await openMove('dinner')
+  return { dd, w, aDate, bDate, dinnerA: w[aDate].dinner, breakfastB: w[bDate].breakfast }
+}
+const across = await acrossSetup()
+const { aDate: xA, bDate: xB, dinnerA: xDinner, breakfastB: xBreakfast } = across
+const options0 = await ev(`window.__mealOptions()`)
+check('no meal chips until a day is chosen', !(await has('[data-testid="meal-move-day-meals"]')))
+await reach(`[data-testid="meal-move-day-${xB}"]`)
+await ev(`document.querySelector('[data-testid="meal-move-day-${xB}"]').click()`)
+await wait(400)
+const chips = await ev(`[...document.querySelectorAll('[data-testid^="meal-move-day-meal-"]')].map(b => ({ slot: b.dataset.testid.replace('meal-move-day-meal-', ''), pressed: b.getAttribute('aria-pressed') === 'true', h: b.getBoundingClientRect().height, w: b.getBoundingClientRect().width }))`)
+check('a day chosen offers that day\'s three meals, the same meal already picked', chips.length === 3 && chips.filter(c => c.pressed).map(c => c.slot).join() === 'dinner', chips)
+check('...each a thumb-sized target', chips.every(c => c.h >= 44 && c.w >= 44), chips)
+await ev(`document.querySelector('[data-testid="meal-move-day-meal-breakfast"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-preview"]') || await has('[data-testid="meal-move-refusal"]')) break; await wait(150) }
+await wait(300)
+const xCard = await text('[data-testid="meal-move-preview"]')
+const xRows = await ev(`[...document.querySelectorAll('[data-testid="meal-move-preview"] > p')].map(p => p.innerText.replace(/\\s+/g, ' ').trim())`)
+check('choosing another meal shows a card, not a refusal', !!xCard && !(await has('[data-testid="meal-move-refusal"]')), await text('[data-testid="meal-move-refusal"]'))
+check('the breakfast chip is now the picked one, the dinner chip is not', await ev(`document.querySelector('[data-testid="meal-move-day-meal-breakfast"]').getAttribute('aria-pressed') === 'true' && document.querySelector('[data-testid="meal-move-day-meal-dinner"]').getAttribute('aria-pressed') === 'false'`))
+check('it names each meal, what it is now and the resized copy it becomes',
+  xRows.some(r => r.startsWith(`${long(xA)}'s dinner`) && r.includes(xDinner) && r.includes(`${xBreakfast} (as dinner)`))
+  && xRows.some(r => r.startsWith(`${long(xB)}'s breakfast`) && r.includes(xBreakfast) && r.includes(`${xDinner} (as breakfast)`)), xRows)
+check('...says they swap places AND that each is resized', new RegExp(`${long(xA)}'s dinner and ${long(xB)}'s breakfast swap places, and each is resized to fit the meal it lands in\\.`).test(xCard ?? ''), xCard)
+check('...and the leftover lunch the dinner feeds is on the card', new RegExp(`${long(xB)}'s lunch becomes`).test(xCard ?? ''), xCard)
+check('...one button that says what it does, on screen where the tap was', (await text('[data-testid="meal-move-confirm"]')) === 'Swap them' && (await inView('[data-testid="meal-move-confirm"]')) === true)
+check('NOTHING IS SAVED before the tap: no pick, no new option', (await ev(`window.__mealPicks()`)).length === 0 && (await ev(`window.__mealOptions()`)).length === options0.length)
+await shoot('meal-day-move-across-card')
+
+await reach('[data-testid="meal-move-confirm"]')
+await ev(`document.querySelector('[data-testid="meal-move-confirm"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-note"]')) break; await wait(150) }
+await wait(500)
+const xNote = await text('[data-testid="meal-move-note"]')
+check('it says what it did, each meal named', xNote === `${long(xA)}'s dinner and ${long(xB)}'s breakfast have swapped places, each resized to fit.`, xNote)
+const xPicks = await ev(`window.__mealPicks()`)
+check('both picks are saved, each naming the resized copy', xPicks.length === 2
+  && xPicks.some(p => p.date === xA && p.slot === 'dinner' && p.meal_name === `${xBreakfast} (as dinner)`)
+  && xPicks.some(p => p.date === xB && p.slot === 'breakfast' && p.meal_name === `${xDinner} (as breakfast)`), xPicks)
+const options1 = await ev(`window.__mealOptions()`)
+check('...and the two resized copies are options in their slots', options1.length === options0.length + 2
+  && options1.some(o => o.slot === 'dinner' && o.name === `${xBreakfast} (as dinner)`) && options1.some(o => o.slot === 'breakfast' && o.name === `${xDinner} (as breakfast)`), options1.slice(options0.length))
+check('the day now open shows the other day\'s breakfast as its dinner', (await meals()).dinner === `${xBreakfast} (as dinner)`, await meals())
+await tapDay(xB)
+check('the other day shows this dinner as its breakfast', (await meals()).breakfast === `${xDinner} (as breakfast)`, await meals())
+const weekX = await readWeek(across.dd)
+const changedX = []
+for (const d of across.dd) for (const slot of ['breakfast', 'lunch', 'dinner']) {
+  if ((d.date === xA && slot === 'dinner') || (d.date === xB && slot === 'breakfast')) continue
+  if (across.w[d.date][slot] !== weekX[d.date][slot]) changedX.push({ date: d.date, slot })
+}
+check('every other meal that changed was on the card before the tap', changedX.every(c => new RegExp(`${c.date === across.dd[0].date ? 'Today' : long(c.date)}'s ${c.slot} (becomes|goes from)`).test(xCard ?? '')) && changedX.length > 0, { changedX, xCard })
+console.log('\n[9b] Undo puts it all back')
+// No tapping about between the swap and the Undo: the note and its Undo live on
+// the row the swap was made from, and leaving the day closes that row.
+const back = await acrossSetup()
+const backOptions0 = await ev(`window.__mealOptions()`)
+// The count the open row prints beside Swap ("Swap · 4 options"): it reads the options the SCREEN holds, so it moves when a copy is added and must move back when one is taken away.
+const swapCount = () => ev(`(document.body.innerText.match(/Swap\\s*·\\s*(\\d+) options?/) || [])[1] ?? null`)
+const countBefore = await swapCount()
+await reach(`[data-testid="meal-move-day-${back.bDate}"]`)
+await ev(`document.querySelector('[data-testid="meal-move-day-${back.bDate}"]').click()`)
+await wait(300)
+await ev(`document.querySelector('[data-testid="meal-move-day-meal-breakfast"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-confirm"]')) break; await wait(150) }
+await wait(300)
+await reach('[data-testid="meal-move-confirm"]')
+await ev(`document.querySelector('[data-testid="meal-move-confirm"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-undo"]')) break; await wait(150) }
+await wait(300)
+const undoBtn = await ev(`(() => { const b = document.querySelector('[data-testid="meal-move-undo"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { h: r.height, w: r.width, text: b.textContent.trim() } })()`)
+check('an Undo sits beside the note, thumb-sized', !!undoBtn && undoBtn.text === 'Undo' && undoBtn.h >= 44 && undoBtn.w >= 44, undoBtn)
+check('...and is on screen where the swap was made', (await inView('[data-testid="meal-move-undo"]')) === true)
+check('...with the swap saved behind it (two picks, two resized copies)', (await ev(`window.__mealPicks()`)).length === 2 && (await ev(`window.__mealOptions()`)).length === backOptions0.length + 2)
+await shoot('meal-day-move-across-done')
+await ev(`document.querySelector('[data-testid="meal-move-undo"]').click()`)
+for (let i = 0; i < 40; i++) { if (/^Put back/.test(await text('[data-testid="meal-move-note"]') ?? '')) break; await wait(150) }
+await wait(500)
+const backNote = await text('[data-testid="meal-move-note"]')
+check('it says what it put back', backNote === `Put back: ${long(back.aDate)}'s dinner and ${long(back.bDate)}'s breakfast are as they were.`, backNote)
+check('...the Undo is gone: there is nothing left to undo', !(await has('[data-testid="meal-move-undo"]')))
+check('no pick is left behind', (await ev(`window.__mealPicks()`)).length === 0, await ev(`window.__mealPicks()`))
+check('...and the resized copies are taken out of the options again', JSON.stringify(await ev(`window.__mealOptions()`)) === JSON.stringify(backOptions0), (await ev(`window.__mealOptions()`)).length)
+check('the row shows the dinner it had', (await meals()).dinner === back.dinnerA, await meals())
+check('...and offers as many options as before: the removed copy is not left in the list', countBefore !== null && (await swapCount()) === countBefore, [countBefore, await swapCount()])
+await shoot('meal-day-move-across-undone')
+const weekBack = await readWeek(back.dd)
+check('the whole week reads exactly as it did before the swap', JSON.stringify(weekBack) === JSON.stringify(back.w), Object.keys(weekBack).filter(d => JSON.stringify(weekBack[d]) !== JSON.stringify(back.w[d])))
+
+console.log('\n[9c] Undo does not overwrite a meal she changed since')
+const again = await acrossSetup()
+await reach(`[data-testid="meal-move-day-${again.bDate}"]`)
+await ev(`document.querySelector('[data-testid="meal-move-day-${again.bDate}"]').click()`)
+await wait(300)
+await ev(`document.querySelector('[data-testid="meal-move-day-meal-breakfast"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-confirm"]')) break; await wait(150) }
+await wait(300)
+await reach('[data-testid="meal-move-confirm"]')
+await ev(`document.querySelector('[data-testid="meal-move-confirm"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-undo"]')) break; await wait(150) }
+// A pick the swap wrote is changed behind its back, the way a later swap would.
+await ev(`window.__mealPicks().find(p => p.slot === 'breakfast').meal_name = 'Something she chose after'`)
+const picksTampered = JSON.stringify(await ev(`window.__mealPicks()`))
+const optionsTampered = JSON.stringify(await ev(`window.__mealOptions()`))
+await ev(`document.querySelector('[data-testid="meal-move-undo"]').click()`)
+for (let i = 0; i < 40; i++) { if (/left both as they are/.test(await text('[data-testid="meal-move-note"]') ?? '')) break; await wait(150) }
+await wait(300)
+const refusedNote = await text('[data-testid="meal-move-note"]')
+check('it says why nothing was put back', refusedNote === "One of those meals has changed since, so I've left both as they are.", refusedNote)
+check('...neither day was touched', JSON.stringify(await ev(`window.__mealPicks()`)) === picksTampered && JSON.stringify(await ev(`window.__mealOptions()`)) === optionsTampered)
+check('...and the Undo stays, in case she wants it later', await has('[data-testid="meal-move-undo"]'))
+await shoot('meal-day-move-across-refused')
+
+console.log('\n[9d] An Undo that does not save says so and keeps the swap')
+const third = await acrossSetup()
+await reach(`[data-testid="meal-move-day-${third.bDate}"]`)
+await ev(`document.querySelector('[data-testid="meal-move-day-${third.bDate}"]').click()`)
+await wait(300)
+await ev(`document.querySelector('[data-testid="meal-move-day-meal-breakfast"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-confirm"]')) break; await wait(150) }
+await wait(300)
+await reach('[data-testid="meal-move-confirm"]')
+await ev(`document.querySelector('[data-testid="meal-move-confirm"]').click()`)
+for (let i = 0; i < 40; i++) { if (await has('[data-testid="meal-move-undo"]')) break; await wait(150) }
+const picksSwapped = JSON.stringify(await ev(`window.__mealPicks()`))
+await ev(`window.__failWrite = (t, op) => t === 'meal_plan_picks' && op === 'delete'`)
+await ev(`document.querySelector('[data-testid="meal-move-undo"]').click()`)
+await wait(1200)
+const failNote = await text('[data-testid="meal-move-note"]')
+check('it does not claim to have put anything back', !/^Put back/.test(failNote ?? '') && /./.test(failNote ?? ''), failNote)
+check('...the swap is still exactly as it was', JSON.stringify(await ev(`window.__mealPicks()`)) === picksSwapped)
+check('...and the Undo is still there to try again', await has('[data-testid="meal-move-undo"]'))
+await shoot('meal-day-move-across-undo-failed')
+await ev(`window.__failWrite = undefined`)
+await ev(`document.querySelector('[data-testid="meal-move-undo"]').click()`)
+for (let i = 0; i < 40; i++) { if (/^Put back/.test(await text('[data-testid="meal-move-note"]') ?? '')) break; await wait(150) }
+check('once the connection is back, Undo works', /^Put back/.test(await text('[data-testid="meal-move-note"]') ?? '') && (await ev(`window.__mealPicks()`)).length === 0)
+
 const errs = await ev(`window.__errors ?? []`)
 check('no page errors', (errs ?? []).length === 0, errs)
 

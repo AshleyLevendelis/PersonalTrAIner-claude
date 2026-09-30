@@ -55,17 +55,24 @@ type Preview =
   | { kind: 'refused'; reason: string }
   | { kind: 'ready'; diff: ProposalDiff; confirmLabel: string; run: () => Promise<string | null> }
 
+/** What a finished swap hands back so the row can offer to put it back. */
+export type MealMoveUndo = () => Promise<{ ok: boolean; text: string }>
+
 export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
   /** Moving to another meal today. Null where that is not offered (another day's row). */
   ctx: MealMoveContext | null
   /** Swapping with another day's. Null where the app has no days to swap between. */
   dayMove: { controller: MealDayMoveController; date: string; slot: MealSlotName } | null
   onPick?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
-  onDone: (summary: string) => void
+  /** `undo` is given for a swap between days only: the row shows it beside the summary. */
+  onDone: (summary: string, undo?: MealMoveUndo) => void
   onCancel: () => void
 }) {
   const [toSlot, setToSlot] = useState<MealSlotName | null>(null)
   const [toDate, setToDate] = useState<string | null>(null)
+  // WHICH MEAL ON THE OTHER DAY (30 Sep 2026). The same meal unless she picks
+  // another; a different meal swaps places with this one and both are resized.
+  const [toMeal, setToMeal] = useState<MealSlotName | null>(null)
   const [dayPlan, setDayPlan] = useState<MealDayMoveResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -106,12 +113,12 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
     setDayPlan(null)
     if (!toDate || !dayMove) return
     let live = true
-    dayMove.controller.plan({ meal_slot: dayMove.slot, from_date: dayMove.date, to_date: toDate })
+    dayMove.controller.plan({ meal_slot: dayMove.slot, from_date: dayMove.date, to_date: toDate, to_slot: toMeal ?? dayMove.slot })
       .then(r => { if (live) setDayPlan(r) })
       .catch(() => { if (live) setDayPlan({ ok: false, reason: DAY_MOVE.refusals.wouldNotHold }) })
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toDate, dayDate, daySlot])
+  }, [toDate, toMeal, dayDate, daySlot])
 
   const preview: Preview | null = useMemo(() => {
     if (toDate) {
@@ -123,9 +130,22 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
         diff: plan.diff,
         confirmLabel: 'Swap them',
         run: async () => {
-          const receipt = await dayMove!.controller.confirm(plan.payload)
+          const controller = dayMove!.controller
+          const receipt = await controller.confirm(plan.payload)
           if (receipt.failed.length > 0) return DAY_MOVE.failureLine(receipt.failed[0].error, receipt.landed.length > 0)
-          onDone(DAY_MOVE.done(dayMove!.slot, dayLabel(plan.payload.legs[0].date, dayMove!.controller.today), dayLabel(plan.payload.legs[1].date, dayMove!.controller.today)))
+          const [a, b] = plan.payload.legs
+          const dayA = dayLabel(a.date, controller.today)
+          const dayB = dayLabel(b.date, controller.today)
+          onDone(
+            a.slot === b.slot ? DAY_MOVE.done(a.slot, dayA, dayB) : DAY_MOVE.doneAcross(a.slot, dayA, b.slot, dayB),
+            // The same function the coach's Undo calls, handed the swap it made.
+            async () => {
+              const back = await controller.undo(plan.payload)
+              return back.failed.length > 0
+                ? { ok: false, text: back.failed[0].error }
+                : { ok: true, text: DAY_MOVE.undo.done(a.slot, dayA, b.slot, dayB) }
+            },
+          )
           return null
         },
       }
@@ -168,7 +188,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
     const r = el.getBoundingClientRect()
     if (r.height > floor - 8 || r.top < 0) window.scrollBy({ top: r.top - 8 })
     else if (r.bottom > floor) window.scrollBy({ top: r.bottom - floor })
-  }, [resultKind, toDate, toSlot, error])
+  }, [resultKind, toDate, toMeal, toSlot, error])
 
   const confirm = async () => {
     if (preview?.kind !== 'ready') return
@@ -197,7 +217,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
                   <button
                     key={s}
                     type="button"
-                    onClick={() => { setToDate(null); setToSlot(prev => (prev === s ? null : s)); setError(null) }}
+                    onClick={() => { setToDate(null); setToMeal(null); setToSlot(prev => (prev === s ? null : s)); setError(null) }}
                     className={`min-h-[44px] rounded-xl px-3.5 text-xs font-semibold ${
                       toSlot === s ? 'bg-primary text-primary-foreground' : 'bg-[color:var(--surface-base)] text-foreground'
                     }`}
@@ -212,14 +232,14 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
           {otherDays.length > 0 && dayMove && (
             <>
               <p className="text-[0.71875rem] text-muted-foreground">
-                {destinations.length > 0 ? 'Or swap it with' : 'Swap it with'} another day's {dayMove.slot}…
+                {destinations.length > 0 ? 'Or swap it with' : 'Swap it with'} another day…
               </p>
               <div className="flex flex-wrap gap-2" data-testid="meal-move-days">
                 {otherDays.map(d => (
                   <button
                     key={d}
                     type="button"
-                    onClick={() => { setToSlot(null); setToDate(prev => (prev === d ? null : d)); setError(null) }}
+                    onClick={() => { setToSlot(null); setToMeal(null); setToDate(prev => (prev === d ? null : d)); setError(null) }}
                     aria-label={d === dayMove.controller.today ? 'Today' : weekdayLong(d)}
                     aria-pressed={toDate === d}
                     // px-2.5, not the meal buttons' px-3.5: six days have to
@@ -234,6 +254,32 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
                   </button>
                 ))}
               </div>
+              {toDate && dayMove.controller.slots.length > 1 && (
+                <>
+                  <p className="text-[0.71875rem] text-muted-foreground">
+                    …with {toDate === dayMove.controller.today ? "today's" : `${weekdayLong(toDate)}'s`}
+                  </p>
+                  <div className="flex flex-wrap gap-2" data-testid="meal-move-day-meals">
+                    {dayMove.controller.slots.map(m => {
+                      const current = (toMeal ?? dayMove.slot) === m
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => { setToMeal(m === dayMove.slot ? null : m); setError(null) }}
+                          aria-pressed={current}
+                          className={`min-h-[44px] rounded-xl px-3.5 text-xs font-semibold ${
+                            current ? 'bg-primary text-primary-foreground' : 'bg-[color:var(--surface-base)] text-foreground'
+                          }`}
+                          data-testid={`meal-move-day-meal-${m}`}
+                        >
+                          {SLOT_LABEL[m]}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </>
           )}
         </>

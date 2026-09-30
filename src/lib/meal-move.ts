@@ -1,4 +1,4 @@
-import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
+import { verifyProposal, computeSlotBudgets, type RawProposal, type PoolOption } from './meal-generation'
 import { normaliseSlot, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
 import { parseIngredientLines, withQuantity, computeScaleFactor, isScaleFactorAbsurd, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
 import type { MacroTargets } from './types'
@@ -136,14 +136,18 @@ export function resizeMealTo(
  */
 export const movedName = (name: string, slot: MealSlotName) => `${name} (as ${slot})`
 
-function legFor(
-  input: BuildMealMoveInput,
+/**
+ * A MEAL RESIZED FOR THE SLOT IT LANDS IN, verified like every other meal.
+ * Shared by the same-day slot move (below) and the swap of two different meals
+ * across days (meal-day-move.ts), which is the same resize with a date on it,
+ * so the two cannot resize a meal two different ways.
+ */
+export function movedOptionFor(
   meal: CurrentMealForSlot,
-  fromSlot: MealSlotName,
   toSlot: MealSlotName,
   budget: MacroTargets,
-  date: string,
-): { leg: MealMoveLeg } | { err: string } {
+  rules: { dietaryPreferences: string[]; dislikedFoods?: string[] },
+): { option: PoolOption; beforeKcal: number; afterKcal: number } | { err: string } {
   const resized = resizeMealTo(meal, budget)
   if ('rejected' in resized) {
     return { err: `${meal.name} can't become ${slotWords(toSlot)} — ${resized.rejected}. Swap it for something else instead?` }
@@ -160,16 +164,29 @@ function legFor(
   // slot. Letting verifyProposal scale again would undo the fit the resize
   // exists to produce.
   const option = verifyProposal(
-    proposal, toSlot, budget, input.dietaryPreferences, rejectLog, input.dislikedFoods ?? [], undefined, true,
+    proposal, toSlot, budget, rules.dietaryPreferences, rejectLog, rules.dislikedFoods ?? [], undefined, true,
   )
   if (!option) return { err: explainRejection(rejectLog, meal.name, toSlot) }
+  return { option, beforeKcal: Math.round(meal.macros.calories), afterKcal: Math.round(option.macros.calories) }
+}
+
+function legFor(
+  input: BuildMealMoveInput,
+  meal: CurrentMealForSlot,
+  fromSlot: MealSlotName,
+  toSlot: MealSlotName,
+  budget: MacroTargets,
+  date: string,
+): { leg: MealMoveLeg } | { err: string } {
+  const moved = movedOptionFor(meal, toSlot, budget, input)
+  if ('err' in moved) return moved
   return {
     leg: {
       slot: toSlot,
       fromSlot,
-      payload: { slot: toSlot, date, option },
-      beforeKcal: Math.round(meal.macros.calories),
-      afterKcal: Math.round(option.macros.calories),
+      payload: { slot: toSlot, date, option: moved.option },
+      beforeKcal: moved.beforeKcal,
+      afterKcal: moved.afterKcal,
       originalName: meal.name,
     },
   }

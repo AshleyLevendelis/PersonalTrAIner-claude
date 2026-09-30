@@ -283,6 +283,12 @@ export const DAY_MOVE = {
   lead: (slot: string, day: string, otherDay: string) => `swap ${poss(day)} ${slot} with ${poss(otherDay)}`,
   swapped: (slot: string, day: string, otherDay: string) =>
     `${cap(poss(day))} ${slot} and ${poss(otherDay)} swap places, so both days keep a ${slot}.`,
+  /** Two DIFFERENT meals on two days (30 Sep 2026): Monday's dinner with Wednesday's lunch. */
+  leadAcross: (slot: string, day: string, otherSlot: string, otherDay: string) =>
+    `swap ${poss(day)} ${slot} with ${poss(otherDay)} ${otherSlot}`,
+  swappedAcross: (slot: string, day: string, otherSlot: string, otherDay: string) =>
+    `${cap(poss(day))} ${slot} and ${poss(otherDay)} ${otherSlot} swap places, and each is resized to fit the meal it lands in.`,
+  unchangedAcross: 'The foods in each meal — only how much of each changes, to fit the meal it lands in',
   /** One item: the card prints these after "Unchanged:". */
   unchanged: 'The meals themselves, their foods and their amounts — only which day each one is on',
   /** A card row's label: "Today's dinner", "Wednesday's dinner". */
@@ -308,6 +314,8 @@ export const DAY_MOVE = {
   became: (to: string) => `→ ${to}`,
   done: (slot: string, day: string, otherDay: string) =>
     `${cap(poss(day))} ${slot} and ${poss(otherDay)} have swapped places.`,
+  doneAcross: (slot: string, day: string, otherSlot: string, otherDay: string) =>
+    `${cap(poss(day))} ${slot} and ${poss(otherDay)} ${otherSlot} have swapped places, each resized to fit.`,
   /** No card, and why. None of these points at a control. */
   refusals: {
     noBody: "I need your height, weight, age and sex before I can work out how your days fit together — you can add them in Profile.",
@@ -315,6 +323,8 @@ export const DAY_MOVE = {
     whichDays: "Which two days did you mean? For example, Monday's dinner with Wednesday's.",
     outOfRange: 'I can only swap meals between today and the next six days — which days did you mean?',
     sameDay: "Those are the same day, so there's nothing to swap.",
+    sameDayOtherMeal: "Those two meals are on the same day. To trade two meals within a day, ask for one to move into the other's slot.",
+    noSuchMeal: (slot: string) => `Your plan doesn't have a ${slot} at the moment, so there's nothing to swap it with. You can change how many meals a day you eat in Profile.`,
     nothingThere: (slot: string, day: string) => `There's no ${slot} planned for ${day} to swap with.`,
     sameDish: (slot: string, day: string, otherDay: string) =>
       `${cap(poss(day))} ${slot} and ${poss(otherDay)} are already the same meal, so there's nothing to swap.`,
@@ -324,6 +334,22 @@ export const DAY_MOVE = {
     ledgerUnreadable: "I couldn't check what you've eaten today just then, so I can't move today's meals. Try again in a moment.",
     notInPlan: (day: string, slot: string) => `${cap(poss(day))} ${slot} isn't one of your saved options any more, so I can't move it.`,
     wouldNotHold: "I can't make that swap fit your plan.",
+  },
+  /** Putting a swap back. Every line says whether anything changed. */
+  undo: {
+    /** The claim alone, for a receipt whose title already says "Put back". */
+    asTheyWere: (slot: string, day: string, otherSlot: string, otherDay: string) =>
+      slot === otherSlot
+        ? `${cap(poss(day))} ${slot} and ${poss(otherDay)} are as they were.`
+        : `${cap(poss(day))} ${slot} and ${poss(otherDay)} ${otherSlot} are as they were.`,
+    /** The sheet's note, which has no title to carry the words. */
+    done: (slot: string, day: string, otherSlot: string, otherDay: string) =>
+      `Put back: ${DAY_MOVE.undo.asTheyWere(slot, day, otherSlot, otherDay)}`,
+    changed: "One of those meals has changed since, so I've left both as they are.",
+    eaten: (slot: string) => `You've logged today's ${slot} as eaten since, so I've left both as they are.`,
+    ledgerUnreadable: "I couldn't check what you've eaten today just then, so I've left both as they are. Try again in a moment.",
+    saveFailed: "I couldn't put them back just then, so nothing has changed. Try again in a moment.",
+    halfSaved: "Only half of it went back — try again to finish it.",
   },
   /** The sheet's line under a failed tap. `partial`: something did land, so it must not say "nothing". */
   failureLine: (why: string, partial: boolean) =>

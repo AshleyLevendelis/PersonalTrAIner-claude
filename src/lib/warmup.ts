@@ -628,9 +628,9 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
  * would silently overrun it.
  */
 export function getWarmupReserveSeconds(budgetSeconds: number): number {
-  // Roughly 15% of the session, floored at 5 minutes and capped at 12 — a
-  // 30-minute session cannot afford a 12-minute warm-up, and a 100-minute
-  // session does not need proportionally more.
+  // 20% of the session, floored at 6.5 minutes (390s) and capped at 14
+  // (840s) — a 30-minute session cannot afford a 14-minute warm-up, and a
+  // 100-minute session does not need proportionally more.
   return Math.max(390, Math.min(840, Math.round(budgetSeconds * 0.20)))
 }
 

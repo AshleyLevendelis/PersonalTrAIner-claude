@@ -25,7 +25,7 @@ import { rebuildDayAroundMainLift } from './session-rebuild'
 import { shortenDayTo } from './exercise-plan'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
-import { swapPoolMeal, clearMealPick, getMealPicksForDate, setMealPick, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
+import { swapPoolMeal, clearMealPick, getMealPicksForDate, getMealPicksForDates, setMealPick, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
 import { setSessionMove, setDeliberateRest, setMarkedMissed, setSwappedForActivity } from './daily-tracking'
 import { saveCardioLog } from './cardio-log-store'
@@ -667,6 +667,20 @@ export async function executeMealMove(
   return { landed, failed: [] }
 }
 
+/** What the swap and its undo need from the screen: showing saved picks, and re-reading the options. */
+export interface MealDayMoveDeps {
+  /** Puts saved picks on screen (state only, no write). `name: null` clears the pick. */
+  show: (updates: { date: string; slot: MealSlotName; name: string | null }[]) => void
+  /**
+   * Re-reads the pool after a resized copy was added or taken away. A pick
+   * names an option, so the screen has to know the option before it can show
+   * the pick; called before `show`. Absent where the swap adds nothing.
+   */
+  reloadPools?: () => Promise<void>
+}
+
+const dayMoveFailed = (error: string): PendingActionReceipt => ({ landed: [], failed: [{ op: 'propose_meal_day_move', error }] })
+
 /**
  * TWO DAYS TRADE A MEAL — Ashley's ruling, 29 Sep 2026: "they swap places",
  * across days. Two picks, BOTH OR NEITHER: a swap that lands one half is the
@@ -680,47 +694,137 @@ export async function executeMealMove(
  * and if a put-back itself fails the receipt says the swap is half saved and
  * names it, rather than "nothing has changed".
  *
- * No new writer: the pick is the one every swap, addition and edit already
- * makes (`setMealPick`), which also refuses a past date.
+ * TWO DIFFERENT MEALS (30 Sep 2026): each leg then also carries the other
+ * meal, resized to its slot, which is added to that slot's options first (the
+ * write the slot move makes) and taken away again if the swap does not land.
+ * The pick is the one every swap, addition and edit already makes
+ * (`setMealPick`), which also refuses a past date.
  */
 export async function executeMealDayMove(
   profileId: string,
   payload: MealDayMovePayload,
-  show: (updates: { date: string; slot: MealSlotName; name: string | null }[]) => void,
+  deps: MealDayMoveDeps,
 ): Promise<PendingActionReceipt> {
-  const written: MealDayMoveLeg[] = []
+  const written: { leg: MealDayMoveLeg; poolIndex: number | null }[] = []
+  const additionOf = (leg: MealDayMoveLeg): MealAdditionPayload | null =>
+    leg.option ? { slot: leg.slot, date: leg.date, option: leg.option } : null
+
+  /** Puts every written leg back to what it was; returns the ones that would not go. */
+  const putBack = async (): Promise<MealDayMoveLeg[]> => {
+    const stuck: MealDayMoveLeg[] = []
+    for (const w of [...written].reverse()) {
+      try {
+        const back = w.leg.previous
+          ? (await setMealPick(profileId, w.leg.date, w.leg.slot, w.leg.previous), true)
+          : await clearMealPick(profileId, w.leg.date, w.leg.slot)
+        if (!back) { stuck.push(w.leg); continue }
+        // The copy goes only once no pick names it.
+        const added = additionOf(w.leg)
+        if (added) await undoMealAddition(profileId, added, w.poolIndex)
+      } catch {
+        stuck.push(w.leg)
+      }
+    }
+    return stuck
+  }
+
   for (const leg of payload.legs) {
+    let poolIndex: number | null = null
+    const added = additionOf(leg)
     try {
-      await setMealPick(profileId, leg.date, payload.slot, leg.name)
-      written.push(leg)
+      if (added) {
+        const result = await executeMealAddition(profileId, added)
+        if (result.receipt.failed.length > 0) throw new Error('the resized meal did not save')
+        poolIndex = result.poolIndex
+      }
+      await setMealPick(profileId, leg.date, leg.slot, leg.name)
+      written.push({ leg, poolIndex })
     } catch (err) {
-      console.error('executeMealDayMove: a pick did not save — putting back what did', err)
+      console.error('executeMealDayMove: a write did not save — putting back what did', err)
+      // This leg's own copy may be in the pool without its pick.
+      if (added && poolIndex !== null) await undoMealAddition(profileId, added, poolIndex).catch(() => false)
       // Every leg already written goes back to what it was. A leg that will
       // not go back is left standing, SHOWN (the screen must match the store)
       // and named in the receipt as the half that landed.
-      const stuck: MealDayMoveLeg[] = []
-      for (const prior of written) {
-        try {
-          const back = prior.previous
-            ? (await setMealPick(profileId, prior.date, payload.slot, prior.previous), true)
-            : await clearMealPick(profileId, prior.date, payload.slot)
-          if (!back) stuck.push(prior)
-        } catch {
-          stuck.push(prior)
-        }
-      }
-      if (stuck.length === 0) {
-        return { landed: [], failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.why.saveFailed }] }
-      }
-      show(stuck.map(l => ({ date: l.date, slot: payload.slot, name: l.name })))
+      const stuck = await putBack()
+      if (stuck.length === 0) return dayMoveFailed(DAY_MOVE.why.saveFailed)
+      if (payload.legs.some(l => l.option)) await deps.reloadPools?.()
+      deps.show(stuck.map(l => ({ date: l.date, slot: l.slot, name: l.name })))
       return {
-        landed: stuck.map(l => `${l.date} ${payload.slot}: ${l.name}`),
+        landed: stuck.map(l => `${l.date} ${l.slot}: ${l.name}`),
         failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.why.halfSaved }],
       }
     }
   }
-  show(payload.legs.map(l => ({ date: l.date, slot: payload.slot, name: l.name })))
-  return { landed: payload.legs.map(l => `${l.date} ${payload.slot}: ${l.name}`), failed: [] }
+  // Only a swap that added options has anything to re-read; the pick alone
+  // resolves against the options the screen already holds.
+  if (payload.legs.some(l => l.option)) await deps.reloadPools?.()
+  deps.show(payload.legs.map(l => ({ date: l.date, slot: l.slot, name: l.name })))
+  return { landed: payload.legs.map(l => `${l.date} ${l.slot}: ${l.name}`), failed: [] }
+}
+
+/**
+ * PUTTING A DAY SWAP BACK (30 Sep 2026). The swap writes its own record, the
+ * payload: each leg names what it wrote and what was there before, so no
+ * second record is needed.
+ *
+ * ONLY WHEN BOTH DAYS STILL HOLD WHAT THE SWAP WROTE. An undo that restored a
+ * pick on a day she has swapped again since would overwrite her later choice
+ * with an earlier one; it says so and leaves both alone. A meal of today's
+ * that she has logged since is left alone too, for the reason the swap
+ * refuses to move one. Both picks or neither, and a resized copy is taken out
+ * of the options only once no pick names it.
+ */
+export async function undoMealDayMove(
+  profileId: string,
+  payload: MealDayMovePayload,
+  deps: MealDayMoveDeps & { today: string; loggedTodaySlots: MealSlotName[] | null },
+): Promise<PendingActionReceipt> {
+  for (const leg of payload.legs) {
+    if (leg.date !== deps.today) continue
+    if (deps.loggedTodaySlots === null) return dayMoveFailed(DAY_MOVE.undo.ledgerUnreadable)
+    if (deps.loggedTodaySlots.includes(leg.slot)) return dayMoveFailed(DAY_MOVE.undo.eaten(leg.slot))
+  }
+  let held: Record<string, Partial<Record<MealSlotName, string>>>
+  try {
+    held = await getMealPicksForDates(profileId, payload.legs.map(l => l.date))
+  } catch {
+    return dayMoveFailed(DAY_MOVE.undo.saveFailed)
+  }
+  for (const leg of payload.legs) {
+    if (held[leg.date]?.[leg.slot] !== leg.name) return dayMoveFailed(DAY_MOVE.undo.changed)
+  }
+
+  const restored: MealDayMoveLeg[] = []
+  for (const leg of payload.legs) {
+    try {
+      const ok = leg.previous
+        ? (await setMealPick(profileId, leg.date, leg.slot, leg.previous), true)
+        : await clearMealPick(profileId, leg.date, leg.slot)
+      if (!ok) throw new Error('the pick would not clear')
+      restored.push(leg)
+    } catch (err) {
+      console.error('undoMealDayMove: a pick did not go back — putting the swap back', err)
+      // Whatever was put back is swapped again, so the two days agree with
+      // each other; one that will not swap again is shown as it now stands.
+      const notSwappedAgain: MealDayMoveLeg[] = []
+      for (const prior of restored) {
+        try { await setMealPick(profileId, prior.date, prior.slot, prior.name) } catch { notSwappedAgain.push(prior) }
+      }
+      if (notSwappedAgain.length === 0) return dayMoveFailed(DAY_MOVE.undo.saveFailed)
+      deps.show(notSwappedAgain.map(l => ({ date: l.date, slot: l.slot, name: l.previous })))
+      return { landed: notSwappedAgain.map(l => `${l.date} ${l.slot}: ${l.previous ?? 'nothing picked'}`), failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.undo.halfSaved }] }
+    }
+  }
+  for (const leg of payload.legs) {
+    const added = leg.option ? { slot: leg.slot, date: leg.date, option: leg.option } : null
+    // A copy that will not go leaves an option nobody asked for, which does no
+    // harm before the strip ends; the meals are back, which is what she asked.
+    if (added) await undoMealAddition(profileId, added).catch(() => false)
+  }
+  if (payload.legs.some(l => l.option)) await deps.reloadPools?.()
+  deps.show(payload.legs.map(l => ({ date: l.date, slot: l.slot, name: l.previous })))
+  return { landed: payload.legs.map(l => `${l.date} ${l.slot}: ${l.previous ?? 'as it was'}`), failed: [] }
 }
 
 export interface InjuryAdaptationPayload {
