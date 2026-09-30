@@ -354,7 +354,9 @@
     "test:chat-groups": "tsx scripts/test-chat-groups.ts",
     "test:grocery-display": "tsx scripts/test-grocery-display.ts",
     "test:grocery-screen": "tsx scripts/test-grocery-screen.ts",
-    "test:chat-page": "tsx scripts/test-chat-page.ts"
+    "test:chat-page": "tsx scripts/test-chat-page.ts",
+    "test:meal-library": "tsx scripts/test-meal-library.ts",
+    "measure:meal-library": "tsx scripts/measure-meal-library.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

@@ -299,6 +299,30 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `meal-pool-size` (22 checks, 11 mutations), `meal-top-up` (131 checks, 30
   mutations in section 8), `verify:meal-top-up` (44 checks, 7 mutations),
   `verify:chat-top-up` (55 checks, 7 mutations), `meal-days` §3b
+- **A library of our own meals behind "more options"** — both surfaces since
+  30 Sep 2026, on her "search the Internet for hundreds of meals". Her ruling,
+  from three options: **write our own and check them**, over an open recipe
+  dataset and over copying sites (this cloud session cannot reach recipe sites
+  at all, the app recomputes every macro from its own food database and never
+  reads anyone's numbers, and the ingredient reader misreads ounces, pounds,
+  kilos, tins and pinches on roughly one line in six while coverage still reads
+  100%). 188 original dishes, no macros in them, used FIRST on the add path
+  only (the button, the swap list's find more, the coach's top-up) and the meal
+  writer asked only for the shortfall; every dish goes through the same
+  `verifyProposal` for the person. **MEASURED, AND IT IS THE POINT: a dish the
+  app ACCEPTS is not a dish it can SERVE.** Acceptance asks for the protein
+  floor; a day is on target at 0.95-1.15x. Raw dishes carried 1.2-2.1x a meal's
+  protein, a top-up said "added 6" and the week showed none. So each dish is
+  first re-portioned to the person's own meal (protein and carb foods only,
+  within a cook's "same dish") and PROVED through the scaler, which took
+  servable from 73-87% (model only) to 94-99%. Named limit: high-energy,
+  lower-protein targets get few good dishes; more low-density dishes fix that.
+  Not built: the model-driven builder script (her machine, key needed), seeding
+  fresh plans (hers), a "from our library" label, and the ingredient-amount
+  reader, which must land before any OUTSIDE recipe text is accepted.
+  `meal-library` (83 checks, 50 mutations), `measure:meal-library`,
+  `verify:meal-top-up` §8, `verify:chat-top-up` §8.
+  `docs/plans/meal-library.md`. Frontend only: no edge function, no migration
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
@@ -1855,6 +1879,32 @@ old — the commands were right and the context was missing.
   **Anything stored outside React that a screen must react to needs a state
   mirror beside the durable copy** — and the way to find the next one is to
   tap the control and look, not to read the handler.
+- **A CAP APPLIED BEFORE A FILTER STARVES THE FILTER.** 30 Sep 2026: the library
+  chooser handed back its best 40 dishes and the caller then checked each
+  against the person's diet. A vegan asking at an ordinary target got 3 of 4
+  vegan lunches when 13 exist and all 13 are servable, because the 40 were
+  ranked without knowing who was asking. The cap was right for bounding work
+  and wrong as a result limit. The chooser now ranks the whole meal (30 ms for
+  four) and the caller stops when it has enough. **A limit belongs AFTER the
+  checks that can reject, or the checks must be inside it.**
+- **A MODEL PICKS, THE REAL FUNCTION PROVES — AND THE PROOF IS WHAT MAKES THE
+  PICK SAFE.** Same day: a straight-line model of how a dish scales chose a
+  portion that the real scaler then refused by a gram, because whole grams and
+  whole eggs round. The model alone scored 73-87% servable; choosing the best
+  eight by the model and keeping the first that the scaler's own functions
+  accept scored 94-99%. Do not hand-copy a pipeline's arithmetic into a second
+  place and trust it: call the pipeline on the finalists.
+- **A PROPERTY BOUNDED IN TWO PLACES: MEASURE THE INNER ONE.** Also 30 Sep: a
+  0.5-2x scale band added to the fit sat inside the scaler's own 0.4-2.5x and
+  moved 2 of 752 cases. A MISSED mutation said so; the band was deleted rather
+  than given a check. The 19 Sep rule ("two mechanisms for one property") held
+  again, and again the evidence was a MISSED mutation, not a reading.
+- **AN EQUIVALENT MUTANT IS A FINDING TO RECORD, NOT A CHECK TO INVENT.** Also
+  30 Sep: passing `false` where a list belonged threw inside a try/catch that
+  contained it, so "library used even when switched off" changed nothing a
+  driver could see. The source check pins the guard; the report says the
+  behaviour is identical. Writing a behavioural check for a difference that
+  does not exist would have produced a check nobody could see fail.
 - **A FUNCTION HANDED TO A STATE SETTER IS CALLED, NOT STORED.** 30 Sep 2026: a
   swap's Undo was kept in row state with `setUndo(undo ?? null)`. React reads
   a function argument as an UPDATER and runs it, so every swap was undone the

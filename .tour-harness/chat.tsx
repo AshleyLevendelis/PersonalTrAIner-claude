@@ -35,6 +35,7 @@ import { getPools } from '@/lib/meal-store'
 import { computeMealMacros } from '@/lib/food-db'
 import { computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { topUpPlan, topUpMealPlan, previewTopUpStart } from '@/lib/meal-top-up'
+import { MEAL_LIBRARY } from '@/lib/meal-library-data'
 import { buildRotation, pinsFromPicks } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
 import type { MacroTargets, Meal, MealPlanDay, UserProfile } from '@/lib/types'
@@ -474,6 +475,8 @@ const finishedSession = SEED_NUDGE
 // list, and the run is the app's own topUpMealPlan. The one thing faked is
 // the meal generator, in the driver, at the fetch boundary.
 const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
+// ?library=off — see real.tsx: a scenario about the meal WRITER switches the library off.
+const LIBRARY_OFF = new URLSearchParams(location.search).get('library') === 'off'
 // ?topfit=1 (with topup=1) — SEVEN DISHES A MEAL, ONLY TWO DINNERS THAT FIT
 // (30 Sep 2026): the coach's card for a plan that is the right size and still
 // repeats. Every dish is sized to the profile's own slot budgets, so which of
@@ -625,6 +628,7 @@ function Harness() {
     ;(window as unknown as Record<string, unknown>).__topUpPlan = () => (macros ? JSON.parse(JSON.stringify(topUpPlan(pools as never, topUpSlots as never, macros))) : null)
   }, [pools])
   useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__libraryNames = MEAL_LIBRARY.map(d => d.name)
     ;(window as unknown as Record<string, unknown>).__topUpPools = () => Object.fromEntries(Object.entries(pools).map(([k, v]) => [k, (v ?? []).length]))
   }, [pools])
   return (
@@ -663,7 +667,7 @@ function Harness() {
               onMealTopUpConfirm={TOPUP && macros ? async () => {
                 const r = await topUpMealPlan({
                   profileId: PROFILE_ID, today: isoOf(anchorDate()), needs: topUpPlan(pools as never, topUpSlots as never, macros).needs,
-                  generation: { targets: macros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: 3, includeSnacks: false },
+                  generation: { targets: macros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: 3, includeSnacks: false, ...(LIBRARY_OFF ? { library: false as const } : {}) },
                 })
                 if (r.added > 0) await reloadPools()
                 return r

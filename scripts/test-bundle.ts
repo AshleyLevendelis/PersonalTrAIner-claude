@@ -493,7 +493,23 @@ console.log('\n3. Nothing has crept back up')
   // and the hook's plan and confirm. The builder and the sheet are lazy; the
   // three figures a person WAITS for moved by 6, 3 and 2 kB. 2,055 is 20 above
   // the 2,035 measured, the same shape as every entry above.
-  const TOTAL_BUDGET_KB = 2055
+  // 30 Sep 2026: 2,055 -> 2,116, for the meal library (Ashley: "add hundreds more
+  // meals"; docs/plans/meal-library.md). MEASURED BOTH ENDS through THIS gate,
+  // the base on a clean worktree of the previous commit:
+  //     e77adc0d, before   total 2045   app 953   paint 425   deploy 270
+  //     after              total 2096   app 955   paint 426   deploy 271
+  //     after the fit      total 2098   app 957   (the portion fit, 2 kB of code)
+  // The base had 10 kB left. 188 original dishes are 50 kB of DATA in a chunk of
+  // their own that only "more options" fetches (the three figures a person
+  // waits for moved by 2, 1 and 1 kB: the chooser). Content, not code, but this
+  // number counts every byte shipped wherever it lives, and that is left as it
+  // is on purpose: moving the data out of the count would change what the
+  // metric measures, which is hers to decide, so the budget rises by what was
+  // measured. The library is meant to GROW, so the next hundred dishes will
+  // raise it again; the headroom line prints the remainder every run, and the
+  // data is the first thing to move to a file fetched on demand if that
+  // becomes the larger half of this figure. 2,116 is 18 above the 2,098 measured.
+  const TOTAL_BUDGET_KB = 2116
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

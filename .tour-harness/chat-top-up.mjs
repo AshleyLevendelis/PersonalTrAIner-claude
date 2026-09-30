@@ -109,8 +109,12 @@ const setValue = `(el, v) => {
   Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, v)
   el.dispatchEvent(new Event('input', { bubbles: true }))
 }`
-const load = async qs => {
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?topup=1&${qs}` })
+// EVERY SCENARIO ABOUT THE MEAL WRITER runs with the library off (30 Sep 2026): a
+// "more options" ask now goes to the library first, so a cut-off reply or "how
+// many was the writer asked for" is only a question with the library switched
+// off. [8] is the one that runs with it on.
+const load = async (qs, library = 'off') => {
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?topup=1&library=${library}&${qs}` })
   await wait(3500)
   let ready = await ev(`!!document.querySelector('textarea')`)
   for (let i = 0; i < 20 && !ready; i++) { await wait(500); ready = await ev(`!!document.querySelector('textarea')`) }
@@ -265,6 +269,38 @@ check('...and it says the truth: plenty of dishes, few that fit, and why nothing
 check('...without the false "nothing to add" claim, or a control to press', !/nothing to add/.test(crowded.text) && !/Nutrition tab|Regenerate|button/i.test(crowded.text.split("top them up").pop() ?? ''), crowded.text.slice(-300))
 check('nothing was generated', (await ev(`window.__generateCalls`)) === 0)
 await shoot('chat-top-up-crowded')
+
+console.log('\n[8] With the library on, the coach\'s top-up is filled from it and the meal writer is never asked')
+check('a fresh plan of five, the library on', await load('', 'on'))
+const libBefore = await ev(`window.__topUpPools()`)
+check('the sanity check: every meal has five options', JSON.stringify(libBefore) === JSON.stringify({ breakfast: 5, lunch: 5, dinner: 5 }), libBefore)
+const libNames = await ev(`window.__libraryNames`)
+check('the fixture is under pressure: the library is on the page and is large', Array.isArray(libNames) && libNames.length >= 150, libNames?.length)
+check('her sentence goes', await say('Can you give me more meal options please'))
+let libCard = await ev(READ)
+for (let i = 0; i < 60 && !(libCard.hasCard && /\?/.test(libCard.text)); i++) { await wait(500); libCard = await ev(READ) }
+check('the card is the same card: she is asked first', libCard.hasCard === true && /Want me to add more options to each of your meals\?/.test(libCard.text), libCard.btns)
+check('nothing is made or stored before the tap', (await ev(`window.__generateCalls`)) === 0 && (await rowsOnPage()) === 15)
+check('Apply', await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => /^Apply/.test((x.textContent || '').trim()))
+  if (!b || b.disabled) return false
+  b.click(); return true
+})()`))
+let libAfter = await ev(READ)
+for (let i = 0; i < 80 && !/\bAdded\b/.test(libAfter.text); i++) { await wait(500); libAfter = await ev(READ) }
+check('a receipt says Added, a line per meal, two options each', /\bAdded\b/.test(libAfter.text) && ['Breakfast', 'Lunch', 'Dinner'].every(m => new RegExp(`${m}[\\s\\S]{0,12}\\+2 options`).test(libAfter.text)), libAfter.text.slice(-500))
+check('THE MEAL WRITER WAS NEVER ASKED: the library filled it', (await ev(`window.__generateCalls`)) === 0, await ev(`window.__generateCalls`))
+check('every meal now has seven options', JSON.stringify(await ev(`window.__topUpPools()`)) === JSON.stringify({ breakfast: 7, lunch: 7, dinner: 7 }), await ev(`window.__topUpPools()`))
+const addedRows = await ev(`window.__fakeDb.meal_plan_slots.filter(r => (r.tags || []).some(t => String(t).startsWith('new-from:'))).map(r => ({ slot: r.slot, name: r.name }))`)
+check('the six new meals are library dishes, two to a meal', addedRows.length === 6 && addedRows.every(r => libNames.includes(r.name)) && ['breakfast', 'lunch', 'dinner'].every(m => addedRows.filter(r => r.slot === m).length === 2), addedRows)
+check('...each carrying its first day, like any added dish', (await ev(`window.__fakeDb.meal_plan_slots.filter(r => (r.tags || []).some(t => t === 'new-from:${START}')).length`)) === 6)
+const libMacros = await ev(`window.__fakeDb.meal_plan_slots.filter(r => (r.tags || []).some(t => String(t).startsWith('new-from:'))).map(r => r.macros)`)
+check('...with macros the app worked out (every one has calories and protein)', libMacros.every(m => m && (m.kcal > 0 || m.calories > 0) && m.protein > 0), libMacros)
+// THE DISHES ARE FITTED TO HER MEALS, NOT ONLY SCALED: a dish cooked for this person carries about the protein her targets ask of each calorie, not twice it.
+const libTargets = await ev(`window.__mealDay.targets`)
+const libDensity = libMacros.map(m => (m.protein / (m.kcal || m.calories)) / (libTargets.protein / libTargets.calories))
+check('...and each is fitted to her meal: no more than 1.3x the protein her targets ask of a calorie (as written they run 1.5-3x)', libDensity.length === 6 && libDensity.every(x => x <= 1.3), libDensity.map(x => Math.round(x * 100) / 100))
+await shoot('chat-top-up-library-receipt')
 
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)

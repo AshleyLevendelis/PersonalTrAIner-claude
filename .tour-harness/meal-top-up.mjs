@@ -103,8 +103,12 @@ const tapButton = async label => {
 // same-page jump to its #fragment and reloads nothing — which read, the first
 // time, as "a fresh plan does not offer again".
 let loads = 0
-const load = async qs => {
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&topup=1&load=${++loads}&${qs}#/tab/nutrition` })
+// EVERY SCENARIO ABOUT THE MEAL WRITER runs with the library off (30 Sep 2026): a
+// "more options" ask goes to the library first, so a cut-off reply, or new
+// meals named "Fresh ...", are only true with the library switched off. [8] is
+// the one that runs with it on.
+const load = async (qs, library = 'off') => {
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&topup=1&library=${library}&load=${++loads}&${qs}#/tab/nutrition` })
   for (let i = 0; i < 60; i++) { if (await has('[data-meal-day]')) break; await wait(200) }
   await wait(700)
 }
@@ -263,6 +267,51 @@ check('"Not now" hides the fit offer', (await offerText()) === null)
 await load('topfit=1')
 check('...and it stays hidden when she comes back', (await offerText()) === null)
 await clearDismissal()
+
+
+console.log('\n[8] With the library on: more options come from it, the held days do not move, and the writer is never asked')
+await load('', 'on')
+await clearDismissal()
+await load('', 'on')
+const days8 = await strip()
+const libNames8 = await ev(`window.__libraryNames`)
+check('the fixture is under pressure: the library is on the page and large', Array.isArray(libNames8) && libNames8.length >= 150, libNames8?.length)
+for (const d of days8.slice(1, HELD)) {
+  await tapDay(d)
+  await ev(`document.querySelector('[data-testid="meal-day-add-grocery"]')?.click()`)
+  for (let i = 0; i < 30; i++) { if ((await ev(`document.querySelector('[data-testid="meal-day-grocery"]')?.dataset.state`)) === 'added') break; await wait(150) }
+}
+await tapDay(days8[0])
+const before8 = await readWeek()
+await tapButton('Get more options')
+for (let i = 0; i < 60; i++) { if (await has('[data-testid="meal-top-up-note"]')) break; await wait(150) }
+await wait(500)
+const done8 = await note()
+check('the receipt says how many were added, and from which day', done8?.text === `Added 6 new meals. They start on ${weekday(days8[HELD])}; every day before then stays as it was.`, done8)
+check('...marked as a success, where she can see it', done8?.failed === 'false' && done8?.onScreen === true, done8)
+check('THE MEAL WRITER WAS NEVER ASKED: the library filled it', (await ev(`window.__generatorCalls`)) === 0, await ev(`window.__generatorCalls`))
+const after8 = await readWeek()
+const same8 = n => after8[n]?.shown === before8[n]?.shown
+check('today and every shopping-list day are exactly as they were', [0, 1, 2, 3].every(same8), [0, 1, 2, 3].filter(n => !same8(n)).map(n => ({ before: before8[n]?.shown, after: after8[n]?.shown })))
+const rows8 = await ev(`window.__mealOptions()`)
+const pools8 = rows8.filter(r => libNames8.includes(r.name))
+check('six library dishes were added to her meals, two to each', pools8.length === 6 && ['breakfast', 'lunch', 'dinner'].every(m => pools8.filter(r => r.slot === m).length === 2), pools8)
+const libDay = after8.findIndex((d, i) => i >= HELD && Object.values(d.names).some(n => libNames8.includes(n)))
+check('a library dish is served from the first new day on, and on no earlier day', libDay >= HELD && !after8.slice(0, HELD).some(d => Object.values(d.names).some(n => libNames8.includes(n))), { libDay, served: after8.map(d => Object.values(d.names)) })
+// A LIBRARY DISH, OPENED: its method is shown, and the app's bookkeeping is not.
+const libSlot = libDay >= 0 ? Object.entries(after8[libDay].names).find(([, n]) => libNames8.includes(n))?.[0] : null
+if (libDay >= 0) await tapDay(days8[libDay])
+if (libSlot) { await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('button')?.click()`); await wait(400) }
+const libCard = await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('.py-4')?.innerText ?? ''`)
+const method = await ev(`document.querySelector('[data-meal-method]')?.innerText ?? ''`)
+check('opened, a library dish shows how to cook it', !!libSlot && method.length > 20, { libSlot, method })
+check('...names its cuisine, and shows none of the app\'s bookkeeping', libCard.length > 0 && !/new-from/.test(libCard), libCard.slice(0, 200))
+await shoot('meal-top-up-library-dish')
+if (libSlot) { await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('button')?.click()`); await wait(300) }
+await tapDay(days8[0])
+const listed8 = await ev(`window.__groceryRows().then(r => [...new Set(r.flatMap(x => x.meal_refs).map(m => m.date))].sort())`)
+check('the shopping list still covers exactly the days it did', JSON.stringify(listed8) === JSON.stringify(days8.slice(1, HELD)), listed8)
+await shoot('meal-top-up-library-done')
 
 const errs = await ev(`window.__errors ?? []`)
 check('no page errors', (errs ?? []).length === 0, errs)

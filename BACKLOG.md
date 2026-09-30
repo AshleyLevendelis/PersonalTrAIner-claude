@@ -2,8 +2,103 @@
 
 Newest first. One line each.
 
-- [ ] **MORE MEALS FROM THE INTERNET — INVESTIGATED, NOT BUILT, WAITING ON
-  HER CHOICE OF SOURCE — 30 Sep 2026.** Ashley: *"We should add more meals, it
+- [x] **A LIBRARY OF OUR OWN MEALS BEHIND "MORE OPTIONS" — BUILT 30 Sep 2026,
+  her ruling.** Ashley: *"We should add more meals ... search the Internet for
+  hundreds of meals with recipes and cooking instructions and macros."* The
+  entry below this one set out why copying the internet does not work here.
+  **Her ruling, from three options: write our own and check them** (over an open
+  recipe dataset and over copying recipe sites). Plan: `docs/plans/meal-library.md`.
+  **WHAT IS BUILT.** 188 original dishes (42 breakfasts, 55 lunches, 63 dinners,
+  28 snacks, 21 cuisines from the app's own list), written in grams or plain
+  counts from foods the app can cost, each with a method that names no amount.
+  **The library holds NO macros**: the app works them out for the person at the
+  moment a dish is offered. It is used on the ADD path only (Nutrition "more
+  options", the swap list's find more, the coach's top-up), before the meal
+  writer is asked; the writer supplies only the shortfall. A fresh plan and a
+  regenerate are unchanged. Data is its own lazily loaded chunk, no migration.
+  Every dish goes through `verifyProposal` for the person, the function every
+  generated dish goes through, so diet (fail-closed), dislikes, coverage and the
+  slot budget still decide. `meal-library-data.ts`, `meal-library.ts`,
+  `meal-generation.ts` (`considerProposal` extracted; one route for both sources).
+  **THE FINDING THAT SHAPED IT, measured before the fit existed.** The first 188
+  dishes passed `verifyProposal` and almost none could be SERVED: against six
+  real targets a typical dish carried 1.2-2.1x the meal's protein (median by
+  target and meal), while a day is only on target at 0.95-1.15x, and the check
+  that accepts a dish asks only for the protein FLOOR. A top-up reported "added 6
+  new meals" and the week never showed one (the driver's libDay was -1). Same
+  trap as "seven dishes of which two fit is not seven options", one layer
+  earlier: acceptance and servability are different tests. Measured, "good"
+  dishes (protein within 1.2x, carbs and fat within 30%) per meal were 0-7.
+  **THE FIT.** Before a dish is offered, its protein foods and carb foods are
+  re-portioned to the meal's own budget, within a cook's "same dish" (protein
+  0.55-1.35x, carbs 0.5-2x); vegetables, fats, sauces and every counted item stay
+  as written. A straight-line model picks the candidates; the best eight are then
+  PROVED through the scaler's own functions, because rounding (whole grams, whole
+  eggs) moved protein by more than the model could see. The first version
+  (model only) let the carb and fat terms pull protein under the floor and
+  scored 73-87% servable; the proof took it to 94-99% (breakfast 94, lunch 99,
+  dinner 98, snack 98; none under 60%, none never served). After: good-fit dishes
+  per meal at the 1,700-2,700 kcal targets run 6-10 breakfasts, 22-26 lunches,
+  25-30 dinners, 4-6 snacks. **NAMED, NOT FIXED: a high-energy, lower-protein
+  target (3,040 kcal / 160 g) still gets few (breakfast 10, lunch 6, dinner 14,
+  snack 2),** because the library is protein-dense and the fit will not turn a
+  chicken dish into a rice dish; more low-protein-density dishes fix that.
+  **TWO THINGS MEASURED AND CHANGED.** (a) A candidate cap of 40 applied BEFORE
+  the diet check starved it: a vegan asking at a mainstream target got 3 of 4
+  vegan lunches when 13 exist and every one is servable. The chooser now ranks
+  the whole meal (30 ms for four meals) and the caller stops once it has
+  enough. (b) A scale band I added to the fit (0.5-2x) moved 2 of 752 cases
+  against the scaler's own 0.4-2.5x; two mechanisms for one property, measured,
+  the inert one deleted.
+  **CSCS REVIEW (her delegation), answers:** (1) effect: more variety inside the
+  same calorie and protein targets; each dish is fitted to the person's own
+  meal, which is what a coach does with a plate. (2) takes away: the writer is
+  asked less often on the add path; its steering (cuisine, likes, cooking time)
+  is reproduced in the ranking. (3) fundamentals: protein floor, calorie band,
+  scale limits unchanged; nothing is prescribed differently. (4) no floor or
+  ceiling moved: the fit READS `meetsProteinFloor`, `isWithinCalorieTolerance`
+  and the scale limits. (5) scope: not clinical; allergens stay with the
+  fail-closed diet check.
+  **GATES.** `test:meal-library` (83 checks; 50 mutations across the chooser,
+  fit, wiring and data, 50 caught). The round found 13 MISSED first and each was
+  a real gap or a real equivalence: the variety bonus and "loves cooking" had no
+  fixture where they bind; an unreadable library was never exercised; a line in
+  ounces passed as "a count of oz" (the reader's misreading, now refused at the
+  source); a dairy fit and the 5 g clamp had no dish that reached them; the
+  carb/fat terms cost 17-19% of the good-fit dishes and the thresholds were too
+  loose to see it. Two were equivalent and are recorded as such, not "fixed":
+  the chooser's `haveNames` and exotic-cap wiring are also enforced by
+  `considerProposal`, so only the ORDER would show a slip, and the gate pins the
+  wiring as source; and `library used even when switched off` is harmless
+  because the TypeError is contained by the library's own try/catch, so the
+  gate pins the guard as source. `verify:meal-top-up` [8] (54 checks) and
+  `verify:chat-top-up` [8] (69): the library fills the ask, the writer is never
+  called, today and the shopping-list days do not move by a gram, a library dish
+  is served from the first new day, shows its method, and carries no
+  bookkeeping label; 11 driver mutations, 8 caught, the 3 missed were the 2
+  equivalents above and the fit proof, which the gate catches instead. A run was
+  killed by the tool's ten-minute limit mid-mutation and left one line removed
+  from `meal-generation.ts`; it was found by counting the line, restored, and
+  the bundle rebuilt before the next run (the 19 Sep rule, again).
+  `test:bundle`: total budget 2,045 -> 2,116 kB for the 50 kB data chunk,
+  measured both ends that day (2,045 before, 2,096 after). **Moving data out of
+  the budget's count is hers to decide**; it was raised, not bypassed.
+  **NOT BUILT, NAMED:** the model-driven script that asks the writer for more
+  dishes and keeps only those that pass (needs her model key, so it runs on her
+  machine, and a mocked end-to-end gate comes first, per the exam-runner
+  lesson); seeding fresh plans from the library (hers to rule); a visible "from
+  our library" label; the ingredient-amount reader (ounces, pounds, kilos, tins,
+  pinch; `cup` per food), still its own open item below and the thing that must
+  land before any OUTSIDE recipe text is accepted.
+  **DEPLOYS:** frontend only (merge to `main`, her word); no edge function, no
+  migration. The top-up works without a `chat-gemini` deploy for the library
+  half, but the coach's card wording still needs the earlier `chat-gemini`
+  deploy. **PROVEN LIVE:** nothing; proven by gate and by driver on the test rig.
+
+- [x] **MORE MEALS FROM THE INTERNET — INVESTIGATED; SUPERSEDED THE SAME DAY by
+  the library entry above (she chose to write our own). CORRECTED: the header
+  said "waiting on her choice of source"; she has chosen. The findings below are
+  kept because the ingredient-reader item in them is still open.** Ashley: *"We should add more meals, it
   must be so easy to search the Internet for hundreds of meals with recipes and
   cooking instructions and macros which we can take and ingest into the app as
   options."* Report only so far (a dietary-enforcement path: plan before build).

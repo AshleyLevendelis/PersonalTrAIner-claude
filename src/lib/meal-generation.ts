@@ -38,6 +38,7 @@ import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from '
 import { isMissingColumnError } from './missing-column'
 import { tagsNewFrom } from './meal-new-from'
 import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
+import { chooseFromLibrary, loadMealLibrary } from './meal-library'
 
 export const MIN_COVERAGE = 0.8
 /**
@@ -682,6 +683,12 @@ export async function generateMealPools(params: {
    * 28 Sep 2026. See meal-new-from.ts.
    */
   servedFrom?: string
+  /**
+   * The library of original dishes (meal-library-data.ts) is used first when
+   * appendToExisting is set. Pass `false` to ask only the meal writer, or a
+   * list to use instead of the real library (a gate's small fixture).
+   */
+  library?: readonly RawProposal[] | false
 }): Promise<GenerateMealPoolsResult> {
   const poolSize = params.poolSize ?? DEFAULT_POOL_SIZE
   const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks)
@@ -734,6 +741,96 @@ export async function generateMealPools(params: {
     for (const slot of Object.keys(grown) as MealSlotName[]) persistedCount[slot] = accepted[slot]?.length ?? 0
   }
 
+  /**
+   * ONE PROPOSAL, THROUGH EVERY CHECK. Everything that arrives — from the meal
+   * writer or, when she is asking for more, from the library — goes through the
+   * same function, so a dish is never accepted by a route that skips a rule
+   * (30 Sep 2026: the loop that used to sit inline in the round below).
+   */
+  const considerProposal = (proposal: RawProposal): void => {
+    const slot = proposal.slot as MealSlotName
+    if (!activeSlots.includes(slot)) return
+    if ((accepted[slot]?.length ?? 0) >= poolSize) return
+
+    const budget = budgets[slot]
+    if (!budget) return
+
+    const existing = existingBySlot[slot] ?? []
+    const isExoticProposal = EXOTIC_CUISINES.has(proposal.cuisine)
+    const poolAlreadyHasExotic = (accepted[slot]?.some(isExoticOption) ?? false) || existing.some(isExoticOption)
+    if (isExoticProposal && poolAlreadyHasExotic) {
+      rejectionLog.push(`[${slot}] "${proposal.name}": pool already has an exotic-cuisine option — cuisine coherence cap (${proposal.cuisine})`)
+      return
+    }
+
+    // Fix 4.3 (ux-sweep) — nothing here checked for a same-named proposal
+    // already in the pool, so a proposal round could (and did, live) add
+    // "Greek Yoghurt Pancakes" twice at slightly different kcal, which
+    // then broke the swap UI downstream: its by-name filter for "options
+    // other than the chosen one" only strips ONE reading of a duplicate
+    // name, so the other duplicate survived as an "option" that was
+    // actually just the meal already showing, with a stale delta against
+    // itself, and the "N options" count coming out of the same list —
+    // wrong in lockstep with it. Rejecting the duplicate at its actual
+    // source keeps that whole downstream chain honest without needing to
+    // special-case it again at render time.
+    const normalizedName = proposal.name.trim().toLowerCase()
+    if (accepted[slot]?.some(o => o.name.trim().toLowerCase() === normalizedName)
+      || existing.some(o => o.name.trim().toLowerCase() === normalizedName)) {
+      rejectionLog.push(`[${slot}] "${proposal.name}": duplicate name already in this slot's pool`)
+      return
+    }
+
+    const slotTimingDislikes = (params.timingRules ?? [])
+      .filter(r => r.anchor === 'slot' && r.slot === slot)
+      .map(r => r.subject)
+    const effectiveDislikes = [...(params.dislikedFoods ?? []), ...slotTimingDislikes]
+    const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences)
+    if (option) {
+      accepted[slot]!.push(params.appendToExisting && params.servedFrom
+        ? { ...option, tags: tagsNewFrom(option.tags, params.servedFrom) }
+        : option)
+    }
+  }
+
+  /**
+   * THE LIBRARY FIRST, WHEN SHE IS ASKING FOR MORE (30 Sep 2026; Ashley: "add
+   * hundreds more meals", docs/plans/meal-library.md). The original dishes in
+   * the library cost nothing to fetch and work offline; each goes through
+   * considerProposal like any other, so the diet check, her dislikes, the food
+   * database and the slot budget all still decide. The meal writer is asked
+   * only for what the library could not supply, by the loop below: `remaining`
+   * is worked out from what has been accepted.
+   *
+   * Only the add path. A fresh plan and a regenerate still ask the writer,
+   * whose steering (cuisines, cooking time, likes) is the plan's first shape;
+   * whether the library should seed those too is hers to rule.
+   */
+  if (params.appendToExisting && params.library !== false) {
+    try {
+      const library = params.library ?? await loadMealLibrary()
+      const liked = steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences).foods
+      for (const slot of activeSlots) {
+        const existing = existingBySlot[slot] ?? []
+        const candidates = chooseFromLibrary(library, {
+          slot,
+          haveNames: existing.map(o => o.name),
+          haveCuisines: existing.map(o => o.tags[0] ?? ''),
+          exoticCuisines: EXOTIC_CUISINES,
+          favoriteCuisines: params.favoriteCuisines,
+          cookingTime: params.cookingTimePreference,
+          likedFoods: liked,
+          rotation: existing.length,
+          budget: budgets[slot],
+        })
+        for (const dish of candidates) considerProposal(dish)
+      }
+    } catch (err) {
+      // The library is a convenience. Without it the meal writer is asked for everything, as before.
+      rejectionLog.push(`[library] could not be read: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   for (let round = 0; round < MAX_GENERATION_ROUNDS; round++) {
     const remaining: Partial<Record<MealSlotName, number>> = {}
     for (const slot of activeSlots) {
@@ -782,51 +879,7 @@ export async function generateMealPools(params: {
       }
     })
     if (settled.every(r => r.status === 'rejected')) continue
-    for (const proposal of proposals) {
-      const slot = proposal.slot as MealSlotName
-      if (!activeSlots.includes(slot)) continue
-      if ((accepted[slot]?.length ?? 0) >= poolSize) continue
-
-      const budget = budgets[slot]
-      if (!budget) continue
-
-      const existing = existingBySlot[slot] ?? []
-      const isExoticProposal = EXOTIC_CUISINES.has(proposal.cuisine)
-      const poolAlreadyHasExotic = (accepted[slot]?.some(isExoticOption) ?? false) || existing.some(isExoticOption)
-      if (isExoticProposal && poolAlreadyHasExotic) {
-        rejectionLog.push(`[${slot}] "${proposal.name}": pool already has an exotic-cuisine option — cuisine coherence cap (${proposal.cuisine})`)
-        continue
-      }
-
-      // Fix 4.3 (ux-sweep) — nothing here checked for a same-named proposal
-      // already in the pool, so a proposal round could (and did, live) add
-      // "Greek Yoghurt Pancakes" twice at slightly different kcal, which
-      // then broke the swap UI downstream: its by-name filter for "options
-      // other than the chosen one" only strips ONE reading of a duplicate
-      // name, so the other duplicate survived as an "option" that was
-      // actually just the meal already showing, with a stale delta against
-      // itself, and the "N options" count coming out of the same list —
-      // wrong in lockstep with it. Rejecting the duplicate at its actual
-      // source keeps that whole downstream chain honest without needing to
-      // special-case it again at render time.
-      const normalizedName = proposal.name.trim().toLowerCase()
-      if (accepted[slot]?.some(o => o.name.trim().toLowerCase() === normalizedName)
-        || existing.some(o => o.name.trim().toLowerCase() === normalizedName)) {
-        rejectionLog.push(`[${slot}] "${proposal.name}": duplicate name already in this slot's pool`)
-        continue
-      }
-
-      const slotTimingDislikes = (params.timingRules ?? [])
-        .filter(r => r.anchor === 'slot' && r.slot === slot)
-        .map(r => r.subject)
-      const effectiveDislikes = [...(params.dislikedFoods ?? []), ...slotTimingDislikes]
-      const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences)
-      if (option) {
-        accepted[slot]!.push(params.appendToExisting && params.servedFrom
-          ? { ...option, tags: tagsNewFrom(option.tags, params.servedFrom) }
-          : option)
-      }
-    }
+    for (const proposal of proposals) considerProposal(proposal)
 
     // The whole point: this round's meals are on disk before the next request
     // goes out, so losing the page from here on costs the REST of the plan

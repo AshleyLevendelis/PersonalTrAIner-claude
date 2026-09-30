@@ -78,6 +78,7 @@ import type { UserFactRow } from '@/lib/memory-store'
 import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
 import { computeSlotBudgets } from '@/lib/meal-generation'
 import { topUpPlan, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
+import { MEAL_LIBRARY } from '@/lib/meal-library-data'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
 
@@ -810,6 +811,11 @@ const AVOID_FACTS = (AVOID ? [{
 // answer 502, the way a cut-off reply does.
 const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
 const TOPUP_FAIL = new URLSearchParams(location.search).get('topupfail') === '1'
+// ?library=off — the meal library (30 Sep 2026) is used first by any "more options" ask, so
+// a scenario about the MEAL WRITER (a cut-off reply, what it was asked for) switches it off
+// and keeps testing exactly what it tested before. Without it the library answers.
+const LIBRARY_OFF = new URLSearchParams(location.search).get('library') === 'off'
+;(window as unknown as { __generatorCalls: number }).__generatorCalls = 0
 // ?topfit=1 (with topup=1) — SEVEN DISHES A MEAL, ONE OF THEM A DINNER THAT FITS
 // (30 Sep 2026, Ashley on "all the days' meals look very similar"). The plan
 // is the FULL size, so the old count-based offer has nothing to say; six of
@@ -833,6 +839,7 @@ if (TOPUP) {
   window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
     if (!url.includes('/functions/v1/generate-meals')) return realFetch(input as RequestInfo, init)
+    ;(window as unknown as { __generatorCalls: number }).__generatorCalls++
     if (TOPUP_FAIL) return new Response(JSON.stringify({ error: 'simulated cut-off reply' }), { status: 502 })
     const body = JSON.parse(String(init?.body ?? '{}')) as { slots: { slot: string; count: number }[] }
     // Shaped like generate-meals' output; the app verifies and sizes them.
@@ -1040,7 +1047,7 @@ function Harness() {
     setTopUpNote(null)
     const r = await topUpMealPlan({
       profileId: PROFILE_ID, today, needs: topUpNeedsNow,
-      generation: { targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks },
+      generation: { targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks, ...(LIBRARY_OFF ? { library: false as const } : {}) },
     })
     if (r.added > 0) setLivePools(await getPools(PROFILE_ID) as never)
     setTopUpNote(r.note)
@@ -1054,6 +1061,7 @@ function Harness() {
   ;(window as unknown as { __mealPicks: unknown }).__mealPicks = () => db.meal_plan_picks
   ;(window as unknown as { __groceryTable: unknown }).__groceryTable = () => db.grocery_items
   // The options each slot holds, by name, so a driver can see a resized copy added and taken away again.
+  ;(window as unknown as { __libraryNames: string[] }).__libraryNames = MEAL_LIBRARY.map(d => d.name)
   ;(window as unknown as { __mealOptions: unknown }).__mealOptions = () => db.meal_plan_slots.map(r => ({ slot: r.slot, name: r.name }))
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
