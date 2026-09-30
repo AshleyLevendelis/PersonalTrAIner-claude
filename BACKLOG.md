@@ -2,6 +2,69 @@
 
 Newest first. One line each.
 
+- [ ] **MORE MEALS FROM THE INTERNET — INVESTIGATED, NOT BUILT, WAITING ON
+  HER CHOICE OF SOURCE — 30 Sep 2026.** Ashley: *"We should add more meals, it
+  must be so easy to search the Internet for hundreds of meals with recipes and
+  cooking instructions and macros which we can take and ingest into the app as
+  options."* Report only so far (a dietary-enforcement path: plan before build).
+  **Findings, each labelled measured or read:**
+  (1) *Measured:* this cloud session cannot reach recipe sites or nutrition
+  services (org egress policy, 403 on both hosts tried; not routed around), so
+  nothing external was sampled. Any ingest has to run on her machine.
+  (2) *Read:* outside macros cannot be taken as given. The app recomputes every
+  macro from its own food database (333 foods) and never reads a model's or a
+  site's numbers (`meal-generation.ts` header). Readers trust STORED macros
+  until the first resize, which silently replaces them, so a dish inserted with
+  a website's numbers would show one figure and then another.
+  (3) *Measured, and the bigger finding:* the ingredient reader was built for
+  the model's metric output, not recipe text. On 115 hand-written, typical
+  ingredient lines (written from general knowledge, none copied from a site),
+  107 found a food but **19 of those carried an amount the reader misread**:
+  ounces, pounds, kg, tins and cans, "a pinch", "a handful", "juice of a lemon"
+  are not understood, so "8 oz chicken breast" counts as 8 g, "1 lb ground
+  turkey" as 1 g, "1 kg potatoes" as 1 g, and coverage still reads 100%
+  because the FOOD was found. About 17% of lines silently wrong, 7% not found
+  (honestly flagged: fresh ginger, baking powder, cooking spray). Separately:
+  `cup` is 240 g for every food (a cup of flour is about 120 g, of spinach about
+  30 g), and a vague name resolves to an arbitrary longer entry ("sauce" →
+  tamari, "cream" → cream cheese, "fish" → fish sauce, "pomegranate molasses" →
+  pomegranate). Long-tail foods miss (kimchi, kohlrabi, pancetta, mascarpone).
+  Scraped recipes would hit all of these at once.
+  (4) *Read:* a cooking method naming any amount is dropped whole (the 19 Sep
+  rule, because the app rescales portions), so copied instructions would mostly
+  vanish unless amounts are rewritten out of them.
+  (5) *Read:* there is no shared dish table. The pool is per person and dateless.
+  A library would need a read-only table, a loader, a per-person sampler (the
+  verifier runs in the browser), methods scrubbed of amounts, a source tag,
+  protection from "regenerate" (which deletes untagged rows) and the
+  `new-from` first-day tag so loading into an existing plan moves no day.
+  (6) *Read:* pools are 7 per meal (10 at most after a top-up) because the day
+  search tries every combination; hundreds per meal cannot live on the phone, so
+  a library is SAMPLED down to the 7-10 that fit each person.
+  **Options, none ruled:** (A) a library written by our own model pipeline,
+  checked by the app's own rules, sampled per person, run on her machine;
+  (B) an open-licensed recipe dataset (needs a source chosen and its licence
+  read by her; still needs the amount fixes and rewritten methods);
+  (C) copying recipe sites (copyright on the text, site terms, unverified
+  macros; not recommended). **Recommendation: A, after the reader fix below.**
+- [ ] **THE INGREDIENT READER MISREADS COMMON AMOUNTS, AND COVERAGE HIDES IT —
+  30 Sep 2026.** Found while sizing the item above, and live on its own: every
+  path that takes ingredient text (the coach's custom meal and add-by-name, food
+  add, top-ups) goes through `parseIngredientLine`, which understands g, ml,
+  tbsp, tsp, cup and named counts only. Measured on the real parser: "8 oz
+  chicken breast" = 8 g, "1 lb ground turkey" = 1 g, "1 kg potatoes" = 1 g,
+  "1 can chickpeas" = 1 g, "a pinch of salt" = 1 g; the food is found, so
+  `coverage` reads 100% and nothing flags it. A meal a person types to the coach
+  in ounces or tins would be costed at a fraction of its calories. Model-written
+  meals are safe only because the prompt asks for grams. Not traced end to end
+  through the coach's tool (whether the model converts the units first is
+  unmeasured). Mechanical, so no ruling needed: add oz, lb, kg, l, tins and
+  cans (standard sizes), and a fixed small gram value or an honest "not
+  counted" for pinch, handful and splash; give `cup` per-food weights where they
+  differ by more than a little; make coverage count a line whose unit it could
+  not read as unknown, not matched. Scratch probes are in the session
+  scratchpad, not the repo.
+
 - [x] **A MEAL FOR A DIFFERENT MEAL ON ANOTHER DAY, AND AN UNDO — 30 Sep 2026,
   Ashley's "finish the day swap", item 3 of her next four.** Two things on both
   surfaces. (a) Monday's dinner with Wednesday's LUNCH: they swap places and
