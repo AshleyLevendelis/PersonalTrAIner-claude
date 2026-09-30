@@ -108,7 +108,7 @@ const load = async qs => {
   for (let i = 0; i < 60; i++) { if (await has('[data-meal-day]')) break; await wait(200) }
   await wait(700)
 }
-const clearDismissal = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('meal-top-up-dismissed:')) localStorage.removeItem(k); return true })()`)
+const clearDismissal = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('meal-top-up-dismissed')) localStorage.removeItem(k); return true })()`)
 const weekday = date => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
 
 console.log('\n[1] A plan made at five options a meal is offered more')
@@ -223,6 +223,46 @@ await shoot('meal-top-up-failed')
 await ev(`[...document.querySelectorAll('[data-testid="meal-top-up-note"] button')].find(b => b.textContent.trim() === 'Dismiss')?.click()`)
 await wait(300)
 check('dismissing the receipt brings the offer back for another go', (await offerText()) !== null)
+
+console.log('\n[7] Seven dishes of which one fits is not seven options')
+// A FULL plan (seven a meal), six of whose dinners are far too big for any
+// day. The count-based offer has nothing to say about it; the fit offer does.
+await load('topfit=1')
+await clearDismissal()
+await load('topfit=1')
+const fitPlan = await ev(`window.__topUpPlan()`)
+check('the fixture: seven dinners, none short by count, and only one that fits, so four are asked for and only three fit in the pool',
+  fitPlan?.have?.dinner === 7 && Object.keys(fitPlan.short ?? {}).length === 0 && fitPlan.fewFit?.dinner === 1 && Object.keys(fitPlan.fewFit ?? {}).length === 1 && fitPlan.needs?.dinner === 3, fitPlan)
+const fitOffered = await offerText()
+check('the offer says how many of the seven dinners fit ( "fits" for one)',
+  (fitOffered ?? '').startsWith('Only 1 of your 7 dinners fits your targets right now, so your dinners keep repeating. I can add some that do.'), fitOffered)
+check('...and what it will not touch, before the tap', /Today, and any day on your shopping list, stay exactly as they are\./.test(fitOffered ?? ''), fitOffered)
+check('...and it is not the count offer', !/options each/.test(fitOffered ?? ''), fitOffered)
+check('...with the same two buttons', await ev(`[...document.querySelectorAll('[data-testid="meal-top-up-offer"] button')].map(b => b.textContent.trim()).join('|')`) === 'Get more options|Not now')
+await ev(`document.querySelector('[data-testid="meal-top-up-offer"]')?.scrollIntoView({ block: 'center' })`)
+await wait(300)
+await shoot('meal-top-up-fit-offer')
+const fitTodayBefore = await dayOnScreen()
+await tapButton('Get more options')
+for (let i = 0; i < 60; i++) { if (await has('[data-testid="meal-top-up-note"]')) break; await wait(150) }
+await wait(500)
+const fitDone = await note()
+check('the receipt says three were added, from tomorrow (four would have been wanted, room for three)',
+  fitDone?.text === 'Added 3 new meals. They start tomorrow; every day before then stays as it was.', fitDone)
+check('...marked as a success, where she can see it', fitDone?.failed === 'false' && fitDone?.onScreen === true, fitDone)
+check('the offer is gone', (await offerText()) === null)
+const fitAfter = await ev(`window.__topUpPlan()`)
+check('...because ten dinners are on the plan and four of them fit', fitAfter?.have?.dinner === 10 && Object.keys(fitAfter.fewFit ?? {}).length === 0 && Object.keys(fitAfter.needs ?? {}).length === 0, fitAfter)
+check('today is exactly as it was', (await dayOnScreen()) === fitTodayBefore)
+await shoot('meal-top-up-fit-done')
+await load('topfit=1')
+check('a fresh plan offers again', (await offerText()) !== null)
+await tapButton('Not now')
+await wait(300)
+check('"Not now" hides the fit offer', (await offerText()) === null)
+await load('topfit=1')
+check('...and it stays hidden when she comes back', (await offerText()) === null)
+await clearDismissal()
 
 const errs = await ev(`window.__errors ?? []`)
 check('no page errors', (errs ?? []).length === 0, errs)

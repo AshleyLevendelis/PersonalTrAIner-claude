@@ -17,11 +17,12 @@
 // thing without a network and App keeps its own wiring.
 // ---------------------------------------------------------------------------
 
-import { DEFAULT_POOL_SIZE, generateMealPools, type PoolOption } from './meal-generation'
+import { DEFAULT_POOL_SIZE, assembleDay, generateMealPools, type PoolOption } from './meal-generation'
+import type { MacroTargets } from './types'
 import { addDays, epochDay } from './meal-rotation'
 import { weekdayLong, longDate } from './day-labels'
 import { readGroceryCoverage } from './grocery-store'
-import { moreMealOptionsOffer, moreMealOptionsDone, moreMealOptionsWhy } from './coach-voice'
+import { moreMealOptionsOffer, moreMealFitOffer, moreMealOptionsDone, moreMealOptionsWhy } from './coach-voice'
 import type { MealSlotName } from './meal-store'
 
 /**
@@ -42,6 +43,97 @@ export function topUpNeeds(
     if (servable > 0 && servable < size) out[slot] = size - servable
   }
   return out
+}
+
+// ---------------------------------------------------------------------------
+// SEVEN OPTIONS IS NOT SEVEN OPTIONS SHE CAN EAT — Ashley, 30 Sep 2026, on
+// "all the days' meals look very similar". A meal can hold seven dishes and
+// still serve two of them, because the rest no longer land a day on her
+// numbers (her targets moved after they were made). The count above cannot
+// see that. Measured on the modelled pools: a meal with 0-1 dishes that fit
+// served 2.4-3.0 different dinners in a week, one with six served five.
+//
+// Her ruling, from three options: speak when FEWER THAN THREE fit. Below
+// that, the week is a rota of two. The offer is the same button and the same
+// promise as the count-based one (today and the shopping-list days stay), and
+// it is still an OFFER, never done unasked.
+//
+// The three numbers, and whose they are:
+//   MIN_FITTING  3   hers (the ruling above)
+//   FITTING_GOAL 5   mine: a week of five different dishes uses all five
+//                    (measure:meal-repeats, 28 Sep), so the ask aims there
+//   MAX_POOL     10  mine: the day search is a product over the meals, so a
+//                    pool of ten costs the week about 3.4x a pool of seven
+//                    (measured 30 Sep). Past it the app stops adding.
+// ---------------------------------------------------------------------------
+export const MIN_FITTING = 3
+export const FITTING_GOAL = 5
+export const MAX_POOL = 10
+
+/**
+ * How many of each meal's servable dishes can be part of a day that lands on
+ * target today. The app's own test, not a new one: pin the dish in its meal,
+ * let the search choose the rest, and ask whether the day it would SERVE is
+ * within the tolerance bands (assembleDay, quiet resize included).
+ *
+ * Judged only when every meal has a servable dish: a meal with none is a
+ * missing meal with its own Redo, and a day without it proves nothing about
+ * the dishes beside it.
+ */
+export function fittingCounts(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  activeSlots: MealSlotName[],
+  targets: MacroTargets,
+): Partial<Record<MealSlotName, number>> {
+  const usable: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  for (const slot of activeSlots) usable[slot] = (pools[slot] ?? []).filter(o => !o.breaksRestriction)
+  if (activeSlots.length === 0 || activeSlots.some(s => usable[s]!.length === 0)) return {}
+  const out: Partial<Record<MealSlotName, number>> = {}
+  for (const slot of activeSlots) {
+    out[slot] = usable[slot]!.filter(o => assembleDay(usable, targets, {}, [], { [slot]: o }).withinTolerance).length
+  }
+  return out
+}
+
+/** What is short, everywhere it is short, worked out once and handed to every surface. */
+export interface TopUpPlan {
+  /** What to ask for, per meal: the larger of the two shortfalls below. The run takes exactly this. */
+  needs: Partial<Record<MealSlotName, number>>
+  /** Short of SEVEN servable options, per meal (the 28 Sep offer). */
+  short: Partial<Record<MealSlotName, number>>
+  /** How many dishes she can be served, per meal that has any. */
+  have: Partial<Record<MealSlotName, number>>
+  /** Meals with fewer than MIN_FITTING dishes that fit, and how many do. Only where adding can help. */
+  fewFit: Partial<Record<MealSlotName, number>>
+  /** Meals with too few that fit but already at MAX_POOL: the app will not add more there. */
+  crowded: MealSlotName[]
+}
+
+export function topUpPlan(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  activeSlots: MealSlotName[],
+  targets: MacroTargets,
+  size = DEFAULT_POOL_SIZE,
+): TopUpPlan {
+  const short = topUpNeeds(pools, activeSlots, size)
+  const fitting = fittingCounts(pools, activeSlots, targets)
+  const have: TopUpPlan['have'] = {}
+  for (const slot of activeSlots) {
+    const n = (pools[slot] ?? []).filter(o => !o.breaksRestriction).length
+    if (n > 0) have[slot] = n
+  }
+  const needs: TopUpPlan['needs'] = { ...short }
+  const fewFit: TopUpPlan['fewFit'] = {}
+  const crowded: MealSlotName[] = []
+  for (const slot of activeSlots) {
+    const f = fitting[slot]
+    if (f === undefined || f >= MIN_FITTING) continue
+    const room = MAX_POOL - (have[slot] ?? 0)
+    if (room <= 0) { crowded.push(slot); continue }
+    fewFit[slot] = f
+    needs[slot] = Math.max(needs[slot] ?? 0, Math.min(FITTING_GOAL - f, room))
+  }
+  return { needs, short, have, fewFit, crowded }
 }
 
 /**
@@ -125,25 +217,45 @@ export function topUpStartLabel(today: string, from: string): string {
 }
 
 /**
- * "NOT NOW" IS REMEMBERED ON THIS DEVICE, for this pool size. A convenience,
+ * "NOT NOW" IS REMEMBERED ON THIS DEVICE, per kind of offer. A convenience,
  * not a record: in a private window it simply comes back, which is the safe
- * direction. Keyed on the size, so raising it again would ask again.
+ * direction. The count offer is keyed on the size, so raising it again would
+ * ask again; the fit offer on her calorie and protein targets, so a change to
+ * them (which is what makes dishes stop fitting) asks again too.
  */
-const dismissKey = (profileId: string) => `meal-top-up-dismissed:${profileId}:${DEFAULT_POOL_SIZE}`
+export type TopUpOfferKind = 'count' | 'fit'
+const dismissKey = (profileId: string, kind: TopUpOfferKind, targets?: MacroTargets) =>
+  kind === 'count'
+    ? `meal-top-up-dismissed:${profileId}:${DEFAULT_POOL_SIZE}`
+    : `meal-top-up-dismissed-fit:${profileId}:${targets ? `${Math.round(targets.calories)}:${Math.round(targets.protein)}` : ''}`
 
-export function isTopUpDismissed(profileId: string): boolean {
-  try { return localStorage.getItem(dismissKey(profileId)) === '1' } catch { return false }
+export function isTopUpDismissed(profileId: string, kind: TopUpOfferKind = 'count', targets?: MacroTargets): boolean {
+  try { return localStorage.getItem(dismissKey(profileId, kind, targets)) === '1' } catch { return false }
 }
 
-export function dismissTopUp(profileId: string): void {
-  try { localStorage.setItem(dismissKey(profileId), '1') } catch { /* the offer comes back next time; nothing is lost */ }
+export function dismissTopUp(profileId: string, kind: TopUpOfferKind = 'count', targets?: MacroTargets): void {
+  try { localStorage.setItem(dismissKey(profileId, kind, targets), '1') } catch { /* the offer comes back next time; nothing is lost */ }
 }
 
-/** The offer's sentence for these needs, or null when nothing is short. */
-export function topUpOffer(needs: Partial<Record<MealSlotName, number>>): string | null {
-  const short = Object.keys(needs) as MealSlotName[]
-  if (short.length === 0) return null
-  return moreMealOptionsOffer(short.map(s => DEFAULT_POOL_SIZE - needs[s]!), DEFAULT_POOL_SIZE)
+/**
+ * The offer on Nutrition, or null when there is nothing to say. The fit offer
+ * comes first: it is the one that explains a week that looks the same, and its
+ * button asks for everything the plan needs, count shortfall included.
+ * `dismissed` says which kinds she has already turned down.
+ */
+export function topUpOffer(
+  plan: TopUpPlan,
+  dismissed: Record<TopUpOfferKind, boolean> = { count: false, fit: false },
+): { kind: TopUpOfferKind; text: string } | null {
+  const fitSlots = Object.keys(plan.fewFit) as MealSlotName[]
+  if (fitSlots.length > 0 && !dismissed.fit) {
+    return { kind: 'fit', text: moreMealFitOffer(fitSlots.map(s => ({ slot: s, fitting: plan.fewFit[s]!, have: plan.have[s] ?? 0 }))) }
+  }
+  const short = Object.keys(plan.short) as MealSlotName[]
+  if (short.length > 0 && !dismissed.count) {
+    return { kind: 'count', text: moreMealOptionsOffer(short.map(s => DEFAULT_POOL_SIZE - plan.short[s]!), DEFAULT_POOL_SIZE) }
+  }
+  return null
 }
 
 /** Everything the meal generator needs that is about HER, not about the top-up. */

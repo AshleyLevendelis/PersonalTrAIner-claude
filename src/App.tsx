@@ -28,7 +28,7 @@ import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
-import { topUpNeeds, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
+import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
@@ -535,16 +535,28 @@ function App() {
     () => (macros ? Object.keys(computeSlotBudgets(macros, profile?.meals_per_day, profile?.include_snacks)) as MealSlotName[] : []),
     [macros, profile?.meals_per_day, profile?.include_snacks],
   )
-  const mealTopUpNeeds = useMemo(() => topUpNeeds(mealPools, activeMealSlots), [mealPools, activeMealSlots])
+  // What is short AND what is stuck repeating (30 Sep 2026: seven dishes of
+  // which two fit is not seven options). Worked out ONCE and handed to the
+  // Nutrition offer and to the coach, so neither can offer what the other's
+  // button would not.
+  const mealTopUpPlan = useMemo(
+    () => (macros ? topUpPlan(mealPools, activeMealSlots, macros) : null),
+    [mealPools, activeMealSlots, macros],
+  )
+  const mealTopUpNeeds = mealTopUpPlan?.needs ?? {}
   const [mealTopUpBusy, setMealTopUpBusy] = useState(false)
   const [mealTopUpNote, setMealTopUpNote] = useState<{ text: string; failed: boolean } | null>(null)
   const [mealTopUpDismissTick, setMealTopUpDismissTick] = useState(0)
   const mealTopUpDismissed = useMemo(
-    () => (profile?.id ? isTopUpDismissed(profile.id) : false),
+    () => ({
+      count: profile?.id ? isTopUpDismissed(profile.id, 'count') : false,
+      fit: profile?.id ? isTopUpDismissed(profile.id, 'fit', macros ?? undefined) : false,
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [profile?.id, mealTopUpDismissTick],
+    [profile?.id, macros, mealTopUpDismissTick],
   )
-  const mealTopUpOffer = !initialMealBuild && !mealTopUpDismissed ? topUpOffer(mealTopUpNeeds) : null
+  const mealTopUpOfferNow = !initialMealBuild && mealTopUpPlan ? topUpOffer(mealTopUpPlan, mealTopUpDismissed) : null
+  const mealTopUpOffer = mealTopUpOfferNow?.text ?? null
 
   const mealPlan = chosenToMealPlanDays(chosenMeals)
   const [isRestoring, setIsRestoring] = useState(true)
@@ -3126,7 +3138,7 @@ function App() {
               mealTopUpBusy={mealTopUpBusy}
               mealTopUpNote={mealTopUpNote}
               onMealTopUp={handleMealTopUp}
-              onMealTopUpDecline={() => { if (profile?.id) dismissTopUp(profile.id); setMealTopUpDismissTick(t => t + 1) }}
+              onMealTopUpDecline={() => { if (profile?.id && mealTopUpOfferNow) dismissTopUp(profile.id, mealTopUpOfferNow.kind, macros ?? undefined); setMealTopUpDismissTick(t => t + 1) }}
               onDismissMealTopUpNote={() => setMealTopUpNote(null)}
               mealStrip={mealDays.strip}
               upcomingDay={mealDays.openDay}
@@ -3195,7 +3207,7 @@ function App() {
               onFindMoreMealOptions={handleFindMoreMealOptions}
               onMealDayMovePlan={mealDays.dayMove.plan}
               onMealDayMoveConfirm={mealDays.dayMove.confirm}
-              mealTopUp={macros ? { needs: mealTopUpNeeds, building: initialMealBuild } : null}
+              mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}
               memoryFacts={memoryFacts}

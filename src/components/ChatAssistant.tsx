@@ -35,7 +35,7 @@ import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
 import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
 import type { MealRefit } from '@/lib/meal-refit'
-import type { TopUpOutcome } from '@/lib/meal-top-up'
+import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import { DEFAULT_POOL_SIZE } from '@/lib/meal-generation'
 import { executeMealMove } from '@/lib/pending-action-executor'
@@ -287,7 +287,7 @@ interface ChatAssistantProps {
    * parity-by-construction the resize has. Null only when the body details the
    * targets need are missing. `building` is the first plan still being made.
    */
-  mealTopUp?: { needs: Partial<Record<MealSlotName, number>>; building: boolean } | null
+  mealTopUp?: (TopUpPlan & { building: boolean }) | null
   /** The day the new meals would start, read from the shopping list; null when the list cannot be read. */
   onMealTopUpStart?: () => Promise<{ from: string; label: string } | null>
   /** The one run, shared with the Nutrition tab's own button. Null when it could not start. */
@@ -3644,7 +3644,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (mealTopUp.building) return { ok: false, refusal: MORE_MEALS.refusals.building }
     // Meal order, not alphabetical: breakfast, lunch, dinner, snack.
     const slots = (['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]).filter(s => (mealTopUp.needs[s] ?? 0) > 0)
-    if (slots.length === 0) return { ok: false, refusal: MORE_MEALS.refusals.full(DEFAULT_POOL_SIZE) }
+    if (slots.length === 0) {
+      return { ok: false, refusal: mealTopUp.crowded.length > 0 ? MORE_MEALS.refusals.crowded : MORE_MEALS.refusals.full(DEFAULT_POOL_SIZE) }
+    }
     const start = onMealTopUpStart ? await onMealTopUpStart() : null
     if (!start) return { ok: false, refusal: MORE_MEALS.refusals.listUnreadable }
     return {
@@ -3655,12 +3657,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       preconditions: { slots, from: start.from },
       payload: { slots, needs: mealTopUp.needs, from: start.from, startLabel: start.label },
       diff: {
-        lead: ask(MORE_MEALS.lead),
-        rows: slots.map(slot => ({
-          field: REFIT_SLOT_LABEL[slot],
-          before: MORE_MEALS.options(DEFAULT_POOL_SIZE - (mealTopUp.needs[slot] ?? 0)),
-          after: MORE_MEALS.options(DEFAULT_POOL_SIZE),
-        })),
+        lead: ask(slots.some(s => mealTopUp.fewFit[s] !== undefined) ? MORE_MEALS.leadFit : MORE_MEALS.lead),
+        // A meal short on fit reads "2 of 7 fit" to "up to 5 of 10 fit"; one
+        // short only on count reads "5 options" to "7 options", as before.
+        rows: slots.map(slot => {
+          const have = mealTopUp.have[slot] ?? 0
+          const fit = mealTopUp.fewFit[slot]
+          const add = mealTopUp.needs[slot] ?? 0
+          return fit !== undefined
+            ? { field: REFIT_SLOT_LABEL[slot], before: MORE_MEALS.fitBefore(fit, have), after: MORE_MEALS.fitAfter(fit + add, have + add) }
+            : { field: REFIT_SLOT_LABEL[slot], before: MORE_MEALS.options(have), after: MORE_MEALS.options(have + add) }
+        }),
         unchanged: [MORE_MEALS.unchanged],
         implications: [
           { severity: 'info', text: MORE_MEALS.starts(start.label) },

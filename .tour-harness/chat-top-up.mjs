@@ -186,10 +186,10 @@ console.log('\n[4] Asking again when every meal is full')
 check('her sentence goes', await say('Can you give me more meal options please'))
 await wait(3500)
 let again = await ev(READ)
-for (let i = 0; i < 40 && !/Every meal already has 7 options/.test(again.text); i++) { await wait(500); again = await ev(READ) }
+for (let i = 0; i < 40 && !/Every meal already has at least 7 options/.test(again.text); i++) { await wait(500); again = await ev(READ) }
 check('there is no second card: nothing left to Apply', !again.btns.some(b => /^Apply/.test(b)), again.btns)
 check('...and it says why, without promising more or pointing at a control',
-  /Every meal already has 7 options, so there's nothing to add\./.test(again.text) && !/Nutrition tab|Regenerate|button/i.test(again.text.split("nothing to add").pop() ?? ''), again.text.slice(-400))
+  /Every meal already has at least 7 options, so there's nothing to add\./.test(again.text) && !/Nutrition tab|Regenerate|button/i.test(again.text.split("nothing to add").pop() ?? ''), again.text.slice(-400))
 check('nothing more was generated', (await ev(`window.__generateCalls`)) === 1)
 
 console.log('\n[5] The meal generator is down: nothing changes, and it says so')
@@ -226,6 +226,45 @@ check('...and it owns up to what is missing: 4 of the 6', /4 of the 6 didn't com
 check('...without printing an internal tool name to her', !/propose_/.test(part.text), part.text.slice(-500))
 check('the pools read back to match: breakfast seven, the others still five', JSON.stringify(await ev(`window.__topUpPools()`)) === JSON.stringify({ breakfast: 7, lunch: 5, dinner: 5 }), await ev(`window.__topUpPools()`))
 await shoot('chat-top-up-partial')
+
+console.log('\n[7] Seven dishes a meal, only two dinners that fit: the coach offers meals that do')
+check('a full plan of seven a meal', await load('topfit=1'))
+const fullPools = await ev(`window.__topUpPools()`)
+check('the sanity check: seven of each, and the app finds only two dinners that fit', JSON.stringify(fullPools) === JSON.stringify({ breakfast: 7, lunch: 7, dinner: 7 })
+  && (await ev(`window.__topUpPlan().fewFit.dinner`)) === 2 && Object.keys(await ev(`window.__topUpPlan().short`)).length === 0, [fullPools, await ev(`window.__topUpPlan()`)])
+check('her sentence goes', await say('Can you give me more meal options please'))
+let fit = await ev(READ)
+for (let i = 0; i < 60 && !(fit.hasCard && /\?/.test(fit.text)); i++) { await wait(500); fit = await ev(READ) }
+check('a CARD, not a refusal: with every meal full by count it would have said there was nothing to add', fit.hasCard === true && !/nothing to add/.test(fit.text), fit.btns)
+check('...it asks for meals that fit, in the app\'s words', /Want me to add meals that fit your targets, where too few of your dishes do\?/.test(fit.text), fit.text.slice(-500))
+check('...one row, for the dinner: two of seven fit, up to five of ten', /Dinner[\s\S]{0,20}2 of 7 fit[\s\S]{0,20}up to 5 of 10 fit/.test(fit.text) && !/Breakfast[\s\S]{0,20}fit/.test(fit.text) && !/Lunch[\s\S]{0,20}fit/.test(fit.text), fit.text.slice(-500))
+check('...and what it will not touch, and the day the new meals start', /Unchanged: Today and every day on your shopping list/.test(fit.text) && fit.text.includes(`The new meals start on ${STARTS_ON}; every day before then stays as it was.`), fit.text.slice(-600))
+check('nothing was generated before the tap', (await ev(`window.__generateCalls`)) === 0 && (await rowsOnPage()) === 21, [await ev(`window.__generateCalls`), await rowsOnPage()])
+await shoot('chat-top-up-fit-card')
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Apply/.test((x.textContent || '').trim())); b?.click() })()`)
+let fitDone = await ev(READ)
+for (let i = 0; i < 80 && !/\bAdded\b/.test(fitDone.text); i++) { await wait(500); fitDone = await ev(READ) }
+await wait(600)
+fitDone = await ev(READ)
+check('a receipt says Added, three dinners and nothing else', /\bAdded\b/.test(fitDone.text) && /Dinner[\s\S]{0,12}\+3 options/.test(fitDone.text) && !/Breakfast[\s\S]{0,12}\+\d options/.test(fitDone.text.split('Added').pop() ?? '') && !/Lunch[\s\S]{0,12}\+\d options/.test(fitDone.text.split('Added').pop() ?? ''), fitDone.text.slice(-400))
+check('...and the app reads back ten dinners, seven of everything else, and no dinner flagged any more',
+  JSON.stringify(await ev(`window.__topUpPools()`)) === JSON.stringify({ breakfast: 7, lunch: 7, dinner: 10 }) && (await ev(`window.__topUpPlan().fewFit.dinner`)) === undefined, [await ev(`window.__topUpPools()`), await ev(`window.__topUpPlan()`)])
+await shoot('chat-top-up-fit-receipt')
+
+console.log('\n[8] The dinner is already at ten and still has two that fit: it says why it cannot add')
+check('a plan with ten dinners', await load('topfit=crowded'))
+check('the sanity check: ten dinners, two that fit, and the app calls it crowded', (await ev(`window.__topUpPools().dinner`)) === 10 && (await ev(`window.__topUpPlan().crowded.join()`)) === 'dinner' && Object.keys(await ev(`window.__topUpPlan().needs`)).length === 0, await ev(`window.__topUpPlan()`))
+check('her sentence goes', await say('Can you give me more meal options please'))
+let crowded = await ev(READ)
+// The reply types itself out: wait for its LAST words, not its first.
+for (let i = 0; i < 40 && !/swap them\./.test(crowded.text); i++) { await wait(500); crowded = await ev(READ) }
+await wait(600)
+crowded = await ev(READ)
+check('there is no card', !crowded.btns.some(b => /^Apply/.test(b)), crowded.btns)
+check('...and it says the truth: plenty of dishes, few that fit, and why nothing is added', /Some of your meals have plenty of dishes but few that fit your targets, and adding more would slow the app down, so I can't top them up\./.test(crowded.text), crowded.text.slice(crowded.text.indexOf('Some of your meals') - 5, crowded.text.indexOf('Some of your meals') + 320))
+check('...without the false "nothing to add" claim, or a control to press', !/nothing to add/.test(crowded.text) && !/Nutrition tab|Regenerate|button/i.test(crowded.text.split("top them up").pop() ?? ''), crowded.text.slice(-300))
+check('nothing was generated', (await ev(`window.__generateCalls`)) === 0)
+await shoot('chat-top-up-crowded')
 
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)

@@ -2,6 +2,91 @@
 
 Newest first. One line each.
 
+- [x] **SEVEN DISHES OF WHICH TWO FIT IS NOT SEVEN OPTIONS — 30 Sep 2026,
+  Ashley's "all the days' meals look very similar", item 2 of her next four.**
+  Until today the app counted a meal's options, not the options that work: a
+  dinner could hold seven dishes and serve two of them, because the rest no
+  longer land a day on her calories and protein (her targets moved after the
+  meals were made), and nothing said so. **Measured first** (modelled pools,
+  150 profiles, targets 10% above the ones the pools were made for): a dinner
+  with fewer than three dishes that fit served **2.7 different dinners a week;
+  the rest served 4.0**. Adding the dishes the ask names cleared the flag on
+  all 52 flagged profiles and lifted the week to 3.7 (not to 4+: the variety
+  ranking and leftovers still limit it, so this reduces the samey week, it does
+  not end it).
+  **Her ruling, from three options: speak when FEWER THAN THREE fit** (over
+  fewer than four, and over only one or none). The offer is the same button and
+  the same promise as the 28 Sep top-up (today and the shopping-list days stay
+  exactly as they are), still an offer, never done unasked, and it went into the
+  existing offer rather than a second one. Copy: *"Only 2 of your 7 dinners
+  fit your targets right now, so your dinners keep repeating. I can add some
+  that do. Today, and any day on your shopping list, stay exactly as they
+  are."* (one that fits reads "fits"; none reads "None of your 7 dinners fit";
+  several meals name the meals and no ratios).
+  **Decided by me, under the CSCS delegation and the tooling, named:** the ask
+  aims at FIVE that fit (a week of five dinners uses all five,
+  `measure:meal-repeats`); a pool is never taken past TEN (the day search is a
+  product over the meals: a week costs about 3.4x more at ten than at seven,
+  measured), which means a pool of seven has room for three however few fit;
+  the two shortfalls (seven servable, five that fit) are asked for together as
+  the larger of the two; "Not now" for the fit offer is remembered per calorie
+  and protein target, so it asks again when her targets move (which is what
+  makes dishes stop fitting). A pool already at ten with too few that fit is
+  not asked for more: the coach says so and offers to swap the ones that keep
+  coming up; the screen says nothing (no offer it cannot keep).
+  **One computation, both surfaces (the `meal-refit` pattern):** App works out
+  a `TopUpPlan` once (what to ask for, what is short by count, what she has,
+  which meals have too few that fit, which are crowded) and hands it to the
+  Nutrition offer and to the coach's card, so the coach cannot offer what the
+  button would not. The coach's card reads "Dinner: 2 of 7 fit to up to 5 of 10
+  fit". "Fit" is the assembler's own test, not a new one: pin the dish in its
+  meal, let the search choose the rest, and ask whether the day it would SERVE
+  is inside the tolerance bands.
+  **CSCS review.** 1. *Effect:* more dishes that suit her calorie and protein
+  targets in the meals that repeat, so the week varies; the training effect is
+  untouched. 2. *What it takes away:* nothing is removed or resized; the pool
+  grows by at most three in a full pool, every new dish through the same
+  `verifyProposal`; the day search costs more with a bigger pool (the cap).
+  3. *Fundamentals:* the tolerance bands and the protein band are the
+  assembler's own and unchanged. 4. *Redefines a floor/ceiling?* "Full" now
+  means seven dishes she can be served that FIT, not seven dishes; the coach's
+  "nothing to add" line now says "at least seven" because a meal can hold ten.
+  No numeric floor moved. 5. *Scope:* not clinical.
+  **Found on the way.** (a) The coach driver's fixture was five dishes of
+  fixed size whatever the profile's targets were, so the new code correctly
+  offered "meals that fit" in a scenario written for "more options": the
+  fixture was a plan whose dishes did not fit its own numbers (the 19 Sep
+  "plausible whole" lesson, again). Dishes are now solved from the food
+  database to the profile's slot budgets. (b) The "nothing to add" refusal was
+  false for a meal with ten dishes, hence "at least seven". (c) A driver
+  mutation (`no room clamp`) came back MISSED because the fixture asked for
+  three either way; the fixture now has ONE dinner that fits, so the clamp
+  binds. (d) **A worktree sweep does not isolate ports**: I ran
+  `verify:meal-top-up` in the main checkout while the release sweep reached the
+  same driver in its worktree, both on Chromium debug port 9493, and the
+  sweep's copy failed; it passed alone. Now a rule in CLAUDE.md. (e) A
+  screenshot of the coach's refusal was taken while it was still typing out;
+  the driver now waits for the last words.
+  **Verified:** `test:meal-top-up` 131 checks (section 8 new: the fit count on
+  fixtures with a known number, the three numbers, threshold two-versus-three,
+  the cap, the larger shortfall, the exact sentences, the "Not now" keys, App's
+  wiring by source, and the population claim measured on every run); **30
+  mutations, 30 caught**; `verify:meal-top-up` 44 checks (7 mutations, 7
+  caught), `verify:chat-top-up` 55 (7, 7), every state screenshot read (the
+  offer, the receipt, the card, the crowded refusal); 162 derived `test:` gates
+  and `tsc` clean; 12 browser drivers green (top-up, chat top-up, meal days,
+  both day-move drivers, refit, kept meal, likes, slot move, chat shell, chat
+  bubbles, chat cardio).
+  **Not verified:** whether this is what HER week is (her saved meals cannot be
+  read from a cloud session: the screenshot of her dinner swap list is still
+  wanted); the coach's real behaviour (the model is stubbed at the fetch
+  boundary, and the exam needs credentials this session lacks); App.tsx (no
+  harness boots it: wiring by source checks); on-phone timing at ten dishes
+  (measured here, not on a phone).
+  **Needs:** the frontend on merge, and the `chat-gemini` deploy (tool
+  description and prompt rule tweaked; the same deploy still owed). The coach
+  exam is stale until it is re-run.
+
 - [x] **A MEAL WITH A FOOD ADDED COUNTS AS THE SAME DISH FOR VARIETY — 29 Sep
   2026, Ashley's list, item 3 of 3** ("a meal with a food added (your yoghurt
   bowl with honey) counts as a different dish, so the app thinks it's giving
@@ -223,6 +308,9 @@ Newest first. One line each.
   routes that work now (Regenerate all; or take unshopped days off the list
   first). Asked for a screenshot of the dinner swap list to confirm how many
   dinners she has and which fit.
+  **UPDATE 30 Sep 2026:** the likeliest cause now has a remedy: a meal with
+  fewer than three dishes that fit her targets gets an offer to add ones that
+  do (entry above). Stays open until her real plan confirms it.
 
 - [x] **PUT LIVE, 29 Sep 2026, on Ashley's "Put it live".** The meal work of
   28 Sep: your chat bubbles plain, never yesterday's dish, the day search

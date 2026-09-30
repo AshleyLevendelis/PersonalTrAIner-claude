@@ -34,7 +34,7 @@ import { assessEdit } from '@/lib/edit-tradeoff'
 import { getPools } from '@/lib/meal-store'
 import { computeMealMacros } from '@/lib/food-db'
 import { computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
-import { topUpNeeds, topUpMealPlan, previewTopUpStart } from '@/lib/meal-top-up'
+import { topUpPlan, topUpMealPlan, previewTopUpStart } from '@/lib/meal-top-up'
 import { buildRotation, pinsFromPicks } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
 import type { MacroTargets, Meal, MealPlanDay, UserProfile } from '@/lib/types'
@@ -474,6 +474,14 @@ const finishedSession = SEED_NUDGE
 // list, and the run is the app's own topUpMealPlan. The one thing faked is
 // the meal generator, in the driver, at the fetch boundary.
 const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
+// ?topfit=1 (with topup=1) — SEVEN DISHES A MEAL, ONLY TWO DINNERS THAT FIT
+// (30 Sep 2026): the coach's card for a plan that is the right size and still
+// repeats. Every dish is sized to the profile's own slot budgets, so which of
+// them fit is the app's answer (topUpPlan), not the fixture's.
+const TOPFIT = ['1', 'crowded'].includes(new URLSearchParams(location.search).get('topfit') ?? '')
+// ?topfit=crowded: the same, with TEN dinners (two that fit), so the meal is
+// already at the size the app will not go past.
+const CROWDED = new URLSearchParams(location.search).get('topfit') === 'crowded'
 // ?daymove=1 — SWAPPING A MEAL WITH ANOTHER DAY'S, ASKED OF THE COACH (29 Sep
 // 2026). The same five-options-a-meal pools and shopping list the top-up run
 // uses, and the week served by the app's OWN useMealDays hook, whose plan and
@@ -493,9 +501,33 @@ const topUpSeed = (() => {
     return { profile_id: PROFILE_ID, slot, name, ingredients, tags: [], prep: '',
       macros: { kcal: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) } }
   }
-  const slots = TOPUP_SLOTS.flatMap(slot => [0, 1, 2, 3, 4].map(i => ({
-    ...dish(slot, `${slot[0].toUpperCase()}${slot.slice(1)} plate ${i + 1}`, 100 + i * 8, 220 + i * 12, 10 + i), pool_index: i,
-  })))
+  // THE TOP-UP SCENARIOS' DISHES ARE SIZED TO THE PROFILE'S OWN BUDGETS (30 Sep
+  // 2026). They used to be a fixed 100-132g of chicken whatever the targets
+  // were, which was a plan whose dishes did not fit its numbers, and the app
+  // now (rightly) notices: the first version of this fixture was offered
+  // "meals that fit your targets" instead of "more options". The day-move
+  // scenarios keep the dishes they were written against.
+  //
+  // Chicken, cooked rice and oil in the amounts that reproduce each slot's
+  // protein, carbs and fat for THIS profile (3040 kcal, 160g P, 411g C, 84g F,
+  // three meals): solved from the food database, not guessed, because
+  // "roughly right" dishes are the ones no day can land on target with.
+  const SIZED_BASE: Record<string, [number, number, number]> = { breakfast: [109, 492, 19], lunch: [145, 656, 26], dinner: [109, 492, 19] }
+  const sized = (slot: string, name: string, i: number, factor: number) => {
+    const k = (0.94 + i * 0.02) * factor
+    const [c, r, o] = SIZED_BASE[slot]
+    return dish(slot, name, Math.round(c * k), Math.round(r * k), Math.round(o * k))
+  }
+  const titled = (slot: string) => `${slot[0].toUpperCase()}${slot.slice(1)}`
+  const slots = TOPUP && TOPFIT
+    ? TOPUP_SLOTS.flatMap(slot => Array.from({ length: slot === 'dinner' && CROWDED ? 10 : 7 }, (_, i) => ({
+        // Dinner: two that fit, five at 2.3x. The other meals: seven that fit.
+        ...sized(slot, `${titled(slot)} plate ${i + 1}`, i, slot === 'dinner' && i >= 2 ? 2.3 : 1), pool_index: i,
+      })))
+    : TOPUP_SLOTS.flatMap(slot => [0, 1, 2, 3, 4].map(i => ({
+        ...(TOPUP ? sized(slot, `${titled(slot)} plate ${i + 1}`, i + 1, 1)
+          : dish(slot, `${titled(slot)} plate ${i + 1}`, 100 + i * 8, 220 + i * 12, 10 + i)), pool_index: i,
+      })))
   // Today and tomorrow are already shopped for, so the app must start the
   // new meals the day after: a start the driver can name in advance.
   const list = [0, 1].map(d => ({
@@ -586,6 +618,9 @@ function Harness() {
   })
   const topUpSlots = macros ? Object.keys(computeSlotBudgets(macros, 3, false)) : []
   useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__topUpPlan = () => (macros ? JSON.parse(JSON.stringify(topUpPlan(pools as never, topUpSlots as never, macros))) : null)
+  }, [pools])
+  useEffect(() => {
     ;(window as unknown as Record<string, unknown>).__topUpPools = () => Object.fromEntries(Object.entries(pools).map(([k, v]) => [k, (v ?? []).length]))
   }, [pools])
   return (
@@ -618,11 +653,11 @@ function Harness() {
               onUpcomingMealPickApplied={DAYMOVE ? mealDays.applyPick : undefined}
               onMealDayMovePlan={DAYMOVE ? mealDays.dayMove.plan : undefined}
               onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
-              mealTopUp={TOPUP && macros ? { needs: topUpNeeds(pools as never, topUpSlots as never), building: false } : null}
+              mealTopUp={TOPUP && macros ? { ...topUpPlan(pools as never, topUpSlots as never, macros), building: false } : null}
               onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}
               onMealTopUpConfirm={TOPUP && macros ? async () => {
                 const r = await topUpMealPlan({
-                  profileId: PROFILE_ID, today: isoOf(anchorDate()), needs: topUpNeeds(pools as never, topUpSlots as never),
+                  profileId: PROFILE_ID, today: isoOf(anchorDate()), needs: topUpPlan(pools as never, topUpSlots as never, macros).needs,
                   generation: { targets: macros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: 3, includeSnacks: false },
                 })
                 if (r.added > 0) await reloadPools()

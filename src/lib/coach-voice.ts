@@ -181,6 +181,32 @@ export function moreMealOptionsOffer(counts: number[], target: number): string {
   return `${have} I can top each one up to ${target}, so your week repeats less. Today, and any day on your shopping list, stay exactly as they are.`
 }
 
+const MEAL_PLURAL: Record<string, string> = { breakfast: 'breakfasts', lunch: 'lunches', dinner: 'dinners', snack: 'snacks' }
+const joinPlain = (items: string[]) =>
+  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+
+/**
+ * THE OFFER FOR A MEAL WITH SEVEN DISHES AND FEW THAT FIT (30 Sep 2026): the
+ * count above says "you have five", this says "you have seven and two of them
+ * work". One meal gets its numbers; several get none, because a sentence
+ * carrying three ratios is one nobody reads. "Fit" is the assembler's own
+ * test (a day with that dish lands within the bands), so it is the word the
+ * rest of the app uses for a day that works.
+ */
+export function moreMealFitOffer(items: { slot: string; fitting: number; have: number }[]): string {
+  const promise = 'Today, and any day on your shopping list, stay exactly as they are.'
+  if (items.length === 1) {
+    const { slot, fitting, have } = items[0]
+    const plural = MEAL_PLURAL[slot] ?? `${slot}s`
+    const lead = fitting === 0
+      ? `None of your ${have} ${plural} fit your targets right now, so your ${plural} keep repeating.`
+      : `Only ${fitting} of your ${have} ${plural} ${fitting === 1 ? 'fits' : 'fit'} your targets right now, so your ${plural} keep repeating.`
+    return `${lead} I can add some that do. ${promise}`
+  }
+  const names = joinPlain(items.map(i => MEAL_PLURAL[i.slot] ?? `${i.slot}s`))
+  return `Very few of your ${names} fit your targets right now, so they keep repeating. I can add some that do. ${promise}`
+}
+
 /**
  * What happened when she tapped it. Every outcome says whether anything
  * changed, because "nothing has changed" is the fact she needs when it fails.
@@ -222,11 +248,17 @@ export const MORE_MEALS = {
   unchanged: 'Today and every day on your shopping list, and every option you already have — nothing is removed or resized.',
   starts: (startLabel: string) => `The new meals start ${startLabel}; every day before then stays as it was.`,
   takesAMoment: 'Finding new meals takes a moment.',
+  /** Completes "Do you want me to ..." when a meal has dishes but too few that fit. */
+  leadFit: 'add meals that fit your targets, where too few of your dishes do',
   /** A row's before and after. */
   options: (n: number) => `${n} option${n === 1 ? '' : 's'}`,
+  /** The same row when it is about fit: what is there now, and what the top-up can reach. */
+  fitBefore: (fitting: number, have: number) => `${fitting} of ${have} fit`,
+  fitAfter: (fitting: number, have: number) => `up to ${fitting} of ${have} fit`,
   /** No card, and why: the three days the request cannot be met. */
   refusals: {
-    full: (size: number) => `Every meal already has ${size} options, so there's nothing to add. If the same ones keep coming up, tell me which and I'll swap them.`,
+    full: (size: number) => `Every meal already has at least ${size} options, so there's nothing to add. If the same ones keep coming up, tell me which and I'll swap them.`,
+    crowded: "Some of your meals have plenty of dishes but few that fit your targets, and adding more would slow the app down, so I can't top them up. If the same ones keep coming up, tell me which and I'll swap them.",
     building: "I'm still building your first set of meals — give me a moment and ask me again.",
     noBody: "I need your height, weight, age and sex before I can build meals around your targets — you can add them in Profile.",
     listUnreadable: "I couldn't check your shopping list just then, so I can't say which days would stay as they are. Try again in a moment.",

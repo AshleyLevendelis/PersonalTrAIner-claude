@@ -19,15 +19,19 @@
  *      did);
  *   4. the offer's arithmetic: what is short, from when, and the run order;
  *   5. the meal generator stamps what it adds, and only then;
- *   6. the wording, and the wiring a screen cannot show.
+ *   6. the wording, and the wiring a screen cannot show;
+ *   7. the coach can do it too, through the same run;
+ *   8. seven dishes of which two fit is not seven options (30 Sep 2026): the
+ *      offer for a meal with too few that FIT, by Ashley's ruling of fewer
+ *      than three.
  */
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { computeSlotBudgets, type AssembledDay, type PoolOption } from '../src/lib/meal-generation'
-import { buildRotation, serveDates, addDays, datesFrom, poolsServedOn } from '../src/lib/meal-rotation'
+import { buildRotation, assembleRotationDay, serveDates, addDays, datesFrom, poolsServedOn } from '../src/lib/meal-rotation'
 import { newFromDate, tagsNewFrom, isBookkeepingTag, displayTags, NEW_FROM_TAG_PREFIX } from '../src/lib/meal-new-from'
-import { topUpNeeds, topUpStartDate, topUpStartLabel, runMealTopUp, topUpOffer } from '../src/lib/meal-top-up'
+import { topUpNeeds, topUpStartDate, topUpStartLabel, runMealTopUp, topUpOffer, topUpPlan, fittingCounts, isTopUpDismissed, dismissTopUp, MIN_FITTING, FITTING_GOAL, MAX_POOL, type TopUpPlan } from '../src/lib/meal-top-up'
 import { moreMealOptionsOffer, moreMealOptionsDone, moreMealOptionsWhy, MORE_MEALS } from '../src/lib/coach-voice'
 import type { MealSlotName } from '../src/lib/meal-store'
 import type { MacroTargets } from '../src/lib/types'
@@ -390,9 +394,11 @@ async function main() {
 
     const app = read('src/App.tsx')
     const grocery = read('src/lib/grocery-store.ts')
-    check('the offer counts only the meals she can be served (the marked pools)', /topUpNeeds\(mealPools, activeMealSlots\)/.test(app) && /const mealPools = useServablePools\(/.test(app))
-    check('...waits while the first plan is being built, and respects "Not now"', /const mealTopUpOffer = !initialMealBuild && !mealTopUpDismissed \? topUpOffer\(mealTopUpNeeds\) : null/.test(app))
-    check('...and there is no offer when nothing is short', topUpOffer({}) === null && topUpOffer({ dinner: 2 }) === moreMealOptionsOffer([5], 7))
+    check('the offer counts only the meals she can be served (the marked pools)', /topUpPlan\(mealPools, activeMealSlots, macros\)/.test(app) && /const mealPools = useServablePools\(/.test(app))
+    check('...waits while the first plan is being built, and respects "Not now"', /const mealTopUpOfferNow = !initialMealBuild && mealTopUpPlan \? topUpOffer\(mealTopUpPlan, mealTopUpDismissed\) : null/.test(app))
+    const nothingShort: TopUpPlan = { needs: {}, short: {}, have: {}, fewFit: {}, crowded: [] }
+    check('...and there is no offer when nothing is short', topUpOffer(nothingShort) === null
+      && topUpOffer({ ...nothingShort, needs: { dinner: 2 }, short: { dinner: 2 }, have: { dinner: 5 } })?.text === moreMealOptionsOffer([5], 7))
     // RE-ANCHORED 29 Sep 2026: the run moved into runMealTopUpNow so the
     // coach's confirm and the button share it. The property is unchanged: the
     // run calls the shared function with today and what is short.
@@ -453,7 +459,8 @@ async function main() {
       /failed: outcome\.added < outcome\.asked\s*\?/.test(confirm) && /outcome\?\.why/.test(confirm), confirm.slice(0, 300))
     check('the button and the coach go through ONE run in App',
       (app.match(/await runMealTopUpNow\(\)/g) ?? []).length === 2 && /onMealTopUpConfirm=\{handleMealTopUpFromChat\}/.test(app))
-    check('...the coach is told the needs the app computes for the button, not its own', /mealTopUp=\{macros \? \{ needs: mealTopUpNeeds, building: initialMealBuild \} : null\}/.test(app))
+    check('...the coach is told the plan the app computes for the button, not its own', /mealTopUp=\{mealTopUpPlan \? \{ \.\.\.mealTopUpPlan, building: initialMealBuild \} : null\}/.test(app)
+      && /const mealTopUpNeeds = mealTopUpPlan\?\.needs \?\? \{\}/.test(app))
     check('...and its receipt is in the chat, without setting the Nutrition tab\'s banner',
       !/setMealTopUpNote/.test(app.slice(app.indexOf('const handleMealTopUpFromChat'), app.indexOf('const previewMealTopUpStart'))))
     const card = read('src/components/chat/ReceiptCard.tsx')
@@ -468,9 +475,9 @@ async function main() {
       && !/Try again/.test(moreMealOptionsDone({ added: 0, asked: 2, reached: true, listUnreadable: false, startLabel: '' })))
     check('the phrasebook has the receipt words', /propose_meal_top_up: \{ done: 'Added', failed: "I couldn't add more meals" \}/.test(voice))
     const refusals = Object.values(MORE_MEALS.refusals).map(r => typeof r === 'function' ? r(7) : r)
-    check('every refusal is a full sentence that names no control', refusals.length === 4
+    check('every refusal is a full sentence that names no control', refusals.length === 5
       && refusals.every(r => /[.]$/.test(r) && !/button|tab\b|Regenerate|Get more options|Profile screen/i.test(r.replace('you can add them in Profile', ''))), refusals)
-    check('...the "full" one names the size and offers to swap instead', /Every meal already has 7 options, so there's nothing to add\./.test(MORE_MEALS.refusals.full(7)) && /I'll swap them/.test(MORE_MEALS.refusals.full(7)))
+    check('...the "full" one names the size and offers to swap instead', /Every meal already has at least 7 options, so there's nothing to add\./.test(MORE_MEALS.refusals.full(7)) && /I'll swap them/.test(MORE_MEALS.refusals.full(7)))
     check('...and the card\'s "unchanged" is ONE item with no full stop of its own (the card joins items with commas)',
       MORE_MEALS.unchanged.split('—').length === 2 && !/\.\s*$/.test(MORE_MEALS.unchanged.slice(0, -1)) )
 
@@ -499,6 +506,160 @@ async function main() {
     check('the preview names the day after the last list day, and how the card says it', ok?.from === '2026-09-30' && ok.label === 'on Wednesday', ok)
     listFails = true
     check('...and is null when the list cannot be read (the card then refuses)', (await previewTopUpStart({ profileId: 'pv', today: TODAY })) === null)
+  }
+
+  console.log('\n8. Seven dishes of which two fit is not seven options')
+  {
+    // A FIXTURE WITH A KNOWN NUMBER THAT FIT. Dinners are `good` dishes sized
+    // to the dinner budget plus bad ones at 2.4x it (too big for any day to
+    // absorb); the other meals are ordinary. The seeds were found by scanning
+    // for the fixture whose dinner count comes out exactly right, and each
+    // count is asserted below rather than trusted.
+    const T8: MacroTargets = { calories: 2200, protein: 165, carbs: 230, fat: 70 }
+    const ALL: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
+    const B8 = computeSlotBudgets(T8, 3, true)
+    const scaled = (b: MacroTargets, k: number): MacroTargets => ({ calories: b.calories * k, protein: b.protein * k, carbs: b.carbs * k, fat: b.fat * k })
+    const build8 = (seed: number, good: number, total: number): Pools => {
+      const rnd = mulberry32(seed)
+      const mk = (slot: MealSlotName, n: number, k: number, off: number) =>
+        Array.from({ length: n }, (_, i) => makeDish(rnd, slot, off + i, scaled(B8[slot]!, k))).filter((o): o is PoolOption => o !== null)
+      return {
+        breakfast: mk('breakfast', 7, 1, 0), lunch: mk('lunch', 7, 1, 20),
+        dinner: [...mk('dinner', good, 1, 40), ...mk('dinner', total - good, 2.4, 60)],
+        snack: mk('snack', 7, 1, 80),
+      }
+    }
+    const SEED = { g0: 10, g1: 16, g2: 5, g3: 3, g4: 50 }
+    const p2 = build8(SEED.g2, 2, 7)
+    const p3 = build8(SEED.g3, 3, 7)
+    const p1 = build8(SEED.g1, 1, 7)
+    const p0 = build8(SEED.g0, 0, 7)
+    const fit = (pools: Pools) => fittingCounts(pools, ALL, T8)
+
+    check('the three numbers are three, five and ten', MIN_FITTING === 3 && FITTING_GOAL === 5 && MAX_POOL === 10)
+    // Sanity on the fixture first, so a later check cannot pass over a fixture that drifted.
+    check('fixture: seven dinners, of which exactly 0, 1, 2 and 3 fit', p2.dinner?.length === 7 && fit(p0).dinner === 0 && fit(p1).dinner === 1 && fit(p2).dinner === 2 && fit(p3).dinner === 3,
+      [fit(p0).dinner, fit(p1).dinner, fit(p2).dinner, fit(p3).dinner])
+    check('...and the other meals fit comfortably (four or more), so only dinner is in question', ALL.filter(s => s !== 'dinner').every(s => (fit(p2)[s] ?? 0) >= 4), fit(p2))
+
+    // A dish that breaks a restriction is not servable, so it cannot be one that fits.
+    const marked: Pools = { ...p2, dinner: p2.dinner!.map((o, i) => (i < 2 ? { ...o, breaksRestriction: true } : o)) }
+    check('a dish marked as breaking a restriction is not counted as fitting', fit(marked).dinner === 0, fit(marked))
+    check('...nor as one she has: seven dinners, two marked, five she can be served', topUpPlan(marked, ALL, T8).have.dinner === 5, topUpPlan(marked, ALL, T8).have)
+    // A meal with nothing in it is a missing meal, not evidence about its neighbours.
+    check('with a meal missing altogether there is no fit judgement at all', JSON.stringify(fit({ ...p2, lunch: [] })) === '{}'
+      && Object.keys(topUpPlan({ ...p2, lunch: [] }, ALL, T8).fewFit).length === 0)
+
+    const plan2 = topUpPlan(p2, ALL, T8), plan3 = topUpPlan(p3, ALL, T8), plan1 = topUpPlan(p1, ALL, T8), plan0 = topUpPlan(p0, ALL, T8)
+    check('two that fit is too few, three is not (her ruling: fewer than three)', plan2.fewFit.dinner === 2 && plan3.fewFit.dinner === undefined,
+      [plan2.fewFit, plan3.fewFit])
+    check('...a meal with seven dishes and two that fit is NOT short by count, and is still offered more', plan2.short.dinner === undefined && plan2.needs.dinner === 3, plan2)
+    // THE GOAL. In a pool of five there is room for five more, so the ask aims
+    // at five that fit: none fitting asks for five, one for four.
+    const p0of5 = build8(SEED.g0, 0, 5), p1of5 = build8(SEED.g1, 1, 5)
+    check('fixture: none of five and one of five fit', fit(p0of5).dinner === 0 && fit(p1of5).dinner === 1, [fit(p0of5).dinner, fit(p1of5).dinner])
+    check('the ask aims at five that fit: none asks for five, one for four, two for three',
+      topUpPlan(p0of5, ALL, T8).needs.dinner === 5 && topUpPlan(p1of5, ALL, T8).needs.dinner === 4 && plan2.needs.dinner === 3,
+      [topUpPlan(p0of5, ALL, T8).needs.dinner, topUpPlan(p1of5, ALL, T8).needs.dinner, plan2.needs.dinner])
+    check('...but a pool of seven has room for only three, however few fit', plan0.needs.dinner === 3 && plan1.needs.dinner === 3, [plan0.needs.dinner, plan1.needs.dinner])
+    check('...and a meal with enough that fit asks for nothing', plan3.needs.dinner === undefined && Object.keys(plan3.needs).length === 0, plan3.needs)
+    check('the meals with enough that fit are left out of it entirely', ALL.filter(s => s !== 'dinner').every(s => plan2.needs[s] === undefined && plan2.fewFit[s] === undefined), plan2)
+
+    // THE CAP. One that fits in a pool of nine has room for exactly one more;
+    // in a pool of ten it has none, and the app says so rather than adding.
+    const p1of9 = build8(SEED.g1, 1, 9), p1of10 = build8(SEED.g1, 1, 10)
+    const plan9 = topUpPlan(p1of9, ALL, T8), plan10 = topUpPlan(p1of10, ALL, T8)
+    check('fixture: one of nine and one of ten fit', fit(p1of9).dinner === 1 && fit(p1of10).dinner === 1, [fit(p1of9).dinner, fit(p1of10).dinner])
+    check('a pool of nine is asked for one more, not four (never past ten)', plan9.needs.dinner === 1 && plan9.fewFit.dinner === 1 && plan9.crowded.length === 0, plan9)
+    check('a pool already at ten is not asked for more, and is named as crowded', plan10.needs.dinner === undefined && plan10.fewFit.dinner === undefined && plan10.crowded.join() === 'dinner', plan10)
+
+    // THE LARGER OF THE TWO SHORTFALLS. Three dinners, two of which fit: short
+    // of seven by four, short of five that fit by three.
+    const p2of3 = build8(SEED.g2, 2, 3), plan2of3 = topUpPlan(p2of3, ALL, T8)
+    check('fixture: two of three fit', fit(p2of3).dinner === 2)
+    check('the ask is the larger of the count shortfall and the fit shortfall (four, not three)', plan2of3.short.dinner === 4 && plan2of3.needs.dinner === 4 && plan2of3.fewFit.dinner === 2, plan2of3)
+    const p2of5 = build8(SEED.g2, 2, 5), plan2of5 = topUpPlan(p2of5, ALL, T8)
+    check('...and when the fit shortfall is the larger it wins (five dinners, two fit: three, not two)', fit(p2of5).dinner === 2 && plan2of5.short.dinner === 2 && plan2of5.needs.dinner === 3, plan2of5)
+
+    // THE WORDS. Exact sentences: the numbers in them come from the plan.
+    const S = 'Today, and any day on your shopping list, stay exactly as they are.'
+    const offer2 = topUpOffer(plan2)
+    check('the offer for two of seven, in full', offer2?.kind === 'fit'
+      && offer2.text === `Only 2 of your 7 dinners fit your targets right now, so your dinners keep repeating. I can add some that do. ${S}`, offer2)
+    check('...one that fits reads "fits", none reads "None of"', topUpOffer(plan1)?.text === `Only 1 of your 7 dinners fits your targets right now, so your dinners keep repeating. I can add some that do. ${S}`
+      && topUpOffer(plan0)?.text === `None of your 7 dinners fit your targets right now, so your dinners keep repeating. I can add some that do. ${S}`)
+    const both: TopUpPlan = { needs: { lunch: 3, dinner: 3 }, short: {}, have: { lunch: 7, dinner: 7 }, fewFit: { lunch: 2, dinner: 1 }, crowded: [] }
+    check('several meals: names them and no ratios', topUpOffer(both)?.text === `Very few of your lunches and dinners fit your targets right now, so they keep repeating. I can add some that do. ${S}`, topUpOffer(both))
+    check('...and it promises what the button promises: today and the shopping-list days stay', /Today, and any day on your shopping list, stay exactly as they are\.$/.test(offer2?.text ?? ''))
+    const countAndFit: TopUpPlan = { needs: { dinner: 4, lunch: 2 }, short: { lunch: 2, dinner: 4 }, have: { lunch: 5, dinner: 3 }, fewFit: { dinner: 2 }, crowded: [] }
+    check('when both are true the fit offer comes first', topUpOffer(countAndFit)?.kind === 'fit')
+    check('...turning it down brings the count offer, turning down both brings none',
+      topUpOffer(countAndFit, { count: false, fit: true })?.kind === 'count' && topUpOffer(countAndFit, { count: true, fit: true }) === null
+      && topUpOffer(countAndFit, { count: true, fit: false })?.kind === 'fit')
+    check('a plan with nothing wrong offers nothing, even with every kind switched on', topUpOffer(plan3) === null, topUpOffer(plan3))
+
+    // "NOT NOW", per kind. The fit one is keyed on her targets, so the offer
+    // returns when they move; the count one is unchanged.
+    const store = new Map<string, string>()
+    ;(globalThis as unknown as { localStorage: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v) } }
+    const other: MacroTargets = { ...T8, calories: 2100 }
+    dismissTopUp('pd', 'fit', T8)
+    check('turning down the fit offer is remembered for those targets', isTopUpDismissed('pd', 'fit', T8) === true)
+    check('...but not for others (her targets moved), and not as the count offer', isTopUpDismissed('pd', 'fit', other) === false && isTopUpDismissed('pd', 'count') === false && isTopUpDismissed('pd') === false)
+    dismissTopUp('pd', 'count')
+    check('...and the count offer is remembered on its own', isTopUpDismissed('pd', 'count') === true && isTopUpDismissed('pd', 'fit', other) === false)
+
+    // WHAT NO BROWSER PAGE BOOTS: App.tsx's own wiring (the harness pages carry
+    // the real screens and the real functions, not App). Source checks, and
+    // named as that: they hold that the lines exist and say the right thing,
+    // not that the branch is reached.
+    const app8 = read('src/App.tsx')
+    check('App: turning the offer down turns down the KIND that was shown, for her current targets',
+      /dismissTopUp\(profile\.id, mealTopUpOfferNow\.kind, macros \?\? undefined\)/.test(app8))
+    check('...and both kinds are read back separately, the fit one for those same targets',
+      /count: profile\?\.id \? isTopUpDismissed\(profile\.id, 'count'\)/.test(app8) && /fit: profile\?\.id \? isTopUpDismissed\(profile\.id, 'fit', macros \?\? undefined\)/.test(app8))
+    check('...and the coach card is built from the same plan, the "crowded" refusal ahead of the "full" one',
+      /crowded\.length > 0 \? MORE_MEALS\.refusals\.crowded : MORE_MEALS\.refusals\.full\(DEFAULT_POOL_SIZE\)/.test(read('src/components/ChatAssistant.tsx')))
+
+    // THE CLAIM THE SENTENCE MAKES, MEASURED: a flagged dinner really is a
+    // samey week, and the dishes the ask names really do end the flag. Same
+    // modelled pools as measure:meal-repeats, seven dishes a meal, targets
+    // 10% above the ones the pools were made for.
+    const SHAPE8 = { mealsPerDay: 3, includeSnacks: true, batchCooking: true }
+    const distinctDinners = (pools: Pools, t: MacroTargets) => {
+      const rot = buildRotation(pools, t, [], SHAPE8)
+      return new Set(WEEK.map(d => assembleRotationDay(rot, d, pools, t, [], {}).chosen.dinner?.name)).size
+    }
+    let flagged = 0, unflagged = 0, flaggedSum = 0, unflaggedSum = 0, cleared = 0, afterSum = 0
+    for (let p = 0; p < 150; p++) {
+      const rnd = mulberry32(7000 + p)
+      const calories = 1700 + Math.round(rnd() * 1300)
+      const protein = Math.round((calories * (0.25 + rnd() * 0.1)) / 4), fat = Math.round((calories * (0.25 + rnd() * 0.1)) / 9)
+      const t: MacroTargets = { calories, protein, fat, carbs: Math.round((calories - protein * 4 - fat * 9) / 4) }
+      const made: MacroTargets = { calories: Math.round(calories * 1.1), protein: Math.round(protein * 1.1), fat: Math.round(fat * 1.1), carbs: Math.round(t.carbs * 1.1) }
+      const bMade = computeSlotBudgets(made, 3, true), bNow = computeSlotBudgets(t, 3, true)
+      const pools: Pools = {}
+      for (const [slot, b] of Object.entries(bMade) as [MealSlotName, MacroTargets][]) pools[slot] = Array.from({ length: 7 }, (_, i) => makeDish(rnd, slot, i, b)).filter((o): o is PoolOption => o !== null)
+      if (Object.values(pools).some(v => (v?.length ?? 0) < 3)) continue
+      const plan = topUpPlan(pools, ALL, t)
+      const dinners = distinctDinners(pools, t)
+      if (plan.fewFit.dinner === undefined) { unflagged++; unflaggedSum += dinners; continue }
+      flagged++; flaggedSum += dinners
+      const more: Pools = {}
+      for (const slot of ALL) {
+        const extra = Array.from({ length: plan.needs[slot] ?? 0 }, (_, i) => makeDish(rnd, slot, 100 + i, bNow[slot]!)).filter((o): o is PoolOption => o !== null)
+          .map(o => ({ ...o, name: `${o.name} (new)` }))
+        more[slot] = [...(pools[slot] ?? []), ...extra]
+      }
+      if (topUpPlan(more, ALL, t).fewFit.dinner === undefined) cleared++
+      afterSum += distinctDinners(more, t)
+    }
+    const flaggedAvg = flaggedSum / Math.max(1, flagged), unflaggedAvg = unflaggedSum / Math.max(1, unflagged), afterAvg = afterSum / Math.max(1, flagged)
+    console.log(`  measured: ${flagged} flagged serve ${flaggedAvg.toFixed(2)} different dinners a week, ${unflagged} unflagged ${unflaggedAvg.toFixed(2)}; after the ask ${afterAvg.toFixed(2)}, flag cleared on ${cleared}/${flagged}`)
+    check('the population has both kinds, so the comparison means something', flagged >= 20 && unflagged >= 20, [flagged, unflagged])
+    check('a flagged meal really is a samey week: over a dinner fewer than the rest', flaggedAvg < unflaggedAvg - 1, [flaggedAvg, unflaggedAvg])
+    check('...and adding what it asks ends the flag for nearly all of them', cleared >= flagged * 0.9, [cleared, flagged])
+    check('...and gives a week with at least half a dinner more', afterAvg > flaggedAvg + 0.5, [afterAvg, flaggedAvg])
   }
 
   console.log(`\n${ran} checks ran`)

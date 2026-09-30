@@ -73,3 +73,55 @@ So a held day is not re-pinned; it is **worked out from the pool as it was**.
 - `test:meal-days` §3 (list = tab for every date) keeps holding.
 - `verify:meal-top-up`: the button on a real screen, today unchanged after
   the tap, the receipt, "Not now".
+
+## Seven dishes of which two fit (30 Sep 2026)
+
+Ashley, on "all the days' meals look very similar": a meal can hold seven
+dishes and serve two of them, because the rest no longer land a day on her
+numbers (her targets moved after they were made). The count above cannot see
+that, and the offer stayed quiet.
+
+**Measured first** (modelled pools, 150 profiles, targets 10% above the ones
+the pools were made for): a dinner with fewer than three dishes that fit
+served **2.7 different dinners in a week; the rest served 4.0**. Adding the
+dishes the ask names cleared the flag on every one of the 52 flagged
+profiles and lifted the week to 3.7. "Fit" is the assembler's own test: pin the
+dish in its meal, let the search choose the rest, and ask whether the day it
+would serve lands within the tolerance bands.
+
+**Her ruling, from three options: speak when FEWER THAN THREE fit** (over
+fewer than four, and over only one or none). It is still an offer, the same
+button and the same promise (today and the shopping-list days stay), never
+done unasked. It went into the existing offer rather than a second one.
+
+**Mine, named:**
+- FITTING_GOAL 5: the ask aims at five that fit (a week of five dinners uses
+  all five, `measure:meal-repeats`, 28 Sep).
+- MAX_POOL 10: the day search is a product over the meals, so a pool of ten
+  costs a week about 3.4x a pool of seven (measured 30 Sep). A pool already at
+  ten is not asked for more; the coach says why, and the screen says nothing.
+  In a pool of seven that leaves room for three more, so the ask is three
+  however few fit.
+- The two shortfalls (seven servable, five that fit) are asked for together as
+  the LARGER of the two, so one tap covers both.
+- "Not now" for the fit offer is remembered per calorie and protein target:
+  her targets moving is what makes dishes stop fitting, so it asks again.
+
+**One computation for both surfaces**: App works out a `TopUpPlan` once
+(what to ask for, what is short by count, what she has, which meals have too
+few that fit, which are crowded) and hands it to the Nutrition offer and to
+the coach's card, so the coach cannot offer what the button would not. The
+card reads "2 of 7 fit" to "up to 5 of 10 fit".
+
+**Not built, named:** replacing dishes that no longer fit (nothing recorded is
+lost, and a kept meal survives a regenerate by her ruling), and a fit measure
+in the meal-quality gate (`test:meal-quality` needs a live database).
+
+## What proves the fit offer
+
+- `test:meal-top-up` section 8: the fit count on fixtures with a known number
+  that fit, the three numbers, the threshold at two versus three, the pool
+  cap, the larger of the two shortfalls, the exact sentences, the "Not now"
+  keys, App's wiring, and the population claim measured on every run.
+- `verify:meal-top-up` [7] and `verify:chat-top-up` [7]-[8]: the screen's
+  offer and receipt, the coach's card and its refusal for a crowded meal.

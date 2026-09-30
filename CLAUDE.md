@@ -282,9 +282,23 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   hands it to both, and the card names what stays and the day the new meals
   start before the tap. A complaint ("it's the same dinners") gets a reply and
   an offer; the card comes on her yes. Needs the `chat-gemini` deploy for chat.
-  `meal-pool-size` (22 checks, 11 mutations), `meal-top-up` (95 checks, 46
-  mutations), `verify:meal-top-up` (31 checks, 9 mutations),
-  `verify:chat-top-up` (38 checks, 11 mutations), `meal-days` §3b
+  **And seven dishes of which two fit is not seven options — both surfaces
+  since 30 Sep 2026**, on her "all the days' meals look very similar". A meal
+  can hold seven dishes and serve two, because the rest no longer land a day
+  on her numbers (targets move after meals are made): measured, a dinner with
+  fewer than three that fit served 2.7 different dinners a week against 4.0.
+  Her ruling, from three options: **speak when fewer than three fit**, the
+  same button and promise, never unasked. "Fit" is the assembler's own test
+  (the dish pinned, the day it would serve inside the bands). Mine: the ask
+  aims at five that fit, and a pool is never taken past ten (the search costs
+  a week about 3.4x more at ten than at seven). One `TopUpPlan` is worked out
+  once and handed to the offer and the coach's card. NOT confirmed on her own
+  plan: her saved meals cannot be read from a cloud session, so the cause of
+  HER week is the likeliest one, not a proven one. Needs the `chat-gemini`
+  deploy for chat.
+  `meal-pool-size` (22 checks, 11 mutations), `meal-top-up` (131 checks, 30
+  mutations in section 8), `verify:meal-top-up` (44 checks, 7 mutations),
+  `verify:chat-top-up` (55 checks, 7 mutations), `meal-days` §3b
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
@@ -1917,6 +1931,16 @@ old — the commands were right and the context was missing.
   state from before is still there, and a check reading "the offer comes
   back on a fresh plan" failed on correct code. Give each load its own
   address (a load counter, never the clock).
+- **TWO COPIES OF ONE DRIVER CANNOT RUN AT THE SAME TIME, AND A SWEEP IN A
+  WORKTREE DOES NOT PROTECT YOU FROM YOURSELF.** 30 Sep 2026: a release sweep
+  ran in a separate worktree (so the tree could keep being edited), and a
+  driver run in the main checkout reached the same browser at the same moment.
+  Each driver starts Chromium on its OWN fixed debug port (9493 for
+  `verify:meal-top-up`), so the second copy talked to the first one's browser
+  and the sweep's gate failed on code that was fine. It passed alone. A
+  worktree isolates FILES, not ports: while a sweep runs anywhere, do not run a
+  driver that the sweep has not yet passed, and re-run any gate that failed
+  while something else was running before believing the failure.
 - **A FAKE MUST FILL WHAT THE DATABASE FILLS.** 27 Sep 2026: the harness's
   fake inserted grocery rows with no `created_at`, which Postgres always
   sets. The list's read sorts on it, threw, fell back to "nothing", and the

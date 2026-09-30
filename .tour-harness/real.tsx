@@ -77,7 +77,7 @@ import { compileFoodDislikes } from '@/lib/fact-compiler'
 import type { UserFactRow } from '@/lib/memory-store'
 import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
 import { computeSlotBudgets } from '@/lib/meal-generation'
-import { topUpNeeds, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
+import { topUpPlan, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
 
@@ -810,6 +810,13 @@ const AVOID_FACTS = (AVOID ? [{
 // answer 502, the way a cut-off reply does.
 const TOPUP = new URLSearchParams(location.search).get('topup') === '1'
 const TOPUP_FAIL = new URLSearchParams(location.search).get('topupfail') === '1'
+// ?topfit=1 (with topup=1) — SEVEN DISHES A MEAL, ONE OF THEM A DINNER THAT FITS
+// (30 Sep 2026, Ashley on "all the days' meals look very similar"). The plan
+// is the FULL size, so the old count-based offer has nothing to say; six of
+// the seven dinners are far too big for any day, so only one can be served on
+// target. Nothing here says which offer shows: the app's own topUpPlan
+// counts, on the app's own targets.
+const TOPFIT = new URLSearchParams(location.search).get('topfit') === '1'
 // ?daymove=1 — SWAPPING A MEAL WITH ANOTHER DAY'S (29 Sep 2026, Ashley: they
 // swap places). Five options a meal (the top-up run's pools, so the week has
 // real variety to swap between), batch cooking ON so a lunch can be last
@@ -907,7 +914,18 @@ const topUpPools = (() => {
   }
   const out: Record<string, unknown[]> = {}
   for (const [slot, options] of Object.entries(leftoverPools)) {
-    out[slot] = [...options, variant(options[0], `${options[0].name}, lighter`, 0.95), variant(options[1], `${options[1].name}, larger`, 1.05)]
+    if (TOPFIT) {
+      // Seven a meal. Breakfast, lunch: the three plus four close variants,
+      // all servable. Dinner: the first one, and six at 2.3x (a feast that
+      // no other meal of the day can make room for). ONE that fits, not two:
+      // with one the plan asks for four and the room in a pool of seven is
+      // three, so the cap is what the receipt shows.
+      out[slot] = slot === 'dinner'
+        ? [options[0], ...[1, 2, 3, 4, 5, 6].map(n => variant(options[n % 3], `${options[n % 3].name}, feast ${n}`, 2.3))]
+        : [...options, ...[0.9, 0.95, 1.05, 1.1].map((k, n) => variant(options[n % 3], `${options[n % 3].name}, x${k}`, k))]
+    } else {
+      out[slot] = [...options, variant(options[0], `${options[0].name}, lighter`, 0.95), variant(options[1], `${options[1].name}, larger`, 1.05)]
+    }
   }
   return out
 })()
@@ -1000,11 +1018,18 @@ function Harness() {
   // ?topup=1: the button, through the app's own function. What App.tsx adds
   // around it (the first-build gate) is held by test:meal-top-up.
   const topUpSlots = driftedMacros ? Object.keys(computeSlotBudgets(driftedMacros, mealShape.mealsPerDay, mealShape.includeSnacks)) as never[] : []
-  const topUpNeedsNow = TOPUP ? topUpNeeds(servablePools as never, topUpSlots) : {}
+  const topUpPlanNow = TOPUP && driftedMacros ? topUpPlan(servablePools as never, topUpSlots, driftedMacros) : null
+  const topUpNeedsNow = topUpPlanNow?.needs ?? {}
   const [topUpBusy, setTopUpBusy] = useState(false)
   const [topUpNote, setTopUpNote] = useState<{ text: string; failed: boolean } | null>(null)
   const [, setTopUpDismissTick] = useState(0)
-  const topUpShown = TOPUP && !isTopUpDismissed(PROFILE_ID) ? topUpOffer(topUpNeedsNow) : null
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__topUpPlan = () => JSON.parse(JSON.stringify(topUpPlanNow))
+  }, [topUpPlanNow])
+  const topUpOfferNow = TOPUP && topUpPlanNow
+    ? topUpOffer(topUpPlanNow, { count: isTopUpDismissed(PROFILE_ID, 'count'), fit: isTopUpDismissed(PROFILE_ID, 'fit', driftedMacros ?? undefined) })
+    : null
+  const topUpShown = topUpOfferNow?.text ?? null
   const handleTopUp = async () => {
     if (!driftedMacros || topUpBusy) return
     setTopUpBusy(true)
@@ -1157,7 +1182,7 @@ function Harness() {
             onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop}
             mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
             onMealTopUp={() => { void handleTopUp() }}
-            onMealTopUpDecline={() => { dismissTopUp(PROFILE_ID); setTopUpDismissTick(t => t + 1) }}
+            onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}
             onDismissMealTopUpNote={() => setTopUpNote(null)}
             mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove} />
         )}
