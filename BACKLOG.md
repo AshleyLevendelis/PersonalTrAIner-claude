@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [ ] **THE INGREDIENT-UNIT FIX — PLANNED, NOT BUILT, WAITING ON HER "BUILD IT"
+  (1 Oct 2026; plan: `docs/plans/ingredient-units.md`).** Dietary and macro path,
+  so plan first. Read-only trace of every reader (file and line), then the
+  disputed claims re-run. **MEASURED: 31 of 53 ordinary recipe lines are costed
+  with an amount over 25% wrong, and all 31 still read as covered.** A meal of rice,
+  8 oz chicken, a tin of tuna, a pinch of salt, broccoli and oil: coverage 0.993,
+  protein 10 g (the chicken alone is about 70). **WHY NOTHING SAW IT: coverage is
+  weighted by mass and the mass is the misread number**, so a line whose mass is
+  mis-estimated small has no weight; no mass-weighted share can ever see it.
+  **CORRECTIONS to what this repo said:** (a) "8 oz is read as 8 grams" is not the
+  mechanism. Nothing recognises oz; it becomes a count of 8 "whole" with "oz" left
+  in the name, and the grams function ends in `return quantity`. (b) Tins and
+  pinches are NOT silent: they do not resolve (cost nothing, refuse a dieter's
+  dish). Cans, pounds, kilos, litres, cups, "half" and "1 large banana" are the
+  silent ones. (c) The old "19 of 115" was a different line set; not comparable.
+  (d) `cup` is 240 g for every food: 1 cup of oats costs 910 kcal. **THE COACH'S
+  `log_meal`, which writes what she ATE, runs the edge function's own copy of the
+  food database, and it differs:** the same line "3 egg, whole" is 5 kcal there
+  and 233 in the app. Its header claims a verbatim synced copy (false), and
+  `test:food-db-parity` compares allergen tags only. NOT measured: what the model
+  actually sends as `unit`, and how many stored meals carry a unit word in a name
+  (production is select-only; a read-only count on her machine would answer it).
+  **The diet check stays fail-closed and the plan pins that it cannot get more
+  permissive** (measured: tin of tuna and a pinch of salt refused for a vegan,
+  8 oz chicken resolves to meat and is refused, 2 cans of chickpeas pass). Staged:
+  (1) stop guessing, a line-count rule because mass cannot see it; (2) understand
+  oz, lb, kg, l, fractions, ranges, per-food cups and cans; (3) fix the prompts that
+  ask for cups. **Hers:** whether an unreadable own-meal line is asked about
+  ("how many grams?", recommended) or refused, and approving that "covered" will
+  mean food AND amount understood (it changes what a safety-adjacent number
+  measures). **Mine, CSCS delegation:** a pinch is negligible, a can is the
+  typical drained weight, a cup is the food's own density.
+
 - [x] **102 MORE MEALS, LEAN ONES — THE LIBRARY IS NOW 290, 1 Oct 2026 (her
   "start on the meals", from the next-steps list; on the branch, NOT on `main`).**
   The one weak spot the library's own measurement had named: big-appetite targets
@@ -200,7 +233,9 @@ Newest first. One line each.
   site's numbers (`meal-generation.ts` header). Readers trust STORED macros
   until the first resize, which silently replaces them, so a dish inserted with
   a website's numbers would show one figure and then another.
-  (3) *Measured, and the bigger finding:* the ingredient reader was built for
+  (3) *CORRECTED 1 Oct 2026, see the unit-fix plan above: the mechanism below is
+  wrong in detail (oz is not read as grams, it is not recognised) and tins and
+  pinches are not silent.* *Measured, and the bigger finding:* the ingredient reader was built for
   the model's metric output, not recipe text. On 115 hand-written, typical
   ingredient lines (written from general knowledge, none copied from a site),
   107 found a food but **19 of those carried an amount the reader misread**:

@@ -304,9 +304,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   from three options: **write our own and check them**, over an open recipe
   dataset and over copying sites (this cloud session cannot reach recipe sites
   at all, the app recomputes every macro from its own food database and never
-  reads anyone's numbers, and the ingredient reader misreads ounces, pounds,
-  kilos, tins and pinches on roughly one line in six while coverage still reads
-  100%). 290 original dishes (188 on 30 Sep, 102 lean ones added 1 Oct), no macros in them, used FIRST on the add path
+  reads anyone's numbers, and the ingredient reader costs ounces, pounds, kilos,
+  litres, cans, cups and "half" wrongly while coverage still reads 100%: 31 of 53
+  ordinary lines measured 1 Oct, mechanism and plan in
+  `docs/plans/ingredient-units.md`; tins and pinches are not silent, they do not
+  resolve at all). 290 original dishes (188 on 30 Sep, 102 lean ones added 1 Oct), no macros in them, used FIRST on the add path
   only (the button, the swap list's find more, the coach's top-up) and the meal
   writer asked only for the shortfall; every dish goes through the same
   `verifyProposal` for the person. **MEASURED, AND IT IS THE POINT: a dish the
