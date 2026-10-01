@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **RELEASE 1 Oct 2026: `main` fast-forwarded to `0df0bc12`, on her
+  explicit "Push to main".** 11 commits: the coach's top-up to seven, the
+  same-meal day swap, a food added counts as the same dish, offer more meals
+  when few fit, the different-meal swap with Undo, and the meal library. Plain
+  fast-forward from `6f82075d`, checked still a fast-forward just before the
+  push; origin read back directly (`main`, and the working branch, both at
+  `0df0bc12`). **Full sweep on that exact head, in a separate worktree:** 311
+  gates, 307 passed. The 4 failures each printed their own known cause:
+  `test:meal-quality` ("VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY must be
+  set"), `test:schema-parity` ("Failed to link to TEST"), `verify:rls` ("No
+  database to read, and no key given") and `test:coach-exam-fresh` (scores are
+  for `84f6086c`, the coach on disk is `e4ed4bbf`: the exam is owed on her
+  machine, and it failed identically at the previous commit). **Not in that
+  sweep:** `test:quality` (about 22 minutes). The previous full sweep did not run
+  it either, and nothing under the exercise engine changed since the swept head
+  `2e9c11da` (the one `warmup.ts` change is a comment, read off the diff), so
+  its result is carried, not re-measured. **Vercel (read from its API, not from
+  the live page):** the production deployment for `0df0bc12` is READY and
+  aliased to `personal-tr-a-iner-claude.vercel.app`, built from `main`, ready 29
+  seconds after the push; the same commit's preview had built READY before. Only
+  one Vercel project is visible to this session's connector (the earlier notes
+  say "both"; the second was not seen, so it is NOT verified). The live page
+  itself could not be fetched from this machine (egress). **STILL OWED ON HER
+  MACHINE:** the `chat-gemini` deploy (the coach's day-swap and top-up wording
+  needs it), the coach exam re-run, revoking the old Anthropic key. No
+  migration and no `generate-meals` deploy in this release. The sweep rewrote
+  tracked screenshots in the worktree only; none reached the branch.
+
 - [x] **A LIBRARY OF OUR OWN MEALS BEHIND "MORE OPTIONS" — BUILT 30 Sep 2026,
   her ruling.** Ashley: *"We should add more meals ... search the Internet for
   hundreds of meals with recipes and cooking instructions and macros."* The
