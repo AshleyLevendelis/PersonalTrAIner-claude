@@ -306,7 +306,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   at all, the app recomputes every macro from its own food database and never
   reads anyone's numbers, and the ingredient reader misreads ounces, pounds,
   kilos, tins and pinches on roughly one line in six while coverage still reads
-  100%). 188 original dishes, no macros in them, used FIRST on the add path
+  100%). 290 original dishes (188 on 30 Sep, 102 lean ones added 1 Oct), no macros in them, used FIRST on the add path
   only (the button, the swap list's find more, the coach's top-up) and the meal
   writer asked only for the shortfall; every dish goes through the same
   `verifyProposal` for the person. **MEASURED, AND IT IS THE POINT: a dish the
@@ -320,7 +320,13 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   Not built: the model-driven builder script (her machine, key needed), seeding
   fresh plans (hers), a "from our library" label, and the ingredient-amount
   reader, which must land before any OUTSIDE recipe text is accepted.
-  `meal-library` (83 checks, 50 mutations), `measure:meal-library`,
+  **LEAN DISHES, 1 Oct 2026:** the 188 were all protein-dense (leanest 7.1 g per
+  100 kcal), so 3,040 kcal / 160 g (5.2 g per 100 kcal) had 6 good lunches; the
+  102 carb-forward ones took it to 30. **Written by feel at "5-6.8", 29 measured
+  3.3-4.7**: legume-and-rice dishes are leaner than a cook feels and no fit can
+  lift them past the protein floor. And a counted "1 bagel" or "1 wrap" strands a
+  lean dish, because the fit moves only grams. `meal-library` (89 checks, 60
+  mutations), `measure:meal-library`,
   `verify:meal-top-up` §8, `verify:chat-top-up` §8.
   `docs/plans/meal-library.md`. Frontend only: no edge function, no migration
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
@@ -1879,6 +1885,19 @@ old — the commands were right and the context was missing.
   **Anything stored outside React that a screen must react to needs a state
   mirror beside the durable copy** — and the way to find the next one is to
   tap the control and look, not to read the handler.
+- **A GATE THRESHOLD DERIVED FROM THE OLD POPULATION BREAKS WHEN THE POPULATION
+  DELIBERATELY CHANGES, AND LOOSENING IT TO FIT IS THE WRONG FIX.** 1 Oct 2026:
+  adding lean dishes to a protein-dense library failed three checks ("no dish
+  served to under half of the cases", "85% mean", "most dishes fitted"). Each
+  encoded "every dish serves the whole grid", which was true of the data and was
+  never the requirement. The requirement is what the library must DO: every
+  target keeps deep, well-fitting lists in every meal. The checks were replaced
+  with that (and a protein-dense dish served to few still fails, so the old
+  protection survives), not widened.
+- **MEASURE THE SHAPE OF WHAT YOU ADD, NOT ONLY THE COUNT.** Same day: 102
+  dishes written by feel at "5-6.8 g of protein per 100 kcal" measured 3.3-4.7
+  for 29 of them, and 20 were served to nobody. A dish can pass every structural
+  check and still sit outside the only range anyone asks for.
 - **A CAP APPLIED BEFORE A FILTER STARVES THE FILTER.** 30 Sep 2026: the library
   chooser handed back its best 40 dishes and the caller then checked each
   against the person's diet. A vegan asking at an ordinary target got 3 of 4

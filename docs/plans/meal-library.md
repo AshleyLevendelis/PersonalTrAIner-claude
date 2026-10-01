@@ -70,6 +70,19 @@ check starved it: a vegan got 3 of 4 lunches when 13 exist). Named limit: a
 high-energy, lower-protein target still gets few good dishes; more
 low-protein-density dishes fix that, the fit will not.
 
+## Lean dishes (1 Oct 2026)
+
+The library's first 188 dishes were all protein-dense (the leanest 7.1 g per 100
+kcal), so a big appetite on a modest protein target (3,040 kcal / 160 g, 5.2 g
+per 100 kcal) had few dishes that fit. 102 carb-forward dishes were added
+(5.3-6.9 g as written; 290 in all: 67 / 84 / 95 / 44). Good-fit dishes at that
+target went 10/6/14/2 -> 24/30/33/13 (breakfast/lunch/dinner/snack). Rules the
+build taught, now pinned by `test:meal-library`: a lean dish needs a protein or
+carb food in grams for the fit to move (a counted bagel or wrap strands it), and
+a dish built on legumes and rice is leaner than it feels and needs a real
+protein food. The gate now holds per-target coverage rather than a per-dish
+"half of the grid", because lean dishes serve the leaner half on purpose.
+
 ## Decisions taken here, recorded (CSCS delegation: general performance nutrition)
 
 1. Effect: more variety inside the same calorie and protein targets. Nothing is
@@ -99,6 +112,6 @@ Every check mutation-tested. Browser drivers for the top-up screens re-run.
   that pass. It needs her model key, so it runs on her machine; a mocked
   end-to-end gate comes before it is ever run for real.
 - Seeding fresh plans from the library (hers to rule); a visible "from our library" label.
-- More dishes with a lower protein density, for high-energy targets.
+- More vegetarian lunches and dinners (28 of each pass the vegetarian check); egg-led dishes cannot be leaned because eggs are counted.
 - The ingredient-amount fix (oz, lb, kg, tins, pinch), needed before any outside
   recipe text is ever accepted.

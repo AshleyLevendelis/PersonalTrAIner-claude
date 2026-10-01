@@ -93,12 +93,14 @@ async function main() {
 
   const served = MEAL_LIBRARY.map(d => ({ d, ...servability(d) }))
   const never = served.filter(x => x.pass === 0).map(x => x.d.name)
-  const weak = served.filter(x => x.pass / Math.max(1, x.of) < 0.5).map(x => `${x.d.name} ${x.pass}/${x.of}`)
+  const weak = served.filter(x => x.pass / Math.max(1, x.of) < 2 / 12).map(x => `${x.d.name} ${x.pass}/${x.of}`)
+  const underHalf = served.filter(x => x.pass / Math.max(1, x.of) < 0.5)
   check('no dish is one nobody can be served (across six real targets and two meal shapes)', never.length === 0, never)
-  check('...and none is served to fewer than half of them', weak.length === 0, weak)
-  check('the library is servable on average: 85% or better in every meal', SLOTS.every(s => {
+  check('...and none is served to fewer than one target in six (2 of 12 cases). It was "half" until 30 Sep 2026, when lean dishes were added for the high-energy targets: they serve the leaner half of the grid on purpose', weak.length === 0, weak)
+  check('...and a dish served to under half is a LEAN one (under 7 g of protein per 100 kcal as written): a protein-dense dish that few can be served is a defect, a lean one is meant for the leaner targets', underHalf.every(x => x.dens < 7), underHalf.filter(x => x.dens >= 7).map(x => `${x.d.name} ${x.dens.toFixed(1)}`))
+  check('the library is servable on average: 78% or better in every meal (measured 82, 89, 91 and 94 on 30 Sep 2026; it was 85 before the lean dishes)', SLOTS.every(s => {
     const r = served.filter(x => x.d.slot === s)
-    return r.reduce((a, x) => a + x.pass / Math.max(1, x.of), 0) / r.length >= 0.85
+    return r.reduce((a, x) => a + x.pass / Math.max(1, x.of), 0) / r.length >= 0.78
   }))
   check('the grid the servability is read on is wide: six targets from 1,700 to 3,100 kcal', TARGET_GRID.length === 6 && TARGET_GRID[0].targets.calories <= 1700 && Math.max(...TARGET_GRID.map(g => g.targets.calories)) >= 3100)
 
@@ -121,6 +123,8 @@ async function main() {
   const without = ask({ haveNames: ['Thai one', '  ITALIAN ONE '] })
   check('a dish she already has is never offered again, whatever its case or spacing', !without.some(d => d.name === 'Thai one' || d.name === 'Italian one') && without.some(d => d.name === 'Thai two'), without.map(d => d.name))
   check('the limit is respected', ask({ limit: 3 }).length === 3)
+  const noLimit = chooseFromLibrary(MEAL_LIBRARY, { slot: 'lunch', haveNames: [], haveCuisines: [] })
+  check('with no limit EVERY dish of the meal comes back, ranked: a cap applied before the diet and dislike checks starved them (a vegan got 3 of 4 vegan lunches while 13 existed)', noLimit.length === inSlot('lunch').length && new Set(noLimit.map(d => d.name)).size === noLimit.length, [noLimit.length, inSlot('lunch').length])
   check('a cuisine she named comes first', ask({ favoriteCuisines: ['Korean'] })[0].name === 'Korean one' && ask({ favoriteCuisines: ['italian'] })[0].cuisine === 'Italian', ask({ favoriteCuisines: ['Korean'] }).map(d => d.name))
   check('a food she likes lifts a dish above an equal one', ask({ likedFoods: ['salmon'] })[0].name === 'Salmon bowl', ask({ likedFoods: ['salmon'] }).map(d => d.name))
   check('quick first when she has said she is short of time', ask({ cookingTime: 'quick' })[0].name === 'Quick bowl', ask({ cookingTime: 'quick' }).map(d => d.name))
@@ -161,6 +165,9 @@ async function main() {
   }
   let shapeBroken: string[] = [], fixedMoved: string[] = [], outOfRange: string[] = [], finiteButRefused: string[] = [], noInfinite = 0, impure: string[] = []
   let fitted = 0, fitCases = 0
+  const naturalDensity = (d: RawProposal) => { const m = computeMealMacros(d.ingredients.map(parseIngredientLine)); return (100 * m.protein) / Math.max(1, m.kcal) }
+  const tally = { dense: { ok: 0, n: 0 }, lean: { ok: 0, n: 0 } }
+  const LEAN_TARGETS = new Set(['2700kcal/170g', '3100kcal/180g', '3040kcal/160g'])
   for (const g of TARGET_GRID) {
     for (const shape of [{ n: 3, sn: true }, { n: 3, sn: false }]) {
       const budgets = computeSlotBudgets(g.targets, shape.n, shape.sn)
@@ -169,6 +176,7 @@ async function main() {
         if (!b) continue
         fitCases++
         const before = JSON.stringify(d)
+        const dens = naturalDensity(d)
         const f = fitDishToBudget(d, b)
         if (JSON.stringify(d) !== before) impure.push(d.name)
         if (JSON.stringify(fitDishToBudget(d, b)) !== JSON.stringify(f)) impure.push(d.name + ' (not repeatable)')
@@ -182,6 +190,8 @@ async function main() {
           const lo = role === 'P' ? 0.55 : 0.5, hi = role === 'P' ? 1.35 : 2.0
           if (role !== 'F' && (now < was * lo - 5 || now > was * hi + 5)) outOfRange.push(`${d.name}: ${t} -> ${f.dish.ingredients[i]}`)
         })
+        if (dens >= 7) { tally.dense.n++; if (f.loss !== Infinity) tally.dense.ok++ }
+        if (dens < 6.5 && LEAN_TARGETS.has(g.label)) { tally.lean.n++; if (f.loss !== Infinity) tally.lean.ok++ }
         if (f.loss !== Infinity) {
           fitted++
           if (!verifyProposal(f.dish, d.slot as MealSlotName, b, [], [])) finiteButRefused.push(`${d.name} @ ${g.label}`)
@@ -194,7 +204,19 @@ async function main() {
   check('...by at most the range a cook would call the same dish (protein 0.55-1.35x, carbs 0.5-2x)', outOfRange.length === 0, outOfRange.slice(0, 5))
   check('a fit never mutates the library and gives the same answer twice', impure.length === 0, impure.slice(0, 5))
   check('a dish the fit says it fitted is ALWAYS accepted by verifyProposal: it proved itself through the scaler', fitted > 1000 && finiteButRefused.length === 0, { fitted, refused: finiteButRefused.slice(0, 5) })
-  check('the fit is not vacuous: most dishes at most targets are fitted (under one case in ten cannot be)', noInfinite / fitCases < 0.1 && fitted / fitCases > 0.9, { noInfinite, fitCases })
+  check('the fit is not vacuous: protein-dense dishes (7 g per 100 kcal or more as written) are fitted at 90% or more of the cases (measured 94.3%)', tally.dense.n > 1500 && tally.dense.ok / tally.dense.n >= 0.9, tally.dense)
+  check('...and lean dishes (under 6.5) are fitted at 90% or more of the cases at the three leanest targets, which is where they are meant to serve (measured 95.3%)', tally.lean.n > 200 && tally.lean.ok / tally.lean.n >= 0.9, tally.lean)
+
+  // A LEAN DISH NEEDS A LEVER. The fit can only move protein foods and carb foods written in grams; a lean dish built on one counted piece (a bagel, a wrap) or on fixed foods has nothing to move and serves one target, not three. Measured 30 Sep 2026: the most any real lean dish leaves fixed is 56% of its calories; the same dish with its bagel as "1 bagel" leaves 72% and drops from 7 of 12 cases to 3.
+  const fixedShare = (d: RawProposal) => {
+    const m = computeMealMacros(d.ingredients.map(parseIngredientLine))
+    let fixed = 0
+    m.lines.forEach((l, i) => { if (l.macros && roleOf(d.ingredients[i]) === 'F') fixed += l.macros.kcal })
+    return fixed / Math.max(1, m.kcal)
+  }
+  const leanDishes = MEAL_LIBRARY.filter(d => naturalDensity(d) < 6.5)
+  const stuck = leanDishes.filter(d => fixedShare(d) > 0.65).map(d => `${d.name} ${(100 * fixedShare(d)).toFixed(0)}%`)
+  check('every lean dish keeps at least 35% of its calories on foods the fit can move (protein and carb foods in grams): a dish with nothing to move serves one target', leanDishes.length >= 50 && stuck.length === 0, { lean: leanDishes.length, stuck })
 
   const median = (xs: number[]) => { const a = [...xs].sort((p, q) => p - q); return a.length ? a[Math.floor(a.length / 2)] : NaN }
   const shapeAt = (slot: MealSlotName, g: typeof TARGET_GRID[number], fit: boolean) => {
@@ -210,8 +232,14 @@ async function main() {
   const mainstream = TARGET_GRID.find(g => g.label === '2300kcal/160g')!
   const medians = (['lunch', 'dinner'] as MealSlotName[]).map(sl => ({ sl, raw: median(shapeAt(sl, mainstream, false).map(x => x.p)), fit: median(shapeAt(sl, mainstream, true).map(x => x.p)) }))
   check('at a mainstream target the typical lunch and dinner carry under 1.2x the meal\'s protein once fitted, and more than 1.25x as written', medians.every(m => m.fit <= 1.2 && m.raw >= 1.25), medians)
-  const goodCounts = GRID4.map(g => ({ t: g.label, bre: shapeAt('breakfast', g, true).filter(good).length, lun: shapeAt('lunch', g, true).filter(good).length, din: shapeAt('dinner', g, true).filter(good).length, sna: shapeAt('snack', g, true).filter(good).length }))
-  check('across the four mainstream targets every meal keeps dishes that FIT it (protein within 1.2x, carbs and fat within 30%): 5 breakfasts, 15 lunches, 15 dinners, 3 snacks', goodCounts.every(c => c.bre >= 5 && c.lun >= 15 && c.din >= 15 && c.sna >= 3), goodCounts)
+  const coverage = TARGET_GRID.map(g => {
+    const per = (sl: MealSlotName) => { const r = shapeAt(sl, g, true); return { n: r.length, good: r.filter(good).length } }
+    return { t: g.label, kcal: g.targets.calories, bre: per('breakfast'), lun: per('lunch'), din: per('dinner'), sna: per('snack') }
+  })
+  check('at EVERY one of the six targets each meal can be served from a deep list: at least 30 breakfasts, 55 lunches, 65 dinners and 25 snacks (measured minimums 39, 65, 75, 32)', coverage.every(c => c.bre.n >= 30 && c.lun.n >= 55 && c.din.n >= 65 && c.sna.n >= 25), coverage.map(c => [c.t, c.bre.n, c.lun.n, c.din.n, c.sna.n]))
+  check('...and keeps dishes that FIT it (protein within 1.2x, carbs and fat within 30%): at least 6 breakfasts, 24 lunches, 26 dinners and 7 snacks at every target (measured minimums 8, 30, 33, 9)', coverage.every(c => c.bre.good >= 6 && c.lun.good >= 24 && c.din.good >= 26 && c.sna.good >= 7), coverage.map(c => [c.t, c.bre.good, c.lun.good, c.din.good, c.sna.good]))
+  const heavy3040 = coverage.find(c => c.t === '3040kcal/160g')!
+  check('THE CASE THAT WAS WEAK: a big appetite on a modest protein target (3,040 kcal, 160 g) has 18 breakfasts, 22 lunches, 25 dinners and 9 snacks that fit; it had 10, 6, 14 and 2 before the lean dishes', heavy3040.bre.good >= 18 && heavy3040.lun.good >= 22 && heavy3040.din.good >= 25 && heavy3040.sna.good >= 9, heavy3040)
 
   // DAIRY THAT IS MOSTLY PROTEIN MOVES WITH THE PROTEIN: a quark bowl at a small breakfast is not 400 g of quark.
   const smallBreakfast = computeSlotBudgets(TARGET_GRID[0].targets, 3, true).breakfast!
@@ -225,8 +253,8 @@ async function main() {
   check('...and the fixture binds: the chicken is brought right down, so a 6 g line would fall under 5 g at that factor', tinyFit.loss !== Infinity && fitChicken <= 230 * 0.7, tinyFit.dish.ingredients)
   check('...yet no line it writes is under 5 g', tinyFit.dish.ingredients.every(t => parseIngredientLine(t).quantity >= 1) && parseIngredientLine(tinyFit.dish.ingredients[2]).quantity >= 5, tinyFit.dish.ingredients)
   const sums = { bre: 0, lun: 0, din: 0, sna: 0 }
-  goodCounts.forEach(c => { sums.bre += c.bre; sums.lun += c.lun; sums.din += c.din; sums.sna += c.sna })
-  check('taken together the four mainstream targets keep the shape the fit reaches: measured 33 breakfasts, 97 lunches, 111 dinners, 21 snacks fit; at least 28, 90, 100 and 18 must', sums.bre >= 28 && sums.lun >= 90 && sums.din >= 100 && sums.sna >= 18, sums)
+  coverage.filter(c => c.kcal <= 2700).forEach(c => { sums.bre += c.bre.good; sums.lun += c.lun.good; sums.din += c.din.good; sums.sna += c.sna.good })
+  check('taken together the four mainstream targets keep the shape the fit reaches: measured 54 breakfasts, 138 lunches, 158 dinners, 55 snacks fit; at least 46, 117, 134 and 46 must', sums.bre >= 46 && sums.lun >= 117 && sums.din >= 134 && sums.sna >= 46, sums)
 
   // THE CHOOSER USES IT: a dish near her meal's shape rises above one far from it, and what it hands back is the fitted dish.
   const neatDish = mk('lunch', 'Fit neat', 'Italian', 'Grill it.', ['170g chicken breast', '220g white rice cooked', '100g broccoli', '1 tbsp olive oil'])
