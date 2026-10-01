@@ -304,11 +304,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   from three options: **write our own and check them**, over an open recipe
   dataset and over copying sites (this cloud session cannot reach recipe sites
   at all, the app recomputes every macro from its own food database and never
-  reads anyone's numbers, and the ingredient reader costs ounces, pounds, kilos,
-  litres, cans, cups and "half" wrongly while coverage still reads 100%: 31 of 53
-  ordinary lines measured 1 Oct, mechanism and plan in
-  `docs/plans/ingredient-units.md`; tins and pinches are not silent, they do not
-  resolve at all). 290 original dishes (188 on 30 Sep, 102 lean ones added 1 Oct), no macros in them, used FIRST on the add path
+  reads anyone's numbers, and the ingredient reader COSTED ounces, pounds, kilos,
+  litres, cans, cups and "half" wrongly while coverage still read 100%: 31 of 53
+  ordinary lines measured 1 Oct, FIXED the same day, see "An amount is
+  understood or it is asked about" below). 290 original dishes (188 on 30 Sep, 102 lean ones added 1 Oct), no macros in them, used FIRST on the add path
   only (the button, the swap list's find more, the coach's top-up) and the meal
   writer asked only for the shortfall; every dish goes through the same
   `verifyProposal` for the person. **MEASURED, AND IT IS THE POINT: a dish the
@@ -331,6 +330,35 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   mutations), `measure:meal-library`,
   `verify:meal-top-up` §8, `verify:chat-top-up` §8.
   `docs/plans/meal-library.md`. Frontend only: no edge function, no migration
+- **An amount is understood or it is asked about — both surfaces since 1 Oct
+  2026**, on her "the unit fix", with two rulings from her "ask me, then build
+  it", each from options: **a line the app cannot read, typed into an own meal or
+  told to the coach, is asked about** ("how many grams?", nothing saved until she
+  answers), over refusing and over estimating; and **"understood" now means the
+  food AND the amount**, over leaving the meaning alone. MEASURED first: 31 of 53
+  ordinary recipe lines were costed more than 25% wrong while coverage read
+  99-100%, because coverage is weighted by mass and the mass is the misread
+  number (8 oz of chicken read as 8 g: coverage 0.993, protein 10 g of about 70).
+  One zero-import reader (`ingredient-units.ts`, a synced copy for the coach's
+  function) converts only what has ONE answer (oz, lb, kg, l, fractions, ranges,
+  "2 x 150g", a stated pack size, an amount written last) and hands anything that
+  depends on the FOOD (a cup of oats, a tin of tuna, a handful of rocket, a
+  carrot) to the food's own table, which is understood or flagged. Nothing is
+  guessed: pint, knob, "some", "to taste", juice of a lemon, and a cup, can or
+  handful of a food with no such weight are unread. `verifyProposal` refuses a
+  dish with an unread line in EVERY mode, including her own portions; the coach's
+  `log_meal` asks before it adds up; the meal writer's and the coach's prompts no
+  longer ask for ounces or cups. The coach's food-database copy had silently
+  drifted (3 eggs: 5 kcal there, 233 here) and is now byte-identical, held by a
+  gate. The diet path did not get more permissive (asked over 106 lines and 22
+  diets). **Counts of "covered" before 1 Oct are not comparable.** Not built:
+  repairing stored meals (no live users), the grocery list's display of an old
+  misparsed line. `ingredient-units` plan: `docs/plans/ingredient-units.md`.
+  `test:ingredient-units` (39 checks; 57 mutations across the reader, the food
+  weights, the refusal, the ask, the coach and the prompts, all caught, eight only
+  after a case where the thing binds was added), `verify:unit-ask` (15 checks, 10
+  mutations). The coach's half is held by source checks only until `chat-gemini`
+  is deployed. Needs the `chat-gemini` AND `generate-meals` deploys
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
@@ -1908,6 +1936,26 @@ old — the commands were right and the context was missing.
   and wrong as a result limit. The chooser now ranks the whole meal (30 ms for
   four) and the caller stops when it has enough. **A limit belongs AFTER the
   checks that can reject, or the checks must be inside it.**
+- **A FIXTURE IN A SHAPE NO REAL DATA HAS PASSES BY BEING MISREAD.** 1 Oct
+  2026: `verify:meal-tradeoff`'s meals were written amount-last ("potato boiled
+  250g"); every stored meal is amount-first ("250g potato boiled"). The old reader
+  costed each line at 1 g and the driver stayed green on a dinner of about two
+  grams, until the reader stopped misreading it and the driver went red. Before
+  trusting a fixture, check its FORMAT against what the app's own writers produce
+  (grep them), not only its values.
+- **A GATE'S FLOOR IS A MEASUREMENT, NOT A ROUND NUMBER, AND A CRASH IS NOT A
+  CATCH.** Same day: a vacuity guard written as `> 20` for a count that measures
+  10 failed correct code, and one check read `.units.cup` off a food with no
+  units, so a single mutation made the whole gate throw at 8 of 37 checks. The
+  harness refused to call that a catch, correctly. Measure the count, and give a
+  dependent check a null-safe value so it FAILS rather than throws.
+- **TWO CHECKS THAT ASK ABOUT THE SAME THING IN NEAR-IDENTICAL WORDS CAN HIDE EACH
+  OTHER.** Same day: custom-meal's "every line needs an amount" became redundant
+  with the new reader (a MISSED mutation said so), and the reader's refusal reads
+  almost the same ("couldn't read how much"), so deleting the first changed
+  nothing a check could see. They ask two different questions (no amount at all;
+  an amount that is there and unreadable), so each now has its own wording pinned
+  rather than one being deleted.
 - **A MODEL PICKS, THE REAL FUNCTION PROVES — AND THE PROOF IS WHAT MAKES THE
   PICK SAFE.** Same day: a straight-line model of how a dish scales chose a
   portion that the real scaler then refused by a gram, because whole grams and

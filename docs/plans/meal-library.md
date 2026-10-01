@@ -16,6 +16,9 @@ them** over an open recipe dataset and over copying recipe sites.
   recipe lines, 19 resolved to a food with a **misread amount** (8 oz chicken =
   8 g, 1 kg potatoes = 1 g) while coverage still read 100%. Scraped recipes would
   hit that on roughly one line in six. Separate BACKLOG item, not part of this.
+  **CORRECTED 1 Oct 2026: fixed the same day (BACKLOG, "An amount is understood or it
+  is asked about"); the 19-of-115 count was a different line set from the 31-of-53
+  measured that day, so the two are not comparable.**
 - A cooking method that names an amount is dropped whole (19 Sep rule), so
   copied instructions would mostly vanish.
 

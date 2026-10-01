@@ -2,38 +2,75 @@
 
 Newest first. One line each.
 
-- [ ] **THE INGREDIENT-UNIT FIX — PLANNED, NOT BUILT, WAITING ON HER "BUILD IT"
-  (1 Oct 2026; plan: `docs/plans/ingredient-units.md`).** Dietary and macro path,
-  so plan first. Read-only trace of every reader (file and line), then the
-  disputed claims re-run. **MEASURED: 31 of 53 ordinary recipe lines are costed
-  with an amount over 25% wrong, and all 31 still read as covered.** A meal of rice,
-  8 oz chicken, a tin of tuna, a pinch of salt, broccoli and oil: coverage 0.993,
-  protein 10 g (the chicken alone is about 70). **WHY NOTHING SAW IT: coverage is
-  weighted by mass and the mass is the misread number**, so a line whose mass is
-  mis-estimated small has no weight; no mass-weighted share can ever see it.
-  **CORRECTIONS to what this repo said:** (a) "8 oz is read as 8 grams" is not the
-  mechanism. Nothing recognises oz; it becomes a count of 8 "whole" with "oz" left
-  in the name, and the grams function ends in `return quantity`. (b) Tins and
-  pinches are NOT silent: they do not resolve (cost nothing, refuse a dieter's
-  dish). Cans, pounds, kilos, litres, cups, "half" and "1 large banana" are the
-  silent ones. (c) The old "19 of 115" was a different line set; not comparable.
-  (d) `cup` is 240 g for every food: 1 cup of oats costs 910 kcal. **THE COACH'S
-  `log_meal`, which writes what she ATE, runs the edge function's own copy of the
-  food database, and it differs:** the same line "3 egg, whole" is 5 kcal there
-  and 233 in the app. Its header claims a verbatim synced copy (false), and
-  `test:food-db-parity` compares allergen tags only. NOT measured: what the model
-  actually sends as `unit`, and how many stored meals carry a unit word in a name
-  (production is select-only; a read-only count on her machine would answer it).
-  **The diet check stays fail-closed and the plan pins that it cannot get more
-  permissive** (measured: tin of tuna and a pinch of salt refused for a vegan,
-  8 oz chicken resolves to meat and is refused, 2 cans of chickpeas pass). Staged:
-  (1) stop guessing, a line-count rule because mass cannot see it; (2) understand
-  oz, lb, kg, l, fractions, ranges, per-food cups and cans; (3) fix the prompts that
-  ask for cups. **Hers:** whether an unreadable own-meal line is asked about
-  ("how many grams?", recommended) or refused, and approving that "covered" will
-  mean food AND amount understood (it changes what a safety-adjacent number
-  measures). **Mine, CSCS delegation:** a pinch is negligible, a can is the
-  typical drained weight, a cup is the food's own density.
+- [x] **AN AMOUNT IS UNDERSTOOD OR IT IS ASKED ABOUT — THE UNIT FIX, BUILT 1 Oct
+  2026 (her "ask me, then build it"; on the branch, NOT on `main`; plan:
+  `docs/plans/ingredient-units.md`).** **Her two rulings, each from options, one
+  at a time:** (1) a line the app still cannot read, typed into an own meal or told
+  to the coach, is **asked about** ("how many grams?", nothing saved until she
+  answers), over refusing and over estimating; (2) **"understood" now means the
+  food AND the amount**, over leaving the meaning alone. Ruling 2 changes what the
+  coverage-style measure means: counts before 1 Oct are not comparable.
+  **WHAT WAS WRONG (measured before building):** 31 of 53 ordinary recipe lines
+  were costed with an amount over 25% wrong and all 31 still read as covered,
+  because coverage is weighted by mass and the mass is the misread number (8 oz
+  of chicken read as 8 g: coverage 0.993, protein 10 g where the chicken alone is
+  about 70). `cup` was 240 g of every food (a cup of oats: 910 kcal). The coach's
+  `log_meal` ran the edge function's OWN copy of the food database, which had
+  drifted from the app's (3 eggs: 5 kcal there, 233 here) while its header
+  claimed a verbatim copy.
+  **WHAT CHANGED.** One zero-import reader (`ingredient-units.ts`, a synced copy
+  for the coach) converts only what has ONE answer: oz, lb, kg, l, fl oz,
+  fractions (also unicode and mixed), ranges (the midpoint), "2 x 150g", a stated
+  pack size "(14 oz) can", word amounts ("a banana", "half an avocado"), and an
+  amount written last ("chicken breast 150g", "steak 8 oz", "tomatoes (400g)").
+  Anything that depends on the FOOD goes to the food's own table
+  (`resolveGrams`): about 250 foods now carry cup, can, handful, whole and similar
+  weights, a food's own unit always wins, and a line is understood only if the
+  food can weigh that unit. Unread, never guessed: pint, quart, knob, glug,
+  "some", "to taste", "juice of a lemon", zero, and a cup, can or handful of a
+  food with no such weight. `verifyProposal` refuses a dish with an unread line in
+  EVERY mode, including her own portions, and quotes the line; the "ask" is the
+  existing rejection translator ("I couldn't read how much "1 knob butter" is, so
+  I haven't added your dinner. How many grams is it?", plural: "...is each?").
+  The coach's `log_meal` reads each line through the same reader and asks before
+  it adds anything up. The meal writer's and the coach's prompts no longer ask for
+  ounces, cups, tins or "common measurements". The two food-database copies are
+  now byte-identical and a gate holds it. Cards say "227g chicken breast, 1 cup
+  white rice cooked, 2 carrots" (they said "name 1cup", "name 2whole", and rounded
+  half a teaspoon to 1tsp under "your portions, untouched"). The diet path did
+  NOT get more permissive: over 106 lines and 22 diets a line is never allowed
+  where its own food is refused.
+  **FOUND ON THE WAY.** (a) The derived sweep (191 gates, 190 passed) failed
+  `verify:meal-tradeoff` and the cause was its FIXTURE: meals written amount-last
+  ("potato boiled 250g"), a shape no stored meal has (stored meals are "250g
+  potato boiled"), which the old reader costed at 1 g a line and the driver never
+  noticed. Fixture fixed to the real shape; the reader now also understands an
+  exact amount written last, because a person typing "chicken breast 150g" should
+  not be asked for grams. (b) A gate crashed at 8 of 37 checks under one mutation
+  (`units.cup` on a food with no units): null-safe now, so it fails instead.
+  (c) The custom-meal "every line needs an amount" check became redundant with
+  the reader and a MISSED mutation said so; both are kept because they ask two
+  different questions, and a check now pins each one's own wording.
+  **VERIFIED.** `test:ingredient-units` 39 checks (a 92-line table with known
+  weights, properties over every food, refusal in both modes, the coach's
+  source order, the household table); **mutations 57 of 57 caught** (reader 28,
+  food weights 16, refusal/ask/coach/prompts 13; eight only after a case where
+  the thing binds was added, one recorded as equivalent on today's data: no food
+  names a unit in both its own table and the household one, so the merge order is
+  pinned in source). New `verify:unit-ask` (15 checks, 10 mutations, all caught):
+  the real chat, the question quotes her line, sits inside the viewport and
+  raises no card; a meal in ounces, cups and counts reaches a card showing 227 g,
+  76 g protein and 57 g carbs; screenshots read. Derived sweep 190 of 191 and the
+  one failure fixed (above); the follow-up re-run is recorded below.
+  **NOT PROVEN LIVE.** The coach's half (`log_meal` asking) is deployed code a
+  driver cannot reach: it is held by source checks only until `chat-gemini` is
+  deployed. What the model actually sends as `unit` is still unmeasured, and so
+  is how many STORED meals carry a unit word in a name (production is
+  select-only). **NOT BUILT:** repairing stored meals (no live users); the
+  grocery list's display of an old misparsed line; the meal-move resize still
+  keeps its own copy of the rounding rules. **DEPLOYS:** frontend on merge to
+  `main` (her word), `chat-gemini` and `generate-meals` each by name on her
+  machine. No migration.
 
 - [x] **102 MORE MEALS, LEAN ONES — THE LIBRARY IS NOW 290, 1 Oct 2026 (her
   "start on the meals", from the next-steps list; on the branch, NOT on `main`).**
@@ -210,8 +247,9 @@ Newest first. One line each.
   machine, and a mocked end-to-end gate comes first, per the exam-runner
   lesson); seeding fresh plans from the library (hers to rule); a visible "from
   our library" label; the ingredient-amount reader (ounces, pounds, kilos, tins,
-  pinch; `cup` per food), still its own open item below and the thing that must
-  land before any OUTSIDE recipe text is accepted.
+  pinch; `cup` per food), the thing that must land before any OUTSIDE recipe text
+  is accepted. **CORRECTED 1 Oct 2026: BUILT the same day (entry at the top, "An
+  amount is understood or it is asked about"); it is no longer open.**
   **DEPLOYS:** frontend only (merge to `main`, her word); no edge function, no
   migration. The top-up works without a `chat-gemini` deploy for the library
   half, but the coach's card wording still needs the earlier `chat-gemini`

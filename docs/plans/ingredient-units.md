@@ -1,4 +1,13 @@
-# Reading ingredient amounts honestly (BUILD APPROVED 1 Oct 2026)
+# Reading ingredient amounts honestly (BUILT 1 Oct 2026)
+
+**BUILT 1 Oct 2026; what shipped, what was verified and what is not live is in BACKLOG.md
+("An amount is understood or it is asked about"). Differences from this plan:** the
+reader also understands an exact amount written LAST ("chicken breast 150g"), found
+when a driver fixture wrote its meals that way; stage 3's "per-line check on the meal
+writer's reply" is the same refusal every dish already goes through, not a new one;
+the coach's `log_meal` asks instead of adding up (the plan said "tells her what it
+could not read"). Not built: repairing stored meals, the grocery list's display of
+an old misparsed line. Everything below is the plan as approved.
 
 **Her rulings, 1 Oct 2026, from her "Ask me, then build it":** (1) a line the app still
 cannot read, typed into an own meal or told to the coach, is **asked about** ("how
