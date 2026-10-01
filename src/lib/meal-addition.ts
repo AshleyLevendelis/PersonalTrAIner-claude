@@ -109,6 +109,13 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
     }
     return `I can't add ${dishName} — it clashes with what you've told me you avoid. Give me a version without it and I'll add that instead.`
   }
+  if (/an amount could not be read/i.test(line)) {
+    // THE ASK (Ashley, 1 Oct 2026, from three options: ask / refuse / estimate). One question, quoting the line, and
+    // nothing is saved until she answers. The quoted lines are the ones as written, so she can see which one.
+    const quoted = [...(line.split('—').slice(1).join('—')).matchAll(/"([^"]+)"/g)].map(m => `"${m[1]}"`)
+    if (quoted.length <= 1) return `I couldn't read how much ${quoted[0] ?? 'one of the ingredients'} is, so I haven't added ${dishName}. How many grams is it?`
+    return `I couldn't read how much of these is: ${quoted.slice(0, 3).join(', ')}. So I haven't added ${dishName}. How many grams is each?`
+  }
   if (/unrecognised dietary restriction/i.test(line)) {
     return `Something's wrong with the dietary restrictions saved on your profile, so I can't safely check ${dishName} against them. Worth fixing those in Profile first — I'd rather stop than guess.`
   }

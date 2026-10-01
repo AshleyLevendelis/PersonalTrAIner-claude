@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
+import { readIngredientText } from "../_shared/ingredient-units.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
@@ -1508,7 +1509,7 @@ const toolDeclarations = [
                 description: "Specific ingredient name, disambiguated where the base name is ambiguous (e.g. 'greek yoghurt 0%', not 'greek yoghurt'; 'whey protein powder' not 'protein').",
               },
               quantity: { type: "number", description: "Quantity in the given unit" },
-              unit: { type: "string", description: "g, ml, medium, large, scoop, tbsp, tsp, slice, whole, clove, etc." },
+              unit: { type: "string", description: "g or ml wherever you know the weight; otherwise tbsp, tsp, medium, large, scoop, slice, whole (a count), clove. Never oz, lb or cup: convert to grams or ask the user." },
             },
             required: ["name", "quantity", "unit"],
           },
@@ -2473,12 +2474,12 @@ INGREDIENT FORMAT RULES (CRITICAL):
 - WRONG: ["Greek yogurt"] (missing quantity)
 - Every meal must include exact quantities for ALL added fats: cooking oils, butter, dressings, sauces.
 - Never say "drizzle of oil" or "splash of dressing" — always specify the exact amount.
-- Use standard nutrition label format: "Xg ingredient" or "X tbsp ingredient" or "X cup ingredient".
+- Use grams or millilitres ("150g ingredient", "250ml milk"), spoons ("1 tbsp ingredient") or a plain count ("3 eggs"). Never ounces, pounds, cups, tins or "a handful": convert them to grams yourself, or ask.
 - Keep ingredient names simple and recognizable (e.g. "chicken breast" not "premium free-range chicken breast fillet").
 
 MEAL SUGGESTION RULES:
 - ALWAYS suggest specific, named dishes — never generic terms like "chicken dish" or "protein source".
-- ALWAYS include precise portion sizes in grams or common measurements.
+- ALWAYS include precise portion sizes in grams, millilitres, spoons or plain counts.
 - When replacing a food item, provide a brief preparation instruction.
 - Ensure any suggested replacement hits the meal slot's macro budget listed above.
 
@@ -3578,7 +3579,11 @@ Keep this context in mind to ensure your greetings and questions naturally align
             Number.isFinite(Number((i as any).quantity)) &&
             typeof (i as any).unit === "string"
           )
-          .map((i) => ({ name: i.name, quantity: Number(i.quantity), unit: i.unit }));
+          // READ THROUGH THE SAME READER THE APP USES (1 Oct 2026). The model's {name, quantity, unit} used to go
+          // straight to the food database, so "8 oz" was 8 g, "3 whole eggs" was 3 g (5 kcal, and this reply printed it as
+          // the meal's total) and a cup was 240 g of everything. Rebuilt as a line and read, oz and lb are converted
+          // exactly and an amount that cannot be understood is flagged, not guessed.
+          .map((i): MealIngredientLine => readIngredientText(`${Number(i.quantity)} ${i.unit} ${i.name}`.replace(/\s+/g, " ").trim()));
 
         if (ingredients.length === 0) {
           // INTENT IS READ HERE, NOT FIFTY LINES DOWN. Ashley, 8 Sep 2026:
@@ -3606,6 +3611,18 @@ Keep this context in mind to ensure your greetings and questions naturally align
         }
 
         const computed = computeMealMacros(ingredients);
+        // AN AMOUNT THAT CANNOT BE UNDERSTOOD IS ASKED ABOUT, NOT ADDED UP (Ashley, 1 Oct 2026). Totals built on a guess
+        // were quoted as the meal's numbers with coverage at 99%; the question is one line and the answer is one number.
+        if (!computed.amountsUnderstood) {
+          const quoted = computed.unreadAmounts.slice(0, 3).map((l) => `"${l}"`).join(", ");
+          const several = computed.unreadAmounts.length > 1;
+          return new Response(
+            JSON.stringify({
+              reply: `I couldn't work out how much ${several ? "of these is" : quoted + " is"}${several ? ": " + quoted : ""}, so I haven't added it up. Roughly how many grams${several ? " of each" : ""}?`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         // Defensive cap, independent of the prompt instruction above: this
         // field is echoed to the user VERBATIM below with no other review,
         // so it's the one spot in this handler where model-generated text

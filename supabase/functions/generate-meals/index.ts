@@ -312,7 +312,7 @@ ${macroGuidance}
 
 RULES:
 1. Each dish needs a specific, appetizing name (not "Chicken and Rice" — something like "Sichuan Mapo Tofu with Charred Bok Choy").
-2. Every ingredient MUST be ONE parseable line with an exact quantity and unit: "165g chicken breast", "2 tbsp olive oil", "1 medium egg", "200g cooked basmati rice". No ranges, no "to taste", no combined items.
+2. Every ingredient MUST be ONE parseable line with an exact quantity and unit: "165g chicken breast", "2 tbsp olive oil", "1 medium egg", "200g cooked basmati rice". Grams or millilitres wherever you know the weight; spoons for oils and sauces; a plain count for eggs, slices and cloves. NEVER ounces, pounds, kilograms, cups, tins, cans, pinches or handfuls (a line the app cannot read is dropped with its whole dish). No ranges, no "to taste", no combined items.
 3. Include all cooking fats with exact amounts.
 4. Aim your ingredient quantities at ALL FOUR stated macro targets, not just calories — exact precision isn't required (the app rescales), but stay in the right neighborhood on protein, carbs AND fat so rescaling doesn't need to be extreme in any one direction. Undershooting protein is a rejection; so is padding it out so far that carbs/fat are starved (see HIT ALL THREE MACROS above).
 5. Report which single cuisine (from the list above, or "Other") each dish draws from as the "cuisine" field.

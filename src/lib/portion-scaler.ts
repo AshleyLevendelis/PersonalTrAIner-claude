@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import type { MealIngredientLine, Macros100g } from './food-db'
+import { readIngredientText } from './ingredient-units'
 
 /** Below this, a scale is "close enough" not to bother touching quantities (mirrors macro-calibration's 0.03 no-op threshold). */
 export const SCALE_NOOP_THRESHOLD = 0.03
@@ -53,7 +54,7 @@ export function isScaleFactorAbsurd(scaleFactor: number): boolean {
  * honest outcome for a line like "salt to taste": there is nothing to resize.
  */
 export function withQuantity(line: string, quantity: number): string | null {
-  const m = /^(\s*)(\d+(?:\.\d+)?)/.exec(line)
+  const m = /^(\s*)(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?(?![\d/])|\d+\/\d+)/.exec(line)
   if (!m) return null
   return `${m[1]}${quantity}${line.slice(m[0].length)}`
 }
@@ -148,61 +149,16 @@ export function scaleToTarget(
 // unmatched (fail-closed) rather than silently vanishing from the meal.
 // ---------------------------------------------------------------------------
 
-// Quantity number: a plain decimal ("1.5"), a simple fraction ("1/2"), or a
-// mixed number ("1 1/2") — recipe-style ingredient lists lean on fractions
-// for spice/seasoning amounts ("1/2 tsp chili powder") far more than whole
-// numbers, and a plain \d+(?:\.\d+)? pattern silently fails on every one of
-// them (the quantity match fails entirely, so the WHOLE line — quantity,
-// unit, and name together — falls through to the no-match branch below,
-// which then treats it as an unmatched ingredient with a mangled name).
-const NUMBER = String.raw`\d+(?:\.\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+`
-
-function parseQuantityNumber(raw: string): number {
-  const mixed = raw.match(/^(\d+(?:\.\d+)?)\s+(\d+)\/(\d+)$/)
-  if (mixed) return parseFloat(mixed[1]) + parseInt(mixed[2], 10) / parseInt(mixed[3], 10)
-  const fraction = raw.match(/^(\d+)\/(\d+)$/)
-  if (fraction) return parseInt(fraction[1], 10) / parseInt(fraction[2], 10)
-  return parseFloat(raw)
-}
-
-const GRAM_PATTERN = new RegExp(`^(${NUMBER})\\s*(g|gram|grams|ml)\\s+(.+)$`, 'i')
-const VOLUME_PATTERN = new RegExp(`^(${NUMBER})\\s*(tbsp|tablespoons?|tsp|teaspoons?|cups?)\\s+(.+)$`, 'i')
-const NAMED_COUNT_PATTERN = new RegExp(`^(${NUMBER})\\s*(medium|large|small|whole|slices?|cloves?|scoops?)\\s+(.+)$`, 'i')
-const BARE_COUNT_PATTERN = new RegExp(`^(${NUMBER})\\s+(.+)$`)
-
+/**
+ * One ingredient line -> {name, quantity, unit}. The reading itself lives in
+ * ingredient-units.ts (zero imports, so the coach's edge function carries the
+ * same copy): oz, lb, kg and litres are converted exactly, fractions and
+ * ranges are read, and an amount that cannot be understood comes back marked
+ * `unread` with the line as written, never guessed. A line that reads
+ * correctly reads exactly as it always did.
+ */
 export function parseIngredientLine(text: string): MealIngredientLine {
-  const trimmed = text.trim()
-
-  const gram = trimmed.match(GRAM_PATTERN)
-  if (gram) {
-    const unit = gram[2].toLowerCase().startsWith('ml') ? 'ml' : 'g'
-    return { name: gram[3].trim(), quantity: parseQuantityNumber(gram[1]), unit }
-  }
-
-  const vol = trimmed.match(VOLUME_PATTERN)
-  if (vol) {
-    const rawUnit = vol[2].toLowerCase()
-    const unit = rawUnit.startsWith('tbsp') || rawUnit.startsWith('tablespoon') ? 'tbsp'
-      : rawUnit.startsWith('tsp') || rawUnit.startsWith('teaspoon') ? 'tsp'
-      : 'cup'
-    return { name: vol[3].trim(), quantity: parseQuantityNumber(vol[1]), unit }
-  }
-
-  const named = trimmed.match(NAMED_COUNT_PATTERN)
-  if (named) {
-    const rawUnit = named[2].toLowerCase().replace(/s$/, '')
-    return { name: named[3].trim(), quantity: parseQuantityNumber(named[1]), unit: rawUnit }
-  }
-
-  const bare = trimmed.match(BARE_COUNT_PATTERN)
-  if (bare) {
-    return { name: bare[2].trim(), quantity: parseQuantityNumber(bare[1]), unit: 'whole' }
-  }
-
-  // No quantity found at all — fall through with the whole string as the
-  // name and a nominal 1g so it still participates in coverage/unmatched
-  // accounting rather than being silently dropped.
-  return { name: trimmed, quantity: 1, unit: 'g' }
+  return readIngredientText(text)
 }
 
 export function parseIngredientLines(texts: string[]): MealIngredientLine[] {

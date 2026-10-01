@@ -1,6 +1,13 @@
 // ---------------------------------------------------------------------------
 // FOOD DATABASE (M1) — the deterministic macro truth source
 // ---------------------------------------------------------------------------
+// KEPT BYTE-FOR-BYTE IDENTICAL with supabase/functions/_shared/food-db.ts: the
+// coach's edge function cannot import across src/lib, so it carries a copy.
+// Edit THIS file, then `cp` it over; test:ingredient-units fails on any
+// difference. It used to be "kept in sync by hand" and was not (measured 1 Oct
+// 2026): nine foods missing, no piece weights, no whole-count rule, so the same
+// "3 eggs" was 233 kcal in the app and 5 kcal in the coach's food diary.
+// ---------------------------------------------------------------------------
 // Every macro value below is per 100g of the EDIBLE, as-prepared portion
 // (cooked weight for grains/meat/rice, raw weight for veg/fruit unless the
 // name says "cooked"), sourced from the USDA FoodData Central / UK McCance &
@@ -549,23 +556,115 @@ function normalize(s: string): string {
     .toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+// ---------------------------------------------------------------------------
+// HOUSEHOLD MEASURES (1 Oct 2026; docs/plans/ingredient-units.md).
+// What one "whole" carrot, a cup of oats, a tin of tuna or a handful of rocket
+// weighs. Measured the same day: 39 of 40 vegetables, 73 of 76 proteins and
+// every dairy food had no piece or cup weight, so "2 carrots" was costed as 2 g
+// and a cup was 240 g of everything (a cup of oats is about 85 g: 910 kcal where
+// 340 is right). A line whose measure is not here is UNREAD and asked about,
+// never guessed, so a gap in this table costs a question, not a wrong number.
+//
+// Values are the household measures in the USDA FoodData Central and typical UK
+// shop sizes, each good to about +/-15%. Cups are the dry/cooked/chopped state the
+// food's own entry describes (cooked rice, rolled oats, chopped raw spinach); tins
+// are the DRAINED weight where a tin is drained (pulses, tuna, sweetcorn). A key
+// here never replaces a unit the entry already names, and every name must exist
+// (test:ingredient-units holds both).
+// ---------------------------------------------------------------------------
+const HOUSEHOLD_UNITS: Record<string, Record<string, number>> = {
+  // vegetables: a whole one
+  'tomato': { whole: 123 }, 'cherry tomatoes': { whole: 17, handful: 80, cup: 149 }, 'cucumber': { whole: 300, cup: 104 },
+  'bell pepper': { whole: 150, cup: 149 }, 'onion': { whole: 110, cup: 160 }, 'carrot': { whole: 61, cup: 128 },
+  'courgette': { whole: 200, cup: 113 }, 'mushroom': { whole: 18, cup: 70 }, 'cauliflower': { head: 600, whole: 600, cup: 100 },
+  'aubergine': { whole: 350, cup: 82 }, 'leek': { whole: 90, cup: 89 }, 'beetroot': { whole: 82, cup: 136 },
+  'butternut squash': { whole: 900, cup: 140 }, 'radish': { whole: 5 }, 'spring onion': { whole: 15, bunch: 90 },
+  'parsnip': { whole: 130 }, 'turnip': { whole: 120 }, 'fennel': { whole: 230 }, 'artichoke': { whole: 120 },
+  'okra': { whole: 12 }, 'shallots': { whole: 40 }, 'celery': { stick: 40, stalk: 40, cup: 101 },
+  'cabbage': { head: 900, cup: 90 }, 'bok choy': { head: 100, cup: 70 }, 'garlic': { head: 50 },
+  // leaves and small veg: cups and handfuls
+  'spinach': { cup: 30, handful: 30 }, 'kale': { cup: 67, handful: 25 }, 'mixed salad leaves': { cup: 35, handful: 30 },
+  'rocket': { cup: 20, handful: 20 }, 'watercress': { cup: 34, handful: 30 }, 'bean sprouts': { cup: 104, handful: 40 },
+  'broccoli': { cup: 91 }, 'green beans': { cup: 110 }, 'peas': { cup: 145 }, 'sweetcorn': { cup: 154, can: 160 },
+  'asparagus': { cup: 134 }, 'brussels sprouts': { cup: 88 }, 'pumpkin': { cup: 116 },
+  'bamboo shoots': { can: 225 },
+  // fruit
+  'lemon': { whole: 58 }, 'lime': { whole: 67 }, 'kiwi': { whole: 69, cup: 180 }, 'peach': { whole: 150, cup: 154 },
+  'plum': { whole: 66, cup: 165 }, 'grapefruit': { whole: 230 }, 'mango': { whole: 336, cup: 165 },
+  'dates': { whole: 24, cup: 147 }, 'figs': { whole: 50 }, 'pomegranate': { whole: 280, cup: 174 }, 'passion fruit': { whole: 18 },
+  'strawberries': { whole: 12, cup: 152, handful: 75 }, 'blueberries': { cup: 148, handful: 75 }, 'raspberries': { cup: 123, handful: 60 },
+  'blackberries': { cup: 144, handful: 75 }, 'mixed berries': { cup: 140, handful: 75 }, 'grapes': { cup: 151, handful: 80 },
+  'pineapple': { cup: 165, can: 230 }, 'watermelon': { cup: 152 }, 'cherries': { cup: 138 }, 'raisins': { cup: 145, handful: 30 },
+  'dried apricots': { whole: 8, cup: 130 }, 'coconut flesh': { cup: 80 },
+  // protein foods: a piece (cooked weight, as the entry's figures are), pulses by the cup and the tin
+  'chicken breast': { whole: 140 }, 'chicken thigh': { whole: 110 }, 'chicken drumstick': { whole: 80 },
+  'pork sausage': { whole: 60 }, 'bacon': { whole: 12, slice: 12 }, 'ham': { slice: 25 }, 'chorizo': { slice: 6 },
+  'salmon': { whole: 150 }, 'cod': { whole: 150 }, 'haddock': { whole: 150 }, 'sea bass': { whole: 130 }, 'tilapia': { whole: 120 },
+  'trout': { whole: 150 }, 'mackerel': { whole: 130 }, 'beef steak sirloin': { whole: 225 }, 'beef rump steak': { whole: 225 },
+  'lamb chop': { whole: 90 }, 'pork chop': { whole: 150 }, 'prawns': { whole: 12 }, 'scallops': { whole: 25 }, 'anchovies': { whole: 4 },
+  'falafel': { whole: 17 }, 'smoked salmon': { slice: 30 },
+  'tuna canned in water': { can: 120 }, 'sardines canned': { can: 90 }, 'crab meat': { can: 145 },
+  'chickpeas': { cup: 164, can: 240 }, 'black beans': { cup: 172, can: 240 }, 'kidney beans': { cup: 177, can: 240 },
+  'pinto beans': { cup: 171, can: 240 }, 'butter beans': { cup: 177, can: 240 }, 'cannellini beans': { cup: 179, can: 240 },
+  'haricot beans': { cup: 179, can: 240 }, 'lentils red': { cup: 198, can: 240 }, 'lentils green': { cup: 198, can: 240 },
+  'brown lentils': { cup: 198, can: 240 }, 'split peas': { cup: 196 }, 'edamame': { cup: 155, handful: 60 },
+  'tofu firm': { cup: 248 }, 'tofu silken': { cup: 248 }, 'tempeh': { cup: 166 },
+  // grains, starches and bakery
+  'white rice cooked': { cup: 160 }, 'brown rice cooked': { cup: 160 }, 'basmati rice cooked': { cup: 160 },
+  'pasta cooked': { cup: 140 }, 'wholewheat pasta cooked': { cup: 140 }, 'couscous cooked': { cup: 157 }, 'quinoa cooked': { cup: 185 },
+  'oats': { cup: 85 }, 'bulgur wheat cooked': { cup: 182 }, 'polenta cooked': { cup: 240 }, 'millet cooked': { cup: 174 },
+  'buckwheat cooked': { cup: 168 }, 'barley': { cup: 157 }, 'egg noodles cooked': { cup: 160 }, 'rice noodles cooked': { cup: 176 },
+  'potato boiled': { whole: 170, cup: 156 }, 'potato baked': { whole: 200 }, 'mashed potato': { cup: 210 },
+  'sweet potato baked': { whole: 130, cup: 200 }, 'sweet potato raw': { whole: 130 }, 'plantain': { whole: 150 },
+  'breadcrumbs': { cup: 108 }, 'plain flour': { cup: 125 }, 'cornmeal': { cup: 157 }, 'granola': { cup: 110, handful: 40 },
+  'muesli': { cup: 85, handful: 40 }, 'cornflakes': { cup: 28 }, 'popcorn': { cup: 8, handful: 15 }, 'tortilla chips': { handful: 30 },
+  'weetabix': { whole: 19 }, 'crackers': { whole: 5 }, 'rye crispbread': { whole: 10 }, 'croissant': { whole: 57 },
+  // dairy and fats by the cup
+  'milk whole': { cup: 244 }, 'milk skimmed': { cup: 245 }, 'milk semi skimmed': { cup: 244 }, 'soy milk': { cup: 243 },
+  'almond milk': { cup: 240 }, 'oat milk': { cup: 240 }, 'greek yoghurt 0%': { cup: 245 }, 'greek yoghurt full fat': { cup: 245 },
+  'natural yoghurt': { cup: 245 }, 'soy yoghurt': { cup: 245 }, 'coconut yoghurt': { cup: 245 }, 'cottage cheese': { cup: 226 },
+  'ricotta cheese': { cup: 246 }, 'cheddar cheese': { cup: 113 }, 'mozzarella': { cup: 112 }, 'feta cheese': { cup: 150 },
+  'parmesan': { cup: 100 }, 'cream cheese': { cup: 232 }, 'double cream': { cup: 238 }, 'single cream': { cup: 240 },
+  'sour cream': { cup: 230 }, 'creme fraiche': { cup: 240 }, 'quark': { cup: 240 }, 'skyr': { cup: 245 },
+  'almonds': { cup: 143, handful: 28 }, 'walnuts': { cup: 100, handful: 30 }, 'cashews': { cup: 137, handful: 30 },
+  'peanuts': { cup: 146, handful: 30 }, 'mixed nuts': { cup: 137, handful: 30 }, 'pistachios': { cup: 123, handful: 30 },
+  'pecans': { cup: 99, handful: 30 }, 'hazelnuts': { cup: 135, handful: 30 }, 'brazil nuts': { cup: 133, handful: 30 },
+  'sunflower seeds': { cup: 140, handful: 30 }, 'pumpkin seeds': { cup: 129, handful: 30 }, 'chia seeds': { cup: 160 },
+  'sesame seeds': { cup: 144 }, 'olives': { cup: 134, handful: 30 }, 'butter': { cup: 227 }, 'peanut butter': { cup: 258 },
+  'coconut milk canned': { cup: 240, can: 400 }, 'coconut cream': { cup: 240, can: 400 }, 'coconut flakes': { cup: 80 },
+  // sauces, sweeteners and tins
+  'hummus': { cup: 246 }, 'salsa': { cup: 259 }, 'tomato passata': { cup: 245 }, 'chopped tomatoes canned': { cup: 240, can: 400 },
+  'marinara sauce': { cup: 250 }, 'honey': { cup: 340 }, 'maple syrup': { cup: 315 }, 'sugar white': { cup: 200 },
+  'brown sugar': { cup: 220 }, 'jam': { cup: 320 }, 'ketchup': { cup: 240 }, 'mayonnaise': { cup: 220 }, 'chicken broth': { cup: 240 },
+  'beef broth': { cup: 240 }, 'guacamole': { cup: 230 }, 'tzatziki': { cup: 240 }, 'trail mix': { cup: 150, handful: 40 },
+  'dark chocolate': { cup: 170 }, 'nutritional yeast': { cup: 60 }, 'water': { cup: 237 }, 'black coffee': { cup: 237 },
+  'star anise': { whole: 0.5 }, 'bay leaves': { whole: 0.2 }, 'lemongrass': { whole: 30, stalk: 30 }, 'curry leaves': { whole: 0.1, sprig: 1 },
+  'oysters': { whole: 15 },
+  'coriander': { handful: 20, bunch: 30 }, 'dill': { handful: 20, bunch: 30 }, 'basil': { handful: 15, bunch: 30 },
+}
+for (const [name, extra] of Object.entries(HOUSEHOLD_UNITS)) {
+  const entry = FOOD_DB.find(f => f.name === name)
+  // A name that matches nothing is a typo that would silently do nothing; the gate fails on it, and the loop skips it so the app still loads.
+  if (entry) entry.units = { ...extra, ...(entry.units ?? {}) }
+}
+
 const LOOKUP = new Map<string, FoodEntry>()
 for (const entry of FOOD_DB) {
   LOOKUP.set(normalize(entry.name), entry)
   for (const alias of entry.aliases) LOOKUP.set(normalize(alias), entry)
 }
 
-/** Water-density defaults for common volume units, used when an entry doesn't override them. */
-const DEFAULT_UNIT_GRAMS: Record<string, number> = {
-  g: 1,
-  gram: 1,
-  grams: 1,
-  ml: 1,
-  tbsp: 15,
-  tablespoon: 15,
-  tsp: 5,
-  teaspoon: 5,
-  cup: 240,
+// PLURALS ON THE STORED SIDE TOO. lookupIngredient de-pluralises the QUERY as
+// a last resort, so "scallions" reaches "scallion" — but "rice cakes" is
+// stored plural, and "chocolate rice cake" never reached it: 8 Sep 2026,
+// every ingredient in a real snack came back unmatched in the coach and the
+// reply printed "roughly 0 kcal ... 0% of the meal by weight". Each key is also
+// indexed under its de-pluralised form when that form is free, so the
+// token-overlap pass can see it. (This fix lived only in the coach's copy until
+// the two files were made one, 1 Oct 2026.)
+for (const [key, entry] of [...LOOKUP]) {
+  const folded = key.split(' ').map(depluralizeToken).join(' ')
+  if (folded !== key && !LOOKUP.has(folded)) LOOKUP.set(folded, entry)
 }
 
 /** True when `needle` (word tokens) appears as a contiguous run inside `haystack` (word tokens) — word-boundary-safe, unlike a raw character substring check (which would wrongly match "corn" inside "unicorn"). */
@@ -667,8 +766,15 @@ export interface MealIngredientLine {
   name: string
   /** Quantity in the given unit. */
   quantity: number
-  /** g, ml, tbsp, tsp, cup, or an ingredient-specific named unit (medium, whole, slice, clove, scoop...). */
+  /** g, ml, tbsp, tsp, cup, or an ingredient-specific named unit (medium, whole, slice, clove, scoop, can, handful...). */
   unit: string
+  /**
+   * Set by the amount reader (ingredient-units.ts) when it could not understand
+   * how much this line is. Never stored: a meal with an unread line is not built.
+   */
+  unread?: string
+  /** The line as it was written, kept only on an unread line so the question can quote it. */
+  source?: string
 }
 
 export interface ComputedMealMacros extends Macros100g {
@@ -677,13 +783,35 @@ export interface ComputedMealMacros extends Macros100g {
   /** Ingredient name strings that could not be resolved. */
   unmatched: string[]
   /** Per-line resolution detail, for scaling/debugging. */
-  lines: { input: MealIngredientLine; entry: FoodEntry | null; grams: number; macros: Macros100g | null }[]
+  lines: { input: MealIngredientLine; entry: FoodEntry | null; grams: number; macros: Macros100g | null; understood: boolean }[]
+  /**
+   * The lines whose AMOUNT was not understood (as written, or "name unit" when the reader gave no source).
+   * `coverage` cannot see these: it is weighted by mass, and an unread amount has no trustworthy mass, so a
+   * misread line carries almost no weight and a meal reads 99% covered with 70 g of protein missing (measured 1 Oct 2026).
+   */
+  unreadAmounts: string[]
+  /** True only when every line's amount was understood. The coverage rule alone cannot say this; verifyProposal needs both. */
+  amountsUnderstood: boolean
 }
 
-/** Resolves a named unit to grams for a specific food entry (entry-specific override, else the water-density default, else 1:1 as grams). */
-export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: number): number {
+/** Grams for the loose amounts, the same for every food: a pinch is under half a gram, a splash is a teaspoon. */
+const LOOSE_GRAMS: Record<string, number> = { pinch: 0.4, dash: 0.6, splash: 5, drop: 0.05 }
+
+/**
+ * How many grams a quantity of a unit is for a food, and whether that was
+ * UNDERSTOOD (1 Oct 2026). Understood means one of: the food's own table names
+ * the unit (units, including the household measures above); grams or ml; a
+ * count of a food that knows its piece weight; the food's purchase unit; a
+ * spoon (water density); a pinch, dash or splash. Anything else is NOT
+ * understood, and the `grams` returned is only the legacy guess the old readers
+ * used (a cup as water, anything else as grams), kept so a meal stored before
+ * this existed reads the same until someone edits it. A new meal never goes
+ * through the guess: verifyProposal refuses a line whose `understood` is false.
+ */
+export function resolveGrams(entry: FoodEntry | null, unit: string, quantity: number): { grams: number; understood: boolean } {
   const u = unit.toLowerCase().trim()
-  if (entry?.units && entry.units[u] != null) return entry.units[u] * quantity
+  if (entry?.units && entry.units[u] != null) return { grams: entry.units[u] * quantity, understood: true }
+  if (u === 'g' || u === 'gram' || u === 'grams' || u === 'ml') return { grams: quantity, understood: true }
   // A BARE COUNT ("3 eggs", "2 bananas") parses as unit 'whole', and almost
   // no entry names a 'whole' size — they name medium/large/small. Falling
   // through to the treat-as-grams default turned "3 eggs" into THREE GRAMS
@@ -691,18 +819,39 @@ export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: num
   // number in the worst place for one. Found by test:custom-meal's very
   // first fixture, which is exactly how a user states their own breakfast.
   // A count of a food that knows its piece weight means pieces: medium
-  // first (the unmarked size), then the shopping unit's average. A food
-  // with neither keeps the old fail-through, where low coverage still
-  // surfaces the uncertainty.
+  // first (the unmarked size), then the shopping unit's average.
   if (u === 'whole' && entry) {
     const piece = entry.units?.medium ?? entry.purchaseUnit?.avgGrams
-    if (piece != null) return piece * quantity
+    if (piece != null) return { grams: piece * quantity, understood: true }
   }
-  if (DEFAULT_UNIT_GRAMS[u] != null) return DEFAULT_UNIT_GRAMS[u] * quantity
-  // Unknown unit name (e.g. a stray "1 handful") — treat the quantity as grams
-  // rather than throwing away the line; coverage will still reflect the
-  // uncertainty if the ingredient itself doesn't resolve.
-  return quantity
+  // "1 large banana" for a food that names only a medium one: the same piece, a size up or down (USDA: a banana is 101, 118, 136 g).
+  const SIZE_FACTOR: Record<string, number> = { small: 0.85, medium: 1, large: 1.15 }
+  if (entry && SIZE_FACTOR[u] != null) {
+    const piece = entry.units?.medium ?? entry.units?.whole ?? entry.purchaseUnit?.avgGrams
+    if (piece != null) return { grams: piece * SIZE_FACTOR[u] * quantity, understood: true }
+  }
+  // "1 head broccoli", "2 bagels": the shopping unit's own label.
+  if (entry?.purchaseUnit && (u === entry.purchaseUnit.label || u === `${entry.purchaseUnit.label}s`)) {
+    return { grams: entry.purchaseUnit.avgGrams * quantity, understood: true }
+  }
+  if (u === 'tbsp' || u === 'tablespoon') return { grams: 15 * quantity, understood: true }
+  if (u === 'tsp' || u === 'teaspoon') return { grams: 5 * quantity, understood: true }
+  if (LOOSE_GRAMS[u] != null) return { grams: LOOSE_GRAMS[u] * quantity, understood: true }
+  // The legacy guess, flagged. A cup was 240 g of everything.
+  return { grams: u === 'cup' ? 240 * quantity : quantity, understood: false }
+}
+
+/** Resolves a named unit to grams for a specific food entry. Same number as resolveGrams, without the flag, for the readers of meals that are already stored. */
+export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: number): number {
+  return resolveGrams(entry, unit, quantity).grams
+}
+
+/** The food a line names. A tin or a jar can name a canned food by its shorter name ("1 tin tuna"): tried as written first, then as "canned ..." (trying "canned" first sent "1 can chopped tomatoes" to a fresh tomato). */
+function lookupForLine(line: MealIngredientLine): FoodEntry | null {
+  const found = lookupIngredient(line.name)
+  if (found) return found
+  const u = line.unit.toLowerCase().trim()
+  return u === 'can' || u === 'jar' ? lookupIngredient(`canned ${line.name}`) : null
 }
 
 /**
@@ -717,11 +866,18 @@ export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMe
   let matchedGrams = 0
   const totals: Macros100g = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   const unmatched: string[] = []
+  const unreadAmounts: string[] = []
   const lines: ComputedMealMacros['lines'] = []
 
   for (const line of ingredients) {
-    const entry = lookupIngredient(line.name)
-    const grams = unitToGrams(entry, line.unit, line.quantity)
+    const entry = lookupForLine(line)
+    const resolved = resolveGrams(entry, line.unit, line.quantity)
+    const grams = resolved.grams
+    // The reader's own verdict first ("to taste", no amount). Then, for a food that RESOLVED, whether its table
+    // can weigh this unit. A food that did not resolve costs nothing either way (coverage and the diet check
+    // already treat it as unknown), so its unit is not asked about.
+    const understood = !line.unread && (entry ? resolved.understood : true)
+    if (!understood) unreadAmounts.push(line.source ?? `${line.quantity} ${line.unit} ${line.name}`)
     totalGrams += grams
 
     if (entry) {
@@ -737,10 +893,10 @@ export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMe
       totals.protein += macros.protein
       totals.carbs += macros.carbs
       totals.fat += macros.fat
-      lines.push({ input: line, entry, grams, macros })
+      lines.push({ input: line, entry, grams, macros, understood })
     } else {
       unmatched.push(line.name)
-      lines.push({ input: line, entry: null, grams, macros: null })
+      lines.push({ input: line, entry: null, grams, macros: null, understood })
     }
   }
 
@@ -752,5 +908,7 @@ export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMe
     coverage: totalGrams > 0 ? matchedGrams / totalGrams : 0,
     unmatched,
     lines,
+    unreadAmounts,
+    amountsUnderstood: unreadAmounts.length === 0,
   }
 }

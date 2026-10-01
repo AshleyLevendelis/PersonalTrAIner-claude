@@ -1,4 +1,10 @@
-# Reading ingredient amounts honestly (PLAN — not built)
+# Reading ingredient amounts honestly (BUILD APPROVED 1 Oct 2026)
+
+**Her rulings, 1 Oct 2026, from her "Ask me, then build it":** (1) a line the app still
+cannot read, typed into an own meal or told to the coach, is **asked about** ("how
+many grams?", nothing saved until answered), over refusing and over estimating.
+(2) **"Understood" now means the food AND the amount**, over leaving the meaning
+alone. Both were asked one at a time, with the recommendation first.
 
 1 Oct 2026. Ashley asked for "the unit fix". It sits on the dietary and macro
 path, so it is a plan first (CLAUDE.md, safety-adjacent work), and nothing here

@@ -523,6 +523,14 @@ export function verifyProposal(
   }
 
   const computed = computeMealMacros(parsed)
+  // AN AMOUNT THAT CANNOT BE UNDERSTOOD REFUSES THE MEAL, in every mode (1 Oct 2026; her ruling: "understood" means
+  // the food AND the amount). Coverage cannot see this: it is weighted by mass, and an unread amount has no
+  // trustworthy mass, so a meal with 8 oz of chicken read as 8 g scored 99% covered with 70 g of protein missing.
+  // keepPortions is no exception: her own amounts are facts, so one the app cannot read is asked about, never costed.
+  if (!computed.amountsUnderstood) {
+    rejectLog.push(`[${slot}] "${proposal.name}": an amount could not be read — ${computed.unreadAmounts.map(l => `"${l}"`).join('; ')}`)
+    return null
+  }
   if (computed.coverage < MIN_COVERAGE) {
     rejectLog.push(`[${slot}] "${proposal.name}": coverage ${(computed.coverage * 100).toFixed(0)}% below ${MIN_COVERAGE * 100}% floor — unmatched: ${computed.unmatched.join(', ')}`)
     return null
