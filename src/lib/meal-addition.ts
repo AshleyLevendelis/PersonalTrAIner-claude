@@ -82,6 +82,18 @@ export function normaliseDate(value: unknown, fallback: string): string {
 }
 
 /**
+ * An ingredient as a person would say it, for the cards that list the portions: "227g chicken breast", "1 cup white rice cooked",
+ * "2 carrots". The cards used to print `name 227g`, `name 1cup` and `name 2whole`, and rounded every amount to a whole number, so
+ * half a teaspoon read "1tsp" on a line headed "your portions, untouched" (1 Oct 2026).
+ */
+export function formatPortion(i: { name: string; quantity: number; unit: string }): string {
+  const q = i.quantity >= 10 ? Math.round(i.quantity) : Math.round(i.quantity * 10) / 10
+  if (i.unit === 'g' || i.unit === 'ml') return `${q}${i.unit} ${i.name}`
+  if (i.unit === 'whole') return `${q} ${i.name}`
+  return `${q} ${i.unit} ${i.name}`
+}
+
+/**
  * verifyProposal writes a precise diagnostic into its rejectLog. These are
  * written for a developer reading a generation run, not for someone who just
  * asked for a curry, so they are translated here — TRANSLATED, not replaced:
@@ -113,8 +125,10 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
     // THE ASK (Ashley, 1 Oct 2026, from three options: ask / refuse / estimate). One question, quoting the line, and
     // nothing is saved until she answers. The quoted lines are the ones as written, so she can see which one.
     const quoted = [...(line.split('—').slice(1).join('—')).matchAll(/"([^"]+)"/g)].map(m => `"${m[1]}"`)
-    if (quoted.length <= 1) return `I couldn't read how much ${quoted[0] ?? 'one of the ingredients'} is, so I haven't added ${dishName}. How many grams is it?`
-    return `I couldn't read how much of these is: ${quoted.slice(0, 3).join(', ')}. So I haven't added ${dishName}. How many grams is each?`
+    // "My dinner" is the default name of a meal she typed in; mid-sentence it reads as a title, so say it as hers.
+    const dish = /^My /.test(dishName) ? `your ${dishName.slice(3)}` : dishName
+    if (quoted.length <= 1) return `I couldn't read how much ${quoted[0] ?? 'one of the ingredients'} is, so I haven't added ${dish}. How many grams is it?`
+    return `I couldn't read how much of these is: ${quoted.slice(0, 3).join(', ')}. So I haven't added ${dish}. How many grams is each?`
   }
   if (/unrecognised dietary restriction/i.test(line)) {
     return `Something's wrong with the dietary restrictions saved on your profile, so I can't safely check ${dishName} against them. Worth fixing those in Profile first — I'd rather stop than guess.`
@@ -196,7 +210,7 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
       // portions are the app's, not the model's, and the meal becomes that
       // day's pick as well as joining the slot's options.
       implications: [
-        { severity: 'info', text: `Portions adjusted to fit your ${slot} target — ${option.ingredients.map(i => `${i.name} ${Math.round(i.quantity)}${i.unit}`).join(', ')}` },
+        { severity: 'info', text: `Portions adjusted to fit your ${slot} target — ${option.ingredients.map(formatPortion).join(', ')}` },
         { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${date}.` },
       ],
       rationale: typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined,

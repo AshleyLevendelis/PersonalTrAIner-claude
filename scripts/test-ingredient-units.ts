@@ -32,6 +32,10 @@ import { readIngredientText } from '../src/lib/ingredient-units'
 import { verifyProposal } from '../src/lib/meal-generation'
 import { validateMealAgainstDiet, DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 import { MEAL_LIBRARY } from '../src/lib/meal-library-data'
+import { buildCustomMealProposal } from '../src/lib/custom-meal'
+import { formatPortion } from '../src/lib/meal-addition'
+import { buildMealFoodAddProposal } from '../src/lib/meal-food-add'
+import type { MacroTargets } from '../src/lib/types'
 // The coach's own copies. Plain TypeScript with no imports, so tsx reads them directly.
 // @ts-ignore a Deno-side file, not part of tsconfig
 import * as serverFood from '../supabase/functions/_shared/food-db'
@@ -74,6 +78,7 @@ const TABLE: [string, number, string][] = [
   ['1 can chickpeas', 240, ''], ['1 tin kidney beans', 240, ''], ['2 cans chickpeas', 480, ''], ['1 can tuna canned in water', 120, ''], ['1 tin tuna', 120, 'did not resolve at all'],
   ['1 can chopped tomatoes', 400, ''], ['1 tin sweetcorn', 160, ''], ['1 (14 oz) can coconut milk canned', 397, 'a stated size is the weight'],
   ['1 can (400g) chopped tomatoes canned', 400, ''], ['2 tins (400g) chopped tomatoes canned', 800, ''],
+  ['1 can (800g) chopped tomatoes canned', 800, 'a stated size beats the typical tin'], ['2 cans (200g) chickpeas', 400, 'a small tin: the stated weight, not the usual 240'],
   // loose amounts
   ['a pinch of black pepper', 0.4, ''], ['1 dash worcestershire sauce', 0.6, ''], ['1 splash olive oil', 5, ''],
   ['a handful of rocket', 20, ''], ['1 handful almonds', 28, ''], ['a handful of spinach', 30, ''],
@@ -83,6 +88,9 @@ const TABLE: [string, number, string][] = [
   ['2 carrots', 122, 'was 2 g'], ['1 onion', 110, ''], ['1 chicken breast', 140, ''], ['4 chicken thighs', 440, ''], ['2 tomatoes', 246, ''], ['a lemon', 58, ''],
   ['2 slices wholemeal bread', 76, ''], ['1 slice white bread', 36, ''], ['3 cloves garlic', 9, ''], ['1 bunch spring onion', 90, ''], ['1 stick celery', 40, ''],
   ['1 head broccoli', 300, ''], ['2 heads cauliflower', 1200, ''], ['1 medium onion, finely diced', 110, 'a prep note after the name'], ['6 cherry tomatoes', 102, ''], ['1 scoop whey protein powder', 30, ''],
+  // the amount written LAST: still one exact answer (the meal-tradeoff driver's fixture wrote its meals this way and every line cost 1 g)
+  ['chicken breast 150g', 150, ''], ['salmon 200 g', 200, ''], ['greek yoghurt 0% 250g', 250, 'a percentage before the amount'], ['potato boiled, 250g', 250, 'after a comma'],
+  ['steak 8 oz', 227, 'in ounces'], ['milk whole 1 l', 1000, ''], ['canned tuna (120g)', 120, 'a bracketed weight is the amount'], ['beef mince 5% fat 500g', 500, ''],
 ]
 
 /** Lines whose amount cannot be known from the line: they must be marked unread, never costed. */
@@ -90,6 +98,8 @@ const UNREAD: [string, string][] = [
   ['salt and pepper to taste', 'to taste'], ['juice of 1 lemon', 'juice'], ['1 pint milk whole', 'pint'], ['1 knob butter', 'knob'], ['1 sachet honey', 'sachet'],
   ['some rice', 'no amount'], ['', 'empty'], ['150g', 'no food'], ['1 cup chicken breast', 'a cup of a food with no cup weight'], ['1 can chicken breast', 'a can of a food with no can weight'],
   ['1 handful chicken breast', 'a handful of a food with no handful weight'],
+  ['eggs 3', 'a count written last has no unit to read'], ['chicken breast 150', 'a bare number last'], ['chicken breast 5% fat', 'a percentage is not an amount'], ['vitamin c 500mg', 'milligrams are not an exact unit here'],
+  ['a bit of salt to taste', 'a word amount that is really "to taste"'], ['chicken breast 150 g.x', 'junk after a unit is not the unit'], ['3 white rice cooked', 'a bare count of a food that has no piece weight'], ['rice 1 cup', 'a cup written last, of a food with no cup weight in this form'],
 ]
 
 async function main() {
@@ -105,7 +115,18 @@ async function main() {
   check('...and every one of them is understood: none is sent off to be asked about', notUnderstood.length === 0, notUnderstood)
   const askedWrong = UNREAD.filter(([line]) => gramsOf(line).understood)
   check(`${UNREAD.length} lines that cannot be known are marked unread, not costed: "to taste", juice of a lemon, a pint, a knob, a cup or a can of a food with no such weight`, askedWrong.length === 0, askedWrong)
-  check('an unread line says WHY and quotes the line as it was written, so the question can name it', UNREAD.filter(([line]) => line.trim().length > 0).every(([line]) => { const m = computeMealMacros([parseIngredientLine(line)]); const p = parseIngredientLine(line); return m.unreadAmounts.includes(p.source ?? `${p.quantity} ${p.unit} ${p.name}`) || m.unreadAmounts.length === 1 }) && !!readIngredientText('juice of 1 lemon').unread && readIngredientText('juice of 1 lemon').source === 'juice of 1 lemon')
+  // Every unread line must be reported by what a person would recognise: the line as written when the READER gave up on it,
+  // or "amount unit name" when the food's own table could not weigh the unit. Never the other way, never somebody else's line.
+  const whyBad: string[] = []
+  for (const [line] of UNREAD.filter(([l]) => l.trim().length > 0)) {
+    const p = parseIngredientLine(line)
+    const m = computeMealMacros([p])
+    const expected = p.source ?? `${p.quantity} ${p.unit} ${p.name}`
+    if (m.unreadAmounts.length !== 1 || m.unreadAmounts[0] !== expected) whyBad.push(`${line} -> ${JSON.stringify(m.unreadAmounts)}, want ["${expected}"]`)
+    if (p.unread !== undefined && (p.source !== line.trim() || p.unread.length < 5)) whyBad.push(`${line} -> reason "${p.unread}", source "${p.source}"`)
+  }
+  const juice = readIngredientText('juice of 1 lemon')
+  check('an unread line is reported as itself (the line as written, or "amount unit name"), and a reader refusal carries a real reason and its source', whyBad.length === 0 && /juice/.test(juice.unread ?? '') && juice.source === 'juice of 1 lemon' && /taste/.test(readIngredientText('salt and pepper to taste').unread ?? '') && /zero/.test(readIngredientText('0 g rice').unread ?? ''), whyBad.slice(0, 4))
 
   console.log('\n2. Properties that need no table')
   const UNIT_WORDS = ['oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'kg', 'g', 'gram', 'ml', 'l', 'litre', 'cup', 'cups', 'tbsp', 'tsp', 'can', 'cans', 'tin', 'tins', 'pinch', 'handful', 'dash', 'splash', 'bunch', 'head', 'stick']
@@ -143,7 +164,7 @@ async function main() {
     if (one.understood !== three.understood) nonlinear.push(`${u} ${food} (understood differs)`)
   }
   check('the weight is linear in the amount, and an amount is understood or not whatever the number is', nonlinear.length === 0, nonlinear.slice(0, 5))
-  const staleDefault = FOOD_DB.filter(f => lookupIngredient(f.name) === f && resolveGrams(f as never, 'cup', 1).understood && (f as never as { units: Record<string, number> }).units.cup === 240 && f.category === 'veg')
+  const staleDefault = FOOD_DB.filter(f => lookupIngredient(f.name) === f && resolveGrams(f as never, 'cup', 1).understood && (f as never as { units?: Record<string, number> }).units?.cup === 240 && f.category === 'veg')
   check('a cup is not 240 g of everything: no vegetable carries the old water-density cup', staleDefault.length === 0, staleDefault.map(f => f.name))
   const reread = ['1 1/2 cups white rice cooked', '2 tbsp olive oil', '½ cup oats', '150g chicken breast']
   check('withQuantity changes a mixed fraction as a whole ("1 1/2 cups" set to 2 is "2 cups", not "2 1/2 cups")', withQuantity('1 1/2 cups oats', 2) === '2 cups oats' && withQuantity('1/2 tsp cumin', 3) === '3 tsp cumin' && withQuantity('150g chicken', 90) === '90g chicken' && reread.length === 4)
@@ -206,6 +227,74 @@ async function main() {
   const dietLines: [string, string, boolean][] = [['1 tin tuna', 'vegan', false], ['1 tin tuna', 'vegetarian', false], ['8 oz chicken breast', 'vegetarian', false], ['1 lb beef mince 5% fat', 'vegetarian', false], ['2 cans chickpeas', 'vegan', true], ['a pinch of salt', 'vegan', false]]
   const verdicts = dietLines.filter(([l, d, want]) => validateMealAgainstDiet([parseIngredientLine(l)], [d]).ok !== want)
   check('the measured verdicts hold: a tin of tuna and 8 oz of chicken are refused for a vegetarian, a pinch of an unknown food is refused for a vegan (fail-closed), chickpeas pass', verdicts.length === 0, verdicts)
+
+  console.log('\n6. Every door she types into asks, and saves nothing until she answers')
+  const targets: MacroTargets = { calories: 2500, protein: 160, carbs: 250, fat: 80 }
+  const customBase = { profileId: 'p1', todayDate: '2026-10-01', targets, mealsPerDay: 3, includeSnacks: true, dietaryPreferences: [] as string[] }
+  const customOk = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['8 oz chicken breast', '1 cup white rice cooked', '2 carrots'], name: 'My dinner' } })
+  check('the control: her own dinner in ounces, cups and counts is accepted as costed', customOk.ok && customOk.payload.option.macros.protein > 60, customOk.ok ? undefined : customOk.reason)
+  const customAsk = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['150g chicken breast', '1 knob butter'], name: 'My dinner' } })
+  check('a line she typed that cannot be read gets one question that quotes it and asks for grams; no card, nothing to confirm', !customAsk.ok && /1 knob butter/.test(customAsk.reason) && /how many grams/i.test(customAsk.reason) && !('payload' in customAsk), customAsk)
+  const customTwo = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['150g chicken breast', '1 knob butter', '1 pint milk whole'], name: 'My dinner' } })
+  check('two unreadable lines are asked about together, both quoted, "each"', !customTwo.ok && /1 knob butter/.test(customTwo.reason) && /1 pint milk whole/.test(customTwo.reason) && /each/i.test(customTwo.reason), customTwo)
+  const customNone = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['150g chicken breast', 'some rice'], name: 'My dinner' } })
+  // Two different questions for two different situations: no amount at all gets the friendlier "how much of the X, grams or counts" wording
+  // (custom-meal's own check, which runs first), an amount that is there but cannot be read gets the "couldn't read it" ask. Without this
+  // line a MISSED mutation showed the second would answer the first's case in near-identical words, so the first could be deleted unseen.
+  check('a line with no amount at all is asked about in its own words ("how much of the ..., grams or counts"), not the unreadable-amount ask', !customNone.ok && /some rice/.test(customNone.reason) && /how much of the some rice/i.test(customNone.reason) && /grams, or counts/i.test(customNone.reason) && !/couldn't read/i.test(customNone.reason), customNone)
+  const parfait = { name: 'Greek Yoghurt and Honey Berry Parfait', ingredients: ['200g greek yoghurt', '100g blueberries', '20g honey', '30g granola'], macros: { calories: 450, protein: 25, carbs: 60, fat: 10 } }
+  const addBase = { profileId: 'p1', todayDate: '2026-10-01', targets, mealsPerDay: 3, includeSnacks: true, dietaryPreferences: [] as string[], currentMeal: parfait }
+  const addOk = buildMealFoodAddProposal({ ...addBase, rawArgs: { meal_slot: 'breakfast', food_lines: ['1 large banana'], origin_verbatim_quote: 'add a banana' } })
+  const addAsk = buildMealFoodAddProposal({ ...addBase, rawArgs: { meal_slot: 'breakfast', food_lines: ['1 knob butter'], origin_verbatim_quote: 'add butter' } })
+  check('adding a food to a meal: a readable one is accepted, an unreadable one is asked about and quoted', addOk.ok && !addAsk.ok && /1 knob butter/.test(addAsk.reason) && /how many grams/i.test(addAsk.reason), { ok: addOk.ok, ask: addAsk })
+
+  check('a portion is said as a person would, not "name 1cup": "227g chicken breast", "1 cup rice", "2 carrots", and half a teaspoon is not rounded to one', formatPortion({ name: 'chicken breast', quantity: 227, unit: 'g' }) === '227g chicken breast' && formatPortion({ name: 'white rice cooked', quantity: 1, unit: 'cup' }) === '1 cup white rice cooked' && formatPortion({ name: 'carrots', quantity: 2, unit: 'whole' }) === '2 carrots' && formatPortion({ name: 'honey', quantity: 0.5, unit: 'tsp' }) === '0.5 tsp honey' && formatPortion({ name: 'milk', quantity: 250.4, unit: 'ml' }) === '250ml milk')
+  check('the unreadable-amount question says "your dinner", not "My dinner" (the default name of a meal she typed in)', !customAsk.ok && /haven't added your dinner/.test(customAsk.reason) && !/added My dinner/.test(customAsk.reason), customAsk)
+
+  console.log('\n7. The coach and the meal writer are told, and the coach asks')
+  const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')
+  const chat = stripComments(text('supabase/functions/chat-gemini/index.ts'))
+  const writer = stripComments(text('supabase/functions/generate-meals/index.ts'))
+  const handler = chat.slice(chat.indexOf('if (name === "log_meal") {'), chat.indexOf('if (name === "log_meal") {') + 9000)
+  const iRead = handler.indexOf('readIngredientText(')
+  const iCompute = handler.indexOf('computeMealMacros(ingredients)')
+  const iAsk = handler.indexOf('!computed.amountsUnderstood')
+  const iTotal = handler.indexOf('computed.kcal')
+  check('the coach reads each logged line through the shared reader BEFORE it adds anything up, asks if one cannot be read, and only then quotes a total', handler.length > 100 && iRead > -1 && iCompute > iRead && iAsk > iCompute && iTotal > iAsk && /how many grams/i.test(handler.slice(iAsk, iTotal)), { iRead, iCompute, iAsk, iTotal })
+  check('the coach imports that reader from the shared copy, not a private one', /import \{ readIngredientText \} from "\.\.\/_shared\/ingredient-units\.ts"/.test(chat))
+  check('the coach\'s log_meal schema no longer invites ounces, pounds or cups ("Never oz, lb or cup")', /unit: \{ type: "string", description: "[^"]*Never oz, lb or cup/.test(chat) && !/"Xg ingredient" or "X tbsp ingredient" or "X cup ingredient"/.test(chat))
+  check('the meal writer is told never to use ounces, pounds, cups, tins or pinches, and that a line the app cannot read drops its dish', /NEVER ounces, pounds, kilograms, cups, tins, cans, pinches or handfuls/.test(writer) && /a line the app cannot read is dropped with its whole dish/.test(writer))
+
+  console.log('\n8. The weights for cups, cans and handfuls are real foods, and a food\'s own unit always wins')
+  const fdSrc = text('src/lib/food-db.ts')
+  const tableSrc = fdSrc.slice(fdSrc.indexOf('const HOUSEHOLD_UNITS'), fdSrc.indexOf('for (const [name, extra] of Object.entries(HOUSEHOLD_UNITS))'))
+  const household: Record<string, Record<string, number>> = {}
+  for (const m of tableSrc.matchAll(/'([^']+)':\s*\{([^}]*)\}/g)) {
+    household[m[1]] = Object.fromEntries([...m[2].matchAll(/(\w+):\s*([\d.]+)/g)].map(u => [u[1], parseFloat(u[2])]))
+  }
+  const names = Object.keys(household)
+  const byName = new Map((FOOD_DB as { name: string; units?: Record<string, number> }[]).map(f => [f.name, f]))
+  const typos = names.filter(n => !byName.has(n))
+  check(`the household table found its foods: ${names.length} listed (a typo would silently do nothing), none missing from the database`, names.length > 200 && typos.length === 0, typos)
+  const conflicts: string[] = []
+  let ownCompared = 0
+  for (const n of names) {
+    const line = fdSrc.split('\n').find(l => l.startsWith(`  f('${n}',`))
+    const ownBlock = line ? [...line.matchAll(/\{([^{}]*)\}/g)].map(b => b[1]).find(b => !/kcal|avgGrams|contains_|is_|true|false/.test(b) && /\w+:\s*[\d.]+/.test(b)) : undefined
+    const own: Record<string, number> = ownBlock ? Object.fromEntries([...ownBlock.matchAll(/(\w+):\s*([\d.]+)/g)].map(u => [u[1], parseFloat(u[2])])) : {}
+    if (ownBlock) ownCompared++
+    const merged = byName.get(n)?.units ?? {}
+    for (const [u, w] of Object.entries(household[n])) {
+      const want = own[u] ?? w
+      if (merged[u] !== want) conflicts.push(`${n}.${u}: ${merged[u]}, want ${want} (${own[u] != null ? 'its own' : 'the table'})`)
+    }
+  }
+  check(`every table weight is applied, and where a food names its own unit that one wins (${ownCompared} foods name their own units too)`, conflicts.length === 0 && ownCompared >= 5, conflicts.slice(0, 4))
+  // MEASURED 1 Oct 2026: no food names a unit in BOTH places yet (10 name their own, none of them one the table also names),
+  // so which wins is not visible in any data today and a behavioural check could not fail. The ORDER is pinned in the source so
+  // the first overlapping row cannot override a food's own, hand-checked weight.
+  const mergeLine = stripComments(fdSrc).match(/entry\.units = \{[^}]*\}/)?.[0] ?? ''
+  check('the household table is spread BEFORE the food\'s own units, so an own unit always wins (equivalent today: no food names a unit in both)', /\.\.\.extra[\s\S]*\.\.\.\(entry\.units/.test(mergeLine), mergeLine)
 
   console.log(`\n${ran} checks ran`)
   if (failed > 0) { console.error(`\n${failed} ingredient-unit check(s) failed`); process.exit(1) }

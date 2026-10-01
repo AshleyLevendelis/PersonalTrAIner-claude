@@ -132,14 +132,16 @@ const mealPlan: MealPlanDay[] = (() => {
   if (!macros) return []
   const share = [0.25, 0.35, 0.4]
   const names = ['Greek yoghurt and oats', 'Chicken and rice bowl', 'Salmon, potatoes and greens']
-  // REAL INGREDIENT LINES, from the app's own food table. The food-edit
+  // REAL INGREDIENT LINES, in the app's own stored shape: the amount FIRST, "250g potato boiled" (what generation and
+  // formatIngredient write). They were written amount-last ("potato boiled 250g") until 1 Oct 2026, a shape no stored meal
+  // has, which the old reader costed at 1 g per line and the driver never noticed. The food-edit
   // builders match a named food against these and then re-verify the whole
   // meal, so a meal with no ingredients can only ever produce "I can't find
   // that in your dinner" — a refusal, which is not the path under test.
   const lines = [
-    ['greek yoghurt 0% 250g', 'oats 60g', 'blueberries 80g'],
-    ['chicken breast 180g', 'white rice cooked 220g', 'broccoli 100g'],
-    ['salmon 200g', 'potato boiled 250g', 'broccoli 120g'],
+    ['250g greek yoghurt 0%', '60g oats', '80g blueberries'],
+    ['180g chicken breast', '220g white rice cooked', '100g broccoli'],
+    ['200g salmon', '250g potato boiled', '120g broccoli'],
   ]
   return ['breakfast', 'lunch', 'dinner'].map((meal, i) => ({
     meal,

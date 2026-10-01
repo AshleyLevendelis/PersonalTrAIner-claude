@@ -315,6 +315,7 @@
     "verify:mobility-filler": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/mobility-filler.mjs",
     "test:meal-tradeoff": "tsx scripts/test-meal-tradeoff.ts",
     "verify:meal-tradeoff": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-tradeoff.mjs",
+    "verify:unit-ask": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/unit-ask.mjs",
     "test:bodyweight-progress": "tsx scripts/test-bodyweight-progress.ts",
     "verify:bodyweight-progress": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/bodyweight-progress.mjs",
     "test:session-length-change": "tsx scripts/test-session-length-change.ts",

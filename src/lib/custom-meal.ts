@@ -1,5 +1,5 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
-import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
+import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, formatPortion, type MealAdditionPayload } from './meal-addition'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
@@ -106,7 +106,7 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
     implications: [
       // The inverse of the addition card's "portions adjusted" line, and
       // the whole point of the feature: nothing was adjusted.
-      { severity: 'info', text: `Your portions, untouched — ${option.ingredients.map(i => `${i.name} ${Math.round(i.quantity)}${i.unit}`).join(', ')}.` },
+      { severity: 'info', text: `Your portions, untouched — ${option.ingredients.map(formatPortion).join(', ')}.` },
       { severity: 'info', text: `The rest of the day re-fits around it${vsBudget !== 0 ? ` (${vsBudget > 0 ? `${vsBudget} kcal over` : `${-vsBudget} kcal under`} the usual ${slot} share)` : ''}.` },
       { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${date}.` },
     ],

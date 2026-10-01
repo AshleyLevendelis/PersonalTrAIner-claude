@@ -157,6 +157,24 @@ function takeQuantity(text: string): { qty: number; rest: string; times?: number
   return null
 }
 
+/** An exact amount at the END of a line: `name 150g`, `name, 8 oz`, `name (400g)`. Anything that is not an exact unit is left alone. */
+function takeTrailingAmount(text: string, stated: { amount: number; unit: 'g' | 'ml' } | null): ReadLine | null {
+  // "tomatoes (400g)": the bracket was already lifted out as a stated size, and with nothing else it IS the amount.
+  if (stated) {
+    const name = text.replace(/[\s,:(–-]+$/, '').trim()
+    return name.length > 0 ? { name, quantity: tidy(stated.amount), unit: stated.unit } : null
+  }
+  const m = text.match(new RegExp(String.raw`^(.*[a-zA-Z%)])\s*[,:(–-]?\s*(${NUM})\s*([a-zA-Z.]+)\s*\)?\s*$`))
+  if (!m) return null
+  const name = m[1].replace(/[\s,:(–-]+$/, '').trim()
+  if (name.length === 0) return null
+  for (const [pattern, conv] of EXACT_UNITS) {
+    const u = m[3].match(pattern)
+    if (u && u[0].length === m[3].length) return { name, quantity: tidy(toNumber(m[2]) * conv.factor), unit: conv.unit }
+  }
+  return null
+}
+
 /**
  * Reads one ingredient line. Every line that READ CORRECTLY before reads the
  * same now (same name, quantity and unit); what changes is that lines which were
@@ -189,7 +207,13 @@ export function readIngredientText(text: string): ReadLine {
     const taken = takeQuantity(t)
     if (taken) { qty = taken.qty; rest = taken.rest; if (taken.times) times = taken.times }
   }
-  if (qty === null) return unread(source, 'it has no amount')
+  // AN AMOUNT WRITTEN LAST, "chicken breast 150g", "salmon, 8 oz", "tomatoes (400g)": still one exact answer, so it is
+  // read rather than asked about. Only the exact units count here; "eggs 3" has no unit and stays unread.
+  if (qty === null) {
+    const last = takeTrailingAmount(t, stated.size)
+    if (last) return last
+    return unread(source, 'it has no amount')
+  }
   if (qty <= 0) return unread(source, 'the amount is zero')
   qty *= times
 
