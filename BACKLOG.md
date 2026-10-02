@@ -61,7 +61,13 @@ Newest first. One line each.
   the real chat, the question quotes her line, sits inside the viewport and
   raises no card; a meal in ounces, cups and counts reaches a card showing 227 g,
   76 g protein and 57 g carbs; screenshots read. Derived sweep 190 of 191 and the
-  one failure fixed (above); the follow-up re-run is recorded below.
+  one failure fixed (above). **Follow-up re-run of the 91 gates that read what the
+  fixes touched (plus every gate that reads the docs): 90 passed, and the one red
+  is `test:coach-exam-fresh`, expected and correct: the coach's reply and prompt
+  changed, so the exam must be re-run on her machine.** `tsc` clean. **BUNDLE: the
+  reader and weights cost about 11 kB of code; total 2137 of 2144 kB (7 left),
+  re-download 275 of 280 kB gzipped (5 left). No budget raised; the next addition
+  to the main chunk has to decide.**
   **NOT PROVEN LIVE.** The coach's half (`log_meal` asking) is deployed code a
   driver cannot reach: it is held by source checks only until `chat-gemini` is
   deployed. What the model actually sends as `unit` is still unmeasured, and so
