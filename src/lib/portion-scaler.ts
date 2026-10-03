@@ -59,6 +59,34 @@ export function withQuantity(line: string, quantity: number): string | null {
   return `${m[1]}${quantity}${line.slice(m[0].length)}`
 }
 
+/** Units a line is weighed in once it is read: a cup, a tin, a handful and the like. Resized in grams, because "1 cup" scaled by 1.3 and rounded to a whole cup is still 1 cup. */
+const WEIGHED_WHEN_RESIZED = new Set(['cup', 'can', 'jar', 'bag', 'pack', 'bottle', 'carton', 'sachet', 'bunch', 'head', 'stick', 'sprig', 'stalk', 'handful'])
+
+/**
+ * Sets a line's amount where `quantity` is in the unit the READER gives the line (1 Oct 2026). `withQuantity` above keeps
+ * the WRITTEN unit, which is right when the number comes from a person reading the line ("make it 200") and wrong when it
+ * comes from the parsed value of a line the reader CONVERTED: "8 oz chicken" parses as 227 g, and scaled by 1.3 and written
+ * back beside the old word that is "295 oz", twenty-eight times too much. A converted line (oz, lb, kg, l, a range, "2 x 150g",
+ * a bracketed weight, an amount written last) is rewritten in the reader's own unit; every other line keeps her words and
+ * changes only the number. Null means there is nothing to resize (no readable amount), and the caller keeps the line.
+ */
+export function withParsedQuantity(line: string, quantity: number): string | null {
+  const p = parseIngredientLine(line)
+  if (p.unread) return null
+  const writtenInGrams = /^\s*[\d./\s]+\s*(?:g|gr|grams?|ml|mls|millilit(?:re|er)s?)\b/i.test(line)
+  // "2-3 tbsp" and "2 x 150g" are two numbers; replacing the first would leave "5-3 tbsp".
+  const twoNumbers = /^\s*(?:\d+(?:\.\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+)\s*(?:-|to|[x×])\s*\d/i.test(line)
+  if (((p.unit === 'g' || p.unit === 'ml') && !writtenInGrams) || twoNumbers) {
+    return p.unit === 'g' || p.unit === 'ml' ? `${quantity}${p.unit} ${p.name}` : p.unit === 'whole' ? `${quantity} ${p.name}` : `${quantity} ${p.unit} ${p.name}`
+  }
+  return withQuantity(line, quantity)
+}
+
+/** Whether a resize should weigh this line in grams rather than count it: see WEIGHED_WHEN_RESIZED. */
+export function isWeighedWhenResized(unit: string): boolean {
+  return WEIGHED_WHEN_RESIZED.has(unit.toLowerCase().trim())
+}
+
 /**
  * Scales every ingredient line's quantity by scaleFactor, using the same
  * per-unit rounding conventions as macro-calibration's string scaler: gram/ml

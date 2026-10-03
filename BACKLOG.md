@@ -51,9 +51,28 @@ Newest first. One line each.
   (c) The custom-meal "every line needs an amount" check became redundant with
   the reader and a MISSED mutation said so; both are kept because they ask two
   different questions, and a check now pins each one's own wording.
-  **VERIFIED.** `test:ingredient-units` 39 checks (a 92-line table with known
+  **FOUND AND FIXED BEFORE THE RELEASE, 3 Oct 2026, by reading the next caller
+  rather than by any check.** The code that rewrites a line to a new amount
+  (`withQuantity`) replaces the leading number and keeps the unit word. That was
+  right while the reader kept every unit, and wrong the moment it converted:
+  the meal-move resize and the library fit passed it the PARSED amount, so
+  "8 oz chicken" (227 g) scaled by 1.3 came back "295 oz", twenty-eight times too
+  much, and a "2-3 tbsp" range came back "5-3 tbsp". Reachable only through a
+  line that had never been normalised (stored meals are written "227g chicken
+  breast"), which is why nothing had seen it. A second, smaller defect in the
+  same code: a cup, tin or handful was scaled and rounded to a whole one, so a
+  meal moved to a bigger slot kept "1 cup" for a factor of 1.3. Now one setter
+  (`withParsedQuantity`) takes the amount in the reader's own unit and rewrites a
+  converted line in it, ranges included; the resize weighs cups, tins, handfuls
+  and the like in grams. Held by a round-trip property (258 rewrites of the 92
+  table lines read back as exactly the number set, in the unit read) and a resize
+  check over oz, cup, tins and grams; 7 mutations, all caught. One equivalent
+  mutant recorded, not run: the library fit uses the same setter, and its lines
+  are grams by `test:meal-library`'s own rule, so using the old setter there
+  changes nothing today.
+  **VERIFIED.** `test:ingredient-units` 42 checks (a 92-line table with known
   weights, properties over every food, refusal in both modes, the coach's
-  source order, the household table); **mutations 57 of 57 caught** (reader 28,
+  source order, the household table); **mutations 64 of 64 caught** (reader 28, the amount setter and the resize 7,
   food weights 16, refusal/ask/coach/prompts 13; eight only after a case where
   the thing binds was added, one recorded as equivalent on today's data: no food
   names a unit in both its own table and the household one, so the merge order is
@@ -65,7 +84,7 @@ Newest first. One line each.
   fixes touched (plus every gate that reads the docs): 90 passed, and the one red
   is `test:coach-exam-fresh`, expected and correct: the coach's reply and prompt
   changed, so the exam must be re-run on her machine.** `tsc` clean. **BUNDLE: the
-  reader and weights cost about 11 kB of code; total 2137 of 2144 kB (7 left),
+  reader and weights cost about 11 kB of code; total 2138 of 2144 kB (6 left),
   re-download 275 of 280 kB gzipped (5 left). No budget raised; the next addition
   to the main chunk has to decide.**
   **NOT PROVEN LIVE.** The coach's half (`log_meal` asking) is deployed code a
@@ -73,8 +92,7 @@ Newest first. One line each.
   deployed. What the model actually sends as `unit` is still unmeasured, and so
   is how many STORED meals carry a unit word in a name (production is
   select-only). **NOT BUILT:** repairing stored meals (no live users); the
-  grocery list's display of an old misparsed line; the meal-move resize still
-  keeps its own copy of the rounding rules. **DEPLOYS:** frontend on merge to
+  grocery list's display of an old misparsed line. **DEPLOYS:** frontend on merge to
   `main` (her word), `chat-gemini` and `generate-meals` each by name on her
   machine. No migration.
 

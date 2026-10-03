@@ -2,7 +2,7 @@ import type { RawProposal } from './meal-generation'
 import type { MealSlotName } from './meal-store'
 import type { CookingTimePreference } from './types'
 import { containsPhrase } from './meal-ingredients'
-import { parseIngredientLine, withQuantity, scaleToTarget, meetsProteinFloor, isWithinCalorieTolerance } from './portion-scaler'
+import { parseIngredientLine, withParsedQuantity, scaleToTarget, meetsProteinFloor, isWithinCalorieTolerance } from './portion-scaler'
 import { computeMealMacros } from './food-db'
 import type { MacroTargets } from './types'
 
@@ -129,7 +129,7 @@ export function fitDishToBudget(dish: RawProposal, budget: MacroTargets): { dish
     const lines = cand.a === 1 && cand.b === 1 ? dish.ingredients : dish.ingredients.map((text, i) => {
       const factor = role[i] === 'P' ? cand.a : role[i] === 'C' ? cand.b : 1
       if (factor === 1) return text
-      return withQuantity(text, Math.max(5, Math.round(parsed[i].quantity * factor))) ?? text
+      return withParsedQuantity(text, Math.max(5, Math.round(parsed[i].quantity * factor))) ?? text
     })
     const fittedParsed = lines.map(parseIngredientLine)
     const fm = computeMealMacros(fittedParsed)

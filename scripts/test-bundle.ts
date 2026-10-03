@@ -501,9 +501,9 @@ console.log('\n3. Nothing has crept back up')
   //     after the fit      total 2098   app 957   (the portion fit, 2 kB of code)
   //     1 Oct 2026, +102 lean dishes   total 2126   app 957   paint 427   deploy 271
   //                        (the data chunk went 50 -> 77 kB; the three figures a person waits for did not move)
-  //     2 Oct 2026, the amount reader  total 2137   app 968   paint 430   deploy 275
+  //     3 Oct 2026, the amount reader  total 2138   app 969   paint 431   deploy 275
   //                        (the reader and the cup/can/handful weights are about 11 kB of code in the main chunk; NO budget was
-  //                        raised: 7 kB left in total and 5 kB on the re-download ceiling, so the next addition must decide)
+  //                        raised: 6 kB left in total and 5 kB on the re-download ceiling, so the next addition must decide)
   // The base had 10 kB left. 188 original dishes are 50 kB of DATA in a chunk of
   // their own that only "more options" fetches (the three figures a person
   // waits for moved by 2, 1 and 1 kB: the chooser). Content, not code, but this

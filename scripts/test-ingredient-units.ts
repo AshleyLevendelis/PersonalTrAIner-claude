@@ -27,7 +27,8 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { FOOD_DB, computeMealMacros, resolveGrams, lookupIngredient } from '../src/lib/food-db'
-import { parseIngredientLine, withQuantity } from '../src/lib/portion-scaler'
+import { parseIngredientLine, withQuantity, withParsedQuantity } from '../src/lib/portion-scaler'
+import { resizeMealTo } from '../src/lib/meal-move'
 import { readIngredientText } from '../src/lib/ingredient-units'
 import { verifyProposal } from '../src/lib/meal-generation'
 import { validateMealAgainstDiet, DIETARY_PREFERENCES } from '../src/lib/diet-rules'
@@ -295,6 +296,31 @@ async function main() {
   // the first overlapping row cannot override a food's own, hand-checked weight.
   const mergeLine = stripComments(fdSrc).match(/entry\.units = \{[^}]*\}/)?.[0] ?? ''
   check('the household table is spread BEFORE the food\'s own units, so an own unit always wins (equivalent today: no food names a unit in both)', /\.\.\.extra[\s\S]*\.\.\.\(entry\.units/.test(mergeLine), mergeLine)
+
+  console.log('\n9. Code that rewrites a line to a new amount cannot change the unit under it')
+  // THE DEFECT, found 3 Oct 2026 reading meal-move: withQuantity keeps the WRITTEN unit, and the callers handed it the PARSED amount.
+  // "8 oz chicken" parses as 227 g, so scaled by 1.3 it came back "295 oz chicken": twenty-eight times too much.
+  const roundTrip: string[] = []
+  let rewritten = 0
+  for (const [line] of TABLE) {
+    const p0 = parseIngredientLine(line)
+    for (const k of [0.5, 1.3, 2]) {
+      const n = Math.max(1, Math.round(p0.quantity * k))
+      const out = withParsedQuantity(line, n)
+      if (out === null) continue
+      rewritten++
+      const back = parseIngredientLine(out)
+      if (back.unread || back.unit !== p0.unit || back.quantity !== n) roundTrip.push(`${line} x${k} -> "${out}" reads ${back.quantity} ${back.unit}, want ${n} ${p0.unit}`)
+    }
+  }
+  check(`setting an amount reads back as exactly that amount in the line's own unit, for ${rewritten} rewrites of ${TABLE.length} lines (8 oz x1.3 is "295g", never "295 oz")`, roundTrip.length === 0 && rewritten > 150, roundTrip.slice(0, 4))
+  check('...and a line whose written unit the reader kept keeps her words: "1 1/2 cups oats" set to 2 is "2 cups oats", a converted one is said in grams', withParsedQuantity('1 1/2 cups oats', 2) === '2 cups oats' && withParsedQuantity('8 oz chicken breast', 295) === '295g chicken breast' && withParsedQuantity('100-150g chicken breast', 300) === '300g chicken breast' && withParsedQuantity('chicken breast 150g', 200) === '200g chicken breast' && withParsedQuantity('2 tins tuna', 3) === '3 tins tuna', [withParsedQuantity('8 oz chicken breast', 295), withParsedQuantity('2 tins tuna', 3)])
+  const moveMeal = { name: 'x', ingredients: ['8 oz chicken breast', '1 cup white rice cooked', '2 cans chickpeas', '150g salmon', '2 tbsp olive oil', '3 eggs'], macros: { calories: 500, protein: 40, carbs: 50, fat: 15 } }
+  const resized = resizeMealTo(moveMeal as never, { calories: 650, protein: 52, carbs: 65, fat: 20 } as never) as { ingredients: string[]; factor: number }
+  const gramsBefore = computeMealMacros(moveMeal.ingredients.map(parseIngredientLine)).lines.map(l => l.grams)
+  const gramsAfter = computeMealMacros((resized.ingredients ?? []).map(parseIngredientLine)).lines.map(l => l.grams)
+  const resizeDrift = moveMeal.ingredients.map((l, i) => ({ l, ratio: gramsAfter[i] / gramsBefore[i] })).filter(({ l, ratio }) => !/eggs$/.test(l) && !/tbsp/.test(l) && !(Math.abs(ratio - resized.factor) <= 0.05 * resized.factor))
+  check('resizing a meal for another slot scales every weighed line by the factor: 8 oz, a cup, two tins, grams (not "295 oz", and not a cup that stays one cup)', Array.isArray(resized.ingredients) && resizeDrift.length === 0 && !resized.ingredients.some(l => /\b(oz|lb|kg)\b/.test(l)), { factor: resized.factor, out: resized.ingredients, resizeDrift })
 
   console.log(`\n${ran} checks ran`)
   if (failed > 0) { console.error(`\n${failed} ingredient-unit check(s) failed`); process.exit(1) }

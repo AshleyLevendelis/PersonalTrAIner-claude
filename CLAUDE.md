@@ -354,9 +354,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   diets). **Counts of "covered" before 1 Oct are not comparable.** Not built:
   repairing stored meals (no live users), the grocery list's display of an old
   misparsed line. `ingredient-units` plan: `docs/plans/ingredient-units.md`.
-  `test:ingredient-units` (39 checks; 57 mutations across the reader, the food
-  weights, the refusal, the ask, the coach and the prompts, all caught, eight only
-  after a case where the thing binds was added), `verify:unit-ask` (15 checks, 10
+  `test:ingredient-units` (42 checks; 64 mutations across the reader, the food
+  weights, the refusal, the ask, the coach, the prompts and the amount setter, all
+  caught, eight only after a case where the thing binds was added), `verify:unit-ask` (15 checks, 10
   mutations). The coach's half is held by source checks only until `chat-gemini`
   is deployed. Needs the `chat-gemini` AND `generate-meals` deploys
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
@@ -1956,6 +1956,16 @@ old — the commands were right and the context was missing.
   nothing a check could see. They ask two different questions (no amount at all;
   an amount that is there and unreadable), so each now has its own wording pinned
   rather than one being deleted.
+- **A HELPER THAT KEEPS THE WRITTEN UNIT MEETS A READER THAT CONVERTS IT.**
+  3 Oct 2026, found by reading the next caller, not by a check. `withQuantity`
+  replaces the leading number and keeps the unit word, which was right while the
+  reader kept every unit and wrong once it converted oz to grams: two callers
+  handed it the parsed 227 g and "8 oz chicken" scaled by 1.3 came back "295 oz",
+  twenty-eight times too much. It was reachable only through a line that had
+  never been normalised, so no gate and no driver had ever seen it. When a
+  reader starts CONVERTING, grep every function that edits the text it reads
+  and give each a round-trip property: the number set reads back as that
+  number, in that unit.
 - **A MODEL PICKS, THE REAL FUNCTION PROVES — AND THE PROOF IS WHAT MAKES THE
   PICK SAFE.** Same day: a straight-line model of how a dish scales chose a
   portion that the real scaler then refused by a gram, because whole grams and

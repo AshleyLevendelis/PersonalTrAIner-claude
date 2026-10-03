@@ -1,6 +1,7 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal, type PoolOption } from './meal-generation'
 import { normaliseSlot, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
-import { parseIngredientLines, withQuantity, computeScaleFactor, isScaleFactorAbsurd, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
+import { parseIngredientLines, withParsedQuantity, isWeighedWhenResized, computeScaleFactor, isScaleFactorAbsurd, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
+import { computeMealMacros } from './food-db'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
@@ -115,13 +116,19 @@ export function resizeMealTo(
     // own number so the text survives: whole grams and ml, one decimal for
     // spoons, and never below one of a counted thing — half an egg scaled from
     // a whole one is not a portion anybody serves.
+    // A cup, a tin or a handful is weighed first: scaled by 1.3 and rounded to a whole cup it would still be one cup, and the
+    // resized meal would not be the size the card promised. The line is then written in grams, which is exact.
+    if (isWeighedWhenResized(unit)) {
+      const grams = computeMealMacros([parsed[i]]).lines[0]?.grams
+      if (grams != null && Number.isFinite(grams) && grams > 0) return `${Math.max(1, Math.round(grams * factor))}g ${parsed[i].name}`
+    }
     const scaled = q * factor
     const rounded = unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml'
       ? Math.max(1, Math.round(scaled))
       : unit === 'tbsp' || unit === 'tablespoon' || unit === 'tsp' || unit === 'teaspoon'
         ? Math.max(0.1, Math.round(scaled * 10) / 10)
         : Math.max(1, Math.round(scaled))
-    return withQuantity(line, rounded) ?? line
+    return withParsedQuantity(line, rounded) ?? line
   })
   return { ingredients, factor }
 }
