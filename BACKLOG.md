@@ -87,6 +87,21 @@ Newest first. One line each.
   reader and weights cost about 11 kB of code; total 2138 of 2144 kB (6 left),
   re-download 275 of 280 kB gzipped (5 left). No budget raised; the next addition
   to the main chunk has to decide.**
+  **RELEASE CHECK, 3 Oct 2026, at `4cbfd5e4`: FULL SWEEP 309 of 311 passed**
+  (311 gates, the three that need a live database excluded). The two reds:
+  `test:coach-exam-fresh`, correct and expected (the coach's reply and prompt
+  changed; the exam has to be re-run on her machine), and `verify:reminders`
+  check 5c ("the streak it SHOWS"), **a FLAKE that predates this work**: it failed
+  once in the sweep and once more in 6 re-runs on this branch, and 1 of 8 runs on
+  `main` at `0df0bc12` with the identical message (`{"sent":1}`, the shown streak
+  never read), so it is the driver's own wait racing the page, not a defect of
+  this change. NOT fixed: the driver reads the streak the moment a number appears
+  and the fact row the moment one exists, and has no check that either has
+  settled; the reach-out feature it covers is not live. **PUSH TO `main` WAS
+  REFUSED by the permission layer on 3 Oct ("Production Deploy"), so `main` is
+  still `0df0bc12` and nothing here is live.** Her "do everything on that order"
+  was not accepted as the explicit word for `main`; it needs her to say "push to
+  main" in those words.
   **NOT PROVEN LIVE.** The coach's half (`log_meal` asking) is deployed code a
   driver cannot reach: it is held by source checks only until `chat-gemini` is
   deployed. What the model actually sends as `unit` is still unmeasured, and so
