@@ -2,8 +2,11 @@
 
 Newest first. One line each.
 
-- [ ] **WHERE ONE WEEK ENDS AND THE NEXT BEGINS — PLANNED, NOT BUILT, WAITING ON
-  HER ANSWER (6 Oct 2026; plan: `docs/plans/week-boundaries.md`).** Her: *"Make sure
+- [ ] **WHERE ONE WEEK ENDS AND THE NEXT BEGINS — RULED, BUILD IN PROGRESS (6 Oct
+  2026; plan: `docs/plans/week-boundaries.md`). HER RULING, from three options: the
+  day you started, every week, changing at local midnight; the Home strip stays Monday
+  to Sunday, shows each day's own session and marks where the new training week
+  starts. Over always-Monday and over the strip also running from the start day.** Her: *"Make sure
   the app knows where one week ends and the other begins."* The app has several
   different ideas of a week and they disagree. **MEASURED:** the plan week
   (`getActiveMesocycleWeek`) counts 24-hour blocks from the plan's creation
