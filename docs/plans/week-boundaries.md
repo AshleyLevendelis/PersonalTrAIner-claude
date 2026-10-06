@@ -1,10 +1,12 @@
-# Where one week ends and the next begins (RULED 6 Oct 2026: option A, the day you started; build in progress)
+# Where one week ends and the next begins (RULED 6 Oct 2026: option A, the day you started; BUILT 6 Oct 2026, S1-S6)
 
 **HER RULING, 6 Oct 2026, from three options: A, "the day you started".** A training week
 runs from the weekday the plan began, every week, and changes at LOCAL MIDNIGHT. The Home
 strip stays Monday to Sunday, shows each day's own session and marks where the new
 training week starts. Over B (always Monday) and over C (the strip runs from the start
 day too). Everything below is the plan as written before her answer; S5 means option A.
+**BUILT the same day: what was built, measured and left is in BACKLOG.md (top entry). Not
+done, by decision: block date ranges and set dates, which are both UTC and move together.**
 
 Ashley, 6 Oct 2026: *"Make sure the app knows where one week ends and the other begins."*
 

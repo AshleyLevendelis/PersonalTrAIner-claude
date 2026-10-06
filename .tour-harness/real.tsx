@@ -66,7 +66,7 @@ import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { getExerciseId, getExerciseEntry, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
 import { prescribeLoad, isExternallyLoaded } from '@/lib/load-prescription'
-import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
+import { ANCHOR_ISO, anchorDate, anchorNowMs, daysAgo, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
 import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks } from '@/lib/meal-rotation'
@@ -133,6 +133,20 @@ const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, 
 // the plan rows) and, unlike the plan, is the same exercise on every
 // weekday. Off by default, so every existing run of this harness is
 // unchanged.
+// ?thursday=1 — A PLAN THAT BEGAN ON A THURSDAY EVENING, so a Monday-to-Sunday strip holds two plan weeks.
+//
+// Written 6 Oct 2026 (docs/plans/week-boundaries.md). The default plan is made at midnight on a MONDAY,
+// so every strip sits inside one plan week and the two sampling moments of a date ("now" and "noon") always
+// agree: the harness could never show where one training week ends and the next begins. This plan is made
+// on the Thursday before the anchor at 18:30, which puts the anchor (a Wednesday) on the LAST day of week 1
+// and the strip's Thursday on the first day of week 2.
+//
+// And week 2 trains on a different weekday: Friday's session sits on Saturday from the second week on (a
+// schedule change that took effect after the plan began, which is how a plan comes to hold weeks with
+// different weekdays). Without that, week 1's days and week 2's are the same list of weekdays and nothing a
+// strip does with the wrong week could be told from the right one. The INPUT is chosen here; what the
+// strip makes of it is the app's.
+const THURSDAY = new URLSearchParams(location.search).get('thursday') === '1'
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
 const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
 // ?offstyle=1 — A FULL GYM AND A FUNCTIONAL TRAINEE, which is the only pairing
@@ -214,7 +228,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
+  created_at: THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - 9 * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
@@ -283,10 +297,14 @@ resetRandomSource()
 // reachable only from the query string, so no other driver sees it.
 const tilt = new URLSearchParams(location.search).get('tilt')
 const firstTrainingDay = generated[0].days.find(d => d.exercises.length > 0)?.day
-const mesocycle = tilt !== 'lopsided' ? generated : generated.map(w => ({
+const tilted = tilt !== 'lopsided' ? generated : generated.map(w => ({
   ...w,
   days: w.days.map(d => d.day === firstTrainingDay ? d
     : { ...d, exercises: d.exercises.map(e => ({ ...e, sets: e.sets * 3 })) }),
+}))
+const mesocycle = !THURSDAY ? tilted : tilted.map(w => w.week_number < 2 ? w : ({
+  ...w,
+  days: w.days.map(d => d.day === 'Friday' ? { ...d, day: 'Saturday' } : d.day === 'Saturday' ? { ...d, day: 'Friday' } : d),
 }))
 const exercisePlan = mesocycle[0].days
 
@@ -303,6 +321,16 @@ function planWeekOneDate(dayName: string): string {
   }
   throw new Error(`planWeekOneDate: no ${dayName} in plan week 1`)
 }
+
+// THE DAYS A WEEK-BOUNDARY DRIVER STANDS ON, read off the plan's own start rather than typed into the
+// driver (test:harness-clock): the last day of plan week 1, the day week 2 starts, and the day after.
+// With ?thursday=1 the first of these is the anchor itself.
+;(window as unknown as { __weekBoundaryTarget: unknown }).__weekBoundaryTarget = (() => {
+  const start = new Date(profile.created_at as string)
+  const startMidnight = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const at = (n: number) => { const d = new Date(startMidnight); d.setDate(d.getDate() + n); return isoOf(d) }
+  return { lastDayOfWeekOne: at(6), weekTwoStarts: at(7), dayAfter: at(8) }
+})()
 
 // WHICH DAY ACTUALLY HOLDS A RAMPED MAIN LIFT — read off the plan, published
 // for the drivers, 14 Sep 2026.

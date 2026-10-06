@@ -31,6 +31,25 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Blocks and phases; a calibration week when weights are unknown; a deload
   lighter than the week before — `block-phases`, `frozen-weeks`,
   `calibration-search`, `starting-out`
+- **A training week runs from the day the plan began, and every screen agrees
+  where it changes** — since 6 Oct 2026, on Ashley's "make sure the app knows
+  where one week ends and the other begins". Her ruling, from three options: **the
+  day you started**, every week, changing at LOCAL MIDNIGHT, over always-Monday
+  weeks and over the strip itself running from the start day. The Home and
+  Exercise strips stay Monday to Sunday, show each day's own session, and mark
+  where the new training week starts ("Week 2 starts Thursday"). A date is in
+  exactly one plan week whatever the time (whole local days from the start date,
+  clamped, clock-change-proof), and every strip day, Home's "tomorrow" and the
+  reach-out facts look the date up in ITS week. CSCS basis: a rolling-from-start
+  week keeps the calibration week whole; Monday-aligned weeks would shorten it.
+  MEASURED, and the numbers are the point: the old count flipped mid-day (a
+  Thursday-18:30 plan was week 1 at noon and week 2 at 23:30 on the same date),
+  and the strip's day loop repeated or skipped a date on **4 of 105** strips in
+  Sydney, Auckland, Lord Howe and Cairo (0 in London, New York, UTC).
+  NOT DONE, by decision: block date ranges and set dates are both UTC and move
+  together or not at all (`docs/plans/week-boundaries.md`). `week-boundaries`
+  (51 checks), `verify:week-boundary` (18 checks; 9 mutations of the app and 2 of
+  its own fixture, all caught)
 - Every loaded lift has a weight, in its implement's unit, under a ceiling
   that warns before it clamps — and a movement-prep move that needs an
   implement gets one too, at **half the working load**, read off the app's own
@@ -2167,6 +2186,35 @@ old — the commands were right and the context was missing.
   at the apostrophe in "That's", truncating the match. It cost two separate
   false results on 15 Sep 2026 — a reddened baseline and a safety string
   reported missing. Use `(['"`])((?:(?!\1).)*)\1`.
+- **A FUNCTION OF A DATE CANNOT BE TESTED AT ONE HOUR OF THE DAY.** 6 Oct 2026:
+  the plan week was counted in milliseconds from the creation instant, so one date
+  had two answers depending on when it was asked, and every gate asked at noon of a
+  plan made at midnight, where the two agree. The test that can see it asks every
+  hour of the boundary day, for plans made at every weekday and time of day, in
+  zones that change their clocks. **And a fixture that can never put the thing
+  under test in the state that matters is not a fixture**: a plan made at midnight
+  on a Monday cannot hold a week boundary inside one strip, so no driver could ever
+  have drawn one. The harness plan gained a Thursday-evening variant, chosen as
+  INPUT (when it began, which weekday week 2 trains) and nothing else.
+- **WALK DATES AS DATES, NEVER AS INSTANTS.** Same day: a loop parsed `2026-03-30`
+  as UTC midnight, stepped it by one LOCAL day and printed the UTC date, so across a
+  clock change one date was printed twice and the last one dropped. Measured over
+  two years of Monday strips: 4 of 105 in four zones, 0 in three others, which is
+  exactly why nobody saw it from London. Date-string arithmetic (`addDays`) has no
+  such failure. The gate keeps the OLD loop beside the new one so the fixture proves
+  it binds: right in UTC, wrong in Sydney.
+- **A STATELESS MUTANT OF A STATEFUL LOOP CAN STICK, AND STICKING READS AS A
+  CRASH.** Also 6 Oct: the first mutant stepped a date string by an instant rule and
+  reached a fixed point (the same date again, for ever), so the run died at 39 of 50
+  checks. The harness correctly refused to call that a catch. A faithful mutant
+  carries the same state the original did.
+- **WHEN TWO SIDES SHARE A CONVENTION, CHANGE BOTH OR NEITHER, AND MEASURE BEFORE
+  ASSUMING LOCAL IS BETTER.** The block date range and a set's day are both UTC;
+  moving only the range to local would split a morning session in UTC+ zones. And
+  `recomputeLoad`'s "today" looked like an obvious local-date fix until
+  `getLastSessionSets` turned out to compare a UTC instant with a date: local is
+  better west of UTC and worse east. I could not show a harm in the UTC version, so
+  I reverted my change rather than keep one I could not argue for.
 - New check → register it in `package.json` → mutation-test it → say in the
   report how many mutations were tried and how many were caught.
 - **THE GATES TO RE-RUN ARE THE ONES THAT READ THE FILES YOU TOUCHED, AND THAT

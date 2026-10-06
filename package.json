@@ -244,6 +244,7 @@
     "verify:chat-shell": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-shell.mjs",
     "verify:tap-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tap-targets.mjs",
     "verify:swapped-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/swapped-day.mjs",
+    "verify:week-boundary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/week-boundary.mjs",
     "verify:absurd-weight": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/absurd-weight.mjs",
     "verify:meal-counter": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-counter.mjs",
     "verify:modal-close": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/modal-close.mjs",

@@ -2,35 +2,77 @@
 
 Newest first. One line each.
 
-- [ ] **WHERE ONE WEEK ENDS AND THE NEXT BEGINS — RULED, BUILD IN PROGRESS (6 Oct
-  2026; plan: `docs/plans/week-boundaries.md`). HER RULING, from three options: the
-  day you started, every week, changing at local midnight; the Home strip stays Monday
-  to Sunday, shows each day's own session and marks where the new training week
-  starts. Over always-Monday and over the strip also running from the start day.** Her: *"Make sure
-  the app knows where one week ends and the other begins."* The app has several
-  different ideas of a week and they disagree. **MEASURED:** the plan week
-  (`getActiveMesocycleWeek`) counts 24-hour blocks from the plan's creation
-  TIMESTAMP, so a plan made Thursday 18:30 flips to week 2 the next Thursday at
-  18:30, in the middle of the day: that Thursday is week 1 at noon and week 2 at
-  23:30. The Home strip is Monday to Sunday against ONE plan week, so unless the plan
-  was made on a Monday every strip straddles two plan weeks. A plan made at 23:30 in
-  New York flips an hour early after the clocks go back. **READ and re-checked in
-  code:** a move is refused with "no free day left this week" at the plan week's
-  edge even when the Monday-Sunday week has free days; Home's schedule comes from the
-  week-1 snapshot and is not refreshed by a later rebuild; "this week" membership
-  compares a noon-sampled date with a now-sampled week, so today can be in neither.
-  **LEADS, not re-checked:** calibration anchoring on the boundary day, the coach's
-  context quoting a different week from its proposals, Sunday's "tomorrow" reading last
-  Monday's cell, the opener never asking about a missed Sunday on a Monday, Program
-  browse showing pre-plan days as missed, UTC dates against local ones in the weight
-  average and block ranges. **Why nothing saw it:** the test clock sits at noon and the
-  test plan is made at midnight, so the two sampling points always agree, and no gate
-  calls the week function directly. **Hers:** when a new training week starts (the
-  day you started, always Monday, or the day you started on every screen including the
-  strip); recommended: the day you started. **Mine, right under any answer, planned:**
-  one function by DATE (local days, so it changes at midnight and clocks cannot move it),
-  every consumer asking it by date, Home reading the live week, local dates instead of
-  UTC, and tests that can see a boundary day.
+- [x] **WHERE ONE WEEK ENDS AND THE NEXT BEGINS — BUILT 6 Oct 2026 (her "make sure
+  the app knows where one week ends and the other begins"; on the branch, NOT on
+  `main`; plan: `docs/plans/week-boundaries.md`).** **HER RULING, from three
+  options: the day you started, every week, changing at local midnight; the Home
+  strip stays Monday to Sunday, shows each day's own session and marks where the new
+  training week starts**, over always-Monday and over the strip also running from the
+  start day. CSCS basis (mine, reasoning not measurement): a rolling-from-start week
+  keeps the calibration week whole, where Monday-aligned weeks would shorten it for
+  most start days; pattern coverage, overload and recovery are untouched.
+  **WHAT WAS WRONG (measured before building):** the plan week counted 24-hour blocks
+  from the creation TIMESTAMP, so a plan made Thursday 18:30 flipped to week 2 at
+  18:30 the next Thursday, mid-day: one date had two answers depending on when it was
+  asked (the callers ask "now", "noon of the date" and "this morning's stamp"), and a
+  New York plan flipped an hour early after the clocks went back. The strip is Monday
+  to Sunday and was read against ONE plan week, so unless a plan began on a Monday
+  every strip showed the other week's days with this week's sessions. Nothing saw it:
+  the test clock sits at noon and the test plan was made at midnight on a Monday.
+  **WHAT CHANGED.** (S1) `getActiveMesocycleWeek` is a pure function of the local
+  calendar DATE: whole local days from the start date, so it changes at midnight and
+  a clock change cannot move it. (S2) One lookup by date (`planDaysForDate`) that the
+  strip, Home's "tomorrow" and the chat's strip all use; a date in today's plan week
+  reads the live days exactly as the screen beside it does. (S3) Home and the
+  reach-out facts read the LIVE week's days, not the week-1 snapshot. (S5) Both strips
+  draw a hairline before the first day of the new week and say it in one line ("Week 2
+  starts Thursday", "starts today", "began Thursday"), and a refused move says which
+  of its three real reasons applies (the week is over / the last day of the week / the
+  days left are taken) and names the day the next week starts. (S4) Local dates where
+  UTC ones were MEASURED to be wrong: the strip's day loop stepped a UTC instant by a
+  local day, so the day the clocks changed was printed twice and a day skipped, **4 of
+  105 Monday-to-Sunday strips over two years in Sydney, Auckland, Lord Howe and Cairo,
+  0 in London, New York and UTC**; the seven-day weight window and the target
+  snapshot's date used UTC "today" while weigh-ins are written under the local one, a
+  day out of step either side of UTC midnight, and neither followed the app's own
+  clock (the dev clock). (S6) The harness plan could never show a boundary; it can now
+  (`?thursday=1`: made on a Thursday at 18:30, and week 2 trains Saturday where week 1
+  trained Friday).
+  **VERIFIED.** `test:week-boundaries` 51 checks (S1 19 x 4 zones incl. a clock change,
+  the per-date lookup, the boundary helpers, and the S4 section: 105 strips x 6 zones,
+  the weight window east and west of UTC, the dev clock, the snapshot date) with the
+  old loop kept in the gate so the fixture proves it binds (right in UTC, wrong in
+  Sydney); mutations 11 (S1), 20 (S2-S5), 7 (S4) all caught, one only after the
+  mutant was made faithful (a stateless step sticks on a date and never ends, which
+  the harness rightly read as a crash, not a catch). `verify:week-boundary` 18 checks,
+  9 mutations of the app and 2 of its own fixture, all caught; screenshots read
+  (Home and Exercise on the last day of week 1, Home on the first day of week 2).
+  Derived gates run on a settled tree: 28 `test:` gates and 20 drivers/gates
+  (Home, Exercise, move, swap, tour, tap targets, screens, bundle, dead code). Typecheck
+  clean. One real failure found by the derivation and fixed: `test:dashboard` pinned
+  the hook call's text and went red when the call gained an argument; re-anchored on
+  "the refresh token is the fifth argument" (2 mutations caught). **A full sweep has
+  NOT been re-run since the branch moved on: needed before any merge.**
+  **DECIDED, NOT BUILT, AND WHY.** Block date ranges and set dates are BOTH UTC
+  (`getBlockDateRange`, and a set's day is `completed_at.slice(0, 10)`), so today they
+  agree with each other and disagree with the plan week by at most a day at a block
+  edge. Changing one alone makes some people worse (the block range moved to local
+  while sets stay UTC splits a morning session in UTC+ zones), so they are changed
+  together or not at all, and changing set dates changes what history shows, which is
+  hers. Also left: `recomputeLoad`'s UTC "today" (I tried local and reverted it:
+  `getLastSessionSets` compares a UTC instant with a date, so local is better west of
+  UTC and worse east, and I could not show a harm), the rolling look-back windows in
+  `daily-tracking` (one day of slack at a window edge, not a week boundary), and the
+  onboarding weigh-in backfill's UTC date. **LEADS STILL OPEN (not re-checked):**
+  calibration anchoring on the boundary day; the coach's context quoting a different
+  week from its proposals; Sunday's "tomorrow" reading last Monday's cell; the opener
+  never asking about a missed Sunday on a Monday; Program browse passing no plan start
+  (pre-plan days read "missed") and its cell/weekday match; `nextSessionAfter` across a
+  plan-week boundary; the `verify:reminders` flake (proven pre-existing on `main`).
+  **SEEN, NOT CHANGED (hers):** Home's weight tile prints a raw ISO date ("kg ·
+  2026-09-16") when the last weigh-in is not today.
+  **Deploys:** frontend only (no edge function, no migration). Live on `main` only on
+  her word.
 
 - [x] **AN AMOUNT IS UNDERSTOOD OR IT IS ASKED ABOUT — THE UNIT FIX, BUILT 1 Oct
   2026 (her "ask me, then build it"; on the branch, NOT on `main`; plan:
