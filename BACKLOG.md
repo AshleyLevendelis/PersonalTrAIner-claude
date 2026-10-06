@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [ ] **WHERE ONE WEEK ENDS AND THE NEXT BEGINS — PLANNED, NOT BUILT, WAITING ON
+  HER ANSWER (6 Oct 2026; plan: `docs/plans/week-boundaries.md`).** Her: *"Make sure
+  the app knows where one week ends and the other begins."* The app has several
+  different ideas of a week and they disagree. **MEASURED:** the plan week
+  (`getActiveMesocycleWeek`) counts 24-hour blocks from the plan's creation
+  TIMESTAMP, so a plan made Thursday 18:30 flips to week 2 the next Thursday at
+  18:30, in the middle of the day: that Thursday is week 1 at noon and week 2 at
+  23:30. The Home strip is Monday to Sunday against ONE plan week, so unless the plan
+  was made on a Monday every strip straddles two plan weeks. A plan made at 23:30 in
+  New York flips an hour early after the clocks go back. **READ and re-checked in
+  code:** a move is refused with "no free day left this week" at the plan week's
+  edge even when the Monday-Sunday week has free days; Home's schedule comes from the
+  week-1 snapshot and is not refreshed by a later rebuild; "this week" membership
+  compares a noon-sampled date with a now-sampled week, so today can be in neither.
+  **LEADS, not re-checked:** calibration anchoring on the boundary day, the coach's
+  context quoting a different week from its proposals, Sunday's "tomorrow" reading last
+  Monday's cell, the opener never asking about a missed Sunday on a Monday, Program
+  browse showing pre-plan days as missed, UTC dates against local ones in the weight
+  average and block ranges. **Why nothing saw it:** the test clock sits at noon and the
+  test plan is made at midnight, so the two sampling points always agree, and no gate
+  calls the week function directly. **Hers:** when a new training week starts (the
+  day you started, always Monday, or the day you started on every screen including the
+  strip); recommended: the day you started. **Mine, right under any answer, planned:**
+  one function by DATE (local days, so it changes at midnight and clocks cannot move it),
+  every consumer asking it by date, Home reading the live week, local dates instead of
+  UTC, and tests that can see a boundary day.
+
 - [x] **AN AMOUNT IS UNDERSTOOD OR IT IS ASKED ABOUT — THE UNIT FIX, BUILT 1 Oct
   2026 (her "ask me, then build it"; on the branch, NOT on `main`; plan:
   `docs/plans/ingredient-units.md`).** **Her two rulings, each from options, one
