@@ -21,6 +21,7 @@ import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
 import { selectCoachTipWithKey, type CoachTipContext } from './coach-tips'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
+import { planDaysForDate } from './plan-week'
 import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
@@ -216,12 +217,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // everywhere, so "tomorrow" means one thing across the app.
   const tomorrowStr = addDays(todayStr, 1)
   const tomorrowName = dayNameOf(tomorrowStr)
-  // Tomorrow's schedule is read from the SAME week's plan (or next week if
-  // tomorrow rolls into a new plan week) — approximated via the flat
-  // week-1 pattern for the schedule shape (which days train), same source
-  // the streak uses, since day-of-week availability doesn't change week to
-  // week within a mesocycle.
-  const tomorrowResolved = sessionForDate({ date: tomorrowStr, plan: exercisePlan, moves })
+  // Tomorrow is looked up in the plan week TOMORROW falls in: the live week's days when it is
+  // still this plan week, the next week's own days when tomorrow is the day a new one starts
+  // (a plan begun on a Thursday changes week on a Thursday). It used to read the week-1 snapshot,
+  // which nothing refreshes after a rebuild from a later week.
+  const tomorrowResolved = sessionForDate({ date: tomorrowStr, plan: planDaysForDate(tomorrowStr, todayStr, activeWeekDays, mesocycle, planCreatedAt).days, moves })
   const tomorrowWorkoutDay = tomorrowResolved.movedTo ? undefined : tomorrowResolved.day ?? undefined
   // The count rides along because Home's Tomorrow row shows it
   // ("Pull & Hinge · 5 exercises") and the day is already in hand here.
@@ -354,7 +354,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // never build a streak: streak.ts treats an unscheduled day as transparent,
   // putting a completed walk in the same bucket as an untouched rest day.
   const scheduledWeekdays = new Set(
-    exercisePlan.filter(d => (d.is_scheduled ?? d.exercises.length > 0)).map(d => d.day),
+    activeWeekDays.filter(d => (d.is_scheduled ?? d.exercises.length > 0)).map(d => d.day),
   )
   const streakDays: StreakDayInput[] = []
   for (let i = 34; i >= 0; i--) {

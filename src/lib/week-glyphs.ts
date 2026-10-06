@@ -60,3 +60,34 @@ export const SHORT_DAY: Record<string, string> = {
   Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu',
   Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
 }
+
+/**
+ * Where the TRAINING week changes inside a Monday-to-Sunday strip: the index of the first day of the new
+ * plan week, or -1 when the window holds one plan week (a plan begun on a Monday, or a legacy plan with
+ * no mesocycle to ask). A plan begun on any other day changes week on that weekday, so most windows hold
+ * a boundary, and seven consecutive days can hold at most one.
+ */
+export function weekBoundaryIndex(days: TrainingWeekDay[]): number {
+  for (let i = 1; i < days.length; i++) {
+    const before = days[i - 1].planWeek
+    const here = days[i].planWeek
+    if (before !== undefined && here !== undefined && before !== here) return i
+  }
+  return -1
+}
+
+/**
+ * One plain line saying where the training week changes, for under a strip. Ashley, 6 Oct 2026: "make sure
+ * the app knows where one week ends and the other begins" — the strip runs Monday to Sunday and the
+ * training week does not, so without this the two read as one thing that quietly changes mid-row.
+ * Null when the window holds a single plan week.
+ */
+export function weekBoundaryNote(days: TrainingWeekDay[], todayDate: string): string | null {
+  const i = weekBoundaryIndex(days)
+  if (i < 0) return null
+  const first = days[i]
+  const label = `Week ${first.planWeek}`
+  if (first.date > todayDate) return `${label} starts ${first.dayName}`
+  if (first.date === todayDate) return `${label} starts today`
+  return `${label} began ${first.dayName}`
+}

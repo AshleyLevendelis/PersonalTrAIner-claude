@@ -194,7 +194,7 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
         ? blocked
           ? `${where} ${blocked} already has a session on it — want it on ${offered.dayName} instead, or shall we take ${home.dayName} off?`
           : `${where} Want it on ${offered.dayName} instead, or shall we take ${home.dayName} off?`
-        : `${where} There's no free day left this week — shall we take ${home.dayName} off?`,
+        : `${where} There's no free day left in this training week — shall we take ${home.dayName} off?`,
     }
   }
 
@@ -270,13 +270,19 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
       // so the question and the two answers describe the same two things.
       message: nextFreeDate
         ? `That's ${resolved.movedFrom.dayName}'s ${resolved.day.focus} — you already moved it once. Want it on ${dayNameOf(nextFreeDate)} instead, or shall we drop it and take ${sittingOn} off?`
-        : `That's ${resolved.movedFrom.dayName}'s ${resolved.day.focus} — you already moved it once, and there's no free day left this week. Shall we drop it and take ${sittingOn} off?`,
+        : `That's ${resolved.movedFrom.dayName}'s ${resolved.day.focus} — you already moved it once, and there's no free day left in this training week. Shall we drop it and take ${sittingOn} off?`,
     }
   }
 
   const requestedDayName = requestedDate ? dayNameOf(requestedDate) : undefined
+  // WHERE THE TRAINING WEEK ENDS, so a refusal can say so. The loop stops at the edge of the session's own
+  // plan week (the plan repeats weekly, so a day past it already holds its own copy of every session); when
+  // that edge is what stopped it, "every day left already has a session" is not the reason.
+  let consideredAny = false
+  let nextWeekStarts: string | null = null
   for (let d = start; daysBetween(start, d) <= 7; d = addDays(d, 1)) {
-    if (weekOf(d) !== originWeek) break
+    if (weekOf(d) !== originWeek) { nextWeekStarts = d; break }
+    consideredAny = true
     if (!isFree(d)) continue
     const asWanted = !!requestedDate && d === requestedDate
     return {
@@ -289,10 +295,18 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
     }
   }
 
+  // Three honest reasons, said differently: that training week is already over, today is its last day, or
+  // the days that are left all have sessions. They used to share one sentence, which was false for the first two.
+  const nextStartName = nextWeekStarts ? dayNameOf(nextWeekStarts) : null
+  const weekEnded = weekOf(todayDate) !== originWeek
   return {
     ok: false,
     reason: 'no_free_day',
-    message: `There's no free day left this week to move ${fromDayName}'s session to — every day left already has a session on it.`,
+    message: weekEnded
+      ? `${fromDayName}'s session belongs to a training week that has already ended, so there's no free day left to move it to.`
+      : !consideredAny && nextStartName
+        ? `There's no free day left in this training week to move ${fromDayName}'s session to — it ends on ${dayNameOf(addDays(nextWeekStarts as string, -1))} and your next week starts ${nextStartName}.`
+        : `There's no free day left in this training week to move ${fromDayName}'s session to — every day left already has a session on it${nextStartName ? `, and your next week starts ${nextStartName}` : ''}.`,
   }
 }
 

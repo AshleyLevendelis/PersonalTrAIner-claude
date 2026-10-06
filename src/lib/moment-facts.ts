@@ -78,7 +78,12 @@ export function momentFactsFrom(input: {
   streakDays: number
   today: string
 }): FactsAhead {
-  const trainingWeekdays = [...new Set(input.exercisePlan.filter(isScheduledDay).map(d => d.day))]
+  // The LIVE week's pattern, not the week-1 snapshot: after a schedule change from a later week the
+  // snapshot still holds the old weekdays, and the phone would be reminding her on days she no longer trains.
+  const liveWeekDays = input.planCreatedAt && input.mesocycle.length > 0
+    ? input.mesocycle.find(w => w.week_number === getActiveMesocycleWeek(input.planCreatedAt, input.now, input.mesocycle.length))?.days
+    : undefined
+  const trainingWeekdays = [...new Set((liveWeekDays ?? input.exercisePlan).filter(isScheduledDay).map(d => d.day))]
   let planEndsOn: string | null = null
   let blockEndsOn: string | null = null
   if (input.planCreatedAt && input.mesocycle.length > 0) {

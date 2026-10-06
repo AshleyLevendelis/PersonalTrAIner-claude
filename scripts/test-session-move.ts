@@ -258,7 +258,7 @@ check('the way back UNMAKES the move, with the write the chat\'s Undo uses',
 check('...and then re-reads the week and tells the app',
   /weekTrain\.refresh\(\); onLogsUpdated\?\.\(\)/.test(panel))
 check('...and the panel re-reads when the CHAT writes a move — the refresh token reaches it',
-  /useTrainingWeek\(profileId, today, liveWeekPlan, planCreatedAt, logsVersion\)/.test(panel))
+  /useTrainingWeek\(profileId, today, liveWeekPlan, planCreatedAt, logsVersion[,)]/.test(panel))
 check('tomorrow is previewed through the hook, so a move onto tomorrow shows there',
   /const tomorrowCell = weekTrain\.days\.find\(d => d\.dayName === tomorrowName\)/.test(panel))
 check('...and says where an arriving one came from',
@@ -278,7 +278,8 @@ const home = strip(src('src/lib/dashboard-data.ts'))
 check('Home resolves today through the same module',
   /const todayResolved = sessionForDate\(\{ date: todayStr, plan: activeWeekDays, moves \}\)/.test(home))
 check('...and tomorrow too, so a move onto tomorrow is not announced as rest',
-  /const tomorrowResolved = sessionForDate\(\{ date: tomorrowStr, plan: exercisePlan, moves \}\)/.test(home))
+  // The PROPERTY: tomorrow is resolved through sessionForDate with the moves handed in, whichever plan week's days it looks in.
+  /const tomorrowResolved = sessionForDate\(\{ date: tomorrowStr, plan: [^\n]*, moves \}\)/.test(home))
 check('...and blanks a moved-away day rather than re-reading the plan',
   /const todayWorkoutDay = todayResolved\.movedTo \? undefined :/.test(home))
 check('...with its own status, ahead of rest',
@@ -338,7 +339,7 @@ check('...and a refusal says which of the four things went wrong',
 check('the confirm branch writes the move', /await executeSessionMove\(profile, payload\)/.test(chat))
 check('...and undo clears it', /await undoSessionMove\(profile\.id, row\.payload/.test(chat))
 check('the chat\'s own week re-reads after a write, so a second move cannot land on the day the first just filled',
-  /useTrainingWeek\(profile\.id, activeSession\.date, liveWeekDays, planCreatedAt \?\? profile\.created_at, dataVersion \+ ownWriteVersion\)/.test(chat))
+  /useTrainingWeek\(profile\.id, activeSession\.date, liveWeekDays, planCreatedAt \?\? profile\.created_at, dataVersion \+ ownWriteVersion[,)]/.test(chat))
 
 // ---------------------------------------------------------------------------
 console.log('\n[11] The coach says something with the card')

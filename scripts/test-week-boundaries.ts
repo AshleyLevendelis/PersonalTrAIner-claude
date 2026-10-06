@@ -22,6 +22,10 @@
  *      unreadable start is week 1, and a one-week plan is always week 1.
  */
 import { getActiveMesocycleWeek } from '../src/lib/calculations'
+import { planDaysForDate } from '../src/lib/plan-week'
+import { weekBoundaryIndex, weekBoundaryNote } from '../src/lib/week-glyphs'
+import type { TrainingWeekDay } from '../src/hooks/useTrainingWeek'
+import type { MesocycleWeek, WorkoutDay } from '../src/lib/types'
 
 let ran = 0
 let failed = 0
@@ -103,6 +107,59 @@ check('a missing start is week 1', getActiveMesocycleWeek(undefined, new Date(20
 check('an unreadable start is week 1, not NaN', getActiveMesocycleWeek('not a date', new Date(2026, 9, 20, 12), TOTAL) === 1)
 check('a total of zero is treated as one week', getActiveMesocycleWeek(created, new Date(2026, 9, 20, 12), 0) === 1)
 check('with no clock given it reads the real one without throwing', Number.isInteger(getActiveMesocycleWeek(created, undefined, TOTAL)))
+
+console.log('\nEach date of a Monday-to-Sunday window looks in its own plan week')
+// A four-week plan whose weeks differ only in their label, so a day taken from the wrong week is visible.
+const dayRow = (week: number, name: string) => ({ day: name, focus: `W${week} ${name}`, exercises: [] }) as unknown as WorkoutDay
+const NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const mesocycle: MesocycleWeek[] = [1, 2, 3, 4].map(w => ({ week_number: w, label: `Week ${w}`, days: NAMES.map(n => dayRow(w, n)) }))
+const daysOfWeek = (w: number) => mesocycle[w - 1].days
+const dateStr = (y: number, m: number, d: number) => { const x = new Date(y, m, d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}` }
+// A plan made on Thursday 1 Oct 2026 in the evening: plan weeks run Thursday to Wednesday.
+// The window of Monday 5 Oct to Sunday 11 Oct holds week 1 (Mon to Wed) and week 2 (Thu to Sun).
+const madeThursday = madeAt(2026, 9, 1, 18, 30)
+const window = Array.from({ length: 7 }, (_, i) => dateStr(2026, 9, 5 + i))
+const weeksSeen = window.map(d => planDaysForDate(d, dateStr(2026, 9, 6), daysOfWeek(1), mesocycle, madeThursday).week)
+check('the window of a Thursday plan holds two plan weeks: Mon-Wed are week 1, Thu-Sun are week 2', JSON.stringify(weeksSeen) === JSON.stringify([1, 1, 1, 2, 2, 2, 2]), weeksSeen)
+const resolvedOn = window.map(d => planDaysForDate(d, dateStr(2026, 9, 6), daysOfWeek(1), mesocycle, madeThursday))
+check('a date in today\'s plan week gets the live days exactly as the caller derived them', resolvedOn.slice(0, 3).every(r => r.days === daysOfWeek(1)))
+check('a date in the NEXT plan week gets that week\'s own days, not this week\'s', resolvedOn.slice(3).every(r => r.days === daysOfWeek(2)), resolvedOn.slice(3).map(r => r.days[0]?.focus))
+// The same window seen from Friday 9 Oct, when week 2 has begun: now Mon-Wed are the PAST week.
+const fromFriday = window.map(d => planDaysForDate(d, dateStr(2026, 9, 9), daysOfWeek(2), mesocycle, madeThursday))
+check('seen from the new week, the earlier days of the window look in the week that has ended', fromFriday.slice(0, 3).every(r => r.days === daysOfWeek(1) && r.week === 1) && fromFriday.slice(3).every(r => r.days === daysOfWeek(2) && r.week === 2), fromFriday.map(r => `${r.week}:${r.days[0]?.focus}`))
+// A dev week-override hands in week 3 as "live": today's whole plan week must follow it, other weeks must not.
+const overridden = window.map(d => planDaysForDate(d, dateStr(2026, 9, 6), daysOfWeek(3), mesocycle, madeThursday))
+check('a forced live week is honoured for today\'s plan week and does not leak into the next one', overridden.slice(0, 3).every(r => r.days === daysOfWeek(3)) && overridden.slice(3).every(r => r.days === daysOfWeek(2)))
+// The live days handed in are WEEK 3's, so "the live days stand" cannot be confused with "week 1's days".
+const noAnswer = [
+  planDaysForDate(window[4], window[1], daysOfWeek(3), undefined, madeThursday),
+  planDaysForDate(window[4], window[1], daysOfWeek(3), [], madeThursday),
+  planDaysForDate(window[4], window[1], daysOfWeek(3), mesocycle, undefined),
+]
+check('with no mesocycle, an empty one, or no plan start there is no per-date answer: no week, and the live days stand', noAnswer.every(r => r.week === undefined && r.days === daysOfWeek(3)), noAnswer.map(r => `${r.week}:${r.days[0]?.focus}`))
+const gappy: MesocycleWeek[] = [mesocycle[0], mesocycle[1], mesocycle[3]] // a week 3 that is missing: the date falls back to what the caller holds
+// Today is in week 1 and the date is in week 3, so the answer has to come from the missing-week fallback itself.
+const inGap = planDaysForDate(dateStr(2026, 9, 20), dateStr(2026, 9, 6), daysOfWeek(1), gappy, madeThursday)
+check('a plan week the mesocycle does not hold falls back to the live days rather than to nothing', inGap.week === 3 && inGap.days === daysOfWeek(1), `${inGap.week}:${inGap.days[0]?.focus}`)
+const farFuture = planDaysForDate(dateStr(2027, 5, 1), dateStr(2026, 9, 6), daysOfWeek(1), mesocycle, madeThursday)
+check('a date past the plan\'s last week stays on the last week\'s days', farFuture.week === 4 && farFuture.days === daysOfWeek(4), farFuture.week)
+check('a date before the plan is week 1', planDaysForDate(dateStr(2026, 8, 20), dateStr(2026, 9, 6), daysOfWeek(1), mesocycle, madeThursday).week === 1)
+
+console.log('\nThe strip says where the training week changes')
+const stripFor = (weeks: (number | undefined)[]): TrainingWeekDay[] => weeks.map((planWeek, i) => ({ date: dateStr(2026, 9, 5 + i), dayName: NAMES[i], state: 'due', ...(planWeek !== undefined ? { planWeek } : {}) }) as TrainingWeekDay)
+// A helper that throws must FAIL a check, not end the run: a crash reads as "not a catch" to the mutation harness.
+const attempt = <T,>(f: () => T): T | string => { try { return f() } catch (e) { return `threw: ${String(e)}` } }
+const noteOn = (days: TrainingWeekDay[], d: string) => attempt(() => weekBoundaryNote(days, d))
+const thursdayPlan = stripFor([1, 1, 1, 2, 2, 2, 2])
+check('the boundary is the first day of the new week: Thursday, index 3', weekBoundaryIndex(thursdayPlan) === 3)
+check('before it, the note says the new week starts, and names the day', noteOn(thursdayPlan, dateStr(2026, 9, 6)) === 'Week 2 starts Thursday', noteOn(thursdayPlan, dateStr(2026, 9, 6)))
+check('on the day itself it says today', noteOn(thursdayPlan, dateStr(2026, 9, 8)) === 'Week 2 starts today', noteOn(thursdayPlan, dateStr(2026, 9, 8)))
+check('after it, the note says the new week began, and names the day', noteOn(thursdayPlan, dateStr(2026, 9, 10)) === 'Week 2 began Thursday', noteOn(thursdayPlan, dateStr(2026, 9, 10)))
+check('a window holding one plan week has no boundary and no note (a plan begun on a Monday)', weekBoundaryIndex(stripFor([2, 2, 2, 2, 2, 2, 2])) === -1 && noteOn(stripFor([2, 2, 2, 2, 2, 2, 2]), dateStr(2026, 9, 6)) === null)
+check('with no plan weeks known (a legacy plan) there is nothing to say', weekBoundaryIndex(stripFor([undefined, undefined, undefined, undefined, undefined, undefined, undefined])) === -1 && noteOn(stripFor([undefined, undefined, undefined, undefined, undefined, undefined, undefined]), dateStr(2026, 9, 6)) === null)
+check('a day whose week is unknown is not a boundary, even beside a day whose week is known', weekBoundaryIndex(stripFor([undefined, undefined, undefined, 2, 2, 2, 2])) === -1 && weekBoundaryIndex(stripFor([2, 2, 2, undefined, undefined, undefined, undefined])) === -1)
+check('a boundary on any weekday is found: Tuesday through Sunday', [1, 2, 3, 4, 5, 6].every(at => weekBoundaryIndex(stripFor(Array.from({ length: 7 }, (_, i) => (i < at ? 3 : 4)))) === at))
+check('a week that changes by more than one is still a boundary', weekBoundaryIndex(stripFor([1, 1, 3, 3, 3, 3, 3])) === 2)
 
 console.log(`\n${ran} checks ran`)
 if (failed > 0) { console.error(`\n${failed} week-boundary check(s) failed`); process.exit(1) }

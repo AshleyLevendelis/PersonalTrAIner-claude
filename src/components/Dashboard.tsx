@@ -213,7 +213,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
   // Home's copy of the week — the RECORD. Exercise's strip is the navigator
   // and owns tap-to-peek; the two share only the glyph vocabulary.
-  const week = useTrainingWeek(profile.id, activeSession.date, exercisePlan ?? [], planCreatedAt, logsVersion)
+  // The LIVE week's days, not the week-1 snapshot App holds: that one is never refreshed after a rebuild
+  // from a later week, so Home's strip kept the old weekdays. The mesocycle lets each day of the window be
+  // looked up in the plan week its own date falls in (a plan begun on a Thursday changes week on a Thursday).
+  const liveWeekDays = mesocycle?.find(w => w.week_number === activeSession.liveWeek)?.days ?? exercisePlan ?? []
+  const week = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt, logsVersion, mesocycle)
 
   // Bumped after a weigh-in save (from WeighInCard here, or a goal-weight
   // set) so the effect below re-fetches — nothing else that changes when a
@@ -634,7 +638,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           {week.days.length > 0 && (
             <div className="mt-3.5">
               <HomeWeekStrip days={week.days} todayName={data.dayName} />
-              <HomeWeekStripLabels days={week.days} />
+              <HomeWeekStripLabels days={week.days} todayDate={activeSession.date} />
             </div>
           )}
         </div>

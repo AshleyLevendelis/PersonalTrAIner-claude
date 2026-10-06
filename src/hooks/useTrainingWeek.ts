@@ -12,7 +12,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
 import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
-import type { WorkoutDay } from '@/lib/types'
+import { planDaysForDate } from '@/lib/plan-week'
+import type { MesocycleWeek, WorkoutDay } from '@/lib/types'
 
 export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen' | 'moved'
 
@@ -39,6 +40,13 @@ export interface TrainingWeekDay {
   markedMissed?: boolean
   /** The person said they rested this day on purpose. Surfaced so a control can offer to unsay it. */
   deliberateRest?: boolean
+  /**
+   * The plan week this date falls in (1-based), when the caller gave the mesocycle to ask. A plan
+   * begun on a Thursday changes week on a Thursday, so a Monday-to-Sunday strip holds two plan
+   * weeks, and this is what lets a screen mark where the new one starts. Absent for a legacy
+   * profile with no mesocycle, where there is only one week to speak of.
+   */
+  planWeek?: number
   /**
    * The session actually run on this date, moves taken into account. The one
    * answer every screen used to derive for itself with
@@ -188,6 +196,73 @@ export function classifyDay(
   return dateStr < todayStr ? 'missed' : 'due'
 }
 
+interface BuildTrainingWeekInput {
+  /** The Monday the window starts on. */
+  monday: Date
+  /** The session date: today, as the app counts it. */
+  today: string
+  /** The LIVE week's days, exactly as the caller derived them. */
+  plan: WorkoutDay[]
+  mesocycle?: MesocycleWeek[]
+  planCreatedAt?: string
+  dashboard: WeeklyDashboardDay[]
+  moves: SessionMove[]
+  loading: boolean
+}
+
+/**
+ * The seven days of the window, each classified against the plan week ITS OWN DATE falls in.
+ *
+ * `plan` stays the answer for every date in TODAY's plan week: it is what the rest of the screen
+ * already shows, and what a dev week-override forces, so the strip can never disagree with the
+ * card beside it. A date in another plan week uses that week's own days, which is the whole
+ * point: a Monday-to-Sunday window of a plan begun on a Thursday holds two plan weeks, and the
+ * days of the other one used to be shown with this week's sessions.
+ *
+ * Pure. Not exported: the dead-code budget counts an export with no caller outside its file, and the
+ * per-date lookup it rests on (planDaysForDate) is what the unit gate holds; the glue is driven in a
+ * browser (verify:week-boundary).
+ */
+function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[] {
+  const { monday, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading } = input
+  const planStartStr = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : undefined
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(d.getDate() + i)
+    const dateStr = getLocalDateString(d)
+    const dayName = WEEKDAY_NAMES[d.getDay()]
+    const { week: planWeek, days: dayPlan } = planDaysForDate(dateStr, today, plan, mesocycle, planCreatedAt)
+    const dashboardDay = dashboard.find(dd => dd.date === dateStr)
+    // Loading rule (§1.3): an un-logged training day must render 'due', never
+    // 'missed', until the range read resolves — loading must not read as
+    // failure. classifyDay already defaults an unmatched date to due/missed
+    // by the real-vs-today comparison; while loading, dashboard is simply
+    // empty, so every training day naturally falls through to its
+    // date-based branch — for a PAST date that would wrongly say 'missed'
+    // before data arrives, so gate explicitly on `loading`.
+    const state = loading
+      ? classifyLoadingSafe(dayName, dayPlan, dateStr, planStartStr)
+      : classifyDay(dayName, dateStr, today, dayPlan, dashboardDay, planStartStr, moves)
+    // Both ends of a move, resolved ONCE here rather than by each of the three
+    // screens that need them. TodayPanel already reads the swap fact from this
+    // hook rather than re-reading the row, with a comment recording why; this
+    // follows the same path for the same reason.
+    const resolved = sessionForDate({ date: dateStr, plan: dayPlan, moves })
+    return {
+      date: dateStr,
+      dayName,
+      state,
+      swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null,
+      markedMissed: !!dashboardDay?.session?.marked_missed,
+      deliberateRest: !!dashboardDay?.session?.deliberate_rest,
+      movedTo: resolved.movedTo,
+      movedFrom: resolved.movedFrom,
+      session: resolved.day,
+      ...(planWeek !== undefined ? { planWeek } : {}),
+    }
+  })
+}
+
 /**
  * `plan` should be the LIVE week's WorkoutDay[] (mesocycle week matching
  * liveWeek, or the flat base plan for a legacy/no-mesocycle profile) — this
@@ -219,6 +294,12 @@ export function useTrainingWeek(
    * ActiveSessionProvider already uses for the same reason.
    */
   refreshToken?: number,
+  /**
+   * The whole mesocycle, so each day of the window is looked up in the plan week ITS DATE falls
+   * in rather than in the one week `plan` holds. Optional: without it (or without a plan start)
+   * every day uses `plan`, which is what every caller did before 6 Oct 2026.
+   */
+  mesocycle?: MesocycleWeek[],
 ): TrainingWeekResult {
   const [dashboard, setDashboard] = useState<WeeklyDashboardDay[]>([])
   // A SECOND READ, deliberately: a move's two ends need not sit in the same
@@ -257,41 +338,8 @@ export function useTrainingWeek(
     refresh()
   }, [refresh])
 
-  const planStartStr = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : undefined
   const monday = sessionDate ? mondayOf(new Date(sessionDate + 'T12:00:00')) : new Date(getAppNow(profileId))
-  const days: TrainingWeekDay[] = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(d.getDate() + i)
-    const dateStr = getLocalDateString(d)
-    const dayName = WEEKDAY_NAMES[d.getDay()]
-    const dashboardDay = dashboard.find(dd => dd.date === dateStr)
-    // Loading rule (§1.3): an un-logged training day must render 'due', never
-    // 'missed', until the range read resolves — loading must not read as
-    // failure. classifyDay already defaults an unmatched date to due/missed
-    // by the real-vs-today comparison; while loading, dashboard is simply
-    // empty, so every training day naturally falls through to its
-    // date-based branch — for a PAST date that would wrongly say 'missed'
-    // before data arrives, so gate explicitly on `loading`.
-    const state = loading
-      ? classifyLoadingSafe(dayName, plan, dateStr, planStartStr)
-      : classifyDay(dayName, dateStr, sessionDate, plan, dashboardDay, planStartStr, moves)
-    // Both ends of a move, resolved ONCE here rather than by each of the three
-    // screens that need them. TodayPanel already reads the swap fact from this
-    // hook rather than re-reading the row, with a comment recording why; this
-    // follows the same path for the same reason.
-    const resolved = sessionForDate({ date: dateStr, plan, moves })
-    return {
-      date: dateStr,
-      dayName,
-      state,
-      swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null,
-      markedMissed: !!dashboardDay?.session?.marked_missed,
-      deliberateRest: !!dashboardDay?.session?.deliberate_rest,
-      movedTo: resolved.movedTo,
-      movedFrom: resolved.movedFrom,
-      session: resolved.day,
-    }
-  })
+  const days = buildTrainingWeekDays({ monday, today: sessionDate, plan, mesocycle, planCreatedAt, dashboard, moves, loading })
 
   const trainingDays = days.filter(d => countsTowardWeekTally(d.state))
   const sessionsPlanned = trainingDays.length

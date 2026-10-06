@@ -944,7 +944,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   // chat has just confirmed is in `trainingWeek.moves` by the next turn —
   // resolveMoveTarget reads those to keep two sessions off one day, and a
   // stale list would let it propose the day it just filled.
-  const trainingWeek = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt ?? profile.created_at, dataVersion + ownWriteVersion)
+  const trainingWeek = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt ?? profile.created_at, dataVersion + ownWriteVersion, mesocycle)
   const yesterdayDate = (() => {
     const d = new Date(`${activeSession.date}T12:00:00`)
     d.setDate(d.getDate() - 1)

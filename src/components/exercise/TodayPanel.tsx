@@ -273,7 +273,7 @@ export function TodayPanel({
     setBorrowedDayName(null)
   }, [todayName])
 
-  const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt, logsVersion)
+  const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt, logsVersion, mesocycle)
 
   const effectiveDayName = borrowedDayName ?? todayName
   // TODAY'S CELL, resolved by the hook that already holds the whole week.
@@ -852,6 +852,7 @@ export function TodayPanel({
       <WeekContextRow
         days={weekTrain.days}
         todayName={todayName}
+        todayDate={today}
         onSelectDay={d => setPeekDay(d)}
         weekNumber={liveWeek}
         totalWeeks={totalWeeks}

@@ -366,7 +366,7 @@ export function WhatHappenedSheet({
             )}
             {verbs.includes('move') && (
               <Button variant="outline" className="w-full justify-start" disabled={busy || moveCandidates.length === 0} onClick={() => setPhase('move')} data-verb="move">
-                {moveCandidates.length > 0 ? 'Move it to another day' : 'Move it — no free day left this week'}
+                {moveCandidates.length > 0 ? 'Move it to another day' : 'Move it — no free day left this training week'}
               </Button>
             )}
             {verbs.includes('rest') && (

@@ -2,7 +2,7 @@ import { ChevronDown, MoreVertical, History, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
-import { GLYPH, STATE_LABEL } from '@/lib/week-glyphs'
+import { GLYPH, STATE_LABEL, weekBoundaryIndex, weekBoundaryNote } from '@/lib/week-glyphs'
 
 // ---------------------------------------------------------------------------
 // Turn 5 — merges what were three separate rows (WeekStrip, ContextLine,
@@ -33,6 +33,7 @@ const SHORT_DAY: Record<string, string> = {
 export function WeekContextRow({
   days,
   todayName,
+  todayDate,
   onSelectDay,
   weekNumber,
   totalWeeks,
@@ -53,6 +54,8 @@ export function WeekContextRow({
 }: {
   days: TrainingWeekDay[]
   todayName: string
+  /** Today's date, so the line under the strip can say whether the new training week has begun. Optional: without it no line is drawn. */
+  todayDate?: string
   onSelectDay: (dayName: string) => void
   weekNumber: number
   totalWeeks: number
@@ -81,6 +84,8 @@ export function WeekContextRow({
   onToggleExpanded: (next: boolean) => void
 }) {
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
+  const boundary = weekBoundaryIndex(days)
+  const boundaryNote = todayDate ? weekBoundaryNote(days, todayDate) : null
 
   // Tab-restructure handoff — "Wk 3/16 · B1 Hypertrophy · ~52 min" as one
   // line, block number included (blockNumber was accepted as a prop before
@@ -195,14 +200,15 @@ export function WeekContextRow({
       )}
 
       <div className="mt-3 flex items-start justify-between">
-        {days.map(d => {
+        {days.map((d, i) => {
           const isToday = d.dayName === todayName
           return (
             <button
               key={d.date}
               type="button"
               onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
-              className="hit-slop-day flex flex-col items-center gap-1 rounded-[9px] px-1.5 py-1"
+              data-week-boundary={i === boundary ? 'start' : undefined}
+              className="hit-slop-day relative flex flex-col items-center gap-1 rounded-[9px] px-1.5 py-1"
               style={isToday ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.4)' } : undefined}
               // This used to interpolate the raw state, so a screen reader
               // announced "Monday: before_plan" — an identifier, not English.
@@ -210,6 +216,7 @@ export function WeekContextRow({
               // here because that fix went into the copy nothing renders.
               aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
             >
+              {i === boundary && <span aria-hidden className="absolute -left-px top-1 bottom-1 w-px bg-border" data-testid="week-boundary-mark" />}
               <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
                 {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}
               </span>
@@ -224,6 +231,8 @@ export function WeekContextRow({
           )
         })}
       </div>
+
+      {boundaryNote && <p className="mt-1.5 text-center text-[0.6875rem] text-muted-foreground" data-testid="week-boundary-note">{boundaryNote}</p>}
 
       {onOpenProgram && (
         <button type="button" className="mt-3 text-[0.71875rem] font-semibold text-primary-text" onClick={onOpenProgram}>
