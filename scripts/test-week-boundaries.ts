@@ -161,6 +161,137 @@ check('a day whose week is unknown is not a boundary, even beside a day whose we
 check('a boundary on any weekday is found: Tuesday through Sunday', [1, 2, 3, 4, 5, 6].every(at => weekBoundaryIndex(stripFor(Array.from({ length: 7 }, (_, i) => (i < at ? 3 : 4)))) === at))
 check('a week that changes by more than one is still a boundary', weekBoundaryIndex(stripFor([1, 1, 3, 3, 3, 3, 3])) === 2)
 
+
+// ---------------------------------------------------------------------------
+// S4 — the strip's days are DATES, and "today" for the weight window is the person's own day.
+// Written against the real functions with a fake client that answers every query with the rows
+// it is given (and, for upserts, records what was written).
+// ---------------------------------------------------------------------------
+console.log('\nThe strip walks dates, not instants (a clock change must not repeat or skip a day)')
+{
+  const store = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, String(v)) }, removeItem: (k: string) => { store.delete(k) }, clear: () => store.clear() }, configurable: true })
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true })
+
+  const fakeFrom = () => {
+    const chain: unknown = new Proxy({}, {
+      get: (_t, prop) => (prop === 'then' ? (resolve: (v: unknown) => void) => resolve({ data: [], error: null }) : () => chain),
+    })
+    return chain
+  }
+  const { setSupabaseClient } = await import('../src/lib/supabase')
+  setSupabaseClient({ from: fakeFrom } as never)
+  const { getWeeklyDashboard } = await import('../src/lib/daily-tracking')
+
+  /** Seven consecutive dates from a Monday, by arithmetic on the calendar and not on the clock. */
+  const sevenFrom = (monday: string) => Array.from({ length: 7 }, (_, i) => { const d = new Date(`${monday}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + i); return d.toISOString().slice(0, 10) })
+  /** The loop the strip used before 6 Oct 2026, kept here so the fixture can prove it binds. */
+  const oldLoop = (startDate: string, endDate: string) => { const out: string[] = []; const cur = new Date(startDate); const end = new Date(endDate); while (cur <= end) { out.push(cur.toISOString().split('T')[0]); cur.setDate(cur.getDate() + 1) } return out }
+  /** 105 consecutive Mondays from 5 Jan 2026: two years, which holds every clock change in the zones below. */
+  const mondays = Array.from({ length: 105 }, (_, k) => { const d = new Date('2026-01-05T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 7 * k); return d.toISOString().slice(0, 10) })
+
+  const STRIP_ZONES = ['UTC', 'Europe/London', 'America/New_York', 'Australia/Sydney', 'Pacific/Auckland', 'Africa/Cairo']
+  let oldWrongSomewhere = false
+  for (const zone of STRIP_ZONES) {
+    process.env.TZ = zone
+    let wrong = 0
+    let oldWrong = 0
+    const firstWrong: string[] = []
+    for (const monday of mondays) {
+      const want = sevenFrom(monday)
+      const got = (await getWeeklyDashboard('p1', monday, want[6])).map(d => d.date)
+      if (got.join() !== want.join()) { wrong++; if (firstWrong.length < 2) firstWrong.push(`${monday}: ${got.join(' ')}`) }
+      if (oldLoop(monday, want[6]).join() !== want.join()) oldWrong++
+    }
+    if (oldWrong > 0) oldWrongSomewhere = true
+    check(`${zone}: all ${mondays.length} Monday-to-Sunday strips over two years are seven consecutive dates`, wrong === 0 && mondays.length === 105, { wrong, firstWrong })
+    if (zone === 'UTC') check('UTC: the old loop was right here (the fixture is not just always wrong)', oldWrong === 0, oldWrong)
+    if (zone === 'Australia/Sydney') check('Sydney: the old loop repeated or skipped a day on some strips (the fixture binds)', oldWrong > 0, oldWrong)
+  }
+  check('some zone showed the old defect, so the strips above were a real test', oldWrongSomewhere)
+}
+
+console.log('\n"Today" for the weight window and the target snapshot is the person\'s own day')
+{
+  const RealDate = Date
+  const freezeAt = (iso: string) => {
+    const fixed = new RealDate(iso).getTime()
+    class Frozen extends RealDate {
+      constructor(...a: unknown[]) { if (a.length === 0) super(fixed); else super(...(a as [string])) }
+      static now() { return fixed }
+    }
+    globalThis.Date = Frozen as unknown as DateConstructor
+  }
+  const thaw = () => { globalThis.Date = RealDate }
+  const upserts: Record<string, unknown>[] = []
+  let weighIns: Record<string, unknown>[] = []
+  const fakeFrom = (table: string) => {
+    const chain: unknown = new Proxy({}, {
+      get: (_t, prop) => {
+        if (prop === 'then') return (resolve: (v: unknown) => void) => resolve({ data: table === 'daily_metrics' ? weighIns : [], error: null })
+        if (prop === 'upsert') return (row: Record<string, unknown>) => { if (table === 'daily_nutrition_targets') upserts.push(row); return chain }
+        return () => chain
+      },
+    })
+    return chain
+  }
+  const { setSupabaseClient } = await import('../src/lib/supabase')
+  setSupabaseClient({ from: fakeFrom } as never)
+  const { getEffectiveTargetWeightKg, snapshotTargetsIfChanged } = await import('../src/lib/nutrition-targets')
+  const near = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) < 0.01
+  const row = (date: string, kg: number) => ({ date, weight_kg: kg })
+
+  // Auckland, 09:00 on 7 Oct: the person's date is 7 Oct, UTC's is still 6 Oct. Today's weigh-in is
+  // 90kg and the six before it 80kg, so a window that includes today averages 81.43 and one that
+  // does not averages 80.
+  process.env.TZ = 'Pacific/Auckland'
+  weighIns = [row('2026-10-07', 90), ...['01', '02', '03', '04', '05', '06'].map(d => row(`2026-10-${d}`, 80))]
+  freezeAt('2026-10-06T20:00:00Z')
+  const morning = await getEffectiveTargetWeightKg('p1', 70)
+  thaw()
+  check('east of UTC in the morning, today\'s weigh-in is inside the seven-day window', near(morning.weightKg, (90 + 6 * 80) / 7), morning)
+
+  // New York, 22:00 on 6 Oct: the person's date is 6 Oct, UTC's is already 7 Oct. The 30 Sep weigh-in
+  // is the seventh day back for the person (100kg) and the eighth for UTC.
+  process.env.TZ = 'America/New_York'
+  weighIns = [row('2026-09-30', 100), ...['01', '02', '03', '04', '05', '06'].map(d => row(`2026-10-${d}`, 80))]
+  freezeAt('2026-10-07T02:00:00Z')
+  const evening = await getEffectiveTargetWeightKg('p1', 70)
+  thaw()
+  check('west of UTC in the evening, the window still reaches back seven days of the person\'s own', near(evening.weightKg, (100 + 6 * 80) / 7), evening)
+
+  // The app's own clock, not the machine's: the dev clock moves the whole app to another date, and a
+  // window read off the machine's date would average weigh-ins from a week the app is not in.
+  process.env.TZ = 'UTC'
+  weighIns = [...['14', '15', '16', '17', '18', '19', '20'].map(d => row(`2026-09-${d}`, 80)), ...['01', '02', '03', '04', '05', '06'].map(d => row(`2026-10-${d}`, 99))]
+  const { setDevClockOverride } = await import('../src/lib/dev-clock')
+  setDevClockOverride('p1', '2026-09-20')
+  freezeAt('2026-10-06T12:00:00Z')
+  const onDevClock = await getEffectiveTargetWeightKg('p1', 70)
+  thaw()
+  setDevClockOverride('p1', null)
+  check('the weight window follows the app\'s date (the dev clock), not the machine\'s', near(onDevClock.weightKg, 80), onDevClock)
+
+  // The snapshot row is dated the person's own day: an evening in New York must not file it under tomorrow.
+  process.env.TZ = 'America/New_York'
+  const profile = { id: 'p1', weight_kg: 80, height_cm: 180, age: 30, gender: 'male', activity_level: 'moderate' } as never
+  freezeAt('2026-10-07T02:00:00Z')
+  upserts.length = 0
+  await snapshotTargetsIfChanged('p1', profile, { calories: 2500, protein: 160, carbs: 280, fat: 80 }, null)
+  thaw()
+  check('the target snapshot is dated the person\'s own day (6 Oct in New York at 22:00), not UTC\'s (7 Oct)', upserts.length === 1 && upserts[0].date === '2026-10-06', upserts.map(u => u.date))
+
+  // And it follows the app's own clock too (the dev clock), as every other dated write does.
+  process.env.TZ = 'UTC'
+  setDevClockOverride('p1', '2026-09-20')
+  freezeAt('2026-10-06T12:00:00Z')
+  upserts.length = 0
+  await snapshotTargetsIfChanged('p1', profile, { calories: 2600, protein: 165, carbs: 290, fat: 85 }, null)
+  thaw()
+  setDevClockOverride('p1', null)
+  check('the target snapshot is dated the app\'s date (the dev clock), not the machine\'s', upserts.length === 1 && upserts[0].date === '2026-09-20', upserts.map(u => u.date))
+}
+
 console.log(`\n${ran} checks ran`)
 if (failed > 0) { console.error(`\n${failed} week-boundary check(s) failed`); process.exit(1) }
 console.log('\nAll week-boundary checks passed.')

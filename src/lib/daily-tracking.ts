@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { SessionMove } from './session-move'
+import { addDays, type SessionMove } from './session-move'
 import type { DailyMetric, DailyNutritionTarget, WorkoutSession, WorkoutExerciseRow, ExerciseSetLog, CardioLog } from './types'
 import { setLabelLong, type SetRef } from './session-derive'
 import { isMalformedZeroWeight } from './set-log-store'
@@ -467,11 +467,13 @@ export async function getWeeklyDashboard(
   }
 
   const days: WeeklyDashboardDay[] = []
-  const current = new Date(startDate)
-  const end = new Date(endDate)
 
-  while (current <= end) {
-    const dateStr = current.toISOString().split('T')[0]
+  // Walked as DATES, not as instants. This used to parse the start as UTC midnight, step it by a
+  // local day and print the UTC date, so the day the clocks changed was printed twice or skipped
+  // (measured 6 Oct 2026: 4 of 105 Monday-to-Sunday strips in Sydney, Auckland and Cairo, none in
+  // London or New York) and the strip showed a duplicated day beside a missing one.
+  // docs/plans/week-boundaries.md S4.
+  for (let dateStr = startDate; dateStr <= endDate; dateStr = addDays(dateStr, 1)) {
     const metric = metrics.find(m => m.date === dateStr) || null
     const nut = nutrition.find(n => n.date === dateStr) || null
     const sess = sessions.find(s => s.date === dateStr) || null
@@ -480,7 +482,6 @@ export async function getWeeklyDashboard(
       : []
 
     days.push({ date: dateStr, metric, nutrition: nut, session: sess, exercises: exs, ...partitionLogsByKind(allLogs, dateStr), cardioLogs: allCardio.filter(c => c.date === dateStr) })
-    current.setDate(current.getDate() + 1)
   }
 
   return days

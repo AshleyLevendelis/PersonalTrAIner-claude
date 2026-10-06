@@ -25,6 +25,7 @@ import { calculateDailyMacros, getStaticDailyMacros, computeBMR, computeStaticTD
 import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets } from './daily-tracking'
 import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
+import { getAppNow, getLocalDateString } from './dev-clock'
 
 export interface ComputeTargetsOptions {
   /** Latest daily_metrics weigh-in, if any — overrides profile.weight_kg. */
@@ -146,7 +147,10 @@ export async function getEffectiveTargetWeightKg(
   profileId: string,
   fallbackWeightKg?: number,
 ): Promise<EffectiveTargetWeight> {
-  const todayStr = new Date().toISOString().split('T')[0]
+  // The person's own calendar day, on the app's clock: weigh-ins are written under it
+  // (WeighInCard), so a UTC "today" put the seven-day window a day out of step for anyone
+  // whose evening or morning sits on the other side of UTC midnight. docs/plans/week-boundaries.md S4.
+  const todayStr = getLocalDateString(getAppNow(profileId))
   const recentWeighIns = await getRecentWeighIns(profileId, 14)
   const trend = computeWeightTrend(
     recentWeighIns.map(w => ({ date: w.date, weightKg: w.weight_kg })),
@@ -208,7 +212,7 @@ export async function snapshotTargetsIfChanged(
 ): Promise<SnapshotResult> {
   if (!targets) return { snapshotted: false, changedFromPrior: false, previous: null }
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString(getAppNow(profileId))
     const recent = await getNutritionTargets(profileId, '1970-01-01', today)
     const last = recent.length > 0 ? recent[recent.length - 1] : null
 

@@ -366,8 +366,9 @@ async function main() {
       /refreshToken/.test(deps), deps)
 
     const dash = fs.readFileSync('src/components/Dashboard.tsx', 'utf-8')
+    // The token is the hook's FIFTH argument; what follows it (the mesocycle, since 6 Oct 2026) may grow.
     check('Dashboard passes one through to the hook',
-      /useTrainingWeek\([^)]*logsVersion\)/.test(dash), dash.match(/useTrainingWeek\([^)]*\)/)?.[0])
+      /useTrainingWeek\((?:[^,()]+,\s*){4}logsVersion\b/.test(dash), dash.match(/useTrainingWeek\([^)]*\)/)?.[0])
     const app = fs.readFileSync('src/App.tsx', 'utf-8')
     check('...and App feeds it the counter its chat writes bump',
       /logsVersion=\{logsVersion\}/.test(app))
