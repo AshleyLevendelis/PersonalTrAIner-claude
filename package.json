@@ -358,6 +358,7 @@
     "test:chat-page": "tsx scripts/test-chat-page.ts",
     "test:meal-library": "tsx scripts/test-meal-library.ts",
     "test:ingredient-units": "tsx scripts/test-ingredient-units.ts",
+    "test:week-boundaries": "tsx scripts/test-week-boundaries.ts",
     "measure:meal-library": "tsx scripts/measure-meal-library.ts"
   },
   "dependencies": {
