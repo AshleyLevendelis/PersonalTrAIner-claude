@@ -206,11 +206,14 @@ export function compileKnownLiftOverrides(goals: UserGoalRow[]): KnownLiftOverri
  */
 export function resolveExerciseDislike(typed: string, resolve: (phrase: string, plan: string[]) => {
   resolution: string; exerciseName?: string; candidates?: { name: string }[]
-}): { ok: true; name: string } | { ok: false; reason: string } {
+}): { ok: true; name: string } | { ok: false; reason: string; candidates?: string[] } {
   const res = resolve(typed, [])
   if (res.resolution === 'resolved' && res.exerciseName) return { ok: true, name: res.exerciseName }
   if (res.resolution === 'ambiguous' && res.candidates?.length) {
-    return { ok: false, reason: `"${typed}" could be ${res.candidates.map(c => c.name).slice(0, 3).join(', ')}. Which one did you mean?` }
+    // The names come back too, so a screen can offer them to TAP rather than asking a
+    // question nobody can answer (user test 8 Oct 2026, finding 31).
+    const candidates = res.candidates.map(c => c.name).slice(0, 3)
+    return { ok: false, reason: `"${typed}" could be ${candidates.join(', ')}. Which one did you mean?`, candidates }
   }
   return { ok: false, reason: `I don't have an exercise called "${typed}". Try the name as it appears in your plan, or tell me in chat.` }
 }

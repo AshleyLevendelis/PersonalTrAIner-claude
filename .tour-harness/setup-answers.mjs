@@ -543,6 +543,31 @@ check('7d. ...in the same group as Foods to avoid', !!avoidNeighbours && avoidNe
 check('7e. ...and right beside it', !!avoidNeighbours && avoidNeighbours.adjacent, avoidNeighbours)
 await shoot('setup-answers-6-exercises-to-avoid')
 
+// --- 7f. AN AMBIGUOUS WORD IS ASKED WHERE SHE TYPED, WITH BUTTONS (user test 8 Oct 2026, #31).
+// It went to the sheet's top-of-page error, about 1,700px above the field, as a question with
+// nothing to tap, so the + looked dead. The claim is that she can SEE it where she tapped and
+// ANSWER it there, so both are asked: on screen near the field, and a tap that saves.
+// A FRESH LOAD: the goal section above leaves a rebuild offer up, which closes the sheet.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?avoidask=1` })
+await wait(3000)
+await dialogReady()
+await openDietaryGroup()
+// Typed the way a person types: tap the box, type, tap +.
+await tap('[data-testid="exercise-avoid-input"]')
+await send('Input.insertText', { text: 'squats' })
+await wait(300)
+await tap('[data-testid="exercise-avoid-input"] + button')
+const ask = await until(() => ev(`(() => { const a = document.querySelector('[data-testid="exercise-avoid-ask"]'); if (!a) return null; const r = a.getBoundingClientRect(); const i = document.querySelector('[data-testid="exercise-avoid-input"]').getBoundingClientRect(); return { text: a.innerText, choices: [...a.querySelectorAll('[data-testid="exercise-avoid-choice"]')].map(b => b.textContent.trim()), inView: r.top >= 0 && r.bottom <= 844, gap: Math.round(r.top - i.bottom) } })()`), v => !!v)
+check('7f. typing "squats" and tapping + asks which one, right under the field', !!ask && ask.inView && ask.gap >= 0 && ask.gap < 120, ask)
+check('7g. ...with the candidates as buttons to tap, not a question with nothing to answer', !!ask && ask.choices.length >= 2 && ask.choices.every(c => /squat/i.test(c)), ask?.choices)
+await shoot('setup-answers-6b-exercise-avoid-ask')
+const avoidPicked = ask?.choices?.[0] ?? '@@'
+await ev(`document.querySelector('[data-testid="exercise-avoid-choice"]')?.click()`)
+const tagRead = () => ev(`(() => { const l = [...document.querySelectorAll('span')].find(s => /^Exercises to avoid$/.test((s.textContent||'').trim())); const box = l ? l.parentElement : null; return { tags: [...(box?.querySelectorAll('[data-slot="badge"]') ?? [])].map(b => b.textContent.trim()), input: box?.querySelector('input')?.value ?? null, ask: !!document.querySelector('[data-testid="exercise-avoid-ask"]') } })()`)
+const tagged = (await until(tagRead, v => !!v && v.tags.some(t => t.includes(avoidPicked)) && v.input === '')) ?? { tags: [], input: null, ask: null }
+check('7h. ...tapping one saves THAT exercise as a tag', tagged.tags.some(t => t.includes(avoidPicked)), { avoidPicked, tagged })
+check('7i. ...and the question and the typed word are gone', tagged.ask === false && tagged.input === '', tagged)
+
 // --- and is absent where it must not take effect ---------------------------
 // assembleProfile DISCARDS all three for a full-gym answer, so a row here
 // would be a control that cannot do anything — the one thing the must-have

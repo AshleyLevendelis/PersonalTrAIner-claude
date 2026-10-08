@@ -304,9 +304,11 @@ function EditableSelectField<T extends string | number>({
  * both put one in this screen's existing error banner.
  */
 function EditableTagList({
-  values, onSave, placeholder,
-}: { values: string[]; onSave: (next: string[]) => void | Promise<void>; placeholder: string }) {
+  values, onSave, placeholder, resetKey = 0, inputTestId,
+}: { values: string[]; onSave: (next: string[]) => void | Promise<void>; placeholder: string; resetKey?: number; inputTestId?: string }) {
   const [input, setInput] = useState('')
+  // Cleared from outside when the caller finished the add another way (a picked name).
+  useEffect(() => { if (resetKey > 0) setInput('') }, [resetKey])
   const [saving, setSaving] = useState(false)
   const add = async () => {
     const v = input.trim()
@@ -347,6 +349,7 @@ function EditableTagList({
           onKeyDown={e => { if (e.key === 'Enter') void add() }}
           placeholder={placeholder}
           className="h-7 text-xs flex-1 min-w-0"
+          data-testid={inputTestId}
         />
         <Button size="icon" variant="outline" aria-label="Add" className="size-7 shrink-0" onClick={() => void add()} disabled={!input.trim() || saving}>
           <Plus className="size-3.5" />
@@ -597,6 +600,30 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const exerciseDislikes = facts.filter(f => f.kind === 'exercise_preference' && f.polarity === 'dislike')
   const exerciseDislikeValues = exerciseDislikes.map(f => f.resolved_refs?.[0] ?? f.display_text)
 
+  const [exerciseAvoidAsk, setExerciseAvoidAsk] = useState<{ typed: string; reason: string; candidates: string[] } | null>(null)
+  const [exerciseAvoidReset, setExerciseAvoidReset] = useState(0)
+  /** The name she tapped, for the word she typed: saved exactly as a resolved add is. */
+  const pickExerciseDislike = async (typed: string, name: string) => {
+    if (!profileId) return
+    try {
+      if (!exerciseDislikeValues.includes(name)) {
+        await createFact({
+          profileId, kind: 'exercise_preference', source: 'manual',
+          rawPhrase: typed, displayText: `won't do ${name}`,
+          polarity: 'dislike', hardness: 'hard', resolvedRefs: [name],
+        })
+      }
+      setExerciseAvoidAsk(null)
+      setExerciseAvoidReset(k => k + 1)
+      setSaveError(null)
+      await reload()
+      await onMemoryChanged()
+    } catch (err) {
+      console.error('Saving an exercise to avoid failed:', err)
+      setExerciseAvoidAsk(a => a ? { ...a, reason: "That wasn't saved, so it is NOT being avoided yet. Check your connection and tap it again." } : a)
+    }
+  }
+
   const saveDislikedExercises = async (next: string[]) => {
     if (!profileId) return
     const added = next.filter(v => !exerciseDislikeValues.includes(v))
@@ -616,10 +643,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     // resolves to "Rowing Machine", a cardio machine; banning it on a guess is
     // silent and permanent.
     const resolutions: { typed: string; name: string }[] = []
+    setExerciseAvoidAsk(null)
     for (const typed of added) {
       const out = resolveExerciseDislike(typed, resolveExerciseName)
       if (out.ok) { resolutions.push({ typed, name: out.name }); continue }
-      setSaveError(out.reason)
+      // ASKED WHERE SHE TYPED, WITH THE ANSWERS AS BUTTONS (user test 8 Oct 2026,
+      // finding 31): this went to the sheet's top-of-page error, about 1,700px above
+      // the field, as a question with nothing to tap, so the + looked dead.
+      setExerciseAvoidAsk({ typed, reason: out.reason, candidates: out.candidates ?? [] })
       throw new Error('unresolved exercise dislike')
     }
 
@@ -1260,7 +1291,22 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Exercises to avoid</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything you'd rather never see in a session.</p>
-              <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" />
+              <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" resetKey={exerciseAvoidReset} inputTestId="exercise-avoid-input" />
+              {exerciseAvoidAsk && (
+                <div className="space-y-2 pt-1" data-testid="exercise-avoid-ask" role="status">
+                  <p className="text-xs leading-snug">{exerciseAvoidAsk.candidates.length > 0 ? `Which "${exerciseAvoidAsk.typed}" do you mean?` : exerciseAvoidAsk.reason}</p>
+                  {exerciseAvoidAsk.candidates.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {exerciseAvoidAsk.candidates.map(name => (
+                        <Button key={name} size="sm" variant="outline" className="min-h-11 text-xs" data-testid="exercise-avoid-choice" onClick={() => void pickExerciseDislike(exerciseAvoidAsk.typed, name)}>
+                          {name}
+                        </Button>
+                      ))}
+                      <Button size="sm" variant="ghost" className="min-h-11 text-xs" onClick={() => setExerciseAvoidAsk(null)}>Never mind</Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
                 canonical picker's tag-based checks AND the free-text
