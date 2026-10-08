@@ -29,7 +29,15 @@ Newest first. One line each.
   weigh-in since the plan began, and absent until there are two. `test:dashboard` §8 (10 checks,
   10/10 mutations), new `verify:home-weight` (10 checks, 5/5 mutations; `?weighins=1` adds one
   in-plan weigh-in as INPUT).
-  **STILL OPEN:** the other clear bugs in the report (#4, #5, #8-#10, #12, #24, #26-#29, #32-#35)
+  **#24** the tightness warm-up added a drill the day's Mobility block already held (Scapular
+  Push-Ups twice, counted twice) and drew "do these first" third: a drill already in the warm-up
+  is never added again and counts as covering its area ("Your warm-up already prepares your
+  shoulders", shown even when nothing was added), and the block is drawn first, where its own line
+  and the feature's description put it. CSCS (mine): low-load mobility for a named tight area
+  before the general raise is fine at bodyweight, and the alternative was changing her wording.
+  `test:tightness` dedupe section (11 checks, 7/7 mutations), `verify:tightness` 2a, 3e-3g
+  (3/3 driver mutations, one a real reorder of the blocks).
+  **STILL OPEN:** the other clear bugs in the report (#4, #5, #8-#10, #12, #26-#29, #32-#35)
   and the questions that are hers (#3, #13, #14, #37, #40, possibly #1's wording), to be asked one
   at a time. Frontend only; nothing here needs an edge-function deploy.
 

@@ -101,6 +101,8 @@ export interface TightnessWarmup {
    * did something it did not.
    */
   notThisTime: string[]
+  /** Areas the day's own warm-up already prepares, so nothing was added for them. */
+  alreadyCovered: string[]
   /** One line for the screen, naming what she said and what it added. */
   note: string | null
 }
@@ -118,11 +120,17 @@ function listOf(parts: string[]): string {
  * `injuries` is the profile's existing list: an injury still vetoes a drill
  * even when tightness asked for it.
  */
-export function tightnessWarmup(areas: string[], injuries: string[] = []): TightnessWarmup {
+export function tightnessWarmup(areas: string[], injuries: string[] = [], alreadyInWarmup: string[] = []): TightnessWarmup {
   const named = areas.filter(a => AREA_JOINTS[a])
-  if (named.length === 0) return { items: [], noDrill: [], notThisTime: [], note: null }
+  if (named.length === 0) return { items: [], noDrill: [], notThisTime: [], alreadyCovered: [], note: null }
 
-  const items = drillsPreparing(jointsForAreas(named), injuries).slice(0, MAX_TIGHTNESS_DRILLS)
+  // A drill the day's warm-up already holds is not added a second time: the
+  // same movement listed twice is one drill, and it would spend one of the
+  // three slots on nothing (user test 8 Oct 2026, #24).
+  const already = new Set(alreadyInWarmup)
+  const items = drillsPreparing(jointsForAreas(named), injuries)
+    .filter(d => !already.has(d.name))
+    .slice(0, MAX_TIGHTNESS_DRILLS)
 
   // THREE STATES PER AREA, not two: it got a drill, it has one that did not
   // fit, or the app has nothing for it. Each area is asked on its own so the
@@ -131,18 +139,21 @@ export function tightnessWarmup(areas: string[], injuries: string[] = []): Tight
   const covered: string[] = []
   const notThisTime: string[] = []
   const noDrill: string[] = []
+  const alreadyCovered: string[] = []
   for (const a of named) {
     const own = drillsPreparing(AREA_JOINTS[a], injuries)
     if (own.length === 0) noDrill.push(a)
     else if (own.some(d => chosen.has(d.name))) covered.push(a)
+    else if (own.some(d => already.has(d.name))) alreadyCovered.push(a)
     else notThisTime.push(a)
   }
 
-  const note = covered.length > 0
-    ? `Added for the ${listOf(covered.map(areaLabel)).toLowerCase()} you said felt tight — do these first.`
-    : null
+  const parts: string[] = []
+  if (covered.length > 0) parts.push(`Added for the ${listOf(covered.map(areaLabel)).toLowerCase()} you said felt tight — do these first.`)
+  if (alreadyCovered.length > 0) parts.push(`Your warm-up already prepares your ${listOf(alreadyCovered.map(areaLabel)).toLowerCase()}.`)
+  const note = parts.length > 0 ? parts.join(' ') : null
 
-  return { items, noDrill, notThisTime, note }
+  return { items, noDrill, notThisTime, alreadyCovered, note }
 }
 
 /**

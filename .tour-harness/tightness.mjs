@@ -112,6 +112,14 @@ check('2. tapping hips', await ev(`(() => {
   b.click(); return true
 })()`))
 await wait(300)
+// SHOULDERS TOO: the pair the user test used (#24), where the day's own Mobility block already
+// holds a shoulder drill the picker would otherwise add a second time.
+check('2a. tapping shoulders', await ev(`(() => {
+  const b = document.querySelector('[data-testid="tight-areas"] [data-area="shoulders"]')
+  if (!b) return false
+  b.click(); return true
+})()`))
+await wait(300)
 check('2b. saving it', await ev(`(() => {
   const b = document.querySelector('[data-testid="tight-save"]')
   if (!b || b.disabled) return false
@@ -129,6 +137,20 @@ const READ = `(() => {
     drills: [...document.querySelectorAll('[data-testid="warmup-tightness"] .text-xs')].map(e => (e.textContent || '').trim()).filter(Boolean),
     numbers: (t.match(/\\d+(?:\\.\\d+)? ?kg|\\d+ × \\d+|\\d+ sets?/g) || []).join('|'),
     rows: document.querySelectorAll('[data-exercise-name]').length,
+    // Every drill name in the open warm-up, in screen order, and where each heading sits.
+    warmNames: (() => {
+      const block = document.querySelector('[data-testid="warmup-tightness"]')?.parentElement
+      return block ? [...block.querySelectorAll('.text-xs > .font-medium')].map(e => (e.textContent || '').trim()) : []
+    })(),
+    mobilityNames: (() => {
+      const h = [...document.querySelectorAll('p')].find(p => (p.textContent || '').trim() === 'Mobility')
+      return h ? [...h.parentElement.querySelectorAll('.text-xs > .font-medium')].map(e => (e.textContent || '').trim()) : []
+    })(),
+    tightBeforeGeneral: (() => {
+      const tight = document.querySelector('[data-testid="warmup-tightness"]')
+      const gen = [...document.querySelectorAll('p')].find(p => (p.textContent || '').trim() === 'General')
+      return !!tight && !!gen && !!(tight.compareDocumentPosition(gen) & Node.DOCUMENT_POSITION_FOLLOWING)
+    })(),
   }
 })()`
 let after = await ev(READ)
@@ -138,6 +160,9 @@ check('3. THE WARM-UP GAINED MOVEMENT FOR IT', after.tightBlock === true, after)
 check('3b. ...under its own heading', after.heading === true, after)
 check('3c. ...saying why it is there', after.saysWhy === true && after.namesHips === true, after)
 check('3d. ...with at least one real drill named', after.drills.length > 0, after.drills)
+check('3e. the case binds: the day\'s own Mobility block holds Scapular Push-Ups', after.mobilityNames.includes('Scapular Push-Ups'), after.mobilityNames)
+check('3f. NO DRILL IS LISTED TWICE in the warm-up', after.warmNames.length > 0 && new Set(after.warmNames).size === after.warmNames.length, after.warmNames)
+check('3g. "for what feels tight" is drawn first, before General ("do these first")', after.tightBeforeGeneral === true, after.warmNames)
 // SCROLL TO THE THING BEFORE PHOTOGRAPHING IT. A screenshot of the part of
 // the page that did not change is not evidence about the part that did.
 await ev(`document.querySelector('[data-testid="warmup-tightness"]')?.scrollIntoView({ block: 'center' })`)

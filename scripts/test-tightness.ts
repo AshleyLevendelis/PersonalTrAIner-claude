@@ -210,5 +210,42 @@ console.log('\n6. Today only — it cannot reach tomorrow')
   check('the caveat has somewhere to render', /extraCaveat/.test(section))
 }
 
+// ---- A DRILL THE WARM-UP ALREADY HOLDS IS NOT ADDED TWICE (user test 8 Oct 2026, #24) ----
+// Scapular Push-Ups sat under Mobility and again under "For what feels tight", and the move
+// count included both. The contrast first, so the checks below cannot pass by the drill never
+// being picked at all.
+{
+  console.log('\n[dedupe] the warm-up\'s own drills')
+  const fresh = tightnessWarmup(['hips', 'shoulders'])
+  const pick = fresh.items[0]?.name ?? ''
+  check('contrast: with nothing in the warm-up, the top drill is picked', pick.length > 0, fresh.items.map(i => i.name))
+  const dedup = tightnessWarmup(['hips', 'shoulders'], [], [pick])
+  check('a drill already in the warm-up is not added again', !dedup.items.some(i => i.name === pick), dedup.items.map(i => i.name))
+  check('...and its slot goes to another drill, not to nothing', dedup.items.length === fresh.items.length, dedup.items.map(i => i.name))
+  // Put EVERY shoulder drill in the warm-up (found by asking until nothing is left to add).
+  const inWarmup: string[] = []
+  for (let i = 0; i < 20; i++) {
+    const r = tightnessWarmup(['shoulders'], [], inWarmup)
+    if (r.items.length === 0) break
+    inWarmup.push(...r.items.map(x => x.name))
+  }
+  const covered = tightnessWarmup(['shoulders'], [], inWarmup)
+  check('with every shoulder drill already in the warm-up, nothing is added', inWarmup.length > 0 && covered.items.length === 0, { inWarmup, added: covered.items.map(i => i.name) })
+  check('...the area is "already covered", never "will have to wait" or "no drill"',
+    covered.alreadyCovered.includes('shoulders') && !covered.notThisTime.includes('shoulders') && !covered.noDrill.includes('shoulders'),
+    { already: covered.alreadyCovered, wait: covered.notThisTime, none: covered.noDrill })
+  check('...and the screen is told so in words', /already prepares your shoulders/.test(covered.note ?? ''), covered.note)
+  const mixed = tightnessWarmup(['shoulders', 'hips'], [], inWarmup)
+  check('...beside the line for what WAS added', /Added for the hips/.test(mixed.note ?? '') && /already prepares your shoulders/.test(mixed.note ?? ''), mixed.note)
+  const panel = strip(read('src/components/exercise/TodayPanel.tsx'))
+  check('Today hands the warm-up\'s own drill names to the picker', /tightnessWarmup\(tightAreas, [^)]*warmupNames\)/.test(panel))
+  check('...read from the day\'s general and mobility blocks', /\[\.\.\.w\.general, \.\.\.w\.mobility\]/.test(panel))
+  const section = strip(read('src/components/exercise/WarmupSection.tsx'))
+  const tightAt = section.indexOf('data-testid="warmup-tightness"')
+  const generalAt = section.indexOf('>General<')
+  check('the tightness block is drawn BEFORE General ("do these first")', tightAt >= 0 && generalAt >= 0 && tightAt < generalAt, { tightAt, generalAt })
+  check('a note with nothing added still renders', /extra\.length === 0 && extraNote/.test(section))
+}
+
 console.log(failures === 0 ? '\nTightness adds warm-up, says what it could not do, and never touches the plan.\n' : `\n${failures} check(s) failed.\n`)
 process.exit(failures === 0 ? 0 : 1)

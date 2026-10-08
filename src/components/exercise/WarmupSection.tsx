@@ -66,6 +66,23 @@ export function WarmupSection({
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
       <CollapsibleContent className="px-3 pb-3 space-y-3">
+        {/* FIRST, because its own line says "do these first" and the feature puts them at the
+            front of today's warm-up; it was drawn third, after General and Mobility (user test #24). */}
+        {extra.length > 0 && (
+          <div className="space-y-1" data-testid="warmup-tightness">
+            <p className="text-[0.625rem] uppercase tracking-wider text-primary-text font-medium">For what feels tight</p>
+            {extra.map((item, i) => (
+              <div key={`tight-${i}`} className="text-xs">
+                <span className="font-medium">{item.name}</span>
+                <span className="text-muted-foreground"> — {item.prescription}</span>
+              </div>
+            ))}
+            {extraNote && <p className="text-[0.6875rem] text-muted-foreground">{extraNote}</p>}
+          </div>
+        )}
+        {extra.length === 0 && extraNote && (
+          <p className="text-[0.6875rem] text-muted-foreground" data-testid="warmup-tightness-note">{extraNote}</p>
+        )}
         {general.length > 0 && (
           <div className="space-y-1">
             <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium">General</p>
@@ -86,18 +103,6 @@ export function WarmupSection({
                 <span className="text-muted-foreground"> — {item.prescription}</span>
               </div>
             ))}
-          </div>
-        )}
-        {extra.length > 0 && (
-          <div className="space-y-1" data-testid="warmup-tightness">
-            <p className="text-[0.625rem] uppercase tracking-wider text-primary-text font-medium">For what feels tight</p>
-            {extra.map((item, i) => (
-              <div key={`tight-${i}`} className="text-xs">
-                <span className="font-medium">{item.name}</span>
-                <span className="text-muted-foreground"> — {item.prescription}</span>
-              </div>
-            ))}
-            {extraNote && <p className="text-[0.6875rem] text-muted-foreground">{extraNote}</p>}
           </div>
         )}
         {extraCaveat && (

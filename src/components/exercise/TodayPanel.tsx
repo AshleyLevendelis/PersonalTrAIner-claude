@@ -6,7 +6,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
-import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { calibrationCueText } from './CalibrationCue'
@@ -189,14 +189,6 @@ export function TodayPanel({
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [tightOpen, setTightOpen] = useState(false)
 
-  // COMPUTED HERE, NEVER STORED. The plan's warm-up is untouched; these exist
-  // for as long as today's answer does and no longer. Injuries still veto a
-  // drill, which is why the profile's list is handed in.
-  const tightness = useMemo(
-    () => tightnessWarmup(tightAreas, profile?.injuries ?? []),
-    [tightAreas, profile?.injuries],
-  )
-
   const handleTightness = async (a: TightnessAnswer) => {
     // THE TWO THAT ARE NOT ABOUT TIGHTNESS go straight to the triage that owns
     // them — the same handler the exercise row uses, so there is one pain path
@@ -298,6 +290,19 @@ export function TodayPanel({
   const workout = todayCell?.movedTo
     ? undefined
     : (todayCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === effectiveDayName)
+  // COMPUTED HERE, NEVER STORED (the tightness answer, see handleTightness). The
+  // plan's warm-up is untouched; these exist for as long as today's answer does.
+  // Injuries still veto a drill, and a drill the warm-up ALREADY holds is never
+  // added twice: it counts as covering its area instead (user test #24, where
+  // Scapular Push-Ups sat under Mobility and again under "For what feels tight").
+  const warmupNames = useMemo(() => {
+    const w = normalizeWarmup(workout?.warmup)
+    return w ? [...w.general, ...w.mobility].map(i => i.name) : []
+  }, [workout?.warmup])
+  const tightness = useMemo(
+    () => tightnessWarmup(tightAreas, profile?.injuries ?? [], warmupNames),
+    [tightAreas, profile?.injuries, warmupNames],
+  )
   // WHAT THEY DID INSTEAD, if they told the coach. The week strip has drawn
   // this correctly all along; this panel read nothing, so on 8 Sep 2026 it
   // went on offering "Start workout" for a session Ashley had already
