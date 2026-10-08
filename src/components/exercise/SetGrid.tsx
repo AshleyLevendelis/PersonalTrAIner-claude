@@ -108,6 +108,13 @@ export interface SetGridProps {
    */
   calibration?: boolean
   /**
+   * The first session back after a break, with eased weights (layoff.ts, 8 Oct 2026).
+   * Last time's numbers are from before the break: shown, they would read as the ask,
+   * and a blank tick would log them. So they step aside and the boxes show today's eased
+   * prescription, with no "last time" marker claiming otherwise.
+   */
+  ignoreLastTime?: boolean
+  /**
    * Needed only to judge a typed weight against what this trainee can
    * actually load — see set-plausibility.ts.
    *
@@ -149,6 +156,7 @@ export function SetGrid({
   rampSets,
   rampKind,
   calibration = false,
+  ignoreLastTime = false,
   profile,
   onSetCompleted,
   onOpenPlateCalc,
@@ -377,7 +385,7 @@ export function SetGrid({
   // ghost is keyed on the set NUMBER alone, so every drop of set 3 would be
   // offered set 3's weight from last week — the full working load, which is
   // the one number a drop is definitely not.
-  const ghostFor = (ref: SetRef) => (isWarm(ref) || isDrop(ref) ? undefined : ghostValues.find(g => g.set_number === ref.setNumber))
+  const ghostFor = (ref: SetRef) => (ignoreLastTime || isWarm(ref) || isDrop(ref) ? undefined : ghostValues.find(g => g.set_number === ref.setNumber))
   const updateInput = (ref: SetRef, field: 'weight' | 'reps', value: string) => {
     const setNumber = ref.setNumber
     const k = rowKey(ref)

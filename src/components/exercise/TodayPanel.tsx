@@ -11,7 +11,12 @@ import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
-import { getExerciseId } from '@/lib/exercise-db'
+import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
+import { layoffStatus, easesWeights, easeWeightKg, easeAddedKg, layoffWeightFrom, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
+import { getLastWorkingSessionDate } from '@/lib/set-log-store'
+import { addDays } from '@/lib/session-move'
+import { restartStillOffered } from '@/lib/plan-restart'
+import { layoffCardLine, layoffLiftNote, layoffRestartOffer } from '@/lib/coach-voice'
 import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
@@ -107,6 +112,7 @@ export function TodayPanel({
   onOpenDetail,
   onOpenSessionHistory,
   onCalibrationSessionFinished,
+  onRestartPlan,
 }: {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
@@ -146,6 +152,8 @@ export function TodayPanel({
    * session; the callee decides whether the week was a calibration week.
    */
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
+  /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
+  onRestartPlan?: () => Promise<string | null>
 }) {
   const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas } = useActiveSession()
 
@@ -598,6 +606,45 @@ export function TodayPanel({
   // this only stops the card lingering after a tap, since `profile` is a prop
   // and does not refetch mid-session.
   const [ceilingHandled, setCeilingHandled] = useState(false)
+  // COMING BACK AFTER A BREAK (layoff.ts). Measured from the last working session
+  // BEFORE today, so it stays on through today's own sets and is gone tomorrow. A
+  // read that fails changes nothing: easing on a guess would be as wrong as not easing.
+  const [layoff, setLayoff] = useState<LayoffStatus>(NO_LAYOFF)
+  useEffect(() => {
+    if (!profileId) { setLayoff(NO_LAYOFF); return }
+    let cancelled = false
+    getLastWorkingSessionDate(profileId, today)
+      .then(last => { if (!cancelled) setLayoff(layoffStatus(last, today)) })
+      .catch(() => { if (!cancelled) setLayoff(NO_LAYOFF) })
+    return () => { cancelled = true }
+  }, [profileId, today])
+  const layoffLine = layoffCardLine(layoff)
+  const breakStartDate = layoff.band !== 'none' ? addDays(today, -layoff.daysAway) : null
+  const restartOffered = restartStillOffered(layoff.band, breakStartDate, planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null)
+  // "Not now" on the restart offer is remembered against THIS break (the date the last
+  // session was on), so it never nags again for the same break and comes back for the next.
+  const breakKey = profileId && restartOffered ? `fitplan_restart_offer_${profileId}_${breakStartDate}` : null
+  const [restartDismissed, setRestartDismissed] = useState(false)
+  const [restartBusy, setRestartBusy] = useState(false)
+  const [restartError, setRestartError] = useState<string | null>(null)
+  useEffect(() => {
+    let dismissed = false
+    try { dismissed = !!breakKey && localStorage.getItem(breakKey) === '1' } catch { /* storage blocked: offer again */ }
+    setRestartDismissed(dismissed)
+    setRestartError(null)
+  }, [breakKey])
+  const dismissRestart = () => {
+    try { if (breakKey) localStorage.setItem(breakKey, '1') } catch { /* storage blocked: hidden for this visit only */ }
+    setRestartDismissed(true)
+  }
+  const handleRestart = async () => {
+    if (!onRestartPlan) return
+    setRestartBusy(true)
+    setRestartError(null)
+    const failed = await onRestartPlan()
+    setRestartBusy(false)
+    if (failed) setRestartError(failed)
+  }
   useEffect(() => {
     if (!profileId || liveWeek <= 1 || !workout || workout.exercises.length === 0) {
       setProgressedLoads({})
@@ -631,6 +678,23 @@ export function TodayPanel({
         // Kept in separate maps on purpose: one is the weight of the bar,
         // the other is what you hang off yourself, and a consumer that
         // confused them would render "+15kg" as a 15kg lift.
+        // THE FIRST SESSION BACK AFTER A BREAK: no increment in any band (a session
+        // that earned one before the break is not evidence about today), and in the
+        // easing bands the weight comes down from LAST time's weight.
+        if (layoff.band !== 'none') {
+          if (kind === 'added') {
+            const last = (rec as { lastAddedKg: number }).lastAddedKg
+            const eased = easeAddedKg(last, layoff)
+            nextAdded[name] = eased
+            nextNotes[name] = { note: layoffLiftNote(layoff, last, eased, true), didProgress: false }
+          } else {
+            const last = (rec as { lastWeightKg: number }).lastWeightKg
+            const eased = layoffWeightFrom(last, layoff, getExerciseEntry(name))
+            nextLoads[name] = eased
+            nextNotes[name] = { note: layoffLiftNote(layoff, last, eased), didProgress: false }
+          }
+          continue
+        }
         if (kind === 'added') nextAdded[name] = (rec as { addedKg: number }).addedKg
         else nextLoads[name] = (rec as { weightKg: number }).weightKg
         nextNotes[name] = { note: rec.note, didProgress: rec.didProgress }
@@ -640,7 +704,7 @@ export function TodayPanel({
       setProgressionNotes(nextNotes)
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [profileId, liveWeek, workout, today])
+  }, [profileId, liveWeek, workout, today, layoff])
 
   const tomorrowIdx = (DAY_ORDER.indexOf(todayName) + 1) % 7
   const tomorrowName = DAY_ORDER[tomorrowIdx]
@@ -998,6 +1062,25 @@ export function TodayPanel({
               </span>
             </InsightBanner>
           )}
+          {layoffLine && (
+            <InsightBanner tone="ai" className="flex-col" data-testid="layoff-line">
+              <span className="text-sm">{layoffLine}</span>
+              {restartOffered && onRestartPlan && !restartDismissed && (
+                <div className="mt-3 border-t border-border/60 pt-3" data-testid="layoff-restart-offer">
+                  <p className="text-sm">{layoffRestartOffer(layoff.daysAway)}</p>
+                  {restartError && <p className="mt-1 text-xs text-destructive" data-testid="layoff-restart-error">{restartError}</p>}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" disabled={restartBusy} onClick={handleRestart} data-testid="layoff-restart-yes">
+                      {restartBusy ? 'Starting again…' : 'Start again from week 1'}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={restartBusy} onClick={dismissRestart} data-testid="layoff-restart-no">
+                      Not now
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </InsightBanner>
+          )}
           {volume && (
             <InsightBanner tone="ai" className="flex items-center justify-between gap-3" data-testid="second-sport-volume">
               <span className="text-sm">
@@ -1156,6 +1239,7 @@ export function TodayPanel({
             progressedLoads={progressedLoads}
             progressedAddedLoads={progressedAddedLoads}
             progressionNotes={progressionNotes}
+            layoff={layoff}
             profile={profile}
             onOpenSwap={onOpenSwap}
             onOpenPlateCalc={onOpenPlateCalc}
@@ -1286,6 +1370,7 @@ function ExerciseList({
   progressedLoads,
   progressedAddedLoads,
   progressionNotes,
+  layoff,
   profile,
   onOpenSwap,
   onOpenPlateCalc,
@@ -1303,6 +1388,8 @@ function ExerciseList({
   progressedLoads: Record<string, number>
   progressedAddedLoads: Record<string, number>
   progressionNotes: Record<string, { note: string; didProgress: boolean }>
+  /** The first session back after a break (layoff.ts): eases every number on the row. */
+  layoff: LayoffStatus
   /** Reaches SetGrid via ExerciseRow, to judge a typed weight — see set-plausibility.ts. */
   profile?: UserProfile
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
@@ -1331,6 +1418,9 @@ function ExerciseList({
 
   const loadSourceFor = (ex: WorkoutDay['exercises'][number]): LoadSource | undefined => {
     if (ex.suggested_load_kg == null) return undefined
+    // Eased after a break: whether the number came off the log or off the plan, it is
+    // neither "from your last session" nor the plan's suggestion any more.
+    if (easesWeights(layoff)) return 'eased'
     if (progressedLoads[ex.name] != null) return 'logged'
     return ex.load_source ?? 'estimate'
   }
@@ -1358,7 +1448,11 @@ function ExerciseList({
     // the plan's +15kg with a note about it. Substituted here, on a copy,
     // rather than mutating the plan — the peek and program-browse surfaces
     // deliberately show plan-derived numbers only.
+    // AFTER A BREAK, A LIFT WITH NO HISTORY IS EASED TOO. Its number is the plan's
+    // printed one, and the plan's weekly ramp kept climbing while the person did not.
+    const easePrinted = easesWeights(layoff)
     const progressedAdded = progressedAddedLoads[ex.name]
+      ?? (easePrinted && ex.suggested_added_load_kg != null ? easeAddedKg(ex.suggested_added_load_kg, layoff) : undefined)
     const withAdded = progressedAdded != null && ex.suggested_added_load_kg != null
       ? { ...ex, suggested_added_load_kg: progressedAdded }
       : ex
@@ -1367,7 +1461,10 @@ function ExerciseList({
     // already said "Held at 35kg" — the figure between them was still the
     // plan's. withWorkingLoadKg moves all three views of it together and
     // scales the ramp rather than flattening it; see its own note.
+    const printedEasedFrom = progressedLoads[ex.name] == null && easePrinted && ex.suggested_load_kg != null
+      ? ex.suggested_load_kg : null
     const progressedLoad = progressedLoads[ex.name]
+      ?? (printedEasedFrom != null ? easeWeightKg(printedEasedFrom, layoff, getExerciseEntry(ex.name)) : undefined)
     const rowEx = progressedLoad != null
       ? withWorkingLoadKg(withAdded, progressedLoad, profile)
       : withAdded
@@ -1379,7 +1476,14 @@ function ExerciseList({
       // takes precedence over the live single-session note: it reflects a
       // real judgment made across the whole prior block, not just whether
       // last session's sets hit the top of the rep range.
-      progressionNote: ex.block_hold_note ? { note: ex.block_hold_note, didProgress: false } : progressionNotes[ex.name],
+      // A break outranks a block hold for the first session back: the hold is about
+      // the block before, the break is about today.
+      progressionNote: layoff.band !== 'none' && (progressionNotes[ex.name] || printedEasedFrom != null)
+        ? (progressionNotes[ex.name] ?? { note: layoffLiftNote(layoff, printedEasedFrom!, progressedLoad!), didProgress: false })
+        : ex.block_hold_note ? { note: ex.block_hold_note, didProgress: false } : progressionNotes[ex.name],
+      // The faint "last time" numbers would offer (and a blank tick would log) the
+      // weight from before the break, so they step aside while weights are eased.
+      easedForBreak: easesWeights(layoff),
       showCalibrationCue: calibrationAnchorIndex === exIndex,
       // Every row of a calibration week, not just the anchor: the cue lands
       // once, but the chip above the number has to say the same thing on all

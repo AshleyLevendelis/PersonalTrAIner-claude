@@ -50,6 +50,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   together or not at all (`docs/plans/week-boundaries.md`). `week-boundaries`
   (51 checks), `verify:week-boundary` (18 checks; 9 mutations of the app and 2 of
   its own fixture, all caught)
+- **Coming back after a break eases the first session, and a very long one is offered a
+  restart** — since 8 Oct 2026, on Ashley's question "what happens if the user doesn't train for
+  weeks?". The answer had been: the plan runs on by date and the first session back is last time's
+  weight PLUS an increment (no age limit on the lookup). Now, from the last working session before
+  today: under 10 days nothing; 10-20 repeat last time, no increment; 3-6 weeks about 90%; 6-12
+  weeks about 80%; 12+ weeks 80% and **her ruling B: OFFER a restart from week 1 with a
+  calibration week, one tap, never automatic**. Today-only and derived (no stored flag): the
+  weight, its chips and warm-up, the boxes (last time's numbers step aside so a blank tick cannot
+  log the pre-break weight) and the label ("eased after your break") all move together; the coach
+  is told the same sentence, opens with a welcome back, and has `propose_plan_restart`. The bands
+  are a CSCS judgement with the basis in BACKLOG, not a measurement. `layoff` (49 checks, 21
+  mutations), `verify:layoff` (27 checks, 11 mutations). Needs the `chat-gemini` deploy for chat
 - Every loaded lift has a weight, in its implement's unit, under a ceiling
   that warns before it clamps — and a movement-prep move that needs an
   implement gets one too, at **half the working load**, read off the app's own

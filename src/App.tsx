@@ -36,6 +36,7 @@ import { watchFavouriteNames } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { buildRestartedPlan } from '@/lib/plan-restart'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
@@ -2384,6 +2385,30 @@ function App() {
   // admitted guess and the cue promised "your heaviest set becomes next
   // week's weight". Weeks after calibration keep the 1 Sep offer-first rule
   // (the accelerator below). Outside a calibration week this is a no-op.
+  // START THE PLAN AGAIN FROM WEEK 1, after a very long break (plan-restart.ts; her
+  // ruling 8 Oct 2026: OFFER it, one tap, never automatic). The new plan is born TODAY
+  // on the app's clock, so week 1 starts today.
+  // History, meals and the profile are untouched; only the plan is replaced.
+  // Returns a sentence when it could not, null when it did.
+  const handleRestartPlan = async (): Promise<string | null> => {
+    if (!profile?.id) return couldNot('start your plan again')
+    try {
+      const weeks = buildRestartedPlan(profile, effectiveExclusions)
+      if (weeks.length === 0) return couldNot('start your plan again')
+      const bornAt = getAppNow(profile.id).toISOString()
+      await saveMesocycle(profile.id, weeks, bornAt)
+      setMesocycle(weeks)
+      setExercisePlan(weeks[0].days)
+      setMesocycleCreatedAt(bornAt)
+      setLogsVersion(v => v + 1)
+      bumpCoachData()
+      return null
+    } catch (err) {
+      console.error('Restarting the plan failed:', err)
+      return couldNot('start your plan again')
+    }
+  }
+
   const handleCalibrationSessionFinished = async ({ date, dayName }: { date: string; dayName: string }) => {
     if (!profile?.id || mesocycle.length === 0) return
     try {
@@ -3176,6 +3201,7 @@ function App() {
               logsVersion={logsVersion}
               onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onCalibrationSessionFinished={handleCalibrationSessionFinished}
+              onRestartPlan={handleRestartPlan}
             />
           </TabsContent>
 
@@ -3217,6 +3243,7 @@ function App() {
               mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}
+              onRestartPlan={handleRestartPlan}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}

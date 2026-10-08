@@ -41,6 +41,8 @@ export interface ExerciseRowProps {
    * were prescribed and others estimated.
    */
   isCalibrationWeek?: boolean
+  /** The first session back after a break, with eased weights: the boxes ignore last time's numbers (layoff.ts). */
+  easedForBreak?: boolean
   onOpenPlateCalc: (weightKg: number) => void
   onSwap: () => void
   onBan: () => void | Promise<void>
@@ -69,6 +71,7 @@ export function ExerciseRow({
   progressionNote,
   showCalibrationCue,
   isCalibrationWeek,
+  easedForBreak = false,
   onOpenPlateCalc,
   onSwap,
   onBan,
@@ -444,6 +447,7 @@ export function ExerciseRow({
             rampSets={ramp && ramp.kind !== 'stale' ? ramp.sets.map(r => ({ setNumber: r.setNumber, kg: 'kg' in r ? r.kg : undefined, reps: r.reps })) : undefined}
             rampKind={ramp?.kind}
             calibration={isCalibrationWeek}
+            ignoreLastTime={easedForBreak}
             profile={profile}
             onOpenPlateCalc={onOpenPlateCalc}
             onSetCompleted={onSetCompleted}

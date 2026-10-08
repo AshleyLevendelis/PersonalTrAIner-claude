@@ -796,6 +796,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_custom_meal: { done: 'Saved', failed: "I couldn't save that meal" },
   propose_meal_refit: { done: 'Resized', failed: "I couldn't resize your meals" },
   propose_meal_top_up: { done: 'Added', failed: "I couldn't add more meals" },
+  propose_plan_restart: { done: 'Plan started again', failed: "I couldn't start your plan again" },
   propose_meal_day_move: { done: 'Swapped over', failed: "I couldn't swap those meals" },
 }
 
@@ -869,4 +870,59 @@ export function dietTargetCaveat(selected: readonly string[] = []): string | nul
   const verb = named.length > 1 ? 'keep' : 'keeps'
   const split = named.length > 1 || named[0] === 'Keto' ? 'a keto split' : 'a low-carb split'
   return `${subject} ${verb} bread, pasta, rice, potatoes, beans and added sugar out of your meals — but not fresh fruit. Your daily carb target stays a standard one, not ${split}.`
+}
+
+// ---------------------------------------------------------------------------
+// COMING BACK AFTER A BREAK (8 Oct 2026, docs/plans/layoff-handling.md).
+//
+// The card, the row notes and the coach's opener all say the same thing about
+// a break, so the sentences live here. A break is named in DAYS under two weeks
+// and in WEEKS after, rounded, because "it's been 23 days" reads like the app
+// counting against you. Never "you missed" — a break is not a failure.
+// ---------------------------------------------------------------------------
+
+/** "12 days" / "3 weeks" — how long the break was, in words a person uses. */
+export function breakLength(daysAway: number): string {
+  if (daysAway < 14) return `${daysAway} days`
+  const weeks = Math.round(daysAway / 7)
+  return `${weeks} weeks`
+}
+
+/** The one line on today's card while the first session back is eased. Null when nothing is eased. */
+export function layoffCardLine(s: { band: string; daysAway: number; factor: number }): string | null {
+  if (s.band === 'none') return null
+  const away = breakLength(s.daysAway)
+  if (s.band === 'hold') return `Back after ${away}, so today repeats last time's weights. No increase until you've had one session back.`
+  const pct = Math.round(s.factor * 100)
+  return `Back after ${away}, so today's weights are eased to about ${pct}% of last time. They climb back from your next session.`
+}
+
+/** The row note for one lift on the first session back. */
+export function layoffLiftNote(s: { band: string }, fromKg: number, toKg: number, added = false): string {
+  const fmt = (kg: number) => `${added ? '+' : ''}${kg}kg`
+  if (s.band === 'hold' || toKg >= fromKg) return `Held at ${fmt(fromKg)} after your break — no increase this session.`
+  return `Eased to ${fmt(toKg)} from ${fmt(fromKg)} after your break. Easy reps today; it climbs back from here.`
+}
+
+/** The restart offer after a very long break (her ruling, 8 Oct 2026: offer, never automatic). */
+export function layoffRestartOffer(daysAway: number): string {
+  return `It's been ${breakLength(daysAway)}. Want to start your plan again from week 1, with a calibration week to find your weights? Today is eased either way.`
+}
+
+/** The coach's opener after a break — warm, one question that earns its place. */
+export function welcomeBackOpener(daysAway: number): string {
+  return `good to see you — it's been ${breakLength(daysAway)}. how did the break go?`
+}
+
+/** The restart card (the coach's half of the offer). */
+export const PLAN_RESTART = {
+  lead: 'start your plan again from week 1, with a calibration week to find your weights',
+  unchanged: 'Your history, meals and settings stay exactly as they are.',
+  calibration: 'Week 1 is a calibration week: you find your working weights again before the ramp starts.',
+  /** The plan has already been started again since the break. */
+  alreadyStarted: "Your plan has already started again from week 1 since your break, so there's nothing to restart — today's weights are eased while you find your feet.",
+  /** Refused after a break shorter than twelve weeks (or none): the screen does not offer it either. */
+  notNow: (daysAway: number) => daysAway >= 10
+    ? `Starting over is for coming back after twelve weeks or more — it's been ${breakLength(daysAway)}, and today's weights are already eased for that. They climb back from your next session.`
+    : "Starting over is for coming back after a long break, and you're training regularly — your plan carries on as it is.",
 }

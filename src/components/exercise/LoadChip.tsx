@@ -32,7 +32,7 @@ import type { PrescribedLoadSource } from '@/lib/load-prescription'
 // when estimate — this renders a real glyph for every state that has copy).
 // ---------------------------------------------------------------------------
 
-export type LoadSource = PrescribedLoadSource | 'logged'
+export type LoadSource = PrescribedLoadSource | 'logged' | 'eased'
 
 const ESTIMATE_CHIP_CLASS = 'border-dashed border-muted-foreground/40 text-muted-foreground/70'
 // Fainter still than an estimate, and italic: the visual order on screen has
@@ -65,6 +65,9 @@ export function loadSourceLabel(source: LoadSource | undefined, calibration = fa
   if (source === 'estimate') return 'suggested'
   if (source === 'known_weight') return 'you told us'
   if (source === 'logged') return 'from your last session'
+  // THE FIRST SESSION BACK AFTER A BREAK (layoff.ts): the number is LESS than last
+  // session, so "from your last session" over it would be a claim it does not meet.
+  if (source === 'eased') return 'eased after your break'
   return null
 }
 
@@ -142,6 +145,9 @@ function explainerFor(source: LoadSource | undefined, loadGuidance?: string, cal
   if (source === 'logged') {
     return 'Calculated from your last session on this lift.' + (loadGuidance ? ` ${loadGuidance}` : '')
   }
+  if (source === 'eased') {
+    return 'Eased for your first session back after a break. It climbs back from your next session.' + (loadGuidance ? ` ${loadGuidance}` : '')
+  }
   return null
 }
 
@@ -211,7 +217,7 @@ export function LoadChip({
   // Suppressed once a real logged number is driving the weight: 'logged'
   // means the progression engine is working from what this person actually
   // lifted, so the estimate's ceiling is no longer what is holding it.
-  const ceiling = source === 'logged' ? null : ceilingLabel(ex)
+  const ceiling = source === 'logged' || source === 'eased' ? null : ceilingLabel(ex)
 
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">

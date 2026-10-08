@@ -245,6 +245,7 @@
     "verify:tap-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tap-targets.mjs",
     "verify:swapped-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/swapped-day.mjs",
     "verify:week-boundary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/week-boundary.mjs",
+    "verify:layoff": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/layoff.mjs",
     "verify:absurd-weight": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/absurd-weight.mjs",
     "verify:meal-counter": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-counter.mjs",
     "verify:modal-close": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/modal-close.mjs",
@@ -360,6 +361,7 @@
     "test:meal-library": "tsx scripts/test-meal-library.ts",
     "test:ingredient-units": "tsx scripts/test-ingredient-units.ts",
     "test:week-boundaries": "tsx scripts/test-week-boundaries.ts",
+    "test:layoff": "tsx scripts/test-layoff.ts",
     "measure:meal-library": "tsx scripts/measure-meal-library.ts"
   },
   "dependencies": {

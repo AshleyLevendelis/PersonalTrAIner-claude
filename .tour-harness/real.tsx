@@ -66,6 +66,7 @@ import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { getExerciseId, getExerciseEntry, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
 import { prescribeLoad, isExternallyLoaded } from '@/lib/load-prescription'
+import { buildRestartedPlan } from '@/lib/plan-restart'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, daysAgo, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
@@ -147,6 +148,14 @@ const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, 
 // strip does with the wrong week could be told from the right one. The INPUT is chosen here; what the
 // strip makes of it is the app's.
 const THURSDAY = new URLSearchParams(location.search).get('thursday') === '1'
+// ?away=N — COMING BACK AFTER N DAYS AWAY (8 Oct 2026, layoff.ts). The last working
+// session is N days before today, on a loaded lift of today's own session, logged at the
+// plan's weight with EVERY set at the top of the range — so without the break the card
+// would add an increment, and the break is what must take it away. The plan is made N+9
+// days ago so it is past its first week (progression is off in week 1). The fixture's
+// usual squat two days ago is left out, or there would be no break at all. The INPUT is
+// chosen here; what the card makes of it is the app's.
+const AWAY = Math.max(0, Number(new URLSearchParams(location.search).get('away') ?? '0') || 0)
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
 const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
 // ?offstyle=1 — A FULL GYM AND A FUNCTIONAL TRAINEE, which is the only pairing
@@ -228,7 +237,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - 9 * 86400000).toISOString(),
+  created_at: AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - 9 * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
@@ -443,6 +452,27 @@ const loggedTarget = (() => {
   return { name: ex.name, planKg: ex.suggested_load_kg as number, liftedKg, sets: ex.sets }
 })()
 ;(window as unknown as { __loggedTarget: unknown }).__loggedTarget = loggedTarget
+const awayTarget = (() => {
+  if (AWAY <= 0) return null
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
+  if (!day) return null
+  const loaded = day.exercises.filter(e => (e.suggested_load_kg ?? 0) > 10)
+  const ex = loaded.find(e => formatRampSets(e)?.kind === 'kg') ?? loaded[0]
+  if (!ex) return null
+  const topReps = Number(String(ex.reps).split('-').pop()?.replace(/[^0-9]/g, '')) || 10
+  return {
+    name: ex.name,
+    lastKg: ex.suggested_load_kg as number,
+    topReps,
+    sets: ex.sets,
+    days: AWAY,
+    // Every OTHER loaded lift on today's card has no history: its number is the plan's
+    // printed one, which the break must ease too.
+    others: loaded.filter(e => e.name !== ex.name).map(e => ({ name: e.name, planKg: e.suggested_load_kg as number })),
+  }
+})()
+;(window as unknown as { __awayTarget: unknown }).__awayTarget = awayTarget
 
 // A CARD WITH NO EXTERNAL LOAD ON TODAY'S SESSION — published for
 // verify:bodyweight-progress §3, 23 Sep 2026. That section asked "today's first
@@ -648,7 +678,7 @@ const db: Db = {
   // CURRENT plan week, and it falls on one of the four available weekdays.
   // (1 and 3 days back are neither, which is why the first fixture read 0/1.)
   exercise_set_logs: [
-    ...[1].map((back, i) => ({
+    ...(AWAY > 0 ? [] : [1]).map((back, i) => ({
       id: `l${i}`, user_id: PROFILE_ID, exercise_name: 'Barbell Squats', set_number: 1,
       weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
       completed_at: new Date(anchorNowMs() - (back + 1) * 86400000).toISOString(),
@@ -690,6 +720,18 @@ const db: Db = {
             date: isoOf(new Date(anchorNowMs() - 3 * 86400000)),
           },
         ]
+      : []),
+    ...(awayTarget
+      ? Array.from({ length: awayTarget.sets }, (_, i) => {
+          const at = daysAgo(awayTarget.days); at.setHours(10, i, 0, 0)
+          return {
+            id: `away${i}`, user_id: PROFILE_ID, session_id: 'sess-away',
+            exercise_id: getExerciseId(awayTarget.name), exercise_name: awayTarget.name,
+            set_number: i + 1, weight_kg: awayTarget.lastKg, reps_completed: awayTarget.topReps,
+            is_bodyweight: false, is_warmup: false, drop_index: 0,
+            completed_at: at.toISOString(), date: isoOf(at),
+          }
+        })
       : []),
     ...(loggedTarget
       ? Array.from({ length: Math.min(3, loggedTarget.sets) }, (_, i) => ({
@@ -1165,6 +1207,17 @@ function Harness() {
   // The app was wired correctly and the harness could not show it. App.tsx
   // owns this state and hands setMesocycle down (App.tsx:2547); so does this.
   const [editedMeso, setEditedMeso] = useState(mesocycle)
+  // When the plan is started again (the restart offer), the plan's birth moves to today, as
+  // App's handler moves it. The plan itself comes from buildRestartedPlan, the function App
+  // calls; only the saving is App's own (this page has no plan table to write to).
+  const [planBornAt, setPlanBornAt] = useState(profile.created_at as string)
+  const restartPlan = async (): Promise<string | null> => {
+    const weeks = buildRestartedPlan(profile, [])
+    if (weeks.length === 0) return "I couldn't start your plan again."
+    setEditedMeso(weeks)
+    setPlanBornAt(new Date(`${TODAY_ISO}T12:00:00`).toISOString())
+    return null
+  }
 
   // THE LIVE SESSION'S TIERS, published for verify:exercise-add, 14 Sep 2026.
   //
@@ -1192,7 +1245,7 @@ function Harness() {
     <AppearanceProvider>
     <ActiveSessionProvider
       profileId={PROFILE_ID}
-      planCreatedAt={profile.created_at}
+      planCreatedAt={planBornAt}
       totalWeeks={mesocycle.length}
       refreshToken={0}
     >
@@ -1229,9 +1282,10 @@ function Harness() {
             mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove} />
         )}
         {activeTab === 'exercise' && (
-          <ExerciseTab plan={exercisePlan} mesocycle={editedMeso} exclusions={[]}
-            profile={profile} profileId={PROFILE_ID} planCreatedAt={profile.created_at}
+          <ExerciseTab plan={planBornAt === profile.created_at ? exercisePlan : editedMeso[0]?.days ?? exercisePlan} mesocycle={editedMeso} exclusions={[]}
+            profile={profile} profileId={PROFILE_ID} planCreatedAt={planBornAt}
             onMesocycleUpdated={setEditedMeso}
+            onRestartPlan={restartPlan}
             onSwapExercise={noop} onBanExercise={noop}
             onDevOverrideWeekChange={noop} onDevOverrideDayChange={noop}
             onDevBypassLocksChange={noop} onLogsSeeded={noop} />

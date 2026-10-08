@@ -228,6 +228,8 @@ export async function checkDoubleProgression(
 
 export interface DoubleProgressionRecommendation {
   weightKg: number
+  /** The heaviest working weight of the last session, before any increment — what a layoff eases from. */
+  lastWeightKg: number
   /** True when every logged set from the last session hit the top of the rep range and the weight bumped up. */
   didProgress: boolean
   note: string
@@ -357,6 +359,7 @@ export async function getDoubleProgressionRecommendation(
   if (!hitTopOnAllSets) {
     return {
       weightKg: lastWeight,
+      lastWeightKg: lastWeight,
       didProgress: false,
       note: `Held at ${lastWeight}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Aim for more reps before adding load.`,
     }
@@ -368,6 +371,7 @@ export async function getDoubleProgressionRecommendation(
 
   return {
     weightKg,
+    lastWeightKg: lastWeight,
     didProgress: true,
     note: `Hit ${prescribedRepRangeHigh} reps on every set last time — up to ${weightKg}kg. Reps reset toward the bottom of the range.`,
   }
@@ -392,6 +396,8 @@ export const ADDED_LOAD_PROGRESSION_STEP_KG = 2.5
 
 export interface AddedLoadProgression {
   addedKg: number
+  /** The added weight of the last session, before any increment — what a layoff eases from. */
+  lastAddedKg: number
   didProgress: boolean
   note: string
 }
@@ -423,6 +429,7 @@ export async function getAddedLoadProgression(
   if (!hitTopOnAllSets) {
     return {
       addedKg: lastAdded,
+      lastAddedKg: lastAdded,
       didProgress: false,
       note: `Holding at +${lastAdded}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Chase the reps before adding more.`,
     }
@@ -430,6 +437,7 @@ export async function getAddedLoadProgression(
   const addedKg = lastAdded + ADDED_LOAD_PROGRESSION_STEP_KG
   return {
     addedKg,
+    lastAddedKg: lastAdded,
     didProgress: true,
     note: `Hit ${prescribedRepRangeHigh} reps on every set last time — up to +${addedKg}kg. Reps reset toward the bottom of the range.`,
   }

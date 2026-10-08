@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { addDays } from './session-move'
 import { getAppNow, getLocalDateString } from './dev-clock'
 import type { ExerciseSetLog } from './types'
 import { isLoggableSetWeight, MAX_LOGGABLE_SET_KG } from './set-plausibility'
@@ -1012,6 +1013,44 @@ export async function getLastSessionSets(
   }
 
   return [...bySetKey.values()].sort((a, b) => a.set_number - b.set_number)
+}
+
+/**
+ * The local date of the person's last WORKING session strictly before `beforeDate`
+ * (any lift), or null when there is none — what a break is measured from
+ * (layoff.ts, 8 Oct 2026). Same rules as getLastSessionSets: working sets only,
+ * never a drop or a malformed row, and the pending (offline) queue counts, so a
+ * session logged yesterday on the train that has not synced yet is not read as a
+ * break. A server row's day is its completion instant read on THIS device's
+ * calendar; a pending row carries the session date it was stamped with.
+ *
+ * Throws on a failed read rather than answering null: "no sessions" would read as
+ * "never trained", and an unreadable history must not be treated as either.
+ */
+export async function getLastWorkingSessionDate(userId: string, beforeDate: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('exercise_set_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_warmup', false)
+    // A day past the date, then filtered on the local calendar below: a set logged late
+    // yesterday west of UTC completes after UTC midnight and would otherwise be missed.
+    .lt('completed_at', addDays(beforeDate, 1))
+    .order('completed_at', { ascending: false })
+    .limit(40)
+  if (error) throw error
+  const server = ((data || []) as ServerSetRow[])
+    .filter(r => !isMalformedZeroWeight(r) && (r.drop_index ?? 0) === 0)
+    .map(r => getLocalDateString(new Date(r.completed_at)))
+    .filter(d => d < beforeDate)
+  const pending = loadPending()
+    .filter((op): op is { kind: 'upsert'; set: PendingSet } => op.kind === 'upsert')
+    .map(op => op.set)
+    .filter(s => s.userId === userId && !s.isWarmup && s.dropIndex === 0 && s.date < beforeDate)
+    .filter(s => !isMalformedZeroWeight({ weight_kg: s.weightKg, is_bodyweight: s.isBodyweight }))
+    .map(s => s.date)
+  const all = [...server, ...pending].sort()
+  return all.length > 0 ? all[all.length - 1] : null
 }
 
 /**

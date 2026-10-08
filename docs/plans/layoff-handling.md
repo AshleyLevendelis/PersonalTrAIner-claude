@@ -1,8 +1,17 @@
-# What the app does when somebody stops training (PLAN, NOT BUILT — 8 Oct 2026)
+# What the app does when somebody stops training (RULED B and BUILT, 8 Oct 2026)
 
 Ashley, 8 Oct 2026: *"What happens if the user doesn't train for a few days or weeks or doesn't
 log anything in the app? Does the app progress on its own? Do the weights ramp up? What happens
 when the user checks back in?"* Then: *"Yes, plan the layoff handling."*
+
+**HER RULING, 8 Oct 2026, from three options: B** — after twelve weeks or more, OFFER to start
+the plan again from week 1 with a calibration week, one tap, never automatic; over easing the
+weights only, and over restarting automatically. **BUILT the same day**; what was built, measured
+and left is in BACKLOG.md. Two deviations from the plan below, both named: the first session back
+keeps the plan's rep target rather than dropping to the low end of the range (the eased weight
+already leaves reps in reserve, and a second number moving on the same row is a second thing to
+explain), and the restart offer sits on the training-day card, so a rest day shows the coach's
+welcome back but not the button.
 
 Tags: **READ** = read the code, did not run it. **MINE** = a CSCS decision under her 18 Sep
 delegation, an assertion with a stated basis, not a measurement. **HERS** = what the app says

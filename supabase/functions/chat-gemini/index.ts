@@ -754,6 +754,21 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_plan_restart",
+    description:
+      "PROPOSES starting the user's training plan again from WEEK 1, with a calibration week to find their working weights again — this does NOT apply anything, the app shows a card and the user taps Confirm. It is for somebody COMING BACK AFTER A LONG BREAK (twelve weeks or more since they last trained) who says they want to start over: 'can I start my plan again', 'I want to start from the beginning', 'reset me back to week one'. Their history, meals and settings are untouched; only the plan is rebuilt from their current answers, beginning today. THE APP DECIDES whether it applies: after a shorter break it refuses and the card never appears, because today's weights are already eased for the break and climb back from the next session — so never promise a restart, offer it and let the card answer. NOT for changing their goal, days, equipment or session length (those have their own tools), and NOT a reason to rebuild after an ordinary missed week.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_exercise_swap",
     description:
       "PROPOSES swapping an exercise in the user's workout plan for a biomechanically similar alternative — this does NOT apply the change. Call this when the user gives an explicit command to modify their plan (e.g. 'swap bench press for push-ups', 'replace squats with leg press') OR proposes a swap due to pain/fatigue that the user has confirmed. The app shows the user a card with the exact before/after and they tap Confirm themselves — do not describe the swap as already done, and do not ask for a SEPARATE confirmation in your own text (the card IS the confirmation step). origin_verbatim_quote must be the exact substring of the user's message that makes this an imperative request, not a paraphrase.",
@@ -2201,6 +2216,7 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 === 3d2. NOT ENOUGH TIME TODAY (propose_session_shorten) ===
 - "I've only got 25 minutes", "I can do half an hour before work", "I need to be out by 7" — call propose_session_shorten with the number of minutes they said. If they say they are short of time but no number, ASK how long they have; do not guess one.
 - "My sessions need to be 45 minutes from now on", "I can only do half an hour these days", "make them shorter permanently", "I've got more time now" — call propose_session_length. THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER: both tools take a figure in minutes, and the same "45 minutes" means one day in the first list and every session from here in this one. Words that decide it: "today", "this morning", "before work" mean ONE day; "from now on", "these days", "permanently", "always", "in future" mean LASTING. If NEITHER kind of word is there — a bare "my sessions should be 45 minutes" — ASK which they mean. Do not guess: one of them rebuilds the rest of their block and the other does not touch tomorrow.
+- COMING BACK AFTER A BREAK. When the plan section says COMING BACK AFTER A BREAK, today's card already shows eased weights (or holds last time's weight with no increase) for the first session back — quote the card, never the plan's printed weights, and never call the break a failure. If they say WHY they were away: illness → ease back and listen; injury or pain → the same triage as any pain report (a niggle, something that has been there a while, or sharp/one-sided/worsening, which names a professional and changes nothing); busy → no lecture. After twelve weeks or more, and only when they say they want to start over, call propose_plan_restart; the app refuses it after a shorter break, so never promise it.
 - Say what it will do, in their terms: the main lift stays exactly as it is, the accessory work at the end comes out until it fits, and the day is back to the full session next week. Never name a specific exercise as the one that will go — the app decides that against the floors and you cannot see the result until the card renders.
 - This is TODAY. "Tuesdays are always too long" is not this tool: session length is a lasting setting they change on the Profile screen, and saying so is the honest answer.
 
@@ -2281,7 +2297,7 @@ NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_top_up, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_top_up, propose_plan_restart, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -3167,6 +3183,23 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_meal_top_up",
+              rawArgs: { origin_verbatim_quote: args.origin_verbatim_quote },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_plan_restart") {
+        // A courier like the top-up. Whether the break is long enough, and what the
+        // restarted plan is, are questions about the user's logs and profile, which the
+        // client holds; and the screen's offer and this card confirm through ONE function
+        // in App, so the coach cannot restart a plan the screen would not offer to.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_plan_restart",
               rawArgs: { origin_verbatim_quote: args.origin_verbatim_quote },
             },
           }),

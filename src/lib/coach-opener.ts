@@ -24,6 +24,8 @@
 // day" fact come in from the caller's app clock.
 // ---------------------------------------------------------------------------
 
+import { welcomeBackOpener } from './coach-voice'
+
 export type OpenerKind =
   | 'check_in'
   | 'noticed'
@@ -34,6 +36,7 @@ export type OpenerKind =
   | 'rest_day'
   | 'session_moved'
   | 'plan_unknown'
+  | 'welcome_back'
 
 export interface OpenerSession {
   focus: string
@@ -50,6 +53,11 @@ export interface OpenerInput {
   awaitingFeel: { date: string; day?: string | null; isToday: boolean } | null
   /** Yesterday's session, if it was scheduled and nothing was logged, swapped or rested on purpose. */
   missedYesterday: { dayName: string; focus: string } | null
+  /**
+   * Days since the last working session when that is a BREAK (layoff.ts: 10 days or
+   * more), else null/absent. Measured from before today, the same number the card uses.
+   */
+  breakDays?: number | null
   /**
    * Whether the plan has arrived at all.
    *
@@ -165,6 +173,20 @@ export const PLAN_UNKNOWN_TEXT = `how's it going?`
 
 export function pickOpener(input: OpenerInput): Opener {
   const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession, movedTo, noticed, lastOrdinaryKind } = input
+
+  // 0. BACK AFTER A BREAK (8 Oct 2026, layoff.ts). Ranked above even the unreviewed session below: after
+  //    weeks away, "how did your last session feel" and "yesterday didn't happen" are
+  //    both about a day long gone. Warm, one question that earns its place (why they
+  //    were away changes what the coach does next: an injury goes to the pain triage),
+  //    and never "you missed". The chips route to the coach like every other opener's.
+  if (input.breakDays != null && input.breakDays >= 10) {
+    return {
+      kind: 'welcome_back',
+      text: welcomeBackOpener(input.breakDays),
+      chips: ['I was ill', 'I picked up an injury', 'Life got busy'],
+      attention: true,
+    }
+  }
 
   // 1. A finished session nobody has asked about. Outranks everything: it is
   //    the one signal the research says predicts whether they come back, and

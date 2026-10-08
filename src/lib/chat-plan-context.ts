@@ -367,10 +367,15 @@ export interface CoachWeekBrief {
    * this exists to stop it claiming.
    */
   week?: CoachWeekRow[] | null
+  /**
+   * The first session back after a break (layoff.ts): the same sentence today's card shows,
+   * so the coach never quotes the printed weights as today's ask while the card shows less.
+   */
+  breakLine?: string | null
 }
 
 /** The whole `exercise_summary` payload sent to chat-gemini. */
-export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggestions, today, week }: CoachWeekBrief): string {
+export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggestions, today, week, breakLine }: CoachWeekBrief): string {
   // HOW TO DO THEM, not just what they are. Added 5 Sep 2026 on Ashley's
   // "fix it": the app's 801 curated form cues had one reader in the whole
   // repo (the Exercise tab's How-to panel) and the coach was not it, so it
@@ -459,6 +464,9 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
   return (today && days.length > 0 ? `${buildTodayHeader(today)}\n\n` : '')
     + rows
     + (coachNote ? `\nThis week's coaching note: ${coachNote}` : '')
+    + (breakLine && days.length > 0
+      ? `\nCOMING BACK AFTER A BREAK, on today's card: ${breakLine} The weights listed above are the plan's printed ones; today's card shows them eased, and the coach quotes the card.`
+      : '')
     + (pendingLoadSuggestions && pendingLoadSuggestions.length > 0
       ? `\nPending suggestion(s) waiting on the dashboard, not yet answered: ${pendingLoadSuggestions.join(' | ')}`
       : '')

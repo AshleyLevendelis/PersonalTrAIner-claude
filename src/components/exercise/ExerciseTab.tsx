@@ -57,6 +57,8 @@ interface ExerciseTabProps {
   onLogsUpdated?: () => void
   /** Fired when a session with logged sets closes — App re-anchors the printed program from a calibration week. */
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
+  /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
+  onRestartPlan?: () => Promise<string | null>
 }
 
 export function ExerciseTab({
@@ -81,6 +83,7 @@ export function ExerciseTab({
   logsVersion,
   onLogsUpdated,
   onCalibrationSessionFinished,
+  onRestartPlan,
 }: ExerciseTabProps) {
   const { route } = useAppRoute()
   const { liveWeek } = useActiveSession()
@@ -262,6 +265,7 @@ export function ExerciseTab({
         onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
         onCalibrationSessionFinished={onCalibrationSessionFinished}
+        onRestartPlan={onRestartPlan}
       />
       <Suspense fallback={null}><SwapDialog
         target={swapTarget}

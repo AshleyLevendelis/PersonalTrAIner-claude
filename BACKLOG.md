@@ -2,18 +2,58 @@
 
 Newest first. One line each.
 
-- [ ] **WHAT THE APP DOES WHEN SOMEBODY STOPS TRAINING — PLANNED 8 Oct 2026, NOT BUILT
-  (her "plan the layoff handling"; plan: `docs/plans/layoff-handling.md`).** Traced, not run:
-  the plan week, deload and printed ramp advance by date whatever is logged; today's weight
-  comes from the last logged session with NO age limit, so a returner is told last weight plus
-  an increment (or the calendar-ramped printed weight if nothing was logged); nothing detects a
-  layoff, eases the load, re-calibrates or says welcome back. **Proposed (mine, CSCS, an
-  assertion with its basis in the plan):** bands by days since the last working session — 0-9
-  nothing, 10-20 hold with no increment, 21-41 about 90%, 42-83 about 80%, 84+ restart — applied
-  today-only and derived (no stored flag, no migration) to BOTH the logged and the printed
-  weight, warm-up rebuilt from the scaled load, a `welcome_back` opener, injury answers routed to
-  the existing red-flag rule. **Hers, asked:** what to do after 12+ weeks — ease only, offer a
-  restart from week 1 (recommended), or restart automatically. Needs the `chat-gemini` deploy.
+- [x] **WHAT THE APP DOES WHEN SOMEBODY STOPS TRAINING — RULED B AND BUILT 8 Oct 2026
+  (her "plan the layoff handling", then "B, build it"; on the branch, NOT on `main`; plan:
+  `docs/plans/layoff-handling.md`).** **HER RULING, from three options: B** — after twelve weeks
+  or more, OFFER to start the plan again from week 1 with a calibration week, one tap, never
+  automatic; over easing the weights only and over restarting automatically.
+  **WHAT WAS WRONG (traced, not run):** the plan week, deload and printed ramp advance by date
+  whatever is logged, and today's weight came from the last logged session with NO age limit, so a
+  returner was told last time's weight PLUS an increment, or the calendar-ramped printed weight
+  where nothing was logged. Nothing detected a break, eased the load or said welcome back.
+  **WHAT CHANGED.** One measured fact, the local date of the last WORKING session before today
+  (`getLastWorkingSessionDate`: warm-ups, drops and junk rows out, the offline queue in, a set
+  late last night west of UTC counted as last night, a failed read never read as "never trained").
+  Bands (`layoff.ts`): under 10 days nothing; 10-20 repeat last time with no increment; 21-41
+  about 90%; 42-83 about 80%; 84+ 80% and the restart offered. Applied to today's card only and
+  derived (nothing stored, no migration): the logged lift's weight eases from LAST time's weight,
+  a lift with no history eases from the printed one, the per-set chips and warm-up follow (they
+  are derived from the top set), the empty boxes stop offering last time's numbers and the "last
+  time" marker steps aside (a blank tick would otherwise log the pre-break weight), and the label
+  over the weight says "eased after your break" instead of "from your last session". One line on
+  the card says it in the phrasebook's words. The coach is told the same sentence in its plan
+  text, opens with a welcome back (ranked above an unreviewed session and a missed day; chips
+  ill / injured / busy, an injury going to the existing pain triage), and has
+  `propose_plan_restart`, refused after a shorter break. The restart builds the plan the way
+  onboarding does with the calibration week forced on (`buildRestartedPlan`), born today on the
+  app's clock; history, meals and profile untouched. "Not now" is remembered for that break; a
+  plan already restarted since the last session is never offered again (`restartStillOffered`).
+  **CSCS review (mine, under her 18 Sep delegation; an assertion with its basis, not a
+  measurement):** (1) protects the first session back, where unaccustomed work costs most, and
+  keeps a real stimulus; (2) costs up to about three sessions of climb-back at 80%; (3) pattern
+  coverage, overload and recovery untouched, nothing removed; (4) no floor or ceiling redefined,
+  the plausibility and ceiling checks still run on the eased number, the increment gains one
+  condition; (5) inside scope, injury routed to the red-flag rule. Basis: trained lifters keep most
+  strength for about three weeks off, lose it progressively after and regain it faster than they
+  built it; the conservative return is about 90% at 3-6 weeks and 80-85% after.
+  **TWO DEVIATIONS FROM THE PLAN, named:** the rep target stays as prescribed (the plan said "low
+  end of the range"; the eased weight already leaves reps in reserve, and a second number moving
+  on the row is a second thing to explain), and the restart button sits on the training-day card,
+  so on a rest day only the coach offers it.
+  **VERIFIED.** `test:layoff` 49 checks; 21 mutations, 20 caught, the 21st an equivalent mutant
+  (a same-day gap returns "no break" by either branch), and one caught only after a case where the
+  two-week wording switch binds was added. `verify:layoff` 27 checks across 30, 12, 5 and 95/100
+  days away; 11 mutations, all caught; screenshots read, and the first pass found two defects no
+  check had asked about — the eased weight labelled "from your last session", and the notice
+  laid out as two side-by-side columns — both fixed and the first now checked. Typecheck clean.
+  **NOT PROVEN:** the coach's half needs the `chat-gemini` deploy (the tool and the prompt rule);
+  the restart's SAVE is App's and no harness page boots App (the driver proves the offer, the tap
+  and the card, through the same plan builder); the coach exam has no case for the welcome back
+  (it is stale anyway until the next run on her machine).
+  **LEFT, named:** Home's lead-lift number and the coach's logged-weight default when a set is
+  told without a weight are still the pre-break numbers; per-lift staleness (a lift skipped for
+  months while training continues) is not handled; the quiet-week notification stays unlive.
+  **Deploys:** frontend, and `chat-gemini` for the coach's half. No migration.
 
 - [x] **WHERE ONE WEEK ENDS AND THE NEXT BEGINS — BUILT 6 Oct 2026 (her "make sure
   the app knows where one week ends and the other begins"; on the branch, NOT on

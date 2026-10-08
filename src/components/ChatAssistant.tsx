@@ -42,7 +42,10 @@ import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
+import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
+import { restartStillOffered } from '@/lib/plan-restart'
+import { getLastWorkingSessionDate } from '@/lib/set-log-store'
 import { isHedged } from '@/lib/definite-mention'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
@@ -72,7 +75,7 @@ import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { estimateDaySeconds } from '@/lib/session-duration'
-import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
+import { addDays, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
@@ -293,6 +296,11 @@ interface ChatAssistantProps {
   /** The one run, shared with the Nutrition tab's own button. Null when it could not start. */
   onMealTopUpConfirm?: () => Promise<TopUpOutcome | null>
   /**
+   * START THE PLAN AGAIN FROM WEEK 1 after a very long break (layoff.ts) — App's one
+   * function, the same one the Exercise tab's offer calls. A sentence on failure, null on success.
+   */
+  onRestartPlan?: () => Promise<string | null>
+  /**
    * SWAPPING A MEAL WITH ANOTHER DAY'S (Ashley, 29 Sep 2026: they swap
    * places). Both from App's week hook, the very functions the Move sheet on
    * the Nutrition tab calls: `plan` builds the card off the live week, and
@@ -396,7 +404,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -954,6 +962,19 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     ? null
     : missedYesterdayFrom(trainingWeek.days, yesterdayDate, liveWeekDays)
 
+  // COMING BACK AFTER A BREAK (layoff.ts) — the same measurement today's card makes, from
+  // the last working session BEFORE today, so the opener, the coach's plan text and the
+  // card all describe the same break. A failed read is no break: nothing is claimed.
+  const [breakStatus, setBreakStatus] = useState<LayoffStatus>(NO_LAYOFF)
+  useEffect(() => {
+    if (!profile.id) return
+    let cancelled = false
+    getLastWorkingSessionDate(profile.id, activeSession.date)
+      .then(last => { if (!cancelled) setBreakStatus(layoffStatus(last, activeSession.date)) })
+      .catch(() => { if (!cancelled) setBreakStatus(NO_LAYOFF) })
+    return () => { cancelled = true }
+  }, [profile.id, activeSession.date, dataVersion])
+
   // Today's session, and how it is named, hoisted out of composeOpener so the
   // opener (the first bubble) and coach-nudge.ts (everything after it) describe
   // the same day in the same words. Two copies of this lookup is exactly how
@@ -996,6 +1017,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         ? { date: feelContext.awaiting.date, day: feelContext.awaiting.day, isToday: feelContext.awaiting.date === activeSession.date }
         : null,
       missedYesterday,
+      breakDays: breakStatus.band !== 'none' ? breakStatus.daysAway : null,
       planKnown,
       movedTo: todayMovedTo ? { dayName: todayMovedTo.dayName } : null,
       todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
@@ -1475,6 +1497,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // that claims no moves is the exact wrong answer this is here to stop.
       week: trainingWeek.loading ? null : trainingWeek.days,
       coachNote: activeMesoWeek?.coach_note,
+      breakLine: layoffCardLine(breakStatus),
       pendingLoadSuggestions,
       today: {
         dayName: activeSession.dayName,
@@ -3681,6 +3704,37 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
   }
 
+  /**
+   * START THE PLAN AGAIN — the coach's half of the offer the Exercise tab makes after a
+   * very long break (her ruling, 8 Oct 2026: offer, never automatic). The break comes from
+   * the same measurement the card makes, so the coach cannot offer a restart the screen
+   * would not; and the confirm calls App's one function, the same one the button calls.
+   */
+  const buildPlanRestartProposal = (rawArgs: Record<string, unknown>):
+    | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: Record<string, unknown>; diff: import('@/lib/pending-actions-store').ProposalDiff }
+    | { ok: false; refusal: string } => {
+    const lastDate = breakStatus.band !== 'none' ? addDays(activeSession.date, -breakStatus.daysAway) : null
+    const planStart = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null
+    if (!onRestartPlan || !restartStillOffered(breakStatus.band, lastDate, planStart)) {
+      return { ok: false, refusal: breakStatus.band === 'restart' ? PLAN_RESTART.alreadyStarted : PLAN_RESTART.notNow(breakStatus.daysAway) }
+    }
+    const total = mesocycle.length > 0 ? mesocycle.length : 4
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_plan_restart:${activeSession.date}`,
+      preconditions: { band: breakStatus.band },
+      payload: { daysAway: breakStatus.daysAway },
+      diff: {
+        lead: ask(PLAN_RESTART.lead),
+        rows: [{ field: 'Plan', before: `Week ${activeSession.liveWeek} of ${total}`, after: `Week 1 of ${total}, starting today` }],
+        unchanged: [PLAN_RESTART.unchanged],
+        implications: [{ severity: 'info', text: PLAN_RESTART.calibration }],
+        rationale: typeof rawArgs.origin_verbatim_quote === 'string' ? rawArgs.origin_verbatim_quote : undefined,
+        reversible: false,
+      },
+    }
+  }
+
   const buildGoalChangeProposal = (rawArgs: Record<string, unknown>): {
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -4919,6 +4973,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             ? "Resizing wouldn't fix these — they're the wrong shape for your numbers rather than the wrong size, so the portions can't get there. Want me to build you a new set of meals around your current targets instead?"
             : "Your meals already add up to your targets, near enough — nothing to resize. If a particular meal feels off, tell me which and I'll look at that one."
         }
+      } else if (result.proposal.kind === 'propose_plan_restart') {
+        const restart = buildPlanRestartProposal(result.proposal.rawArgs ?? {})
+        if (restart.ok) built = { scopeKey: restart.scopeKey, preconditions: restart.preconditions, payload: restart.payload, diff: restart.diff }
+        else refusal = restart.refusal
       } else if (result.proposal.kind === 'propose_meal_top_up') {
         const topUp = await buildMealTopUpProposal(result.proposal.rawArgs ?? {})
         if (topUp.ok) built = { scopeKey: topUp.scopeKey, preconditions: topUp.preconditions, payload: topUp.payload, diff: topUp.diff }
@@ -5714,6 +5772,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // stored pre-image this proposal deliberately does not carry — the
       // payload is three numbers precisely so the write reads live state.
       // Asking again after a target move re-offers, which is the way back.
+      undoToken = undefined
+    } else if (row.kind === 'propose_plan_restart') {
+      // ONE FUNCTION FOR BOTH SURFACES: App's handleRestartPlan, which the Exercise tab's
+      // "Start again from week 1" also calls. No Undo: the old plan is replaced, and the
+      // way back is the week the calendar would have been in, which no longer exists.
+      const failed = onRestartPlan ? await onRestartPlan() : didNotSave('The restart')
+      const ok = failed === null
+      receipt = ok
+        ? { landed: ['Week 1, starting today'], failed: [] }
+        : { landed: [], failed: [{ op: 'propose_plan_restart', error: failed ?? didNotSave('The restart') }] }
+      title = ok ? RECEIPTS['propose_plan_restart'].done : RECEIPTS['propose_plan_restart'].failed
+      rows = ok ? [{ label: 'Plan', detail: 'Week 1, with a calibration week' }] : []
       undoToken = undefined
     } else if (row.kind === 'propose_meal_top_up') {
       // ONE RUN FOR BOTH SURFACES. The Nutrition tab's "Get more options"
