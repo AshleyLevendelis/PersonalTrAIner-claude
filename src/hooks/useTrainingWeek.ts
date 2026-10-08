@@ -136,7 +136,14 @@ export function classifyDay(
     if (dashboardDay && dashboardDay.workingLogs.length > 0) return dashboardDay.session?.is_completed ? 'done' : 'partial'
     return 'rest'
   }
-  if (workout.exercises.length === 0) return 'recovery'
+  // A PRESCRIBED ACTIVITY IS A SESSION, not recovery (user test 8 Oct 2026, finding 19): the
+  // starting-out plan's walk read "~" on the strip, done or not, so a skipped walk never showed as
+  // missed and a logged one never showed as done. It is done once an activity is logged that day,
+  // and otherwise falls through to the same date judgement a lifting day gets.
+  if (workout.exercises.length === 0) {
+    if (!workout.plannedActivity) return 'recovery'
+    if ((dashboardDay?.cardioLogs?.length ?? 0) > 0) return 'done'
+  }
 
   // Logged work outranks every date judgement below. If they trained that
   // day it counts, even if it predates the plan — anything else would erase
@@ -369,7 +376,7 @@ function classifyLoadingSafe(
 ): DayGlyphState {
   const workout = plan.find(d => d.day === weekdayName)
   if (!workout) return 'rest'
-  if (workout.exercises.length === 0) return 'recovery'
+  if (workout.exercises.length === 0 && !workout.plannedActivity) return 'recovery'
   // Same guard as classifyDay: a pre-plan day must not flash as 'due'
   // (an outstanding session) while the range read resolves.
   if (planStartStr && dateStr < planStartStr) return 'before_plan'

@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [~] **THE APP TESTS ITSELF AS A USER — 8 Oct 2026, her "test the app as a user daily and pick
+  up any bugs ... it's best if claude tests itself".** Approach (mine, she said "you decide"):
+  an exploratory click-through of the real screens on the browser harness first, fix the clear
+  bugs, then a repeatable journey suite and a daily routine, then a prompt for her machine for the
+  half that needs the real coach and the TEST database. **Report:** `docs/audits/user-test-2026-10-08.md`
+  (40 findings, screenshots beside it; harness only, so the coach was the stand-in, not Gemini).
+  **FIXED so far, each with a check that was seen to fail:**
+  #31 an ambiguous "exercise to avoid" on Profile now asks which, under the field (`verify:setup-answers`
+  7f-7i, 4/4 mutations); #2 the plate calculator's below-the-bar answer (`test:plate-math`); #16/#17
+  Today names its own day and labels a borrowed session as that day's (`verify:rest-day` 1e);
+  #18 a rest day with logged sets reads done, and the rest card says "N to go" / "none left this
+  week" (`test:training-week` 3b, `verify:rest-day` 10a-c); **#19 the walking plan's Home** said
+  "Rest day · 0 of 0 sessions done" while Exercise showed the walk, and the strip drew the day as
+  recovery: Home now names the walk with its minutes and effort, says Done once a walk is logged,
+  and the strip shows the day as due/done (`test:training-week` 3c, `verify:planned-activity`
+  H1-H3, 3/3 driver mutations caught, one only after the strip check H2b was added).
+  **STILL OPEN:** the other clear bugs in the report (#4, #5, #8-#10, #12, #20-#24, #26-#29, #32-#35)
+  and the questions that are hers (#3, #13, #14, #37, #40, possibly #1's wording), to be asked one
+  at a time. Frontend only; nothing here needs an edge-function deploy.
+
 - [x] **WHAT THE APP DOES WHEN SOMEBODY STOPS TRAINING — RULED B AND BUILT 8 Oct 2026
   (her "plan the layoff handling", then "B, build it"; on the branch, NOT on `main`; plan:
   `docs/plans/layoff-handling.md`).** **HER RULING, from three options: B** — after twelve weeks

@@ -433,7 +433,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // rather than filled with a placeholder — an estimate we do not have is not
   // "~0 min".
   const glanceParts: string[] = []
-  if (data.session.status === 'in_progress') {
+  if (data.session.activity) {
+    // An activity session reads like one: "20 min · Easy", not "0 exercises".
+    glanceParts.push(`${data.session.activity.minutes} min`)
+    if (data.session.activity.effort) glanceParts.push(data.session.activity.effort)
+  } else if (data.session.status === 'in_progress') {
     if (data.session.minutesLeft != null) glanceParts.push(`~${data.session.minutesLeft} min left`)
     // DELIBERATE DEVIATION FROM THE HANDOFF. It specifies "bench 92.5 kg
     // next"; the app knows the session's heaviest lift but NOT the running

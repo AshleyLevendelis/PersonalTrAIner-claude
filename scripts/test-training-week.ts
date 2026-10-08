@@ -88,6 +88,17 @@ console.log('\n3b. A rest day they lifted on counts (user test 8 Oct 2026, findi
   check('...and nothing logged is still a rest day', classifyDay('Saturday', SAT, TODAY, PLAN, undefined, PLAN_START) === 'rest')
 }
 
+console.log('\n3c. A prescribed walk is a session (user test 8 Oct 2026, finding 19)')
+{
+  const walkDay = (day: string): WorkoutDay => ({ day, focus: 'Walk', exercises: [], plannedActivity: { activity: 'Walk', duration: 20, targetRpe: 3 } } as unknown as WorkoutDay)
+  const WALK_PLAN = [walkDay('Monday'), walkDay('Wednesday'), walkDay('Friday'), restDay('Sunday')]
+  const walked = { session: null, workingLogs: [], warmupLogs: [], cardioLogs: [{ id: 'c' }] } as never
+  check('a walk day with the walk logged reads done', classifyDay('Friday', FRI, TODAY, WALK_PLAN, walked, PLAN_START) === 'done')
+  check('...a past walk day with nothing logged reads missed, not recovery', classifyDay('Friday', FRI, TODAY, WALK_PLAN, undefined, PLAN_START) === 'missed')
+  check('...a future walk day is due', classifyDay('Friday', '2026-08-28', TODAY, WALK_PLAN, undefined, PLAN_START) === 'due')
+  check('...and a recovery day with no prescribed activity is still recovery', classifyDay('Sunday', '2026-08-23', TODAY, WALK_PLAN, undefined, PLAN_START) === 'recovery')
+}
+
 console.log('\n4. Days at or after the plan start behave normally')
 check('the plan-start day itself is not before_plan', classifyDay('Friday', PLAN_START, TODAY, PLAN, undefined, PLAN_START) !== 'before_plan')
 check('a future training day is due', classifyDay('Friday', '2026-08-28', TODAY, PLAN, undefined, PLAN_START) === 'due')

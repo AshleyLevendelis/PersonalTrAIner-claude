@@ -136,6 +136,17 @@ check('3. and the coach\'s reason for it is on screen',
 const lit = await ev(`[...document.querySelectorAll('[data-testid="cardio-save"]')].filter(n => n.className.includes('glow-pulse')).map(n => !!n.closest('[data-testid="planned-activity"]'))`)
 check('3b. exactly one ✓ on the card is lit, and it is the prescribed walk\'s', lit.length === 1 && lit[0] === true, lit)
 
+const homeSession = () => ev(`(() => { const l = [...document.querySelectorAll('p')].find(p => /^Today.s session$/i.test((p.textContent || '').trim())); const box = l ? l.closest('[data-tour="hero"]') : null; return box ? box.innerText.replace(/\\s+/g, ' ').trim().slice(0, 240) : null })()`)
+// HOME, BEFORE THE WALK (user test 8 Oct 2026, finding 19): it said "Rest day · 0 of 0 sessions
+// done" while this tab said the walk was today's session.
+await ev(`location.hash = '#/tab/dashboard'`); await wait(3500)
+const homeBefore = await homeSession()
+check('H1. Home names today\'s walk as today\'s session, not a rest day', !!homeBefore && homeBefore.includes(want.activity) && homeBefore.includes(`${want.duration} min`) && !/Rest day/.test(homeBefore), homeBefore)
+check('H2. ...and counts the walking days as sessions (not "0 of 0")', !!homeBefore && !/0 of 0/.test(homeBefore), homeBefore)
+const homeCell = await ev(`(() => { const n = [...document.querySelectorAll('[role="img"][aria-label]')].find(x => (x.getAttribute('aria-label') || '').startsWith(${JSON.stringify(want.day + ':')})); return n ? n.getAttribute('aria-label') : null })()`)
+check('H2b. ...and the strip shows the walk day as a session due, not active recovery', homeCell === `${want.day}: due`, homeCell)
+await ev(`location.hash = '#/tab/exercise'`); await wait(3000)
+
 // ONE TAP, ON THE ✓ — like a set. The plan's minutes are in the box and its
 // effort is chosen, so tapping the lit ✓ logs exactly what the plan asked.
 const tapped = await ev(`(() => {
@@ -222,6 +233,12 @@ check('10. the week view gives the activity day a line of its own',
   (week || '').slice(0, 400))
 check('11. ...and does not call it light movement and mobility',
   !/light movement and mobility/i.test(week || ''), (week || '').slice(0, 300))
+
+// HOME, AFTER THE WALK: the session is done there too.
+await ev(`location.hash = '#/tab/dashboard'`); await wait(3500)
+const homeAfter = await homeSession()
+check('H3. after logging the walk, Home says today\'s session is done', !!homeAfter && /\bDone\b/.test(homeAfter) && !/Start session/.test(homeAfter), homeAfter)
+await ev(`location.hash = '#/tab/exercise'`); await wait(3000)
 
 const err = await ev('window.__err ?? null')
 check('12. no uncaught error on the page', err === null, err)

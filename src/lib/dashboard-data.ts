@@ -12,6 +12,8 @@
 
 import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-store'
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
+import { effortForRpe, effortLabel } from './cardio-effort'
+import { getCardioLogsForDateMerged } from './cardio-log-store'
 import { getRecentWeighIns } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
 import { getPRCache, type PRMetric } from './pr-engine'
@@ -75,6 +77,12 @@ export interface TodaySession {
   movedTo?: { date: string; dayName: string } | null
   /** Set when today IS the day another session was moved onto — where it came from. */
   movedFrom?: { date: string; dayName: string } | null
+  /**
+   * Today's session is an ACTIVITY the plan prescribes — the starting-out plan's walk — rather
+   * than exercises. It is a session, not a rest day (user test 8 Oct 2026, finding 19: Home said
+   * "Rest day · 0 of 0 sessions done" while the Exercise tab said the walk was today's session).
+   */
+  activity?: { minutes: number; effort: string | null } | null
 }
 
 export interface PhaseContext {
@@ -240,7 +248,15 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // ---- Today's session status --------------------------------------------
   const nonWarmupToday = todayLogs.filter(l => !l.is_warmup)
   const setsPlanned = todayWorkoutDay?.exercises.reduce((s, ex) => s + ex.sets, 0) ?? 0
-  const isRestDay = planKnown && (!todayWorkoutDay || todayWorkoutDay.exercises.length === 0)
+  // A day with no exercises but a PRESCRIBED ACTIVITY (the starting-out walk) is a session.
+  const activityToday = planKnown && todayWorkoutDay && todayWorkoutDay.exercises.length === 0
+    ? todayWorkoutDay.plannedActivity ?? null
+    : null
+  const isRestDay = planKnown && !activityToday && (!todayWorkoutDay || todayWorkoutDay.exercises.length === 0)
+  const activityDoneToday = activityToday
+    // By the day's own date, offline queue included (the merged read the card itself uses).
+    ? (await getCardioLogsForDateMerged(profileId, todayStr).catch(() => [])).length > 0
+    : false
 
   let explicitlyCompleted = false
   if (!isRestDay) {
@@ -275,6 +291,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     : isRestDay
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
+    : activityToday
+    ? { status: activityDoneToday ? 'done' : 'not_started', focus: activityToday.activity, exerciseNames: [],
+        setsLogged: 0, setsPlanned: 0, exerciseCount: 0, estimatedMinutes: activityToday.duration,
+        minutesLeft: null, leadLift: null, movedFrom: todayResolved.movedFrom,
+        activity: { minutes: activityToday.duration, effort: (() => { const k = effortForRpe(activityToday.targetRpe); return k ? effortLabel(k) : null })() } }
     : {
         movedTo: todayResolved.movedTo,
         movedFrom: todayResolved.movedFrom,
