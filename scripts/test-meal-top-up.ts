@@ -442,7 +442,7 @@ async function main() {
       /A COMPLAINT IS NOT AN ASK/.test(rule) && /only when they say so/.test(rule))
     check('...and never points at a control or states a number', !/Get more options|Nutrition tab|the button/i.test(rule) && /Never state how many options/.test(rule), rule.slice(0, 200))
     check('...and it is in the list of cards that bring their own Confirm buttons, so no quick-reply chips are added on top',
-      /propose_meal_refit, propose_meal_top_up, propose_cardio_session\)/.test(fn))
+      /\(([^()]*\bpropose_meal_top_up\b[^()]*)\) already render their own Confirm/.test(fn))
 
     check('the chat builds the card from what App hands it: nothing the model said', /const buildMealTopUpProposal = async/.test(chat)
       && /buildMealTopUpProposal\(result\.proposal\.rawArgs \?\? \{\}\)/.test(chat))

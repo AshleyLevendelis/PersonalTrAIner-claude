@@ -83,7 +83,9 @@ export function momentFactsFrom(input: {
   const liveWeekDays = input.planCreatedAt && input.mesocycle.length > 0
     ? input.mesocycle.find(w => w.week_number === getActiveMesocycleWeek(input.planCreatedAt, input.now, input.mesocycle.length))?.days
     : undefined
-  const trainingWeekdays = [...new Set((liveWeekDays ?? input.exercisePlan).filter(isScheduledDay).map(d => d.day))]
+  // A live week that holds no days (an older plan row, or one still loading) says nothing about the
+  // pattern, so the plan's own week answers instead of an empty list.
+  const trainingWeekdays = [...new Set((liveWeekDays && liveWeekDays.length > 0 ? liveWeekDays : input.exercisePlan).filter(isScheduledDay).map(d => d.day))]
   let planEndsOn: string | null = null
   let blockEndsOn: string | null = null
   if (input.planCreatedAt && input.mesocycle.length > 0) {

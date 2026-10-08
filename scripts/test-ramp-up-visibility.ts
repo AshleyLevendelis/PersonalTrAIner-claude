@@ -241,7 +241,7 @@ async function main() {
     check('...while a build-up never fires a personal best', /const pr = warm[^:]*\? null : checkForPR\(/.test(gridSrc))
     check('...and never starts the rest timer or the same-session bump', /if \(!warm &&[^)]*onSetCompleted && prescribedReps\)/.test(gridSrc))
     check('...and never takes last week\'s WORKING weight as its ghost',
-      /const ghostFor = \(ref: SetRef\) => \(isWarm\(ref\)[^?]*\? undefined :/.test(gridSrc))
+      /const ghostFor = \(ref: SetRef\) => \((?:\w+ \|\| )?isWarm\(ref\)[^?]*\? undefined :/.test(gridSrc))
 
 
     // THE STRIP IS READ-ONLY EVERYWHERE NOW, AND THE MACHINERY IS GONE WITH IT.

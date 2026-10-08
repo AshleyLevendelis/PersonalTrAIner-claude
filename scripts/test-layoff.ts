@@ -25,7 +25,7 @@
  * What a test cannot prove is that the card USES any of this — that is verify:layoff.
  */
 import { layoffStatus, easeWeightKg, easeAddedKg, layoffWeightFrom, easesWeights, NO_LAYOFF, type LayoffStatus } from '../src/lib/layoff'
-import { breakLength, layoffCardLine, layoffLiftNote, layoffRestartOffer, welcomeBackOpener, PLAN_RESTART } from '../src/lib/coach-voice'
+import { layoffCardLine, layoffLiftNote, layoffRestartOffer, welcomeBackOpener, PLAN_RESTART } from '../src/lib/coach-voice'
 import { pickOpener, type OpenerInput } from '../src/lib/coach-opener'
 import { buildCoachExerciseSummary } from '../src/lib/chat-plan-context'
 import { getExerciseEntry } from '../src/lib/exercise-db'
@@ -113,7 +113,8 @@ console.log('\n4. The sentences')
   const hold: LayoffStatus = { band: 'hold', factor: 1, daysAway: 12 }
   const e90: LayoffStatus = { band: 'ease90', factor: 0.9, daysAway: 23 }
   const e80: LayoffStatus = { band: 'restart', factor: 0.8, daysAway: 95 }
-  check('a break under two weeks is told in days, longer in weeks', breakLength(12) === '12 days' && breakLength(23) === '3 weeks' && breakLength(95) === '14 weeks')
+  const breakLength = (d: number) => (/it's been (.+)\. how/.exec(welcomeBackOpener(d)) ?? [])[1] ?? '?'
+  check('a break under two weeks is told in days, longer in weeks', breakLength(12) === '12 days' && breakLength(23) === '3 weeks' && breakLength(95) === '14 weeks', [breakLength(12), breakLength(23), breakLength(95)])
   check('...the switch is AT two weeks: 13 days, then 2 weeks, and 20 days reads 3 weeks', breakLength(13) === '13 days' && breakLength(14) === '2 weeks' && breakLength(20) === '3 weeks', [breakLength(13), breakLength(14), breakLength(20)])
   check('no break: nothing on the card', layoffCardLine(NO_LAYOFF) === null)
   check('hold: the card says it repeats last time, with no increase', /repeats last time/.test(layoffCardLine(hold) ?? '') && /No increase/.test(layoffCardLine(hold) ?? ''), layoffCardLine(hold))

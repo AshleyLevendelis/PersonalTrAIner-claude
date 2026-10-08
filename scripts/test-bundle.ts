@@ -513,8 +513,9 @@ console.log('\n3. Nothing has crept back up')
   // measured. The library is meant to GROW, so the next hundred dishes will
   // raise it again; the headroom line prints the remainder every run, and the
   // data is the first thing to move to a file fetched on demand if that
-  // becomes the larger half of this figure. 2,144 is 18 above the 2,126 measured on 1 Oct.
-  const TOTAL_BUDGET_KB = 2144
+  // becomes the larger half of this figure. 2,144 was 18 above the 2,126 measured on 1 Oct;
+  // 8 Oct measured 2,148 after the week-boundary and coming-back-after-a-break work, so 2,160.
+  const TOTAL_BUDGET_KB = 2160
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

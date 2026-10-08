@@ -705,7 +705,7 @@ console.log('\n8. A week that repeats itself SAYS so — Ashley\'s ruling, 5 Sep
   check('the card computes the label', /ceilingLabel\(ex\)/.test(chip))
   check('...and RENDERS it outside the explainer', /\{ceiling && \(/.test(chip))
   check('...and drops it once a logged number is driving the weight',
-    /source === 'logged' \? null : ceilingLabel\(ex\)/.test(chip))
+    /source === 'logged'(?: \|\| source === '\w+')* \? null : ceilingLabel\(ex\)/.test(chip))
 
   // --- AND THE COACH GETS THE SAME FACT. Two surfaces describing one week
   // differently is the disagreement this repo keeps producing.

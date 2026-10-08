@@ -882,7 +882,7 @@ export function dietTargetCaveat(selected: readonly string[] = []): string | nul
 // ---------------------------------------------------------------------------
 
 /** "12 days" / "3 weeks" — how long the break was, in words a person uses. */
-export function breakLength(daysAway: number): string {
+function breakLength(daysAway: number): string {
   if (daysAway < 14) return `${daysAway} days`
   const weeks = Math.round(daysAway / 7)
   return `${weeks} weeks`
