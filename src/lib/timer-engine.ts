@@ -508,6 +508,19 @@ export function roundSubline(config: RoundConfig, phase: 'ready' | 'work' | 'res
 // training, which is the class of thing this codebase keeps finding and
 // removing.
 // ---------------------------------------------------------------------------
+/**
+ * The shape of one timer block in the words a person would write it down in:
+ * "5 × 3 min", "3 × 30s", "5 × 15s, 45s rest", "10 × every 1 min". It is the
+ * note on the block's log, and the only place the exact seconds survive, since
+ * a cardio log keeps whole minutes (Ashley's circuit, 8 Oct 2026: 3 × 30s of
+ * push-ups is "2 min" in the minutes column and "3 × 30s" here).
+ */
+export function blockShape(config: RoundConfig): string {
+  const unit = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} min` : `${s}s`)
+  if (roundStyleOf(config) === 'emom') return `${config.rounds} × every ${unit(config.workSeconds)}`
+  return `${config.rounds} × ${unit(config.workSeconds)}${config.restSeconds > 0 ? `, ${unit(config.restSeconds)} rest` : ''}`
+}
+
 export interface RoundLogSummary {
   /** What to call it in the log — the noun a person would use. */
   activityName: string
@@ -529,9 +542,7 @@ export function roundLogSummary(config: RoundConfig): RoundLogSummary {
   // The rest that joined the two blocks belongs to the session too: the
   // carried figure counts full work+rest cycles, so nothing is double-counted.
   const workedSeconds = (carried?.seconds ?? 0) + blockSeconds
-  const detail = emom
-    ? `${config.rounds} × every ${config.workSeconds}s`
-    : `${config.rounds} rounds · ${config.workSeconds}s work / ${config.restSeconds}s rest`
+  const detail = blockShape(config)
   return {
     activityName: emom ? 'EMOM' : 'Intervals',
     // Rounded, never floored to zero: a 40-second round is still a thing that

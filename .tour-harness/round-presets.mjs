@@ -260,19 +260,26 @@ const effortState = await ev(`(() => {
     lit: !!save && save.className.includes('glow-pulse'),
   }
 })()`)
-check('26. ...on the conditioning side, with an effort still to answer',
-  /How hard/.test(sheet) && effortState.found && effortState.effort.length === 3 && effortState.effort.every(v => v === 'false') && effortState.lit === false,
-  { effortState, sheet: sheet.slice(0, 200) })
-const filled = await ev(`(() => {
-  const out = {}
-  for (const i of document.querySelectorAll('input')) {
-    const l = (i.closest('label') || {}).textContent || i.getAttribute('aria-label') || ''
-    if (i.value) out[l.trim().slice(0, 24) || i.type] = i.value
+check('26. ...on the conditioning side, with nothing logged until she says what it was',
+  effortState.found && /What was this block\?/.test(sheet) && effortState.lit === false, { effortState, sheet: sheet.slice(0, 200) })
+// NAMED, NOT "INTERVALS" since 8 Oct 2026 (her circuit ruling A): the sheet asks what the block
+// was, with a chip per block name carrying the timer's minutes, and nothing chosen yet.
+const blockAsk = await ev(`(() => {
+  const box = document.querySelector('[data-testid="unplanned-work-sheet"]')
+  return {
+    title: /What was this block\\?/.test(box?.innerText ?? ''),
+    rope: (box?.querySelector('[data-testid="quick-log-skipping"]')?.textContent ?? '').replace(/\\s+/g, ' '),
+    chosen: [...(box?.querySelectorAll('[role="radio"]') ?? [])].filter(b => b.getAttribute('aria-checked') === 'true').length,
+    intervals: /Intervals/.test(box?.innerText ?? ''),
   }
-  return out
 })()`)
-check('27. ...with the activity and the minutes already in it',
-  JSON.stringify(filled).includes('Intervals') && /"1"/.test(JSON.stringify(filled)), filled)
+check('27. ...asking what the block was, by name, with the minutes the timer counted',
+  blockAsk.title && /Skipping/.test(blockAsk.rope) && /1 min/.test(blockAsk.rope) && blockAsk.chosen === 0 && !blockAsk.intervals, blockAsk)
+await tap('[data-testid="unplanned-work-sheet"] [data-testid="quick-log-skipping"]')
+await wait(400)
+const effortAfterPick = await ev(`[...(document.querySelector('[data-testid="unplanned-work-sheet"]')?.querySelectorAll('[data-effort]') ?? [])].map(b => b.getAttribute('aria-checked'))`)
+check('27b. once the block is named, the effort is asked and none is chosen for her',
+  effortAfterPick.length === 3 && effortAfterPick.every(v => v === 'false'), effortAfterPick)
 await shoot('round-log-sheet')
 
 // THE WRITE ITSELF. The queue is local-first, so the row exists the moment it
@@ -291,7 +298,7 @@ check('28. once the effort is answered the ✓ lights, and is pressed', saveClic
 await wait(1500)
 const storedRound = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => ({ a: r.activity_name, m: r.duration_minutes, rpe: r.intensity_rpe, notes: r.notes }))`)
 check('28b. ...and the store holds the round at the effort she chose, with what the timer ran',
-  storedRound.length === 1 && storedRound[0].rpe === 7 && /Intervals/.test(storedRound[0].a) && !!storedRound[0].notes, storedRound)
+  storedRound.length === 1 && storedRound[0].rpe === 7 && storedRound[0].a === 'Skipping rope' && /^2 × 1s, 1s rest$/.test(storedRound[0].notes ?? ''), storedRound)
 const logged = await ev(`document.body.innerText`)
 check('29. the app says it was logged, rather than going quiet',
   /Logged ·/.test(logged), logged.slice(0, 200))
@@ -301,6 +308,25 @@ check('29. the app says it was logged, rather than going quiet',
 check('30. ...and the timer released the screen only after that',
   /Logged ·/.test(logged) && !/Log session/.test(logged), logged.slice(0, 160))
 await shoot('round-logged')
+
+// THE CIRCUIT OFFER, RIGHT WHERE THE BLOCK WAS LOGGED (her ruling A, 8 Oct 2026): today's session is
+// still due, so Tools offers to count the block as today's workout, and one tap swaps the day.
+const toolsOffer = await ev(`(() => {
+  const o = document.querySelector('[data-testid="circuit-offer"]')
+  return o ? o.innerText.replace(/\\s+/g, ' ').trim() : null
+})()`)
+check('31. Tools offers to count the logged block as today\'s workout',
+  !!toolsOffer && /Skipping rope · 2 × 1s, 1s rest/.test(toolsOffer) && /instead of /.test(toolsOffer), toolsOffer)
+await shoot('round-circuit-offer')
+check('32. counting it', await ev(`(() => { const b = document.querySelector('[data-testid="circuit-offer-yes"]'); if (!b) return false; b.click(); return true })()`))
+await wait(1500)
+const toolsSwap = await ev(`({
+  swapped: (window.__fakeDb?.workout_sessions ?? []).map(r => r.swapped_for_activity ?? null).filter(Boolean),
+  offer: !!document.querySelector('[data-testid="circuit-offer"]'),
+  cardio: (window.__fakeDb?.cardio_logs ?? []).length,
+})`)
+check('33. ...swaps the day under the block\'s name, adds no row, and the offer goes',
+  toolsSwap.swapped.includes('Skipping rope') && toolsSwap.cardio === 1 && !toolsSwap.offer, toolsSwap)
 
 const err = await ev(`window.__lastError ?? null`)
 check('no uncaught error on the page', err === null || err === undefined, err)

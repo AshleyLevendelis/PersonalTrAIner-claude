@@ -415,24 +415,28 @@ export interface CardioPick {
 export function UnplannedCardioEntry({
   picks,
   initialPick = null,
-  prefill,
   notes,
   onLogged,
   saveVerb = 'Log',
+  defaultMinutes,
 }: {
   picks: readonly CardioPick[]
   /** Index into picks to start on, or null for nothing chosen. */
   initialPick?: number | null
-  /** The round timer's hand-off: name and minutes filled in, effort left to her. */
-  prefill?: { activityName: string; durationMinutes: number }
   notes?: string | null
   onLogged?: (view: CardioLogView) => void
   saveVerb?: string
+  /**
+   * Minutes already known for whatever is chosen, Other included: the timer's
+   * block (circuit log, 8 Oct 2026). Without it a typed name under Other lost
+   * the minutes the timer had just counted.
+   */
+  defaultMinutes?: number
 }) {
   const { profileId, date } = useActiveSession()
-  const [pick, setPick] = useState<number | 'other' | null>(prefill ? 'other' : initialPick)
-  const [otherName, setOtherName] = useState(prefill?.activityName ?? '')
-  const [minutes, setMinutes] = useState(prefill ? String(prefill.durationMinutes) : '')
+  const [pick, setPick] = useState<number | 'other' | null>(initialPick)
+  const [otherName, setOtherName] = useState('')
+  const [minutes, setMinutes] = useState('')
   const chosen = typeof pick === 'number' ? picks[pick] : null
   // AN EFFORT IS ONLY EVER PRE-CHOSEN FROM A PICK THAT CARRIES ONE. "Other"
   // and the timer's prefill start blank: the app cannot know how a round or a
@@ -449,7 +453,7 @@ export function UnplannedCardioEntry({
   }
 
   const activityName = pick === 'other' ? otherName.trim() : chosen?.activity ?? ''
-  const hint = chosen?.minutes ?? null
+  const hint = chosen?.minutes ?? (pick === 'other' ? defaultMinutes ?? null : null)
   const ready = !!activityName && !!effort && (minutes.trim() !== '' || hint != null)
 
   const handleSave = () => {
@@ -536,7 +540,7 @@ export function UnplannedCardioEntry({
           value={otherName}
           onChange={e => { setOtherName(e.target.value); setError(null) }}
           className="h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none"
-          autoFocus={!prefill}
+          autoFocus
         />
       )}
       {/* NO ROW UNTIL A CHIP IS CHOSEN. Ashley, 27 Sep 2026, on an active

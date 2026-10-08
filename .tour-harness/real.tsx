@@ -773,7 +773,14 @@ const db: Db = {
         moved_to_date: isoOf(new Date(anchorNowMs() + 86400000)),
       }]
     : [],
-  cardio_logs: [],
+  // ?circuit=1: two timer blocks already logged today, as INPUT (the rows the round timer's sheet
+  // writes), so verify:circuit-log can ask what the Today card offers (her circuit ruling A, 8 Oct 2026).
+  cardio_logs: new URLSearchParams(location.search).get('circuit') === '1'
+    ? [
+        { id: 'c1', user_id: PROFILE_ID, date: today, activity_name: 'Skipping rope', duration_minutes: 15, intensity_rpe: 7, notes: '5 × 3 min', completed_at: anchorDate().toISOString() },
+        { id: 'c2', user_id: PROFILE_ID, date: today, activity_name: 'Assault bike', duration_minutes: 4, intensity_rpe: 8, notes: '5 × 15s, 45s rest', completed_at: anchorDate().toISOString() },
+      ]
+    : [],
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
   daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }],
@@ -1299,7 +1306,9 @@ function Harness() {
             onDevBypassLocksChange={noop} onLogsSeeded={noop} />
         )}
         {activeTab === 'tools' && (
-          <ToolsTab profileId={PROFILE_ID} mealPools={pools} targets={macros} softLikedFoods={[]} />
+          <ToolsTab profileId={PROFILE_ID} exercisePlan={livePlan} mesocycle={liveMeso}
+            liveWeek={getActiveMesocycleWeek(planBornAt, new Date(TODAY_ISO + 'T12:00:00'), liveMeso.length || 4)}
+            planCreatedAt={planBornAt} />
         )}
         {activeTab === 'chat' && (
           <div className="pt-10 text-center text-sm text-muted-foreground">

@@ -22,6 +22,9 @@ import { parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
 import type { WorkoutDay, MesocycleWeek } from '@/lib/types'
 import type { RoundLogSummary } from '@/lib/timer-engine'
 import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
+import { CircuitOffer } from '@/components/exercise/CircuitOffer'
+import { useTrainingWeek } from '@/hooks/useTrainingWeek'
+import { sessionForDate } from '@/lib/session-move'
 
 // ---------------------------------------------------------------------------
 // TOOLS IS ONE TIMER SURFACE — design handoff 2a (12 Sep 2026), then 4a
@@ -87,14 +90,26 @@ export interface ToolsTabProps {
   mesocycle?: MesocycleWeek[]
   /** Which mesocycle week is live, so the block number is the one they are in. */
   liveWeek?: number
+  /** When the plan began, so "is today's session still due" is the same answer Today gives. */
+  planCreatedAt?: string
+  /** App's logsVersion: bumped by a day write elsewhere, so the offer below re-reads the day. */
+  logsVersion?: number
+  /** Tell App a day changed (the circuit counted as today's workout), so every screen re-reads it. */
+  onLogsUpdated?: () => void
 }
 
-export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: ToolsTabProps) {
+export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCreatedAt, logsVersion, onLogsUpdated }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
   // be a second answer to a question this app deliberately has one owner for.
-  const { dayName } = useActiveSession()
+  const { dayName, date: today, logs: setLogs } = useActiveSession()
+  // TODAY, THE WAY THE TODAY CARD SEES IT, for the circuit offer under a logged block (her ruling A,
+  // 8 Oct 2026): the same week hook and the same per-date lookup, so the two places cannot disagree
+  // about whether the session is still due.
+  const liveDays = mesocycle?.find(w => w.week_number === liveWeek)?.days ?? exercisePlan ?? []
+  const week = useTrainingWeek(profileId, today, liveDays, planCreatedAt, logsVersion, mesocycle)
+  const todaysSession = sessionForDate({ date: today, plan: liveDays, moves: week.moves }).day ?? undefined
   const todaysConditioning = (exercisePlan ?? []).find(d => d.day === dayName)?.recommendedCardio
 
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
@@ -190,12 +205,14 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
       // viewport — so an in-flow sheet opened where nobody could see it.
       overlay
       prefill={roundToLog
-        ? { activityName: roundToLog.activityName, durationMinutes: roundToLog.durationMinutes, notes: roundToLog.detail }
+        ? { durationMinutes: roundToLog.durationMinutes, notes: roundToLog.detail }
         : undefined}
-      onCardioLogged={() => {
+      onCardioLogged={view => {
         // ONLY NOW. The round is released after the write, not before it —
-        // resetting first is what threw the session away last time.
-        setLoggedNote(`Logged · ${roundToLog?.activityName} · ${roundToLog?.durationMinutes} min`)
+        // resetting first is what threw the session away last time. The note
+        // names the block she chose ("Skipping rope · 5 × 3 min"), not the
+        // timer's "Intervals" (circuit log, 8 Oct 2026).
+        setLoggedNote(`Logged · ${view.activity_name} · ${roundToLog?.detail ?? `${view.duration_minutes} min`}`)
         setRoundToLog(null)
         timers.reset()
       }}
@@ -270,6 +287,16 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
         >
           {loggedNote} — it's on your week and the coach can see it. Tap to dismiss.
         </button>
+      )}
+      {loggedNote && (
+        <CircuitOffer
+          profileId={profileId}
+          date={today}
+          day={week.days.find(d => d.date === today)}
+          session={todaysSession}
+          workingSetsToday={setLogs.filter(l => !l.is_warmup && (l.drop_index ?? 0) === 0).length}
+          onChanged={() => { week.refresh(); onLogsUpdated?.() }}
+        />
       )}
 
       <p className="text-[1.75rem] font-bold leading-none">Tools</p>

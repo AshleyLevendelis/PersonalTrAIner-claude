@@ -798,6 +798,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_meal_top_up: { done: 'Added', failed: "I couldn't add more meals" },
   propose_plan_restart: { done: 'Plan started again', failed: "I couldn't start your plan again" },
   propose_meal_day_move: { done: 'Swapped over', failed: "I couldn't swap those meals" },
+  propose_circuit_log: { done: 'Logged', failed: "I couldn't log that workout" },
 }
 
 // ---------------------------------------------------------------------------

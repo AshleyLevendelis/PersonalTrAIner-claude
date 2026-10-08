@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Plus, X, Dumbbell, Activity } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { UnplannedCardioEntry, type CardioPick } from './CardioSetRow'
+import type { CardioLogView } from '@/lib/cardio-log-store'
+import { BLOCK_NAMES, blockChipLabel } from '@/lib/circuit'
 
 // ---------------------------------------------------------------------------
 // One entry point for off-plan lifts AND ad-hoc cardio (LAYOUT-DESIGN.md
@@ -29,6 +31,11 @@ const CONDITIONING_PRESETS: readonly CardioPick[] = [
   { label: 'Zone 2', activity: 'Zone 2 Cardio', minutes: 15, rpe: 5 },
 ]
 
+/** The timer's chips: what a block usually is, at the minutes the timer counted, effort left to her. */
+function timerBlockPicks(minutes: number): CardioPick[] {
+  return BLOCK_NAMES.map(name => ({ label: blockChipLabel(name), activity: name, minutes }))
+}
+
 export function AddUnplannedWork({
   onLiftAdded,
   onCardioLogged,
@@ -39,7 +46,7 @@ export function AddUnplannedWork({
   overlay,
 }: {
   onLiftAdded?: () => void
-  onCardioLogged?: () => void
+  onCardioLogged?: (view: CardioLogView) => void
   /** Turn 5: unplanned work moved behind the day-level "⋮" menu (see
    * WeekContextRow) — controlled-open mode for that call site. Omit both
    * `open`/`hideTrigger` for the previous always-visible-button behavior. */
@@ -58,7 +65,7 @@ export function AddUnplannedWork({
    * invent, so the one thing left to answer is the one thing only she can.
    * The fields stay editable: a prefill is a head start, not a claim.
    */
-  prefill?: { activityName: string; durationMinutes: number; notes?: string }
+  prefill?: { durationMinutes: number; notes?: string }
   /**
    * RENDER AS A REAL SHEET, ABOVE EVERYTHING — not as a block in the page.
    *
@@ -174,12 +181,15 @@ export function AddUnplannedWork({
 
       {mode === 'cardio' && (
         <UnplannedCardioEntry
-          picks={CONDITIONING_PRESETS}
-          prefill={prefill}
-          // "3 rounds · 120s work / 30s rest" — what the timer actually ran, so
-          // the log says more than "Intervals, 7 min" when she reads it back.
+          // A TIMER BLOCK IS NAMED, NOT "INTERVALS" (Ashley's ruling A, 8 Oct
+          // 2026): the chips are what a block usually is, each carrying the
+          // timer's own minutes and no effort, and Other keeps the minutes too.
+          picks={prefill ? timerBlockPicks(prefill.durationMinutes) : CONDITIONING_PRESETS}
+          defaultMinutes={prefill?.durationMinutes}
+          // "5 × 3 min" — what the timer actually ran, so the log says more
+          // than a name and a minute count when she reads it back.
           notes={prefill?.notes ?? null}
-          onLogged={() => { onCardioLogged?.(); reset() }}
+          onLogged={view => { onCardioLogged?.(view); reset() }}
         />
       )}
     </div>
@@ -194,7 +204,7 @@ export function AddUnplannedWork({
     <Dialog open onOpenChange={o => { if (!o) reset() }}>
       <DialogContent data-testid="unplanned-work-sheet">
         <DialogHeader>
-          <DialogTitle className="pr-8">Log what you did</DialogTitle>
+          <DialogTitle className="pr-8">{prefill ? 'What was this block?' : 'Log what you did'}</DialogTitle>
           <DialogDescription>{prefill?.notes ?? 'Anything you did that was not on the plan.'}</DialogDescription>
         </DialogHeader>
         {body}

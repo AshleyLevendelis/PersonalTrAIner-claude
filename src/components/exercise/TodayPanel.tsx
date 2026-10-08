@@ -77,6 +77,7 @@ import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
+import { CircuitOffer } from './CircuitOffer'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
@@ -1060,6 +1061,16 @@ export function TodayPanel({
               </span>
             </InsightBanner>
           )}
+          {/* THE BLOCKS SHE LOGGED OFF THE TIMER, COUNTED AS TODAY'S WORKOUT in one tap (her ruling A,
+              8 Oct 2026). Gone once it is counted: the swapped line below says so instead. */}
+          <CircuitOffer
+            profileId={profileId}
+            date={today}
+            day={weekTrain.days.find(d => d.date === today)}
+            session={workout}
+            workingSetsToday={logs.filter(l => !l.is_warmup && (l.drop_index ?? 0) === 0).length}
+            onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+          />
           {swappedToday && (
             <InsightBanner tone="ai" data-testid="swapped-today">
               <span className="text-sm">

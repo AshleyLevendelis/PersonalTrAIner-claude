@@ -221,6 +221,33 @@ export async function deleteCardioLog(clientId: string): Promise<void> {
 }
 
 /**
+ * Removes the logs a coach card wrote, by WHAT they are (that person, that day, that name, that
+ * note), not by a client id: the coach's Undo can be tapped long after the ten-minute window that
+ * holds a client id, and a receipt that said "undone" while the blocks stayed on the week would be
+ * the app telling her something false. Local queue entries go too, so a log still waiting to sync
+ * is not sent afterwards. Circuit log, 8 Oct 2026. Resolves false if the server delete failed.
+ */
+export async function deleteCardioLogsMatching(
+  userId: string,
+  date: string,
+  entries: readonly { activityName: string; notes: string | null }[],
+): Promise<boolean> {
+  if (flushPromise) await flushPromise
+  const matches = (i: { activityName: string; notes?: string | null }) =>
+    entries.some(e => e.activityName === i.activityName && (e.notes ?? null) === (i.notes ?? null))
+  savePending(loadPending().filter(i => !(i.userId === userId && i.date === date && matches(i))))
+  let ok = true
+  for (const e of entries) {
+    let q = supabase.from('cardio_logs').delete().eq('user_id', userId).eq('date', date).eq('activity_name', e.activityName)
+    q = e.notes == null ? q.is('notes', null) : q.eq('notes', e.notes)
+    const { error } = await q
+    if (error) { console.error('deleteCardioLogsMatching: delete failed', error); ok = false }
+  }
+  notify()
+  return ok
+}
+
+/**
  * CAN THIS LOG STILL BE UNDONE? Asked by a row BEFORE it offers Undo, so the
  * button is never drawn over a log deleteCardioLog would silently leave in
  * place. deleteCardioLog no-ops on anything it no longer holds — past the

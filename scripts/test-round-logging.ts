@@ -47,7 +47,7 @@ console.log('\n1. Her round, turned into a log entry')
     noLead.durationMinutes === hugeLead.durationMinutes && hugeLead.durationMinutes === 7,
     { noLead: noLead.durationMinutes, hugeLead: hugeLead.durationMinutes })
   check('it is called conditioning, not a lift', s.activityName === 'Intervals', s.activityName)
-  check('the detail says what actually ran', s.detail === '3 rounds · 120s work / 30s rest', s.detail)
+  check('the detail says what actually ran, as she would write it', s.detail === '3 × 2 min, 30s rest', s.detail)
 }
 
 console.log('\n2. Every shape survives it')
@@ -55,7 +55,7 @@ console.log('\n2. Every shape survives it')
   const emom = roundLogSummary({ rounds: 10, workSeconds: 60, restSeconds: 0, style: 'emom' })
   check('an EMOM is logged as an EMOM', emom.activityName === 'EMOM', emom)
   check('...ten minutes of it', emom.durationMinutes === 10, emom)
-  check('...described by its interval, not a zero rest', emom.detail === '10 × every 60s', emom.detail)
+  check('...described by its interval, not a zero rest', emom.detail === '10 × every 1 min', emom.detail)
 
   const tabata = roundLogSummary({ rounds: 8, workSeconds: 20, restSeconds: 10 })
   check('Tabata is four minutes', tabata.durationMinutes === 4, tabata)
@@ -86,7 +86,7 @@ console.log('\n3. The button hands the round over instead of discarding it')
   check('...opening the conditioning sheet already filled in',
     /prefill=\{roundToLog/.test(tools) && /notes: roundToLog\.detail/.test(tools), null)
   check('...and the timer is reset only inside onCardioLogged',
-    /onCardioLogged=\{\(\) => \{[\s\S]{0,400}?timers\.reset\(\)/.test(tools), null)
+    /onCardioLogged=\{(?:\(\)|\w+) => \{[\s\S]{0,500}?timers\.reset\(\)/.test(tools), null)
   // THE BANNER MUST BE SET, not merely renderable. The first version tested
   // only that `{loggedNote && ...}` existed in the file; deleting the line
   // that sets it left the render in place and the check green while nothing
@@ -115,12 +115,16 @@ console.log('\n4. It reaches the places she looked')
   // fills itself — both ends are held.
   const row = strip(readFileSync('src/components/exercise/CardioSetRow.tsx', 'utf8'))
   const entry = row.slice(row.indexOf('export function UnplannedCardioEntry'))
-  check('the sheet hands the prefill to the row', /prefill=\{prefill\}/.test(sheet), null)
-  check('the prefill fills the activity and the duration',
-    /useState\(prefill\?\.activityName \?\? ''\)/.test(entry) && /useState\(prefill \? String\(prefill\.durationMinutes\) : ''\)/.test(entry), null)
+  // SINCE 8 OCT 2026 THE BLOCK IS NAMED, NOT "INTERVALS" (her circuit ruling A): the sheet hands
+  // the row the timer's minutes and a chip per block name, and the row asks which one it was.
+  check('the sheet hands the timer\'s minutes to the row', /defaultMinutes=\{prefill\?\.durationMinutes\}/.test(sheet), null)
+  check('...and offers block names, not "Intervals", when the timer sent it',
+    /picks=\{prefill \? timerBlockPicks\(prefill\.durationMinutes\)/.test(sheet) && !/Intervals/.test(sheet), null)
+  check('...the minutes carry over to Other too',
+    /hint = chosen\?\.minutes \?\? \(pick === 'other' \? defaultMinutes/.test(entry), null)
   check('...and never the effort, which only she knows',
     !/prefill\.(rpe|intensity)/.test(sheet) && !/prefill\??\.(rpe|intensity)/.test(entry)
-      && /useState<number \| 'other' \| null>\(prefill \? 'other'/.test(entry)
+      && !/rpe:/.test(sheet.slice(sheet.indexOf('function timerBlockPicks'), sheet.indexOf('function timerBlockPicks') + 200))
       && /useState<EffortKey \| null>\(chosen \? effortForRpe\(chosen\.rpe\) : null\)/.test(entry), null)
   // AND THE DETAIL SURVIVES THE SAVE. Checked at the writing end, not the
   // passing end: ToolsTab handing over `notes` proves nothing if the save

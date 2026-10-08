@@ -1,4 +1,7 @@
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
+import { blockShape } from '@/lib/timer-engine'
+import { circuitName } from '@/lib/circuit'
+import { rpeToStore, effortLabel, type EffortKey } from '@/lib/cardio-effort'
 import ReactMarkdown from 'react-markdown'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { buildCoachMealSummary, buildCoachUpcomingSummary, mealsContaining } from '@/lib/meal-ingredients'
@@ -21,7 +24,7 @@ import { createPendingAction, claimPendingAction, declinePendingAction, markExec
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
 import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
@@ -75,7 +78,7 @@ import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { estimateDaySeconds } from '@/lib/session-duration'
-import { addDays, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
+import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
@@ -2030,6 +2033,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (pendingAction.kind === 'propose_rest_day') return 'Want me to mark that as a rest day?'
     if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
     if (pendingAction.kind === 'propose_session_activity_swap') return 'Want me to swap that day over?'
+    if (pendingAction.kind === 'propose_circuit_log') return 'Want me to log this workout?'
     if (pendingAction.kind === 'propose_session_move') return 'Want me to move that session?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -3205,6 +3209,56 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       diff: {
         lead: ask(`mark ${dayName} as ${activityName} instead of your lift`),
         rows: [{ field: dayName, before: session.focus, after: activityName }],
+        implications,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_circuit_log's card — a workout made of timer blocks (Ashley's ruling A,
+   * 8 Oct 2026). Each block becomes the same cardio row the round timer's sheet writes (her block
+   * name, the shape in the note, the minutes by the timer's own rule), and when she said it
+   * replaced the session AND that session is still due, the same day swap the screen's "Count it
+   * as today's workout" makes. The server only builds this from rounds, times and an effort she
+   * stated; nothing here fills a gap.
+   */
+  const buildCircuitLogProposal = (rawArgs: Record<string, unknown>):
+    | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: CircuitLogPayload; diff: import('@/lib/pending-actions-store').ProposalDiff }
+    | { ok: false; refusal: string } => {
+    const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
+    const delta = daysBetween(activeSession.date, date)
+    if (!Number.isFinite(delta) || delta > 0 || delta < -7) return { ok: false, refusal: "I can only log a workout you've already done, from the last week." }
+    const effort = (['easy', 'steady', 'hard'] as const).find(e => e === rawArgs.effort) as EffortKey | undefined
+    if (!effort) return { ok: false, refusal: 'How hard did that feel overall — easy, steady or hard?' }
+    const raw = Array.isArray(rawArgs.blocks) ? rawArgs.blocks as Record<string, unknown>[] : []
+    const blocks: CircuitLogPayload['blocks'] = []
+    for (const b of raw) {
+      const name = typeof b.activity_name === 'string' ? b.activity_name.trim() : ''
+      const rounds = Number(b.rounds), work = Number(b.work_seconds), rest = Number(b.rest_seconds ?? 0)
+      if (!name || !Number.isInteger(rounds) || rounds < 1 || rounds > 100 || !(work > 0) || work > 3600 || !(rest >= 0) || rest > 3600) continue
+      const config = { rounds, workSeconds: Math.round(work), restSeconds: Math.round(rest) }
+      const seconds = rounds * config.workSeconds + (rounds - 1) * config.restSeconds
+      blocks.push({ activityName: name, ...config, durationMinutes: Math.max(1, Math.round(seconds / 60)), shape: blockShape(config) })
+    }
+    if (blocks.length === 0) return { ok: false, refusal: 'What did each block look like — how many rounds, and how long each?' }
+    const dayName = dayNameOf(date)
+    const session = sessionForDate({ date, plan: exercisePlan, moves: trainingWeek.moves }).day
+    const dayState = trainingWeek.days.find(d => d.date === date)?.state
+    const replaces = rawArgs.replaced_session === true && !!session && session.exercises.length > 0 && dayState === 'due'
+    const swapName = replaces ? circuitName(blocks.map(b => b.activityName)) : null
+    const implications: import('@/lib/pending-actions-store').ProposalDiff['implications'] = [
+      { severity: 'info', text: `Each block goes on your week as ${effortLabel(effort).toLowerCase()} work.` },
+    ]
+    if (replaces) implications.push({ severity: 'info', text: `It counts as ${dayName}'s workout instead of ${session!.focus}. The session stays on the plan if you still want it.` })
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_circuit_log:${date}:${blocks.map(b => `${b.activityName}/${b.shape}`).join('|')}`,
+      preconditions: { date },
+      payload: { date, dayName, blocks, intensityRpe: rpeToStore(effort), swapName, sessionFocus: replaces ? session!.focus : null },
+      diff: {
+        lead: ask(replaces ? `log this as ${dayName}'s workout` : `log this workout on ${dayName}`),
+        rows: blocks.map(b => ({ field: b.activityName, before: '—', after: b.shape })),
         implications,
         reversible: true,
       },
@@ -4973,6 +5027,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
             ? "Resizing wouldn't fix these — they're the wrong shape for your numbers rather than the wrong size, so the portions can't get there. Want me to build you a new set of meals around your current targets instead?"
             : "Your meals already add up to your targets, near enough — nothing to resize. If a particular meal feels off, tell me which and I'll look at that one."
         }
+      } else if (result.proposal.kind === 'propose_circuit_log') {
+        const circuit = buildCircuitLogProposal(result.proposal.rawArgs ?? {})
+        if (circuit.ok) built = { scopeKey: circuit.scopeKey, preconditions: circuit.preconditions, payload: circuit.payload as unknown as Record<string, unknown>, diff: circuit.diff }
+        else refusal = circuit.refusal
       } else if (result.proposal.kind === 'propose_plan_restart') {
         const restart = buildPlanRestartProposal(result.proposal.rawArgs ?? {})
         if (restart.ok) built = { scopeKey: restart.scopeKey, preconditions: restart.preconditions, payload: restart.payload, diff: restart.diff }
@@ -5773,6 +5831,14 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // payload is three numbers precisely so the write reads live state.
       // Asking again after a target move re-offers, which is the way back.
       undoToken = undefined
+    } else if (row.kind === 'propose_circuit_log') {
+      const result = await executeCircuitLog(profile, row.payload as unknown as CircuitLogPayload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_circuit_log'].done : RECEIPTS['propose_circuit_log'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
+      undoToken = ok ? row.id : undefined
+      onLogsUpdated?.()
     } else if (row.kind === 'propose_plan_restart') {
       // ONE FUNCTION FOR BOTH SURFACES: App's handleRestartPlan, which the Exercise tab's
       // "Start again from week 1" also calls. No Undo: the old plan is replaced, and the
@@ -6388,6 +6454,9 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         }
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
+        onLogsUpdated?.()
+      } else if (row.kind === 'propose_circuit_log') {
+        await undoCircuitLog(profile.id, row.payload as unknown as CircuitLogPayload)
         onLogsUpdated?.()
       } else if (row.kind === 'propose_session_activity_swap') {
         await undoSwapForActivity(profile.id, row.payload as unknown as SwapForActivityPayload)

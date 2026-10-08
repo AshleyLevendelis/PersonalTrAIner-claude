@@ -8,7 +8,7 @@ import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
 import { detectPlanClaim, planClaimFloorText } from "../_shared/plan-claim.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
-import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming } from "../_shared/message-evidence.ts";
+import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming, statedDurationsSeconds, statedCount, statedEffort } from "../_shared/message-evidence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1382,6 +1382,34 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_circuit_log",
+    description:
+      "PROPOSES logging a workout they DID that was made of timed blocks, each its own thing — this does NOT apply anything, the app shows a card and the user taps Confirm. Call when they tell you about a circuit or interval session they already did, block by block ('5 rounds of 3 min skipping, 3 rounds of 30s push-ups, then 5x15s on the bike with 45s rest'). One entry in blocks per block, in the order done, each with the name THEY used, the rounds, the work time and the rest between rounds, all as they stated them. Set replaced_session true when they did it INSTEAD of their planned session ('didn't do my workout, did this instead'); the app only counts it as that day's workout when the session is still due. The effort is theirs to say: if they have not said how hard it was overall, ask 'How hard did that feel overall — easy, steady or hard?' and wait; never pick one. NOT propose_session_activity_swap (one named activity like Muay Thai or a run, not timed blocks), NOT log_workout (sets and reps of lifts), NOT propose_cardio_session (planning one for later).",
+    parameters: {
+      type: "object",
+      properties: {
+        blocks: {
+          type: "array",
+          description: "Each block, in order. Every number must be one they stated.",
+          items: {
+            type: "object",
+            properties: {
+              activity_name: { type: "string", description: "What the block was, in their words: 'Skipping rope', 'Push-ups', 'Assault bike'." },
+              rounds: { type: "number", description: "How many rounds, as stated." },
+              work_seconds: { type: "number", description: "Length of each round's work, in seconds (3 min = 180)." },
+              rest_seconds: { type: "number", description: "Rest between rounds in seconds, ONLY if they said one. Omit otherwise." },
+            },
+            required: ["activity_name", "rounds", "work_seconds"],
+          },
+        },
+        effort: { type: "string", enum: ["easy", "steady", "hard"], description: "How hard it was overall, ONLY if they said. Omit and ask if not." },
+        replaced_session: { type: "boolean", description: "True when they did this instead of their planned session." },
+        date: { type: "string", description: "ISO date (YYYY-MM-DD) they did it. Omit for today." },
+      },
+      required: ["blocks"],
+    },
+  },
+  {
     name: "log_workout_session",
     description:
       "DEPRECATED for natural-language logging — prefer log_workout instead, which is the same natural-language path but with a clarification round-trip when the exercise name is ambiguous or unstated; this tool writes immediately with no chance to ask first. Only call this for the narrow case log_workout doesn't cover: explicit structured per-exercise data the user is reading off (sets_completed/reps_completed/weight_kg as separate numbers, not a natural-language description). If the message gives sets/reps/weight but names no exercise (e.g. 'I did 5x5 at 80kg'), do NOT call this tool with a guessed exercise_name — ask which exercise instead and wait for the answer.",
@@ -2696,6 +2724,7 @@ SESSION PLANNING RULES:
 NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
 2. When the user says they are skipping their lifting for something else and names it, call propose_session_activity_swap. That is the tool for exactly this, and its card is the only thing that changes what the Exercise tab shows. A PLAIN STATEMENT IS ENOUGH TO CALL IT — "I'm not going to hit that session, I'm doing Muay Thai instead" needs no command verb and no please. The rule further down about not calling a tool for a sentence with no imperative verb is about propose_meal_swap and propose_exercise_swap, where the user is ordering a change to the plan's content; it does NOT apply to the four day tools, where telling you what is happening to their day IS the request. Answering that sentence in prose is the failure this rule exists to stop: measured live twice, 25 Aug and 15 Sep 2026, both times about Muay Thai, both times with the coach saying the day was sorted when nothing had been written.
+2b. When what they did instead was a CIRCUIT OF TIMED BLOCKS — rounds of this, rounds of that ("5 rounds of 3 min skipping, 3x30s push-ups, 5x15s on the bike") — call propose_circuit_log, one block each, not propose_session_activity_swap with one name for the lot: Ashley's ruling, 8 Oct 2026, is that each block is recorded as itself. Every number is theirs; if they have not said how hard it felt overall, ask (easy, steady or hard) before calling.
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
 3b. When they say a session did NOT happen and name nothing in its place and do not call it a rest — "I missed yesterday", "didn't train Monday", "mark it missed" — call propose_missed_session. A miss is not a rest: never answer a miss with propose_rest_day unless they say it was a rest. It shows a card; until they confirm, nothing has happened, so do not say it has.
 4. When they want something you have no tool for, say plainly you cannot do it from chat and point them at the RIGHT screen — the Profile screen for training days and personal details, the Nutrition tab for logging food. An honest "I can't do that from here" beats a confident sentence that turns out to be false. NOTE: changing WHICH DAYS they train is something you CAN do — call propose_schedule_change (§3e) rather than declining it.
@@ -3586,6 +3615,62 @@ Keep this context in mind to ensure your greetings and questions naturally align
                 // it marks the day, and the coach asks how long afterwards.
                 // Carried from the write path rather than re-derived.
                 activity_planned: eventTiming(message, activityName) === "future",
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_circuit_log") {
+        // A WORKOUT MADE OF TIMER BLOCKS — Ashley's ruling A, 8 Oct 2026
+        // (docs/plans/timer-circuit-log.md). The card writes the same rows the
+        // round timer's sheet writes, so every figure on it must be one SHE
+        // wrote: her recent messages are the evidence, not the model's word.
+        // A block whose rounds or work time she never stated is dropped, a rest
+        // she never gave is zero, and with no effort in her words the coach asks.
+        const recentUser = Array.isArray(history)
+          ? history.filter((t: { role?: string; content?: unknown }) => t && t.role !== "assistant" && typeof t.content === "string").slice(-3).map((t: { content: string }) => t.content)
+          : [];
+        const evidence = [...recentUser, message].join("\n");
+        const seconds = statedDurationsSeconds(evidence);
+        const said = (n: number) => seconds.some((s) => Math.abs(s - n) <= 1);
+        const rawBlocks = Array.isArray(args.blocks) ? args.blocks as Record<string, unknown>[] : [];
+        const blocks: { activity_name: string; rounds: number; work_seconds: number; rest_seconds: number }[] = [];
+        const unmatched: string[] = [];
+        for (const b of rawBlocks) {
+          const nameB = typeof b.activity_name === "string" ? b.activity_name.trim() : "";
+          const rounds = Math.round(Number(b.rounds));
+          const work = Math.round(Number(b.work_seconds));
+          const rest = Math.round(Number(b.rest_seconds ?? 0));
+          if (!nameB) continue;
+          if (!(rounds >= 1) || !statedCount(evidence, rounds) || !(work > 0) || !said(work)) { unmatched.push(nameB); continue; }
+          blocks.push({ activity_name: nameB, rounds, work_seconds: work, rest_seconds: rest > 0 && said(rest) ? rest : 0 });
+        }
+        if (blocks.length === 0 || unmatched.length > 0) {
+          const who = unmatched.length > 0 ? unmatched.join(" and ") : "each block";
+          return new Response(
+            JSON.stringify({ reply: `How many rounds of ${who}, and how long was each round?` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const effort = statedEffort([...recentUser.slice(-1), message].join("\n"));
+        if (!effort) {
+          return new Response(
+            JSON.stringify({ reply: "Nice work. How hard did that feel overall — easy, steady or hard?" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_circuit_log",
+              rawArgs: {
+                date: typeof args.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(args.date) ? args.date : context.current_local_date,
+                blocks,
+                effort,
+                replaced_session: args.replaced_session === true,
               },
             },
           }),

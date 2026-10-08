@@ -217,3 +217,58 @@ export function eventTiming(message: string, subject?: string): EventTiming {
   }
   return judge(text);
 }
+
+// ---------------------------------------------------------------------------
+// A WORKOUT MADE OF TIMER BLOCKS, told to the coach (Ashley's ruling A,
+// 8 Oct 2026). Her message was "5rounds of 3mins of skipping rope, 3rounds of
+// 30seconds push ups, 3x30secs sits ups and then 5x15seconds on 45seconds rest
+// on the assault bike" — no spaces between number and unit, "x" for rounds.
+// The coach's card is built only from figures these find in what she wrote,
+// so a block the model filled in (a round count, a rest she never gave) is
+// refused rather than logged.
+// ---------------------------------------------------------------------------
+
+/** Every duration she wrote, in SECONDS: "3mins" → 180, "30seconds" → 30, "1.5 min" → 90. */
+export function statedDurationsSeconds(text: string): number[] {
+  const m = (text || "").toLowerCase();
+  const out: number[] = [];
+  const re = /(\d+(?:\.\d+)?)\s*(seconds?|secs?|s\b|minutes?|mins?|m\b)/g;
+  for (const hit of m.matchAll(re)) {
+    const n = Number(hit[1]);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    out.push(Math.round(/^m/.test(hit[2]) ? n * 60 : n));
+  }
+  return out;
+}
+
+/** Whether she wrote this count anywhere as a number of its own ("5rounds", "5x15", "five rounds"). */
+export function statedCount(text: string, n: number): boolean {
+  const m = (text || "").toLowerCase();
+  if (new RegExp(`(^|[^\\d.])${n}(?![\\d.])`).test(m)) return true;
+  return Object.entries(WORD_NUMBERS).some(([w, v]) => v === n && new RegExp(`\\b${w}\\b`).test(m));
+}
+
+export type StatedEffort = "easy" | "steady" | "hard";
+
+/**
+ * How hard she SAID it was, in her words, or null. The last effort word wins
+ * ("started easy, finished hard" is hard). Deliberately narrow: "a decent
+ * workout" says nothing about effort, and a guess here would be stored as
+ * hers. The coach asks instead.
+ */
+export function statedEffort(text: string): StatedEffort | null {
+  const m = (text || "").toLowerCase();
+  const words: [RegExp, StatedEffort][] = [
+    [/\b(easy|easier|light|gentle|chilled|chill)\b/g, "easy"],
+    [/\b(steady|moderate|medium|middling)\b/g, "steady"],
+    [/\b(hard|harder|tough|brutal|intense|killer|savage|exhausting|knackering|all[- ]out|maximal|flat[- ]out)\b/g, "hard"],
+  ];
+  let best: { at: number; level: StatedEffort } | null = null;
+  for (const [re, level] of words) {
+    for (const hit of m.matchAll(re)) {
+      const at = hit.index ?? 0;
+      if (!best || at > best.at) best = { at, level };
+    }
+  }
+  return best ? best.level : null;
+}

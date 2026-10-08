@@ -28,7 +28,7 @@ import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, getMealPicksForDates, setMealPick, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
 import { setSessionMove, setDeliberateRest, setMarkedMissed, setSwappedForActivity } from './daily-tracking'
-import { saveCardioLog } from './cardio-log-store'
+import { saveCardioLog, deleteCardioLogsMatching } from './cardio-log-store'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
 import type { MealMovePayload } from './meal-move'
@@ -1746,6 +1746,72 @@ export async function executeSwapForActivity(
 /** Clears the swap. The day goes back to whatever it was — due, or missed. */
 export async function undoSwapForActivity(profileId: string, payload: SwapForActivityPayload): Promise<void> {
   await setSwappedForActivity(profileId, payload.date, null)
+}
+
+// ---------------------------------------------------------------------------
+// A WORKOUT MADE OF TIMER BLOCKS, from the coach — Ashley's ruling A, 8 Oct
+// 2026 (docs/plans/timer-circuit-log.md). The SAME rows the screen writes:
+// one cardio log per block under its own name, and, when it replaced the day's
+// session, the same day swap the screen's offer makes, named for the blocks.
+// The effort is one she stated (the server refuses to build the card without
+// one), never a default.
+// ---------------------------------------------------------------------------
+
+export interface CircuitBlockPayload {
+  activityName: string
+  rounds: number
+  workSeconds: number
+  restSeconds: number
+  /** Work plus the rests between rounds, whole minutes, at least 1. */
+  durationMinutes: number
+  /** "5 × 3 min" — the block's note, and how the coach's Undo finds it again. */
+  shape: string
+}
+
+export interface CircuitLogPayload {
+  date: string
+  dayName: string
+  blocks: CircuitBlockPayload[]
+  intensityRpe: number
+  /** The day's swap name when the circuit replaced its session; null when it did not. */
+  swapName: string | null
+  sessionFocus?: string | null
+}
+
+export async function executeCircuitLog(
+  profile: UserProfile,
+  payload: CircuitLogPayload,
+): Promise<{ receipt: PendingActionReceipt }> {
+  if (!profile.id) {
+    return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+  }
+  const landed: string[] = []
+  const failed: PendingActionReceipt['failed'] = []
+  for (const b of payload.blocks) {
+    const view = saveCardioLog({
+      userId: profile.id,
+      date: payload.date,
+      activityName: b.activityName,
+      durationMinutes: b.durationMinutes,
+      intensityRpe: payload.intensityRpe,
+      notes: b.shape,
+    })
+    if (view) landed.push(`${b.activityName}: ${b.shape}`)
+    else failed.push({ op: 'save', error: `Couldn't log ${b.activityName}` })
+  }
+  if (payload.swapName && failed.length === 0) {
+    const ok = await setSwappedForActivity(profile.id, payload.date, payload.swapName)
+    if (ok) landed.push(`${payload.dayName}: counted as your workout${payload.sessionFocus ? ` instead of ${payload.sessionFocus}` : ''}`)
+    else failed.push({ op: 'save', error: `Couldn't count it as ${payload.dayName}'s workout` })
+  }
+  return { receipt: { landed, failed } }
+}
+
+/** Takes the blocks off the day, and the swap with them when the card made one. */
+export async function undoCircuitLog(profileId: string, payload: CircuitLogPayload): Promise<boolean> {
+  const ok = await deleteCardioLogsMatching(profileId, payload.date, payload.blocks.map(b => ({ activityName: b.activityName, notes: b.shape })))
+  if (payload.swapName) await setSwappedForActivity(profileId, payload.date, null)
+  return ok
 }
 
 export interface MissedSessionPayload {
