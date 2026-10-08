@@ -25,7 +25,8 @@ export interface CoachTipContext {
   knownLiftProgress: { name: string; deltaKg: number }[]
   /** Distinct trained dates so far in the current plan week vs the same span (same number of days into the week) last plan week. */
   sessionsThisWeekSoFar: number
-  sessionsLastWeekSameSpan: number
+  /** Null when there is no whole previous plan week to compare with (week 1, or a span before the plan began). */
+  sessionsLastWeekSameSpan: number | null
   /** Scheduled training days so far this plan week (up to and including today, only counting days that have passed or today if already logged) and how many of those were actually trained. */
   scheduledSoFarThisWeek: number
   loggedOfScheduledSoFarThisWeek: number
@@ -70,6 +71,7 @@ const RULES: Rule[] = [
     key: 'session_pace',
     evaluate: ctx => {
       if (ctx.sessionsThisWeekSoFar === 0) return null
+      if (ctx.sessionsLastWeekSameSpan == null) return null // no whole previous week: there is no "usual"
       if (ctx.sessionsThisWeekSoFar > ctx.sessionsLastWeekSameSpan) {
         return `${ordinal(ctx.sessionsThisWeekSoFar)} session this week — you're ahead of your usual pace.`
       }

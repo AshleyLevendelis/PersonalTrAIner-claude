@@ -602,6 +602,96 @@ async function main() {
     else process.env.TZ = tzBefore
   }
 
+  // ---- 8. TWO TIPS THAT SAID UNTRUE THINGS (user test, 8 Oct 2026) --------
+  //
+  // #20 "Every planned session this week, done — 2 for 2" while a session
+  // moved onto today was still owed: the origin day was counted as scheduled
+  // by its weekday, and an optional walk logged there counted as the session.
+  // #21 "…you're ahead of your usual pace" in week 1, with no week before it,
+  // and a this-week count that added cardio logs a last-week count left out.
+  //
+  // Dates sit inside the last 35 REAL days because the recent-log readers
+  // ask for "since 35 days ago" on the machine clock. The water target is 0
+  // and protein is 0 so no other tip can take the slot the checks read.
+  console.log('\n[8] the adherence and pace tips only say true things')
+  {
+    const W = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const lifting = new Set(['Monday', 'Wednesday', 'Friday'])
+    const plan = W.map(day => ({
+      day, focus: lifting.has(day) ? 'Full Body' : 'Rest', is_scheduled: lifting.has(day),
+      exercises: lifting.has(day) ? [{ name: 'Goblet Squat', sets: 3, reps: '8-10', rest: '90s', rest_seconds: 90, intensity: 'RPE 7' }] : [],
+    })) as never
+    const noTargets = { calories: 2000, protein: 0, carbs: 200, fat: 60 }
+    let n = 0
+    const fresh = () => `tips-${++n}`
+    const walk = (user: string, date: string) =>
+      db.cardio_logs.push({ id: crypto.randomUUID(), user_id: user, date, activity: 'Walk', duration_minutes: 30, completed_at: `${date}T09:00:00` })
+    const lift = (user: string, date: string) =>
+      db.exercise_set_logs.push({ id: crypto.randomUUID(), user_id: user, date, completed_at: `${date}T09:00:00`,
+        exercise_name: 'Goblet Squat', set_number: 1, reps: 10, weight_kg: 20, is_warmup: false, drop_index: 0 })
+    const load = (user: string, planStart: string, today: string, moves: unknown[] = []) =>
+      loadDashboardData({
+        profile: { id: user, created_at: `${planStart}T00:00:00`, water_target_ml: 0 } as never,
+        macros: noTargets, exercisePlan: plan, mesocycle: [], moves: moves as never,
+        planCreatedAt: `${planStart}T00:00:00`, todayLogs: [], liveWeek: 1,
+        dayName: W[new Date(`${today}T12:00:00`).getDay()], todayStr: today,
+        now: new Date(`${today}T12:00:00`),
+      })
+    const sessions = (r: { consistency: { components: { label: string; done: number; outOf: number }[] } | null }) =>
+      r.consistency?.components.find(c => c.label === 'planned sessions') ?? null
+
+    // (a) #20 as found: Monday lifted, Wednesday's session moved to Thursday
+    // (today), a walk logged on Wednesday. Owed: Thursday. Done: Monday only.
+    const moved = fresh()
+    lift(moved, '2026-09-21'); walk(moved, '2026-09-23')
+    const a = await load(moved, '2026-09-21', '2026-09-24', [{ fromDate: '2026-09-23', toDate: '2026-09-24' }])
+    check('a day whose session moved away is not a planned session on that date', sessions(a)?.outOf === 1, sessions(a))
+    check('...so the week reads 1 of 1, never "2 for 2"', sessions(a)?.done === 1 && !/2 for 2/.test(a.coachTip ?? ''), { s: sessions(a), tip: a.coachTip })
+
+    // (b) No move: a walk on a LIFTING day keeps the streak but is not the session.
+    const walked = fresh()
+    lift(walked, '2026-09-21'); walk(walked, '2026-09-23')
+    const b = await load(walked, '2026-09-21', '2026-09-24')
+    check('an optional walk on a lifting day does not count as that day\'s session', sessions(b)?.outOf === 2 && sessions(b)?.done === 1, sessions(b))
+    check('...and still counts toward the activity streak', b.streak >= 1, b.streak)
+
+    // (c) #21: week 1 has no "usual".
+    const week1 = fresh()
+    walk(week1, '2026-09-21')
+    const c = await load(week1, '2026-09-21', '2026-09-23')
+    check('in week 1 the pace tip never claims a "usual pace"', !/usual pace/.test(c.coachTip ?? ''), c.coachTip)
+
+    // (d) #21: two walks on one day are one trained day, in both weeks.
+    const twice = fresh()
+    walk(twice, '2026-09-21'); walk(twice, '2026-09-28'); walk(twice, '2026-09-28')
+    const d = await load(twice, '2026-09-21', '2026-09-30')
+    check('two logs on one day are not "ahead" of one log on the same day last week', !/usual pace/.test(d.coachTip ?? ''), d.coachTip)
+
+    // (e) The contrast, so (c) and (d) cannot pass by the rule never firing:
+    // two trained days this week against one at the same point last week.
+    const ahead = fresh()
+    walk(ahead, '2026-09-21'); walk(ahead, '2026-09-28'); walk(ahead, '2026-09-29')
+    const e = await load(ahead, '2026-09-21', '2026-09-30')
+    check('...while a genuinely busier week still says so', /2nd session this week — you're ahead of your usual pace/.test(e.coachTip ?? ''), e.coachTip)
+
+    // (f) #23: "since week 1" is measured from the first weigh-in SINCE the plan began.
+    const weighed = fresh()
+    db.daily_metrics.push(
+      { id: crypto.randomUUID(), profile_id: weighed, date: '2026-08-21', weight_kg: 80.6 },
+      { id: crypto.randomUUID(), profile_id: weighed, date: '2026-09-22', weight_kg: 80.4 },
+      { id: crypto.randomUUID(), profile_id: weighed, date: '2026-09-24', weight_kg: 80.0 },
+    )
+    const f = await load(weighed, '2026-09-21', '2026-09-24')
+    check('"since week 1" starts at the first weigh-in inside the plan, not one from before it', f.weightSinceWeekOneKg === -0.4, f.weightSinceWeekOneKg)
+    const only = fresh()
+    db.daily_metrics.push(
+      { id: crypto.randomUUID(), profile_id: only, date: '2026-08-21', weight_kg: 80.6 },
+      { id: crypto.randomUUID(), profile_id: only, date: '2026-09-24', weight_kg: 80.0 },
+    )
+    const g = await load(only, '2026-09-21', '2026-09-24')
+    check('...and with one weigh-in inside the plan there is no "since week 1" at all', g.weightSinceWeekOneKg === null, g.weightSinceWeekOneKg)
+  }
+
   if (failures > 0) {
     console.error(`\n${failures} dashboard check(s) FAILED.`)
     process.exit(1)

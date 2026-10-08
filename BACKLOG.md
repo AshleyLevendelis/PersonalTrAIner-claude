@@ -18,7 +18,18 @@ Newest first. One line each.
   recovery: Home now names the walk with its minutes and effort, says Done once a walk is logged,
   and the strip shows the day as due/done (`test:training-week` 3c, `verify:planned-activity`
   H1-H3, 3/3 driver mutations caught, one only after the strip check H2b was added).
-  **STILL OPEN:** the other clear bugs in the report (#4, #5, #8-#10, #12, #20-#24, #26-#29, #32-#35)
+  **#20** "Every planned session this week, done — 2 for 2" while a moved session was still owed:
+  each day is now read through moves (a day whose session left is not scheduled that date), and a
+  lifting day counts as done only with working sets, so an optional walk keeps the streak and is
+  not the session. **#21** "ahead of your usual pace" in week 1: no comparison without a whole
+  previous plan week, and both weeks count trained DAYS the same way (this week had been adding
+  every cardio log on top). **#22** the weight tile printed "2026-09-16": now "yesterday", the
+  weekday within a week, else "16 Sep" (spelt out, since the browser's own format wrapped the tile).
+  **#23** "since week 1" was measured from a weigh-in weeks before the plan: now from the first
+  weigh-in since the plan began, and absent until there are two. `test:dashboard` §8 (10 checks,
+  10/10 mutations), new `verify:home-weight` (10 checks, 5/5 mutations; `?weighins=1` adds one
+  in-plan weigh-in as INPUT).
+  **STILL OPEN:** the other clear bugs in the report (#4, #5, #8-#10, #12, #24, #26-#29, #32-#35)
   and the questions that are hers (#3, #13, #14, #37, #40, possibly #1's wording), to be asked one
   at a time. Frontend only; nothing here needs an edge-function deploy.
 

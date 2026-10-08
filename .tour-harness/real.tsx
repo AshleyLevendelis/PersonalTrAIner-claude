@@ -473,6 +473,8 @@ const awayTarget = (() => {
   }
 })()
 ;(window as unknown as { __awayTarget: unknown }).__awayTarget = awayTarget
+// The fixture's latest weigh-in date, which verify:home-weight counts its days from.
+;(window as unknown as { __weighInTarget: unknown }).__weighInTarget = { date: isoOf(anchorDate()) }
 
 // A CARD WITH NO EXTERNAL LOAD ON TODAY'S SESSION — published for
 // verify:bodyweight-progress §3, 23 Sep 2026. That section asked "today's first
@@ -668,6 +670,12 @@ const db: Db = {
   daily_metrics: [
     { id: 'm1', profile_id: PROFILE_ID, date: today, weight_kg: 80 },
     { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
+    // ?weighins=1: one more weigh-in INSIDE the plan (which began nine days before the anchor), so
+    // "since week 1" has a real in-plan starting point; the 21 Aug one predates the plan and must
+    // never be it (verify:home-weight).
+    ...(new URLSearchParams(location.search).get('weighins') === '1'
+      ? [{ id: 'm3', profile_id: PROFILE_ID, date: isoOf(daysAgo(3)), weight_kg: 80.4 }]
+      : []),
   ],
   water_logs: [],
   // Two logged sessions inside the current plan week, so consistency has

@@ -146,6 +146,14 @@ export interface DashboardData {
   weightTrend: WeightTrendResult | null
   /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getRecentWeighIns), just re-mapped/re-ordered for charting rather than averaging. */
   weightSeries: WeightSeriesPoint[]
+  /**
+   * Latest weigh-in minus the FIRST one made since the plan began. Null when
+   * there is no plan date, no weigh-in since it began, or only one. It used to
+   * be latest minus the oldest in the series, so a weigh-in from weeks before
+   * the plan was printed as "since week 1", even in week 1 (user test 8 Oct
+   * 2026, #23).
+   */
+  weightSinceWeekOneKg: number | null
   /** The active body_weight_kg goal's target, if one exists — drawn as a reference line on the Home trend chart. Null when no goal has been set (no UI existed to set one before this; chat's record_goal was the only path). */
   weightGoalKg: number | null
   recentPRs: RecentPR[]
@@ -374,9 +382,17 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // exercises array — would never count as scheduled, so logging it could
   // never build a streak: streak.ts treats an unscheduled day as transparent,
   // putting a completed walk in the same bucket as an untouched rest day.
-  const scheduledWeekdays = new Set(
-    activeWeekDays.filter(d => (d.is_scheduled ?? d.exercises.length > 0)).map(d => d.day),
-  )
+  //
+  // AND A DAY IS SCHEDULED IF ITS SESSION IS STILL ON IT. Each date is read
+  // through the same per-date resolver Home and the strip use: a day whose
+  // session was moved away holds nothing (it is owed on the day it went to,
+  // so it is neither a miss nor a "done"), and the day it landed on holds it.
+  // The weekday-only version counted the origin as scheduled, so an optional
+  // walk logged there read as the planned session done (user test 8 Oct
+  // 2026, #20: "Every planned session this week, done — 2 for 2" while the
+  // moved session was still owed).
+  const workingDates = new Set(workingLogs.map(l => l.date))
+  const sessionDoneByDate = new Map<string, boolean>()
   const streakDays: StreakDayInput[] = []
   for (let i = 34; i >= 0; i--) {
     // Same reason as tomorrow above: a fixed-millisecond walk back over
@@ -391,9 +407,19 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     // decided nothing and only made the line hard to read. Same helper as
     // set-log-store, so "the day the user says it is" means one thing.
     const dateStr = getLocalDateString(d)
-    const weekdayName = d.toLocaleDateString('en-US', { weekday: 'long' })
-    const scheduled = scheduledWeekdays.has(weekdayName)
+    const resolved = sessionForDate({
+      date: dateStr,
+      plan: planDaysForDate(dateStr, todayStr, activeWeekDays, mesocycle, planCreatedAt).days,
+      moves,
+    })
+    const held = resolved.day
+    const scheduled = held != null && (held.is_scheduled ?? held.exercises.length > 0)
     const logged = loggedDates.has(dateStr)
+    // What "the planned session was done" means for THIS day: a lifting day
+    // needs working sets; an activity-shaped day (a walk) is done by the
+    // activity. An optional walk on a lifting day keeps the streak alive and
+    // does not stand in for the session.
+    sessionDoneByDate.set(dateStr, held != null && held.exercises.length > 0 ? workingDates.has(dateStr) : logged)
     if (dateStr === todayStr && scheduled && !logged) continue // today, not over yet — not a miss (streak.ts's contract)
     streakDays.push({ date: dateStr, scheduled, logged, planWeek: getActiveMesocycleWeek(planCreatedAt, d, totalWeeks) })
   }
@@ -427,14 +453,22 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const inCurrentPlanWeek = (d: { date: string; planWeek: number }) =>
     d.planWeek === currentPlanWeek && sincePlanStart(d)
   const daysIntoCurrentWeek = streakDays.filter(inCurrentPlanWeek).length
-  const sessionsThisWeekSoFar = new Set(workingLogs.filter(l => streakDays.find(d => d.date === l.date && inCurrentPlanWeek(d))).map(l => l.date)).size
-    + cardioLogs.filter(c => streakDays.find(d => d.date === c.date && inCurrentPlanWeek(d))).length
+  // Distinct trained dates, counted the SAME way in both weeks (a lift or an
+  // activity). This week used to add every cardio log on top of the lifting
+  // dates while last week counted lifting dates only, so one walk could put
+  // a week "ahead". And there is no "usual" without a whole previous plan
+  // week to compare with: in week 1, or when last week's span starts before
+  // the plan, the comparison is null and the tip stays quiet (user test
+  // 8 Oct 2026, #21).
+  const sessionsThisWeekSoFar = streakDays.filter(d => inCurrentPlanWeek(d) && loggedDates.has(d.date)).length
   const lastPlanWeek = currentPlanWeek - 1
   const lastWeekDatesSameSpan = streakDays.filter(d => d.planWeek === lastPlanWeek && sincePlanStart(d)).slice(0, daysIntoCurrentWeek).map(d => d.date)
-  const sessionsLastWeekSameSpan = new Set(workingLogs.filter(l => lastWeekDatesSameSpan.includes(l.date)).map(l => l.date)).size
+  const sessionsLastWeekSameSpan = lastPlanWeek >= 1 && daysIntoCurrentWeek > 0 && lastWeekDatesSameSpan.length === daysIntoCurrentWeek
+    ? lastWeekDatesSameSpan.filter(date => loggedDates.has(date)).length
+    : null
 
   const scheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled).length
-  const loggedOfScheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled && d.logged).length
+  const loggedOfScheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled && sessionDoneByDate.get(d.date)).length
 
   // Protein adherence: consecutive PRIOR days (not including in-progress
   // today) hitting >=95% of target, over a 14-day window.
@@ -558,6 +592,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     hasNutritionTargets,
     weightTrend,
     weightSeries,
+    weightSinceWeekOneKg: (() => {
+      const since = planStartStr == null ? [] : weightSeries.filter(p => p.date >= planStartStr)
+      return since.length > 1 ? Math.round((since[since.length - 1].kg - since[0].kg) * 10) / 10 : null
+    })(),
     weightGoalKg: weightGoal?.target_value ?? null,
     recentPRs,
     streak: streakResult.currentStreak,

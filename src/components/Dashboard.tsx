@@ -5,6 +5,7 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
+import { daysBetween } from '@/lib/session-move'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -25,6 +26,20 @@ import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
 import { ShopDayCard } from '@/components/ShopDayCard'
+
+/**
+ * When the last weigh-in was, in words that fit the tile on one line: "yesterday", the weekday
+ * within the past week ("Mon"), otherwise "16 Sep". Never the stored 2026-09-16 (user test #22).
+ * Spelt out here rather than through toLocaleDateString, which writes "Wed, 16 Sept" in some
+ * browsers and wraps the tile.
+ */
+function weighInDayLabel(date: string, today: string): string {
+  const days = daysBetween(date, today)
+  if (days === 1) return 'yesterday'
+  const d = new Date(`${date}T12:00:00`)
+  if (days > 1 && days < 7) return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]
+  return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]}`
+}
 import { personalBest, bestReadingOf } from '@/lib/coach-voice'
 
 interface DashboardProps {
@@ -486,9 +501,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const stepsToday = steps?.steps ?? 0
   const waterShown = waterMl ?? data.waterMl
   const lastWeighIn = data.weightSeries.length > 0 ? data.weightSeries[data.weightSeries.length - 1] : null
-  const weightDeltaKg = data.weightSeries.length > 1
-    ? data.weightSeries[data.weightSeries.length - 1].kg - data.weightSeries[0].kg
-    : null
+  // Counted from the first weigh-in since the plan began, never one before it (user test #23).
+  const weightDeltaKg = data.weightSinceWeekOneKg
   // Hairline cell geometry, written once: the grid opens with a border-top,
   // the left column carries the vertical rule, the top row the horizontal one.
   const cellStyle = (col: 0 | 1, row: 0 | 1): CSSProperties => ({
@@ -785,7 +799,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 <span className="block tabular-mono text-[1.375rem] font-bold leading-none">
                   {lastWeighIn ? lastWeighIn.kg.toFixed(1) : '—'}
                   <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">
-                    {lastWeighIn ? `kg · ${lastWeighIn.date === data.today ? 'today ✓' : lastWeighIn.date}` : 'log one'}
+                    {lastWeighIn ? `kg · ${lastWeighIn.date === data.today ? 'today ✓' : weighInDayLabel(lastWeighIn.date, data.today)}` : 'log one'}
                   </span>
                 </span>
               </button>
