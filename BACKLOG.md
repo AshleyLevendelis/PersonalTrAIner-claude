@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [ ] **WHAT THE APP DOES WHEN SOMEBODY STOPS TRAINING — PLANNED 8 Oct 2026, NOT BUILT
+  (her "plan the layoff handling"; plan: `docs/plans/layoff-handling.md`).** Traced, not run:
+  the plan week, deload and printed ramp advance by date whatever is logged; today's weight
+  comes from the last logged session with NO age limit, so a returner is told last weight plus
+  an increment (or the calendar-ramped printed weight if nothing was logged); nothing detects a
+  layoff, eases the load, re-calibrates or says welcome back. **Proposed (mine, CSCS, an
+  assertion with its basis in the plan):** bands by days since the last working session — 0-9
+  nothing, 10-20 hold with no increment, 21-41 about 90%, 42-83 about 80%, 84+ restart — applied
+  today-only and derived (no stored flag, no migration) to BOTH the logged and the printed
+  weight, warm-up rebuilt from the scaled load, a `welcome_back` opener, injury answers routed to
+  the existing red-flag rule. **Hers, asked:** what to do after 12+ weeks — ease only, offer a
+  restart from week 1 (recommended), or restart automatically. Needs the `chat-gemini` deploy.
+
 - [x] **WHERE ONE WEEK ENDS AND THE NEXT BEGINS — BUILT 6 Oct 2026 (her "make sure
   the app knows where one week ends and the other begins"; on the branch, NOT on
   `main`; plan: `docs/plans/week-boundaries.md`).** **HER RULING, from three
