@@ -62,6 +62,8 @@ export interface TrainingWeekResult {
   moves: SessionMove[]
   sessionsDone: number
   sessionsPlanned: number
+  /** Training days still ahead this week: today's unfinished session and the ones after it. Missed days are not counted. */
+  sessionsLeft: number
   loading: boolean
   refresh: () => void
 }
@@ -126,7 +128,14 @@ export function classifyDay(
   // below is what says so.
   const resolved = sessionForDate({ date: dateStr, plan, moves })
   const workout = resolved.movedTo ? plan.find(d => d.day === weekdayName) : resolved.day ?? undefined
-  if (!workout) return 'rest'
+  // A REST DAY THEY TRAINED ON COUNTS (user test 8 Oct 2026, finding 17): borrowing another day's
+  // session onto a rest day and lifting stayed "rest day" on the strip and "0 of 4 done" on Home.
+  // The rule below already says logged work outranks every date judgement; it now holds on a rest
+  // day too. LIFTING only: an activity logged on a rest day is the rest-day card doing its job.
+  if (!workout) {
+    if (dashboardDay && dashboardDay.workingLogs.length > 0) return dashboardDay.session?.is_completed ? 'done' : 'partial'
+    return 'rest'
+  }
   if (workout.exercises.length === 0) return 'recovery'
 
   // Logged work outranks every date judgement below. If they trained that
@@ -344,8 +353,12 @@ export function useTrainingWeek(
   const trainingDays = days.filter(d => countsTowardWeekTally(d.state))
   const sessionsPlanned = trainingDays.length
   const sessionsDone = trainingDays.filter(d => d.state === 'done').length
+  // STILL AHEAD, not "planned minus done" (user test 8 Oct 2026, finding 18: "0 of 4 done · 4 to
+  // go" on a Thursday with Monday and Wednesday already missed). A missed day is not to go; it is
+  // gone. What is left is today's unfinished session and the days after it.
+  const sessionsLeft = trainingDays.filter(d => d.state === 'due' || (d.state === 'partial' && d.date === sessionDate)).length
 
-  return { days, sessionsDone, sessionsPlanned, loading, refresh, moves }
+  return { days, sessionsDone, sessionsPlanned, sessionsLeft, loading, refresh, moves }
 }
 
 function classifyLoadingSafe(

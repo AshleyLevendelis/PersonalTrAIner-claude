@@ -120,6 +120,18 @@ check('1c. ...and the old sentence is gone', !/sessions done\\./i.test(await ev(
 check('1d. ...while the two numbers are still readable in words',
   /this week · \d+ of \d+ done/i.test(track.text), track.text)
 
+// 1e. "TO GO" COUNTS WHAT IS STILL AHEAD (user test 8 Oct 2026, finding 18): it read "4 to go" on
+// a Thursday with Monday and Wednesday already missed. Read against the strip's own cells, so the
+// number and the days cannot disagree; this fixture has missed days behind it, so it binds.
+const ahead = await ev(`(() => {
+  const cells = [...document.querySelectorAll('[aria-label]')].map(n => n.getAttribute('aria-label')).filter(l => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday): /.test(l))
+  const week = cells.slice(-7)
+  return { week, missedBehind: week.filter(l => /: missed$/.test(l)).length, due: week.filter(l => /: due$/.test(l)).length }
+})()`)
+const toGo = Number((track.text.match(/(\d+) to go/i) || [])[1] ?? (/none left/i.test(track.text) ? 0 : -1))
+check('1e. "to go" is the sessions still ahead, not planned minus done (missed days are gone, not to go)',
+  ahead.missedBehind > 0 && toGo === ahead.due, { toGo, ahead, text: track.text })
+
 console.log('\n2. THE DEFECT: no dotted underlines, and no two plan actions on one line\n')
 // The card as a whole — a dotted underline anywhere on it is the old grammar
 // coming back. Scoped to the card so the chrome above it is not this gate's
@@ -383,6 +395,23 @@ await wait(900)
 const afterLog = await rowsOnCard()
 check('8g. the ✓ logs the walk and it reads back', afterLog.receipts === 1, afterLog)
 check('8h. ...and the second row goes away again, back to the suggestion\'s alone', afterLog.unplannedRows === 0 && afterLog.minutes === 1, afterLog)
+
+// 10. BORROWING A SESSION KEEPS TODAY'S NAME (user test 8 Oct 2026, finding 16: it read "TODAY ·
+// WEDNESDAY — borrowed from Thursday" on a Thursday). The picker's chips name the day borrowed FROM.
+console.log('\n10. Train anyway: today stays today, the session says whose it is\n')
+await send('Page.navigate', { url: `${BASE}&today=${restDay?.date ?? ''}&n=borrow#/tab/exercise` })
+await wait(4000)
+await tap('[data-testid="train-anyway"]')
+await wait(500)
+const borrowedFrom = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/.test((x.textContent || '').trim())); if (!b) return null; const d = b.textContent.trim(); b.click(); return d })()`)
+await wait(1500)
+const todayName = new Date(`${restDay?.date ?? '2026-09-17'}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+const heading = await ev(`(() => { const s = [...document.querySelectorAll('span')].find(x => /^Today · /.test((x.textContent || '').trim())); return s ? s.textContent.trim() : null })()`)
+const whose = await text('[data-testid="borrowed-from"]')
+check('10a. a day was borrowed from the picker', !!borrowedFrom, borrowedFrom)
+check('10b. the heading still names TODAY', heading === `Today · ${todayName}`, { heading, todayName })
+check('10c. ...and the session is named as the borrowed day\'s', whose === `${borrowedFrom}'s session`, { whose, borrowedFrom })
+await shoot('rest-day-borrowed')
 
 const errs = await ev(`(window.__errors ?? []).length`)
 check('9. nothing on the page threw', !errs, errs)

@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useState, useMemo } from 'react'
-import { plateCombinations, MAX_BARBELL_TARGET_KG } from '@/lib/plate-math'
+import { plateCombinations, MAX_BARBELL_TARGET_KG, noPlatesMessage } from '@/lib/plate-math'
 
 export { MAX_BARBELL_TARGET_KG }
 
@@ -133,7 +133,7 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
             </div>
           ) : !showing ? (
             <div className="text-center py-6 text-sm text-muted-foreground">
-              {target <= 0 ? 'Enter a target weight above' : 'No plates needed — bar only'}
+              {noPlatesMessage(target, bar)}
             </div>
           ) : (
             <>

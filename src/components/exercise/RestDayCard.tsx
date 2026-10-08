@@ -47,9 +47,11 @@ const MICRO = 'text-[0.59375rem] uppercase tracking-[.12em] whitespace-nowrap'
  * Renders nothing when the plan has no sessions this week — the same guard the
  * sentence had, because "0 of 0" is not a reassuring thing to show somebody.
  */
-function WeekTrack({ done, planned }: { done: number; planned: number }) {
+function WeekTrack({ done, planned, left }: { done: number; planned: number; left?: number }) {
   if (planned <= 0) return null
   const complete = done >= planned
+  // What is still AHEAD — a missed day is not "to go" (user test 8 Oct 2026, finding 18).
+  const ahead = left ?? planned - done
   return (
     <div className="mt-3.5" data-testid="week-track">
       <div className="flex items-center gap-[3px]">
@@ -64,7 +66,7 @@ function WeekTrack({ done, planned }: { done: number; planned: number }) {
       </div>
       <div className="mt-[5px] flex items-center justify-between gap-2">
         <span className={`${MICRO} text-primary-text glow-mint`}>This week · {done} of {planned} done</span>
-        <span className={`${MICRO} text-muted-foreground`}>{complete ? 'week complete' : `${planned - done} to go`}</span>
+        <span className={`${MICRO} text-muted-foreground`}>{complete ? 'week complete' : ahead > 0 ? `${ahead} to go` : 'none left this week'}</span>
       </div>
     </div>
   )
@@ -278,7 +280,7 @@ export function RestDayCard({
   onAddCardio,
 }: {
   dayName: string
-  weekTally: { done: number; planned: number }
+  weekTally: { done: number; planned: number; left?: number }
   tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
   trainAnywayOptions: string[]
@@ -309,7 +311,7 @@ export function RestDayCard({
           </div>
         </div>
 
-        <WeekTrack done={weekTally.done} planned={weekTally.planned} />
+        <WeekTrack done={weekTally.done} planned={weekTally.planned} left={weekTally.left} />
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry />
 
@@ -387,7 +389,7 @@ export function MovedDayCard({
   /** What left — the plan's own session for this weekday. Null when the plan cannot say. */
   focus: string | null
   toDayName: string
-  weekTally: { done: number; planned: number }
+  weekTally: { done: number; planned: number; left?: number }
   tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
   /** Resolves true when the move was cleared, false when the write failed. */
@@ -423,7 +425,7 @@ export function MovedDayCard({
           </div>
         </div>
 
-        <WeekTrack done={weekTally.done} planned={weekTally.planned} />
+        <WeekTrack done={weekTally.done} planned={weekTally.planned} left={weekTally.left} />
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry />
 
@@ -462,7 +464,7 @@ export function ActiveRecoveryCard({
   onAddCardio,
 }: {
   workout: WorkoutDay
-  weekTally: { done: number; planned: number }
+  weekTally: { done: number; planned: number; left?: number }
   tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
   onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
@@ -492,7 +494,7 @@ export function ActiveRecoveryCard({
             </p>
           </div>
         </div>
-        <WeekTrack done={weekTally.done} planned={weekTally.planned} />
+        <WeekTrack done={weekTally.done} planned={weekTally.planned} left={weekTally.left} />
         {/* LOGGED LIKE A SET since 24 Sep 2026 — the plan's minutes in the box
             and its effort already chosen, so the ✓ alone logs the walk the plan
             asked for. PlannedCardioRow reads itself back from today's logs, so

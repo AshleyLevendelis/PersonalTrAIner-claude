@@ -137,3 +137,14 @@ export function plateCombinations(targetKg: number, barKg: number, limit = 4): P
 
   return found.slice(0, limit).map(plates => ({ plates, perSideKg }))
 }
+
+/**
+ * What the calculator says when there are no plates to show. A target LIGHTER than the bar is
+ * not "bar only" — the bar alone is heavier than what was asked (user test 8 Oct 2026, finding
+ * 2: a 14kg target against a 20kg bar was told "No plates needed — bar only").
+ */
+export function noPlatesMessage(target: number, bar: number): string {
+  if (!(target > 0)) return 'Enter a target weight above'
+  if (target < bar) return `That's lighter than the ${bar}kg bar on its own — use a lighter bar, or dumbbells.`
+  return 'No plates needed — bar only'
+}

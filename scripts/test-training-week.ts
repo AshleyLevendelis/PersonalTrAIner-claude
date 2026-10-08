@@ -75,6 +75,19 @@ console.log('\n3. Logged work always wins over any date reasoning')
     classifyDay('Monday', MON, TODAY, PLAN, emptyCompletedRest, PLAN_START) === 'rest_chosen')
 }
 
+console.log('\n3b. A rest day they lifted on counts (user test 8 Oct 2026, finding 17)')
+{
+  // Saturday has no row in PLAN: a plain rest day. Lifting on it (a borrowed session) is work.
+  const SAT = '2026-08-22'
+  const liftedDone = { session: { is_completed: true }, workingLogs: [{ id: 'x' }], warmupLogs: [], cardioLogs: [] } as never
+  const liftedPartial = { session: null, workingLogs: [{ id: 'x' }], warmupLogs: [], cardioLogs: [] } as never
+  const walked = { session: null, workingLogs: [], warmupLogs: [], cardioLogs: [{ id: 'c' }] } as never
+  check('a finished session on a rest day reads done', classifyDay('Saturday', SAT, TODAY, PLAN, liftedDone, PLAN_START) === 'done')
+  check('...a part-done one reads partial', classifyDay('Saturday', SAT, TODAY, PLAN, liftedPartial, PLAN_START) === 'partial')
+  check('...an activity logged from the rest-day card leaves it a rest day', classifyDay('Saturday', SAT, TODAY, PLAN, walked, PLAN_START) === 'rest')
+  check('...and nothing logged is still a rest day', classifyDay('Saturday', SAT, TODAY, PLAN, undefined, PLAN_START) === 'rest')
+}
+
 console.log('\n4. Days at or after the plan start behave normally')
 check('the plan-start day itself is not before_plan', classifyDay('Friday', PLAN_START, TODAY, PLAN, undefined, PLAN_START) !== 'before_plan')
 check('a future training day is due', classifyDay('Friday', '2026-08-28', TODAY, PLAN, undefined, PLAN_START) === 'due')

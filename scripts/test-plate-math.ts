@@ -21,6 +21,7 @@ import {
   STANDARD_PLATES,
   MAX_PLATES_PER_SIDE,
   MAX_BARBELL_TARGET_KG,
+  noPlatesMessage,
 } from '../src/lib/plate-math'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -168,6 +169,16 @@ console.log('\n5. The options are on screen, and tapping one changes the bar\n')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('the tile no longer claims to know which plates you own',
     !/your plates/.test(tools), /sub: '[^']*'/.exec(tools.slice(tools.indexOf('Plate calculator')))?.[0])
+}
+
+// A TARGET LIGHTER THAN THE BAR IS NOT "BAR ONLY" (user test 8 Oct 2026, finding 2: a 14kg
+// target against a 20kg bar was told "No plates needed — bar only", which loads 6kg too much).
+// Called, not grepped, and the screen must be the one calling it.
+{
+  check('a target lighter than the bar says so, naming the bar', /lighter than the 20kg bar/.test(noPlatesMessage(14, 20)) && !/bar only/.test(noPlatesMessage(14, 20)), noPlatesMessage(14, 20))
+  check('...a target equal to the bar is bar only', noPlatesMessage(20, 20) === 'No plates needed — bar only')
+  check('...no target asks for one', /Enter a target/.test(noPlatesMessage(0, 20)))
+  check('...and the calculator screen shows this message rather than its own copy', /noPlatesMessage\(target, bar\)/.test(read('src/components/PlateCalculator.tsx')) && !/bar only'/.test(read('src/components/PlateCalculator.tsx')))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
