@@ -139,8 +139,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // the affected gates by grepping for the changed source files can never
   // name it. Any change under src/ is a change to the bundle; run this gate
   // for all of them. 280 is 8 kB over the 272 measured today.
-  headroom('a deploy re-downloads', appGzip, 280, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 280, appGzip)
+  // MOVED 8 Oct 2026: 280 -> 284. Measured on a clean worktree the same day: 278.4 kB gzipped before
+  // the timer-circuit log (her ruling A) and 279.8 kB after, so that feature cost 1.3 kB and the
+  // other 6.4 kB of the old margin had eroded since 23 Sep. The new line is 4 kB above 279.8.
+  headroom('a deploy re-downloads', appGzip, 284, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 284, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')

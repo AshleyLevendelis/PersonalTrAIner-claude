@@ -1405,8 +1405,12 @@ const toolDeclarations = [
         effort: { type: "string", enum: ["easy", "steady", "hard"], description: "How hard it was overall, ONLY if they said. Omit and ask if not." },
         replaced_session: { type: "boolean", description: "True when they did this instead of their planned session." },
         date: { type: "string", description: "ISO date (YYYY-MM-DD) they did it. Omit for today." },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message telling you what they did (or, when this turn only answers your effort question, the answer itself, e.g. 'hard'). Copy it verbatim. It does NOT have to be a command: telling you the workout IS the request.",
+        },
       },
-      required: ["blocks"],
+      required: ["blocks", "origin_verbatim_quote"],
     },
   },
   {

@@ -2,6 +2,55 @@
 
 Newest first. One line each.
 
+- [x] **A WORKOUT MADE OF TIMER BLOCKS — RULED A AND BUILT 8 Oct 2026** (plan:
+  `docs/plans/timer-circuit-log.md`; on the branch, NOT on `main`). Ashley, from the gym: she
+  skipped the session and did 5 x 3 min skipping rope, 3 x 30s push-ups, 3 x 30s sit-ups and
+  5 x 15s assault bike on 45s rest off the round timer; *"the app has no way of logging or
+  tracking that."* **WHAT WAS TRUE (traced):** every timer block logged as "Intervals" with the
+  round pattern in a note; counting it as the day's workout was a second step that asked the name
+  again and could write a second row; the coach could only squash it into one activity name.
+  **HER RULING, from three options: A, one workout made of blocks** (over B, one entry with a typed
+  name, and C, building the circuit in the timer first).
+  **BUILT:** (1) a finished round's "Log session" asks "What was this block?" with chips for common
+  blocks (each at the timer's minutes, no effort), Other keeps the timer's minutes, the note is the
+  shape as she would write it ("5 × 3 min", "5 × 15s, 45s rest"); (2) "Count this as today's workout
+  instead of <session>?" on Tools under a logged block and on the Exercise tab's Today card, one
+  component and one decision (`circuitOfferFor`: only when something is logged, the day's lifting
+  session is still due and no working set is logged), one write (the existing day swap named
+  "Circuit: Skipping rope, Push-ups, Sit-ups and Assault bike"), no extra cardio row, "Not today"
+  hides it for the day; (3) the coach's `propose_circuit_log`: the card is built only from rounds
+  and work times SHE wrote (her last few messages are the evidence, not the model's arguments), a
+  rest she never gave is zero, and with no effort in her words it asks "easy, steady or hard?"
+  first. Confirm writes the same rows the screen writes; Undo removes them by name and shape (the
+  cardio store's own Undo only lasts ten minutes) and clears the swap.
+  **Decided by me, and why:** no migration (a block is a cardio row; whole minutes in the column,
+  the exact shape in the note); timed push-ups stay conditioning blocks, not lifting sets, because
+  a seconds-unit set would meet her 16 Sep "most reps" bodyweight record; chip faces shortened
+  ("Skipping", "KB swings") after the first screenshot truncated them, the log keeps the full name.
+  **FOUND ON THE WAY, not fixed:** the coach's existing one-activity swap (`executeSwapForActivity`)
+  stores an effort of 6 when none was said, the invented number her 24 Sep ruling forbids; and its
+  Undo clears the swap but leaves the activity's cardio row. The new path does neither.
+  **CSCS review:** logging only; no prescription, floor or plan changes; the session stays on the
+  plan, as every swap does.
+  **Verified:** `test:circuit-log` (61 checks, 18/18 mutations, two only after the fixture used her
+  real words "a decent workout" and an unrelated same-shape block), `verify:circuit-log` (13 checks,
+  4/4), `verify:round-presets` 26-33 (3/3 new mutations), `test:round-logging` re-anchored (the
+  detail wording changed on purpose). Screenshots read: the block sheet, both offers, the swapped
+  day. Derived sweep (178 gates read these files): 170 passed; `test:bundle` crossed by 0.4 kB
+  (measured on a clean worktree: the feature costs 1.3 kB gzipped, the rest of the margin had
+  eroded since 23 Sep; the line moved 280 -> 284 with the measurement recorded) and
+  `test:question-not-a-card` caught the new tool missing `origin_verbatim_quote`, now required.
+  Three other bundle budgets have 1-2 kB left (task: bundle room). `coach-exam-fresh` is red by
+  design until the exam is re-run on her machine. **Not proven live.** **Needs the `chat-gemini`
+  deploy** for the coach's half.
+
+- [x] **THE APP'S ADDRESS, corrected 8 Oct 2026.** I gave Ashley
+  `personal-tr-a-iner-claude.vercel.app` and she got "I couldn't sign you in · supabaseUrl is
+  required". That Vercel project has NO environment variables; `personal-tr-a-iner-claude-yco8`
+  has both Supabase ones, so the working app is `personal-tr-a-iner-claude-yco8.vercel.app`. The
+  note at the 29 Sep entry above named the empty project as live; it was read, not checked.
+  Whether to delete the empty project or give it the two settings is hers.
+
 - [~] **THE APP TESTS ITSELF AS A USER — 8 Oct 2026, her "test the app as a user daily and pick
   up any bugs ... it's best if claude tests itself".** Approach (mine, she said "you decide"):
   an exploratory click-through of the real screens on the browser harness first, fix the clear

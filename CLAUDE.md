@@ -577,6 +577,14 @@ menu" stays true when a copy is also left outside it.
   that costs nothing. Anything built on a model JUDGEMENT should be split this
   way and the two halves named separately.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
+- **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
+  8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
+  only be logged as "Intervals". Her ruling, from three options: **A, one workout made of blocks**.
+  A finished round asks what the block was (names as chips, the timer's minutes, effort asked, the
+  shape as the note); "Count this as today's workout" on Tools and Today makes the day swap named
+  for the blocks, only while the session is still due; the coach's `propose_circuit_log` is built
+  only from rounds, times and an effort SHE stated. `circuit-log` (61 checks, 18 mutations),
+  `verify:circuit-log`, `verify:round-presets` §26-33. Needs the `chat-gemini` deploy for chat
 - Rebuild today's session as a whole, for today — **both surfaces since 16 Sep
   2026**. Her ruling that day, from three options: **keep the main lift and
   rebuild around it** — you still do today's main lift at the weight and sets
