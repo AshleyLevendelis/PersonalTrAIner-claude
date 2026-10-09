@@ -11,7 +11,7 @@
 // M1's generation pipeline is what needed this logic, not that function.
 // ---------------------------------------------------------------------------
 
-import { lookupIngredient, unitToGrams, type MealIngredientLine, type Macros100g } from './food-db'
+import { lookupIngredient, unitToGrams, computeMealMacros, type MealIngredientLine, type Macros100g } from './food-db'
 
 /** Below this, a scale is "close enough" not to bother touching quantities (mirrors macro-calibration's 0.03 no-op threshold). */
 export const SCALE_NOOP_THRESHOLD = 0.03
@@ -186,7 +186,54 @@ export function scaleToTarget(
     }
   }
 
-  return { ingredients: scaleIngredients(ingredients, scaleFactor), scaleFactor }
+  const rounded = scaleIngredients(ingredients, scaleFactor)
+  return { ingredients: holdProteinFloor(ingredients, rounded, scaleFactor, target.protein), scaleFactor }
+}
+
+/**
+ * ROUNDING MUST NOT BE WHAT TAKES A DISH UNDER ITS PROTEIN FLOOR.
+ *
+ * Every caller that checks a scaled dish asks for protein AT OR ABOVE the
+ * target, with no tolerance (meetsProteinFloor). A dish resized to a budget
+ * of its own shape — last night's dinner re-portioned as lunch is exactly
+ * that — lands on the floor to the gram, so whichever way the protein food
+ * happens to round decides whether the dish is served. With whole grams that
+ * was a coin toss worth 0.3 g; with fives it would be one worth 1.5 g, and it
+ * was measured doing it: the leftover lunch vanished (test:leftovers) the
+ * moment grams went to fives.
+ *
+ * So: when the exact scaled dish reaches the floor and the rounded one does
+ * not, the richest protein line that was rounded DOWN is rounded up instead
+ * (one step: 5 g, or 1 g under 20). Still an amount somebody can measure,
+ * still costed from what is shown, at most one step heavier than "nearest".
+ * When the exact dish does not reach the floor either, rounding is not the
+ * reason and nothing is touched.
+ */
+function holdProteinFloor(
+  original: MealIngredientLine[],
+  rounded: MealIngredientLine[],
+  scaleFactor: number,
+  proteinFloor: number,
+): MealIngredientLine[] {
+  if (rounded === original || !(proteinFloor > 0)) return rounded
+  if (computeMealMacros(rounded).protein >= proteinFloor) return rounded
+  const exact = original.map(l => ({ ...l, quantity: l.quantity * scaleFactor }))
+  if (computeMealMacros(exact).protein < proteinFloor) return rounded
+
+  const roundedDown = rounded
+    .map((l, i) => ({ i, density: lookupIngredient(l.name)?.per100g.protein ?? 0 }))
+    .filter(({ i }) => GRAM_LIKE_UNITS.has(rounded[i].unit.toLowerCase().trim()) && rounded[i].quantity < exact[i].quantity)
+    .sort((a, b) => b.density - a.density)
+  let out = rounded
+  for (const { i, density } of roundedDown) {
+    if (density <= 0) break
+    const q = out[i].quantity
+    out = out.map((l, j) => (j === i ? { ...l, quantity: q + (q < KITCHEN_FINE_BELOW_G ? 1 : KITCHEN_GRAM_STEP) } : l))
+    if (computeMealMacros(out).protein >= proteinFloor) return out
+  }
+  // No single step up reaches it: leave the plain rounding, and the caller's
+  // own floor check refuses the dish as it would have.
+  return rounded
 }
 
 // ---------------------------------------------------------------------------

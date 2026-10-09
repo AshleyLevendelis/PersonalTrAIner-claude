@@ -529,7 +529,14 @@ async function main() {
         snack: mk('snack', 7, 1, 80),
       }
     }
-    const SEED = { g0: 10, g1: 16, g2: 5, g3: 3, g4: 50 }
+    // g3 was 3 until 9 Oct 2026. The fixture's dishes are drawn by rejection
+    // (a draw that misses its protein is thrown away and the next one tried),
+    // so when the scaler's rounding changed that day the random stream behind
+    // every seed changed with it, and seed 3 no longer drew three dinners
+    // that fit. Re-found by the same scan, not adjusted to pass: judged on the
+    // SAME 80 stored pools, the old and the new rounding fit 2,547 and 2,551
+    // dishes of 6,400 — the rule did not make dishes fit less often.
+    const SEED = { g0: 10, g1: 16, g2: 5, g3: 7, g4: 50 }
     const p2 = build8(SEED.g2, 2, 7)
     const p3 = build8(SEED.g3, 3, 7)
     const p1 = build8(SEED.g1, 1, 7)

@@ -151,6 +151,39 @@ console.log('\n3. Every path that resizes a dish gives measurable amounts, and c
 }
 
 // ---------------------------------------------------------------------------
+console.log('\n3b. Rounding is never what takes a dish under its protein floor')
+// ---------------------------------------------------------------------------
+{
+  // Last night's dinner re-portioned as lunch (test:leftovers' own case): the
+  // budget is the dish's own shape at 1.26x, so the exact resize lands ON the
+  // protein floor and the way the chicken rounds decides it. 200g x 1.26 is
+  // 252g: to the nearest 5 that is 250g, and 250g of chicken is under the floor.
+  const dinner: MealIngredientLine[] = [{ name: 'chicken breast', quantity: 200, unit: 'g' }, { name: 'cooked basmati rice', quantity: 220, unit: 'g' }]
+  const dm = computeMealMacros(dinner)
+  const budget = { kcal: Math.round(dm.kcal) * 1.26, protein: Math.round(Math.round(dm.protein) * 1.26), carbs: 0, fat: 0 }
+  const r = scaleToTarget(dinner, { kcal: dm.kcal, protein: dm.protein, carbs: dm.carbs, fat: dm.fat }, budget)
+  const after = computeMealMacros(r.ingredients)
+  const plain = scaleIngredients(dinner, r.scaleFactor)
+  check('the fixture is on the line: plain rounding alone would miss the floor', computeMealMacros(plain).protein < budget.protein && plain[0].quantity === 250, { plain: plain.map(l => l.quantity), protein: computeMealMacros(plain).protein, floor: budget.protein })
+  check('the resized dish reaches its protein floor', after.protein >= budget.protein, { protein: after.protein, floor: budget.protein })
+  check('...by rounding the chicken UP one step instead of down (255g), and nothing else', r.ingredients[0].quantity === 255 && r.ingredients[1].quantity === plain[1].quantity, r.ingredients.map(l => l.quantity))
+  check('...and every amount is still measurable', odd(r.ingredients).length === 0, odd(r.ingredients))
+  // When the exact resize would not reach the floor either, rounding is not the reason: nothing is nudged.
+  const far = scaleToTarget(dinner, { kcal: dm.kcal, protein: dm.protein, carbs: dm.carbs, fat: dm.fat }, { ...budget, protein: budget.protein + 20 })
+  check('a dish that could not reach the floor anyway is rounded plainly, not pushed', far.ingredients.every((l, i) => l.quantity === plain[i].quantity), far.ingredients.map(l => l.quantity))
+  // THE CASE THAT BINDS: a floor the exact resize misses by a whisker, which
+  // one step up WOULD clear. Pushing it would be the scaler quietly accepting
+  // dishes a plain calorie resize does not reach — not its job.
+  const exactProtein = computeMealMacros(dinner.map(l => ({ ...l, quantity: l.quantity * r.scaleFactor }))).protein
+  const near = scaleToTarget(dinner, { kcal: dm.kcal, protein: dm.protein, carbs: dm.carbs, fat: dm.fat }, { ...budget, protein: exactProtein + 0.3 })
+  check('...even when one step up would have cleared it (the floor is 0.3g past what the exact resize gives)',
+    near.ingredients.every((l, i) => l.quantity === plain[i].quantity) && computeMealMacros(dinner.map((l, i) => ({ ...l, quantity: i === 0 ? 255 : plain[1].quantity }))).protein >= exactProtein + 0.3,
+    { got: near.ingredients.map(l => l.quantity), exactProtein })
+  const noFloor = scaleToTarget(dinner, { kcal: dm.kcal, protein: dm.protein, carbs: dm.carbs, fat: dm.fat }, { ...budget, protein: 0 })
+  check('with no protein asked for, plain rounding', noFloor.ingredients.every((l, i) => l.quantity === plain[i].quantity))
+}
+
+// ---------------------------------------------------------------------------
 console.log('\n4. What she reads')
 // ---------------------------------------------------------------------------
 {
