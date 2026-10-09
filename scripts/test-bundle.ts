@@ -139,8 +139,12 @@ console.log('\n1. The libraries are cached separately from the app')
   // the affected gates by grepping for the changed source files can never
   // name it. Any change under src/ is a change to the bundle; run this gate
   // for all of them. 280 is 8 kB over the 272 measured today.
-  headroom('a deploy re-downloads', appGzip, 280, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 280, appGzip)
+  // MOVED 9 Oct 2026: 280 -> 305 kB gzipped, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 297. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  headroom('a deploy re-downloads', appGzip, 305, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 305, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -213,9 +217,13 @@ console.log('\n2b. The coach is not on the path to first paint')
   // worktree of the commit before: 427, so the row costs 2 kB gzipped. It sat
   // at 427 of 428 with 1 kB printed as left since 23 Sep. 437 is 8 kB over
   // today's 429, the margin every move here has used.
-  headroom('first paint fetches', firstLoadGzip, 437, 'kB gzipped')
+  // MOVED 9 Oct 2026: 437 -> 461 kB gzipped, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 453. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  headroom('first paint fetches', firstLoadGzip, 461, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 437, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 461, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -313,7 +321,11 @@ console.log('\n3. Nothing has crept back up')
   // real UI on a card that previously ended in three text links, and the
   // ceiling had four. Raised with room the way Ashley's 15 Sep ruling says,
   // to 24 kB of measured headroom above 961.
-  const APP_CHUNK_BUDGET_KB = 985
+  // MOVED 9 Oct 2026: 985 -> 1,052 kB raw, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 1,032. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  const APP_CHUNK_BUDGET_KB = 1052
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -509,7 +521,11 @@ console.log('\n3. Nothing has crept back up')
   // raise it again; the headroom line prints the remainder every run, and the
   // data is the first thing to move to a file fetched on demand if that
   // becomes the larger half of this figure. 2,116 is 18 above the 2,098 measured.
-  const TOTAL_BUDGET_KB = 2116
+  // MOVED 9 Oct 2026: 2,116 -> 2,221 kB raw, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 2,201. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  const TOTAL_BUDGET_KB = 2221
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
