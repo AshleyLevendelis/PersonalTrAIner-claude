@@ -1,11 +1,11 @@
 // ===========================================================================
 // GENERATED FILE — DO NOT EDIT.
 //
-// This is src/lib/food-db.ts, copied here by scripts/sync-food-db.mjs so the
-// chat-gemini edge function (Deno, which cannot import from src/) reads the
-// SAME food database the app does. Change the source, then run:
+// This is src/lib/food-db.ts, copied here by scripts/sync-shared-code.mjs so the edge
+// functions (Deno, which cannot import from src/) run the SAME code the app
+// does. Change the source, then run:
 //
-//     npm run sync:food-db
+//     npm run sync:shared
 //
 // A hand edit here is overwritten by the next sync, and test:food-db-parity
 // fails for as long as this file differs from what the script would write.

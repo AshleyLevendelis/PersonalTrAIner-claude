@@ -26,7 +26,7 @@
     "test:diet-tag-sync": "tsx scripts/test-diet-tag-sync.ts",
     "test:chat-app-reality": "tsx scripts/test-chat-app-reality.ts",
     "test:grocery": "tsx scripts/test-grocery.ts",
-    "sync:food-db": "node scripts/sync-food-db.mjs",
+    "sync:shared": "node scripts/sync-shared-code.mjs",
     "test:meal-amounts": "tsx scripts/test-meal-amounts.ts",
     "verify:meal-log-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-log-card.mjs",
     "test:rehab-order": "tsx scripts/test-rehab-order.ts",

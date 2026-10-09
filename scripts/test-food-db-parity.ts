@@ -14,7 +14,7 @@
  * 9 Sep plural fix had gone into the coach's copy and never reached the app.
  * Same words, 266 kcal from the coach and 417 from the screen.
  *
- * So the coach's copy is now GENERATED from the app's (scripts/sync-food-db.mjs)
+ * So the coach's copy is now GENERATED from the app's (scripts/sync-shared-code.mjs)
  * and this gate holds three things:
  *   1. the generated file is exactly what the script would write today;
  *   2. the source can run on Deno at all (no imports, nothing Node-only);
@@ -32,7 +32,7 @@ import * as app from '../src/lib/food-db'
 import * as coach from '../supabase/functions/_shared/food-db.ts'
 import { validateMealAgainstDiet } from '../src/lib/diet-rules'
 // @ts-expect-error — a plain .mjs script, no types; scripts/ is not type-checked anyway
-import { foodDbSyncState, denoProblems, renderEdgeFoodDb, FOOD_DB_SOURCE, FOOD_DB_EDGE_COPY } from './sync-food-db.mjs'
+import { sharedSyncStates, denoProblems, renderSharedCopy, SHARED_FILES } from './sync-shared-code.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -49,40 +49,47 @@ type Entry = { name: string; aliases: string[]; tags: Record<string, boolean>; u
 const appFoods = app.FOOD_DB as unknown as Entry[]
 const coachFoods = coach.FOOD_DB as unknown as Entry[]
 
-console.log('\n1. The coach\'s copy is what the app\'s file generates, today')
+const FOOD_DB_SOURCE = 'src/lib/food-db.ts'
+type SyncState = { source: string; copy: string; fresh: boolean; expected: string; actual: string; problems: string[] }
+const states = sharedSyncStates(ROOT) as SyncState[]
+
+console.log('\n1. Every generated copy is what its source generates, today')
 {
-  const state = foodDbSyncState(ROOT) as { fresh: boolean; expected: string; actual: string; problems: string[] }
-  let firstDiff = -1
-  if (!state.fresh) {
-    const a = state.expected.split('\n'), b = state.actual.split('\n')
-    firstDiff = a.findIndex((line, i) => line !== b[i])
+  check('the food database is one of the shared files (sanity check on this check)',
+    (SHARED_FILES as { source: string }[]).some(f => f.source === FOOD_DB_SOURCE) && states.length === (SHARED_FILES as unknown[]).length, SHARED_FILES)
+  for (const state of states) {
+    let firstDiff = -1
+    if (!state.fresh) {
+      const a = state.expected.split('\n'), b = state.actual.split('\n')
+      firstDiff = a.findIndex((line, i) => line !== b[i])
+    }
+    check(`${state.copy} is byte-for-byte the generated file — if this fails: npm run sync:shared`, state.fresh,
+      state.fresh ? undefined : { firstDifferingLine: firstDiff + 1, expected: state.expected.split('\n')[firstDiff]?.slice(0, 120), found: state.actual.split('\n')[firstDiff]?.slice(0, 120) })
+    check(`...and says, at the top, that it is generated from ${state.source} and how to regenerate it`,
+      /^\/\/ =+\n\/\/ GENERATED FILE — DO NOT EDIT\./.test(state.actual) && state.actual.slice(0, 900).includes(state.source) && /npm run sync:shared/.test(state.actual.slice(0, 900)))
   }
-  check(`${FOOD_DB_EDGE_COPY} is byte-for-byte the generated file — if this fails: npm run sync:food-db`, state.fresh,
-    state.fresh ? undefined : { firstDifferingLine: firstDiff + 1, expected: state.expected.split('\n')[firstDiff]?.slice(0, 120), found: state.actual.split('\n')[firstDiff]?.slice(0, 120) })
-  check('the generated file says, at the top, that it is generated and how to regenerate it',
-    /^\/\/ =+\n\/\/ GENERATED FILE — DO NOT EDIT\./.test(state.actual) && /npm run sync:food-db/.test(state.actual.slice(0, 900)))
   // Prove the detector: a one-character change to the source must read stale.
+  const foodState = states.find(st => st.source === FOOD_DB_SOURCE)!
   const source = readFileSync(join(ROOT, FOOD_DB_SOURCE), 'utf8')
   check('the staleness check can fail: a source that differs by one character does not match the file on disk',
-    renderEdgeFoodDb(source.replace('kcal: 165', 'kcal: 166')) !== state.actual && source.includes('kcal: 165'))
+    renderSharedCopy(FOOD_DB_SOURCE, source.replace('kcal: 165', 'kcal: 166')) !== foodState.actual && source.includes('kcal: 165'))
 }
-
 {
   // And the moment a stale copy would do harm is the deploy, so the deploy
   // script refuses one BEFORE it asks for the production phrase or links.
   const deploy = readFileSync(join(ROOT, 'scripts/deploy-functions.mjs'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-  const iCheck = deploy.indexOf('foodDbSyncState(')
+  const iCheck = deploy.indexOf('sharedSyncStates(')
   const iConfirm = deploy.indexOf('await confirmProduction()')
   const iLink = deploy.indexOf('link(target)')
   check('the deploy script found its own landmarks (sanity check on this check)', iConfirm > 0 && iLink > 0, { iConfirm, iLink })
   check('the deploy script checks the copy before confirming or linking anything', iCheck > 0 && iCheck < iConfirm && iCheck < iLink, { iCheck, iConfirm, iLink })
-  check('...and a stale copy stops it', /if \(!state\.fresh[^)]*\)\s*\{[\s\S]{0,500}process\.exit\(1\)/.test(deploy.slice(iCheck > 0 ? iCheck : 0, iCheck + 900)))
+  check('...and a stale copy stops it', /!state\.fresh[\s\S]{0,120}if \(stale\.length > 0\)\s*\{[\s\S]{0,600}process\.exit\(1\)/.test(deploy.slice(iCheck > 0 ? iCheck : 0, iCheck + 1200)))
 }
 
-console.log('\n2. The source can run on Deno')
+console.log('\n2. Every shared source can run on Deno')
 {
+  for (const state of states) check(`${state.source}: no imports, no require, no process.*, no import.meta.env`, state.problems.length === 0, state.problems)
   const source = readFileSync(join(ROOT, FOOD_DB_SOURCE), 'utf8')
-  check('no imports, no require, no process.*, no import.meta.env', (denoProblems(source) as string[]).length === 0, denoProblems(source))
   // ...and the detector fires on each thing it exists to refuse.
   check('the Deno check refuses an import', (denoProblems(`import { x } from './y'\n${source}`) as string[]).length > 0)
   check('the Deno check refuses process.env', (denoProblems(`${source}\nconst k = process.env.X\n`) as string[]).length > 0)
