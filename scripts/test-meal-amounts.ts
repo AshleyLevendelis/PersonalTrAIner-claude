@@ -123,6 +123,7 @@ console.log('\n1. Everyday counted foods come to a sensible weight (both copies)
     ['1 salmon fillet (by count)', { name: 'salmon fillet', quantity: 1, unit: 'whole' }, 85, 150],
     ['2 cod fillets', { name: 'cod', quantity: 2, unit: 'fillets' }, 180, 300],
     ['1 chicken breast', { name: 'chicken breast', quantity: 1, unit: 'whole' }, 100, 180],
+    ['1 pot of natural yoghurt', { name: 'natural yoghurt', quantity: 1, unit: 'pot' }, 100, 180],
     ['2 chicken breasts (unit: breasts)', { name: 'chicken', quantity: 2, unit: 'breasts' }, 0, 0], // see below: bare "chicken" is not chicken breast
     ['3 rashers of bacon', { name: 'bacon', quantity: 3, unit: 'rashers' }, 45, 100],
     ['3 bacon rashers (by count)', { name: 'bacon rashers', quantity: 3, unit: 'whole' }, 45, 100],
@@ -138,7 +139,7 @@ console.log('\n1. Everyday counted foods come to a sensible weight (both copies)
     ['half an avocado', { name: 'avocado', quantity: 1, unit: 'half' }, 50, 110],
     ['half a banana (unit: half)', { name: 'banana', quantity: 1, unit: 'half' }, 45, 75],
     ['1 baked potato', { name: 'jacket potato', quantity: 1, unit: 'medium' }, 140, 260],
-    ['a handful of almonds', { name: 'almonds', quantity: 1, unit: 'handful' }, 20, 40],
+    ['a handful of almonds', { name: 'almonds', quantity: 1, unit: 'handful' }, 15, 35],
     ['10 almonds', { name: 'almonds', quantity: 10, unit: 'whole' }, 9, 16],
     ['1 can of chickpeas', { name: 'chickpeas', quantity: 1, unit: 'can' }, 200, 420],
     ['1 scoop whey', { name: 'whey protein powder', quantity: 1, unit: 'scoop' }, 22, 40],
@@ -360,7 +361,7 @@ console.log('\n9. A typed line: an amount said in words, and the "of" a unit lea
   // example. "a banana" was ONE GRAM of banana.
   const W: [string, number, number][] = [
     ['a banana', 90, 150], ['an egg', 40, 70], ['two eggs', 80, 140], ['one large egg', 50, 70],
-    ['half an avocado', 50, 110], ['a handful of almonds', 20, 40], ['a medium onion', 80, 160],
+    ['half an avocado', 50, 110], ['a handful of almonds', 15, 35], ['a medium onion', 80, 160],
     ['2 slices of bread', 50, 100], ['1 can of chickpeas', 200, 420], ['3 rashers of bacon', 45, 100],
   ]
   for (const [text, min, max] of W) {

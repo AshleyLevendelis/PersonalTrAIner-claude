@@ -597,7 +597,11 @@ for (const [key, entry] of [...LOOKUP]) {
 //   USDA = USDA FoodData Central, the "portion" (household measure) weights
 //          published with each Standard Reference food.
 //   FPS  = UK Food Standards Agency, "Food Portion Sizes" (3rd edition).
+//   BNF  = British Nutrition Foundation, "Find your balance" portion guide.
 //   pack = the weight printed on the ordinary UK supermarket pack, named.
+// Checked against the live source on 9 Oct 2026: the BNF rows and the tuna
+// can. The USDA and FPS rows are as recalled from those tables and are cited
+// so they can be checked; a wrong one is a one-line change.
 // This table is cooked-basis for meat and fish (see the file header), so a
 // fillet or a breast is its COOKED weight. Keys are the unit words a line may
 // use; `medium` or `whole` is what a bare count ("2 bananas") means.
@@ -610,18 +614,18 @@ const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
   'croissant': { whole: 57 },                          // USDA: croissant, butter, 1 medium 57 g
   'falafel': { whole: 17 },                            // USDA: falafel, 1 patty 17 g
   // --- meat and fish, cooked weight ------------------------------------------
-  'chicken breast': { breast: 130, fillet: 130 },      // FPS: chicken breast, grilled, no bone 130 g
+  'chicken breast': { breast: 120, fillet: 120 },      // BNF: a grilled chicken breast, 120 g
   'bacon': { rasher: 25, slice: 25 },                  // FPS: back bacon, one grilled rasher 25 g
   'ham': { slice: 23 },                                // FPS: ham, one average slice 23 g
   'pork sausage': { whole: 40 },                       // FPS: one large sausage, grilled 40 g
-  'salmon': { fillet: 100 },                           // pack: UK fillets sell at about 120 g raw; about 100 g cooked
-  'cod': { fillet: 120 },                              // FPS: white fish fillet, baked, medium 120 g
+  'salmon': { fillet: 100 },                           // BNF: a cooked fish fillet (salmon or cod), 100-140 g · UK packs sell at about 120 g raw
+  'cod': { fillet: 120 },                              // BNF: a cooked fish fillet (salmon or cod), 100-140 g
   'haddock': { fillet: 120 },                          // FPS: as cod
   'tilapia': { fillet: 87 },                           // USDA: tilapia, cooked, 1 fillet 87 g
   'sea bass': { fillet: 101 },                         // USDA: sea bass, cooked, 1 fillet 101 g
   'trout': { fillet: 71 },                             // USDA: rainbow trout, farmed, cooked, 1 fillet 71 g
   'mackerel': { fillet: 88 },                          // USDA: Atlantic mackerel, cooked, 1 fillet 88 g
-  'tuna canned in water': { can: 102 },                // pack: 145 g can, 102 g drained (John West)
+  'tuna canned in water': { can: 102 },                // pack: John West tuna chunks, 102 g drained
   'sardines canned': { can: 90 },                      // pack: 120 g can, about 90 g drained
   // --- cans of pulses and tomatoes -------------------------------------------
   'chickpeas': { can: 240 },                           // pack: 400 g can, 240 g drained
@@ -631,10 +635,10 @@ const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
   'butter beans': { can: 240 },                        // pack: as chickpeas
   'chopped tomatoes canned': { can: 400 },             // pack: 400 g can, used whole
   // --- dairy -----------------------------------------------------------------
-  'milk whole': { glass: 200 },                        // British Nutrition Foundation portion guide: a 200 ml glass
+  'milk whole': { glass: 200 },                        // BNF: one medium glass, 200 ml
   'milk semi skimmed': { glass: 200 },                 // as whole milk
   'milk skimmed': { glass: 200 },                      // as whole milk
-  'natural yoghurt': { pot: 125 },                     // pack: standard UK yoghurt pot 125 g
+  'natural yoghurt': { pot: 120 },                     // BNF: one individual pot, 120 g
   'cheddar cheese': { slice: 25 },                     // pack: pre-sliced cheddar, 25 g a slice
   'mozzarella': { ball: 125 },                         // pack: one ball, 125 g drained
   'butter': { pat: 5 },                                // USDA: butter, 1 pat 5 g
@@ -670,12 +674,12 @@ const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
   'mixed salad leaves': { handful: 36 },               // USDA: lettuce, shredded, 1 cup 36 g
   'rocket': { handful: 20 },                           // USDA: arugula, raw, 1 cup 20 g
   // --- nuts, olives ------------------------------------------------------------
-  'almonds': { whole: 1.2, handful: 30 },              // USDA: 1 almond 1.2 g · NHS: a handful of nuts is about 30 g
-  'walnuts': { whole: 4, half: 2, handful: 30 },       // USDA: 1 oz is 14 halves, 2 g each
-  'cashews': { whole: 1.6, handful: 30 },              // USDA: 1 oz is 18 kernels, 1.6 g each
-  'brazil nuts': { whole: 5, handful: 30 },            // USDA: 1 kernel 5 g
-  'peanuts': { handful: 30 },                          // NHS: a handful of nuts is about 30 g
-  'mixed nuts': { handful: 30 },                       // as peanuts
+  'almonds': { whole: 1.2, handful: 20 },              // USDA: 1 almond 1.2 g · BNF: nuts, the amount that fits in your palm, 20 g
+  'walnuts': { whole: 4, half: 2, handful: 20 },       // USDA: 1 oz is 14 halves, 2 g each · BNF handful as almonds
+  'cashews': { whole: 1.6, handful: 20 },              // USDA: 1 oz is 18 kernels, 1.6 g each · BNF handful as almonds
+  'brazil nuts': { whole: 5, handful: 20 },            // USDA: 1 kernel 5 g · BNF handful as almonds
+  'peanuts': { handful: 20 },                          // BNF: nuts, the amount that fits in your palm, 20 g
+  'mixed nuts': { handful: 20 },                       // as peanuts
   'olives': { whole: 4 },                              // USDA: ripe olive, 1 large 4.4 g
   // --- things a recipe counts that weigh almost nothing -----------------------
   'bay leaves': { whole: 0.6 },                        // USDA: bay leaf, 1 tsp crumbled 0.6 g (about one leaf)
