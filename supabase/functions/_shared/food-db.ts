@@ -1,14 +1,18 @@
+// ===========================================================================
+// GENERATED FILE — DO NOT EDIT.
+//
+// This is src/lib/food-db.ts, copied here by scripts/sync-food-db.mjs so the
+// chat-gemini edge function (Deno, which cannot import from src/) reads the
+// SAME food database the app does. Change the source, then run:
+//
+//     npm run sync:food-db
+//
+// A hand edit here is overwritten by the next sync, and test:food-db-parity
+// fails for as long as this file differs from what the script would write.
+// ===========================================================================
+
 // ---------------------------------------------------------------------------
 // FOOD DATABASE (M1) — the deterministic macro truth source
-// ---------------------------------------------------------------------------
-// SYNCED COPY of src/lib/food-db.ts, verbatim, for the chat-gemini edge
-// function (Deno deploy target — no shared import surface with src/lib, see
-// generate-meals's FAMILIAR_CUISINES/EXOTIC_CUISINES for the established
-// precedent of this pattern). Kept in sync by hand: this file has zero
-// internal imports, so a straight file copy is the sync mechanism — if
-// food-db.ts changes (a fixed macro value, a new/renamed entry), copy this
-// file over again. Chat-realism round: added so the chat can compute real
-// macros instead of the model estimating them from memory.
 // ---------------------------------------------------------------------------
 // Every macro value below is per 100g of the EDIBLE, as-prepared portion
 // (cooked weight for grains/meat/rice, raw weight for veg/fruit unless the
@@ -67,9 +71,12 @@ export interface FoodTags {
   is_refined_sugar?: boolean
   is_high_carb?: boolean
   is_high_fodmap?: boolean
-  // Referenced by NO dietary preference — nothing on the Deno side reads
-  // FoodTags at all today, but kept in lockstep with src/lib/food-db.ts's
-  // copy. See that file's comment for the full rationale.
+  // Populated on 8 entries (bacon, ham, chorizo, pepperoni, salami, gammon...)
+  // but intentionally referenced by NO dietary preference in diet-rules.ts's
+  // FORBIDDEN_TAGS — the mirror image of the is_grain bug (data with no
+  // rule, rather than a rule with no data). Not a gap to silently "fix" by
+  // wiring it into a preference; if this app ever adds an "avoid processed
+  // meat" restriction, the data is already here and correct.
   is_processed_meat?: boolean
 }
 
@@ -82,6 +89,13 @@ export interface Macros100g {
   fat: number
 }
 
+export interface PurchaseUnit {
+  /** Average grams for one purchase unit — one whole item, one head, one egg, etc. */
+  avgGrams: number
+  /** Singular label, e.g. 'egg', 'head', 'bagel' — pluralized with a trailing 's' at display time. */
+  label: string
+}
+
 export interface FoodEntry {
   name: string
   aliases: string[]
@@ -90,6 +104,14 @@ export interface FoodEntry {
   tags: FoodTags
   /** Named-unit -> gram weight, for quantities like "1 medium egg" or "2 tbsp". Water-density defaults (tbsp/tsp/cup) are applied automatically when not overridden here. */
   units?: Record<string, number>
+  /**
+   * Shopping-list purchase unit — GroceryList.tsx's display layer converts
+   * stored grams into a rounded count of these when present (e.g. "2 heads"
+   * broccoli, "12 eggs"). Independent of `units` above (cooking portions);
+   * only set where a whole/discrete purchase form is unambiguous. Stored
+   * quantities/aggregation are unaffected — this is display-only.
+   */
+  purchaseUnit?: PurchaseUnit
 }
 
 function f(
@@ -99,8 +121,9 @@ function f(
   category: FoodCategory,
   tags: FoodTags = {},
   units?: Record<string, number>,
+  purchaseUnit?: PurchaseUnit,
 ): FoodEntry {
-  return { name, aliases, per100g, category, tags, units }
+  return { name, aliases, per100g, category, tags, units, purchaseUnit }
 }
 
 export const FOOD_DB: FoodEntry[] = [
@@ -143,13 +166,14 @@ export const FOOD_DB: FoodEntry[] = [
   f('squid', ['calamari'], { kcal: 92, protein: 15.6, carbs: 3.1, fat: 1.4 }, 'protein', { contains_shellfish: true }),
 
   // ===== PROTEIN: eggs & dairy protein ================================
-  f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }),
+  f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }, { avgGrams: 58, label: 'egg' }),
   f('egg white', ['egg whites'], { kcal: 52, protein: 11, carbs: 0.7, fat: 0.2 }, 'protein', { contains_egg: true }, { medium: 33, large: 38 }),
   f('egg yolk', ['egg yolks'], { kcal: 322, protein: 16, carbs: 3.6, fat: 27 }, 'protein', { contains_egg: true }, { medium: 17, large: 20 }),
   f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
   f('greek yoghurt full fat', ['greek yogurt', 'full fat greek yoghurt', 'greek style yoghurt'], { kcal: 97, protein: 9, carbs: 4, fat: 5 }, 'dairy', { contains_dairy: true }),
   f('natural yoghurt', ['plain yoghurt', 'natural yogurt', 'low fat yogurt', 'low fat yoghurt'], { kcal: 61, protein: 4.3, carbs: 4.7, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('cottage cheese', [], { kcal: 98, protein: 11, carbs: 3.4, fat: 4.3 }, 'dairy', { contains_dairy: true }),
+  f('ricotta cheese', ['ricotta', 'light ricotta cheese', 'light ricotta'], { kcal: 174, protein: 11, carbs: 3, fat: 13 }, 'dairy', { contains_dairy: true }),
   f('whey protein powder', ['protein powder', 'whey protein', 'whey isolate'], { kcal: 380, protein: 80, carbs: 8, fat: 5 }, 'protein', { contains_dairy: true }, { scoop: 30 }),
   f('milk whole', ['whole milk', 'full fat milk'], { kcal: 61, protein: 3.2, carbs: 4.8, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('milk skimmed', ['skimmed milk', 'skim milk', 'fat free milk'], { kcal: 34, protein: 3.4, carbs: 5, fat: 0.1 }, 'dairy', { contains_dairy: true }),
@@ -178,18 +202,18 @@ export const FOOD_DB: FoodEntry[] = [
   f('kidney beans', ['red kidney beans', 'cooked kidney beans', 'canned kidney beans'], { kcal: 127, protein: 8.7, carbs: 23, fat: 0.5 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('pinto beans', ['cooked pinto beans'], { kcal: 143, protein: 9, carbs: 26, fat: 0.7 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('butter beans', ['lima beans', 'cooked butter beans'], { kcal: 113, protein: 7.6, carbs: 20, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
+  f('cannellini beans', ['canned cannellini beans', 'cooked cannellini beans', 'white kidney beans'], { kcal: 118, protein: 8.1, carbs: 20, fat: 0.5 }, 'protein', { is_legume: true, is_high_carb: true }),
+  f('brown lentils', ['canned brown lentils', 'cooked brown lentils'], { kcal: 116, protein: 9, carbs: 20, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('soy mince', ['tvp', 'textured vegetable protein', 'soy protein mince'], { kcal: 285, protein: 50, carbs: 30, fat: 1 }, 'protein', { contains_soy: true }),
   f('quorn mince', ['quorn'], { kcal: 92, protein: 12, carbs: 4.4, fat: 2.7 }, 'protein', { contains_egg: true }),
   f('quorn fillet', ['quorn fillets', 'quorn chicken pieces'], { kcal: 106, protein: 13, carbs: 6.7, fat: 2.9 }, 'protein', { contains_egg: true }),
-  // PEANUTS COUNT AS NUTS HERE. Kept in lockstep with src/lib/food-db.ts's
-  // copy of this entry — see the fuller rationale there. Short version:
-  // 'nut-free' is a user-facing safety checkbox, not a botanical
-  // classification, and peanuts are the most common severe nut allergen.
-  // Over-restricting a tree-nut-only user fails safe; under-restricting a
-  // peanut-allergic user does not. NOTE: nothing on the Deno side reads
-  // FoodTags today (chat-gemini imports computeMealMacros only), so this is
-  // currently inert here — it is fixed anyway so the two tables cannot drift
-  // into disagreeing about a safety fact.
+  // PEANUTS COUNT AS NUTS HERE. Botanically peanuts are legumes, and this
+  // entry (plus 'peanuts' and 'peanut oil' below) used to assert
+  // contains_nuts: false on that basis. That is the wrong frame: 'nut-free'
+  // is a user-facing safety checkbox, not a botanical classification, and
+  // peanuts are the most common severe nut allergen. Over-restricting a
+  // tree-nut-only user fails safe; under-restricting a peanut-allergic user
+  // does not. Do not "correct" these back to false.
   f('peanut butter', [], { kcal: 588, protein: 25, carbs: 20, fat: 50 }, 'fat', { contains_nuts: true }, { tbsp: 16 }),
   f('almond butter', [], { kcal: 614, protein: 21, carbs: 19, fat: 56 }, 'fat', { contains_nuts: true }, { tbsp: 16 }),
   f('hummus', [], { kcal: 166, protein: 7.9, carbs: 11, fat: 9.6 }, 'other', { contains_sesame: true, is_legume: true }),
@@ -202,7 +226,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('wholewheat pasta cooked', ['wholewheat pasta', 'whole wheat pasta', 'wholemeal pasta'], { kcal: 149, protein: 6.3, carbs: 30, fat: 1.1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('white bread', ['bread', 'white bread slice', 'sliced white bread'], { kcal: 265, protein: 9, carbs: 49, fat: 3.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { slice: 36 }),
   f('wholemeal bread', ['whole wheat bread', 'brown bread'], { kcal: 247, protein: 13, carbs: 41, fat: 3.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { slice: 38 }),
-  f('bagel', ['plain bagel'], { kcal: 257, protein: 10, carbs: 50, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 95 }),
+  f('bagel', ['plain bagel'], { kcal: 257, protein: 10, carbs: 50, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 95 }, { avgGrams: 95, label: 'bagel' }),
   f('tortilla wrap', ['flour tortilla', 'wrap', 'tortilla'], { kcal: 310, protein: 8.4, carbs: 50, fat: 8 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
   f('corn tortilla', [], { kcal: 218, protein: 5.7, carbs: 44, fat: 2.8 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 26 }),
   f('pitta bread', ['pita bread', 'pitta'], { kcal: 275, protein: 9.1, carbs: 56, fat: 1.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
@@ -211,7 +235,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('oats', ['rolled oats', 'porridge oats', 'oatmeal'], { kcal: 379, protein: 13.5, carbs: 67.7, fat: 6.9 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('potato boiled', ['potato', 'boiled potato', 'new potatoes'], { kcal: 87, protein: 1.9, carbs: 20, fat: 0.1 }, 'carb', { is_high_carb: true }),
   f('potato baked', ['baked potato', 'jacket potato'], { kcal: 93, protein: 2.5, carbs: 21, fat: 0.1 }, 'carb', { is_high_carb: true }),
-  f('mashed potato', [], { kcal: 105, protein: 1.9, carbs: 16, fat: 4 }, 'carb', { contains_dairy: true, is_high_carb: true }),
+  f('mashed potato', ['instant mashed potato', 'instant mashed potatoes', 'prepared instant mashed potatoes'], { kcal: 105, protein: 1.9, carbs: 16, fat: 4 }, 'carb', { contains_dairy: true, is_high_carb: true }),
   f('sweet potato baked', ['sweet potato', 'baked sweet potato'], { kcal: 90, protein: 2, carbs: 21, fat: 0.2 }, 'carb', { is_high_carb: true }),
   f('egg noodles cooked', ['egg noodles', 'noodles'], { kcal: 138, protein: 4.5, carbs: 25, fat: 2.1 }, 'carb', { is_grain: true, contains_egg: true, contains_gluten: true, is_high_carb: true }),
   f('rice noodles cooked', ['rice noodles'], { kcal: 109, protein: 1.8, carbs: 25, fat: 0.2 }, 'carb', { is_grain: true, is_high_carb: true }),
@@ -221,6 +245,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('plain flour', ['flour', 'all purpose flour'], { kcal: 364, protein: 10, carbs: 76, fat: 1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('rice cakes', [], { kcal: 387, protein: 8.2, carbs: 81, fat: 2.8 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 9 }),
   f('crackers', ['water crackers', 'wheat crackers'], { kcal: 421, protein: 9, carbs: 71, fat: 11 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
+  f('rye crispbread', ['rye crispbreads', 'crispbread', 'crispbreads'], { kcal: 321, protein: 9.9, carbs: 71, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
+  f('pancake mix', ['pancake batter mix', 'dry pancake mix'], { kcal: 356, protein: 8, carbs: 76, fat: 3 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('popcorn', ['air popped popcorn'], { kcal: 387, protein: 13, carbs: 78, fat: 4.5 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('tortilla chips', ['corn chips'], { kcal: 490, protein: 7, carbs: 63, fat: 24 }, 'carb', { is_grain: true, is_high_carb: true }),
 
@@ -228,9 +254,9 @@ export const FOOD_DB: FoodEntry[] = [
   f('olive oil', ['extra virgin olive oil'], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('vegetable oil', ['sunflower oil', 'cooking oil', 'rapeseed oil', 'canola oil'], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('coconut oil', [], { kcal: 862, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 13, tsp: 4.5 }),
-  f('avocado', [], { kcal: 160, protein: 2, carbs: 8.5, fat: 14.7 }, 'fruit', {}, { whole: 150, half: 75 }),
+  f('avocado', [], { kcal: 160, protein: 2, carbs: 8.5, fat: 14.7 }, 'fruit', {}, { whole: 150, half: 75 }, { avgGrams: 150, label: 'avocado' }),
   f('almonds', ['almond'], { kcal: 579, protein: 21.2, carbs: 22, fat: 49.9 }, 'fat', { contains_nuts: true }),
-  f('walnuts', [], { kcal: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, 'fat', { contains_nuts: true }),
+  f('walnuts', ['walnut', 'walnut halves'], { kcal: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, 'fat', { contains_nuts: true }),
   f('cashews', ['cashew nuts'], { kcal: 553, protein: 18.2, carbs: 30.2, fat: 43.9 }, 'fat', { contains_nuts: true }),
   f('peanuts', [], { kcal: 567, protein: 25.8, carbs: 16.1, fat: 49.2 }, 'fat', { contains_nuts: true }), // see 'peanut butter' above for why this is true, not false
   f('mixed nuts', [], { kcal: 607, protein: 20, carbs: 19, fat: 54 }, 'fat', { contains_nuts: true }),
@@ -244,7 +270,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('tahini', [], { kcal: 595, protein: 17, carbs: 21, fat: 54 }, 'fat', { contains_sesame: true }, { tbsp: 15 }),
 
   // ===== VEG ===========================================================
-  f('broccoli', ['steamed broccoli', 'broccoli florets'], { kcal: 34, protein: 2.8, carbs: 6.6, fat: 0.4 }, 'veg', {}),
+  f('broccoli', ['steamed broccoli', 'broccoli florets'], { kcal: 34, protein: 2.8, carbs: 6.6, fat: 0.4 }, 'veg', {}, undefined, { avgGrams: 300, label: 'head' }), // avgGrams is a standard-head estimate, not a curated unit value like the others
   f('spinach', ['baby spinach', 'fresh spinach'], { kcal: 23, protein: 2.9, carbs: 3.6, fat: 0.4 }, 'veg', {}),
   f('kale', [], { kcal: 49, protein: 4.3, carbs: 8.8, fat: 0.9 }, 'veg', {}),
   f('mixed salad leaves', ['salad leaves', 'lettuce', 'mixed greens'], { kcal: 15, protein: 1.4, carbs: 2.9, fat: 0.2 }, 'veg', {}),
@@ -273,12 +299,13 @@ export const FOOD_DB: FoodEntry[] = [
   f('rocket', ['arugula'], { kcal: 25, protein: 2.6, carbs: 3.7, fat: 0.7 }, 'veg', {}),
 
   // ===== FRUIT ==========================================================
-  f('banana', ['bananas'], { kcal: 89, protein: 1.1, carbs: 23, fat: 0.3 }, 'fruit', {}, { medium: 118 }),
-  f('apple', ['apples'], { kcal: 52, protein: 0.3, carbs: 14, fat: 0.2 }, 'fruit', {}, { medium: 182 }),
-  f('orange', ['oranges'], { kcal: 47, protein: 0.9, carbs: 12, fat: 0.1 }, 'fruit', {}, { medium: 131 }),
+  f('banana', ['bananas'], { kcal: 89, protein: 1.1, carbs: 23, fat: 0.3 }, 'fruit', {}, { medium: 118 }, { avgGrams: 118, label: 'banana' }),
+  f('apple', ['apples'], { kcal: 52, protein: 0.3, carbs: 14, fat: 0.2 }, 'fruit', {}, { medium: 182 }, { avgGrams: 182, label: 'apple' }),
+  f('orange', ['oranges'], { kcal: 47, protein: 0.9, carbs: 12, fat: 0.1 }, 'fruit', {}, { medium: 131 }, { avgGrams: 131, label: 'orange' }),
   f('strawberries', ['strawberry'], { kcal: 32, protein: 0.7, carbs: 7.7, fat: 0.3 }, 'fruit', {}),
   f('blueberries', ['blueberry'], { kcal: 57, protein: 0.7, carbs: 14, fat: 0.3 }, 'fruit', {}),
   f('raspberries', ['raspberry'], { kcal: 52, protein: 1.2, carbs: 12, fat: 0.7 }, 'fruit', { is_high_fodmap: true }),
+  f('mixed berries', ['frozen mixed berries', 'berries'], { kcal: 46, protein: 1, carbs: 11, fat: 0.5 }, 'fruit', {}),
   f('grapes', ['grape'], { kcal: 69, protein: 0.7, carbs: 18, fat: 0.2 }, 'fruit', {}),
   f('mango', [], { kcal: 60, protein: 0.8, carbs: 15, fat: 0.4 }, 'fruit', { is_high_fodmap: true }),
   f('pineapple', [], { kcal: 50, protein: 0.5, carbs: 13, fat: 0.1 }, 'fruit', {}),
@@ -287,7 +314,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('dried apricots', [], { kcal: 241, protein: 3.4, carbs: 63, fat: 0.5 }, 'fruit', { contains_sulphites: true, is_high_carb: true, is_high_fodmap: true }),
   f('kiwi', ['kiwi fruit'], { kcal: 61, protein: 1.1, carbs: 15, fat: 0.5 }, 'fruit', {}),
   f('watermelon', [], { kcal: 30, protein: 0.6, carbs: 7.6, fat: 0.2 }, 'fruit', { is_high_fodmap: true }),
-  f('pear', ['pears'], { kcal: 57, protein: 0.4, carbs: 15, fat: 0.1 }, 'fruit', { is_high_fodmap: true }, { medium: 178 }),
+  f('pear', ['pears'], { kcal: 57, protein: 0.4, carbs: 15, fat: 0.1 }, 'fruit', { is_high_fodmap: true }, { medium: 178 }, { avgGrams: 178, label: 'pear' }),
   f('lemon', ['lemon juice'], { kcal: 29, protein: 1.1, carbs: 9.3, fat: 0.3 }, 'fruit', {}),
   f('lime', ['lime juice'], { kcal: 30, protein: 0.7, carbs: 10.5, fat: 0.2 }, 'fruit', {}),
 
@@ -308,6 +335,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('pesto', ['basil pesto'], { kcal: 303, protein: 4, carbs: 4, fat: 30 }, 'condiment', { contains_dairy: true, contains_nuts: true }, { tbsp: 16 }),
   f('tomato passata', ['passata'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
   f('chopped tomatoes canned', ['tinned tomatoes', 'canned tomatoes'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
+  f('marinara sauce', ['marinara'], { kcal: 42, protein: 1.5, carbs: 7, fat: 1 }, 'condiment', {}),
   f('curry paste', ['thai curry paste', 'tikka paste'], { kcal: 168, protein: 3, carbs: 12, fat: 12 }, 'condiment', { is_high_fodmap: true }, { tbsp: 20 }),
   f('coconut cream', [], { kcal: 330, protein: 3.6, carbs: 6.7, fat: 34 }, 'fat', {}),
   f('gravy granules made', ['gravy'], { kcal: 65, protein: 1.2, carbs: 9, fat: 2.6 }, 'condiment', { contains_gluten: true }),
@@ -316,8 +344,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('vegetable stock cube', ['stock cube', 'vegetable stock'], { kcal: 233, protein: 8, carbs: 40, fat: 5 }, 'condiment', { contains_celery: true, is_high_fodmap: true }),
   // Soy lecithin is a near-ubiquitous emulsifier in commercial chocolate —
   // brand-dependent, not knowable from the name. Absent reads as safe, so
-  // true is the only fail-safe state this schema can express. Kept in
-  // lockstep with src/lib/food-db.ts.
+  // true is the only fail-safe state this schema can express.
   f('dark chocolate', ['70% dark chocolate'], { kcal: 546, protein: 7.8, carbs: 46, fat: 31 }, 'other', { is_refined_sugar: true, contains_soy: true }),
   f('milk chocolate', [], { kcal: 535, protein: 7.6, carbs: 59, fat: 30 }, 'other', { contains_dairy: true, is_refined_sugar: true, contains_soy: true }),
   // Brand-dependent, not knowable from the name — protein bars routinely
@@ -355,12 +382,15 @@ export const FOOD_DB: FoodEntry[] = [
   f('nutritional yeast', [], { kcal: 325, protein: 45, carbs: 27, fat: 5 }, 'other', {}),
 
   // ===== CARB: more grains / breakfast ===================================
-  // Nut content is brand-dependent and not knowable from the name. Kept in
-  // lockstep with src/lib/food-db.ts's copy — see the fuller rationale there.
+  // Nut content is brand-dependent and not knowable from the name (most UK
+  // supermarket "original" granolas do carry almonds/pecans/walnuts). Absent
+  // reads as safe in this schema, so removing the assertion would be a false
+  // safe just as surely as `false` was — true is the only fail-safe state
+  // this schema can express for a food whose allergen content varies by brand.
   f('granola', [], { kcal: 471, protein: 10, carbs: 64, fat: 20 }, 'carb', { is_grain: true, is_high_carb: true, contains_nuts: true }),
   // Same shape as granola — nut content is brand-dependent and not knowable
-  // from the name. Absent reads as safe, so true is the only fail-safe state
-  // this schema can express.
+  // from the name (almonds/hazelnuts are common). Absent reads as safe, so
+  // true is the only fail-safe state this schema can express.
   f('muesli', [], { kcal: 362, protein: 9.7, carbs: 66, fat: 6 }, 'carb', { is_grain: true, is_high_carb: true, contains_nuts: true }),
   f('cornflakes', ['corn flakes'], { kcal: 357, protein: 7.5, carbs: 84, fat: 0.9 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('weetabix', ['bran cereal'], { kcal: 338, protein: 11, carbs: 69, fat: 2.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
@@ -424,7 +454,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('harissa', [], { kcal: 111, protein: 3, carbs: 12, fat: 6 }, 'condiment', { is_high_fodmap: true }, { tbsp: 15 }),
   f('tzatziki', [], { kcal: 88, protein: 3.8, carbs: 3.6, fat: 6.8 }, 'condiment', { contains_dairy: true, is_high_fodmap: true }),
   f('guacamole', [], { kcal: 155, protein: 2, carbs: 8.5, fat: 13 }, 'condiment', { is_high_fodmap: true }),
-  f('sour cream', [], { kcal: 198, protein: 2.4, carbs: 4.6, fat: 19.7 }, 'dairy', { contains_dairy: true }),
+  f('sour cream', ['soured cream'], { kcal: 198, protein: 2.4, carbs: 4.6, fat: 19.7 }, 'dairy', { contains_dairy: true }),
+  f('creme fraiche', ['crème fraîche', 'half-fat creme fraiche', 'half-fat crème fraîche'], { kcal: 292, protein: 2.4, carbs: 3.4, fat: 30 }, 'dairy', { contains_dairy: true }),
   f('coleslaw', [], { kcal: 150, protein: 1.2, carbs: 8, fat: 13 }, 'condiment', { contains_egg: true, is_high_fodmap: true }),
   f('vinaigrette dressing', ['salad dressing', 'french dressing'], { kcal: 260, protein: 0.2, carbs: 8, fat: 25 }, 'condiment', {}, { tbsp: 15 }),
   f('ranch dressing', [], { kcal: 460, protein: 1, carbs: 6, fat: 48 }, 'condiment', { contains_dairy: true, contains_egg: true }, { tbsp: 15 }),
@@ -493,8 +524,10 @@ export const FOOD_DB: FoodEntry[] = [
   f('sulguni cheese', ['sulguni'], { kcal: 280, protein: 22, carbs: 2, fat: 21 }, 'dairy', { contains_dairy: true }),
   f('sesame seeds', ['roasted sesame seeds'], { kcal: 573, protein: 17.7, carbs: 23.4, fat: 49.7 }, 'fat', { contains_sesame: true }),
   f('hemp seeds', [], { kcal: 553, protein: 31.6, carbs: 8.7, fat: 48.8 }, 'fat', {}),
-  // Untagged before this round (absent reads as safe). Tagged for the same
-  // reason as 'peanut butter' above; kept in lockstep with src/lib/food-db.ts.
+  // Untagged before this round (absent reads as safe), so nut-free never saw
+  // it. Tagged for the same reason as 'peanut butter' above. Refined peanut
+  // oil is often tolerated clinically, but that is a per-person medical call
+  // this app cannot make from an ingredient string.
   f('peanut oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', { contains_nuts: true }, { tbsp: 14, tsp: 4.5 }),
   f('safflower oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('red snapper', ['red snapper fillet'], { kcal: 100, protein: 20.5, carbs: 0, fat: 1.3 }, 'protein', { contains_fish: true }),
@@ -504,6 +537,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('injera flatbread', ['injera'], { kcal: 220, protein: 7, carbs: 45, fat: 1.5 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('calamansi juice', ['calamansi'], { kcal: 29, protein: 0.5, carbs: 9.5, fat: 0.2 }, 'fruit', {}),
   f('water', ['warm water', 'cold water', 'boiling water'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'other', {}),
+  f('black coffee', ['coffee', 'cold brew coffee', 'brewed coffee', 'filter coffee'], { kcal: 1, protein: 0.1, carbs: 0, fat: 0 }, 'other', {}),
 ]
 
 // ---------------------------------------------------------------------------
@@ -511,7 +545,21 @@ export const FOOD_DB: FoodEntry[] = [
 // ---------------------------------------------------------------------------
 
 function normalize(s: string): string {
-  return s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ')
+  // Decompose accented Latin characters to their base letter + a combining
+  // mark (NFD), then drop the combining marks — "crème" -> "creme", "café"
+  // -> "cafe" — BEFORE the punctuation pass below. Without this, the
+  // [^a-z0-9\s] regex treated every accented character as punctuation and
+  // replaced it with a space ("crème" -> "cr me"), silently breaking
+  // tokenization for every accented ingredient name (confirmed: "crème
+  // fraîche" was an unresolved-ingredient failure from the very first
+  // meal-quality baseline, long before this fix).
+  //
+  // Replace (not strip) punctuation with a space — stripping it fused
+  // adjacent words into unmatchable tokens ("seitan-based" -> "seitanbased",
+  // "boiled/instant" -> "boiledinstant"), which made every hyphenated or
+  // slash-separated ingredient name an automatic lookup miss.
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 const LOOKUP = new Map<string, FoodEntry>()
@@ -526,22 +574,219 @@ for (const entry of FOOD_DB) {
 // "roughly 0 kcal … 0% of the meal by weight". Each key is also indexed under
 // its de-pluralised form when that form is free, so the token-overlap pass
 // can see it. Same conservative rule as the query side (depluralizeToken).
+//
+// This lived ONLY in the coach's hand-copied database from 9 Sep to 9 Oct
+// 2026, while the count fix and nine foods lived only in this one. The two
+// are now one file (see the header), so a fix cannot land on one side again.
+//
+// AND IT IS KEPT OFF THE DIET CHECK, ON PURPOSE. A food the diet check cannot
+// resolve is refused for every restriction (diet-rules.ts fails closed); a
+// food it CAN resolve is judged by that one entry's tags. Measured the day
+// the files were merged: with these extra keys 88 phrases in a 10,827-phrase
+// corpus stop being a miss, and some of them are dishes — "prawn cocktail"
+// becomes prawns, "sausage roll" becomes pork sausage, "peanut sauce" becomes
+// peanuts. For costing a meal that is the 9 Sep fix working. For an allergy it
+// would turn "refused" into "judged as plain prawns", which is weaker, and
+// dietary enforcement does not change without a written plan
+// (docs/plans/ingredient-lookup-truth.md). So the names exactly as stored are
+// kept too, and the diet check reads those: lookupIngredientAsStored.
+const LOOKUP_AS_STORED = new Map(LOOKUP)
 for (const [key, entry] of [...LOOKUP]) {
   const folded = key.split(' ').map(depluralizeToken).join(' ')
   if (folded !== key && !LOOKUP.has(folded)) LOOKUP.set(folded, entry)
 }
 
-/** Water-density defaults for common volume units, used when an entry doesn't override them. */
-const DEFAULT_UNIT_GRAMS: Record<string, number> = {
-  g: 1,
-  gram: 1,
-  grams: 1,
-  ml: 1,
-  tbsp: 15,
-  tablespoon: 15,
-  tsp: 5,
-  teaspoon: 5,
-  cup: 240,
+// ---------------------------------------------------------------------------
+// PIECE WEIGHTS — what ONE of them weighs
+// ---------------------------------------------------------------------------
+// "2 eggs", "1 can of tuna", "5 rye crispbreads" are how people say what they
+// ate, and until 9 Oct 2026 only ten foods here knew what one of them weighed.
+// Everything else fell through to "treat the number as grams": two eggs were
+// two grams of egg, five crispbreads were five grams (H6 and M23 in that
+// day's test log). A food with no row here and no unit of its own is now
+// "amount unknown" (see unitToGrams) — never a guess.
+//
+// EVERY FIGURE NAMES WHERE IT CAME FROM. Three references, abbreviated:
+//   USDA = USDA FoodData Central, the "portion" (household measure) weights
+//          published with each Standard Reference food.
+//   FPS  = UK Food Standards Agency, "Food Portion Sizes" (3rd edition).
+//   pack = the weight printed on the ordinary UK supermarket pack, named.
+// This table is cooked-basis for meat and fish (see the file header), so a
+// fillet or a breast is its COOKED weight. Keys are the unit words a line may
+// use; `medium` or `whole` is what a bare count ("2 bananas") means.
+// A weight already written on the entry itself wins over a row here.
+const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
+  // --- bread, crackers, cereal ---------------------------------------------
+  'rye crispbread': { whole: 10, slice: 10 },          // pack: Ryvita Original, 10 g a slice
+  'crackers': { whole: 7 },                            // FPS: one cream cracker 7 g
+  'weetabix': { whole: 19, biscuit: 19 },              // pack: Weetabix, 2 biscuits = 37.5 g
+  'croissant': { whole: 57 },                          // USDA: croissant, butter, 1 medium 57 g
+  'falafel': { whole: 17 },                            // USDA: falafel, 1 patty 17 g
+  // --- meat and fish, cooked weight ------------------------------------------
+  'chicken breast': { breast: 130, fillet: 130 },      // FPS: chicken breast, grilled, no bone 130 g
+  'bacon': { rasher: 25, slice: 25 },                  // FPS: back bacon, one grilled rasher 25 g
+  'ham': { slice: 23 },                                // FPS: ham, one average slice 23 g
+  'pork sausage': { whole: 40 },                       // FPS: one large sausage, grilled 40 g
+  'salmon': { fillet: 100 },                           // pack: UK fillets sell at about 120 g raw; about 100 g cooked
+  'cod': { fillet: 120 },                              // FPS: white fish fillet, baked, medium 120 g
+  'haddock': { fillet: 120 },                          // FPS: as cod
+  'tilapia': { fillet: 87 },                           // USDA: tilapia, cooked, 1 fillet 87 g
+  'sea bass': { fillet: 101 },                         // USDA: sea bass, cooked, 1 fillet 101 g
+  'trout': { fillet: 71 },                             // USDA: rainbow trout, farmed, cooked, 1 fillet 71 g
+  'mackerel': { fillet: 88 },                          // USDA: Atlantic mackerel, cooked, 1 fillet 88 g
+  'tuna canned in water': { can: 102 },                // pack: 145 g can, 102 g drained (John West)
+  'sardines canned': { can: 90 },                      // pack: 120 g can, about 90 g drained
+  // --- cans of pulses and tomatoes -------------------------------------------
+  'chickpeas': { can: 240 },                           // pack: 400 g can, 240 g drained
+  'black beans': { can: 240 },                         // pack: as chickpeas
+  'kidney beans': { can: 240 },                        // pack: as chickpeas
+  'cannellini beans': { can: 240 },                    // pack: as chickpeas
+  'butter beans': { can: 240 },                        // pack: as chickpeas
+  'chopped tomatoes canned': { can: 400 },             // pack: 400 g can, used whole
+  // --- dairy -----------------------------------------------------------------
+  'milk whole': { glass: 200 },                        // British Nutrition Foundation portion guide: a 200 ml glass
+  'milk semi skimmed': { glass: 200 },                 // as whole milk
+  'milk skimmed': { glass: 200 },                      // as whole milk
+  'natural yoghurt': { pot: 125 },                     // pack: standard UK yoghurt pot 125 g
+  'cheddar cheese': { slice: 25 },                     // pack: pre-sliced cheddar, 25 g a slice
+  'mozzarella': { ball: 125 },                         // pack: one ball, 125 g drained
+  'butter': { pat: 5 },                                // USDA: butter, 1 pat 5 g
+  // --- fruit -----------------------------------------------------------------
+  'kiwi': { medium: 69 },                              // USDA: kiwifruit, 1 fruit 69 g
+  'peach': { medium: 150 },                            // USDA: peach, 1 medium 150 g
+  'plum': { medium: 66 },                              // USDA: plum, 1 fruit 66 g
+  'figs': { medium: 50 },                              // USDA: fig, raw, 1 medium 50 g
+  'grapefruit': { medium: 246, half: 123 },            // USDA: grapefruit, half a medium fruit 123 g
+  'passion fruit': { medium: 18 },                     // USDA: passion fruit, 1 fruit 18 g
+  'strawberries': { medium: 12, large: 18 },           // USDA: strawberry, 1 medium 12 g, 1 large 18 g
+  'cherries': { whole: 8 },                            // USDA: sweet cherry, 1 cherry 8 g
+  'grapes': { whole: 5 },                              // USDA: grape, 1 grape 4.9 g
+  'lemon': { medium: 58 },                             // USDA: lemon without peel, 1 fruit 58 g
+  'lime': { medium: 67 },                              // USDA: lime, 1 fruit 67 g
+  // --- vegetables ------------------------------------------------------------
+  'tomato': { medium: 123 },                           // USDA: tomato, 1 medium whole 123 g
+  'cherry tomatoes': { whole: 17 },                    // USDA: tomato, 1 cherry 17 g
+  'cucumber': { whole: 300 },                          // USDA: cucumber with peel, 1 cucumber 301 g
+  'bell pepper': { medium: 119, large: 164 },          // USDA: sweet pepper, 1 medium 119 g, 1 large 164 g
+  'onion': { medium: 110, small: 70, large: 150 },     // USDA: onion, small 70 g, medium 110 g, large 150 g
+  'carrot': { medium: 61 },                            // USDA: carrot, 1 medium 61 g
+  'courgette': { medium: 196 },                        // USDA: zucchini, 1 medium 196 g
+  'mushroom': { medium: 18 },                          // USDA: white mushroom, 1 medium 18 g
+  'spring onion': { medium: 15 },                      // USDA: spring onion, 1 medium 15 g
+  'celery': { stalk: 40, stick: 40 },                  // USDA: celery, 1 medium stalk 40 g
+  'leek': { medium: 89 },                              // USDA: leek, 1 leek 89 g
+  'radish': { medium: 4.5 },                           // USDA: radish, 1 medium 4.5 g
+  'sweetcorn': { cob: 90, ear: 90 },                   // USDA: sweet corn, 1 medium ear yields 90 g
+  'potato baked': { medium: 173 },                     // USDA: baked potato, flesh and skin, 1 medium 173 g
+  'sweet potato baked': { medium: 114 },               // USDA: sweet potato, baked in skin, 1 medium 114 g
+  'spinach': { handful: 30 },                          // USDA: raw spinach, 1 cup (a generous handful) 30 g
+  'mixed salad leaves': { handful: 36 },               // USDA: lettuce, shredded, 1 cup 36 g
+  'rocket': { handful: 20 },                           // USDA: arugula, raw, 1 cup 20 g
+  // --- nuts, olives ------------------------------------------------------------
+  'almonds': { whole: 1.2, handful: 30 },              // USDA: 1 almond 1.2 g · NHS: a handful of nuts is about 30 g
+  'walnuts': { whole: 4, half: 2, handful: 30 },       // USDA: 1 oz is 14 halves, 2 g each
+  'cashews': { whole: 1.6, handful: 30 },              // USDA: 1 oz is 18 kernels, 1.6 g each
+  'brazil nuts': { whole: 5, handful: 30 },            // USDA: 1 kernel 5 g
+  'peanuts': { handful: 30 },                          // NHS: a handful of nuts is about 30 g
+  'mixed nuts': { handful: 30 },                       // as peanuts
+  'olives': { whole: 4 },                              // USDA: ripe olive, 1 large 4.4 g
+  // --- things a recipe counts that weigh almost nothing -----------------------
+  'bay leaves': { whole: 0.6 },                        // USDA: bay leaf, 1 tsp crumbled 0.6 g (about one leaf)
+  'star anise': { whole: 2 },                          // kitchen scale, not a table: one pod is about 2 g
+  'vegetable stock cube': { cube: 10 },                // pack: Knorr stock cube 10 g
+}
+for (const entry of FOOD_DB) {
+  const pieces = PIECE_WEIGHTS[entry.name]
+  if (pieces) entry.units = { ...pieces, ...entry.units }
+}
+
+// ---------------------------------------------------------------------------
+// AMOUNTS — "2 eggs", "1 large banana", "2 slices" -> grams, or "unknown"
+// ---------------------------------------------------------------------------
+
+/**
+ * Mass and volume units, which mean the same for every food. Volumes are at
+ * water density unless the entry gives its own. A pinch is a sixteenth of a
+ * teaspoon by kitchen convention (about 0.3 g of salt or spice) and a dash an
+ * eighth (about 0.6 g): trace amounts, weighed as such rather than refused.
+ */
+const MEASURE_GRAMS: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000, oz: 28.35, lb: 453.6, tbsp: 15, tsp: 5, cup: 240, pinch: 0.3, dash: 0.6 }
+
+/** Other spellings of a unit -> the one word it is looked up under. Plurals are folded before this is read. */
+const UNIT_SPELLINGS: Record<string, string> = {
+  gram: 'g', gm: 'g', gr: 'g', kilo: 'kg', kilogram: 'kg',
+  millilitre: 'ml', milliliter: 'ml', litre: 'l', liter: 'l', ounce: 'oz', pound: 'lb',
+  tablespoon: 'tbsp', tbs: 'tbsp', teaspoon: 'tsp',
+  med: 'medium', regular: 'medium', standard: 'medium', average: 'medium',
+  lg: 'large', big: 'large', sm: 'small', 'extra large': 'xl', 'x large': 'xl', xlarge: 'xl',
+  tin: 'can', leaves: 'leaf', halves: 'half', loaves: 'loaf',
+}
+
+/** Words that mean "this many of them" and nothing more. */
+const COUNT_UNITS = new Set(['', 'whole', 'piece', 'each', 'item', 'unit', 'count', 'x', 'pc', 'ea', 'single'])
+
+/**
+ * A size the entry does not list, as a share of its medium. The spread is
+ * the USDA's own for whole fruit and eggs: banana 101 / 118 / 136 g, egg
+ * 44 / 50 / 58 g, apple 149 / 182 / 223 g — small is about 0.85 of a medium
+ * and large about 1.15. Extra large is the banana's 152 g. `half` and
+ * `quarter` are arithmetic, not estimates.
+ */
+const SIZE_OF_MEDIUM: Record<string, number> = { small: 0.85, medium: 1, large: 1.15, xl: 1.3, half: 0.5, quarter: 0.25 }
+
+/** "Slices of", "Eggs", "tbsp." -> "slice", "egg", "tbsp". */
+function normaliseUnit(raw: string): string {
+  let u = String(raw ?? '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  u = u.replace(/ of$/, '')
+  if (UNIT_SPELLINGS[u]) return UNIT_SPELLINGS[u]
+  if (/(ch|sh|ss|x)es$/.test(u)) u = u.slice(0, -2)
+  else if (u.length > 2 && u.endsWith('s') && !u.endsWith('ss')) u = u.slice(0, -1)
+  return UNIT_SPELLINGS[u] ?? u
+}
+
+/** A unit word carried in the ingredient's own name: "garlic cloves" -> the clove, "salmon fillets" -> the fillet, "large egg" -> the large one. */
+function pieceNamedIn(entry: FoodEntry, name: string): number | null {
+  if (!entry.units || !name) return null
+  for (const word of normalize(name).split(' ')) {
+    const unit = normaliseUnit(word)
+    if (MEASURE_GRAMS[unit] == null && entry.units[unit] != null) return entry.units[unit]
+  }
+  return null
+}
+
+/** How an amount was read: on a scale or spoon ('measured'), as a number of pieces ('counted'), or not at all. */
+type AmountBasis = 'measured' | 'counted' | 'unknown'
+
+function resolveAmount(entry: FoodEntry | null, unit: string, quantity: number, name: string): { grams: number | null; basis: AmountBasis } {
+  const unknown = { grams: null, basis: 'unknown' as const }
+  if (!Number.isFinite(quantity) || quantity < 0) return unknown
+  const u = normaliseUnit(unit)
+  const own = entry?.units
+  const measured = MEASURE_GRAMS[u] != null
+  // A bare count — "2 eggs" arrives as unit whole, egg, eggs, piece, each… —
+  // including the food's own name as the unit: { name: 'egg', unit: 'eggs' }.
+  const counted = !!entry && (COUNT_UNITS.has(u) || LOOKUP.get(normalize(unit)) === entry || LOOKUP.get(u) === entry)
+  // The line's own words may say WHICH piece: "2 garlic cloves", "1 salmon
+  // fillet", "half avocado". That beats the food's default piece.
+  const named = entry ? pieceNamedIn(entry, name) : null
+  // 1. A count of a piece the name itself names.
+  if (counted && named != null) return { grams: named * quantity, basis: 'counted' }
+  // 2. The entry's own word for the unit — "1 medium egg", "2 slices", "1 tbsp honey".
+  if (own && own[u] != null) return { grams: own[u] * quantity, basis: measured ? 'measured' : 'counted' }
+  // 3. A measure that means the same for every food.
+  if (measured) return { grams: MEASURE_GRAMS[u] * quantity, basis: 'measured' }
+  // Past here the answer depends on what ONE of this food weighs, so a food
+  // the table does not know has no amount either.
+  if (!entry) return unknown
+  const piece = named ?? own?.medium ?? own?.whole ?? entry.purchaseUnit?.avgGrams ?? null
+  // 4. A count of a food that knows its piece weight.
+  if (counted) return piece != null ? { grams: piece * quantity, basis: 'counted' } : unknown
+  // 5. A size the entry does not list, scaled from its medium.
+  const share = SIZE_OF_MEDIUM[u]
+  if (share != null && piece != null) return { grams: piece * share * quantity, basis: 'counted' }
+  // 6. Anything else — a bowl, a serving, a glass of something with no glass
+  //    weight — is UNKNOWN. It is never the bare number.
+  return unknown
 }
 
 /** True when `needle` (word tokens) appears as a contiguous run inside `haystack` (word tokens) — word-boundary-safe, unlike a raw character substring check (which would wrongly match "corn" inside "unicorn"). */
@@ -553,8 +798,10 @@ function containsWordSequence(haystack: string[], needle: string[]): boolean {
   return false
 }
 
-/** Strips a trailing 's' from tokens long enough that it's almost certainly a plural, not part of the word itself (avoids "hummus" -> "hummu", "asparagus" -> "asparagu"). Deliberately conservative: only used as a last-resort fallback below, never in the primary matching passes. */
+/** Strips a trailing plural suffix from tokens long enough that it's almost certainly a plural, not part of the word itself (avoids "hummus" -> "hummu", "asparagus" -> "asparagu"). Handles "-oes"/"-ies" specially ("potatoes" -> "potato", not the naive slice(-1) result "potatoe"; "berries" -> "berry") since a naive trailing-'s' strip never converges on the singular DB entry for these. Deliberately conservative: only used as a last-resort fallback below, never in the primary matching passes. */
 function depluralizeToken(token: string): string {
+  if (token.length > 5 && token.endsWith('ies')) return token.slice(0, -3) + 'y'
+  if (token.length > 5 && token.endsWith('oes')) return token.slice(0, -2)
   return token.length > 4 && token.endsWith('s') && !token.endsWith('ss') ? token.slice(0, -1) : token
 }
 
@@ -570,11 +817,49 @@ function depluralizeToken(token: string): string {
  * nutritional profile for an unresolved ingredient (see diet-rules.ts's
  * fail-closed handling).
  */
+/**
+ * REMEMBERED, because the day search asks the same few names thousands of
+ * times (28 Sep 2026: 1.2 of 2.8 seconds of a week's search was this scan).
+ * LOOKUP is filled once at load and never changes, so the answer for a name
+ * never changes either. Capped so a long session cannot grow it without end.
+ */
+const LOOKUP_MEMO = new Map<string, FoodEntry | null>()
+const LOOKUP_MEMO_CAP = 5000
+
 export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntry | null {
+  if (!_isPluralRetry) {
+    const known = LOOKUP_MEMO.get(name)
+    if (known !== undefined) return known
+    const found = lookupIngredientUncached(name, false, LOOKUP)
+    if (LOOKUP_MEMO.size >= LOOKUP_MEMO_CAP) LOOKUP_MEMO.clear()
+    LOOKUP_MEMO.set(name, found)
+    return found
+  }
+  return lookupIngredientUncached(name, true, LOOKUP)
+}
+
+/**
+ * The same lookup over the names EXACTLY AS STORED — without the extra
+ * singular keys lookupIngredient gained on 9 Oct 2026. This is what the app's
+ * lookup was before that day, kept for the one caller where a new match is a
+ * LOOSER answer: the diet check, which refuses what it cannot resolve. See
+ * the note where LOOKUP_AS_STORED is built.
+ */
+const AS_STORED_MEMO = new Map<string, FoodEntry | null>()
+export function lookupIngredientAsStored(name: string): FoodEntry | null {
+  const known = AS_STORED_MEMO.get(name)
+  if (known !== undefined) return known
+  const found = lookupIngredientUncached(name, false, LOOKUP_AS_STORED)
+  if (AS_STORED_MEMO.size >= LOOKUP_MEMO_CAP) AS_STORED_MEMO.clear()
+  AS_STORED_MEMO.set(name, found)
+  return found
+}
+
+function lookupIngredientUncached(name: string, _isPluralRetry: boolean, index: Map<string, FoodEntry>): FoodEntry | null {
   const key = normalize(name)
   if (!key) return null
 
-  const exact = LOOKUP.get(key)
+  const exact = index.get(key)
   if (exact) return exact
 
   const keyTokens = key.split(' ').filter(Boolean)
@@ -583,7 +868,7 @@ export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntr
   // inside the query's words, or vice versa? Longest (by word count) wins so
   // "chicken breast" beats "chicken".
   let best: { entry: FoodEntry; len: number } | null = null
-  for (const [known, entry] of LOOKUP) {
+  for (const [known, entry] of index) {
     const knownTokens = known.split(' ').filter(Boolean)
     if (knownTokens.length === 0) continue
     if (containsWordSequence(keyTokens, knownTokens) || containsWordSequence(knownTokens, keyTokens)) {
@@ -598,7 +883,7 @@ export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntr
   // false-positives.
   const keyTokenSet = new Set(keyTokens.filter(t => t.length > 2))
   let bestOverlap: { entry: FoodEntry; score: number } | null = null
-  for (const [known, entry] of LOOKUP) {
+  for (const [known, entry] of index) {
     const knownTokens = known.split(' ').filter(t => t.length > 2)
     if (knownTokens.length === 0) continue
     const overlap = knownTokens.filter(t => keyTokenSet.has(t)).length
@@ -610,7 +895,7 @@ export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntr
 
   if (!_isPluralRetry) {
     const depluralized = keyTokens.map(depluralizeToken).join(' ')
-    if (depluralized !== key) return lookupIngredient(depluralized, true)
+    if (depluralized !== key) return lookupIngredientUncached(depluralized, true, index)
   }
   return null
 }
@@ -625,42 +910,62 @@ export interface MealIngredientLine {
 }
 
 export interface ComputedMealMacros extends Macros100g {
-  /** Share (0-1) of the meal's total gram mass successfully resolved to a food-db entry. */
+  /**
+   * Share (0-1) of the meal that was actually costed. By WEIGHT among the
+   * lines whose amount is known, times the share of LINES whose amount is
+   * known at all — an amount nobody could read has no weight to be a share of.
+   */
   coverage: number
-  /** Ingredient name strings that could not be resolved. */
+  /** Every line left out of the numbers: a food this table does not know, OR a known food whose amount could not be read. */
   unmatched: string[]
-  /** Per-line resolution detail, for scaling/debugging. */
-  lines: { input: MealIngredientLine; entry: FoodEntry | null; grams: number; macros: Macros100g | null }[]
+  /** The subset of `unmatched` that is a KNOWN food with an unreadable amount ("1 large latte", "1 bowl pasta") — the ones to ask "how big?" about. */
+  amountUnknown: string[]
+  /** Per-line resolution detail, for scaling/debugging. `grams` is null when the amount could not be read. */
+  lines: { input: MealIngredientLine; entry: FoodEntry | null; grams: number | null; basis: AmountBasis; macros: Macros100g | null }[]
 }
 
-/** Resolves a named unit to grams for a specific food entry (entry-specific override, else the water-density default, else 1:1 as grams). */
-export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: number): number {
-  const u = unit.toLowerCase().trim()
-  if (entry?.units && entry.units[u] != null) return entry.units[u] * quantity
-  if (DEFAULT_UNIT_GRAMS[u] != null) return DEFAULT_UNIT_GRAMS[u] * quantity
-  // Unknown unit name (e.g. a stray "1 handful") — treat the quantity as grams
-  // rather than throwing away the line; coverage will still reflect the
-  // uncertainty if the ingredient itself doesn't resolve.
-  return quantity
+/**
+ * Grams for a quantity of a food, or NULL WHEN THE AMOUNT CANNOT BE READ.
+ *
+ * It used to end `return quantity` — "unknown unit, treat the number as
+ * grams". That one line logged two scrambled eggs as two grams of egg, a
+ * large latte as one gram of milk and five crispbreads as five grams, each
+ * with coverage 100% and nothing flagged (9 Oct 2026, H6 and M23). A wrong
+ * number that looks measured is the worst thing this file can produce, so
+ * there is no fall-through any more: every caller has to say what it does
+ * with "unknown", and the type makes it.
+ *
+ * `name` is the line's own words, which may carry the unit ("garlic cloves").
+ */
+export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: number, name = ''): number | null {
+  return resolveAmount(entry, unit, quantity, name).grams
 }
 
 /**
  * Computes total macros for a list of ingredient lines by resolving each to
- * food-db and scaling its per-100g values by the line's gram weight. Lines
- * that fail to resolve contribute their gram weight to the mass total (so
- * coverage reflects "how much of this meal is nutritionally known") but zero
- * macros — never an invented estimate.
+ * food-db and scaling its per-100g values by the line's gram weight. A line
+ * that fails to resolve — the food, or how much of it — contributes zero
+ * macros and is listed in `unmatched`; never an invented estimate.
  */
 export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMealMacros {
   let totalGrams = 0
   let matchedGrams = 0
+  let linesWithAmount = 0
   const totals: Macros100g = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   const unmatched: string[] = []
+  const amountUnknown: string[] = []
   const lines: ComputedMealMacros['lines'] = []
 
   for (const line of ingredients) {
     const entry = lookupIngredient(line.name)
-    const grams = unitToGrams(entry, line.unit, line.quantity)
+    const { grams, basis } = resolveAmount(entry, line.unit, line.quantity, line.name)
+    if (grams == null) {
+      unmatched.push(line.name)
+      if (entry) amountUnknown.push(line.name)
+      lines.push({ input: line, entry, grams: null, basis, macros: null })
+      continue
+    }
+    linesWithAmount++
     totalGrams += grams
 
     if (entry) {
@@ -676,20 +981,84 @@ export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMe
       totals.protein += macros.protein
       totals.carbs += macros.carbs
       totals.fat += macros.fat
-      lines.push({ input: line, entry, grams, macros })
+      lines.push({ input: line, entry, grams, basis, macros })
     } else {
       unmatched.push(line.name)
-      lines.push({ input: line, entry: null, grams, macros: null })
+      lines.push({ input: line, entry: null, grams, basis, macros: null })
     }
   }
 
+  const byWeight = totalGrams > 0 ? matchedGrams / totalGrams : 0
+  const byLine = ingredients.length > 0 ? linesWithAmount / ingredients.length : 0
   return {
     kcal: Math.round(totals.kcal),
     protein: Math.round(totals.protein * 10) / 10,
     carbs: Math.round(totals.carbs * 10) / 10,
     fat: Math.round(totals.fat * 10) / 10,
-    coverage: totalGrams > 0 ? matchedGrams / totalGrams : 0,
+    coverage: byWeight * byLine,
     unmatched,
+    amountUnknown,
     lines,
   }
+}
+
+// ---------------------------------------------------------------------------
+// LOGGED MEALS — is this a number to put in somebody's day, and what the card says
+// ---------------------------------------------------------------------------
+// The coach's log_meal turns "I had 2 scrambled eggs on toast" into a card she
+// taps to record it. Twice in one test log (9 Oct 2026) that card carried a
+// number a quarter of the real one, stated as fact. The amounts are fixed
+// above; this is the second lock, read by the coach's handler BEFORE it hands
+// the app a card and by the card's own verifier after: when the numbers do not
+// look like a meal, the app asks a short question instead of logging them.
+
+/** A breakfast, lunch or dinner under this is not a meal anyone logs — one boiled egg is 78 kcal. */
+export const MAIN_MEAL_MIN_KCAL = 100
+/** A counted food that came to less than this is a misread amount, unless one of them really is that small (a clove, a bay leaf, an almond). */
+const COUNTED_LINE_MIN_GRAMS = 5
+const MAIN_MEALS = ['breakfast', 'lunch', 'dinner']
+
+/** True when `kcal` is too little to be the whole of a main meal. Snacks have no floor: a coffee is a snack. */
+export function tooSmallForMainMeal(kcal: number, slot: unknown): boolean {
+  return MAIN_MEALS.includes(String(slot ?? '').trim().toLowerCase()) && kcal < MAIN_MEAL_MIN_KCAL
+}
+
+/**
+ * "assumed large eggs" -> "large eggs", so the card can say "Assumed:" once.
+ *
+ * The coach is told to write each note as 'assumed 0% fat greek yoghurt', and
+ * the card used to prefix the list with "Assuming" — so every card with a
+ * guess on it read "Assuming assumed large eggs" (test log, 9 Oct 2026, L32).
+ * The word is the card's to say, not each note's.
+ */
+export function assumedLine(assumptions: readonly string[]): string | null {
+  const items = assumptions
+    .map(a => a.trim().replace(/^(?:i\s+|i've\s+|we\s+)?assum(?:ed|ing|e|es)\b[\s:,-]*(?:that\s+)?/i, '').replace(/[.;,\s]+$/, '').trim())
+    .filter(Boolean)
+  return items.length > 0 ? `Assumed: ${items.join('; ')}.` : null
+}
+
+const listOf = (names: string[]) => names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+
+/**
+ * The question to ask INSTEAD of logging, or null when the numbers stand.
+ * Only ever about food the table knows: a food it does not know at all is the
+ * coverage floor's job (the card's verifier names it), not a "how big" one.
+ */
+export function doubtAboutLoggedMeal(computed: Pick<ComputedMealMacros, 'kcal' | 'lines' | 'unmatched'>, slot: unknown): string | null {
+  const unsure = computed.lines.filter(l => {
+    if (!l.entry) return false
+    if (l.grams == null) return true
+    if (l.basis !== 'counted' || l.grams >= COUNTED_LINE_MIN_GRAMS) return false
+    const pieces = Object.entries(l.entry.units ?? {}).filter(([unit]) => MEASURE_GRAMS[unit] == null).map(([, g]) => g)
+    const smallest = Math.min(...pieces, l.entry.purchaseUnit?.avgGrams ?? Infinity)
+    return !(smallest < COUNTED_LINE_MIN_GRAMS)
+  }).map(l => l.input.name)
+  if (unsure.length > 0) {
+    return `How big ${unsure.length === 1 ? 'was' : 'were'} the ${listOf(unsure)}? A rough weight in grams, or ml for a drink, is enough.`
+  }
+  if (computed.unmatched.length === 0 && tooSmallForMainMeal(computed.kcal, slot)) {
+    return `That only comes to ${computed.kcal} kcal, which is small for a ${String(slot).trim().toLowerCase()}. How big was it, and was there anything else with it?`
+  }
+  return null
 }

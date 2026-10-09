@@ -117,8 +117,15 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
     return `${dishName} has ${food ?? "something you've told me you don't like"} in it. Want me to add a version without it?`
   }
   if (/coverage/i.test(line)) {
-    const unmatched = /unmatched:\s*(.+)$/.exec(line)?.[1]
-    return `I can't measure ${dishName} accurately${unmatched ? ` — I don't have ${unmatched} in my food data` : ''}, and I'd rather not put a made-up number in your plan. Describe it with more everyday ingredients and I'll try again.`
+    const unmatched = /unmatched:\s*([^—]*)/.exec(line)?.[1]?.trim()
+    // A food the app KNOWS, in an amount it could not read ("2 hummus", "1
+    // bowl of pasta"). Saying "I don't have hummus in my food data" would be
+    // false, and "more everyday ingredients" would not help: it needs a weight.
+    const amountUnknown = /amount unknown:\s*(.+)$/.exec(line)?.[1]?.trim()
+    if (amountUnknown && !unmatched) {
+      return `I can't measure ${dishName} accurately — I couldn't put a weight on ${amountUnknown}. Give me a rough weight in grams and I'll try again.`
+    }
+    return `I can't measure ${dishName} accurately${unmatched ? ` — I don't have ${unmatched} in my food data` : ''}${amountUnknown ? `, and I couldn't put a weight on ${amountUnknown}` : ''}, and I'd rather not put a made-up number in your plan. Describe it with more everyday ingredients and I'll try again.`
   }
   if (/not slot-appropriate/i.test(line)) {
     return `${dishName} doesn't really work as a ${slot}. Want it in a different slot?`

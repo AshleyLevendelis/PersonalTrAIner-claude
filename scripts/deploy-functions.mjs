@@ -41,6 +41,19 @@ if (unknown.length) {
 
 const functions = requested.length ? requested : available
 
+// THE COACH'S FOOD DATABASE IS A GENERATED COPY of the app's, and a stale one
+// is exactly what logged two eggs as two grams of egg (9 Oct 2026). Refused
+// here, before any confirmation is asked for, so a stale copy cannot ship.
+{
+  const { foodDbSyncState, FOOD_DB_EDGE_COPY } = await import('./sync-food-db.mjs')
+  const state = foodDbSyncState()
+  if (!state.fresh || state.problems.length > 0) {
+    console.error(`${FOOD_DB_EDGE_COPY} is stale or cannot run on Deno${state.problems.length ? ` (${state.problems.join('; ')})` : ''}.`)
+    console.error('Run `npm run sync:food-db`, commit, and deploy again. Nothing was deployed, nothing was linked.')
+    process.exit(1)
+  }
+}
+
 console.log(`About to deploy to ${label} (${target}):`)
 for (const f of functions) console.log(`  - ${f}`)
 console.log('')

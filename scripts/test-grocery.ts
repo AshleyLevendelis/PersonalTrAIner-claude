@@ -180,7 +180,41 @@ async function main() {
   await flushPending()
   const afterChatSpinach = await getAllItems(spinachProfileId)
   check('still exactly one spinach row — no duplicate canonical_key insert, no dead-letter silent drop', afterChatSpinach.filter(i => i.canonical_key === 'spinach').length === 1, afterChatSpinach)
-  check('merged quantity normalizes to grams (100g existing + ~1g from the 1:1 fallback for an unmapped count unit)', (afterChatSpinach.find(i => i.canonical_key === 'spinach')?.quantity ?? 0) > 100)
+  // RE-ANCHORED 9 Oct 2026. This used to assert "100g existing + ~1g from
+  // the 1:1 fallback for an unmapped count unit" — i.e. it PINNED the default
+  // that read an unknown unit as grams, the same line that logged two eggs as
+  // two grams of egg (H6) and put "rye crispbread ~5g" on a shopping list
+  // (M23). One spinach, no unit, is not a weight: the row keeps what it had
+  // and is marked a rough estimate, which the screen shows as "tap to set the
+  // amount".
+  const spinachRow = afterChatSpinach.find(i => i.canonical_key === 'spinach')
+  check('an add whose amount cannot be read leaves the row at the 100g it had — not 101g', spinachRow?.quantity === 100 && spinachRow?.unit === 'g', spinachRow)
+  check('...and marks it a rough estimate rather than inventing a gram', spinachRow?.needs_review === true, spinachRow)
+  check('...reporting that nothing was added, so an undo takes nothing off', chatSpinach.addedQuantity === 0, chatSpinach.addedQuantity)
+  // A count the database CAN weigh still merges as a weight.
+  const chatHandful = addItemLocal({ profileId: spinachProfileId, name: 'spinach', quantity: 2, unit: 'handful', source: 'chat', currentItems: afterChatSpinach })
+  check('two handfuls of spinach add their real 60g to the row', chatHandful.row.quantity === 160 && chatHandful.row.unit === 'g' && chatHandful.addedQuantity === 60, chatHandful)
+
+  // ---- 1b. Counted foods on a generated list (M23) -------------------------
+  console.log('\n[1b] a counted food is weighed by the piece, and a count nobody can weigh stays a count')
+  const countProfileId = crypto.randomUUID()
+  const countPools = { snack: [{ slot: 'snack' as const, name: 'Crispbread Plate', macros: targets, tags: [], ingredients: [
+    { name: 'rye crispbread', quantity: 5, unit: 'whole' },   // the test log's "rye crispbread ~5g"
+    { name: 'hummus', quantity: 2, unit: 'whole' },            // no piece weight: cannot be weighed
+    { name: 'cottage cheese', quantity: 100, unit: 'g' },
+    { name: 'cottage cheese', quantity: 1, unit: 'bowl' },     // a weight AND an unreadable amount, one food
+  ] }] }
+  await generateGroceryList({ profileId: countProfileId, mealPools: countPools, targets, startDate: '2026-09-28', days: 1 })
+  await flushPending()
+  const counted = await getAllItems(countProfileId)
+  const crispRow = counted.find(i => i.canonical_key === 'rye crispbread')
+  check('five rye crispbreads are 50g on the list, not 5g', crispRow?.quantity === 50 && crispRow?.unit === 'g' && crispRow?.needs_review === false, crispRow)
+  const hummusRow = counted.find(i => i.canonical_key === 'hummus')
+  check('a count with no piece weight stays "2 whole" — never "2g"', hummusRow?.quantity === 2 && hummusRow?.unit === 'whole', hummusRow)
+  check('...and is marked a rough estimate', hummusRow?.needs_review === true, hummusRow)
+  const cottageRow = counted.find(i => i.canonical_key === 'cottage cheese')
+  check('a food with a weight and an unreadable amount shows the weight it knows (100g, not 101g)', cottageRow?.quantity === 100 && cottageRow?.unit === 'g', cottageRow)
+  check('...marked a rough estimate, because part of it is missing', cottageRow?.needs_review === true, cottageRow)
 
   // ---- 2. Regeneration preserves manual items + checked state --------------
   console.log('\n[2] regeneration preserves manual items and checked state; dropped meals remove their lines')

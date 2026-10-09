@@ -262,8 +262,9 @@ function suggestReplacements(input: BuildMealFoodEditInput, slot: MealSlotName, 
   if (!parsed) return []
   const entry = lookupIngredient(parsed.name)
   if (!entry) return []
-  const grams = unitToGrams(entry, parsed.unit, parsed.quantity)
-  if (!(grams > 0)) return []
+  // An amount that cannot be read has nothing to match a swap against.
+  const grams = unitToGrams(entry, parsed.unit, parsed.quantity, parsed.name)
+  if (grams == null || !(grams > 0)) return []
 
   const share = grams / 100
   const lost: Macros100g = {

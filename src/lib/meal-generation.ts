@@ -524,7 +524,11 @@ export function verifyProposal(
 
   const computed = computeMealMacros(parsed)
   if (computed.coverage < MIN_COVERAGE) {
-    rejectLog.push(`[${slot}] "${proposal.name}": coverage ${(computed.coverage * 100).toFixed(0)}% below ${MIN_COVERAGE * 100}% floor — unmatched: ${computed.unmatched.join(', ')}`)
+    // Two different gaps, kept apart so the sentence built from this line can
+    // tell them apart: a food the table does not know, and a known food whose
+    // AMOUNT could not be read ("2 hummus", "1 bowl pasta").
+    const unknownFoods = computed.unmatched.filter(n => !computed.amountUnknown.includes(n))
+    rejectLog.push(`[${slot}] "${proposal.name}": coverage ${(computed.coverage * 100).toFixed(0)}% below ${MIN_COVERAGE * 100}% floor — unmatched: ${unknownFoods.join(', ')}${computed.amountUnknown.length > 0 ? ` — amount unknown: ${computed.amountUnknown.join(', ')}` : ''}`)
     return null
   }
 
