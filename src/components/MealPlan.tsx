@@ -14,7 +14,7 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
-import { methodSafeToShow, type PoolOption } from '@/lib/meal-generation'
+import { methodSafeToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
@@ -614,25 +614,18 @@ function EmptySlotRow({ slot, isGenerating, onRegenerate }: { slot: MealSlotName
 /** One hero number (today's planned calories) + a 2px progress line + a quiet tabular-mono macro row — replaces the old dual progress-bar TotalsBar. */
 function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroTargets }) {
   const calPct = targets.calories > 0 ? Math.min(100, (totals.calories / targets.calories) * 100) : 0
-  const calDelta = Math.round(totals.calories - targets.calories)
-  const proteinAchieved = targets.protein > 0 && totals.protein >= targets.protein
-  // Fix 4.6 (ux-sweep) — this used to say "on the number" purely off the
-  // calorie delta, so a day 32% over on protein and 27% under on carbs
-  // still read as "on the number" because calories alone happened to land
-  // close — an "at or above target" check on protein isn't enough either,
-  // since that's true at 32% over too. Now requires calories AND protein
-  // AND carbs to each be within a real tolerance of target before making
-  // that claim; otherwise it states the actual calorie delta (unchanged,
-  // and was always honest on its own — the "on the number" case was the
-  // only one overclaiming).
-  const withinTolerance = (actual: number, target: number, pct: number) =>
-    target <= 0 || Math.abs(actual - target) <= target * pct
-  const macrosOnTarget = Math.abs(calDelta) < 30
-    && withinTolerance(totals.protein, targets.protein, 0.1)
-    && withinTolerance(totals.carbs, targets.carbs, 0.1)
-  const deltaLabel = Math.abs(calDelta) < 30
-    ? (macrosOnTarget ? 'on the number' : 'kcal on target, macros off')
-    : calDelta > 0 ? `${calDelta} over` : `${Math.abs(calDelta)} under`
+  // THE ENGINE'S VERDICT, NOT A SECOND OPINION. This component had its own
+  // rule for "on the number" (calories within 30 kcal, protein and carbs
+  // within 10%, fat not looked at) beside the meal engine's bands for a
+  // correct day — so the screen could call a day "macros off" that the engine
+  // had chosen because it was on target, and the two readings two grams of
+  // protein apart in the 9 Oct 2026 test log (179 g "on the number", 181 g
+  // "macros off") were both, by the engine, fine. The words now come from the
+  // engine (dayVerdictLabel), and an off day says WHICH number is off.
+  const deltaLabel = dayVerdictLabel(totals, targets)
+  // Lit when protein is where a correct day has it — the same band, not a
+  // third rule ("at or above target" lit it at 30% over too).
+  const proteinAchieved = targets.protein > 0 && macroOnTarget('protein', totals.protein, targets.protein)
 
   return (
     <div>
