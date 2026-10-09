@@ -33,6 +33,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 /** source (the one a person edits) -> copy (generated, for the edge functions). */
 export const SHARED_FILES = [
   { source: 'src/lib/food-db.ts', copy: 'supabase/functions/_shared/food-db.ts' },
+  { source: 'src/lib/weigh-in-check.ts', copy: 'supabase/functions/_shared/weigh-in-check.ts' },
 ]
 
 const header = (source) => `// ===========================================================================

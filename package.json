@@ -29,6 +29,8 @@
     "sync:shared": "node scripts/sync-shared-code.mjs",
     "test:meal-amounts": "tsx scripts/test-meal-amounts.ts",
     "verify:meal-log-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-log-card.mjs",
+    "test:weigh-in-targets": "tsx scripts/test-weigh-in-targets.ts",
+    "verify:weigh-in": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/weigh-in.mjs",
     "test:rehab-order": "tsx scripts/test-rehab-order.ts",
     "test:one-main-lift": "tsx scripts/test-one-main-lift.ts",
     "test:deload-lighter": "tsx scripts/test-deload-lighter.ts",

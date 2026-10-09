@@ -11,6 +11,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
+import { changeSinceStart } from '@/lib/weight-trend'
 import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
 import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
@@ -478,9 +479,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const stepsToday = steps?.steps ?? 0
   const waterShown = waterMl ?? data.waterMl
   const lastWeighIn = data.weightSeries.length > 0 ? data.weightSeries[data.weightSeries.length - 1] : null
-  const weightDeltaKg = data.weightSeries.length > 1
-    ? data.weightSeries[data.weightSeries.length - 1].kg - data.weightSeries[0].kg
-    : null
+  // FROM THE STARTING WEIGHT, not from the first of the fourteen rows the
+  // chart holds — see changeSinceStart for the two ways that went wrong.
+  const weightDeltaKg = changeSinceStart(data.startingWeightKg, data.weightSeries)
   // Hairline cell geometry, written once: the grid opens with a border-top,
   // the left column carries the vertical rule, the top row the horizontal one.
   const cellStyle = (col: 0 | 1, row: 0 | 1): CSSProperties => ({
@@ -783,7 +784,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               </button>
               {weightDeltaKg != null && (
                 <span className="mt-2 block text-[0.6875rem] font-semibold text-primary-text">
-                  {weightDeltaKg > 0 ? '+' : ''}{weightDeltaKg.toFixed(1)} kg since week 1
+                  {weightDeltaKg > 0 ? '+' : ''}{weightDeltaKg.toFixed(1)} kg since you started
                 </span>
               )}
             </div>

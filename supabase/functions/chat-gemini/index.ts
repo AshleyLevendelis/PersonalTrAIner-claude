@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
+import { checkWeighIn, calendarDaysBetween } from "../_shared/weigh-in-check.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
@@ -3392,6 +3393,37 @@ Keep this context in mind to ensure your greetings and questions naturally align
           );
         }
 
+        // IS IT BELIEVABLE, GIVEN THE LAST ONE? The same check the weigh-in
+        // card and the Profile field ask (_shared/weigh-in-check.ts is the
+        // app's own file, generated). 9 Oct 2026: 62 kg an hour after 81.2 kg
+        // was inside 25-350, so it was saved and the calorie target dropped
+        // 183 kcal on the spot.
+        //
+        // THE VERDICT IS LOGGED AND NOTHING ELSE. What a surprising weigh-in
+        // should DO — ask first, hold the target for a second day — is
+        // Ashley's decision and is open, so the weight is saved exactly as
+        // before, and the verdict is kept out of the reply and out of what the
+        // model is shown. The read is before the write on purpose: after it,
+        // "the last weigh-in" would be this one.
+        let weighInCheck: ReturnType<typeof checkWeighIn> = { verdict: "ok" };
+        try {
+          const lastResp = await fetch(
+            `${supabaseUrl}/rest/v1/daily_metrics?profile_id=eq.${profileId}&select=*&order=date.desc&limit=1`,
+            { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } }
+          );
+          const lastRows = lastResp.ok ? await lastResp.json() : [];
+          const last = Array.isArray(lastRows) && lastRows.length > 0 ? lastRows[0] : null;
+          const lastKg = last ? Number(last.weight_kg) : null;
+          const today = context.current_local_date;
+          const daysSince = last && typeof last.date === "string" && typeof today === "string"
+            ? calendarDaysBetween(last.date, today)
+            : null;
+          weighInCheck = checkWeighIn(weightKg, lastKg, daysSince);
+        } catch (err) {
+          console.error("log_weight: could not read the last weigh-in to check against:", err);
+        }
+        console.log(`weigh-in check verdict=${weighInCheck.verdict}${weighInCheck.verdict === "surprising" ? ` difference_kg=${weighInCheck.differenceKg} allowed_kg=${weighInCheck.allowedKg}` : ""}`);
+
         let dbSuccess = true;
         try {
           const todayDate = context.current_local_date;
@@ -3422,7 +3454,10 @@ Keep this context in mind to ensure your greetings and questions naturally align
           dbSuccess = false;
         }
 
-        const weightFloor = `Logged **${weightKg} kg** for today. Your targets recalculate from your latest weigh-in.`;
+        // Not "recalculate from your latest weigh-in": they follow the 7-day
+        // average and move once it has shifted a kilo (Ashley's ruling), and
+        // this sentence said otherwise until 9 Oct 2026.
+        const weightFloor = `Logged **${weightKg} kg** for today. Your targets follow your 7-day average.`;
         const confirmText = dbSuccess
           ? (await toolReply({
               outcome: { name, args, response: { status: "saved", weight_kg: weightKg, date: context.current_local_date } },

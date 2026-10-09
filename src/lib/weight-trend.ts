@@ -64,3 +64,49 @@ export function computeWeightTrend(
 
   return { rollingAvgKg, sampleCount: last7.length, ratePerWeekKg, onTrackForGoal }
 }
+
+const oneDecimal = (n: number) => Math.round(n * 10) / 10
+
+/**
+ * The line under the weigh-in box: what the targets follow, and how much is
+ * behind the average quoted.
+ *
+ * It said "Targets recalculate from your latest weigh-in · 7-day avg 62 kg"
+ * (test log, 9 Oct 2026). Both halves were untrue: targets follow the 7-day
+ * AVERAGE and only when it has moved a kilo, and that "7-day avg" was the mean
+ * of however many rows existed — one. So the first half states the rule, and
+ * the second calls the figure an average of N weigh-ins until there are three.
+ * Same trend the targets are computed from, so the two cannot disagree.
+ */
+export function weighInAverageLine(trend: WeightTrendResult | null): string {
+  const rule = 'Targets follow your 7-day average'
+  if (!trend) return rule
+  const avg = `${oneDecimal(trend.rollingAvgKg)} kg`
+  return trend.sampleCount >= 3
+    ? `${rule} · 7-day avg ${avg}`
+    : `${rule} · avg of ${trend.sampleCount} weigh-in${trend.sampleCount === 1 ? '' : 's'} ${avg}`
+}
+
+/**
+ * Kilograms gained or lost SINCE THE STARTING WEIGHT, or null when there is
+ * nothing honest to show.
+ *
+ * Home said "-0.2 kg since week 1" for someone 1.0 kg down (test log L31): it
+ * subtracted the first of the last 14 weigh-in rows. Two things were wrong.
+ * The sign-up weight is stored as a weigh-in dated that day, so a weigh-in the
+ * same day REPLACES it and the start is gone from the series; and after
+ * fourteen weigh-ins "the first" is fourteen entries ago, not the start. The
+ * starting weight is its own fact (the weight given at sign-up) and is passed
+ * in. `weighIns` is oldest first.
+ *
+ * Null when only the sign-up weight exists — "0.0 kg since you started" on
+ * day one is noise, not progress.
+ */
+export function changeSinceStart(startKg: number | null | undefined, weighIns: readonly { kg: number }[]): number | null {
+  if (startKg == null || !Number.isFinite(startKg) || weighIns.length === 0) return null
+  const latest = weighIns[weighIns.length - 1].kg
+  if (weighIns.length === 1 && latest === startKg) return null
+  // To the one decimal the screen prints, and never "-0.0".
+  const change = oneDecimal(latest - startKg)
+  return change === 0 ? 0 : change
+}
