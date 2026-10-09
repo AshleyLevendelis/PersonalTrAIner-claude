@@ -921,6 +921,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_missed_session: { done: 'Marked as missed', failed: "I couldn't mark that day" },
   propose_session_move: { done: 'Moved', failed: "I couldn't move that session" },
   propose_session_activity_swap: { done: 'Swapped', failed: "I couldn't swap that day" },
+  propose_weigh_in: { done: 'Weigh-in saved', failed: "I couldn't save that weigh-in" },
   propose_injury_adaptation: { done: 'Adapted', failed: "I couldn't adapt it" },
   propose_injury_as_lasting: { done: 'Saved', failed: "I couldn't save that" },
   propose_injury_recovered: { done: 'Cleared', failed: "I couldn't clear that" },

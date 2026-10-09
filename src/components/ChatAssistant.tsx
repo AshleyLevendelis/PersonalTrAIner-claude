@@ -19,6 +19,8 @@ import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
+import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, type WeighInPayload } from '@/lib/weigh-in-proposal'
+import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
   executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
@@ -5154,6 +5156,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
         else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
+      } else if (result.proposal.kind === 'propose_weigh_in' && result.proposal.rawArgs) {
+        // A weight told to the coach that is far from the last one: asked
+        // about, not saved (Ashley, 9 Oct 2026). The card's question is worked
+        // out from the app's own read of the weigh-ins — weigh-in-proposal.ts.
+        const weighIn = buildWeighInProposal(profile.id, result.proposal.rawArgs, await getWeighInPicture(profile.id))
+        if (weighIn) built = { scopeKey: weighIn.scopeKey, preconditions: weighIn.preconditions, payload: weighIn.payload as unknown as Record<string, unknown>, diff: weighIn.diff }
+        else refusal = "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?"
       } else if (result.proposal.kind === 'propose_session_activity_swap' && result.proposal.rawArgs) {
         const sw = buildSwapForActivityProposal(result.proposal.rawArgs)
         if (sw) built = { scopeKey: sw.scopeKey, preconditions: sw.preconditions, payload: sw.payload as unknown as Record<string, unknown>, diff: sw.diff }
@@ -6189,6 +6198,22 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // touch the plan, so there is nothing to restore beyond clearing the
       // flag — which is exactly what undoRestDay does.
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_weigh_in') {
+      // Her yes to "is 62 kg right?". Written by the weigh-in box's own
+      // function, then the same refresh a weigh-in from the box triggers —
+      // which is where the calorie target is held or moved (the hold is
+      // re-derived from the weigh-ins, nutrition-targets.ts).
+      const payload = row.payload as unknown as WeighInPayload
+      const result = await executeWeighIn(profile.id, payload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_weigh_in'].done : RECEIPTS['propose_weigh_in'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      if (ok) {
+        await onWeightLogged?.()
+        const held = (await getWeighInPicture(profile.id)).heldLatest
+        if (held && held.date === payload.date) rows.push({ label: 'Calorie target', detail: WEIGH_IN_RECEIPT_HOLD_DETAIL })
+      }
     } else if (row.kind === 'propose_session_activity_swap') {
       const payload = row.payload as unknown as SwapForActivityPayload
       const result = await executeSwapForActivity(profile, payload)

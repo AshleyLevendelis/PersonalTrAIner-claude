@@ -19,9 +19,12 @@
 //      what it moved from and to;
 //   3. "today" is the app's date for all of it;
 //   4. one check for "is this weigh-in believable", asked by every place a
-//      weight is typed — a verdict only (what a surprising one DOES is
-//      Ashley's decision, and nothing she can see changes yet);
-//   5. the change shown on Home is measured from the starting weight (L31).
+//      weight is typed;
+//   5. the change shown on Home is measured from the starting weight (L31);
+//   6. ASHLEY'S RULING OF 9 OCT 2026, "Ask, and hold the target" (sections
+//      10-12): a weigh-in far from the last one is ASKED about before it is
+//      saved, and once saved does not move the calorie target until another
+//      day's weigh-in agrees with it — then the target moves, with the notice.
 //
 // Written to run on the tree as it was before the fix as well, so it can be
 // seen to fail for the reason the bug existed: where a function did not exist
@@ -275,27 +278,49 @@ async function main() {
     check('the coach\'s copy gives the same verdict in all 108 cases', cells === 108 && disagreements === 0, { cells, disagreements })
   }
 
-  console.log('\n6. Every place a weight is typed asks it — and a surprising one changes nothing she can see, yet\n')
+  console.log('\n6. Every place a weight is typed asks it, and none of them saves a surprising one unasked\n')
   {
+    // RE-ANCHORED 9 Oct 2026 ON ASHLEY'S RULING. Until she ruled, this section
+    // pinned the opposite: "the verdict is held, not acted on — nothing
+    // refuses or rewords a save". She chose "Ask, and hold the target", so
+    // each place now has to ask BEFORE it writes.
     const card = strip(raw('src/components/WeighInCard.tsx'))
     const profileScreen = strip(raw('src/components/ProfileScreen.tsx'))
     const coach = strip(raw('supabase/functions/chat-gemini/index.ts'))
     const handler = coach.slice(coach.indexOf('name === "log_weight"'), coach.indexOf('name === "propose_session_activity_swap"'))
-    check('the weigh-in card calls the check with the weight being saved', /checkWeighIn\(kg,/.test(card), card.match(/checkWeighIn\([^)]*\)/)?.[0])
-    check('the Profile weight field calls it', /checkWeighIn\(/.test(profileScreen), profileScreen.match(/checkWeighIn\([^)]*\)/)?.[0])
+    check('the weigh-in card asks the shared question with the weight being saved', /weighInQuestion\(kg,/.test(card), card.match(/weighInQuestion\([^)]*\)/)?.[0])
+    {
+      // In the card's save handler the question is asked first, and when there
+      // is one the handler leaves before anything is written.
+      const i = card.indexOf('const handleSave = async')
+      const body = card.slice(i, card.indexOf('const handleCorrect'))
+      const ask = body.indexOf('weighInQuestion(kg,')
+      const leave = body.search(/if \(question\) \{[\s\S]{0,80}?return/)
+      const write = body.search(/await save\(kg\)/)
+      check('...and when there is a question it stops before the save', i >= 0 && ask >= 0 && leave > ask && write > leave, { ask, leave, write })
+      check('...the card writes a weigh-in in one place only, behind that', (card.match(/upsertDailyMetric\(/g) ?? []).length === 1 && !/upsertDailyMetric\(/.test(body))
+    }
+    check('the Profile weight field calls the check', /checkWeighIn\(n,/.test(profileScreen), profileScreen.match(/checkWeighIn\([^)]*\)/)?.[0])
+    {
+      const i = profileScreen.indexOf('data-testid="profile-weight-field"')
+      const field = profileScreen.slice(i, profileScreen.indexOf('<Row label="Current weight">'))
+      const leave = field.search(/verdict\.verdict === 'surprising'[^{]*\{[\s\S]{0,200}?return/)
+      const write = field.indexOf("savePatch({ weight_kg: n })")
+      check('...and on a surprising figure it stops before the save', i >= 0 && leave >= 0 && write > leave, { leave, write })
+      check('...the only other save of a weight there is behind the "yes" button', (field.match(/savePatch\(\{ weight_kg/g) ?? []).length === 2 && /profile-weight-yes[\s\S]{0,200}savePatch\(\{ weight_kg: kg \}\)/.test(field))
+    }
     check('the coach\'s log_weight handler was found (sanity check on this check)', handler.length > 300, handler.length)
-    check('the coach\'s log_weight calls it, from the generated copy', /checkWeighIn\(weightKg,/.test(handler) && /import \{[^}]*checkWeighIn[^}]*\} from "\.\.\/_shared\/weigh-in-check\.ts"/.test(coach))
-    // The verdict is held, not acted on. No sentence is chosen by it and no
-    // save is skipped because of it — that is the owner decision still open.
-    const acts = (src: string) => /verdict === 'surprising'\s*\)\s*(return|\{[^}]*return)/.test(src) || /surprising['"]\s*\?\s*[`'"]/.test(src)
-    check('nothing on the card refuses or rewords a save on the verdict', !acts(card))
-    check('nothing on Profile does', !acts(profileScreen))
-    // In the handler the verdict may be DECLARED, ASSIGNED and LOGGED. Any other
-    // line that mentions it is the verdict reaching the reply, the model or a
-    // decision — which is the ruling being made in code before she has made it.
-    const mentions = handler.split('\n').filter(l => /weighInCheck/.test(l))
-    const allowed = mentions.filter(l => /^\s*let weighInCheck\b/.test(l) || /^\s*weighInCheck = checkWeighIn\(/.test(l) || /^\s*console\.log\(`weigh-in check /.test(l))
-    check('in the coach\'s handler the verdict is declared, assigned and logged — and appears nowhere else', mentions.length === 3 && allowed.length === 3, mentions.map(l => l.trim().slice(0, 90)))
+    check('the coach\'s log_weight asks the same question, from the generated copy', /weighInQuestion\(weightKg,/.test(handler) && /import \{[^}]*weighInQuestion[^}]*\} from "\.\.\/_shared\/weigh-in-check\.ts"/.test(coach))
+    {
+      const ask = handler.indexOf('weighInQuestion(weightKg,')
+      const leave = handler.search(/if \(weighInAsk\) \{[\s\S]{0,900}?kind: "propose_weigh_in"/)
+      const write = handler.indexOf('daily_metrics?on_conflict')
+      const firstWrite = handler.search(/method: "POST"/)
+      check('...and a surprising weight goes back as a proposal BEFORE anything is written', ask >= 0 && leave > ask && write > leave && firstWrite > leave, { ask, leave, write, firstWrite })
+      const proposal = handler.slice(leave, write)
+      check('...the proposal carries the weight and the day, and returns', /weight_kg: weightKg/.test(proposal) && /date: context\.current_local_date/.test(proposal) && /return new Response/.test(proposal))
+      check('...and on that turn the coach says nothing of its own (the card\'s sentence is the app\'s)', /reply: ""/.test(proposal))
+    }
     check('the card no longer claims targets recalculate from the LATEST weigh-in', !/recalculate from your latest weigh-in/i.test(card))
     check('...and neither does the coach\'s own sentence', !/recalculate from your latest weigh-in/i.test(handler))
   }
@@ -344,6 +369,192 @@ async function main() {
     check('a saved weigh-in goes through the one retarget function', /retargetAfterWeighIn\(profile\.id, profile, exercisePlan\)/.test(handler))
     check('...and its three results reach the screen', /setLatestWeightKg\(retarget\.latestWeightKg\)/.test(handler) && /setTargetWeightAnchorKg\(retarget\.anchorKg\)/.test(handler) && /setMacros\(targets\)/.test(handler))
     check('...and its notice is the phrasebook\'s, only when something moved', /retarget\.recorded\.then\([\s\S]{0,300}targetsMoved\([\s\S]{0,200}result\.changedFromPrior && moved/.test(handler))
+  }
+
+  // -------------------------------------------------------------------------
+  // ASHLEY'S RULING, 9 Oct 2026 — "Ask, and hold the target".
+  // -------------------------------------------------------------------------
+  type Reading = { date: string; kg: number }
+  type Question = { differenceKg: number; againstKg: number; daysSince: number } | null
+  const ask = (wicApp as unknown as { weighInQuestion?: (kg: number, today: string, readings: Reading[], anchors?: Reading[] | null) => Question } | null)?.weighInQuestion
+  const askText = (wicApp as unknown as { weighInQuestionText?: (q: NonNullable<Question>, kg: number) => string } | null)?.weighInQuestionText
+  const standing = (wicApp as unknown as { weighInStanding?: (readings: Reading[], anchors?: Reading[] | null) => { trusted: Reading[]; held: (Reading & { against: Reading })[] } } | null)?.weighInStanding
+  const picture = nt.getWeighInPicture as unknown as ((id: string) => Promise<{ today: string; recent: { date: string; weight_kg: number }[]; anchors: Reading[]; standing: { trusted: Reading[]; held: Reading[] }; heldLatest: Reading | null }>) | undefined
+  /** What the weigh-in box does: ask the question against what is saved; `said` is her answer when asked. Returns whether it asked and whether it saved. */
+  const typeWeighIn = async (p: UserProfile, date: string, kg: number, said: 'yes' | 'no' = 'yes') => {
+    setDevClockOverride(p.id!, date)
+    const pic = picture ? await picture(p.id!) : null
+    const question = ask && pic ? ask(kg, pic.today, pic.recent.map(w => ({ date: w.date, kg: w.weight_kg })), pic.anchors) : null
+    if (question && said === 'no') return { asked: question, saved: false as const, result: null }
+    return { asked: question, saved: true as const, result: await weighIn(p, date, kg) }
+  }
+  const linesUnderBox = async (p: UserProfile) => {
+    const pic = picture ? await picture(p.id!) : null
+    const line = wt.weighInAverageLine as unknown as (t: unknown) => string
+    return pic ? { line: line(wt.computeWeightTrend(pic.standing.trusted.map(w => ({ date: w.date, weightKg: w.kg })), pic.today, null)), held: pic.heldLatest } : { line: '', held: null }
+  }
+
+  console.log('\n10. A weigh-in far from the last one is ASKED about before it is saved\n')
+  {
+    check('the question, the standing and the picture exist', typeof ask === 'function' && typeof askText === 'function' && typeof standing === 'function' && typeof picture === 'function')
+    const q = (kg: number, today: string, readings: Reading[], anchors?: Reading[]) => (ask ? ask(kg, today, readings, anchors) : undefined)
+    const typo = q(62, '2026-03-02', [{ date: '2026-03-02', kg: 81.2 }])
+    check('62 kg an hour after 81.2 kg: asked, 19.2 kg lighter, against today\'s own weigh-in', !!typo && typo.differenceKg === -19.2 && typo.againstKg === 81.2 && typo.daysSince === 0, typo)
+    const text = (qq: Question | undefined, kg: number) => (qq && askText ? askText(qq, kg) : '')
+    check('...in these words', text(typo, 62) === "That's 19.2 kg lighter than earlier today — is 62 kg right?", text(typo, 62))
+    check('81.2 kg an hour after 82 kg: not asked', q(81.2, '2026-03-02', [{ date: '2026-03-02', kg: 82 }]) === null)
+    check('heavier is asked the same way', text(q(101, '2026-03-02', [{ date: '2026-03-02', kg: 81 }]), 101) === "That's 20 kg heavier than earlier today — is 101 kg right?", text(q(101, '2026-03-02', [{ date: '2026-03-02', kg: 81 }]), 101))
+    check('the time since the last one is said: yesterday', /lighter than yesterday — is 62 kg right\?$/.test(text(q(62, '2026-03-03', [{ date: '2026-03-02', kg: 81.2 }]), 62)), text(q(62, '2026-03-03', [{ date: '2026-03-02', kg: 81.2 }]), 62))
+    check('...five days', /than your last weigh-in 5 days ago —/.test(text(q(62, '2026-03-07', [{ date: '2026-03-02', kg: 81.2 }]), 62)), text(q(62, '2026-03-07', [{ date: '2026-03-02', kg: 81.2 }]), 62))
+    check('...three weeks', /than your last weigh-in 3 weeks ago —/.test(text(q(55, '2026-03-23', [{ date: '2026-03-02', kg: 81.2 }]), 55)), text(q(55, '2026-03-23', [{ date: '2026-03-02', kg: 81.2 }]), 55))
+    check('...four months', /than your last weigh-in 4 months ago —/.test(text(q(50, '2026-06-30', [{ date: '2026-03-02', kg: 95 }]), 50)), text(q(50, '2026-06-30', [{ date: '2026-03-02', kg: 95 }]), 50))
+    check('no sentence can read "NaN" or "undefined"', ![text(typo, 62), text(q(101, '2026-03-02', [{ date: '2026-03-02', kg: 81 }]), 101)].some(t => /NaN|undefined/.test(t)))
+    // SOMEBODY BACK AFTER MONTHS MUST GET THROUGH. 11 kg down after four months is not even asked about.
+    check('back after four months, 11 kg lighter: not asked at all', q(84, '2026-06-30', [{ date: '2026-03-02', kg: 95 }]) === null)
+    check('a first-ever weigh-in: nothing to ask against', q(62, '2026-03-02', []) === null)
+    check('a weigh-in that agrees with yesterday\'s confirmed surprise is not asked about again',
+      q(62.4, '2026-03-03', [{ date: '2026-03-02', kg: 62 }], [{ date: '2026-03-02', kg: 82 }]) === null)
+    // Fine against this morning's, but 4.3 kg from yesterday's: it would be held, so it is asked about — against yesterday's.
+    const drift = q(80.2, '2026-03-03', [{ date: '2026-03-02', kg: 84.5 }, { date: '2026-03-03', kg: 82.5 }])
+    check('nothing is held without being asked: fine against this morning but 4.3 kg from yesterday is asked, against yesterday', !!drift && drift.againstKg === 84.5 && drift.daysSince === 1 && drift.differenceKg === -4.3, drift)
+    check('a weigh-in dated in the future is not "the last one"', q(81, '2026-03-02', [{ date: '2026-03-05', kg: 60 }, { date: '2026-03-01', kg: 81.2 }]) === null)
+    // The coach's copy asks the same.
+    const coachAsk = (wicCoach as unknown as { weighInQuestion?: typeof ask } | null)?.weighInQuestion
+    let differ = 0, cells = 0
+    if (ask && coachAsk) for (const kg of [50, 62, 79, 81.2, 84, 101]) for (const today of ['2026-03-02', '2026-03-03', '2026-04-20']) for (const readings of [[], [{ date: '2026-03-02', kg: 81.2 }], [{ date: '2026-03-01', kg: 84.5 }, { date: '2026-03-02', kg: 62 }]] as Reading[][]) for (const anchors of [undefined, [{ date: '2026-03-01', kg: 82 }]] as (Reading[] | undefined)[]) {
+      cells++
+      if (JSON.stringify(ask(kg, today, readings, anchors)) !== JSON.stringify(coachAsk(kg, today, readings, anchors))) differ++
+    }
+    check('the coach\'s copy asks the same question in all 108 cases', cells === 108 && differ === 0, { cells, differ })
+    check('"agrees" is the target rule\'s own kilo', (wicApp as unknown as { WEIGH_IN_AGREES_WITHIN_KG?: number } | null)?.WEIGH_IN_AGREES_WITHIN_KG === nt.TARGET_WEIGHT_ANCHOR_THRESHOLD_KG)
+  }
+
+  console.log('\n11. Saved on her yes — and the calorie target HOLDS until another day agrees\n')
+  {
+    // The test log, to the letter: sign up at 82, weigh in at 81.2, then type 62 the same day.
+    const h = sam('hold-1')
+    const s0 = await signUp(h, '2026-03-02')
+    await typeWeighIn(h, '2026-03-02', 81.2)
+    const no = await typeWeighIn(h, '2026-03-02', 62, 'no')
+    check('62 after 81.2 is asked about', !!no.asked && no.asked.differenceKg === -19.2, no.asked)
+    check('"No, change it": nothing is saved — today\'s weigh-in is still 81.2', no.saved === false && (db.daily_metrics ?? []).find(r => r.profile_id === h.id)?.weight_kg === 81.2, (db.daily_metrics ?? []).filter(r => r.profile_id === h.id))
+    const yes = await typeWeighIn(h, '2026-03-02', 62, 'yes')
+    check('"Yes": it is saved', yes.saved === true && (db.daily_metrics ?? []).find(r => r.profile_id === h.id)?.weight_kg === 62)
+    check('...and the calorie target is exactly what it was', yes.result?.targets.calories === s0.targets.calories && yes.result?.targets.protein === s0.targets.protein, { before: s0.targets.calories, after: yes.result?.targets.calories })
+    check('...the anchor is still the 82 kg', yes.result?.anchorKg === 82, yes.result?.anchorKg)
+    check('...nothing is announced, and no new target is recorded', yes.result?.notice === null && (db.daily_nutrition_targets ?? []).filter(r => r.profile_id === h.id).length === 1, yes.result?.notice)
+    check('...Sam\'s 62 kg would have cut the target (the fixture can tell)', kcalAt(h, 62) < s0.targets.calories - 100, [kcalAt(h, 62), s0.targets.calories])
+    const under = await linesUnderBox(h)
+    check('the box knows the newest weigh-in is waiting', under.held?.kg === 62, under.held)
+    check('...and the average it quotes does not include it', !/62/.test(under.line), under.line)
+    const note = (wicApp as unknown as { weighInHeldNote?: (kg: number) => string } | null)?.weighInHeldNote
+    check('...and says so: saved, target stays, will follow once another day agrees', typeof note === 'function' && /^62 kg is saved\./.test(note(62)) && /calorie target stays where it is/.test(note(62)) && /once another day's weigh-in agrees/.test(note(62)), typeof note === 'function' ? note(62) : 'missing')
+    // A reload the same day changes nothing: the hold is re-derived, not remembered.
+    setDevClockOverride(h.id!, '2026-03-02')
+    const reloaded = await nt.getEffectiveTargetWeightKg(h.id!, 62)
+    check('a reload the same day still holds (nothing is remembered on the phone; it is worked out from the weigh-ins)', reloaded.weightKg === 82, reloaded)
+    // Typing 62 again the same day: fine against today's row, still held, so still asked.
+    const again = await typeWeighIn(h, '2026-03-02', 62.2, 'yes')
+    check('a second figure the same day is not "another day": still held', again.result?.targets.calories === s0.targets.calories && (await linesUnderBox(h)).held?.kg === 62.2, again.result)
+
+    // THE SECOND DAY AGREES.
+    const day2 = await typeWeighIn(h, '2026-03-03', 62.5)
+    check('next day, 62.5 kg: not asked — it agrees with the one waiting', day2.asked === null, day2.asked)
+    check('...and now the target moves', day2.result!.targets.calories !== s0.targets.calories, day2.result?.targets)
+    check('...to the target for the average of the two days (62.35 kg)', day2.result!.targets.calories === kcalAt(h, (62.2 + 62.5) / 2) && Math.abs((day2.result!.anchorKg ?? 0) - 62.35) < 0.001, { anchor: day2.result?.anchorKg, kcal: day2.result?.targets.calories })
+    const fmt = (n: number) => n.toLocaleString('en-GB')
+    check('...with the usual notice, naming from and to', typeof day2.result!.notice === 'string' && day2.result!.notice!.includes(fmt(s0.targets.calories)) && day2.result!.notice!.includes(fmt(day2.result!.targets.calories)), day2.result?.notice)
+    check('...and nothing is waiting any more', (await linesUnderBox(h)).held === null)
+    const day3 = await typeWeighIn(h, '2026-03-04', 62.4)
+    check('the day after that it holds again and says nothing', day3.asked === null && day3.result!.targets.calories === day2.result!.targets.calories && day3.result!.notice === null, day3)
+  }
+  {
+    // IT WAS A TYPO, and she says yes by mistake. The next day she weighs in properly.
+    const t = sam('hold-2')
+    const s0 = await signUp(t, '2026-03-02')
+    await typeWeighIn(t, '2026-03-02', 62, 'yes')
+    const back = await typeWeighIn(t, '2026-03-03', 81.6)
+    check('a typo confirmed by mistake, then 81.6 kg the next day: asked (it is 19.6 kg from yesterday\'s)', !!back.asked && back.asked.differenceKg === 19.6 && back.asked.daysSince === 1, back.asked)
+    check('...and the target never moved: 81.6 is within a kilo of where it was set', back.result!.targets.calories === s0.targets.calories && back.result!.notice === null, back.result)
+    check('...the typo is never followed, and the new weigh-in is not waiting', (await linesUnderBox(t)).held === null && !/62/.test((await linesUnderBox(t)).line), await linesUnderBox(t))
+    const st = standing && picture ? (await picture(t.id!)).standing : null
+    check('...it stays in the record as a weigh-in the target does not trust', !!st && st.held.length === 1 && st.held[0].kg === 62 && st.trusted.some(r => r.kg === 81.6), st)
+  }
+  {
+    // Corrected the same day.
+    const c = sam('hold-3')
+    const s0 = await signUp(c, '2026-03-02')
+    await typeWeighIn(c, '2026-03-02', 62, 'yes')
+    const fixed = await typeWeighIn(c, '2026-03-02', 81.5)
+    check('a typo corrected the same day: asked (heavier than earlier today), saved, not waiting, target unmoved',
+      !!fixed.asked && fixed.asked.daysSince === 0 && fixed.result!.targets.calories === s0.targets.calories && (await linesUnderBox(c)).held === null, fixed)
+  }
+  {
+    // BACK AFTER MONTHS AT A VERY DIFFERENT WEIGHT: through in one answer, and the target follows on the second day.
+    const r = sam('hold-4')
+    const s0 = await signUp(r, '2026-01-05')
+    const back = await typeWeighIn(r, '2026-04-20', 60)   // 105 days: 15.4 kg would be believed; 22 kg is asked about
+    check('back after 15 weeks, 22 kg lighter: asked once', !!back.asked && back.asked.differenceKg === -22 && back.asked.daysSince === 105, back.asked)
+    check('...saved on yes, target held that day', back.saved && back.result!.targets.calories === s0.targets.calories && back.result!.anchorKg === 82, back.result)
+    const next = await typeWeighIn(r, '2026-04-21', 60.3)
+    check('...and the next day\'s weigh-in is not asked about and moves the target to the new average', next.asked === null && Math.abs((next.result!.anchorKg ?? 0) - 60.15) < 0.001 && typeof next.result!.notice === 'string', next)
+    const g = sam('hold-5')
+    await signUp(g, '2026-01-05')
+    const gentle = await typeWeighIn(g, '2026-04-20', 71)   // 11 kg in 15 weeks: believable
+    check('back after 15 weeks, 11 kg lighter: not asked, and the target moves the same day as it always did', gentle.asked === null && gentle.result!.anchorKg === 71 && typeof gentle.result!.notice === 'string', gentle)
+  }
+  {
+    // A surprise among ordinary days: the average is taken over the others.
+    const m = sam('hold-6')
+    const s0 = await signUp(m, '2026-03-02')
+    await typeWeighIn(m, '2026-03-03', 81.8)
+    await typeWeighIn(m, '2026-03-04', 81.9)
+    const odd = await typeWeighIn(m, '2026-03-05', 70, 'yes')
+    check('a surprise among ordinary days: the average the target follows leaves it out (81.9, not 78.9)', odd.result!.targets.calories === s0.targets.calories && odd.result!.anchorKg === 82 && /81\.9 kg$/.test((await linesUnderBox(m)).line), { r: odd.result, line: (await linesUnderBox(m)).line })
+  }
+  {
+    // The Profile weight field edits the STARTING weight. The target is worked out from the weigh-in anchor, so it cannot move it.
+    const p0 = sam('profile-field')
+    check('the Profile field cannot move the target: with an anchor, the target does not read the profile\'s weight', kcalAt({ ...p0, weight_kg: 28 } as UserProfile, 82) === kcalAt(p0, 82) && nt.computeTargets({ ...p0, weight_kg: 28 } as UserProfile)!.calories !== kcalAt(p0, 82))
+    const app = strip(raw('src/App.tsx'))
+    check('...and App recomputes on a profile edit from the anchor first', /computeTargets\(profile, \{\s*latestWeightKg: targetWeightAnchorKg \?\? profile\.weight_kg/.test(app))
+    const words = (wicApp as unknown as { profileWeightQuestionText?: (d: number, prev: number, kg: number) => string } | null)?.profileWeightQuestionText
+    check('the Profile field\'s question names the figure it replaces', typeof words === 'function' && words(-51, 79, 28) === "That's 51 kg lighter than the 79 kg you gave before — is 28 kg right?", typeof words === 'function' ? words(-51, 79, 28) : 'missing')
+  }
+
+  console.log('\n12. The coach: a card instead of a write\n')
+  {
+    const wp = await import('../src/lib/weigh-in-proposal').catch(() => null)
+    check('the card builder and its confirm exist', typeof wp?.buildWeighInProposal === 'function' && typeof wp?.executeWeighIn === 'function')
+    const k = sam('coach-1')
+    const s0 = await signUp(k, '2026-03-02')
+    await typeWeighIn(k, '2026-03-02', 81.2)
+    setDevClockOverride(k.id!, '2026-03-02')
+    const pic = picture ? await picture(k.id!) : null
+    // What the edge function sends: its own reads. The app re-asks from its own.
+    const built = wp && pic ? wp.buildWeighInProposal(k.id!, { weight_kg: 62, date: '2026-03-02', difference_kg: -19.2, against_kg: 81.2, days_since: 0 }, pic as never) : null
+    check('62 kg told to the coach becomes a card whose sentence is the weigh-in box\'s own question', built?.diff.lead === "That's 19.2 kg lighter than earlier today — is 62 kg right?", built?.diff.lead)
+    check('...showing the two figures', built?.diff.rows.length === 1 && built.diff.rows[0].before === '81.2 kg' && built.diff.rows[0].after === '62 kg', built?.diff.rows)
+    check('...and saying the target will wait', built?.diff.implications?.some(i => /calorie target stays where it is until another day's weigh-in agrees/.test(i.text)) === true, built?.diff.implications)
+    // A beat first: a write started and not awaited would land after this line.
+    await new Promise(r => setTimeout(r, 5))
+    check('building the card wrote nothing', (db.daily_metrics ?? []).find(r => r.profile_id === k.id)?.weight_kg === 81.2)
+    check('a weight outside 25-350 kg builds no card', wp && pic ? wp.buildWeighInProposal(k.id!, { weight_kg: 18, date: '2026-03-02' }, pic as never) === null : false)
+    if (wp && built) {
+      const done = await wp.executeWeighIn(k.id!, built.payload)
+      check('her yes writes the weigh-in, on that day', done.receipt.failed.length === 0 && (db.daily_metrics ?? []).find(r => r.profile_id === k.id && r.date === '2026-03-02')?.weight_kg === 62, done.receipt)
+      const r = await (nt.retargetAfterWeighIn as unknown as (id: string, p: UserProfile) => Promise<{ targets: MacroTargets; anchorKg: number | null }>)(k.id!, k)
+      check('...and the target holds, as it does from the box', r.targets.calories === s0.targets.calories && r.anchorKg === 82, r)
+    } else check('her yes writes the weigh-in, and the target holds', false)
+    // A correction of a waiting typo is asked about but is not itself held: the card must not promise a wait.
+    const pic2 = picture ? await picture(k.id!) : null
+    const fix = wp && pic2 ? wp.buildWeighInProposal(k.id!, { weight_kg: 81.4, date: '2026-03-02', difference_kg: 19.4, against_kg: 62, days_since: 0 }, pic2 as never) : null
+    check('a correction told to the coach is asked about, without the line about waiting', !!fix && /heavier than earlier today/.test(fix.diff.lead ?? '') && (fix.diff.implications ?? []).length === 0, fix?.diff)
+    const chatUi = strip(raw('src/components/ChatAssistant.tsx'))
+    check('the chat builds that card for the coach\'s proposal', /kind === 'propose_weigh_in'[\s\S]{0,300}buildWeighInProposal\(/.test(chatUi))
+    check('...confirms it through that executor, then refreshes the targets', /row\.kind === 'propose_weigh_in'[\s\S]{0,700}executeWeighIn\([\s\S]{0,500}onWeightLogged\?\.\(\)/.test(chatUi))
+    const { RECEIPTS } = await import('../src/lib/coach-voice')
+    check('...and its receipt has a title', typeof RECEIPTS.propose_weigh_in?.done === 'string' && typeof RECEIPTS.propose_weigh_in?.failed === 'string')
   }
 
   console.log(`\n${ran} checks ran.`)

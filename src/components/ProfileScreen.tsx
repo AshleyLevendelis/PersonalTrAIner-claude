@@ -56,7 +56,7 @@ import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 import { dietTargetCaveat } from '@/lib/coach-voice'
-import { checkWeighIn, type WeighInCheck } from '@/lib/weigh-in-check'
+import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_LABEL, type WeighInCheck } from '@/lib/weigh-in-check'
 
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
 // push plumbing are needed by nobody on first paint (test:bundle holds the
@@ -427,6 +427,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // What the shared weigh-in check made of the last weight typed here (see the
   // weight row). Held, not acted on.
   const [weightCheck, setWeightCheck] = useState<WeighInCheck | null>(null)
+  // A weight far from the one it replaces, typed and NOT YET SAVED: Ashley's
+  // ruling of 9 Oct 2026 is to ask first and save only on yes.
+  const [weightAsking, setWeightAsking] = useState<{ kg: number; differenceKg: number; previousKg: number } | null>(null)
+  // Bumped by "No, change it" so the box goes back to the saved figure.
+  const [weightFieldKey, setWeightFieldKey] = useState(0)
+  const weightFieldRef = useRef<HTMLSpanElement>(null)
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -954,15 +960,45 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Row label="Gender"><EditableSelectField value={profile.gender} options={GENDER_OPTIONS as { value: 'male' | 'female'; label: string }[]} onSave={v => savePatch({ gender: v })} /></Row>
             <Row label="Height"><EditableTextField value={profile.height_cm} unit="cm" min={100} max={250} onSave={n => savePatch({ height_cm: n })} /></Row>
             {/* The same "is this believable?" check the weigh-in card asks
-                (weigh-in-check.ts), against the figure being replaced. HELD,
-                NOT ACTED ON — what a surprising weight should do is Ashley's
-                open decision, so it saves exactly as before; the verdict sits
-                on the wrapper for the ruling to plug into. */}
+                (weigh-in-check.ts), against the figure being replaced.
+                ASHLEY'S RULING, 9 Oct 2026 — "Ask, and hold the target": a
+                surprising figure is asked about and saved only on yes. The
+                HOLD needs nothing here: this is the starting weight, and the
+                calorie target is worked out from the weigh-in average
+                (App's targetWeightAnchorKg), which this field does not move. */}
             <Row label="Onboarding weight">
-              <span data-testid="profile-weight-field" data-weigh-in-check={weightCheck?.verdict}>
-                <EditableTextField value={profile.weight_kg} unit="kg" min={25} max={350} onSave={n => { setWeightCheck(checkWeighIn(n, profile.weight_kg ?? null, 0)); savePatch({ weight_kg: n }) }} />
+              <span ref={weightFieldRef} data-testid="profile-weight-field" data-weigh-in-check={weightCheck?.verdict}>
+                <EditableTextField key={weightFieldKey} value={profile.weight_kg} unit="kg" min={25} max={350} onSave={n => {
+                  const verdict = checkWeighIn(n, profile.weight_kg ?? null, 0)
+                  setWeightCheck(verdict)
+                  if (verdict.verdict === 'surprising' && profile.weight_kg != null) {
+                    setWeightAsking({ kg: n, differenceKg: verdict.differenceKg, previousKg: profile.weight_kg })
+                    return
+                  }
+                  setWeightAsking(null)
+                  savePatch({ weight_kg: n })
+                }} />
               </span>
             </Row>
+            {weightAsking && (
+              <div role="group" aria-label="Check this weight" data-testid="profile-weight-question" className="space-y-2.5 rounded-xl border border-border bg-[color:var(--surface-raised)] px-3.5 py-3">
+                <p className="text-[0.8125rem] leading-snug text-foreground" aria-live="polite">{profileWeightQuestionText(weightAsking.differenceKg, weightAsking.previousKg, weightAsking.kg)}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-11 flex-1 text-[0.8125rem]" data-testid="profile-weight-yes" onClick={() => { const kg = weightAsking.kg; setWeightAsking(null); savePatch({ weight_kg: kg }) }}>
+                    {weighInYesLabel(weightAsking.kg)}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-11 flex-1 text-[0.8125rem]" data-testid="profile-weight-no" onClick={() => {
+                    // Nothing was saved. The box goes back to the saved figure,
+                    // selected, so the next thing typed replaces it.
+                    setWeightAsking(null)
+                    setWeightFieldKey(k => k + 1)
+                    requestAnimationFrame(() => { const box = weightFieldRef.current?.querySelector('input'); box?.focus(); box?.select() })
+                  }}>
+                    {WEIGH_IN_NO_LABEL}
+                  </Button>
+                </div>
+              </div>
+            )}
             <Row label="Current weight">
               <span className="text-sm">{latestWeightKg != null && latestWeightKg > 0 ? `${latestWeightKg} kg` : 'Log a weigh-in on Dashboard'}</span>
             </Row>

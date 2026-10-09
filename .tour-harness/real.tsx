@@ -38,7 +38,8 @@ import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { resolveLoadFields } from '@/lib/warmup'
-import { computeTargets } from '@/lib/nutrition-targets'
+import { computeTargets, retargetAfterWeighIn } from '@/lib/nutrition-targets'
+import { targetsMoved } from '@/lib/coach-voice'
 import { getPools, setMealPick } from '@/lib/meal-store'
 import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
 import { checkMealRefit } from '@/lib/meal-refit'
@@ -118,6 +119,8 @@ const TODAY_ISO = new URLSearchParams(location.search).get('today') ?? ANCHOR_IS
 // depends on the hour). Noon when absent, as every run before 9 Oct 2026 was.
 // Still the app's own seam (the dev clock), never the machine's.
 const CLOCK = new URLSearchParams(location.search).get('clock')
+const WEIGH_IN_ANCHOR = new URLSearchParams(location.search).get('anchor') === '1'
+const WEIGH_IN_HELD = new URLSearchParams(location.search).get('held') === '1'
 setDevClockOverride(PROFILE_ID, TODAY_ISO, CLOCK)
 // ?joined=today — the account was made today (no pace line is said that day).
 const JOINED_TODAY = new URLSearchParams(location.search).get('joined') === 'today'
@@ -690,7 +693,12 @@ const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
   // A weigh-in so the Dashboard's trend has something real to draw rather
   // than rendering its empty state, which is not what the tour spotlights.
-  daily_metrics: [
+  // ?held=1 (verify:weigh-in §5): yesterday's weigh-in was a surprising 62 kg
+  // that she confirmed, so it is saved and WAITING, and there is none today.
+  daily_metrics: WEIGH_IN_HELD ? [
+    { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: 62 },
+    { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
+  ] : [
     { id: 'm1', profile_id: PROFILE_ID, date: today, weight_kg: 80 },
     { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
   ],
@@ -820,7 +828,15 @@ const db: Db = {
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
-  daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
+  // ?anchor=1 / ?held=1: the target row every account has had since 9 Oct 2026
+  // — what set the targets at sign-up (anchorTargetsAtSignUp), at the 80 kg
+  // the fixture started on. Behind a flag because the drivers written before
+  // that date were built on an empty table.
+  daily_nutrition_targets: (WEIGH_IN_ANCHOR || WEIGH_IN_HELD) && macros ? [{
+    id: 't1', profile_id: PROFILE_ID, date: String(profile.created_at).slice(0, 10), workout_split: 'REST',
+    target_calories: macros.calories, target_protein_g: macros.protein, target_carbs_g: macros.carbs, target_fats_g: macros.fat,
+    calculated_weight_kg: profile.weight_kg,
+  }] : [], workout_exercises: [], weight_basis_offers: [],
 }
 // A DRIVER'S OWN ROWS. A script the driver registers to run before the page
 // (Page.addScriptToEvaluateOnNewDocument) may define window.__seedDb; it is
@@ -1288,6 +1304,22 @@ function Harness() {
   const livePlan = planArrived ? exercisePlan : []
   const liveMeso = planArrived ? editedMeso : []
 
+  // A SAVED WEIGH-IN, AS App.tsx HANDLES IT (handleWeightLogged): the app's
+  // one retarget function, its targets onto the screen, its notice when the
+  // target really moved. App shows the notice in its banner; here it lands on
+  // the window for verify:weigh-in to read.
+  const [homeMacros, setHomeMacros] = useState(macros)
+  const handleWeightLogged = async () => {
+    const retarget = await retargetAfterWeighIn(PROFILE_ID, profile, exercisePlan)
+    setHomeMacros(retarget.targets)
+    const result = await retarget.recorded
+    const moved = result.previous && retarget.targets ? targetsMoved(result.previous, retarget.targets, 'weigh_in') : null
+    ;(window as unknown as { __weighInRetarget: unknown }).__weighInRetarget = {
+      calories: retarget.targets?.calories ?? null, anchorKg: retarget.anchorKg,
+      notice: result.changedFromPrior && moved ? moved : null,
+    }
+  }
+
   const noop = () => {}
   return (
     <AppearanceProvider>
@@ -1315,8 +1347,9 @@ function Harness() {
 
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
-          <Dashboard profile={profile} macros={macros} exercisePlan={livePlan}
+          <Dashboard profile={profile} macros={homeMacros} exercisePlan={livePlan}
             mesocycle={liveMeso} planCreatedAt={profile.created_at}
+            onWeightLogged={handleWeightLogged}
 />
         )}
         {activeTab === 'nutrition' && (
