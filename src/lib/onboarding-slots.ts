@@ -138,6 +138,42 @@ export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string;
 ]
 
 /**
+ * STYLES THE APP STILL RUNS BUT NO LONGER OFFERS.
+ *
+ * Ashley's ruling, August 2026 (recorded in her notes, written into the repo
+ * for the first time here, 9 Oct 2026): "remove combat from the picker for now
+ * and backlog it properly. It's a real audience she wants to come back to, but
+ * not at this stage. Removal must handle existing profiles that already have
+ * combat set."
+ *
+ * So `combat` leaves every place a style can be CHOSEN — onboarding, the
+ * Profile screen, and the coach's change-your-style proposal — and stays
+ * everywhere a style is READ. A profile that already holds it keeps it, keeps
+ * its plan, and regenerates exactly as before: the type, the engine's
+ * STYLE_CONFIGS entry, the catalogue's 85 style tags and every gate that
+ * builds a combat plan are untouched on purpose. Nothing is migrated.
+ *
+ * STYLE_OPTIONS stays the full list because it is also how a stored value
+ * gets its label ("Combat / conditioning" on the Profile row and the summary).
+ * Anything that OFFERS a choice reads OFFERED_STYLE_OPTIONS or
+ * styleOptionsFor instead; test:style-picker holds that for every surface.
+ */
+const STYLES_NOT_OFFERED: readonly TrainingStyle[] = ['combat']
+
+/** The styles someone can pick today. */
+export const OFFERED_STYLE_OPTIONS = STYLE_OPTIONS.filter(o => !STYLES_NOT_OFFERED.includes(o.value))
+
+/**
+ * The options for a picker shown to someone who ALREADY HAS a style: what is
+ * offered, plus the one they hold if it is no longer offered — so their own
+ * style is named and can be kept, and nobody else can choose it. Moving off
+ * it is one-way while it stays unoffered.
+ */
+export function styleOptionsFor(current: TrainingStyle | null | undefined): typeof STYLE_OPTIONS {
+  return STYLE_OPTIONS.filter(o => !STYLES_NOT_OFFERED.includes(o.value) || o.value === current)
+}
+
+/**
  * All 8 codes are live somewhere: 5 (lower_back/knees/shoulders/neck/wrists)
  * drive exercise-selection joint filtering (INJURED_JOINTS, exercise-plan.ts),
  * and warmup.ts's mobility-drill contraindications additionally consume
@@ -786,7 +822,13 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
     inputHint: 'Your deadlift, in kg…', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, unit: 'kg', destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'trainingDays', question: 'Which days can you actually train?', inputHint: 'Which days?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
   { key: 'sessionDuration', question: 'How long can your sessions usually run?', inputHint: 'How long have you got?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
-  { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
+  { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column',
+    // A NEW answer must be one that is offered. `options` stays the full list
+    // so a value already stored still shows its label, but an unoffered one
+    // can no longer be written here — not by a tap (the chips do not show it),
+    // not by typing its label, and not by the coach mapping "I box" onto it.
+    // A draft saved before this that holds it is simply asked again.
+    validate: isOneOf(OFFERED_STYLE_OPTIONS) },
   { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'Love it or loathe it?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
   //
@@ -948,15 +990,16 @@ export function isSlotApplicable(def: SlotDef, values: OnboardingSlotValues): bo
 }
 
 /**
- * The options a slot should OFFER right now.
+ * The options a slot should OFFER right now — the single choke point for
+ * hiding a value (VISION.md's "Only offer what's built"), so it happens in
+ * one place rather than at each render site. The chips and the catalogue the
+ * coach is sent both read this.
  *
- * Nothing is filtered today. Kept as the single choke point so that if a
- * value ever needs hiding until the engine can honour it (VISION.md's "Only
- * offer what's built"), it happens in one place rather than at each render
- * site.
+ * One value is hidden today: the combat training style. See
+ * STYLES_NOT_OFFERED for the ruling and for what is deliberately left alone.
  */
 export function offeredOptionsFor(def: SlotDef): readonly SlotOption[] | undefined {
-  return def.options
+  return def.key === 'trainingStyle' ? OFFERED_STYLE_OPTIONS : def.options
 }
 
 /**

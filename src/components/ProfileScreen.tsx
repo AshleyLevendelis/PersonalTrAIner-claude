@@ -41,7 +41,7 @@ import { AppearanceSection } from '@/components/AppearanceSection'
 import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
 import type { RevealSpeed } from '@/lib/reveal-speed-store'
 import {
-  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS, START_PREFERENCE_OPTIONS,
+  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, styleOptionsFor, RECOVERY_OPTIONS, START_PREFERENCE_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
   DAYS_FULL, partitionInjuries, GOAL_OPTIONS,
@@ -1146,7 +1146,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               )}
             </div>
             <Row label="Session length"><EditableSelectField value={profile.session_duration_preference} options={DURATION_OPTIONS} onSave={v => savePatch({ session_duration_preference: v })} /></Row>
-            <Row label="Style"><EditableSelectField value={profile.training_style ?? ''} options={STYLE_OPTIONS} onSave={v => savePatch({ training_style: v as TrainingStyle })} /></Row>
+            <Row label="Style"><EditableSelectField value={profile.training_style ?? ''} options={styleOptionsFor(profile.training_style)} onSave={v => savePatch({ training_style: v as TrainingStyle })} /></Row>
             <Row label="Activity level"><EditableSelectField value={profile.activity_level} options={ACTIVITY_OPTIONS} onSave={v => savePatch({ activity_level: v })} /></Row>
             {/* Directly under Activity level, because that is what it
                 overrides. The placeholder shows the band that activity level

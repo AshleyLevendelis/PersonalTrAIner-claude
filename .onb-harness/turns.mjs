@@ -16,146 +16,22 @@
 // Trusted input through CDP (Input.*), not el.click(): this harness has a
 // history of synthetic clicks behaving differently from taps.
 // ---------------------------------------------------------------------------
-import { createServer } from 'http'
-import { readFileSync, writeFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
-import { join, extname } from 'path'
-import { spawn, spawnSync } from 'child_process'
-import { connect } from 'net'
+import { writeFileSync } from 'fs'
+import { ownBrowser, wait } from './own-browser.mjs'
 
-const DIST = new URL('./dist/', import.meta.url).pathname
-const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
-const server = createServer((q, r) => {
-  const p = q.url.split('?')[0]
-  const f = join(DIST, p === '/' ? '/.onb-harness/scripted.html' : p)
-  if (!existsSync(f) || statSync(f).isDirectory()) { r.writeHead(404); r.end(); return }
-  r.writeHead(200, { 'Content-Type': T[extname(f)] ?? 'application/octet-stream' })
-  r.end(readFileSync(f))
+// The browser, the checks and the single exit all come from own-browser.mjs —
+// read its header before touching how this driver starts or stops.
+const { origin, send, ev, evj, check, section, finish, isGone } = await ownBrowser({
+  dist: new URL('./dist/', import.meta.url).pathname,
+  index: '/.onb-harness/scripted.html',
+  ports: [9700, 9729],
 })
-await new Promise(r => server.listen(0, r))
-const port = server.address().port
-
-// A BROWSER OF ITS OWN, AND NO WAITING ON ANYTHING WITHOUT A DEADLINE.
-//
-// While this driver was being written, on a machine where other checks were
-// running at the same time, it stalled repeatedly in ways that looked exactly
-// like the page hanging. None of them were the page:
-//   - killing Chromium's main process leaves its children holding the debug
-//     port's listening socket for a while. The next run connected to that
-//     dead socket and waited for an answer that could never come;
-//   - a run that was killed from outside left its browser alive on the fixed
-//     port, and the next run attached to THAT one;
-//   - Chromium started without its own profile directory can hand itself to
-//     an instance that is already running and exit.
-// So: a port counts as free only when a connection to it is REFUSED; the
-// browser gets a throwaway profile and is killed as a whole process group
-// however the run ends; and every wait below has a time limit.
-const wait = ms => new Promise(r => setTimeout(r, ms))
-const refused = p => new Promise(res => {
-  const sock = connect({ port: p, host: '127.0.0.1' })
-  const done = v => { sock.destroy(); res(v) }
-  sock.once('connect', () => done(false))
-  sock.once('error', e => done(e.code === 'ECONNREFUSED'))
-  sock.setTimeout(1000, () => done(false))
-})
-let PORT = 0
-for (let p = 9700; p <= 9749 && !PORT; p++) if (await refused(p)) PORT = p
-if (!PORT) { console.error('  FAIL: no free debug port in 9700-9749'); process.exit(1) }
-const profile = mkdtempSync(join(tmpdir(), 'onb-turns-'))
-const chrome = spawn('/opt/pw-browsers/chromium',
-  ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--no-sandbox', '--disable-gpu', 'about:blank'],
-  { stdio: 'ignore', detached: true })
-// THE BROWSER CAN BE KILLED FROM OUTSIDE, and on a shared machine it was:
-// measured, the stalls that survived everything above were Chromium itself
-// gone mid-run (its own HTTP endpoint dead), not the page. That is not a
-// result about the app, so it is never reported as one: every call waiting on
-// the browser fails at once, the run says plainly what happened, and it starts
-// again from the top (twice at most).
-let browserGone = null
-chrome.on('exit', (code, signal) => {
-  if (closing) return
-  browserGone = signal ? `signal ${signal}` : `exit code ${code}`
-  for (const fail of dead.splice(0)) fail()
-})
-let closing = false
-const dead = []
-const shutDown = () => {
-  closing = true
-  // The whole group, so no child is left holding the port.
-  try { process.kill(-chrome.pid, 'SIGKILL') } catch {}
-  try { rmSync(profile, { recursive: true, force: true }) } catch {}
-  server.close()
-}
-for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { shutDown(); process.exit(130) })
-let target
-for (let i = 0; i < 80 && !target; i++) {
-  try {
-    const l = await fetch(`http://127.0.0.1:${PORT}/json/list`, { signal: AbortSignal.timeout(2000) }).then(r => r.json())
-    target = l.find(x => x.type === 'page')?.webSocketDebuggerUrl
-  } catch {}
-  if (!target) await wait(250)
-}
-if (!target) { console.error('  FAIL: the browser never came up'); shutDown(); process.exit(1) }
-const ws = new WebSocket(target)
-const attached = await Promise.race([
-  new Promise(r => ws.addEventListener('open', () => r(true), { once: true })),
-  wait(15000).then(() => false),
-])
-if (!attached) { console.error('  FAIL: could not attach to the browser'); shutDown(); process.exit(1) }
-let id = 0; const pend = new Map()
-ws.addEventListener('message', e => {
-  const m = JSON.parse(e.data)
-  if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id) }
-})
-// Every call has a deadline: a page that stops answering must FAIL the check
-// that was waiting on it, not hang the run until something kills it.
-// Date.now() here is a stopwatch (elapsed milliseconds), never a calendar date.
-const send = (m, p = {}) => new Promise((r, reject) => {
-  if (browserGone) { reject(new Error('the browser is gone')); return }
-  const i = ++id
-  dead.push(() => { pend.delete(i); reject(new Error('the browser is gone')) })
-  const began = Date.now()
-  const timer = setTimeout(() => { pend.delete(i); reject(new Error(`the page did not answer ${m} within 60s`)) }, 60000)
-  pend.set(i, v => {
-    clearTimeout(timer)
-    // Said out loud, because a slow machine and a stuck page look the same
-    // from outside until one of them finally answers.
-    const took = Date.now() - began
-    if (took > 5000) console.log(`      (slow: ${m} took ${Math.round(took / 1000)}s)`)
-    r(v)
-  })
-  ws.send(JSON.stringify({ id: i, method: m, params: p }))
-})
-const ev = x => send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true }).then(r => r.result?.result?.value)
-const evj = async x => JSON.parse(await ev(`JSON.stringify(${x})`) ?? 'null')
-
-await send('Page.enable'); await send('Runtime.enable')
-await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
-await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
-
-let failures = 0, ran = 0
-const check = (label, ok, extra) => {
-  ran++
-  if (ok) console.log(`  ok: ${label}`)
-  else { failures++; console.error(`  FAIL: ${label}${extra !== undefined ? ` — ${typeof extra === 'string' ? extra : JSON.stringify(extra)}` : ''}`) }
-}
-
-// One section per behaviour. A step that throws (an element missing or off
-// screen, a page that stopped answering) is a FAILED check in its own section
-// rather than a crash that silently skips the rest; ONLY=4,7 runs a subset.
-const only = process.env.ONLY ? process.env.ONLY.split(',') : null
-async function section(n, title, fn) {
-  if (only && !only.includes(String(n))) return
-  if (browserGone) return
-  console.log(`\n[${n}] ${title}`)
-  try { await fn() } catch (e) { check(`section ${n} ran to its end — ${e instanceof Error ? e.message : String(e)}`, false) }
-}
 
 const INPUT = '.ob-composer-fade input'
 const SENDBTN = 'button:has(svg.lucide-send)'
 
 async function open(state) {
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?state=${state}` })
+  await send('Page.navigate', { url: `${origin}/?state=${state}` })
   await wait(1500)
 }
 async function tapAt(x, y) {
@@ -593,19 +469,29 @@ await section(14, 'M5 — "40 minutes tops" is ticked as the setting it was stor
   check('choosing the setting itself adds no note', !(await evj(`__ticks()`)).some(t => /closest setting/.test(t)), await evj(`__ticks()`))
 })
 
-if (!browserGone) {
+await section(15, 'M3 — the combat style is not offered, and cannot be recorded by the coach either', async () => {
+  await open('m2')
+  await queue({ reply: 'Good. How do you like to train?', actions: [{ name: 'present_slot', args: { slot_key: 'trainingStyle' } }] })
+  await tapOption('sessionDuration', '30-45 min')
+  await wait(600)
+  let cards = await evj(`__cards('trainingStyle')`)
+  check('the style question shows its options', cards.length === 1 && cards[0].labels.length === 3, cards)
+  check('...and none of them is combat', cards.length === 1 && !cards[0].labels.some(l => /combat|fight/i.test(l)), cards[0]?.labels)
+  // Someone says they box and the coach maps it onto the style it remembers.
+  await queue({
+    reply: 'Boxing, nice. How do you feel about cardio?',
+    actions: [{ name: 'set_slot', args: { slot_key: 'trainingStyle', value: 'combat' } }, { name: 'present_slot', args: { slot_key: 'conditioningPreference' } }],
+  })
+  await say('I box twice a week so something that suits that')
+  const draft = await evj(`__draft()`)
+  check('"combat" is refused as a new answer, whatever the coach sends', draft?.values?.trainingStyle == null && !draft?.confirmedSlots?.includes('trainingStyle'), draft?.values?.trainingStyle)
+  check('...with no tick claiming it was recorded', !(await evj(`__ticks()`)).some(t => /^Style/.test(t)), await evj(`__ticks()`))
+  cards = await evj(`__cards('trainingStyle')`)
+  check('...and the three real options put back in front of them', cards.some(c => c.labels.length === 3 && c.inView && !c.labels.some(l => /combat/i.test(l))), cards)
+})
+
+if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }
 
-shutDown()
-if (browserGone) {
-  const attempt = Number(process.env.ONB_TURNS_ATTEMPT ?? '1')
-  console.log(`\nNOT A RESULT: the browser went away mid-run (${browserGone}) after ${ran} checks — something outside this check ended it.`)
-  if (attempt >= 3) { console.error('Three attempts, three lost browsers. Run this again on a quieter machine.\n'); process.exit(2) }
-  console.log(`Starting again from the top (attempt ${attempt + 1} of 3).\n`)
-  const again = spawnSync(process.execPath, process.argv.slice(1), { stdio: 'inherit', env: { ...process.env, ONB_TURNS_ATTEMPT: String(attempt + 1) } })
-  process.exit(again.status ?? 2)
-}
-console.log(`\n${ran} checks ran.`)
-if (failures > 0) { console.error(`${failures} check(s) failed.\n`); process.exit(1) }
-console.log('Every turn put its chips under the question it asked.\n')
+finish('Every turn put its chips under the question it asked.')

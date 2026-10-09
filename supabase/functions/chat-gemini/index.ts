@@ -1208,14 +1208,14 @@ const toolDeclarations = [
   {
     name: "propose_style_change",
     description:
-      "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / combat / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
+      "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
     parameters: {
       type: "object",
       properties: {
         training_style: {
           type: "string",
-          enum: ["functional", "bodybuilding", "combat", "hybrid"],
-          description: "The style they want from now on. functional = athletic/explosive; bodybuilding = aesthetics/symmetry, higher reps; combat = fight-ready conditioning, heavy main lifts; hybrid = a balance of all three.",
+          enum: ["functional", "bodybuilding", "hybrid"],
+          description: "The style they want from now on. functional = athletic/explosive; bodybuilding = aesthetics/symmetry, higher reps; hybrid = a balance of the two.",
         },
         reason: {
           type: "string",
@@ -2229,7 +2229,7 @@ When the user wants to train on different days ("I can't do Thursdays anymore", 
 
 === 3f. HOW THEY TRAIN (propose_style_change) ===
 When the user wants a LASTING change to how they train ("switch me to bodybuilding", "I want to train more like an athlete from now on", "can we make my whole programme hybrid"):
-- Call propose_style_change with training_style: one of functional, bodybuilding, combat, hybrid. Map what they said to the nearest one and say which you picked; if it genuinely isn't clear which of the four they mean, ask before calling.
+- Call propose_style_change with training_style: one of functional, bodybuilding, hybrid. Map what they said to the nearest one and say which you picked; if it genuinely isn't clear which of the three they mean, ask before calling. (Combat is not offered as a style to move TO any more. Someone already on it keeps it, and their plan, until they choose to change.)
 - This rebuilds the plan from the live week forward. Weeks they've already logged are untouched — say so, it's the reassurance people want before tapping Confirm.
 - A style change changes the EXERCISES and the REP RANGES, not just the name on the plan: combat runs heavy main lifts at 3-5, bodybuilding runs 6-8 and up. Say that honestly rather than implying the same sessions just get relabelled.
 - THIS TOOL IS FOR A LASTING CHANGE TO HOW THEY TRAIN, AND NOTHING ELSE. "Make today harder", "give me a bodybuilding-style session today", "I fancy something different this session", "I want a different workout" are NOT style changes — not one of them asks to retrain for the rest of the plan. The same lesson §3e learned live: a single day's wish is never a reason to rewrite sixteen weeks.
