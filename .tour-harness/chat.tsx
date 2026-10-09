@@ -27,6 +27,7 @@ import { createRoot } from 'react-dom/client'
 import { setSupabaseClient } from '@/lib/supabase'
 import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
+import { EXERCISE_DATABASE } from '@/lib/exercise-db'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { removeExerciseFromSession } from '@/lib/session-edit'
@@ -211,11 +212,17 @@ const crossPatternSwap = (() => {
   const week = mesocycle[0]
   const today = week.days.find(d => d.day === todayName)
   if (!today || today.exercises.length === 0) return null
-  const otherDay = week.days.find(d => d.day !== todayName && d.focus !== today.focus && d.exercises.length > 0)
-  if (!otherDay) return null
+  // A TRAINING LIFT, not the movement-prep drill that now opens most days
+  // (9 Oct 2026): Band Face Pulls -> Wall Slides is two primers, moves no
+  // pushing or pulling set, and the card was right to stay quiet about it.
+  const isPrimer = (name: string) => EXERCISE_DATABASE.find(e => e.name === name)?.mechanics_tier === 'primer'
+  const firstLift = (d: { exercises: { name: string }[] }) => d.exercises.find(e => !isPrimer(e.name))
+  const from = firstLift(today)
+  const otherDay = week.days.find(d => d.day !== todayName && d.focus !== today.focus && !!firstLift(d))
+  if (!from || !otherDay) return null
   return {
-    from: today.exercises[0].name,
-    to: otherDay.exercises[0].name,
+    from: from.name,
+    to: firstLift(otherDay)!.name,
     fromFocus: today.focus,
     toFocus: otherDay.focus,
   }

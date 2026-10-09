@@ -157,8 +157,12 @@ check('today\'s conditioning is actually offered on the timer surface',
 // been moved onto and a session being done elsewhere on the day it left. The
 // property is the same and now says more: the conditioning comes from the plan
 // the tab is given, AS IT RUNS TODAY (the week strip's own resolved cell).
+// RE-ANCHORED again 9 Oct 2026: the tab now reads THIS week of the block
+// (falling back to the plan it is given) and passes the plan's start date, so
+// the strip's cells are the same ones Home resolves.
 check('...derived from the plan the tab is given, as it runs today',
-  /useTrainingWeek\(profileId, todayDate, exercisePlan \?\? EMPTY_PLAN\)/.test(stripComments(read('src/components/ToolsTab.tsx')))
+  /const liveDays = mesocycle\?\.find\(w => w\.week_number === liveWeek\)\?\.days \?\? exercisePlan \?\? EMPTY_PLAN/.test(stripComments(read('src/components/ToolsTab.tsx')))
+  && /useTrainingWeek\(profileId, todayDate, liveDays, planCreatedAt/.test(stripComments(read('src/components/ToolsTab.tsx')))
   && /const todaysConditioning = \(todayCell\?\.movedTo \? null : todayCell\?\.session\)\?\.recommendedCardio/.test(stripComments(read('src/components/ToolsTab.tsx'))))
 
 console.log('\n4. No window.confirm anywhere — it is suppressible in a PWA\n')

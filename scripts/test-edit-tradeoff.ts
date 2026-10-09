@@ -482,5 +482,31 @@ console.log('\n9. The card and the ask are built from the verdict, not re-derive
   check('...and case in the name never splits one thing into two', k('remove', 'SQUATS') === k('remove', 'squats'))
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n10. More sets is a cost the card can state, not a ceiling it can claim')
+// ---------------------------------------------------------------------------
+{
+  // CSCS review, 9 Oct 2026. The UP branch said "past the point where more
+  // does more" on ANY rise of 40%, so a swap taking chest from 3 sets a week to
+  // 6 (under any productive range) told the trainee it was too much. The app
+  // holds no absolute ceiling, on purpose (muscleVolumeChange's comment), so
+  // the sentence may only make the relative claim: more to recover from.
+  const w1 = hyperPlan.find(w => w.week_number === 1)!
+  const doubled = { ...w1, days: w1.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, sets: (e.sets ?? 0) * 2 })) })) }
+  const after = hyperPlan.map(w => (w.week_number === 1 ? doubled : w))
+  const day = w1.days.find(d => d.exercises.length > 0)!
+  const up = assessEdit({
+    profile: hyper, before: hyperPlan, after, weekNumber: 1,
+    dayName: day.day, kind: 'add', scope: 'today', exerciseName: day.exercises[0].name,
+  })
+  const moved = muscleVolumeChange(w1, doubled)
+  check('the fixture really doubles a muscle\'s week', moved !== null && moved.direction === 'up' && moved.after === moved.before * 2, moved)
+  check('a big rise still costs something on the card', up.tier >= 1 && typeof up.cost === 'string', up)
+  check('...stated as the person\'s own numbers, before and after',
+    new RegExp(`goes from ${moved?.before} sets this week to ${moved?.after}\\b`).test(up.cost ?? ''), up.cost)
+  check('...and never as a ceiling the app does not hold',
+    !/more does more|past the point|too much|too many/i.test(up.cost ?? ''), up.cost)
+}
+
 console.log(failures === 0 ? '\nAll edit trade-off checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

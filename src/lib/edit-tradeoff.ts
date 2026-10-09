@@ -463,7 +463,15 @@ export function assessEdit(ctx: EditContext): Tradeoff {
       tier: 1,
       // UP is a cost too, and saying so is the honest half of "add it and say
       // the session is longer". More is not free; it is recovery you spend.
-      cost: `Your ${g} goes from ${volume.before} sets this week to ${volume.after} — past the point where more does more, for most people.`,
+      //
+      // CORRECTED 9 Oct 2026 (CSCS review). This said "past the point where
+      // more does more, for most people" on ANY 40% rise, so 3 -> 6 chest sets
+      // a week (well under the usual productive range) was called too much.
+      // That is a claim about an absolute ceiling, and the comment above
+      // muscleVolumeChange explains why the app holds none: its counting is
+      // generous and it would fire wrongly. The cost it CAN state is relative,
+      // so that is what it says.
+      cost: `Your ${g} goes from ${volume.before} sets this week to ${volume.after} — that's more to recover from before the next session that trains it.`,
       alternatives: [
         { label: 'Swap one out instead', note: `keeps the ${g} work where it was`, prompt: `swap something out for it instead of adding` },
       ],

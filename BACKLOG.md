@@ -2,6 +2,41 @@
 
 Newest first. One line each.
 
+- [x] **JOB 2 OF THE 9 OCT HAND-OVER: THE BRANCH VERIFIED ON A SETTLED TREE (9 Oct 2026).**
+  Full sweep at `44d4b19b`, 362 gates. A container restart killed it at 310; the other 52 were
+  run on the same commit and all passed. **Reds, read one by one:** `test:meal-quality`,
+  `test:schema-parity` and `verify:rls` are the usual environmental three (no database from a
+  cloud session); `test:coach-exam-fresh` is red by design until the exam is re-run. Four were
+  real and none was a defect in the app:
+  - `test:bounds-and-boundaries` was pinned to the Tools line my own job-1 fix changed (Tools
+    now reads THIS week of the block). Re-anchored on the property; 3/3 mutations caught.
+  - `verify:warmup-rows` needed a bodyweight lift on the day, and H4 (a day named for a body
+    part trains it) moved the Cossack squat off it. The driver now takes either of two
+    bodyweight rep lifts and says which; a mutation showing warm-ups on every lift was caught.
+  - `verify:reminders` read the streak by its old words ("N days streak"); the pill now says
+    "N sessions in a row". It reads the pill's number by testid; a mutation sending streak+1 was
+    caught.
+  - `verify:swap-request` swapped the day's FIRST exercise, which is now a movement-prep drill
+    (Band Face Pulls -> Wall Slides, two primers): the card was right to report no cost. The
+    harness now takes the first training lift (Chin-Ups -> Barbell Bench Press); a mutation
+    marking every warning as a note was caught.
+  **FOUND BY READING THE SCREENSHOT, AND FIXED (CSCS review, mine under her delegation):** the
+  swap card told a trainee that chest going from 3 sets a week to 6 was "past the point where
+  more does more, for most people". It said that on ANY rise of 40% or more, whatever the
+  numbers, and 6 sets a week is under any productive range. The comment above the counting
+  already explains why the app holds no absolute ceiling (its counting is generous), so the
+  sentence made a claim the code had deliberately refused to make. It now says the relative
+  cost it can stand behind: "...that's more to recover from before the next session that trains
+  it." The rise still costs something on the card, with the same "swap one out instead". Not on
+  this branch only: main has the same sentence. CSCS five: (1) no change to any prescription,
+  only to what a card says; (2) takes away a false claim and nothing else; (3) fundamentals
+  untouched; (4) no floor or ceiling redefined, and the fix is precisely that it stops implying
+  one; (5) in scope. `test:edit-tradeoff` §10 (4 checks, 3/3 mutations: the old sentence back,
+  the up branch switched off, the wrong number). Derived gates for the file all green, plus
+  `test:bundle`, `test:no-dead-code` and four card drivers. Screenshot re-read.
+  **Noticed, not changed:** the same card names only the biggest move (chest up), not the back
+  work the swap removes; a cross-pattern swap costs two muscles and states one.
+
 - [~] **THE 9 OCT TEST-LOG FIXES — 88 ISSUES FROM TWO RUNS AS A NEW USER, BRANCH
   `claude/test-log-fixes-oct9` (58 commits on `main` at `0df0bc12`; NOT on `main`, nothing deployed,
   no migration).** Ashley asked a cloud session to use the live app as a new user ("Sam") and log

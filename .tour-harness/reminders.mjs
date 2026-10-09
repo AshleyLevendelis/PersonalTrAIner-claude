@@ -194,7 +194,9 @@ await send('Emulation.setUserAgentOverride', { userAgent: '' })
 console.log('  5. Home tells the server what only the plan knows')
 if (stubId) { await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: stubId }); stubId = null }
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/real.html` })
-const shown = await until(() => ev(`(() => { const m = (document.body.textContent || '').match(/(\\d+)\\s*days?\\s*streak/); return m ? Number(m[1]) : null })()`), v => v !== null)
+// Read off the pill's own testid (9 Oct 2026): its words changed from "N days
+// streak" to "N sessions in a row" (M-lane), and the number is the claim.
+const shown = await until(() => ev(`(() => { const m = (document.querySelector('[data-testid="home-streak"]')?.textContent || '').match(/^\\s*(\\d+)/); return m ? Number(m[1]) : null })()`), v => v !== null)
 const facts = await until(() => ev(`(window.__fakeDb?.coach_moment_facts ?? [])[0] ?? null`), v => v !== null)
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 check('5a. Home sent the facts once it had a plan', !!facts, facts)

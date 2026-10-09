@@ -135,10 +135,15 @@ await wait(5000)
 // A DRIVER THAT CANNOT FIND ITS SUBJECT SAYS SO. Reporting PASSED over a
 // screen that never rendered is the failure mode verify:rls exists to shame.
 const LOADED = 'Barbell Squats'
-const BODYWEIGHT = 'Cossack Squat (Bodyweight)'
+// Any bodyweight lift counted in reps will do: the plan is really generated, so
+// which one the day holds moves when generation does (9 Oct 2026, H4: a day
+// named for a body part now trains it, and the Cossack squat left this day).
+// Each name here is `equipment: ['bodyweight']`, `prescription_type: 'reps'`.
+const BODYWEIGHT_CANDIDATES = ['Cossack Squat (Bodyweight)', 'Chair Leg Extension']
 const present = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(r => r.getAttribute('data-exercise-name'))`)
+const BODYWEIGHT = BODYWEIGHT_CANDIDATES.find(n => (present ?? []).includes(n)) ?? BODYWEIGHT_CANDIDATES[0]
 check('the fixture still carries a loaded lift to read', (present ?? []).includes(LOADED), present)
-check('...and a bodyweight one beside it', (present ?? []).includes(BODYWEIGHT), present)
+check(`...and a bodyweight one beside it (${BODYWEIGHT})`, (present ?? []).includes(BODYWEIGHT), present)
 if (!(present ?? []).includes(LOADED) || !(present ?? []).includes(BODYWEIGHT)) await finish()
 
 // ---- 1. The build-up rows are THERE, with no interaction -----------------
