@@ -757,5 +757,123 @@ console.log('\n9. No stop claims a feature that is not on the tab it is pointing
   }
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n10. No stop says its tab "never logs" something that tab logs')
+// ---------------------------------------------------------------------------
+// A DENIAL IS A CLAIM TOO, and §9 could not see one. It reads a sentence for
+// the feature being OFFERED ("water ... logged right here") and skips any
+// sentence that names another tab as a signpost. So the Home stop's "Start
+// session hands you to Exercise ... Home shows; it never logs." was skipped
+// twice over — while the very next stop said water, steps and the weigh-in
+// "are logged right here". Both were on screen, one card apart, from 6 Sep to
+// 9 Oct 2026 (test log L7). The first line was written when Home was a
+// read-out and never revisited when Home became the place the day is logged.
+//
+// The rule: when a stop says its tab never / doesn't / can't log, then every
+// kind of logging the denial covers must be one that tab's own files do not
+// do. "never logs a set" covers sets. A bare "never logs" covers everything.
+// Owners are derived from App.tsx exactly as in §9 — nothing here says which
+// tab logs what.
+{
+  const appSrc = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
+  const SRC_DIR = join(ROOT, 'src')
+  const codeOf = (file: string) => readFileSync(file, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  const findComponentFile = (name: string): string | null => {
+    const walk = (dir: string): string | null => {
+      for (const e of readdirSync(dir)) {
+        const full = join(dir, e)
+        if (statSync(full).isDirectory()) { const hit = walk(full); if (hit) return hit }
+        else if (e === `${name}.tsx`) return full
+      }
+      return null
+    }
+    return walk(join(SRC_DIR, 'components'))
+  }
+  const fileExists = (f: string) => { try { return statSync(f).isFile() } catch { return false } }
+  const directComponentImports = (file: string): string[] => {
+    const out: string[] = []
+    for (const m of readFileSync(file, 'utf8').matchAll(/from ['"]([^'"]+)['"]/g)) {
+      const spec = m[1]
+      let p: string
+      if (spec.startsWith('@/')) p = join(SRC_DIR, spec.slice(2))
+      else if (spec.startsWith('.')) p = join(dirname(file), spec)
+      else continue
+      if (p.includes(`components${sep}ui${sep}`)) continue
+      for (const ext of ['.tsx', '.ts']) {
+        const cand = p + ext
+        if (cand.includes(`${sep}components${sep}`) && fileExists(cand)) out.push(cand)
+      }
+    }
+    return out
+  }
+  const filesForTab = (tab: string): string[] => {
+    const at = appSrc.indexOf(`<TabsContent value="${tab}"`)
+    if (at === -1) return []
+    const rest = appSrc.slice(at + 1)
+    const stop = [rest.indexOf('<TabsContent value="'), rest.indexOf('</Tabs>')].filter(i => i !== -1).sort((a, b) => a - b)[0] ?? rest.length
+    const files = new Set<string>()
+    for (const m of new Set([...rest.slice(0, stop).matchAll(/<([A-Z]\w+)/g)].map(x => x[1]))) {
+      const f = findComponentFile(m)
+      if (!f) continue
+      files.add(f)
+      for (const d of directComponentImports(f)) files.add(d)
+    }
+    return [...files]
+  }
+  const tabBar = readFileSync(join(ROOT, 'src/components/BottomTabBar.tsx'), 'utf8')
+  const labelOf = (t: string) => new RegExp(`tab: '${t}', label: '([^']+)'`).exec(tabBar)?.[1] ?? t
+
+  // What can be logged, how the app does it, and the word a denial would use.
+  const LOGGED: { label: string; marker: RegExp; noun: RegExp }[] = [
+    // The loggable set row, not the writer: owners are read one import deep
+    // (see §9 for why), and the row that takes the tick is at that depth
+    // while saveSet itself is two below it. PeekPanel and ExerciseLine draw a
+    // set WITHOUT a tick, deliberately, and do not match.
+    { label: 'a set', marker: /<SetGrid\b|<ExerciseRow\b|\bsaveSet\b/, noun: /\bsets?\b/i },
+    { label: 'water', marker: /logWater\b/, noun: /water/i },
+    { label: 'steps', marker: /logStepsManual/, noun: /steps/i },
+    { label: 'a weigh-in', marker: /<WeighInCard|logWeight/, noun: /weigh|weight/i },
+  ]
+  const ownersOf = (marker: RegExp) => TABS.filter(t => filesForTab(t as string).some(f => marker.test(codeOf(f))))
+  for (const l of LOGGED) {
+    const owners = ownersOf(l.marker)
+    check(`logging ${l.label}: some tab does it, and not every tab (sanity check on this row)`,
+      owners.length > 0 && owners.length < TABS.length, owners)
+  }
+
+  /** Every kind of logging a sentence DENIES. Empty when it denies none. */
+  const deniedBy = (sentence: string) => {
+    const m = /\b(?:never|doesn'?t|does not|won'?t|can'?t|cannot)\s+logs?\b([^.;!?]*)/i.exec(sentence)
+    if (!m) return []
+    const named = LOGGED.filter(l => l.noun.test(m[1]))
+    return named.length > 0 ? named : LOGGED
+  }
+  // Proven on synthetic lines, so the detector cannot go vacuous later.
+  check('the detector reads a bare denial as covering everything (proving this check)',
+    deniedBy('Home shows; it never logs.').length === LOGGED.length)
+  check('...a scoped one as covering only what it names',
+    deniedBy('Home shows your training; it never logs a set.').map(l => l.label).join() === 'a set')
+  check('...and an offer as denying nothing',
+    deniedBy('Water, steps and your weigh-in are logged right here.').length === 0)
+
+  let denials = 0
+  for (const step of TOUR_STEPS) {
+    for (const line of [step.copy, step.pendingCopy, step.typedWeightCopy]) {
+      for (const sentence of (line ?? '').split(/(?<=[.!?])\s+/)) {
+        for (const l of deniedBy(sentence)) {
+          denials++
+          check(`the "${step.key}" stop may say ${labelOf(step.tab as string)} never logs ${l.label}`,
+            !ownersOf(l.marker).includes(step.tab as never), { sentence, loggedOn: ownersOf(l.marker) })
+        }
+      }
+    }
+  }
+  // If the tour stops denying anything this section has nothing to hold, and
+  // should say so rather than pass silently on zero rows.
+  console.log(`  (${denials} denial(s) read from the tour's own copy)`)
+}
+
 console.log(failures === 0 ? '\nAll app-tour checks passed.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)
