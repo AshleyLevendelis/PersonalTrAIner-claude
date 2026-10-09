@@ -150,5 +150,85 @@ console.log('\n5. The detector is not vacuous')
     survivesRegeneration(['not-a-real-tag', FAVOURITE_TAG]) === true)
 }
 
+// ===========================================================================
+console.log('\n6. The heart writes whole numbers, because the table only takes whole numbers')
+// ===========================================================================
+// 9 Oct 2026 (M21). favorite_meals.calories / protein / carbs / fat are
+// `integer`. A meal's macros carry one decimal. PostgREST rejects a decimal
+// for an integer column rather than rounding it, so the heart had never saved
+// a real meal — and no check noticed, because every stand-in database here
+// accepted 46.6. Run against the write as it was, the first check below
+// printed: 22P02, invalid input syntax for type integer: "46.6".
+{
+  const storeMap = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (k: string) => storeMap.get(k) ?? null, setItem: (k: string, v: string) => { storeMap.set(k, String(v)) }, removeItem: (k: string) => { storeMap.delete(k) } }, configurable: true })
+  if (!('window' in globalThis)) Object.defineProperty(globalThis, 'window', { value: { addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true } }, configurable: true })
+  const { setSupabaseClient } = await import('../src/lib/supabase')
+  const { makeFakeSupabase, INTEGER_COLUMNS, integerViolation } = await import('../.tour-harness/fake-supabase')
+  const { markFavourite } = await import('../src/lib/favourite-meals')
+  const { MEAL_LIBRARY } = await import('../src/lib/meal-library-data')
+  const { verifyProposal, computeSlotBudgets } = await import('../src/lib/meal-generation')
+  const { integerColumns } = await import('./integer-columns.mjs')
+  const db: Record<string, Record<string, unknown>[]> = { favorite_meals: [], meal_plan_slots: [] }
+  const client = makeFakeSupabase(db)
+  setSupabaseClient(client as never)
+
+  // A REAL MEAL, as the app serves it: the first library dinner that verifies, with its decimals.
+  const budget = computeSlotBudgets({ calories: 2300, protein: 160, carbs: 250, fat: 72 }, 3, true).dinner!
+  // ...and ALL THREE of protein, carbs and fat off a whole number, so each of
+  // the three roundings has something to do (a dish with 41.0 g of carbs let a
+  // missing round on carbs through).
+  const real = MEAL_LIBRARY.filter(d => d.slot === 'dinner').map(d => verifyProposal(d, 'dinner', budget, [], []))
+    .find(o => o !== null && [o.macros.protein, o.macros.carbs, o.macros.fat].every(v => !Number.isInteger(v)))!
+  const m = real?.macros ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  check('the fixture is a real served meal whose protein, carbs and fat are each NOT a whole number (so every rounding has something to do)',
+    !!real && [m.protein, m.carbs, m.fat].every(v => !Number.isInteger(v)), m)
+
+  const quiet = console.error; const logged: unknown[] = []; console.error = (...a: unknown[]) => { logged.push(a) }
+  const ok = await markFavourite('p-heart', favouriteInputFromOption(real as PoolOption))
+  console.error = quiet
+  // Null-safe from here on: when the save is refused there is no row, and the
+  // checks below must FAIL, not crash (a crash runs fewer checks and reads as
+  // a broken gate rather than a caught bug).
+  const row: Record<string, unknown> = db.favorite_meals[0] ?? {}
+  check('hearting it saves', ok === true && db.favorite_meals.length === 1, { ok, rows: db.favorite_meals.length, logged: JSON.stringify(logged).slice(0, 200) })
+  check('...as four whole numbers', ['calories', 'protein', 'carbs', 'fat'].every(k => Number.isInteger(row[k])), row)
+  check('...each the meal\'s own figure, rounded (not zero, not truncated)',
+    row.calories === Math.round(m.calories) && row.protein === Math.round(m.protein) && row.carbs === Math.round(m.carbs) && row.fat === Math.round(m.fat), { row, m })
+  // The second heart on the same meal goes down the UPDATE path, which has its own row.
+  console.error = (...a: unknown[]) => { logged.push(a) }
+  const again = await markFavourite('p-heart', favouriteInputFromOption(real as PoolOption))
+  console.error = quiet
+  check('hearting it again (the update path) saves too, and counts to two', again === true && db.favorite_meals.length === 1 && db.favorite_meals[0]?.times_used === 2, db.favorite_meals[0] ?? null)
+
+  // THE STAND-IN DATABASE REFUSES WHAT POSTGRES REFUSES.
+  const refused = await (client.from('favorite_meals') as { insert: (r: unknown) => Promise<{ data: unknown; error: { code: string; message: string } | null }> }).insert({ profile_id: 'x', name: 'Decimal dinner', calories: 512, protein: 46.6, carbs: 40, fat: 12 })
+  check('a decimal in a whole-number column is refused with Postgres\'s own code', refused.error?.code === '22P02' && /invalid input syntax for type integer: "46\.6"/.test(refused.error.message), refused.error)
+  check('...and the refused row is not stored', !db.favorite_meals.some(r => r.name === 'Decimal dinner'))
+  const updated = await (client.from('favorite_meals') as never as { update: (r: unknown) => { eq: (c: string, v: unknown) => Promise<{ error: { code: string } | null }> } }).update({ fat: 12.5 }).eq('profile_id', 'p-heart')
+  check('...an update is refused the same way, and changes nothing', updated.error?.code === '22P02' && Number.isInteger(db.favorite_meals[0]?.fat), [updated.error, db.favorite_meals[0]?.fat ?? null])
+  check('a whole number and a null are both fine', integerViolation('favorite_meals', { calories: 500, protein: null, carbs: 40, fat: 0 }) === null)
+  check('a table with no whole-number columns is never judged', integerViolation('grocery_items', { quantity: 12.5 }) === null)
+
+  // The fake's list is the migrations' list. A new integer column that nobody adds here fails this.
+  const fromSql = integerColumns(ROOT) as Record<string, string[]>
+  const same = JSON.stringify(Object.entries(fromSql).sort()) === JSON.stringify(Object.entries(INTEGER_COLUMNS).map(([t, c]) => [t, [...c].sort()]).sort())
+  check(`the stand-in's whole-number columns are exactly the ones the migrations declare (${Object.keys(fromSql).length} tables)`, same && Object.keys(fromSql).length >= 15,
+    { onlyInSql: Object.keys(fromSql).filter(t => JSON.stringify(fromSql[t]) !== JSON.stringify([...(INTEGER_COLUMNS[t] ?? [])].sort())), onlyInFake: Object.keys(INTEGER_COLUMNS).filter(t => !fromSql[t]) })
+  check('...and favorite_meals\' four macro columns are among them', ['calories', 'protein', 'carbs', 'fat'].every(c => (INTEGER_COLUMNS.favorite_meals ?? []).includes(c)))
+}
+
+// ===========================================================================
+console.log('\n7. A heart that does not save says so')
+// ===========================================================================
+{
+  const card = readFileSync(join(ROOT, 'src/components/MealPlan.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const handler = /const handleFavouriteToggle = async \(\) => \{[\s\S]*?\n {2}\}/.exec(card)?.[0] ?? ''
+  check('the heart\'s handler reads whether the save worked (it used to throw the answer away)', /const saved = await onToggleFavourite\(/.test(handler) && /saved === null/.test(handler), handler.slice(0, 300))
+  check('...and on a failure sets a sentence from the shared phrasebook', /setFavouriteError\(didNotSave\(/.test(handler))
+  check('...which is cleared before the next attempt', handler.indexOf('setFavouriteError(null)') > -1 && handler.indexOf('setFavouriteError(null)') < handler.indexOf('await onToggleFavourite('))
+  check('the sentence is rendered on the card (verify:meal-favourite reads it off the screen)', /\{favouriteError && \(\s*<p[^>]*data-testid="meal-favourite-error"[^>]*>\{favouriteError\}<\/p>/.test(card))
+}
+
 console.log(failures === 0 ? '\nAll meal-favourite checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

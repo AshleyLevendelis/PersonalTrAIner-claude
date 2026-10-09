@@ -25,7 +25,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
-import { COOK_ONCE } from '@/lib/coach-voice'
+import { COOK_ONCE, didNotSave } from '@/lib/coach-voice'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
@@ -736,6 +736,11 @@ function MealSlotRow({
 }) {
   const [busy, setBusy] = useState(false)
   const [favouriteBusy, setFavouriteBusy] = useState(false)
+  // THE HEART'S FAILURE IS SAID. Until 9 Oct 2026 a heart that did not save
+  // did nothing at all on screen and wrote "Couldn't save ..." to a console
+  // nobody reads (M21) — and it had never once saved. The heart still does
+  // not move on a failed write; now a line under the row says why not.
+  const [favouriteError, setFavouriteError] = useState<string | null>(null)
   const [swapOpen, setSwapOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -782,7 +787,9 @@ function MealSlotRow({
       // this card reports a failed write rather than showing the change
       // anyway, and a heart is the easiest thing in the app to flip
       // optimistically and quietly lose.
-      await onToggleFavourite(option, !isFavourite)
+      setFavouriteError(null)
+      const saved = await onToggleFavourite(option, !isFavourite)
+      if (saved === null) setFavouriteError(didNotSave(isFavourite ? 'Taking this off your favourites' : 'This favourite'))
     } finally {
       setFavouriteBusy(false)
     }
@@ -1178,6 +1185,9 @@ function MealSlotRow({
               </button>
             )}
           </div>
+          {favouriteError && (
+            <p role="status" className="text-[0.71875rem] text-[color:var(--role-warn-text)]" data-testid="meal-favourite-error">{favouriteError}</p>
+          )}
 
           {addOpen && onMealPickApplied && (() => {
             const ctx = editContextFor(option)

@@ -145,6 +145,44 @@ check('3b. ...and empties again — a heart is on or off, not a counter you cann
 const w = await pageWidth()
 check('3c. nothing about it makes the page scroll sideways at 390px', w && w.scroll <= w.client + 1, w)
 
+// --- 4. what was written, and what happens when it is not ------------------
+// 9 Oct 2026 (M21). The heart had never saved a real meal: it wrote the meal's
+// macros with one decimal into whole-number columns and the database refused
+// the row. Nothing above could see it, because the stand-in database took a
+// decimal without a word. It now refuses one the way Postgres does, so 2b
+// above is the proof that the write is whole numbers — and this reads the row.
+check('4a. the heart takes a tap again', await tapHeart())
+await timeUntil(heartOn, 'yes', 4000)
+const stored = await ev(`(() => {
+  const name = document.querySelector('[data-meal-favourite]')?.getAttribute('data-meal-favourite')
+  const row = (window.__fakeDb?.favorite_meals ?? []).find(r => r.name === name) ?? null
+  const shown = (window.__fakeDb?.meal_plan_slots ?? []).length
+  return { row: row && { calories: row.calories, protein: row.protein, carbs: row.carbs, fat: row.fat }, rejected: window.__intRejects ?? [], shown }
+})()`)
+check('4b. the row is in the table, with four whole numbers', !!stored?.row && ['calories', 'protein', 'carbs', 'fat'].every(k => Number.isInteger(stored.row[k]) && stored.row[k] >= 0) && stored.row.calories > 0, stored)
+check('4c. ...and nothing this screen wrote was refused for a decimal in a whole-number column', Array.isArray(stored?.rejected) && stored.rejected.length === 0, stored?.rejected)
+// Take it off again, then make the next save fail.
+await tapHeart(); await timeUntil(heartOn, 'no', 4000)
+await ev(`(() => { window.__failWrite = (t) => t === 'favorite_meals'; return true })()`)
+check('4d. the heart takes a tap while the save is going to fail', await tapHeart())
+await wait(900)
+const failed = await ev(`(() => {
+  const h = document.querySelector('[data-meal-favourite]')
+  const e = document.querySelector('[data-testid="meal-favourite-error"]')
+  if (e) e.scrollIntoView({ block: 'center' })
+  const r = e?.getBoundingClientRect()
+  return { on: h?.getAttribute('data-meal-favourite-on') ?? null, pressed: h?.getAttribute('aria-pressed') ?? null, text: e ? e.textContent.trim() : null, onScreen: !!r && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight, rows: (window.__fakeDb?.favorite_meals ?? []).length }
+})()`)
+check('4e. a heart that did not save does not look saved', failed?.on === 'no' && failed?.pressed === 'false' && failed?.rows === 0, failed)
+check('4f. ...and a line under the meal says so, in plain words, on screen', failed?.text === "This favourite didn't save. Check your connection and give it another go." && failed?.onScreen === true, failed)
+check('4g. ...with no raw error in it', !!failed?.text && !/22P02|TypeError|undefined|NaN|simulated|\{|\[/.test(failed.text), failed?.text)
+await shoot('meal-favourite-failed')
+await ev(`(() => { window.__failWrite = undefined; return true })()`)
+check('4h. the next tap works', await tapHeart())
+const recovered = await timeUntil(heartOn, 'yes', 4000)
+const gone = await ev(`!document.querySelector('[data-testid="meal-favourite-error"]')`)
+check('4i. ...the heart fills, and the line has gone', recovered !== null && gone === true, { recovered, gone })
+
 console.log(failures === 0 ? '\nAll favourite screen checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 try { chrome.kill() } catch {}
 server.close()
