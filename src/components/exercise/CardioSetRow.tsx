@@ -279,6 +279,9 @@ function EntryBoxes({
           placeholder={minutesHint != null ? String(minutesHint) : 'min'}
           value={minutes}
           onChange={e => onMinutes(e.target.value)}
+          // ENTER LOGS IT, as it does in a set's box (tester's L10) — the
+          // same handler the ✓ calls, so it refuses whatever the ✓ refuses.
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (!saving) onSave() } }}
           className={`h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${invalid ? 'ring-1 ring-destructive' : ''}`}
         />
         <EffortBox effort={effort} onEffort={onEffort} subject={subject} />

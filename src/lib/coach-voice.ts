@@ -796,6 +796,17 @@ export function setsWaitingToSend(count: number): string {
 }
 
 export const FIRST_LOG_NOTE = 'First time logged — this is your baseline'
+/**
+ * Under an empty weight box whose faint number is the set she has JUST done,
+ * carried down (tester's M11, 9 Oct 2026) — not last time's and not the plan's.
+ * The kind travels with the number, as everywhere: a bodyweight set says so
+ * rather than printing a 0.
+ */
+export function sameAsSetAbove(carry: { kg: number; isBodyweight: boolean; added?: boolean; fromSet: number }): string {
+  return carry.isBodyweight
+    ? `same as set ${carry.fromSet} · bodyweight`
+    : `same as set ${carry.fromSet} · ${carry.added ? '+' : ''}${carry.kg}kg`
+}
 /** Under a set row the server refused, beside its Retry. */
 export const SET_DID_NOT_SAVE = "didn't save"
 

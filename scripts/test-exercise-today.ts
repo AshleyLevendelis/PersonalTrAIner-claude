@@ -200,13 +200,21 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // because a build-up row and a working row can both be "2". The property is
   // the shape of the fallback, not what the parameter is called — so the
   // identifier is captured and the placeholder below must use the SAME one.
+  // RE-ANCHORED 9 Oct 2026 (tester's M11). Both checks pinned the inline
+  // expression `input.weight || (ghost ? … : defaultWeightFor(row))`, which is
+  // the line that filed her 22.5kg set as bodyweight: it never looked at the
+  // set just done. The fallback now lives in ONE resolver the save and the box
+  // both read. Same two properties, asked of it: a blank weight logs what the
+  // resolver says, the resolver still ends at the prescribed default, and the
+  // box shows the resolver's number.
   check('a blank weight still logs the prescribed number, as ruled',
-    /input\.weight \|\| \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\((\w+)\)\)/.test(setGrid))
+    /parseFloat\(input\.weight \|\| blankWeightFor\((\w+)\)\.text\)/.test(setGrid)
+    && /text: ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\((\w+)\), carry: null/.test(setGrid))
   // The placeholder shows the SAME default the tick would log, where one
   // exists — routed through one helper so the two cannot drift apart.
   check('...and the box shows that same number, so the tick keeps its promise',
-    /placeholder=\{isBW \? 'BW' : \(ghost \? String\(ghost\.weight_kg\) : weightPlaceholderFor\((\w+)\)\)\}/.test(setGrid)
-    && /const d = defaultWeightFor\((\w+)\)\s*\n\s*return d === '' \? '[^']+' : d/.test(setGrid))
+    /placeholder=\{isBW \? 'BW' : weightPlaceholderFor\((\w+)\)\}/.test(setGrid)
+    && /const d = blankWeightFor\((\w+)\)\.text\s*\n\s*return d === '' \? '[^']+' : d/.test(setGrid))
 }
 
 // ---------------------------------------------------------------------------

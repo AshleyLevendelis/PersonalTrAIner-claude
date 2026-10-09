@@ -191,7 +191,10 @@ check('...and so is a drop, whose weight comes from a set that really happened',
   /if \(calibrationProbe &&[^)]*!drop[^)]*setNumber > 1/.test(save))
 check('...before the weight is derived, so the fallback never runs', save.length > 0 && /!input\.weight\.trim\(\)/.test(save))
 check('...and the refusal names the probe, so it reads as the design', /set 1 was the probe/.test(save))
-check('the empty box asks to be typed into', /const d = defaultWeightFor\(\w+\)\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
+// RE-ANCHORED 9 Oct 2026: the box's number now comes from the one resolver the
+// save reads (blankWeightFor — the set just done, then last time, then the
+// plan), so the prompt is asked of that. Same property: no number, "type it".
+check('the empty box asks to be typed into', /const d = blankWeightFor\(\w+\)\.text\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
 
 // ANCHORED ON THE BLOCK'S OWN TESTID, not on the condition that renders it.
 // The old anchor was the full condition text and broke the moment that
@@ -349,8 +352,12 @@ check('the grid\'s calibration behaviour is off unless the week turns it on', /c
 // replace — the same test the plan re-anchor uses for evidence.
 check('the search is gated on there being a weight to search for',
   /const calibrationProbe = calibration && suggestedLoadKg != null && !!catalogEntry && isExternallyLoaded\(catalogEntry\)/.test(grid))
-check('...and all three rules read that same flag, not the week alone',
-  (grid.match(/calibrationProbe && [^\n]*setNumber > 1/g) || []).length === 3
+// RE-ANCHORED 9 Oct 2026, three → four. The fourth rule is new and is the same
+// kind: the weight of the set just done never carries INTO sets 2+ of a probe
+// (tester's M11 — carrying it would be the default this week exists to refuse).
+// Still a literal count, so a rule that stops reading the flag is noticed.
+check('...and all four rules read that same flag, not the week alone',
+  (grid.match(/calibrationProbe && [^\n]*setNumber > 1/g) || []).length === 4
   && !/[^a-zA-Z]calibration && [^\n]*setNumber > 1/.test(grid), (grid.match(/calibration(Probe)? && [^\n]*setNumber > 1/g) || []))
 
 // ---------------------------------------------------------------------------

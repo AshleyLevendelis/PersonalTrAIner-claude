@@ -56,6 +56,8 @@
     "verify:history-streak": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/history-streak.mjs",
     "test:finish-check": "tsx scripts/test-finish-check.ts",
     "verify:finish-check": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/finish-check.mjs",
+    "test:log-manners": "tsx scripts/test-log-manners.ts",
+    "verify:log-manners": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/log-manners.mjs",
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",

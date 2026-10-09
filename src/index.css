@@ -919,6 +919,21 @@ html body[data-scroll-locked] {
     );
   }
 
+  /* NO NATIVE SPINNER ON A NUMBER BOX (tester's L10, 9 Oct 2026). On a desktop
+   * the up/down arrows are drawn INSIDE the box, and in the 72px Minutes box
+   * and the Reps box they sat on top of the digits. Nothing in the app is
+   * dosed by clicking an arrow — every number is typed, or tapped as a chip —
+   * and a phone never drew them, so this changes nothing there. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   /* Audit fix: expand a small tappable control's HIT AREA to the ~44x44px
    * minimum without growing its visual size — an invisible ::after covering
    * the element plus enough margin on each side to reach 44px total, laid

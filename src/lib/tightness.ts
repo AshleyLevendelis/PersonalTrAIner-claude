@@ -82,6 +82,12 @@ export function areaLabel(area: string): string {
  */
 export const MAX_TIGHTNESS_DRILLS = 3
 
+/** The drills today's warm-up already holds, by block — the names as the plan prints them. */
+export interface WarmupToday {
+  general?: string[]
+  mobility?: string[]
+}
+
 export interface TightnessWarmup {
   items: WarmupItem[]
   /**
@@ -101,6 +107,12 @@ export interface TightnessWarmup {
    * did something it did not.
    */
   notThisTime: string[]
+  /**
+   * Areas today's warm-up ALREADY prepares, with the drills that do it — the
+   * fourth state (tester's M9, 9 Oct 2026). Named back to her rather than
+   * added a second time.
+   */
+  already: { area: string; drills: string[] }[]
   /** One line for the screen, naming what she said and what it added. */
   note: string | null
 }
@@ -112,37 +124,88 @@ function listOf(parts: string[]): string {
 }
 
 /**
+ * How many NEW drills an area gets when today's warm-up already prepares it.
+ *
+ * ONE — decided as a CSCS coach, 9 Oct 2026. She has told the app something
+ * the plan could not know, so the answer is not "nothing"; but a leg day's
+ * warm-up that already opens the hips twice does not need three more hip
+ * drills (the tester's warm-up went from 6 minutes to 10 on duplicates). One
+ * different drill for the area, the next best the catalogue holds, and the
+ * ones already there named back to her.
+ */
+const NEW_DRILLS_FOR_AN_AREA_ALREADY_PREPARED = 1
+
+/**
  * The extra mobility for what she said is tight, plus the honest account of
  * anything it could not help with.
  *
  * `injuries` is the profile's existing list: an injury still vetoes a drill
  * even when tightness asked for it.
+ *
+ * `today` is the warm-up these are being added to. NEVER THE SAME DRILL TWICE
+ * IN ONE WARM-UP (tester's M9): "Hips" on a leg day added World's Greatest
+ * Stretch and Bodyweight Squat to Stand, both already in that day's warm-up,
+ * because this function picked from the whole catalogue with no knowledge of
+ * the day. A drill already there is skipped and the next best for the area is
+ * taken instead; what is already there is reported in `already`.
  */
-export function tightnessWarmup(areas: string[], injuries: string[] = []): TightnessWarmup {
+export function tightnessWarmup(areas: string[], injuries: string[] = [], today: WarmupToday = {}): TightnessWarmup {
   const named = areas.filter(a => AREA_JOINTS[a])
-  if (named.length === 0) return { items: [], noDrill: [], notThisTime: [], note: null }
+  if (named.length === 0) return { items: [], noDrill: [], notThisTime: [], already: [], note: null }
 
-  const items = drillsPreparing(jointsForAreas(named), injuries).slice(0, MAX_TIGHTNESS_DRILLS)
+  const inWarmup = new Set([...(today.general ?? []), ...(today.mobility ?? [])].map(n => n.trim().toLowerCase()))
+  const isThere = (d: WarmupItem) => inWarmup.has(d.name.trim().toLowerCase())
 
-  // THREE STATES PER AREA, not two: it got a drill, it has one that did not
-  // fit, or the app has nothing for it. Each area is asked on its own so the
-  // answer is about that area and not about the set she happened to tap.
+  // Each area asked on its own, once: every drill it has, and which of those
+  // today's warm-up already holds.
+  const own = new Map(named.map(a => [a, drillsPreparing(AREA_JOINTS[a], injuries)] as const))
+  const there = new Map(named.map(a => [a, (own.get(a) ?? []).filter(isThere).map(d => d.name)] as const))
+
+  // Best-covering first, as before — but a drill already in the warm-up is
+  // never a candidate, and an area the warm-up already prepares stops asking
+  // once it has its one new drill.
+  const items: WarmupItem[] = []
+  const given = new Map<string, number>()
+  for (const d of drillsPreparing(jointsForAreas(named), injuries)) {
+    if (items.length >= MAX_TIGHTNESS_DRILLS) break
+    if (isThere(d)) continue
+    const serves = named.filter(a => (own.get(a) ?? []).some(o => o.name === d.name))
+    const stillWants = serves.some(a =>
+      (there.get(a) ?? []).length === 0 || (given.get(a) ?? 0) < NEW_DRILLS_FOR_AN_AREA_ALREADY_PREPARED)
+    if (!stillWants) continue
+    items.push(d)
+    for (const a of serves) given.set(a, (given.get(a) ?? 0) + 1)
+  }
+
+  // FOUR STATES PER AREA: it got a drill, the warm-up already has one for it,
+  // it has one that did not fit, or the app has nothing for it. Each area is
+  // asked on its own so the answer is about that area and not about the set
+  // she happened to tap.
   const chosen = new Set(items.map(i => i.name))
   const covered: string[] = []
   const notThisTime: string[] = []
   const noDrill: string[] = []
+  const already: { area: string; drills: string[] }[] = []
   for (const a of named) {
-    const own = drillsPreparing(AREA_JOINTS[a], injuries)
-    if (own.length === 0) noDrill.push(a)
-    else if (own.some(d => chosen.has(d.name))) covered.push(a)
-    else notThisTime.push(a)
+    const mine = own.get(a) ?? []
+    const has = there.get(a) ?? []
+    if (has.length > 0) already.push({ area: a, drills: has })
+    if (mine.length === 0) noDrill.push(a)
+    else if (mine.some(d => chosen.has(d.name))) covered.push(a)
+    else if (has.length === 0) notThisTime.push(a)
   }
 
+  // THE SENTENCE SAYS WHERE THEY ARE LISTED (M9: it said "do these first" and
+  // the screen listed them last). Decided as a CSCS coach: raise the pulse
+  // first, then mobilise what is tight, then the session's own mobility — a
+  // joint moves through more range once it is warm. So they sit straight after
+  // the general block, and only lead the warm-up when it has none.
+  const where = (today.general ?? []).length > 0 ? 'straight after the general warm-up' : 'first'
   const note = covered.length > 0
-    ? `Added for the ${listOf(covered.map(areaLabel)).toLowerCase()} you said felt tight — do these first.`
+    ? `Added for the ${listOf(covered.map(areaLabel)).toLowerCase()} you said felt tight — do ${items.length === 1 ? 'this' : 'these'} ${where}.`
     : null
 
-  return { items, noDrill, notThisTime, note }
+  return { items, noDrill, notThisTime, already, note }
 }
 
 /**
@@ -152,8 +215,13 @@ export function tightnessWarmup(areas: string[], injuries: string[] = []): Tight
  * rule here, and an area that silently produces no drill looks identical on
  * screen to one that worked.
  */
-export function uncoveredNote(r: Pick<TightnessWarmup, 'noDrill' | 'notThisTime'>): string | null {
+export function uncoveredNote(r: Pick<TightnessWarmup, 'noDrill' | 'notThisTime'> & Partial<Pick<TightnessWarmup, 'already'>>): string | null {
   const parts: string[] = []
+  // WHAT IS ALREADY THERE, said first: it is the good news, and without it an
+  // answer that added nothing would look exactly like an answer that was lost.
+  for (const a of r.already ?? []) {
+    parts.push(`Your warm-up already has ${listOf(a.drills)} for your ${areaLabel(a.area).toLowerCase()}.`)
+  }
   if (r.notThisTime.length > 0) {
     // TRUE, AND DIFFERENT FROM THE OTHER ONE. She named more than the warm-up
     // has room for; the drills exist and the session still has to fit.

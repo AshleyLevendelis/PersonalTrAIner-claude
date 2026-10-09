@@ -94,7 +94,13 @@ export async function boot({ debugPort, passed }) {
     return true
   }
   const tickButton = (name, rowIndex) => `[...(${rowsExpr(name)}[${rowIndex}]?.querySelectorAll('button') ?? [])].find(b => /^save set/i.test(b.getAttribute('aria-label') || ''))`
-  const rowSaved = (name, rowIndex) => ev(`!!${rowsExpr(name)}[${rowIndex}]?.getAttribute('data-sync')`)
+  // RE-OPENS THE CARD FIRST, since 9 Oct 2026. A card whose header has been
+  // tapped used to stay open for the rest of the session; it now closes itself
+  // when its last planned set is logged, like a card nobody touched (tester's
+  // L11). Read while closed, the row is not on the page and a saved set read
+  // as "not saved". Asking whether a row is saved is not a claim about whether
+  // the card is open — verify:log-manners holds that.
+  const rowSaved = async (name, rowIndex) => { await ensureOpen(name); return ev(`!!${rowsExpr(name)}[${rowIndex}]?.getAttribute('data-sync')`) }
   /** Tick working set `rowIndex + 1`. `weight`/`reps` are typed when given; a row that needs a weight and is given none gets 10. */
   const tick = async (name, rowIndex, { weight, reps } = {}) => {
     await ensureOpen(name)

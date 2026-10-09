@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
@@ -6,7 +6,8 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
-import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, plannedSetProgress, normalizeWarmup, filterDropSets, type ExerciseGroup } from '@/lib/session-derive'
+import { overridesToRelease, type CardProgress } from '@/lib/set-row'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { reconnectingLine } from '@/lib/coach-voice'
@@ -192,13 +193,6 @@ export function TodayPanel({
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [tightOpen, setTightOpen] = useState(false)
 
-  // COMPUTED HERE, NEVER STORED. The plan's warm-up is untouched; these exist
-  // for as long as today's answer does and no longer. Injuries still veto a
-  // drill, which is why the profile's list is handed in.
-  const tightness = useMemo(
-    () => tightnessWarmup(tightAreas, profile?.injuries ?? []),
-    [tightAreas, profile?.injuries],
-  )
 
   const handleTightness = async (a: TightnessAnswer) => {
     // THE TWO THAT ARE NOT ABOUT TIGHTNESS go straight to the triage that owns
@@ -333,6 +327,21 @@ export function TodayPanel({
   const workout = todayCell?.movedTo
     ? undefined
     : (todayCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === effectiveDayName)
+  // COMPUTED HERE, NEVER STORED. The plan's warm-up is untouched; these exist
+  // for as long as today's answer does and no longer. Injuries still veto a
+  // drill, which is why the profile's list is handed in — and so is the
+  // warm-up on screen, so a drill it already holds is never added a second
+  // time (tester's M9).
+  const tightness = useMemo(
+    () => {
+      const plan = normalizeWarmup(workout?.warmup)
+      return tightnessWarmup(tightAreas, profile?.injuries ?? [], {
+        general: (plan?.general ?? []).map(i => i.name),
+        mobility: (plan?.mobility ?? []).map(i => i.name),
+      })
+    },
+    [tightAreas, profile?.injuries, workout?.warmup],
+  )
   // WHAT THEY DID INSTEAD, if they told the coach. The week strip has drawn
   // this correctly all along; this panel read nothing, so on 8 Sep 2026 it
   // went on offering "Start workout" for a session Ashley had already
@@ -1473,12 +1482,42 @@ function ExerciseList({
   onBan: (name: string) => void
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
 }) {
-  const { setsFor } = useActiveSession()
+  const { setsFor, logs, extraSetsFor } = useActiveSession()
   // User overrides only — the default expanded state (which exercise is
   // "current") is recomputed fresh every render from live logs below, so a
   // completed exercise's row auto-advances to the next incomplete one
   // without any explicit "mark done, move on" step.
   const [expandOverrides, setExpandOverrides] = useState<Record<number, boolean>>({})
+
+  // A HEADER TAP IS NOT FOR EVER (tester's L11). A tapped header used to pin
+  // its card open or shut for the rest of the session, so a finished exercise
+  // re-opened to add a drop never closed again. The choice is let go when the
+  // work it was made for is done — see overridesToRelease for the rule. Read
+  // as a short string so the effect runs when a count moves, not every render.
+  const progress: Record<number, CardProgress> = {}
+  workout.exercises.forEach((ex, i) => {
+    const exerciseId = ex.id ?? getExerciseId(ex.name)
+    const working = setsFor(exerciseId, ex.name)
+    const drops = filterDropSets(logs, exerciseId, ex.name)
+    const rowNumbers = new Set([...Array.from({ length: ex.sets }, (_, n) => n + 1), ...working.map(l => l.set_number), ...extraSetsFor(exerciseId)])
+    let added = extraSetsFor(exerciseId).length + extraSetsFor(`${exerciseId}#warmup`).length
+    for (const n of rowNumbers) added += extraSetsFor(`${exerciseId}#drop${n}`).length
+    progress[i] = { complete: working.length >= ex.sets, logged: working.length + drops.length, added }
+  })
+  const progressKey = JSON.stringify(progress)
+  const lastProgress = useRef<Record<number, CardProgress>>(progress)
+  useEffect(() => {
+    const now = JSON.parse(progressKey) as Record<number, CardProgress>
+    const release = overridesToRelease(lastProgress.current, now)
+    lastProgress.current = now
+    if (release.length === 0) return
+    setExpandOverrides(prev => {
+      if (!release.some(i => i in prev)) return prev
+      const next = { ...prev }
+      for (const i of release) delete next[i]
+      return next
+    })
+  }, [progressKey])
 
   const groups = groupExercises(workout.exercises)
   const calibrationAnchorIndex = currentMesoWeekObj?.isCalibrationWeek

@@ -17,11 +17,12 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
+import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2, X } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { lastTime, loggedSetReading, sameAsSetAbove, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { carriedWeightFor, shouldCentreOnFocus, type CarriedWeight } from '@/lib/set-row'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
@@ -33,9 +34,30 @@ import type { UserProfile } from '@/lib/types'
 // about lifting — so 500kg on a 24kg dumbbell passed it without comment.
 const MAX_REPS = 999
 
-/** Keeps the row a lifter is actively editing above the soft keyboard (LAYOUT-DESIGN.md §7.6) — scrollIntoView on focus, not on every keystroke. */
+/**
+ * Keeps the row a lifter is actively editing above the soft keyboard
+ * (LAYOUT-DESIGN.md §7.6) — on focus, not on every keystroke.
+ *
+ * AND ONLY WHEN THE KEYBOARD WOULD COVER IT (tester's L13, 9 Oct 2026). It
+ * used to centre every box on every focus, so with no soft keyboard the page
+ * slid under a stationary pointer and the next tap landed on the row below.
+ * The decision is `shouldCentreOnFocus`, which a gate can ask.
+ */
 function scrollRowIntoView(e: React.FocusEvent<HTMLInputElement>) {
+  const box = e.currentTarget.getBoundingClientRect()
+  const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight
+  if (!shouldCentreOnFocus({ coarsePointer, top: box.top, bottom: box.bottom, viewportHeight })) return
   e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+/**
+ * A focused number box changes its value when the wheel turns over it, which
+ * on a desktop silently alters a weight on the way down the page. Letting go
+ * of the box hands the wheel back to the page.
+ */
+function releaseOnWheel(e: React.WheelEvent<HTMLInputElement>) {
+  if (document.activeElement === e.currentTarget) e.currentTarget.blur()
 }
 
 interface SetInputState {
@@ -443,6 +465,37 @@ export function SetGrid({
     // external load, where 0kg x 12 is exactly what happened.
     return catalogEntryIsLoaded ? '' : '0'
   }
+  /**
+   * THE SET JUST DONE, CARRIED DOWN (tester's M11) — see carriedWeightFor for
+   * the rule and its basis. Working rows only, and never in calibration week
+   * on sets 2+, which deliberately have no default: there the row asks, with
+   * the next-weight chips.
+   */
+  const carryFor = (ref: SetRef): CarriedWeight | null => (
+    isWarm(ref) || isDrop(ref) || (calibrationProbe && ref.setNumber > 1)
+      ? null
+      : carriedWeightFor(ref.setNumber, existingLogs, perSetLoadKg)
+  )
+  /**
+   * WHAT A BLANK WEIGHT BOX LOGS, and where that number came from — ONE
+   * resolver for the save, the placeholder, the plate calculator and the
+   * marker under the row, so the box can never show one number and log
+   * another. In order: the set just done today, her last session, the plan.
+   */
+  const blankWeightFor = (ref: SetRef): { text: string; carry: CarriedWeight | null } => {
+    const carry = carryFor(ref)
+    if (carry) return { text: String(carry.kg), carry }
+    const ghost = ghostFor(ref)
+    return { text: ghost ? String(ghost.weight_kg) : defaultWeightFor(ref), carry: null }
+  }
+  /** The carry is worth SAYING only when it changes the number the box would otherwise have shown. */
+  const carryChangesTheBox = (ref: SetRef): CarriedWeight | null => {
+    const carry = carryFor(ref)
+    if (!carry) return null
+    const ghost = ghostFor(ref)
+    const otherwise = ghost ? String(ghost.weight_kg) : defaultWeightFor(ref)
+    return otherwise !== '' && Number(otherwise) === carry.kg ? null : carry
+  }
   /** What the empty box SHOWS — the default where one exists, a prompt where it does not. */
   /**
    * THIS ROW HAS NO WEIGHT TO OFFER — no prescription and no last time — so a
@@ -456,10 +509,10 @@ export function SetGrid({
    * step before the set was logged. Ashley's ruling, 24 Sep 2026, from three
    * options: on these days the tour says to type the weight, then tap ✓.
    */
-  const offersNoWeight = (ref: SetRef): boolean => !ghostFor(ref) && defaultWeightFor(ref) === ''
+  const offersNoWeight = (ref: SetRef): boolean => blankWeightFor(ref).text === ''
 
   const weightPlaceholderFor = (ref: SetRef): string => {
-    const d = defaultWeightFor(ref)
+    const d = blankWeightFor(ref).text
     return d === '' ? 'type it' : d
   }
 
@@ -561,9 +614,10 @@ export function SetGrid({
     // used to fall through to weight_kg=0, which downstream code flags as
     // malformed and drops from every summary/history view without telling
     // the user their tap didn't actually count.
+    // AND THE SET JUST DONE COMES BEFORE BOTH (M11): see blankWeightFor.
     const weight = input.isBodyweight
       ? 0
-      : parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : defaultWeightFor(ref))) || 0
+      : parseFloat(input.weight || blankWeightFor(ref).text) || 0
     // A 0kg save without the BW flag produces exactly the "malformed
     // zero-weight" row every summary/history reader silently filters out —
     // the tap would look successful (rest timer starts) but the set vanishes.
@@ -759,6 +813,46 @@ export function SetGrid({
     setExtraSets(exerciseId, [...extraSetNumbers, next])
   }
 
+  /**
+   * ENTER IN A SET'S BOX LOGS THAT SET (tester's L10). The same function the ✓
+   * calls, so every refusal the tick makes — an empty calibration box, a
+   * weight past what she can load — the key makes too.
+   */
+  const saveOnEnter = (e: React.KeyboardEvent<HTMLInputElement>, ref: SetRef) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    handleSaveSet(ref)
+  }
+
+  /**
+   * THE LIST A ROW SHE ADDED LIVES IN, or null for a row the plan or the log
+   * put there (tester's L11). Only an added row can be taken away again: a
+   * prescribed row is the plan's, and a logged one has its own Delete.
+   */
+  const addedRowKey = (ref: SetRef): string | null => {
+    if (isDrop(ref)) return extraSetsFor(dropExtrasKey(ref.setNumber)).includes(ref.dropIndex ?? 0) ? dropExtrasKey(ref.setNumber) : null
+    if (isWarm(ref)) return extraWarmupNumbers.includes(ref.setNumber) && !prescribedWarmupNumbers.includes(ref.setNumber) ? `${exerciseId}#warmup` : null
+    return extraSetNumbers.includes(ref.setNumber) && ref.setNumber > totalSets ? exerciseId : null
+  }
+  /**
+   * Take an added row off the screen again. It was never logged, so there is
+   * nothing to delete from the record — the row simply stops being drawn, and
+   * anything typed into it goes with it. Its number can be issued again: no
+   * stored set ever carried it.
+   */
+  const handleRemoveAddedRow = (ref: SetRef) => {
+    const listKey = addedRowKey(ref)
+    if (!listKey) return
+    const n = isDrop(ref) ? (ref.dropIndex ?? 0) : ref.setNumber
+    setExtraSets(listKey, extraSetsFor(listKey).filter(x => x !== n))
+    saveSetDraft(draftIdFor(ref), ref.setNumber, { weight: '', reps: '', isBodyweight: false })
+    const k = rowKey(ref)
+    setInputs(prev => { const next = { ...prev }; delete next[k]; return next })
+    setRowErrors(prev => { const next = { ...prev }; delete next[k]; return next })
+    setRowWarnings(prev => { const next = { ...prev }; delete next[k]; return next })
+    if (confirmWeightSet === k) setConfirmWeightSet(null)
+  }
+
   const logColumnLabel = prescriptionType
     ? getRepsColumnLabel(prescribedReps ?? '', prescriptionType)
     : 'Reps'
@@ -899,7 +993,7 @@ export function SetGrid({
                 The violet says what the row COUNTS AS and is the only colour
                 carrying that meaning; the rail beside it only says these rows
                 belong together. */}
-            <span className={`w-7 font-mono text-xs font-medium text-center ${warm ? 'text-[color:var(--ramp-label)]' : (isSaved ? 'text-primary-text' : 'text-muted-foreground')}`}>
+            <span className={`order-1 w-7 font-mono text-xs font-medium text-center ${warm ? 'text-[color:var(--ramp-label)]' : (isSaved ? 'text-primary-text' : 'text-muted-foreground')}`}>
               {setLabel(ref)}
             </span>
             {/* `max` is a hint the browser does not enforce (see
@@ -916,51 +1010,22 @@ export function SetGrid({
             <Input
               id={`setgrid-weight-${exerciseId}-${k}`}
               type="number"
+              inputMode="decimal"
               min="0"
               max={MAX_LOGGABLE_SET_KG}
               step="0.5"
-              placeholder={isBW ? 'BW' : (ghost ? String(ghost.weight_kg) : weightPlaceholderFor(ref))}
+              placeholder={isBW ? 'BW' : weightPlaceholderFor(ref)}
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(ref, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
+              onKeyDown={e => saveOnEnter(e, ref)}
+              onWheel={releaseOnWheel}
+              className={`order-2 h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
               disabled={isBW}
             />
-            {/* The `?.` used to make this button silently inert wherever the
-                prop was absent, which is how Additional Work came to have a
-                dead one. The handler is threaded there now — and the button
-                only renders where one exists, so the same gap cannot draw a
-                dead control again. */}
-            {/* AND NOT ON A CABLE, since 19 Sep 2026. The pin IS the weight
-                there, so a button offering to work out the plates describes a
-                machine that is not in front of her — see
-                takesPlateCalculator, which has the measurement for why this
-                is cable rather than every stack. */}
-            {onOpenPlateCalc && takesPlateCalculator(catalogEntry) && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="size-7 text-muted-foreground hover:text-foreground"
-                onClick={() => onOpenPlateCalc(parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : '0')) || 0)}
-                disabled={isBW}
-                aria-label="Plate calculator"
-              >
-                <Dumbbell className="size-3.5" />
-              </Button>
-            )}
-            {isBodyweightCapable && (
-              <Button
-                variant={isBW ? 'default' : 'outline'}
-                size="sm"
-                className="h-7 w-7 text-[0.625rem] font-bold px-0"
-                onClick={() => toggleBodyweight(ref)}
-                aria-label="Toggle bodyweight"
-              >
-                BW
-              </Button>
-            )}
             <Input
               type="number"
+              inputMode="numeric"
               min="0"
               max={MAX_REPS}
               step="1"
@@ -970,9 +1035,11 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(ref, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : ''}`}
+              onKeyDown={e => saveOnEnter(e, ref)}
+              onWheel={releaseOnWheel}
+              className={`order-5 h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : ''}`}
             />
-            <div className="flex items-center gap-1">
+            <div className="order-6 flex items-center gap-1">
               {isPRSet && prBadgeSet?.result && (
                 <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary-text glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
@@ -1016,6 +1083,46 @@ export function SetGrid({
                 <Check className="size-3.5" />
               </Button>
             </div>
+            {/* AFTER THE TICK IN THE DOCUMENT, WHERE THEY ALWAYS WERE ON SCREEN
+                (tester's L32, 9 Oct 2026). Tab used to go weight → plate
+                calculator → BW → reps, so a keyboard logger typing a weight
+                and pressing Tab landed on an icon. The `order-*` classes on
+                this row's children keep every control exactly where it was
+                drawn; only the focus order changed: weight, reps, ✓, then
+                these two. A screen reader hears number, weight, reps, save. */}
+            {/* The `?.` used to make this button silently inert wherever the
+                prop was absent, which is how Additional Work came to have a
+                dead one. The handler is threaded there now — and the button
+                only renders where one exists, so the same gap cannot draw a
+                dead control again. */}
+            {/* AND NOT ON A CABLE, since 19 Sep 2026. The pin IS the weight
+                there, so a button offering to work out the plates describes a
+                machine that is not in front of her — see
+                takesPlateCalculator, which has the measurement for why this
+                is cable rather than every stack. */}
+            {onOpenPlateCalc && takesPlateCalculator(catalogEntry) && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="order-3 size-7 text-muted-foreground hover:text-foreground"
+                onClick={() => onOpenPlateCalc(parseFloat(input.weight || blankWeightFor(ref).text || '0') || 0)}
+                disabled={isBW}
+                aria-label="Plate calculator"
+              >
+                <Dumbbell className="size-3.5" />
+              </Button>
+            )}
+            {isBodyweightCapable && (
+              <Button
+                variant={isBW ? 'default' : 'outline'}
+                size="sm"
+                className="order-4 h-7 w-7 text-[0.625rem] font-bold px-0"
+                onClick={() => toggleBodyweight(ref)}
+                aria-label="Toggle bodyweight"
+              >
+                BW
+              </Button>
+            )}
           </div>
           {/* THE RECEIPT NAMES THE ROW IT IS FOR. It read the WORKING logs by
               set number and printed "Set 3", so two things were wrong at once:
@@ -1180,6 +1287,38 @@ export function SetGrid({
               boxes. Only where a ghost is actually driving the placeholder,
               and never once the row is saved — then the boxes hold today's
               real numbers and the marker would be describing nothing. */}
+          {/* AND WHERE THE WEIGHT IN THE BOX CAME FROM, when it is the set she
+              has just done rather than last time's or the plan's (M11). Same
+              rule as the marker below — a hint must say whose it is — and only
+              when the carry changed the number, so a session lifted exactly as
+              written gains no line at all. */}
+          {!isSaved && !isBW && !input.weight && (() => {
+            const carry = carryChangesTheBox(ref)
+            return carry ? (
+              <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="carried-weight">
+                {sameAsSetAbove(carry)}
+              </p>
+            ) : null
+          })()}
+          {/* A ROW SHE ADDED AND HAS NOT LOGGED CAN BE TAKEN AWAY AGAIN (L11).
+              "Add a drop", "Add Set" and "Add warm-up" each drew a row that
+              then had no way off the screen and survived a reload. A real
+              28px control on its own line — not an invisible tap area, which
+              here would reach up over the ✓ of the row it belongs to. */}
+          {!isSaved && addedRowKey(ref) && (
+            <div className={`flex justify-end ${drop ? 'pl-5 pr-1' : 'px-1'}`}>
+              <button
+                type="button"
+                data-testid="remove-added-row"
+                onClick={() => handleRemoveAddedRow(ref)}
+                className="flex h-7 items-center gap-1 px-1 text-[0.6875rem] text-muted-foreground"
+                aria-label={`Remove ${setLabelLong(ref).toLowerCase()}`}
+              >
+                <X className="size-3" />
+                Remove
+              </button>
+            </div>
+          )}
           {ghost && !isSaved && (
             <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="last-time">
               {lastTime(loggedSetReading(ghost))}

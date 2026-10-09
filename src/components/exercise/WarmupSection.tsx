@@ -82,17 +82,10 @@ export function WarmupSection({
             ))}
           </div>
         )}
-        {mobility.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
-            {mobility.map((item, i) => (
-              <div key={i} className="text-xs">
-                <span className="font-medium">{item.name}</span>
-                <span className="text-muted-foreground"> — {item.prescription}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* BETWEEN THE GENERAL BLOCK AND THE SESSION'S OWN MOBILITY — where the
+            line under them says they go (tester's M9: it said "do these first"
+            and they were drawn last). Pulse first, then what is tight, then
+            the rest. With no general block they lead. */}
         {extra.length > 0 && (
           <div className="space-y-1" data-testid="warmup-tightness">
             <p className="text-[0.625rem] uppercase tracking-wider text-primary-text font-medium">For what feels tight</p>
@@ -103,6 +96,17 @@ export function WarmupSection({
               </div>
             ))}
             {extraNote && <p className="text-[0.6875rem] text-muted-foreground">{extraNote}</p>}
+          </div>
+        )}
+        {mobility.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[0.625rem] uppercase tracking-wider text-muted-foreground font-medium">Mobility</p>
+            {mobility.map((item, i) => (
+              <div key={i} className="text-xs">
+                <span className="font-medium">{item.name}</span>
+                <span className="text-muted-foreground"> — {item.prescription}</span>
+              </div>
+            ))}
           </div>
         )}
         {extraCaveat && (
