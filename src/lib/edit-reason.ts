@@ -270,6 +270,59 @@ export const NIGGLE_EASE_OFF_DAYS = 7
  */
 export const EQUIPMENT_SWITCH_DAYS = 7
 
+// ---------------------------------------------------------------------------
+// "NOTHING TO CHANGE" IS AN ANSWER, NOT A FAILURE.
+//
+// Test log H2, 9 Oct 2026. A tester on the Minimalist tier said "I haven't got
+// the kit" about a band exercise and was shown the four tiers, his own among
+// them. He picked it. The app answered "Everything in this week already works
+// with that — nothing to change." in RED, under the buttons, as though
+// something had gone wrong. Two things were wrong and neither was the
+// arithmetic:
+//   - his own tier was on offer, and picking it can never change anything (the
+//     plan was built for it) — a question with a guaranteed dead answer;
+//   - a sheet's `onReason` hands back one string, and every string was drawn
+//     as an error. "There is nothing to do" and "that didn't save" are not the
+//     same message and must not look it.
+//
+// So the sentences that mean "I looked, and there is nothing to change" live
+// HERE, once, and the sheet asks this module which kind it was handed rather
+// than guessing from the wording. The coach's equipment card uses the same
+// sentence builder (it used to fall through to "I couldn't find that on your
+// current plan", which is a different and untrue thing to say).
+// ---------------------------------------------------------------------------
+
+/** The exercise row said "it hurts" about an area nothing in these weeks loads. */
+export const NOTHING_LOADS_THAT_AREA = "Nothing in your plan loads that area, so there's nothing to ease off."
+/** ...and the lasting version, which still records it for future plans. */
+export const NOTHING_LOADS_THAT_AREA_NOTED = "Nothing in your plan loads that area right now, so there's nothing to change today — but I've noted it for future plans."
+
+/**
+ * What to say when a kit change would change nothing.
+ *
+ * `scope` is the stretch that was checked, in the caller's own words ("this
+ * week", "the next 5 days"), so the screen and the coach each describe what
+ * they actually looked at. `tierLabel` is the tier as the picker names it.
+ */
+export function equipmentNothingToChange(opts: { sameTier: boolean; tierLabel: string; scope: string }): string {
+  const kit = opts.tierLabel.toLowerCase()
+  return opts.sameTier
+    ? `Your plan is already built around ${kit} — nothing to change.`
+    : `Everything in ${opts.scope} already works with ${kit} — nothing to change.`
+}
+
+/**
+ * True for a message that reports a deliberate no-op rather than a failure,
+ * so a sheet can draw it as information. Recognised by what it IS (one of the
+ * sentences above), never by sniffing for a word like "nothing" in an error.
+ */
+export function isNothingToChangeMessage(message: string | null | undefined): boolean {
+  if (!message) return false
+  return message === NOTHING_LOADS_THAT_AREA
+    || message === NOTHING_LOADS_THAT_AREA_NOTED
+    || /^(Your plan is already built around .+|Everything in .+ already works with .+) — nothing to change\.$/.test(message)
+}
+
 /**
  * What the app says when someone picks the red-flag answer.
  *

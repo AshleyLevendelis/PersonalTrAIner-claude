@@ -29,7 +29,7 @@
 import type { Exercise, WorkoutDay } from './types'
 import { buildCoachTechniqueSummary } from './exercise-technique'
 import { sessionForDate, dayNameOf, addDays, type SessionMove } from './session-move'
-import { describeTempo } from './periodization'
+import { describeExerciseTempo } from './periodization'
 import { ceilingNoteForCoach } from './progression-ceiling'
 
 /** True when the per-set loads are not all the same — a ramp, not a straight-across weight. */
@@ -105,7 +105,7 @@ export function loadClauseForCoach(e: Exercise): string {
  * on the next screen.
  */
 export function describeExerciseForCoach(e: Exercise): string {
-  const tempo = describeTempo(e.tempo)
+  const tempo = describeExerciseTempo(e)
   return `${e.name} (${e.sets}x${e.reps}${loadClauseForCoach(e)}, rest ${e.rest}`
     + (e.intensity ? `, ${e.intensity}` : '')
     + (tempo ? `, tempo ${tempo}` : '')

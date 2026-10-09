@@ -348,6 +348,9 @@ export interface Exercise {
    * afterwards:
    *   'ceiling'    the unverified ramp reached the standards estimate
    *   'implement'  the improvised-implement safety cap
+   *   'stated_limit'
+   *                at the heaviest dumbbell/kettlebell the trainee has said
+   *                they own (see LoadPrescription.hold)
    *   'floor'      rounded up to the bar / the lightest pair
    *   'matched'    lowered by enforceOneWeightPerPrescription to match the
    *                same lift's other slot this week
@@ -364,7 +367,7 @@ export interface Exercise {
    * The load_guidance sentence says the first three in words; this is the
    * same fact in a form a measurement can read. Absent otherwise.
    */
-  load_hold?: 'ceiling' | 'implement' | 'floor' | 'matched' | 'unaffordable_step'
+  load_hold?: 'ceiling' | 'implement' | 'stated_limit' | 'floor' | 'matched' | 'unaffordable_step'
   /**
    * What the frozen-load rep bump did this week, when it ran at all (the
    * weight did not move from last week and the lift is eligible):

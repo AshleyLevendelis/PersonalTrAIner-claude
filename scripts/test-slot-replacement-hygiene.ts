@@ -17,8 +17,11 @@
  * adaptation, so covering it covers all four.
  */
 import { applyReplacement } from '../src/lib/mesocycle-edit'
-import { EXERCISE_DATABASE, searchExerciseCatalog, searchExerciseCatalogByWords } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, isBallisticMovement, searchExerciseCatalog, searchExerciseCatalogByWords } from '../src/lib/exercise-db'
 import { prescribeLoad } from '../src/lib/load-prescription'
+import { generateExercisePlan, generateMesocycle, isTempoEligible, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
+import { substituteForInjury } from '../src/lib/plan-adaptations'
 import type { Exercise, UserProfile } from '../src/lib/types'
 
 const profile = {
@@ -82,11 +85,20 @@ console.log('\n[2] Units are re-derived the other way (rep lift -> carry)')
   }
 }
 
-console.log('\n[3] A reps -> reps swap KEEPS the block\'s own rep prescription')
+console.log('\n[3] With no programming handed in, the slot\'s own rep range is copied (the ADD path)')
 {
+  // RE-LABELLED 9 Oct 2026, behaviour unchanged. This used to read "a reps ->
+  // reps swap KEEPS the block's own rep prescription", and that was the rule
+  // for every replacement until M32 showed what it cost: a slot's reps are the
+  // block's range AFTER the outgoing lift's own levers have worked on it (a
+  // band kickback walked to 16-19 handed that to a loaded dumbbell lift).
+  // Swap, ban, injury/kit adaptation and session rebuild now pass the incoming
+  // lift's OWN programming (buildReplacementSlot; held by
+  // test:replacement-prescription). What is left on this bare call is the ADD
+  // path, which has no outgoing exercise and copies a peer on purpose.
   const a = EXERCISE_DATABASE.filter(e => e.prescription_type === 'reps' && e.mechanics_tier !== 'primer')
   const out = applyReplacement(slotFor(a[0].name, { reps: '6-8' }), a[1], loadFor(a[1].name))
-  check('reps unchanged on a same-units swap', out.reps === '6-8', out.reps)
+  check('reps copied from the template when no programming is passed', out.reps === '6-8', out.reps)
 }
 
 console.log('\n[4] No outgoing-exercise data survives the replacement')
@@ -208,5 +220,173 @@ console.log('\n[7] The picker finds what a person actually types')
     searchExerciseCatalogByWords('deadlift', 30).length === searchExerciseCatalog('deadlift', 30).length)
 }
 
-if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
-console.log('\nAll slot-replacement hygiene checks passed.')
+// ---------------------------------------------------------------------------
+// 9 Oct 2026 — the FOURTH, FIFTH and SIXTH fields to leak through this one
+// function, found on a tester's plan ("2s down · drive up" on a Kettlebell
+// Swing and on a timed Spanish Squat hold), and the reason sections [8]-[10]
+// stop testing fields one at a time.
+//
+// Sections [4] and [5] above each name the fields somebody had already been
+// bitten by. That is why `tempo` got through: the gate could only ever hold
+// what had already gone wrong. [9] holds the CLASS instead — a field the gate
+// has never heard of must not survive either.
+// ---------------------------------------------------------------------------
+console.log('\n[8] A tempo cue follows the INCOMING exercise, never the outgoing one')
+{
+  const bw = (n: string) => slotFor(n, { tempo: '2-0-1', suggested_load: 'Bodyweight', suggested_load_kg: null, per_set_load: null, reps: '10-12' })
+  const bodyweightLoad = (n: string) => prescribeLoad(byName(n)!, profile, { targetRpeLabel: 'RPE 7-8', sets: 3, repRangeLabel: '10-12' })
+
+  // The tester's two rows, by name, because a general property that happens
+  // to pass says nothing about the report it came from.
+  const hold = applyReplacement(bw('Box Squat (Bodyweight)'), byName('Spanish Squat')!, bodyweightLoad('Spanish Squat'))
+  check('Spanish Squat is a timed hold after the swap', /s$/.test(hold.reps), hold.reps)
+  check('...and a timed hold carries no tempo', hold.tempo === undefined, hold.tempo)
+
+  const swing = applyReplacement(bw('Single-Leg Glute Bridge'), byName('Kettlebell Swing (Heavy)')!, loadFor('Kettlebell Swing (Heavy)'))
+  check('Kettlebell Swing (Heavy) carries a weight after the swap', typeof swing.suggested_load_kg === 'number', swing.suggested_load_kg)
+  check('...and a loaded, ballistic lift carries no tempo', swing.tempo === undefined, swing.tempo)
+
+  // THE OTHER HALF, or "clear it always" would pass everything above. Where
+  // there is still no weight to add, the block's tempo is still the lever and
+  // must stay: a tempo'd bodyweight squat swapped for another bodyweight,
+  // rep-counted lift keeps it.
+  const stays = applyReplacement(bw('Box Squat (Bodyweight)'), byName('Glute Bridge')!, bodyweightLoad('Glute Bridge'))
+  check('a weightless rep-counted lift KEEPS the block\'s tempo', stays.tempo === '2-0-1', stays.tempo)
+  // ...and nothing invents one: an outgoing slot with no tempo (a deload week,
+  // a power block) hands none on.
+  const none = applyReplacement({ ...bw('Box Squat (Bodyweight)'), tempo: undefined }, byName('Glute Bridge')!, bodyweightLoad('Glute Bridge'))
+  check('no tempo in, no tempo out', none.tempo === undefined, none.tempo)
+
+  // THE PROPERTY, over the whole catalogue rather than three names: whatever
+  // comes in, the slot carries a tempo only if generation's own rule would
+  // have given that exercise one.
+  const live = EXERCISE_DATABASE.filter(e => !e.retired)
+  const wrong: string[] = []
+  let kept = 0
+  for (const incoming of live) {
+    const load = prescribeLoad(incoming, profile, { targetRpeLabel: 'RPE 7-8', sets: 3, repRangeLabel: '10-12' })
+    const out = applyReplacement(bw('Box Squat (Bodyweight)'), incoming, load, profile)
+    const eligible = isTempoEligible(incoming, out, 'intermediate')
+    if (out.tempo !== undefined) kept++
+    if ((out.tempo !== undefined) !== eligible) wrong.push(`${incoming.name}:${out.tempo ?? 'none'}`)
+    if (out.tempo !== undefined && (incoming.prescription_type !== 'reps' || isBallisticMovement(incoming) || incoming.mechanics_tier === 'primer')) {
+      wrong.push(`${incoming.name} is a hold/carry/interval/ballistic/primer with a tempo`)
+    }
+  }
+  check(`across all ${live.length} live exercises, tempo survives exactly where generation would give one`, wrong.length === 0, wrong.slice(0, 8))
+  check('...and that is a real choice: some keep it and most do not', kept > 10 && kept < live.length - 10, kept)
+  // THE ONE LOADED LIFT THAT KEEPS IT, by Ashley's ruling ("slow the movement
+  // down"): a backpack sitting on its ceiling has no more weight to add. Held
+  // here so "a weight means no tempo" cannot be simplified into the rule.
+  {
+    const bag = byName('Backpack Row')!
+    const bagLoad = prescribeLoad(bag, profile, { targetRpeLabel: 'RPE 7-8', sets: 3, repRangeLabel: '10-12' })
+    const out = applyReplacement(bw('Box Squat (Bodyweight)'), bag, bagLoad, profile)
+    check('a backpack at its limit keeps the tempo (20kg for an intermediate)', out.suggested_load_kg === 20 && out.tempo === '2-0-1', { kg: out.suggested_load_kg, tempo: out.tempo })
+    const unknown = applyReplacement(bw('Box Squat (Bodyweight)'), bag, bagLoad)
+    check('...but with no experience to read the limit from, a weighted lift is not guessed at', unknown.tempo === undefined, unknown.tempo)
+  }
+
+  // PROVE THE BALLISTIC DETECTOR, so it cannot go vacuous: every entry whose
+  // own coaching note or cues call it ballistic, explosive or a jump/slam must
+  // answer true, and an ordinary lift must not.
+  const saysBallistic = live.filter(e => /ballistic|explosive/i.test([e.coach_note_swap, ...(e.form_cues ?? [])].join(' ')) && e.prescription_type === 'reps')
+  const missed = saysBallistic.filter(e => !isBallisticMovement(e)).map(e => e.name)
+  check(`every rep-counted entry the catalogue itself calls ballistic/explosive is caught (${saysBallistic.length})`, saysBallistic.length >= 3 && missed.length === 0, missed)
+  // The eligibility rule holds it in its own right, not by the accident that
+  // today's one working-set swing always carries a weight: a swing with no
+  // number on it ("choose by feel") is still not slowed down.
+  check('a swing with no weight on it is still not tempo-eligible',
+    isTempoEligible(byName('Kettlebell Swing (Heavy)')!, { suggested_load_kg: null, reps: '10-12' }, 'intermediate') === false)
+  // Belt and braces, each half held on its own: the entry says what the
+  // movement IS and the string says what was actually written, and the two
+  // have disagreed before ("8-12" left on a carry). Either alone refuses.
+  check('a hold is refused by what it IS, even holding a rep-count string',
+    isTempoEligible(byName('Spanish Squat')!, { suggested_load_kg: null, reps: '10-12' }, 'intermediate') === false)
+  check('...and a rep lift is refused when its string is not a rep count',
+    isTempoEligible(byName('Glute Bridge')!, { suggested_load_kg: null, reps: '30-45s' }, 'intermediate') === false)
+  check('...while an ordinary weightless rep lift is', isTempoEligible(byName('Glute Bridge')!, { suggested_load_kg: null, reps: '10-12' }, 'intermediate') === true)
+  check('...and a squat, a curl and a leg swing warm-up are not', !isBallisticMovement(byName('Barbell Squats')!) && !isBallisticMovement(byName('Hammer Curls')!) && !isBallisticMovement(byName('Leg Swings')!))
+}
+
+console.log('\n[9] The slot is BUILT from the incoming exercise — nothing unlisted can ride along')
+{
+  const a = EXERCISE_DATABASE.filter(e => e.prescription_type === 'reps' && e.mechanics_tier !== 'primer' && !e.retired)
+  // Every per-exercise field the type has today that describes the lift that
+  // was THERE, each set to a value that would be a lie on the lift coming in —
+  // plus one the type does not have, standing in for the next field somebody
+  // adds. A spread-and-delete implementation passes every named field it
+  // remembered and fails on the one it did not.
+  const stuffed = {
+    ...slotFor(a[0].name),
+    tempo: '4-1-1',
+    suggested_added_load_kg: 17.5,
+    load_source: 'known_weight',
+    load_hold: 'unaffordable_step',
+    rep_bump: 'bought',
+    distance_bump: 'walked',
+    selection_note: 'Picked over the runner-up for its lower joint stress.',
+    block_hold_note: 'Held from last block — no progress logged.',
+    substitution: 'Some Other Lift',
+    superset_label: 'A',
+    a_field_nobody_has_written_yet: 'belongs to the outgoing exercise',
+  } as unknown as Exercise
+  const load = loadFor(a[1].name)
+  const out = applyReplacement(stuffed, a[1], load) as unknown as Record<string, unknown>
+
+  check('a field this gate has never heard of does not survive', !('a_field_nobody_has_written_yet' in out) || out.a_field_nobody_has_written_yet === undefined, Object.keys(out))
+  check('load_hold (why the OUTGOING weight was stuck) does not survive', out.load_hold === undefined || out.load_hold === (load.hold ?? undefined), out.load_hold)
+  check('rep_bump (the outgoing lift\'s frozen-weight rep) does not survive', out.rep_bump === undefined, out.rep_bump)
+  check('distance_bump does not survive', out.distance_bump === undefined, out.distance_bump)
+  check('block_hold_note does not survive', out.block_hold_note === undefined, out.block_hold_note)
+  check('selection_note does not survive', out.selection_note === undefined, out.selection_note)
+  check('suggested_added_load_kg (a belt weight) does not survive', out.suggested_added_load_kg === undefined, out.suggested_added_load_kg)
+  check('load_source describes the incoming prescription, not the outgoing one', out.load_source === load.load_source, out.load_source)
+  check('a loaded lift still carrying a weight takes no tempo', out.tempo === undefined, out.tempo)
+  // What a replacement is ALLOWED to carry, stated so that "return nothing"
+  // cannot pass: the slot's own programming and effort.
+  check('sets, rest and effort ARE carried — that is the slot\'s programming', out.sets === stuffed.sets && out.rest === stuffed.rest && out.intensity === stuffed.intensity, { s: out.sets, r: out.rest, i: out.intensity })
+  check('...and the incoming lift has its weight', out.suggested_load_kg === load.starting_weight_kg && out.suggested_load === load.display, { kg: out.suggested_load_kg, d: out.suggested_load })
+}
+
+async function endToEnd() {
+  console.log('\n[10] End to end: the tester\'s knee adaptation, on a seeded build of his plan')
+  // Minimalist, bodybuilding, Mon/Tue/Thu/Sat, 30-45 min, intermediate,
+  // shoulder flag, fat loss, 24kg dumbbells — the profile the report came
+  // from. Seeded, because selection carries a random tie-break.
+  setRandomSource(seededRngFromKey('sam:2'))
+  try {
+    const sam = {
+      ...profile, fitness_goal: 'fat_loss', equipment_access: 'minimalist', injuries: ['shoulders'],
+      training_style: 'bodybuilding', session_duration_preference: '30-45', max_dumbbell_kg: 24,
+      training_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        .map(day => ({ day, available: ['Monday', 'Tuesday', 'Thursday', 'Saturday'].includes(day) })),
+    } as unknown as UserProfile
+    const meso = generateMesocycle(sam, generateExercisePlan(sam, []).plan)
+    const before = new Map<string, string>()
+    for (const w of meso) for (const d of w.days) for (const e of d.exercises) before.set(`${w.week_number}|${d.day}|${e.name}`, e.reps)
+    const { mesocycle: after, touchedSlots } = await substituteForInjury({ mesocycle: meso, profile: sam, injuryCode: 'knees', weekNumbers: [1, 2], exclusions: [] })
+    check('the adaptation changed something, so this has teeth', touchedSlots.filter(t => t.after).length >= 4, touchedSlots.length)
+
+    const incoming = new Set(touchedSlots.filter(t => t.after).map(t => `${t.weekNumber}|${t.dayName}|${t.after}`))
+    const leaks: string[] = []
+    let seen = 0
+    for (const w of after) for (const d of w.days) for (const e of d.exercises) {
+      if (!incoming.has(`${w.week_number}|${d.day}|${e.name}`)) continue
+      seen++
+      const entry = byName(e.name)
+      if (e.tempo !== undefined && !isTempoEligible(entry, e, 'intermediate')) leaks.push(`${e.name} ${e.reps} ${e.suggested_load} tempo=${e.tempo}`)
+      if (e.rep_bump !== undefined) leaks.push(`${e.name} rep_bump=${e.rep_bump}`)
+      if (e.suggested_load_kg == null && e.load_hold !== undefined) leaks.push(`${e.name} has no weight but load_hold=${e.load_hold}`)
+    }
+    check(`all ${seen} replaced slots were inspected`, seen === incoming.size && seen >= 4, { seen, expected: incoming.size })
+    check('no replaced slot carries the outgoing lift\'s tempo, rep bump or hold reason', leaks.length === 0, leaks.slice(0, 6))
+  } finally {
+    resetRandomSource()
+  }
+}
+
+endToEnd().then(() => {
+  if (failures > 0) { console.error(`\n${failures} check(s) FAILED.`); process.exit(1) }
+  console.log('\nAll slot-replacement hygiene checks passed.')
+}).catch(err => { console.error(err); process.exit(1) })

@@ -22,8 +22,11 @@
 import {
   reasonsFor, reasonChipsFor, routeFor, cardLineFor, reasonForLabel, reasonQuestion,
   HURT_KINDS, NIGGLE_EASE_OFF_DAYS, RED_FLAG_ADVICE,
+  NOTHING_LOADS_THAT_AREA, NOTHING_LOADS_THAT_AREA_NOTED, equipmentNothingToChange, isNothingToChangeMessage,
   type EditReason, type ReasonedEditKind, type ReasonRoute,
 } from '../src/lib/edit-reason'
+import { applyInjuryFromRow, applyEquipmentFromRow } from '../src/lib/screen-adaptations'
+import { setSupabaseClient } from '../src/lib/supabase'
 import { askText, DO_IT_ANYWAY, type Tradeoff } from '../src/lib/tradeoff-shape'
 import { assessEdit } from '../src/lib/edit-tradeoff'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
@@ -264,5 +267,118 @@ console.log('\n7. Where both questions apply, there is ONE question')
   check('...alongside all four answers, none silently dropped', rendered === 5, { rendered, asked })
 }
 
-console.log(failures === 0 ? '\nAll reason-chip checks passed.\n' : `\n${failures} check(s) failed.\n`)
-process.exit(failures === 0 ? 0 : 1)
+// ---------------------------------------------------------------------------
+// 8. "I HAVEN'T GOT THE KIT" — test log H2/H3, 9 Oct 2026.
+//
+// Three things, all about one path:
+//   (a) a kit change that changes nothing is INFORMATION, and the sheet can
+//       tell it from a failure (it was drawn red);
+//   (b) the picker does not offer the tier the plan is already built for;
+//   (c) easing an area off, or changing kit, from the exercise row honours
+//       what the person has banned — both passed `exclusions: []`, so a
+//       row-level change could hand back a banned exercise.
+// (c) is RUN, against the real appliers with a stand-in database, because the
+// property is about what ends up on the plan.
+// ---------------------------------------------------------------------------
+async function kitAndExclusions() {
+  console.log('\n8. "I haven\'t got the kit": a no-op is an answer, and bans are honoured')
+
+  // --- (a) which messages are information ---
+  const same = equipmentNothingToChange({ sameTier: true, tierLabel: 'Minimalist', scope: 'this week' })
+  const other = equipmentNothingToChange({ sameTier: false, tierLabel: 'Home gym', scope: 'the next 5 days' })
+  check('picking the tier you are already on says the plan is built for it', same === 'Your plan is already built around minimalist — nothing to change.', same)
+  check('another tier that conflicts with nothing names the kit and the stretch checked', other === 'Everything in the next 5 days already works with home gym — nothing to change.', other)
+  check('both are recognised as "nothing to change"', isNothingToChangeMessage(same) && isNothingToChangeMessage(other))
+  check('so are the two "nothing loads that area" answers', isNothingToChangeMessage(NOTHING_LOADS_THAT_AREA) && isNothingToChangeMessage(NOTHING_LOADS_THAT_AREA_NOTED))
+  const failuresSaid = [
+    "That didn't save — try again in a moment.",
+    "I can't see this week on your plan just now.",
+    "I can't see the rest of your plan just now.",
+    'No plan to edit.',
+    "I can't adjust for that just now.",
+    'Every exercise is already at its minimum.',
+    // Contains the word, and is still a failure — recognition is by identity.
+    'Nothing saved — check your connection and try again.',
+    '',
+  ]
+  check('a real failure is never mistaken for one', failuresSaid.every(m => !isNothingToChangeMessage(m)), failuresSaid.filter(m => isNothingToChangeMessage(m)))
+  check('...nor is null', !isNothingToChangeMessage(null) && !isNothingToChangeMessage(undefined))
+
+  // --- the screens, read as source (comments stripped) ---
+  const strip = (src: string) => src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const dialog = strip(readFileSync('src/components/exercise/SwapDialog.tsx', 'utf8'))
+  check('the swap sheet draws a no-op as a note, not in the error colour',
+    /isNothingToChangeMessage\(reasonError\)\s*\?\s*<p className="[^"]*text-muted-foreground[^"]*" data-testid="swap-reason-note"/.test(dialog)
+    && !/swap-reason-note"[^>]*text-destructive|text-destructive[^"]*" data-testid="swap-reason-note"/.test(dialog))
+  check('...and a failure still in red', /<p className="[^"]*text-destructive[^"]*" data-testid="swap-reason-error"/.test(dialog))
+  // --- (b) the picker ---
+  const step = strip(readFileSync('src/components/exercise/EditReasonStep.tsx', 'utf8'))
+  check('the kit picker leaves out the tier the plan is already built for', /EQUIPMENT_OPTIONS\.filter\(o => o\.value !== currentEquipment\)\.map/.test(step))
+  check('...and the swap sheet tells it which tier that is', /currentEquipment=\{profile\?\.equipment_access\}/.test(dialog))
+  // The coach says the same sentence for the same finding, instead of the
+  // generic "I couldn't find that on your current plan".
+  const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
+  const builder = chat.slice(chat.indexOf('const buildEquipmentAdaptationProposal = '), chat.indexOf('const buildEquipmentAdaptationProposal = ') + 3200)
+  check('the coach\'s equipment card answers a no-op with the shared sentence', /touchedSlots\.length === 0\) \{\s*return \{\s*refusal: equipmentNothingToChange\(/.test(builder), builder.slice(0, 120))
+  check('...and its caller passes that refusal on rather than dropping it', /const adaptation = await buildEquipmentAdaptationProposal\([^)]*\)\s*if \(adaptation && 'refusal' in adaptation\) refusal = adaptation\.refusal/.test(chat))
+
+  // --- (c) bans are honoured, RUN ---
+  const ok: unknown = new Proxy(function () {}, {
+    get: (_t, prop) => (prop === 'then' ? (resolve: (v: unknown) => void) => resolve({ data: null, error: null }) : ok),
+    apply: () => ok,
+  })
+  setSupabaseClient({ from: () => ok, rpc: () => ok } as never)
+  const quietLog = console.log; const quietWarn = console.warn
+  const hush = async <T>(fn: () => Promise<T>): Promise<T> => { console.log = () => {}; console.warn = () => {}; try { return await fn() } finally { console.log = quietLog; console.warn = quietWarn } }
+
+  const sam = {
+    id: 'p-1', age: 34, gender: 'male', height_cm: 180, weight_kg: 82, activity_level: 'moderate',
+    fitness_goal: 'fat_loss', preferred_time: 'evening', bmr: 1800, tdee: 2600, equipment_access: 'minimalist',
+    injuries: ['shoulders'], training_style: 'bodybuilding', training_experience: 'intermediate',
+    session_duration_preference: '30-45', workout_split_preference: 'ai_recommendation',
+    training_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => ({ day, available: ['Monday', 'Tuesday', 'Thursday', 'Saturday'].includes(day) })),
+    weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], macro_calculation_mode: 'STANDARD_STATIC',
+    coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate', max_dumbbell_kg: 24,
+    created_at: '2026-10-05T00:00:00.000Z',
+  } as never
+  setRandomSource(seededRngFromKey('sam:2'))
+  const plan = await hush(async () => generateMesocycle(sam))
+  resetRandomSource()
+  const namesIn = (meso: { week_number: number; days: { exercises: { name: string }[] }[] }[], week: number) =>
+    new Set(meso.find(w => w.week_number === week)!.days.flatMap(d => d.exercises.map(e => e.name)))
+
+  // INJURY. First find what the knee adaptation reaches for with nothing banned…
+  const open = await hush(() => applyInjuryFromRow(sam, plan, 1, 'niggle', 'knees', []))
+  const brought = [...namesIn(open.mesocycle ?? [], 1)].filter(n => !namesIn(plan, 1).has(n))
+  check('with nothing banned, easing the knees off brings in other exercises', open.message === null && brought.length >= 2, { message: open.message, brought })
+  // …then ban the first of them and ask again.
+  const banned = brought[0]
+  const honoured = await hush(() => applyInjuryFromRow(sam, plan, 1, 'niggle', 'knees', [banned]))
+  check(`with ${banned} banned, the same change does not bring it in`, !!honoured.mesocycle && !namesIn(honoured.mesocycle, 1).has(banned), honoured.mesocycle ? [...namesIn(honoured.mesocycle, 1)] : honoured.message)
+
+  // KIT. Same shape: bodyweight for the week, with and without a ban.
+  const kitOpen = await hush(() => applyEquipmentFromRow(sam, plan, 1, 'bodyweight', []))
+  const kitBrought = [...namesIn(kitOpen.mesocycle ?? [], 1)].filter(n => !namesIn(plan, 1).has(n))
+  check('with nothing banned, switching to bodyweight brings in other exercises', kitOpen.message === null && kitBrought.length >= 1, { message: kitOpen.message, kitBrought })
+  const kitBanned = kitBrought[0]
+  const kitHonoured = await hush(() => applyEquipmentFromRow(sam, plan, 1, 'bodyweight', [kitBanned]))
+  check(`with ${kitBanned} banned, the kit change does not bring it in`, !!kitHonoured.mesocycle && !namesIn(kitHonoured.mesocycle, 1).has(kitBanned), kitHonoured.mesocycle ? [...namesIn(kitHonoured.mesocycle, 1)] : kitHonoured.message)
+
+  // And the tester's own tap: his own tier, which the picker no longer
+  // offers but the function must still answer honestly if it is ever asked.
+  const own = await hush(() => applyEquipmentFromRow(sam, plan, 1, 'minimalist', []))
+  check('picking his own tier changes nothing and says so as information', own.mesocycle === undefined && isNothingToChangeMessage(own.message) && /already built around minimalist/.test(own.message ?? ''), own.message)
+
+  // The tab hands the appliers the person's real list.
+  const tab = strip(readFileSync('src/components/exercise/ExerciseTab.tsx', 'utf8'))
+  check('the exercise tab passes its exclusions to both appliers',
+    /applyInjuryFromRow\(profile, mesocycle, liveWeek, answer\.hurt, answer\.area, exclusions\)/.test(tab)
+    && /applyEquipmentFromRow\(profile, mesocycle, liveWeek, tier, exclusions\)/.test(tab))
+  const appliers = strip(readFileSync('src/lib/screen-adaptations.ts', 'utf8'))
+  check('...and neither applier hard-codes an empty list any more', !/exclusions:\s*\[\]/.test(appliers), appliers.match(/exclusions:\s*\[\]/g))
+}
+
+kitAndExclusions().then(() => {
+  console.log(failures === 0 ? '\nAll reason-chip checks passed.\n' : `\n${failures} check(s) failed.\n`)
+  process.exit(failures === 0 ? 0 : 1)
+}).catch(err => { console.error(err); process.exit(1) })

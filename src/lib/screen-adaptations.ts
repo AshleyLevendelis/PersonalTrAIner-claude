@@ -26,7 +26,8 @@
 // ---------------------------------------------------------------------------
 
 import type { MesocycleWeek, UserProfile } from './types'
-import { NIGGLE_EASE_OFF_DAYS, EQUIPMENT_SWITCH_DAYS } from './edit-reason'
+import { NIGGLE_EASE_OFF_DAYS, EQUIPMENT_SWITCH_DAYS, NOTHING_LOADS_THAT_AREA, NOTHING_LOADS_THAT_AREA_NOTED, equipmentNothingToChange } from './edit-reason'
+import { EQUIPMENT_OPTIONS } from './picker-options'
 import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from './plan-adaptations'
 import { executeInjuryAdaptation, executeLastingInjury, executeEquipmentAdaptation } from './pending-action-executor'
 import { createPlanAdaptation } from './plan-adaptations-store'
@@ -50,6 +51,15 @@ export async function applyInjuryFromRow(
   liveWeek: number,
   hurt: 'niggle' | 'lasting',
   area: string,
+  /**
+   * The person's real exclusions — everything they have banned or said they
+   * dislike, already compiled. REQUIRED, not defaulted: this used to pass `[]`
+   * to every call below, so easing off a sore knee from the exercise row could
+   * hand back an exercise the person had banned (the replacement pool is
+   * filtered by this list and by nothing else that knows about a ban). The
+   * coach's own cards have always passed theirs.
+   */
+  exclusions: string[],
 ): Promise<RowAdaptationResult> {
   const lasting = hurt === 'lasting'
   const weekSpan = lasting ? Number.MAX_SAFE_INTEGER : Math.max(1, Math.ceil(NIGGLE_EASE_OFF_DAYS / 7))
@@ -58,15 +68,15 @@ export async function applyInjuryFromRow(
     .filter(n => n >= liveWeek && n < liveWeek + weekSpan)
   if (weekNumbers.length === 0) return { message: "I can't see the rest of your plan just now." }
 
-  const trial = await substituteForInjury({ mesocycle, profile, injuryCode: area, weekNumbers, exclusions: [] })
+  const trial = await substituteForInjury({ mesocycle, profile, injuryCode: area, weekNumbers, exclusions })
   if (trial.touchedSlots.length === 0) {
     // NOT AN ERROR, AND NOT SILENCE. Nothing in these weeks loads that area,
     // so there is nothing to ease off — saying so is more use than a spinner
     // that ends with the plan unchanged and no explanation. A lasting one
     // still goes on the profile, because next block might.
     return lasting
-      ? { addInjuryCode: area, message: "Nothing in your plan loads that area right now, so there's nothing to change today — but I've noted it for future plans." }
-      : { message: "Nothing in your plan loads that area, so there's nothing to ease off." }
+      ? { addInjuryCode: area, message: NOTHING_LOADS_THAT_AREA_NOTED }
+      : { message: NOTHING_LOADS_THAT_AREA }
   }
   // Being time-bounded does not make a gutted plan acceptable: a fortnight of
   // a hollow programme is still a fortnight of not training. The coach's own
@@ -75,9 +85,9 @@ export async function applyInjuryFromRow(
 
   try {
     const result = lasting
-      ? await executeLastingInjury(profile, mesocycle, { injuryCode: area, weekNumbers, exclusions: [], mode })
+      ? await executeLastingInjury(profile, mesocycle, { injuryCode: area, weekNumbers, exclusions, mode })
       : await executeInjuryAdaptation(profile, mesocycle, {
-          injuryCode: area, durationDays: NIGGLE_EASE_OFF_DAYS, weekNumbers, exclusions: [], mode,
+          injuryCode: area, durationDays: NIGGLE_EASE_OFF_DAYS, weekNumbers, exclusions, mode,
         })
     if (!lasting) {
       await createPlanAdaptation({
@@ -107,19 +117,29 @@ export async function applyEquipmentFromRow(
   mesocycle: MesocycleWeek[],
   liveWeek: number,
   tier: string,
+  /** The person's real exclusions — see applyInjuryFromRow. */
+  exclusions: string[],
 ): Promise<RowAdaptationResult> {
   const weekNumbers = mesocycle.map(w => w.week_number).filter(n => n === liveWeek)
   if (weekNumbers.length === 0) return { message: "I can't see this week on your plan just now." }
 
   const trial = await substituteForEquipment({
-    mesocycle, profile, equipmentTier: tier as never, weekNumbers, exclusions: [],
+    mesocycle, profile, equipmentTier: tier as never, weekNumbers, exclusions,
   })
   if (trial.touchedSlots.length === 0) {
-    return { message: 'Everything in this week already works with that — nothing to change.' }
+    // INFORMATION, NOT A REFUSAL — see edit-reason.ts. The sheet draws it as
+    // such, and names the kit that was checked rather than "that".
+    return {
+      message: equipmentNothingToChange({
+        sameTier: tier === profile.equipment_access,
+        tierLabel: EQUIPMENT_OPTIONS.find(o => o.value === tier)?.label ?? tier,
+        scope: 'this week',
+      }),
+    }
   }
   try {
     const result = await executeEquipmentAdaptation(profile, mesocycle, {
-      equipmentTier: tier as never, durationDays: EQUIPMENT_SWITCH_DAYS, weekNumbers, exclusions: [],
+      equipmentTier: tier as never, durationDays: EQUIPMENT_SWITCH_DAYS, weekNumbers, exclusions,
     })
     await createPlanAdaptation({
       profileId: profile.id!, kind: 'equipment', equipmentOverride: tier,

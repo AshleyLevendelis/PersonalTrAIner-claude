@@ -52,12 +52,18 @@ interface EditReasonStepProps {
   /** Lets someone get on with it without saying why — the change is never gated behind an answer. */
   onSkip: () => void
   busy?: boolean
+  /**
+   * The kit tier the plan is already built for. The "what have you got
+   * today?" picker leaves it out: choosing it can never change anything, and
+   * a question should not offer an answer that is guaranteed to do nothing.
+   */
+  currentEquipment?: string
 }
 
 /** 44px minimum, the same as the nutrition sheet's verb chips — a gym floor, one hand. */
 const CHIP = 'w-full min-h-[44px] justify-start text-left'
 
-export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, busy }: EditReasonStepProps) {
+export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, busy, currentEquipment }: EditReasonStepProps) {
   const [hurting, setHurting] = useState(false)
   const [kitting, setKitting] = useState(false)
   const [hurt, setHurt] = useState<Exclude<HurtKind, 'red_flag'> | null>(null)
@@ -112,11 +118,18 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, busy }: E
     return (
       <div className="space-y-2" data-testid="reason-kit">
         <p className="text-sm">What have you got today?</p>
-        {EQUIPMENT_OPTIONS.map(o => (
+        {EQUIPMENT_OPTIONS.filter(o => o.value !== currentEquipment).map(o => (
           <Button
             key={o.value}
             variant="outline"
-            className={CHIP}
+            // WRAPS, unlike the other chips. A tier's description is a list of
+            // kit ("Barbell, rack, bench, dumbbells, kettlebells, bands…") and
+            // a button does not wrap by default, so at phone width each one
+            // ran off the right of the sheet and dragged the sheet's width
+            // with it — which clipped whatever was printed underneath,
+            // including the "nothing to change" note. Read off a screenshot,
+            // 9 Oct 2026; held by verify:hurts §5h.
+            className={`${CHIP} h-auto whitespace-normal py-2`}
             disabled={busy}
             data-kit={o.value}
             onClick={() => onAnswer({ type: 'equipment', tier: o.value })}

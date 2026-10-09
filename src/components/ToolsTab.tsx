@@ -19,7 +19,7 @@ import { ProtocolChips, protocolChoices } from '@/components/timers/ProtocolChip
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
-import type { WorkoutDay, MesocycleWeek } from '@/lib/types'
+import type { WorkoutDay, MesocycleWeek, EquipmentAccess } from '@/lib/types'
 import type { RoundLogSummary } from '@/lib/timer-engine'
 import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
 
@@ -87,9 +87,11 @@ export interface ToolsTabProps {
   mesocycle?: MesocycleWeek[]
   /** Which mesocycle week is live, so the block number is the one they are in. */
   liveWeek?: number
+  /** The kit tier, so the cardio quick picks on the "log this round" sheet are ones the person can do. */
+  equipmentAccess?: EquipmentAccess
 }
 
-export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: ToolsTabProps) {
+export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
@@ -188,6 +190,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
       open={!!roundToLog}
       onOpenChange={o => { if (!o) setRoundToLog(null) }}
       hideTrigger
+      equipmentAccess={equipmentAccess}
       // ABOVE THE FIELD, NOT UNDER IT. The full-screen branch below renders
       // this beside RoundField, which is fixed and opaque over the whole
       // viewport — so an in-flow sheet opened where nobody could see it.

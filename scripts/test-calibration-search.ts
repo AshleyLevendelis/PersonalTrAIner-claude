@@ -28,10 +28,12 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { generateMesocycle } from '../src/lib/exercise-plan'
+import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
 import { calibrationAnchorsFor, planCalibrationAnchors, calibrationAnchorMessage } from '../src/lib/calibration-anchor'
+import { patchBlockFromLiftedKg } from '../src/lib/beat-target-offer'
 import { getExerciseEntry, getExerciseId } from '../src/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, DELOAD_LOAD_FRACTION } from '../src/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, DELOAD_LOAD_FRACTION, nextSetRungsKg } from '../src/lib/load-prescription'
 import type { UserProfile, ExerciseSetLog } from '../src/lib/types'
 import { perSetChipsWorthShowing } from '../src/components/exercise/LoadChip'
 
@@ -152,7 +154,7 @@ check('a lifted number a later week already meets leaves that week alone',
 check('...while the week below it still rises to meet the lift', kgIn(modest.next.find(n => n.week_number === w2.week_number)!) === kgIn(w3))
 
 const msg = calibrationAnchorMessage(2, plan.applied)
-check('the sentence names the lift, the set and the week', msg.includes(ex.name) && msg.includes(`${heavier}kg`) && /Week 2/.test(msg), msg)
+check('the sentence names the lift, the set and the week', !!msg && msg.includes(ex.name) && msg.includes(`${heavier}kg`) && /Week 2/.test(msg), msg)
 
 // ---------------------------------------------------------------------------
 console.log('\n2. The grid: sets 2+ have no default, the tick refuses, the chips climb off the last logged set')
@@ -206,7 +208,15 @@ const cascade = grid.slice(cascadeStart, cascadeEnd)
 check('the next-weight chips exist, in a calibration week, on an unlogged set', cascade.includes('data-testid="calibration-cascade"'))
 check('...computed off the previous LOGGED set', /existingLogs\.find\(l => l\.set_number === setNumber - 1\)/.test(cascade))
 check('...never off the prescription', !/suggestedLoadKg|perSetLoadKg|defaultWeightFor/.test(cascade))
-check('...snapped to the implement\'s real plate step', /roundToPlate\(target, mode\)/.test(cascade) && /plateStepKg\(mode\)/.test(cascade))
+// RE-ANCHORED 9 Oct 2026. The ladder's arithmetic moved out of the component
+// into nextSetRungsKg (load-prescription.ts) so it could stop at a stated
+// dumbbell limit, and three checks that pinned its exact lines in SetGrid went
+// red on a correct change. They now hold the same properties by RUNNING the
+// ladder, plus one source check that the grid really uses it.
+check('...built by the shared ladder, from that logged weight and nothing else', /nextSetRungsKg\(base, catalogEntry, profile\)/.test(cascade) && /const base = Number\(prev\.weight_kg\)/.test(cascade))
+const barbellLift = getExerciseEntry('Barbell Bench Press')!
+const pairLift = getExerciseEntry('Romanian Deadlifts')!
+check('...snapped to the implement\'s real plate step', nextSetRungsKg(40, barbellLift, null).every(kg => (kg * 2) % 5 === 0) && nextSetRungsKg(20, pairLift, null).every(kg => kg % 2 === 0), { bar: nextSetRungsKg(40, barbellLift, null), pair: nextSetRungsKg(20, pairLift, null) })
 check('...and a tap FILLS the box; it does not log the set', /updateInput\(\w+, 'weight', String\(o\.kg\)\)/.test(cascade) && !/handleSaveSet/.test(cascade))
 // The same re-anchoring as the refusal above, and it wants both exclusions:
 // a build-up's number comes from the prescription, and a DROP's comes from the
@@ -226,8 +236,20 @@ check('at a light barbell weight the two percentage targets DO collide',
   roundToPlate(27.5 * 1.05, 'barbell') === roundToPlate(27.5 * 1.10, 'barbell'),
   { five: roundToPlate(27.5 * 1.05, 'barbell'), ten: roundToPlate(27.5 * 1.10, 'barbell') })
 check('...so each rung is floored one real step above the one before it',
-  /const floor = \(rungs\[rungs\.length - 1\] \?\? base\) \+ step/.test(cascade)
-  && /Math\.max\(roundToPlate\(target, mode\), floor\)/.test(cascade))
+  JSON.stringify(nextSetRungsKg(27.5, barbellLift, null)) === '[30,32.5]', nextSetRungsKg(27.5, barbellLift, null))
+
+// IT STOPS AT WHAT THE PERSON HAS SAID THEY OWN (test log H18). 24kg dumbbells,
+// 30kg just logged: the app offered "+2 · 32" and "+4 · 34".
+{
+  const owns = (kg: number) => ({ ...profile, max_dumbbell_kg: kg }) as unknown as UserProfile
+  check('the fixture is a dumbbell pair with a real ladder when no limit is known', loadingMode(pairLift) === 'dumbbell' && JSON.stringify(nextSetRungsKg(30, pairLift, profile)) === '[32,34]', nextSetRungsKg(30, pairLift, profile))
+  check('logged at or above a stated limit: no rung is offered above it', nextSetRungsKg(30, pairLift, owns(24)).length === 0 && nextSetRungsKg(24, pairLift, owns(24)).length === 0, [nextSetRungsKg(30, pairLift, owns(24)), nextSetRungsKg(24, pairLift, owns(24))])
+  check('one step under the limit: the limit itself is offered, and nothing past it', JSON.stringify(nextSetRungsKg(22, pairLift, owns(24))) === '[24]', nextSetRungsKg(22, pairLift, owns(24)))
+  check('well under the limit the ladder is untouched', JSON.stringify(nextSetRungsKg(16, pairLift, owns(24))) === '[18,20]', nextSetRungsKg(16, pairLift, owns(24)))
+  check('a stated limit on a DIFFERENT implement changes nothing here', JSON.stringify(nextSetRungsKg(30, pairLift, { ...profile, max_single_implement_kg: 12, max_improvised_kg: 10 } as unknown as UserProfile)) === '[32,34]')
+  check('...and a barbell lift is never cut short by a dumbbell limit', JSON.stringify(nextSetRungsKg(27.5, barbellLift, owns(24))) === '[30,32.5]', nextSetRungsKg(27.5, barbellLift, owns(24)))
+  check('the "same" chip is still there — the grid always lists the logged weight first', /const opts = \[base, \.\.\.rungs\]/.test(cascade))
+}
 check('...and the chip says the kilos it adds, which is true at every weight',
   /label: kg === base \? 'same' : `\+\$\{Number\(\(kg - base\)\.toFixed\(2\)\)\}`/.test(cascade)
   && !/\+5%|\+10%/.test(cascade))
@@ -307,6 +329,7 @@ const handler = app.slice(app.indexOf('const handleCalibrationSessionFinished = 
 check('the app plans the anchor from that day', /applyCalibrationAnchors\(\{/.test(handler))
 check('...adopts the rewritten program', /setMesocycle\(r\.next\)/.test(handler))
 check('...and says so in the coach\'s voice', /calibrationAnchorMessage\(/.test(handler))
+check('...only when there is something true to say — a null sentence is never shown', /const said = calibrationAnchorMessage\([^\n]*\)\s*\n\s*if \(said\) setAdaptationMessages\(/.test(handler), handler.match(/calibrationAnchorMessage[\s\S]{0,160}/)?.[0])
 check('...wired to the exercise tab', /onCalibrationSessionFinished=\{handleCalibrationSessionFinished\}/.test(app))
 
 // ---------------------------------------------------------------------------
@@ -329,6 +352,127 @@ check('the search is gated on there being a weight to search for',
 check('...and all three rules read that same flag, not the week alone',
   (grid.match(/calibrationProbe && [^\n]*setNumber > 1/g) || []).length === 3
   && !/[^a-zA-Z]calibration && [^\n]*setNumber > 1/.test(grid), (grid.match(/calibration(Probe)? && [^\n]*setNumber > 1/g) || []))
+
+// ---------------------------------------------------------------------------
+console.log('\n6. The sentence and the plan agree, when the person has said what their heaviest dumbbell is')
+// ---------------------------------------------------------------------------
+// Test log H18, 9 Oct 2026. A tester whose heaviest dumbbells are 24kg logged
+// Romanian Deadlifts at 30kg per hand in his calibration week. Home said
+// "Week 2 now starts Romanian Deadlifts from your 30kg set"; week 2 printed
+// 24kg per hand, because the plan is clamped to what he owns and the sentence
+// was built from what he lifted. Two numbers for one fact, an hour apart.
+{
+  setRandomSource(seededRngFromKey('sam:2'))
+  const sam = {
+    ...profile, fitness_goal: 'fat_loss', equipment_access: 'minimalist', injuries: ['shoulders'],
+    training_style: 'bodybuilding', session_duration_preference: '30-45', max_dumbbell_kg: 24, weight_kg: 82,
+    training_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      .map(d => ({ day: d, available: ['Monday', 'Tuesday', 'Thursday', 'Saturday'].includes(d) })),
+  } as unknown as UserProfile
+  console.log = () => {}
+  const samPlan = generateMesocycle(sam)
+  console.log = quiet
+  resetRandomSource()
+  const thu = samPlan[0].days.find(d => d.day === 'Thursday')!
+  const rdlIndex = thu.exercises.findIndex(e => e.name === 'Romanian Deadlifts')
+  const rdlKg = (w: typeof week1) => w.days.find(d => d.day === 'Thursday')!.exercises[rdlIndex]?.suggested_load_kg
+  check('the fixture has his Thursday Romanian Deadlifts, printed under 24kg in weeks 1 and 2', rdlIndex >= 0 && rdlKg(samPlan[0])! < 24 && rdlKg(samPlan[1])! < 24, { i: rdlIndex, w1: rdlIndex >= 0 && rdlKg(samPlan[0]), w2: rdlIndex >= 0 && rdlKg(samPlan[1]) })
+
+  const over = planCalibrationAnchors(samPlan, sam, 1, 'Thursday', [log(1, 30, {}, 'Romanian Deadlifts'), log(2, 30, {}, 'Romanian Deadlifts')])
+  const wk2 = over.next.find(w => w.week_number === 2)!
+  check('week 2 is written at 24kg per hand — the plan respects what he owns', rdlKg(wk2) === 24, rdlKg(wk2))
+  const said = calibrationAnchorMessage(2, over.applied)
+  check('the sentence quotes the weight that was WRITTEN', !!said && /24kg/.test(said), said)
+  check('...and does not announce the 30kg he lifted as where week 2 starts', !!said && !/from your 30kg set/.test(said) && !/starts[^.]*\b30kg/.test(said), said)
+  check('...and says why it stopped there, in plain words', !!said && /heaviest/.test(said), said)
+  check('no "undefined", "null" or "NaN" in it', !!said && !/undefined|null|NaN/.test(said), said)
+  console.log(`     says: "${said}"`)
+  check('the sentence, exactly', said === "Week 2 now starts Romanian Deadlifts at 24kg per hand, the heaviest you've told me you have — not the guess it was printed with.", said)
+  // The deload backs off from what was WRITTEN (24), not from what was lifted
+  // (30): 70% of 30 is 21, 70% of 24 is 16.8.
+  const samDeload = over.next.find(w => w.block_number === samPlan[0].block_number && w.is_deload)!
+  check('the block\'s deload is 70% of the 24kg that was written, not of the 30kg lifted', rdlKg(samDeload) === roundToPlate(24 * DELOAD_LOAD_FRACTION, 'dumbbell') && rdlKg(samDeload)! < 20, rdlKg(samDeload))
+  const wk2Row = wk2.days.find(d => d.day === 'Thursday')!.exercises[rdlIndex]
+  check('week 2\'s row records WHY it stops at 24 — his own limit — and says so beside the weight',
+    wk2Row.load_hold === 'stated_limit' && /24kg dumbbells/.test(wk2Row.load_guidance ?? '') && !/Add \d/.test(wk2Row.load_guidance ?? ''),
+    { hold: wk2Row.load_hold, guidance: wk2Row.load_guidance })
+  check('the anchor carries what next week reads, so the sentence cannot drift from the plan', over.applied[0]?.nextWeek?.kg === 24 && over.applied[0]?.nextWeek?.moved === true && over.applied[0]?.nextWeek?.atStatedLimit === true, over.applied[0])
+
+  // "ONLY CLAIM A CHANGE WHEN THE NUMBER MOVED". The same lift, for somebody
+  // whose plan is ALREADY printed at his limit: lifting more than he owns
+  // changes nothing on the plan, so nothing is announced and nothing is saved.
+  const limit = rdlKg(samPlan[1])!
+  const atLimit = { ...sam, max_dumbbell_kg: limit } as unknown as UserProfile
+  setRandomSource(seededRngFromKey('sam:2'))
+  console.log = () => {}
+  const limitPlan = generateMesocycle(atLimit)
+  console.log = quiet
+  resetRandomSource()
+  const lIndex = limitPlan[0].days.find(d => d.day === 'Thursday')!.exercises.findIndex(e => e.name === 'Romanian Deadlifts')
+  const lKg = (w: typeof week1) => w.days.find(d => d.day === 'Thursday')!.exercises[lIndex]?.suggested_load_kg
+  const block = limitPlan.filter(w => w.block_number === limitPlan[0].block_number && (w.week_in_block ?? 1) > 1 && !w.is_deload)
+  check(`the second fixture's later loading weeks already sit at his ${limit}kg limit`, lIndex >= 0 && block.length >= 2 && block.every(w => lKg(w) === limit), block.map(w => lKg(w)))
+  const none = planCalibrationAnchors(limitPlan, atLimit, 1, 'Thursday', [log(1, limit + 6, {}, 'Romanian Deadlifts')])
+  const rdlApplied = none.applied.filter(a => a.exerciseName === 'Romanian Deadlifts')
+  check('a lift that cannot move the plan is not reported as applied', rdlApplied.length === 0, none.applied)
+  check('...no week is rewritten for it', none.changedWeeks.length === 0 && none.next === limitPlan, none.changedWeeks.map(w => w.week_number))
+  check('...and there is no sentence at all', calibrationAnchorMessage(2, none.applied) === null, calibrationAnchorMessage(2, none.applied))
+
+  // "PATCHED" MEANS THE NUMBER MOVED, where a clamp INSIDE the prescription
+  // hands back what was already printed. His Tuesday Backpack Row sits at the
+  // 20kg a bag is trusted with at his experience; a logged 26 cannot raise it
+  // (that limit is about the bag, not about him), so nothing is rewritten and
+  // nothing is announced.
+  const tue = samPlan[0].days.find(d => d.day === 'Tuesday')!
+  const bagIndex = tue.exercises.findIndex(e => e.name === 'Backpack Row')
+  const bagKg = (w: typeof week1) => w.days.find(d => d.day === 'Tuesday')!.exercises[bagIndex]?.suggested_load_kg
+  check('the fixture has a Backpack Row already at 20kg in weeks 1 to 3', bagIndex >= 0 && [0, 1, 2].every(i => bagKg(samPlan[i]) === 20), bagIndex >= 0 && [0, 1, 2].map(i => bagKg(samPlan[i])))
+  const bag = planCalibrationAnchors(samPlan, sam, 1, 'Tuesday', [log(1, 26, {}, 'Backpack Row')])
+  check('a logged 26kg on it rewrites no week and is not reported as applied', bag.applied.length === 0 && bag.changedWeeks.length === 0 && bag.next === samPlan, { applied: bag.applied, changed: bag.changedWeeks.map(w => w.week_number) })
+
+  // ...and where ROUNDING hands it back. A deload's target is 70% of the
+  // reachable weight (16.8kg for 24), which rounds to the 16kg dumbbell; a
+  // plan whose deload is already 16 and whose loading weeks are already 24 has
+  // nothing to move, and must not be reported as patched for being rewritten
+  // with the same figures.
+  const settled = over.next
+  const again = patchBlockFromLiftedKg(settled, sam, { blockNumber: samPlan[0].block_number ?? 1, dayName: 'Thursday', exIndex: rdlIndex, exerciseName: 'Romanian Deadlifts', liftedKg: 30, fromWeekInBlock: 2 })
+  // (The helper always returns a fresh array; an untouched WEEK keeps its identity.)
+  const untouched = again.next.every((w, i) => w === settled[i])
+  check('re-anchoring a block that is already there changes nothing and says so', again.patched === false && untouched, { patched: again.patched, untouched })
+
+  // THE SENTENCE ITSELF, on anchors built by hand, so each branch is held on
+  // its own rather than only through whatever a generated plan happens to do.
+  const a = (over: Record<string, unknown>) => ({ exIndex: 0, exerciseName: 'Dumbbell Rows', plannedKg: 16, liftedKg: 30, ...over }) as never
+  const movedTo = (kg: number, atStatedLimit: boolean, moved = true) => ({ nextWeek: { kg, label: `~${kg}kg per hand`, moved, atStatedLimit } })
+  check('a lift whose next week did not move is not announced at all', calibrationAnchorMessage(2, [a(movedTo(24, true, false))]) === null)
+  check('...and is left out of a list where another lift did move',
+    calibrationAnchorMessage(2, [a(movedTo(24, true, false)), a({ exerciseName: 'Hammer Curls', liftedKg: 12, ...movedTo(12, false) })])
+      === 'Week 2 now starts Hammer Curls from your 12kg set — not the guess it was printed with.',
+    calibrationAnchorMessage(2, [a(movedTo(24, true, false)), a({ exerciseName: 'Hammer Curls', liftedKg: 12, ...movedTo(12, false) })]))
+  // Stopped short by something that is NOT a limit the person gave: the
+  // number is still the written one, and nothing is claimed about what they
+  // told us.
+  const short = calibrationAnchorMessage(2, [a(movedTo(26, false))])
+  check('stopped short by something other than a stated limit: the written number, and no claim about what they told us', !!short && /at 26kg per hand/.test(short) && !/told me/.test(short) && !/30kg/.test(short), short)
+  check('two lifts read as a sentence, one of each kind',
+    calibrationAnchorMessage(2, [a(movedTo(24, true)), a({ exerciseName: 'Hammer Curls', liftedKg: 12, ...movedTo(12, false) })])
+      === "Week 2 now starts Dumbbell Rows at 24kg per hand, the heaviest you've told me you have and Hammer Curls from your 12kg set — not the guesses it was printed with.",
+    calibrationAnchorMessage(2, [a(movedTo(24, true)), a({ exerciseName: 'Hammer Curls', liftedKg: 12, ...movedTo(12, false) })]))
+  // And the planner sets that flag only for a STATED limit. No limit given, a
+  // set logged above the heaviest dumbbell the table allows (50kg per hand):
+  // the plan stops at 50 and the sentence must not say he told us so.
+  const noLimit = { ...sam, max_dumbbell_kg: undefined } as unknown as UserProfile
+  const huge = planCalibrationAnchors(samPlan, noLimit, 1, 'Thursday', [log(1, 60, {}, 'Romanian Deadlifts')])
+  const hugeSaid = calibrationAnchorMessage(2, huge.applied)
+  check('with no limit stated, a table clamp is never described as something he told us',
+    huge.applied[0]?.nextWeek?.kg === 50 && huge.applied[0]?.nextWeek?.atStatedLimit === false && !!hugeSaid && /at 50kg per hand/.test(hugeSaid) && !/told me/.test(hugeSaid),
+    { anchor: huge.applied[0], hugeSaid })
+
+  // And the ordinary case is untouched: no limit in the way, the lifted
+  // number is the written number and the sentence still says so.
+  check('with nothing in the way the sentence still reads "from your Nkg set"', !!msg && msg.includes(`from your ${heavier}kg set`), msg)
+}
 
 console.log(failures === 0 ? '\nAll calibration-search checks passed.' : `\n${failures} calibration-search check(s) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

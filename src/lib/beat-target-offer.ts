@@ -277,6 +277,23 @@ export function patchBlockFromLiftedKg(
   const entry = getExerciseEntry(anchor.exerciseName)
   if (!entry) return { next: mesocycle, patched: false }
   const fromWeek = anchor.fromWeekInBlock ?? 1
+  // WHAT THE PLAN CAN ACTUALLY BE WRITTEN AT. Somebody who has said their
+  // heaviest dumbbells are 24kg and logs a borrowed 30 is re-anchored to 24 —
+  // prescribeLoad clamps the forced number to what they own. Working from the
+  // lifted figure anyway got two things wrong (test log H18, 9 Oct 2026): the
+  // deload was written at 70% of 30 rather than of 24, which rounds to the
+  // same dumbbell as the loading weeks when the limit is low, so the recovery
+  // week stopped being lighter; and a week already printed AT the limit was
+  // rewritten with the identical number and reported as changed, which is how
+  // the app came to announce "now starts from your 30kg set" over a plan that
+  // read 24 before and after.
+  //
+  // ASKED OF prescribeLoad ITSELF rather than re-derived from the ceilings: it
+  // is the one place every clamp lives (the table, a stated limit, and a bag's
+  // strap limit, which is not a "ceiling" in the other two's sense). A first
+  // version capped at the stated/table ceiling only and still wrote a
+  // backpack's deload at 70% of a logged 26kg the bag is never prescribed.
+  const reachableKg = prescribeLoad(entry, profile, { forceStartingWeightKg: anchor.liftedKg }).starting_weight_kg ?? anchor.liftedKg
 
   let patched = false
   const next = mesocycle.map(week => {
@@ -293,7 +310,7 @@ export function patchBlockFromLiftedKg(
     // the anchor, and prescribeLoad's own rounding holds it at the
     // equipment floor where that lands under it (the generator's
     // deloadAtFloor case, reached by the same arithmetic).
-    const targetKg = week.is_deload ? anchor.liftedKg * DELOAD_LOAD_FRACTION : anchor.liftedKg
+    const targetKg = week.is_deload ? reachableKg * DELOAD_LOAD_FRACTION : reachableKg
     if (target.suggested_load_kg != null && target.suggested_load_kg >= targetKg) return week
 
     const load = prescribeLoad(entry, profile, {
@@ -303,12 +320,23 @@ export function patchBlockFromLiftedKg(
       repRangeLabel: target.reps,
       forceStartingWeightKg: targetKg,
     })
+    // "PATCHED" MEANS THE NUMBER MOVED. Rounding to a real dumbbell or one
+    // more clamp inside prescribeLoad (a backpack's strap limit) can hand back
+    // exactly what was already printed; that week is left as it was, and if
+    // every week is, nothing was patched and nothing may be announced.
+    if (load.starting_weight_kg === target.suggested_load_kg) return week
     const patchedEx: Exercise = {
       ...target,
       suggested_load: load.display,
       suggested_load_kg: load.starting_weight_kg,
       per_set_load: load.per_set,
       load_guidance: load.basis,
+      // WHY IT IS WHERE IT IS, from the same calculation as the number. This
+      // patch used to leave the old week's reason standing ("next weight up is
+      // too big a jump") beside a weight that had just jumped — and a week
+      // re-anchored to the person's own dumbbell limit carried no reason for
+      // stopping there at all.
+      load_hold: load.hold ?? undefined,
     }
     patched = true
     return {
@@ -363,8 +391,11 @@ export async function confirmBeatTargetOffer(
   await Promise.all(
     next.filter(w => w.block_number === payload.blockNumber).map(w => saveMesocycleWeek(profileId, w)),
   )
+  // THE RECEIPT QUOTES WHAT WAS WRITTEN, read back off the plan — not the
+  // lifted figure, which a stated dumbbell limit can sit below.
+  const writtenKg = plannedKgForSlot(next, payload.blockNumber, payload.dayName, payload.exIndex, payload.exerciseName)
   await resolvePendingAction(offerId, 'done', {
-    landed: [`${payload.exerciseName} starts block ${payload.blockNumber} at ${payload.liftedKg}kg.`],
+    landed: [`${payload.exerciseName} starts block ${payload.blockNumber} at ${writtenKg ?? payload.liftedKg}kg.`],
     failed: [],
   })
   return next

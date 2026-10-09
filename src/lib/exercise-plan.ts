@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -13,7 +13,7 @@ import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields 
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
+  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
@@ -5442,6 +5442,84 @@ function isLoadlessWeek(days: WorkoutDay[]): boolean {
  *     a second one at the same time is what "one lever at a time" exists to
  *     prevent.
  */
+/**
+ * MAY THIS LIFT, AS IT IS PRESCRIBED RIGHT NOW, CARRY A TEMPO?
+ *
+ * One predicate, because two paths need the same answer. Generation asked it
+ * inline (below) and a gate held it for generated plans — but a replacement
+ * (swap, ban, injury or kit adaptation, session rebuild) never asked at all:
+ * it inherited the outgoing slot's tempo with the rest of the slot, so a
+ * tempo'd bodyweight squat swapped for a Spanish Squat left "2s down · drive
+ * up" on a timed hold, and one swapped for Kettlebell Swing (Heavy) left it on
+ * a loaded ballistic lift. Found on a tester's plan, 9 Oct 2026 (L30).
+ * `applyReplacement` now asks this about the INCOMING exercise.
+ *
+ * The exclusions, each for its own reason (the first four are generation's
+ * own, moved here unchanged):
+ *   - primers: movement prep, deliberately easy, never a working set.
+ *   - non-'reps' prescriptions: a hold, a carry and an interval have no reps
+ *     to slow down.
+ *   - anything that takes added load (a belted chin-up): Ashley's ruling —
+ *     slowing it would paper over the missing weight instead of closing it.
+ *   - anything carrying a weight it can still add to: there the weight IS the
+ *     lever. A backpack sitting on its ceiling has no more to add, so it does
+ *     qualify (Ashley: "slow the movement down").
+ *   - BALLISTIC movements, added with this function: a swing, jump or throw
+ *     has no controlled lowering phase to slow. Inert for generation today —
+ *     every ballistic entry is a primer, a cardio interval, or a swing that
+ *     always carries a weight — and stated anyway, because "inert today" is
+ *     how the replacement path came to print it.
+ */
+export function isTempoEligible(
+  entry: ExerciseEntry | undefined,
+  slot: { suggested_load_kg?: number | null; reps: string },
+  /**
+   * Whose backpack ceiling to read. `undefined` means "not known here", and
+   * then a lift carrying a weight is never eligible — the strict answer, not
+   * a guessed tier (the novice ceiling is 8kg, so guessing would call nearly
+   * every backpack lift "at its limit").
+   */
+  experience: TrainingExperience | undefined,
+): boolean {
+  if (!entry || entry.mechanics_tier === 'primer') return false
+  if (entry.prescription_type !== 'reps') return false
+  if (isBallisticMovement(entry)) return false
+  // "NO MORE LOAD TO ADD", not "no load at all" — the condition this rule
+  // was written with, widened to the case it always meant.
+  //
+  // A weighted backpack has a hard physical ceiling
+  // (IMPROVISED_IMPLEMENT_CEILING_KG, 8/12/20/25kg by experience). A lift
+  // sitting on it has a weight — 20kg — and was therefore skipped, even
+  // though 20kg is every kilogram it will ever have. MEASURED: Backpack
+  // Row was 91 of 217 repeated week-to-week transitions, the single
+  // largest contributor in the app.
+  //
+  // The exclusion below for accepts_added_load is Ashley's earlier ruling
+  // and is NOT disturbed by this: a belt can always take another plate,
+  // so slowing a chin-up down would paper over a gap instead of closing
+  // it. A backpack cannot. That is the whole distinction — one implement
+  // has more to give and one does not.
+  if (slot.suggested_load_kg != null) {
+    if (experience === undefined) return false
+    const improvisedCeiling = IMPROVISED_IMPLEMENT_CEILING_KG[experience]
+      ?? IMPROVISED_IMPLEMENT_CEILING_KG.novice
+    const atImprovisedCeiling = isImprovisedLoadImplement(entry)
+      && slot.suggested_load_kg >= improvisedCeiling
+    if (!atImprovisedCeiling) return false
+  }
+  // A chin-up or a dip CAN take a belt or a loaded backpack, so "there is
+  // no weight to add" is false for them — showing no weight there is a
+  // gap in this app, not a fact about the movement. Ashley's call, and
+  // the right one: slowing the rep down would paper over that gap
+  // instead of closing it. Excluded here and flagged in BACKLOG; the
+  // real fix is prescribing the added load.
+  if (entry.accepts_added_load) return false
+  // Belt and braces: prescription_type says what the entry IS, this says
+  // what the string actually holds. A mismatch between them has shipped
+  // before (fixedUnitPrescription exists because of it).
+  return /^\d+(\s*-\s*\d+)?$/.test(String(slot.reps).trim())
+}
+
 function applyTempoPrescription(
   days: WorkoutDay[],
   phase: TrainingPhase,
@@ -5452,47 +5530,10 @@ function applyTempoPrescription(
   const tempo = getPhaseTempo(phase)
   if (!tempo) return
   const notation = formatTempo(tempo)
-  const improvisedCeiling = IMPROVISED_IMPLEMENT_CEILING_KG[experience]
-    ?? IMPROVISED_IMPLEMENT_CEILING_KG.novice
   for (const day of days) {
     for (const ex of day.exercises) {
-      const entryForLoad = ex.suggested_load_kg != null
-        ? EXERCISE_DATABASE.find(e => e.name === ex.name)
-        : undefined
-      // "NO MORE LOAD TO ADD", not "no load at all" — the condition this
-      // function was written with, widened to the case it always meant.
-      //
-      // A weighted backpack has a hard physical ceiling
-      // (IMPROVISED_IMPLEMENT_CEILING_KG, 8/12/20/25kg by experience). A lift
-      // sitting on it has a weight — 20kg — and was therefore skipped, even
-      // though 20kg is every kilogram it will ever have. MEASURED: Backpack
-      // Row was 91 of 217 repeated week-to-week transitions, the single
-      // largest contributor in the app.
-      //
-      // The exclusion below for accepts_added_load is Ashley's earlier ruling
-      // and is NOT disturbed by this: a belt can always take another plate,
-      // so slowing a chin-up down would paper over a gap instead of closing
-      // it. A backpack cannot. That is the whole distinction — one implement
-      // has more to give and one does not.
-      const atImprovisedCeiling = entryForLoad != null
-        && isImprovisedLoadImplement(entryForLoad)
-        && (ex.suggested_load_kg ?? 0) >= improvisedCeiling
-      if (ex.suggested_load_kg != null && !atImprovisedCeiling) continue
       const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
-      if (!entry || entry.mechanics_tier === 'primer') continue
-      if (entry.prescription_type !== 'reps') continue
-      // A chin-up or a dip CAN take a belt or a loaded backpack, so "there is
-      // no weight to add" is false for them — showing no weight there is a
-      // gap in this app, not a fact about the movement. Ashley's call, and
-      // the right one: slowing the rep down would paper over that gap
-      // instead of closing it. Excluded here and flagged in BACKLOG; the
-      // real fix is prescribing the added load.
-      if (entry.accepts_added_load) continue
-      // Belt and braces: prescription_type says what the entry IS, this says
-      // what the string actually holds. A mismatch between them has shipped
-      // before (fixedUnitPrescription exists because of it).
-      if (!/^\d+(\s*-\s*\d+)?$/.test(String(ex.reps).trim())) continue
-      ex.tempo = notation
+      if (isTempoEligible(entry, ex, experience)) ex.tempo = notation
     }
   }
 }
@@ -6546,6 +6587,114 @@ function repLowOf(reps: string | undefined): number | null {
   return m ? Number(m[1]) : null
 }
 
+/**
+ * THE REP RANGE THIS EXERCISE WOULD BE GIVEN, IN THIS WEEK, IF GENERATION HAD
+ * PUT IT THERE — for a lift coming INTO a slot by swap, ban, injury or kit
+ * adaptation, or session rebuild.
+ *
+ * WHY IT EXISTS (test log M32, 9 Oct 2026). A replacement used to inherit the
+ * outgoing slot's `reps` whenever both were rep-counted. That string is not
+ * "the block's range for this slot" — it is the block's range AFTER the
+ * outgoing lift's own levers have worked on it:
+ *   - a weightless lift walks its reps up a rep a week (it has nothing else),
+ *   - a lift whose weight is frozen buys reps on top (`rep_bump`),
+ *   - and the base bracket itself belongs to the outgoing lift's TIER.
+ * So a band kickback that had walked to 16-19 handed 16-19 to a loaded
+ * dumbbell extension, and a walking lunge that had bought two reps handed
+ * 11-13 to a bodyweight step-up beside 10-12 neighbours.
+ *
+ * THE RULE IS GENERATION'S OWN, not a new one. When the generator rotates a
+ * different exercise into a slot mid-block (its weekly accessory rotation) it
+ * re-derives the base from the NEW exercise and applies this week's shifts.
+ * This is that arithmetic, lifted out so a replacement can ask for it:
+ *     the incoming exercise's bracket for its tier, style, goal and experience
+ *   + this block's phase shift (and the deload's)
+ *   + the week-in-block rep ramp, ONLY where reps are this lift's lever —
+ *     no weight to add, a goal whose accessories progress by reps, or a
+ *     weight so light that one real notch is too big a jump.
+ * `test:replacement-prescription` holds the two against each other: for every
+ * slot generation itself wrote, this returns what generation printed.
+ *
+ * WHAT IT DELIBERATELY LEAVES OUT: the frozen-weight rep bump. That is earned
+ * by one named lift across the weeks of a block (a streak keyed on its name),
+ * and a lift that arrived today has no streak — generation gives a newly
+ * rotated-in lift none either.
+ *
+ * ONE KNOWN APPROXIMATION, on a deload week only. Generation cuts a weightless
+ * lift's reps by two when cutting its SETS bought nothing (they were already
+ * at the two-set floor in the loading weeks). That needs the loading week's
+ * set count, which a single week does not carry, so a weightless lift coming
+ * in on a deload gets the phase's own range — at most two reps more than
+ * generation would have written, on a week that is still lighter than the one
+ * before it (no ramp, and the slot's sets are the deload's).
+ *
+ * Returns null — and the caller must say what it does then — for anything not
+ * counted in reps (holds, carries and intervals have their own fixed units)
+ * and for a week whose phase cannot be read.
+ */
+export function repRangeForIncomingExercise(
+  entry: ExerciseEntry,
+  profile: UserProfile,
+  week: Pick<MesocycleWeek, 'phase_label' | 'week_in_block' | 'is_deload'>,
+  /** The slot's effort target, used only to price the "is one notch too big a jump" question. */
+  intensity?: string,
+): string | null {
+  if ((entry.prescription_type ?? 'reps') !== 'reps') return null
+  const label = week.phase_label?.trim()
+  const phaseConfig = Object.values(PHASE_CONFIGS).find(c => c.label === label)
+  if (!phaseConfig) return null
+
+  const expConfig = getExperienceConfig(profile.training_experience || 'novice')
+  const styleConfig = STYLE_CONFIGS[profile.training_style || 'hybrid']
+  const policy = getGoalPolicy((profile.fitness_goal || 'hypertrophy') as FitnessGoal)
+  const base = assignSetsRepsFromConfig(entry, styleConfig, expConfig, policy, profile.session_duration_preference).reps
+
+  const isPrimer = entry.mechanics_tier === 'primer'
+  const isMainCompound = entry.mechanics_tier === 'tier1_compound'
+  const isDeload = !!week.is_deload
+  const w = Math.min(Math.max(1, week.week_in_block ?? 1), 4)
+  const category = categorize(entry)
+  // Generation's own definition, both halves (see `isBodyweight` in
+  // generateMesocycle): no external load, OR tagged loaded with no anchor to
+  // price it from. A primer is neither a weightless working lift nor a loaded
+  // one for this purpose.
+  const isBodyweight = !isPrimer && (!isExternallyLoaded(entry) || category == null)
+  const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
+
+  // A lift that has just arrived has no block baseline, so the two questions
+  // generation asks of one are asked of its own starting estimate instead.
+  const startingKg = (reps: string): number | null => (isBodyweight || isPrimer || category == null)
+    ? null
+    : prescribeLoad(entry, profile, { targetRpeLabel: intensity, repRangeLabel: reps }).starting_weight_kg
+
+  if (isDeload) {
+    // A deload's default move is a lighter weight and reps eased UP by two.
+    // Where there is no weight to take off — a weightless lift, a warm-up
+    // move, or a loaded one already so light that 70% of it rounds back up to
+    // the lightest thing that exists — easing reps up would make the recovery
+    // week harder, so they stay at the phase's range (generation's
+    // `deloadLoadLeverDead`). See the approximation note above for the further
+    // two-rep cut this cannot see.
+    const loadingReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+    const kg = isExternallyLoaded(entry) ? startingKg(loadingReps) : null
+    const atFloor = kg != null && kg * DELOAD_LOAD_FRACTION < getEquipmentFloorKg(entry)
+    const leverDead = !isExternallyLoaded(entry) || atFloor
+    return leverDead ? loadingReps : shiftReps(base, phaseConfig.rep_shift + 2, repFloor)
+  }
+  const phaseReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+
+  // IS ONE NOTCH OF THIS IMPLEMENT TOO BIG A JUMP? (generation's
+  // `loadStepUnaffordable`: more than 12% of the weight in one step.)
+  let loadStepUnaffordable = false
+  const start = startingKg(phaseReps)
+  if (start != null && start > 0 && category != null) {
+    loadStepUnaffordable = getLoadIncrementKg(entry, category, start) / start > 0.12
+  }
+  const rampReps = isBodyweight || loadStepUnaffordable
+    || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)
+  return shiftReps(phaseReps, rampReps ? w - 1 : 0, repFloor)
+}
+
 /** Carries progress by DISTANCE, not weight — see the load-floor comment. */
 function isCarryByName(name: string): boolean {
   const entry = EXERCISE_DATABASE.find(e => e.name === name)
@@ -7338,6 +7487,17 @@ export function generateMesocycle(
           } else if (dbEntry?.prescription_type === 'steady_state') {
             reps = baseReps
             restForWeek = ex.rest
+          } else if (dbEntry?.prescription_type === 'time') {
+            // A HOLD STEPS IN SECONDS, NOT IN REPS — see stepHoldSeconds
+            // (periodization.ts) for the ruling and its basis. It used to fall
+            // through to the branch below and take the phase's rep_shift as a
+            // seconds delta, which is where "Plank 3x34-49s" came from.
+            // A PRIMER HOLD STAYS AT ITS BASE: a balance hold in the warm-up
+            // is preparation, and the app does not progress preparation.
+            // (Week 1 of stepHoldSeconds IS the base, so a primer asks for it.)
+            reps = stepHoldSeconds(baseReps, isPrimer ? 1 : w, isDeload)
+              ?? shiftReps(phaseReps, rampSteps, repFloor)
+            restForWeek = adjustRest(ex.rest, restShift)
           } else {
             reps = shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)

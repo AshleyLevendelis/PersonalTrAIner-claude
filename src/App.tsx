@@ -2407,7 +2407,11 @@ function App() {
       })
       if (r.applied.length === 0 || r.nextWeekNumber == null) return
       setMesocycle(r.next)
-      setAdaptationMessages(prev => [...prev, { text: calibrationAnchorMessage(r.nextWeekNumber!, r.applied) }])
+      // Null when next week's own number did not move (a later week of the
+      // block did): the plan is adopted either way, and nothing is announced
+      // that the person could not go and see.
+      const said = calibrationAnchorMessage(r.nextWeekNumber!, r.applied)
+      if (said) setAdaptationMessages(prev => [...prev, { text: said }])
     } catch (err) {
       console.error('[calibration-anchor] failed to re-anchor the program:', err)
     }
@@ -3191,7 +3195,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} />
+            <ToolsTab profileId={profile.id} equipmentAccess={profile.equipment_access} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">

@@ -276,7 +276,7 @@ export function ExerciseRow({
                 {/* A lift with no weight renders no LoadChip at all (see its
                     header). Tempo takes that slot when there is one — it is
                     what the trainee is actually meant to progress. */}
-                <TempoChip tempo={ex.tempo} />
+                <TempoChip ex={ex} />
                 {ex.suggested_added_load_kg != null ? (
                   <AddedLoadChip ex={ex} />
                 ) : ex.suggested_assistance_kg != null ? (

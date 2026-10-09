@@ -4,7 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input'
 import { Plus, X, Dumbbell, Activity } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { UnplannedCardioEntry, type CardioPick } from './CardioSetRow'
+import { UnplannedCardioEntry } from './CardioSetRow'
+import { cardioPresetsFor } from '@/lib/cardio-presets'
+import type { EquipmentAccess } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // One entry point for off-plan lifts AND ad-hoc cardio (LAYOUT-DESIGN.md
@@ -19,15 +21,11 @@ import { UnplannedCardioEntry, type CardioPick } from './CardioSetRow'
 // CardioSetRow). The presets were buttons that filled two text boxes and a
 // 5-10 number strip; they are the row's activity chips now, each carrying its
 // minutes and its effort, and the effort is Easy / Steady / Hard like every
-// other cardio log. The activity strings are unchanged — they are what the
-// log has always recorded — and so are the RPEs, which a preset logged as-is
-// still stores exactly (see rpeToStore): the HIIT bike is still an 8.
-const CONDITIONING_PRESETS: readonly CardioPick[] = [
-  { label: 'Incline walk', activity: 'Incline Treadmill Walk', minutes: 15, rpe: 4 },
-  { label: 'Heavy bag', activity: 'Heavy Bag / Functional Circuit', minutes: 15, rpe: 7 },
-  { label: 'HIIT bike', activity: 'HIIT / Assault Bike', minutes: 10, rpe: 8 },
-  { label: 'Zone 2', activity: 'Zone 2 Cardio', minutes: 15, rpe: 5 },
-]
+// other cardio log.
+//
+// WHICH FOUR depends on the kit since 9 Oct 2026 — see cardio-presets.ts. This
+// file used to hold one list for everybody, and a tester training at home was
+// offered a treadmill, a heavy bag and an assault bike.
 
 export function AddUnplannedWork({
   onLiftAdded,
@@ -37,9 +35,15 @@ export function AddUnplannedWork({
   hideTrigger,
   prefill,
   overlay,
+  equipmentAccess,
 }: {
   onLiftAdded?: () => void
   onCardioLogged?: () => void
+  /**
+   * The person's kit tier, so the quick-pick cardio options are ones they can
+   * do. Left out, the options are the ones that need no kit at all.
+   */
+  equipmentAccess?: EquipmentAccess | null
   /** Turn 5: unplanned work moved behind the day-level "⋮" menu (see
    * WeekContextRow) — controlled-open mode for that call site. Omit both
    * `open`/`hideTrigger` for the previous always-visible-button behavior. */
@@ -174,7 +178,7 @@ export function AddUnplannedWork({
 
       {mode === 'cardio' && (
         <UnplannedCardioEntry
-          picks={CONDITIONING_PRESETS}
+          picks={cardioPresetsFor(equipmentAccess)}
           prefill={prefill}
           // "3 rounds · 120s work / 30s rest" — what the timer actually ran, so
           // the log says more than "Intervals, 7 min" when she reads it back.

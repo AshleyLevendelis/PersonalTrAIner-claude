@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
+import { isNothingToChangeMessage } from '@/lib/edit-reason'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
 import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
@@ -184,8 +185,15 @@ export function SwapDialog({
               busy={reasonBusy}
               onAnswer={answerReason}
               onSkip={() => setAsked(true)}
+              currentEquipment={profile?.equipment_access}
             />
-            {reasonError && <p className="text-xs text-destructive" data-testid="swap-reason-error">{reasonError}</p>}
+            {/* "NOTHING TO CHANGE" IS NOT AN ERROR. onReason hands back one
+                string for both a failure and a deliberate no-op, and drawing
+                both red told someone whose plan was already fine that
+                something had gone wrong. edit-reason.ts knows which is which. */}
+            {reasonError && (isNothingToChangeMessage(reasonError)
+              ? <p className="text-xs text-muted-foreground" data-testid="swap-reason-note">{reasonError}</p>
+              : <p className="text-xs text-destructive" data-testid="swap-reason-error">{reasonError}</p>)}
           </>
         ) : (<>
         {!pendingSwap && currentEntry && (
