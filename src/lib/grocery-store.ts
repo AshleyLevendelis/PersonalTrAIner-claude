@@ -253,7 +253,8 @@ export function resolveGroceryTarget(name: string): {
   displayName: string
   category: GroceryCategory
   needsReview: boolean
-  toGrams: (quantity: number, unit: string) => number
+  /** Grams, or null when the amount cannot be read ("2 shallots" with no piece weight) — never the bare number. */
+  toGrams: (quantity: number, unit: string) => number | null
 } {
   const trimmed = name.trim()
   const entry = lookupIngredient(trimmed)
@@ -263,7 +264,7 @@ export function resolveGroceryTarget(name: string): {
       displayName: entry.name,
       category: categoryForEntry(entry),
       needsReview: false,
-      toGrams: (quantity, unit) => unitToGrams(entry, unit, quantity),
+      toGrams: (quantity, unit) => unitToGrams(entry, unit, quantity, trimmed),
     }
   }
   return {
@@ -271,7 +272,7 @@ export function resolveGroceryTarget(name: string): {
     displayName: trimmed,
     category: 'other',
     needsReview: true,
-    toGrams: (quantity, unit) => unitToGrams(null, unit, quantity),
+    toGrams: (quantity, unit) => unitToGrams(null, unit, quantity, trimmed),
   }
 }
 
@@ -391,20 +392,28 @@ export function addItemLocal(input: {
   // and stores the merged row in grams, matching generation's own convention.
   if (existing) {
     const sameUnit = existing.unit === input.unit
-    const existingQuantity = sameUnit ? existing.quantity : target.toGrams(existing.quantity, existing.unit)
-    const addQuantity = sameUnit ? input.quantity : target.toGrams(input.quantity, input.unit)
+    const existingGrams = sameUnit ? existing.quantity : target.toGrams(existing.quantity, existing.unit)
+    const addGrams = sameUnit ? input.quantity : target.toGrams(input.quantity, input.unit)
+    // AN AMOUNT THAT CANNOT BE READ IS NOT ADDED AS A NUMBER. "Add spinach"
+    // (one, no unit) onto a 100 g row used to add ONE GRAM through the old
+    // unknown-unit-means-grams default (9 Oct 2026). The row keeps the amount
+    // it had and is marked as a rough estimate, which is the screen's own way
+    // of saying "tap to set the amount".
+    const unreadable = existingGrams == null || addGrams == null
+    const existingQuantity = unreadable ? existing.quantity : existingGrams
+    const addQuantity = unreadable ? 0 : addGrams
     const item: PendingItem = {
       id: existing.id,
       profileId: input.profileId,
       canonicalKey: existing.canonical_key,
       displayName: existing.display_name,
       quantity: existingQuantity + addQuantity,
-      unit: sameUnit ? existing.unit : 'g',
+      unit: sameUnit || unreadable ? existing.unit : 'g',
       category: existing.category,
       source: existing.source,
       mealRefs: existing.meal_refs,
       checked: existing.checked,
-      needsReview: existing.needs_review,
+      needsReview: existing.needs_review || unreadable,
       createdAt: existing.created_at,
       attempts: 0,
       dismissed: existing.dismissed,
@@ -666,6 +675,8 @@ interface AggregatedIngredient {
   category: GroceryCategory
   needsReview: boolean
   grams: number
+  /** Counts whose weight could not be read ("2 shallots"): kept as a count and flagged, never added to `grams` as if they were grams. */
+  uncounted?: { quantity: number; unit: string }
   mealRefs: MealRef[]
 }
 
@@ -760,16 +771,22 @@ async function reconcileGenerated(
         const grams = target.toGrams(ing.quantity, ing.unit)
         const ref: MealRef = { day, slot: option.slot, mealName: option.name, date }
         const existing = aggregate.get(target.canonicalKey)
-        if (existing) {
-          existing.grams += grams
-          if (!existing.mealRefs.some(r => r.date === ref.date && r.slot === ref.slot && r.mealName === ref.mealName)) {
-            existing.mealRefs.push(ref)
-          }
+        const row: AggregatedIngredient = existing ?? {
+          canonicalKey: target.canonicalKey, displayName: target.displayName, category: target.category,
+          needsReview: target.needsReview, grams: 0, mealRefs: [],
+        }
+        if (!existing) aggregate.set(target.canonicalKey, row)
+        if (grams != null) {
+          row.grams += grams
         } else {
-          aggregate.set(target.canonicalKey, {
-            canonicalKey: target.canonicalKey, displayName: target.displayName, category: target.category,
-            needsReview: target.needsReview, grams, mealRefs: [ref],
-          })
+          // "5 rye crispbreads" was FIVE GRAMS on the list until 9 Oct 2026
+          // (M23). A count the food database cannot weigh stays a count and
+          // the row says it is a rough estimate.
+          row.needsReview = true
+          row.uncounted = { quantity: (row.uncounted?.quantity ?? 0) + ing.quantity, unit: row.uncounted?.unit ?? ing.unit }
+        }
+        if (!row.mealRefs.some(r => r.date === ref.date && r.slot === ref.slot && r.mealName === ref.mealName)) {
+          row.mealRefs.push(ref)
         }
       }
     }
@@ -788,7 +805,10 @@ async function reconcileGenerated(
 
   for (const agg of aggregate.values()) {
     const existing = existingGenerated.get(agg.canonicalKey)
-    const roundedGrams = Math.round(agg.grams)
+    // Nothing weighable at all: show the count she would buy, not "0g".
+    const amount = agg.grams > 0 || !agg.uncounted
+      ? { quantity: Math.round(agg.grams), unit: 'g' }
+      : { quantity: agg.uncounted.quantity, unit: agg.uncounted.unit }
     if (existing?.dismissed) {
       // Deliberately removed by the user — leave it dismissed, don't resurrect it.
       existingGenerated.delete(agg.canonicalKey)
@@ -811,7 +831,7 @@ async function reconcileGenerated(
       existingGenerated.delete(agg.canonicalKey)
       enqueueUpsert({
         id: existing.id, profileId: profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
-        quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
+        quantity: amount.quantity, unit: amount.unit, category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: existing.checked, needsReview: agg.needsReview, createdAt: existing.created_at, attempts: 0,
         dismissed: false, userEdited: false,
       })
@@ -819,7 +839,7 @@ async function reconcileGenerated(
     } else {
       enqueueUpsert({
         id: generateId(), profileId: profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
-        quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
+        quantity: amount.quantity, unit: amount.unit, category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: false, needsReview: agg.needsReview, createdAt: new Date().toISOString(), attempts: 0,
         dismissed: false, userEdited: false,
       })

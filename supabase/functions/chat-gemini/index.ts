@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
-import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
+import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
+import { checkWeighIn, calendarDaysBetween } from "../_shared/weigh-in-check.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
@@ -1516,7 +1517,7 @@ const toolDeclarations = [
         assumptions: {
           type: "array",
           items: { type: "string" },
-          description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. A short phrase each, e.g. 'assumed 0% fat greek yoghurt' — never your reasoning about what tool to call or why, that is not an assumption and must never appear here. Empty array if you made none.",
+          description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. A short phrase each, naming only the thing you assumed, e.g. '0% fat greek yoghurt' or 'large eggs' (the app writes the word 'Assumed' itself) — never your reasoning about what tool to call or why, that is not an assumption and must never appear here. Empty array if you made none.",
         },
       },
       required: ["intent", "meal_slot", "food_name", "ingredients", "assumptions"],
@@ -2500,7 +2501,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is propose_session_activity_swap; if the session is happening later this week, propose_session_move.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response, in the how-to shape §1 gives: the one to three cues that matter most for this person as short numbered lines, then the "Full form guide" offer. Target muscles, common mistakes and further tips belong in the full guide, when they ask for it — never all in the first answer. (This line used to ask for all four at once, which contradicted §1 and produced four-paragraph essays; Ashley saw them on 24 Sep 2026.)
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
-- When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
+- When a food LOGGING command is given (log_meal), execute it immediately. Log what they say they ate, at the amounts they said — what they ate is a fact, never something to fit to a meal's budget. Do NOT ask for macro details.
 - If the user does not specify which meal slot for a swap, infer it from the current meal plan.
 - When calling propose_meal_swap or propose_meal_addition, call the function FIRST. Do NOT write a long preamble — put reasoning in the "reason" field.
 - Do NOT trigger function calls for hypothetical questions, comparisons, or educational questions about exercise technique (answer those directly as text).
@@ -3392,6 +3393,37 @@ Keep this context in mind to ensure your greetings and questions naturally align
           );
         }
 
+        // IS IT BELIEVABLE, GIVEN THE LAST ONE? The same check the weigh-in
+        // card and the Profile field ask (_shared/weigh-in-check.ts is the
+        // app's own file, generated). 9 Oct 2026: 62 kg an hour after 81.2 kg
+        // was inside 25-350, so it was saved and the calorie target dropped
+        // 183 kcal on the spot.
+        //
+        // THE VERDICT IS LOGGED AND NOTHING ELSE. What a surprising weigh-in
+        // should DO — ask first, hold the target for a second day — is
+        // Ashley's decision and is open, so the weight is saved exactly as
+        // before, and the verdict is kept out of the reply and out of what the
+        // model is shown. The read is before the write on purpose: after it,
+        // "the last weigh-in" would be this one.
+        let weighInCheck: ReturnType<typeof checkWeighIn> = { verdict: "ok" };
+        try {
+          const lastResp = await fetch(
+            `${supabaseUrl}/rest/v1/daily_metrics?profile_id=eq.${profileId}&select=*&order=date.desc&limit=1`,
+            { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } }
+          );
+          const lastRows = lastResp.ok ? await lastResp.json() : [];
+          const last = Array.isArray(lastRows) && lastRows.length > 0 ? lastRows[0] : null;
+          const lastKg = last ? Number(last.weight_kg) : null;
+          const today = context.current_local_date;
+          const daysSince = last && typeof last.date === "string" && typeof today === "string"
+            ? calendarDaysBetween(last.date, today)
+            : null;
+          weighInCheck = checkWeighIn(weightKg, lastKg, daysSince);
+        } catch (err) {
+          console.error("log_weight: could not read the last weigh-in to check against:", err);
+        }
+        console.log(`weigh-in check verdict=${weighInCheck.verdict}${weighInCheck.verdict === "surprising" ? ` difference_kg=${weighInCheck.differenceKg} allowed_kg=${weighInCheck.allowedKg}` : ""}`);
+
         let dbSuccess = true;
         try {
           const todayDate = context.current_local_date;
@@ -3422,7 +3454,10 @@ Keep this context in mind to ensure your greetings and questions naturally align
           dbSuccess = false;
         }
 
-        const weightFloor = `Logged **${weightKg} kg** for today. Your targets recalculate from your latest weigh-in.`;
+        // Not "recalculate from your latest weigh-in": they follow the 7-day
+        // average and move once it has shifted a kilo (Ashley's ruling), and
+        // this sentence said otherwise until 9 Oct 2026.
+        const weightFloor = `Logged **${weightKg} kg** for today. Your targets follow your 7-day average.`;
         const confirmText = dbSuccess
           ? (await toolReply({
               outcome: { name, args, response: { status: "saved", weight_kg: weightKg, date: context.current_local_date } },
@@ -3629,7 +3664,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // a PARTIAL total (from what resolved) plus a plain caveat — never a
         // guessed number for the ingredients the food database doesn't know.
         const macroLine = computed.unmatched.length > 0
-          ? `roughly ${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g) from what I could identify — that's ${Math.round(computed.coverage * 100)}% of the meal by weight`
+          ? `roughly ${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g) from what I could count — about ${Math.round(computed.coverage * 100)}% of the meal`
           : `${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g)`;
 
         // TWO REPLIES, BECAUSE THERE ARE TWO QUESTIONS.
@@ -3676,7 +3711,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // client. They came from the verified food database here; recomputing
         // would give the card a second opinion about the meal the coach has
         // just quoted, which is the disagreement this repo keeps finding.
+        // THE STOP BEFORE THE CARD (9 Oct 2026, H6). Two typed meals reached
+        // her as cards at a quarter of their real calories — 187 kcal for a
+        // wrap and a large latte, 266 for two eggs on buttered toast — because
+        // every food was found and then costed at one or two grams. The
+        // amounts are read properly now (_shared/food-db.ts), and this is the
+        // second lock: an amount the database could not read, a counted food
+        // that came to almost nothing, or a breakfast, lunch or dinner under
+        // 100 kcal gets ONE short question in the app's own words instead of a
+        // card. The sentence is server-authored on purpose: the model cannot
+        // soften it into a number, and it defended the last wrong one.
+        const doubt = doubtAboutLoggedMeal(computed, args.meal_slot);
         if (!asked) {
+          if (doubt) {
+            return new Response(
+              JSON.stringify({ reply: doubt }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
           return new Response(
             JSON.stringify({
               reply: "",
@@ -3701,12 +3753,22 @@ Keep this context in mind to ensure your greetings and questions naturally align
         const parts: string[] = [
           `**${args.food_name}** is ${macroLine}${slot ? ` — worth weighing against your ${slot} budget` : ""}.`,
         ];
-        if (computed.unmatched.length > 0) {
-          parts.push(`I couldn't find these in my food database, so they're not counted above: ${computed.unmatched.join(", ")}.`);
+        // TWO DIFFERENT GAPS, SAID DIFFERENTLY. A food the database does not
+        // know, and a food it knows whose AMOUNT it could not read ("1 large
+        // latte") — the second used to be costed at one gram and reported as
+        // fully counted. Neither is ever given a guessed number.
+        const unreadAmounts = computed.amountUnknown;
+        const unknownFoods = computed.unmatched.filter((n) => !unreadAmounts.includes(n));
+        if (unknownFoods.length > 0) {
+          parts.push(`I couldn't find these in my food database, so they're not counted above: ${unknownFoods.join(", ")}.`);
         }
-        if (assumptions.length > 0) {
-          parts.push(`Assumptions: ${assumptions.join("; ")}.`);
+        if (unreadAmounts.length > 0) {
+          parts.push(`I couldn't tell how much of these there was, so they're not counted either: ${unreadAmounts.join(", ")}. Give me a rough weight and I'll add them.`);
         }
+        // "Assumed: large eggs; 10 g butter." — the same line the card prints,
+        // from the same function, so it can never read "assumed assumed".
+        const assumed = assumedLine(assumptions);
+        if (assumed) parts.push(assumed);
 
         // TODAY'S TEMPLATE IS THE FLOOR. Everything below reads the MESSAGE
         // before deciding whether numbers are even the answer. 8 Sep 2026,
@@ -3726,7 +3788,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
         });
         const advice = isAdviceQuestion(message);
         const evaluation = isEvaluationQuestion(message);
-        const nothingIdentified = computed.lines.every((l) => !l.entry);
+        // Nothing COSTED: no food known, or none with an amount that could be read.
+        const nothingIdentified = computed.lines.every((l) => !l.entry || l.grams == null);
         // The model's own arithmetic, in any shape — never allowed through.
         const macroArithmetic = /\b\d+(?:\.\d+)?\s*(?:kcal|calories?|cals?)\b|\b\d+(?:\.\d+)?\s*g\b\s*(?:of\s+)?(?:protein|carbs?|fat)\b/i;
         const neverSay = [/\blogged\b/i, /\bassum/i, /food database/i];
@@ -3764,7 +3827,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
           const spoken = await toolReply({
             outcome: { name, args, response: { status: "not_computed", food: foodName, unmatched: computed.unmatched, note: "no numbers are available for these" } },
             nudge: evaluation ? EVALUATION_NUDGE : undefined,
-            floor: `I don't know ${missing} well enough to put numbers on it — tell me roughly what was in it and I will.`,
+            floor: unknownFoods.length === 0 && doubt
+              ? doubt
+              : `I don't know ${missing} well enough to put numbers on it — tell me roughly what was in it and I will.`,
             preferFirstLegText: true,
             forbid: [macroArithmetic, ...neverSay],
           });

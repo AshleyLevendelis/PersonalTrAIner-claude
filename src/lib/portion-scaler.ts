@@ -11,7 +11,7 @@
 // M1's generation pipeline is what needed this logic, not that function.
 // ---------------------------------------------------------------------------
 
-import type { MealIngredientLine, Macros100g } from './food-db'
+import { lookupIngredient, unitToGrams, type MealIngredientLine, type Macros100g } from './food-db'
 
 /** Below this, a scale is "close enough" not to bother touching quantities (mirrors macro-calibration's 0.03 no-op threshold). */
 export const SCALE_NOOP_THRESHOLD = 0.03
@@ -167,16 +167,39 @@ function parseQuantityNumber(raw: string): number {
 
 const GRAM_PATTERN = new RegExp(`^(${NUMBER})\\s*(g|gram|grams|ml)\\s+(.+)$`, 'i')
 const VOLUME_PATTERN = new RegExp(`^(${NUMBER})\\s*(tbsp|tablespoons?|tsp|teaspoons?|cups?)\\s+(.+)$`, 'i')
-const NAMED_COUNT_PATTERN = new RegExp(`^(${NUMBER})\\s*(medium|large|small|whole|slices?|cloves?|scoops?)\\s+(.+)$`, 'i')
+// pinch and dash: a pinch of anything weighs almost nothing, and the food
+// database says how little (MEASURE_GRAMS), so "1 pinch of salt" keeps its
+// place as a trace line instead of becoming an amount nobody can read.
+const NAMED_COUNT_PATTERN = new RegExp(`^(${NUMBER})\\s*(medium|large|small|whole|slices?|cloves?|scoops?|pinch(?:es)?|dash(?:es)?)\\s+(.+)$`, 'i')
 const BARE_COUNT_PATTERN = new RegExp(`^(${NUMBER})\\s+(.+)$`)
+
+/** "a banana", "an egg", "half an avocado", "two slices" — an amount said in words. */
+const WORDED_AMOUNT = /^(half an?|a couple of|an?|one|two|three|four|five|six|seven|eight|nine|ten)\s+(.+)$/i
+const WORD_VALUE: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, 'a couple of': 2, 'half a': 0.5, 'half an': 0.5 }
+
+/** "of bread" -> "bread": the word left behind when a unit is lifted out of "2 slices of bread". */
+const withoutOf = (name: string) => name.trim().replace(/^of\s+/i, '')
 
 export function parseIngredientLine(text: string): MealIngredientLine {
   const trimmed = text.trim()
 
+  // AN AMOUNT SAID IN WORDS IS STILL AN AMOUNT. "3 eggs, 150g greek yoghurt,
+  // a banana" is the custom-meal prompt's own example, and "a banana" fell to
+  // the no-quantity branch at the bottom: ONE GRAM of banana, coverage 100%
+  // (9 Oct 2026 — the same wrong-by-two-orders number as the eggs in H6).
+  // Read only when the result is something the food database can weigh, so
+  // "a pinch of salt" and "a little oil" are left exactly as they were.
+  const worded = trimmed.match(WORDED_AMOUNT)
+  if (worded) {
+    const asNumber = parseIngredientLine(`${WORD_VALUE[worded[1].toLowerCase().replace(/\s+/g, ' ')]} ${worded[2]}`)
+    const entry = lookupIngredient(asNumber.name)
+    if (entry && unitToGrams(entry, asNumber.unit, asNumber.quantity, asNumber.name) != null) return asNumber
+  }
+
   const gram = trimmed.match(GRAM_PATTERN)
   if (gram) {
     const unit = gram[2].toLowerCase().startsWith('ml') ? 'ml' : 'g'
-    return { name: gram[3].trim(), quantity: parseQuantityNumber(gram[1]), unit }
+    return { name: withoutOf(gram[3]), quantity: parseQuantityNumber(gram[1]), unit }
   }
 
   const vol = trimmed.match(VOLUME_PATTERN)
@@ -185,13 +208,13 @@ export function parseIngredientLine(text: string): MealIngredientLine {
     const unit = rawUnit.startsWith('tbsp') || rawUnit.startsWith('tablespoon') ? 'tbsp'
       : rawUnit.startsWith('tsp') || rawUnit.startsWith('teaspoon') ? 'tsp'
       : 'cup'
-    return { name: vol[3].trim(), quantity: parseQuantityNumber(vol[1]), unit }
+    return { name: withoutOf(vol[3]), quantity: parseQuantityNumber(vol[1]), unit }
   }
 
   const named = trimmed.match(NAMED_COUNT_PATTERN)
   if (named) {
-    const rawUnit = named[2].toLowerCase().replace(/s$/, '')
-    return { name: named[3].trim(), quantity: parseQuantityNumber(named[1]), unit: rawUnit }
+    const rawUnit = named[2].toLowerCase().replace(/(ch|sh)es$/, '$1').replace(/s$/, '')
+    return { name: withoutOf(named[3]), quantity: parseQuantityNumber(named[1]), unit: rawUnit }
   }
 
   const bare = trimmed.match(BARE_COUNT_PATTERN)

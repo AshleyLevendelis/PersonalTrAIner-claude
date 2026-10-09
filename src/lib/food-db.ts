@@ -545,7 +545,7 @@ function normalize(s: string): string {
   // adjacent words into unmatchable tokens ("seitan-based" -> "seitanbased",
   // "boiled/instant" -> "boiledinstant"), which made every hyphenated or
   // slash-separated ingredient name an automatic lookup miss.
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
@@ -554,18 +554,230 @@ for (const entry of FOOD_DB) {
   LOOKUP.set(normalize(entry.name), entry)
   for (const alias of entry.aliases) LOOKUP.set(normalize(alias), entry)
 }
+// PLURALS ON THE STORED SIDE TOO. lookupIngredient de-pluralises the QUERY as
+// a last resort, so "scallions" reaches "scallion" — but "rice cakes" is
+// stored plural, and "chocolate rice cake" never reached it: 8 Sep 2026,
+// every ingredient in a real snack came back unmatched and the reply printed
+// "roughly 0 kcal … 0% of the meal by weight". Each key is also indexed under
+// its de-pluralised form when that form is free, so the token-overlap pass
+// can see it. Same conservative rule as the query side (depluralizeToken).
+//
+// This lived ONLY in the coach's hand-copied database from 9 Sep to 9 Oct
+// 2026, while the count fix and nine foods lived only in this one. The two
+// are now one file (see the header), so a fix cannot land on one side again.
+//
+// AND IT IS KEPT OFF THE DIET CHECK, ON PURPOSE. A food the diet check cannot
+// resolve is refused for every restriction (diet-rules.ts fails closed); a
+// food it CAN resolve is judged by that one entry's tags. Measured the day
+// the files were merged: with these extra keys 88 phrases in a 10,827-phrase
+// corpus stop being a miss, and some of them are dishes — "prawn cocktail"
+// becomes prawns, "sausage roll" becomes pork sausage, "peanut sauce" becomes
+// peanuts. For costing a meal that is the 9 Sep fix working. For an allergy it
+// would turn "refused" into "judged as plain prawns", which is weaker, and
+// dietary enforcement does not change without a written plan
+// (docs/plans/ingredient-lookup-truth.md). So the names exactly as stored are
+// kept too, and the diet check reads those: lookupIngredientAsStored.
+const LOOKUP_AS_STORED = new Map(LOOKUP)
+for (const [key, entry] of [...LOOKUP]) {
+  const folded = key.split(' ').map(depluralizeToken).join(' ')
+  if (folded !== key && !LOOKUP.has(folded)) LOOKUP.set(folded, entry)
+}
 
-/** Water-density defaults for common volume units, used when an entry doesn't override them. */
-const DEFAULT_UNIT_GRAMS: Record<string, number> = {
-  g: 1,
-  gram: 1,
-  grams: 1,
-  ml: 1,
-  tbsp: 15,
-  tablespoon: 15,
-  tsp: 5,
-  teaspoon: 5,
-  cup: 240,
+// ---------------------------------------------------------------------------
+// PIECE WEIGHTS — what ONE of them weighs
+// ---------------------------------------------------------------------------
+// "2 eggs", "1 can of tuna", "5 rye crispbreads" are how people say what they
+// ate, and until 9 Oct 2026 only ten foods here knew what one of them weighed.
+// Everything else fell through to "treat the number as grams": two eggs were
+// two grams of egg, five crispbreads were five grams (H6 and M23 in that
+// day's test log). A food with no row here and no unit of its own is now
+// "amount unknown" (see unitToGrams) — never a guess.
+//
+// EVERY FIGURE NAMES WHERE IT CAME FROM. Three references, abbreviated:
+//   USDA = USDA FoodData Central, the "portion" (household measure) weights
+//          published with each Standard Reference food.
+//   FPS  = UK Food Standards Agency, "Food Portion Sizes" (3rd edition).
+//   BNF  = British Nutrition Foundation, "Find your balance" portion guide.
+//   pack = the weight printed on the ordinary UK supermarket pack, named.
+// Checked against the live source on 9 Oct 2026: the BNF rows and the tuna
+// can. The USDA and FPS rows are as recalled from those tables and are cited
+// so they can be checked; a wrong one is a one-line change.
+// This table is cooked-basis for meat and fish (see the file header), so a
+// fillet or a breast is its COOKED weight. Keys are the unit words a line may
+// use; `medium` or `whole` is what a bare count ("2 bananas") means.
+// A weight already written on the entry itself wins over a row here.
+const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
+  // --- bread, crackers, cereal ---------------------------------------------
+  'rye crispbread': { whole: 10, slice: 10 },          // pack: Ryvita Original, 10 g a slice
+  'crackers': { whole: 7 },                            // FPS: one cream cracker 7 g
+  'weetabix': { whole: 19, biscuit: 19 },              // pack: Weetabix, 2 biscuits = 37.5 g
+  'croissant': { whole: 57 },                          // USDA: croissant, butter, 1 medium 57 g
+  'falafel': { whole: 17 },                            // USDA: falafel, 1 patty 17 g
+  // --- meat and fish, cooked weight ------------------------------------------
+  'chicken breast': { breast: 120, fillet: 120 },      // BNF: a grilled chicken breast, 120 g
+  'bacon': { rasher: 25, slice: 25 },                  // FPS: back bacon, one grilled rasher 25 g
+  'ham': { slice: 23 },                                // FPS: ham, one average slice 23 g
+  'pork sausage': { whole: 40 },                       // FPS: one large sausage, grilled 40 g
+  'salmon': { fillet: 100 },                           // BNF: a cooked fish fillet (salmon or cod), 100-140 g · UK packs sell at about 120 g raw
+  'cod': { fillet: 120 },                              // BNF: a cooked fish fillet (salmon or cod), 100-140 g
+  'haddock': { fillet: 120 },                          // FPS: as cod
+  'tilapia': { fillet: 87 },                           // USDA: tilapia, cooked, 1 fillet 87 g
+  'sea bass': { fillet: 101 },                         // USDA: sea bass, cooked, 1 fillet 101 g
+  'trout': { fillet: 71 },                             // USDA: rainbow trout, farmed, cooked, 1 fillet 71 g
+  'mackerel': { fillet: 88 },                          // USDA: Atlantic mackerel, cooked, 1 fillet 88 g
+  'tuna canned in water': { can: 102 },                // pack: John West tuna chunks, 102 g drained
+  'sardines canned': { can: 90 },                      // pack: 120 g can, about 90 g drained
+  // --- cans of pulses and tomatoes -------------------------------------------
+  'chickpeas': { can: 240 },                           // pack: 400 g can, 240 g drained
+  'black beans': { can: 240 },                         // pack: as chickpeas
+  'kidney beans': { can: 240 },                        // pack: as chickpeas
+  'cannellini beans': { can: 240 },                    // pack: as chickpeas
+  'butter beans': { can: 240 },                        // pack: as chickpeas
+  'chopped tomatoes canned': { can: 400 },             // pack: 400 g can, used whole
+  // --- dairy -----------------------------------------------------------------
+  'milk whole': { glass: 200 },                        // BNF: one medium glass, 200 ml
+  'milk semi skimmed': { glass: 200 },                 // as whole milk
+  'milk skimmed': { glass: 200 },                      // as whole milk
+  'natural yoghurt': { pot: 120 },                     // BNF: one individual pot, 120 g
+  'cheddar cheese': { slice: 25 },                     // pack: pre-sliced cheddar, 25 g a slice
+  'mozzarella': { ball: 125 },                         // pack: one ball, 125 g drained
+  'butter': { pat: 5 },                                // USDA: butter, 1 pat 5 g
+  // --- fruit -----------------------------------------------------------------
+  'kiwi': { medium: 69 },                              // USDA: kiwifruit, 1 fruit 69 g
+  'peach': { medium: 150 },                            // USDA: peach, 1 medium 150 g
+  'plum': { medium: 66 },                              // USDA: plum, 1 fruit 66 g
+  'figs': { medium: 50 },                              // USDA: fig, raw, 1 medium 50 g
+  'grapefruit': { medium: 246, half: 123 },            // USDA: grapefruit, half a medium fruit 123 g
+  'passion fruit': { medium: 18 },                     // USDA: passion fruit, 1 fruit 18 g
+  'strawberries': { medium: 12, large: 18 },           // USDA: strawberry, 1 medium 12 g, 1 large 18 g
+  'cherries': { whole: 8 },                            // USDA: sweet cherry, 1 cherry 8 g
+  'grapes': { whole: 5 },                              // USDA: grape, 1 grape 4.9 g
+  'lemon': { medium: 58 },                             // USDA: lemon without peel, 1 fruit 58 g
+  'lime': { medium: 67 },                              // USDA: lime, 1 fruit 67 g
+  // --- vegetables ------------------------------------------------------------
+  'tomato': { medium: 123 },                           // USDA: tomato, 1 medium whole 123 g
+  'cherry tomatoes': { whole: 17 },                    // USDA: tomato, 1 cherry 17 g
+  'cucumber': { whole: 300 },                          // USDA: cucumber with peel, 1 cucumber 301 g
+  'bell pepper': { medium: 119, large: 164 },          // USDA: sweet pepper, 1 medium 119 g, 1 large 164 g
+  'onion': { medium: 110, small: 70, large: 150 },     // USDA: onion, small 70 g, medium 110 g, large 150 g
+  'carrot': { medium: 61 },                            // USDA: carrot, 1 medium 61 g
+  'courgette': { medium: 196 },                        // USDA: zucchini, 1 medium 196 g
+  'mushroom': { medium: 18 },                          // USDA: white mushroom, 1 medium 18 g
+  'spring onion': { medium: 15 },                      // USDA: spring onion, 1 medium 15 g
+  'celery': { stalk: 40, stick: 40 },                  // USDA: celery, 1 medium stalk 40 g
+  'leek': { medium: 89 },                              // USDA: leek, 1 leek 89 g
+  'radish': { medium: 4.5 },                           // USDA: radish, 1 medium 4.5 g
+  'sweetcorn': { cob: 90, ear: 90 },                   // USDA: sweet corn, 1 medium ear yields 90 g
+  'potato baked': { medium: 173 },                     // USDA: baked potato, flesh and skin, 1 medium 173 g
+  'sweet potato baked': { medium: 114 },               // USDA: sweet potato, baked in skin, 1 medium 114 g
+  'spinach': { handful: 30 },                          // USDA: raw spinach, 1 cup (a generous handful) 30 g
+  'mixed salad leaves': { handful: 36 },               // USDA: lettuce, shredded, 1 cup 36 g
+  'rocket': { handful: 20 },                           // USDA: arugula, raw, 1 cup 20 g
+  // --- nuts, olives ------------------------------------------------------------
+  'almonds': { whole: 1.2, handful: 20 },              // USDA: 1 almond 1.2 g · BNF: nuts, the amount that fits in your palm, 20 g
+  'walnuts': { whole: 4, half: 2, handful: 20 },       // USDA: 1 oz is 14 halves, 2 g each · BNF handful as almonds
+  'cashews': { whole: 1.6, handful: 20 },              // USDA: 1 oz is 18 kernels, 1.6 g each · BNF handful as almonds
+  'brazil nuts': { whole: 5, handful: 20 },            // USDA: 1 kernel 5 g · BNF handful as almonds
+  'peanuts': { handful: 20 },                          // BNF: nuts, the amount that fits in your palm, 20 g
+  'mixed nuts': { handful: 20 },                       // as peanuts
+  'olives': { whole: 4 },                              // USDA: ripe olive, 1 large 4.4 g
+  // --- things a recipe counts that weigh almost nothing -----------------------
+  'bay leaves': { whole: 0.6 },                        // USDA: bay leaf, 1 tsp crumbled 0.6 g (about one leaf)
+  'star anise': { whole: 2 },                          // kitchen scale, not a table: one pod is about 2 g
+  'vegetable stock cube': { cube: 10 },                // pack: Knorr stock cube 10 g
+}
+for (const entry of FOOD_DB) {
+  const pieces = PIECE_WEIGHTS[entry.name]
+  if (pieces) entry.units = { ...pieces, ...entry.units }
+}
+
+// ---------------------------------------------------------------------------
+// AMOUNTS — "2 eggs", "1 large banana", "2 slices" -> grams, or "unknown"
+// ---------------------------------------------------------------------------
+
+/**
+ * Mass and volume units, which mean the same for every food. Volumes are at
+ * water density unless the entry gives its own. A pinch is a sixteenth of a
+ * teaspoon by kitchen convention (about 0.3 g of salt or spice) and a dash an
+ * eighth (about 0.6 g): trace amounts, weighed as such rather than refused.
+ */
+const MEASURE_GRAMS: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000, oz: 28.35, lb: 453.6, tbsp: 15, tsp: 5, cup: 240, pinch: 0.3, dash: 0.6 }
+
+/** Other spellings of a unit -> the one word it is looked up under. Plurals are folded before this is read. */
+const UNIT_SPELLINGS: Record<string, string> = {
+  gram: 'g', gm: 'g', gr: 'g', kilo: 'kg', kilogram: 'kg',
+  millilitre: 'ml', milliliter: 'ml', litre: 'l', liter: 'l', ounce: 'oz', pound: 'lb',
+  tablespoon: 'tbsp', tbs: 'tbsp', teaspoon: 'tsp',
+  med: 'medium', regular: 'medium', standard: 'medium', average: 'medium',
+  lg: 'large', big: 'large', sm: 'small', 'extra large': 'xl', 'x large': 'xl', xlarge: 'xl',
+  tin: 'can', leaves: 'leaf', halves: 'half', loaves: 'loaf',
+}
+
+/** Words that mean "this many of them" and nothing more. */
+const COUNT_UNITS = new Set(['', 'whole', 'piece', 'each', 'item', 'unit', 'count', 'x', 'pc', 'ea', 'single'])
+
+/**
+ * A size the entry does not list, as a share of its medium. The spread is
+ * the USDA's own for whole fruit and eggs: banana 101 / 118 / 136 g, egg
+ * 44 / 50 / 58 g, apple 149 / 182 / 223 g — small is about 0.85 of a medium
+ * and large about 1.15. Extra large is the banana's 152 g. `half` and
+ * `quarter` are arithmetic, not estimates.
+ */
+const SIZE_OF_MEDIUM: Record<string, number> = { small: 0.85, medium: 1, large: 1.15, xl: 1.3, half: 0.5, quarter: 0.25 }
+
+/** "Slices of", "Eggs", "tbsp." -> "slice", "egg", "tbsp". */
+function normaliseUnit(raw: string): string {
+  let u = String(raw ?? '').toLowerCase().replace(/\(.*?\)/g, ' ').replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  u = u.replace(/ of$/, '')
+  if (UNIT_SPELLINGS[u]) return UNIT_SPELLINGS[u]
+  if (/(ch|sh|ss|x)es$/.test(u)) u = u.slice(0, -2)
+  else if (u.length > 2 && u.endsWith('s') && !u.endsWith('ss')) u = u.slice(0, -1)
+  return UNIT_SPELLINGS[u] ?? u
+}
+
+/** A unit word carried in the ingredient's own name: "garlic cloves" -> the clove, "salmon fillets" -> the fillet, "large egg" -> the large one. */
+function pieceNamedIn(entry: FoodEntry, name: string): number | null {
+  if (!entry.units || !name) return null
+  for (const word of normalize(name).split(' ')) {
+    const unit = normaliseUnit(word)
+    if (MEASURE_GRAMS[unit] == null && entry.units[unit] != null) return entry.units[unit]
+  }
+  return null
+}
+
+/** How an amount was read: on a scale or spoon ('measured'), as a number of pieces ('counted'), or not at all. */
+type AmountBasis = 'measured' | 'counted' | 'unknown'
+
+function resolveAmount(entry: FoodEntry | null, unit: string, quantity: number, name: string): { grams: number | null; basis: AmountBasis } {
+  const unknown = { grams: null, basis: 'unknown' as const }
+  if (!Number.isFinite(quantity) || quantity < 0) return unknown
+  const u = normaliseUnit(unit)
+  const own = entry?.units
+  const measured = MEASURE_GRAMS[u] != null
+  // A bare count — "2 eggs" arrives as unit whole, egg, eggs, piece, each… —
+  // including the food's own name as the unit: { name: 'egg', unit: 'eggs' }.
+  const counted = !!entry && (COUNT_UNITS.has(u) || LOOKUP.get(normalize(unit)) === entry || LOOKUP.get(u) === entry)
+  // The line's own words may say WHICH piece: "2 garlic cloves", "1 salmon
+  // fillet", "half avocado". That beats the food's default piece.
+  const named = entry ? pieceNamedIn(entry, name) : null
+  // 1. A count of a piece the name itself names.
+  if (counted && named != null) return { grams: named * quantity, basis: 'counted' }
+  // 2. The entry's own word for the unit — "1 medium egg", "2 slices", "1 tbsp honey".
+  if (own && own[u] != null) return { grams: own[u] * quantity, basis: measured ? 'measured' : 'counted' }
+  // 3. A measure that means the same for every food.
+  if (measured) return { grams: MEASURE_GRAMS[u] * quantity, basis: 'measured' }
+  // Past here the answer depends on what ONE of this food weighs, so a food
+  // the table does not know has no amount either.
+  if (!entry) return unknown
+  const piece = named ?? own?.medium ?? own?.whole ?? entry.purchaseUnit?.avgGrams ?? null
+  // 4. A count of a food that knows its piece weight.
+  if (counted) return piece != null ? { grams: piece * quantity, basis: 'counted' } : unknown
+  // 5. A size the entry does not list, scaled from its medium.
+  const share = SIZE_OF_MEDIUM[u]
+  if (share != null && piece != null) return { grams: piece * share * quantity, basis: 'counted' }
+  // 6. Anything else — a bowl, a serving, a glass of something with no glass
+  //    weight — is UNKNOWN. It is never the bare number.
+  return unknown
 }
 
 /** True when `needle` (word tokens) appears as a contiguous run inside `haystack` (word tokens) — word-boundary-safe, unlike a raw character substring check (which would wrongly match "corn" inside "unicorn"). */
@@ -609,19 +821,36 @@ export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntr
   if (!_isPluralRetry) {
     const known = LOOKUP_MEMO.get(name)
     if (known !== undefined) return known
-    const found = lookupIngredientUncached(name, false)
+    const found = lookupIngredientUncached(name, false, LOOKUP)
     if (LOOKUP_MEMO.size >= LOOKUP_MEMO_CAP) LOOKUP_MEMO.clear()
     LOOKUP_MEMO.set(name, found)
     return found
   }
-  return lookupIngredientUncached(name, true)
+  return lookupIngredientUncached(name, true, LOOKUP)
 }
 
-function lookupIngredientUncached(name: string, _isPluralRetry: boolean): FoodEntry | null {
+/**
+ * The same lookup over the names EXACTLY AS STORED — without the extra
+ * singular keys lookupIngredient gained on 9 Oct 2026. This is what the app's
+ * lookup was before that day, kept for the one caller where a new match is a
+ * LOOSER answer: the diet check, which refuses what it cannot resolve. See
+ * the note where LOOKUP_AS_STORED is built.
+ */
+const AS_STORED_MEMO = new Map<string, FoodEntry | null>()
+export function lookupIngredientAsStored(name: string): FoodEntry | null {
+  const known = AS_STORED_MEMO.get(name)
+  if (known !== undefined) return known
+  const found = lookupIngredientUncached(name, false, LOOKUP_AS_STORED)
+  if (AS_STORED_MEMO.size >= LOOKUP_MEMO_CAP) AS_STORED_MEMO.clear()
+  AS_STORED_MEMO.set(name, found)
+  return found
+}
+
+function lookupIngredientUncached(name: string, _isPluralRetry: boolean, index: Map<string, FoodEntry>): FoodEntry | null {
   const key = normalize(name)
   if (!key) return null
 
-  const exact = LOOKUP.get(key)
+  const exact = index.get(key)
   if (exact) return exact
 
   const keyTokens = key.split(' ').filter(Boolean)
@@ -630,7 +859,7 @@ function lookupIngredientUncached(name: string, _isPluralRetry: boolean): FoodEn
   // inside the query's words, or vice versa? Longest (by word count) wins so
   // "chicken breast" beats "chicken".
   let best: { entry: FoodEntry; len: number } | null = null
-  for (const [known, entry] of LOOKUP) {
+  for (const [known, entry] of index) {
     const knownTokens = known.split(' ').filter(Boolean)
     if (knownTokens.length === 0) continue
     if (containsWordSequence(keyTokens, knownTokens) || containsWordSequence(knownTokens, keyTokens)) {
@@ -645,7 +874,7 @@ function lookupIngredientUncached(name: string, _isPluralRetry: boolean): FoodEn
   // false-positives.
   const keyTokenSet = new Set(keyTokens.filter(t => t.length > 2))
   let bestOverlap: { entry: FoodEntry; score: number } | null = null
-  for (const [known, entry] of LOOKUP) {
+  for (const [known, entry] of index) {
     const knownTokens = known.split(' ').filter(t => t.length > 2)
     if (knownTokens.length === 0) continue
     const overlap = knownTokens.filter(t => keyTokenSet.has(t)).length
@@ -657,7 +886,7 @@ function lookupIngredientUncached(name: string, _isPluralRetry: boolean): FoodEn
 
   if (!_isPluralRetry) {
     const depluralized = keyTokens.map(depluralizeToken).join(' ')
-    if (depluralized !== key) return lookupIngredientUncached(depluralized, true)
+    if (depluralized !== key) return lookupIngredientUncached(depluralized, true, index)
   }
   return null
 }
@@ -672,56 +901,62 @@ export interface MealIngredientLine {
 }
 
 export interface ComputedMealMacros extends Macros100g {
-  /** Share (0-1) of the meal's total gram mass successfully resolved to a food-db entry. */
+  /**
+   * Share (0-1) of the meal that was actually costed. By WEIGHT among the
+   * lines whose amount is known, times the share of LINES whose amount is
+   * known at all — an amount nobody could read has no weight to be a share of.
+   */
   coverage: number
-  /** Ingredient name strings that could not be resolved. */
+  /** Every line left out of the numbers: a food this table does not know, OR a known food whose amount could not be read. */
   unmatched: string[]
-  /** Per-line resolution detail, for scaling/debugging. */
-  lines: { input: MealIngredientLine; entry: FoodEntry | null; grams: number; macros: Macros100g | null }[]
+  /** The subset of `unmatched` that is a KNOWN food with an unreadable amount ("1 large latte", "1 bowl pasta") — the ones to ask "how big?" about. */
+  amountUnknown: string[]
+  /** Per-line resolution detail, for scaling/debugging. `grams` is null when the amount could not be read. */
+  lines: { input: MealIngredientLine; entry: FoodEntry | null; grams: number | null; basis: AmountBasis; macros: Macros100g | null }[]
 }
 
-/** Resolves a named unit to grams for a specific food entry (entry-specific override, else the water-density default, else 1:1 as grams). */
-export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: number): number {
-  const u = unit.toLowerCase().trim()
-  if (entry?.units && entry.units[u] != null) return entry.units[u] * quantity
-  // A BARE COUNT ("3 eggs", "2 bananas") parses as unit 'whole', and almost
-  // no entry names a 'whole' size — they name medium/large/small. Falling
-  // through to the treat-as-grams default turned "3 eggs" into THREE GRAMS
-  // of egg: 5 kcal, coverage 100%, nothing flagged — a confidently wrong
-  // number in the worst place for one. Found by test:custom-meal's very
-  // first fixture, which is exactly how a user states their own breakfast.
-  // A count of a food that knows its piece weight means pieces: medium
-  // first (the unmarked size), then the shopping unit's average. A food
-  // with neither keeps the old fail-through, where low coverage still
-  // surfaces the uncertainty.
-  if (u === 'whole' && entry) {
-    const piece = entry.units?.medium ?? entry.purchaseUnit?.avgGrams
-    if (piece != null) return piece * quantity
-  }
-  if (DEFAULT_UNIT_GRAMS[u] != null) return DEFAULT_UNIT_GRAMS[u] * quantity
-  // Unknown unit name (e.g. a stray "1 handful") — treat the quantity as grams
-  // rather than throwing away the line; coverage will still reflect the
-  // uncertainty if the ingredient itself doesn't resolve.
-  return quantity
+/**
+ * Grams for a quantity of a food, or NULL WHEN THE AMOUNT CANNOT BE READ.
+ *
+ * It used to end `return quantity` — "unknown unit, treat the number as
+ * grams". That one line logged two scrambled eggs as two grams of egg, a
+ * large latte as one gram of milk and five crispbreads as five grams, each
+ * with coverage 100% and nothing flagged (9 Oct 2026, H6 and M23). A wrong
+ * number that looks measured is the worst thing this file can produce, so
+ * there is no fall-through any more: every caller has to say what it does
+ * with "unknown", and the type makes it.
+ *
+ * `name` is the line's own words, which may carry the unit ("garlic cloves").
+ */
+export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: number, name = ''): number | null {
+  return resolveAmount(entry, unit, quantity, name).grams
 }
 
 /**
  * Computes total macros for a list of ingredient lines by resolving each to
- * food-db and scaling its per-100g values by the line's gram weight. Lines
- * that fail to resolve contribute their gram weight to the mass total (so
- * coverage reflects "how much of this meal is nutritionally known") but zero
- * macros — never an invented estimate.
+ * food-db and scaling its per-100g values by the line's gram weight. A line
+ * that fails to resolve — the food, or how much of it — contributes zero
+ * macros and is listed in `unmatched`; never an invented estimate.
  */
 export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMealMacros {
   let totalGrams = 0
   let matchedGrams = 0
+  let linesWithAmount = 0
   const totals: Macros100g = { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   const unmatched: string[] = []
+  const amountUnknown: string[] = []
   const lines: ComputedMealMacros['lines'] = []
 
   for (const line of ingredients) {
     const entry = lookupIngredient(line.name)
-    const grams = unitToGrams(entry, line.unit, line.quantity)
+    const { grams, basis } = resolveAmount(entry, line.unit, line.quantity, line.name)
+    if (grams == null) {
+      unmatched.push(line.name)
+      if (entry) amountUnknown.push(line.name)
+      lines.push({ input: line, entry, grams: null, basis, macros: null })
+      continue
+    }
+    linesWithAmount++
     totalGrams += grams
 
     if (entry) {
@@ -737,20 +972,84 @@ export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMe
       totals.protein += macros.protein
       totals.carbs += macros.carbs
       totals.fat += macros.fat
-      lines.push({ input: line, entry, grams, macros })
+      lines.push({ input: line, entry, grams, basis, macros })
     } else {
       unmatched.push(line.name)
-      lines.push({ input: line, entry: null, grams, macros: null })
+      lines.push({ input: line, entry: null, grams, basis, macros: null })
     }
   }
 
+  const byWeight = totalGrams > 0 ? matchedGrams / totalGrams : 0
+  const byLine = ingredients.length > 0 ? linesWithAmount / ingredients.length : 0
   return {
     kcal: Math.round(totals.kcal),
     protein: Math.round(totals.protein * 10) / 10,
     carbs: Math.round(totals.carbs * 10) / 10,
     fat: Math.round(totals.fat * 10) / 10,
-    coverage: totalGrams > 0 ? matchedGrams / totalGrams : 0,
+    coverage: byWeight * byLine,
     unmatched,
+    amountUnknown,
     lines,
   }
+}
+
+// ---------------------------------------------------------------------------
+// LOGGED MEALS — is this a number to put in somebody's day, and what the card says
+// ---------------------------------------------------------------------------
+// The coach's log_meal turns "I had 2 scrambled eggs on toast" into a card she
+// taps to record it. Twice in one test log (9 Oct 2026) that card carried a
+// number a quarter of the real one, stated as fact. The amounts are fixed
+// above; this is the second lock, read by the coach's handler BEFORE it hands
+// the app a card and by the card's own verifier after: when the numbers do not
+// look like a meal, the app asks a short question instead of logging them.
+
+/** A breakfast, lunch or dinner under this is not a meal anyone logs — one boiled egg is 78 kcal. */
+export const MAIN_MEAL_MIN_KCAL = 100
+/** A counted food that came to less than this is a misread amount, unless one of them really is that small (a clove, a bay leaf, an almond). */
+const COUNTED_LINE_MIN_GRAMS = 5
+const MAIN_MEALS = ['breakfast', 'lunch', 'dinner']
+
+/** True when `kcal` is too little to be the whole of a main meal. Snacks have no floor: a coffee is a snack. */
+export function tooSmallForMainMeal(kcal: number, slot: unknown): boolean {
+  return MAIN_MEALS.includes(String(slot ?? '').trim().toLowerCase()) && kcal < MAIN_MEAL_MIN_KCAL
+}
+
+/**
+ * "assumed large eggs" -> "large eggs", so the card can say "Assumed:" once.
+ *
+ * The coach is told to write each note as 'assumed 0% fat greek yoghurt', and
+ * the card used to prefix the list with "Assuming" — so every card with a
+ * guess on it read "Assuming assumed large eggs" (test log, 9 Oct 2026, L32).
+ * The word is the card's to say, not each note's.
+ */
+export function assumedLine(assumptions: readonly string[]): string | null {
+  const items = assumptions
+    .map(a => a.trim().replace(/^(?:i\s+|i've\s+|we\s+)?assum(?:ed|ing|e|es)\b[\s:,-]*(?:that\s+)?/i, '').replace(/[.;,\s]+$/, '').trim())
+    .filter(Boolean)
+  return items.length > 0 ? `Assumed: ${items.join('; ')}.` : null
+}
+
+const listOf = (names: string[]) => names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+
+/**
+ * The question to ask INSTEAD of logging, or null when the numbers stand.
+ * Only ever about food the table knows: a food it does not know at all is the
+ * coverage floor's job (the card's verifier names it), not a "how big" one.
+ */
+export function doubtAboutLoggedMeal(computed: Pick<ComputedMealMacros, 'kcal' | 'lines' | 'unmatched'>, slot: unknown): string | null {
+  const unsure = computed.lines.filter(l => {
+    if (!l.entry) return false
+    if (l.grams == null) return true
+    if (l.basis !== 'counted' || l.grams >= COUNTED_LINE_MIN_GRAMS) return false
+    const pieces = Object.entries(l.entry.units ?? {}).filter(([unit]) => MEASURE_GRAMS[unit] == null).map(([, g]) => g)
+    const smallest = Math.min(...pieces, l.entry.purchaseUnit?.avgGrams ?? Infinity)
+    return !(smallest < COUNTED_LINE_MIN_GRAMS)
+  }).map(l => l.input.name)
+  if (unsure.length > 0) {
+    return `How big ${unsure.length === 1 ? 'was' : 'were'} the ${listOf(unsure)}? A rough weight in grams, or ml for a drink, is enough.`
+  }
+  if (computed.unmatched.length === 0 && tooSmallForMainMeal(computed.kcal, slot)) {
+    return `That only comes to ${computed.kcal} kcal, which is small for a ${String(slot).trim().toLowerCase()}. How big was it, and was there anything else with it?`
+  }
+  return null
 }

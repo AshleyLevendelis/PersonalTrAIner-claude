@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { MIN_COVERAGE } from './meal-generation'
+import { MAIN_MEAL_MIN_KCAL, assumedLine, tooSmallForMainMeal } from './food-db'
 import type { MealMacros, MealSlotName } from './meal-store'
 
 /** The four the ledger accepts — meal_events' CHECK constraint, no more and no fewer. */
@@ -31,7 +32,7 @@ export interface MealLogPayload {
   slot: MealSlotName
   mealName: string
   macros: MealMacros
-  /** Ingredients the food database could not resolve. Excluded from macros, shown on the card. */
+  /** Lines left out of the numbers: a food the database does not know, or an amount it could not read. Shown on the card as "Not counted: …". */
   unmatched: string[]
   /** Portion sizes and variants the model had to assume. Shown on the card so she can correct them before tapping. */
   assumptions: string[]
@@ -47,7 +48,7 @@ export interface MealLogComputed {
 }
 
 export type MealLogProposalResult =
-  | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: MealLogPayload; diff: { rows: { field: string; before: string; after: string }[]; rationale?: string } }
+  | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: MealLogPayload; diff: { rows: { field: string; before: string; after: string }[]; implications?: { severity: 'info' | 'warn'; text: string }[] } }
   | { ok: false; reason: string }
 
 /**
@@ -107,7 +108,27 @@ export function buildMealLogProposal(input: {
     }
   }
 
+  // AND A MAIN MEAL HAS TO BE THE SIZE OF ONE. The coach's handler asks this
+  // before it sends a card at all; it is asked again here because this is the
+  // last thing between a number and her day, and the two test-log cards that
+  // reached her at a quarter of their real size (H6, 9 Oct 2026) both passed
+  // every check that stood here then.
+  if (tooSmallForMainMeal(kcal, slot)) {
+    return {
+      ok: false,
+      reason: `**${mealName}** only comes to ${kcal} kcal by my numbers, and I'd expect a ${slot} to be over ${MAIN_MEAL_MIN_KCAL}. How big was it, and was there anything else with it?`,
+    }
+  }
+
   const macros: MealMacros = { kcal, protein, carbs, fat }
+  const unmatched = computed.unmatched ?? []
+  const assumed = assumedLine(input.assumptions ?? [])
+  const implications: { severity: 'info' | 'warn'; text: string }[] = []
+  // WHAT THE NUMBER LEAVES OUT, ON THE CARD. `unmatched` was documented as
+  // "shown on the card" for a month and rendered nowhere, so a meal could be
+  // confirmed at 80% of itself without a word.
+  if (unmatched.length > 0) implications.push({ severity: 'warn', text: `Not counted: ${unmatched.join(', ')}.` })
+  if (assumed) implications.push({ severity: 'info', text: assumed })
 
   return {
     ok: true,
@@ -121,12 +142,12 @@ export function buildMealLogProposal(input: {
       slot,
       mealName,
       macros,
-      unmatched: computed.unmatched ?? [],
+      unmatched,
       assumptions: input.assumptions ?? [],
     },
     diff: {
       rows: [{ field: 'meal', before: slot, after: `${mealName} — ${kcal} kcal (P ${protein}g · C ${carbs}g · F ${fat}g)` }],
-      rationale: (input.assumptions ?? []).length > 0 ? `Assuming ${(input.assumptions ?? []).join('; ')}.` : undefined,
+      ...(implications.length > 0 ? { implications } : {}),
     },
   }
 }

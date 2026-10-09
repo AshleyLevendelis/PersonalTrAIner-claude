@@ -54,6 +54,7 @@ import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 import { dietTargetCaveat } from '@/lib/coach-voice'
+import { checkWeighIn, type WeighInCheck } from '@/lib/weigh-in-check'
 
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
 // push plumbing are needed by nobody on first paint (test:bundle holds the
@@ -417,6 +418,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
+  // What the shared weigh-in check made of the last weight typed here (see the
+  // weight row). Held, not acted on.
+  const [weightCheck, setWeightCheck] = useState<WeighInCheck | null>(null)
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -943,7 +947,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Row label="Age"><EditableTextField value={profile.age} unit="years" min={13} max={100} onSave={n => savePatch({ age: n })} /></Row>
             <Row label="Gender"><EditableSelectField value={profile.gender} options={GENDER_OPTIONS as { value: 'male' | 'female'; label: string }[]} onSave={v => savePatch({ gender: v })} /></Row>
             <Row label="Height"><EditableTextField value={profile.height_cm} unit="cm" min={100} max={250} onSave={n => savePatch({ height_cm: n })} /></Row>
-            <Row label="Onboarding weight"><EditableTextField value={profile.weight_kg} unit="kg" min={25} max={350} onSave={n => savePatch({ weight_kg: n })} /></Row>
+            {/* The same "is this believable?" check the weigh-in card asks
+                (weigh-in-check.ts), against the figure being replaced. HELD,
+                NOT ACTED ON — what a surprising weight should do is Ashley's
+                open decision, so it saves exactly as before; the verdict sits
+                on the wrapper for the ruling to plug into. */}
+            <Row label="Onboarding weight">
+              <span data-testid="profile-weight-field" data-weigh-in-check={weightCheck?.verdict}>
+                <EditableTextField value={profile.weight_kg} unit="kg" min={25} max={350} onSave={n => { setWeightCheck(checkWeighIn(n, profile.weight_kg ?? null, 0)); savePatch({ weight_kg: n }) }} />
+              </span>
+            </Row>
             <Row label="Current weight">
               <span className="text-sm">{latestWeightKg != null && latestWeightKg > 0 ? `${latestWeightKg} kg` : 'Log a weigh-in on Dashboard'}</span>
             </Row>

@@ -524,7 +524,11 @@ export function verifyProposal(
 
   const computed = computeMealMacros(parsed)
   if (computed.coverage < MIN_COVERAGE) {
-    rejectLog.push(`[${slot}] "${proposal.name}": coverage ${(computed.coverage * 100).toFixed(0)}% below ${MIN_COVERAGE * 100}% floor — unmatched: ${computed.unmatched.join(', ')}`)
+    // Two different gaps, kept apart so the sentence built from this line can
+    // tell them apart: a food the table does not know, and a known food whose
+    // AMOUNT could not be read ("2 hummus", "1 bowl pasta").
+    const unknownFoods = computed.unmatched.filter(n => !computed.amountUnknown.includes(n))
+    rejectLog.push(`[${slot}] "${proposal.name}": coverage ${(computed.coverage * 100).toFixed(0)}% below ${MIN_COVERAGE * 100}% floor — unmatched: ${unknownFoods.join(', ')}${computed.amountUnknown.length > 0 ? ` — amount unknown: ${computed.amountUnknown.join(', ')}` : ''}`)
     return null
   }
 
@@ -1265,13 +1269,85 @@ function relDiff(actual: number, target: number): number {
   return target > 0 ? Math.abs(actual - target) / target : 0
 }
 
+/** The four numbers a day is judged on. */
+export type DayMacro = 'calories' | 'protein' | 'carbs' | 'fat'
+const DAY_MACROS: readonly DayMacro[] = ['calories', 'protein', 'carbs', 'fat']
+
+/**
+ * IS ONE MACRO INSIDE THE BAND A CORRECT DAY KEEPS IT IN? The single
+ * definition — the day search below is built from it, and so is the Nutrition
+ * header.
+ *
+ * It used to be written inline in dayWithinTolerance, and the header had a
+ * different rule of its own (calories within 30 kcal, protein and carbs within
+ * 10%, fat not looked at). So the screen read "ON THE NUMBER" at 179 g of
+ * protein against 164 g and "MACROS OFF" at 181 g, on days the engine had
+ * chosen as on target (test log L20, 9 Oct 2026) — and could say "on the
+ * number" with fat 40% out. The arithmetic here is the search's own, moved,
+ * not rewritten: a float that fell just inside a band still does.
+ */
+export function macroOnTarget(macro: DayMacro, actual: number, target: number): boolean {
+  switch (macro) {
+    case 'calories': return relDiff(actual, target) <= DAY_CALORIE_TOLERANCE
+    case 'protein': return target <= 0 || (actual >= target * DAY_PROTEIN_LOWER_RATIO && actual <= target * DAY_PROTEIN_UPPER_RATIO)
+    case 'carbs': return relDiff(actual, target) <= DAY_CARB_TOLERANCE
+    case 'fat': return relDiff(actual, target) <= DAY_FAT_TOLERANCE
+  }
+}
+
 function dayWithinTolerance(totals: MacroTargets, targets: MacroTargets): boolean {
   if (targets.calories <= 0) return true
-  const calOk = relDiff(totals.calories, targets.calories) <= DAY_CALORIE_TOLERANCE
-  const proteinOk = targets.protein <= 0 || (totals.protein >= targets.protein * DAY_PROTEIN_LOWER_RATIO && totals.protein <= targets.protein * DAY_PROTEIN_UPPER_RATIO)
-  const carbOk = relDiff(totals.carbs, targets.carbs) <= DAY_CARB_TOLERANCE
-  const fatOk = relDiff(totals.fat, targets.fat) <= DAY_FAT_TOLERANCE
-  return calOk && proteinOk && carbOk && fatOk
+  return macroOnTarget('calories', totals.calories, targets.calories)
+    && macroOnTarget('protein', totals.protein, targets.protein)
+    && macroOnTarget('carbs', totals.carbs, targets.carbs)
+    && macroOnTarget('fat', totals.fat, targets.fat)
+}
+
+/** How far outside its own band a macro sits, as a share of its target: 0 inside it. Protein's band is lopsided, so 20% over protein (5 points past) is a smaller miss than 20% under (15 points past). */
+function distancePastBand(macro: DayMacro, actual: number, target: number): number {
+  if (target <= 0) return 0
+  const ratio = actual / target
+  const [low, high] = macro === 'calories' ? [1 - DAY_CALORIE_TOLERANCE, 1 + DAY_CALORIE_TOLERANCE]
+    : macro === 'protein' ? [DAY_PROTEIN_LOWER_RATIO, DAY_PROTEIN_UPPER_RATIO]
+    : macro === 'carbs' ? [1 - DAY_CARB_TOLERANCE, 1 + DAY_CARB_TOLERANCE]
+    : [1 - DAY_FAT_TOLERANCE, 1 + DAY_FAT_TOLERANCE]
+  return ratio < low ? low - ratio : ratio > high ? ratio - high : 0
+}
+
+export interface DayVerdict {
+  /** Every macro inside its band — exactly what the day search means by a correct day. */
+  onTarget: boolean
+  /** The macros outside their band, the worst miss first; `delta` is actual minus target, to the whole unit (kcal or grams). Empty when on target. */
+  off: { macro: DayMacro; delta: number }[]
+}
+
+/** The engine's answer about one day's totals, macro by macro, for anything that has to SAY it. */
+export function dayVerdict(totals: MacroTargets, targets: MacroTargets): DayVerdict {
+  if (dayWithinTolerance(totals, targets)) return { onTarget: true, off: [] }
+  const off = DAY_MACROS
+    .filter(macro => !macroOnTarget(macro, totals[macro], targets[macro]))
+    .map(macro => ({ macro, delta: Math.round(totals[macro] - targets[macro]), past: distancePastBand(macro, totals[macro], targets[macro]) }))
+    .sort((a, b) => b.past - a.past)
+    .map(({ macro, delta }) => ({ macro, delta }))
+  return { onTarget: false, off }
+}
+
+/**
+ * The few words beside the day's calorie target on Nutrition: "on target", or
+ * WHAT is off and by how much — "120 over", "protein 26 g over". Never "macros
+ * off", which told nobody what to change.
+ *
+ * Calories are named whenever they are off: this sits on the line that reads
+ * "target 1697 · …", so a bare "120 over" is about that number, as it always
+ * was. Otherwise the macro furthest outside its own band is named.
+ */
+export function dayVerdictLabel(totals: MacroTargets, targets: MacroTargets): string {
+  const verdict = dayVerdict(totals, targets)
+  if (verdict.onTarget) return 'on target'
+  const named = verdict.off.find(o => o.macro === 'calories') ?? verdict.off[0]
+  const amount = Math.abs(named.delta)
+  const direction = named.delta > 0 ? 'over' : 'under'
+  return named.macro === 'calories' ? `${amount} ${direction}` : `${named.macro} ${amount} g ${direction}`
 }
 
 /**

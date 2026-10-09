@@ -17,7 +17,7 @@
 // to a vegan because an ingredient string didn't resolve) is not.
 // ---------------------------------------------------------------------------
 
-import { lookupIngredient, type FoodTags } from './food-db'
+import { lookupIngredientAsStored, type FoodTags } from './food-db'
 import type { MealIngredientLine } from './food-db'
 
 export type DietaryPreference =
@@ -209,7 +209,13 @@ export function validateMealAgainstDiet(
   let sawDairy = false
 
   for (const line of ingredients) {
-    const entry = lookupIngredient(line.name)
+    // The names AS STORED, not lookupIngredient's wider reading: on 9 Oct 2026
+    // the app's lookup gained extra singular keys ("prawn" for "prawns"), which
+    // would have turned 88 corpus phrases — "prawn cocktail", "sausage roll",
+    // "peanut sauce" — from "cannot be resolved, refused" below into "judged as
+    // that one ingredient". Enforcement here is unchanged until the plan in
+    // docs/plans/ingredient-lookup-truth.md is built.
+    const entry = lookupIngredientAsStored(line.name)
 
     if (!entry) {
       for (const pref of activePrefs) {

@@ -22,7 +22,7 @@ import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } fr
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
-import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
+import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged, anchorTargetsAtSignUp, retargetAfterWeighIn } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
@@ -1692,6 +1692,16 @@ function App() {
     if (data) {
       enrichedProfile.id = data.id
       localStorage.setItem(STORAGE_KEY, data.id)
+      // THE FIRST ANCHOR. The 1 kg rule compares the 7-day average with "the
+      // average that last set the target", and at sign-up nothing had recorded
+      // one — so the first weigh-in became it, and 82 kg -> 81.2 kg the same
+      // day moved the target (test log H10). Written here, held in state so
+      // this session reads it without a reload. Not awaited beyond the write
+      // itself failing quietly: a missed anchor is the old behaviour, never a
+      // blocked sign-up.
+      anchorTargetsAtSignUp(data.id, enrichedProfile, calculatedMacros)
+        .then(anchorKg => { if (anchorKg != null && activeProfileIdRef.current === data.id) setTargetWeightAnchorKg(anchorKg) })
+        .catch(err => console.error('Anchoring the first targets failed:', err))
       // Conversational-onboarding draft: context facts / goals volunteered
       // mid-conversation queue in the draft (user_context_facts/user_goals
       // need a profile_id that didn't exist until this insert). Flush them
@@ -2800,17 +2810,14 @@ function App() {
   /** Re-derives targets after a new weigh-in lands (Part 5's capture calls this). */
   const handleWeightLogged = async () => {
     if (!profile?.id) return
-    const weight = await getLatestWeightKg(profile.id).catch(() => null)
-    setLatestWeightKg(weight)
-    // A fresh weigh-in is exactly the case the anchor threshold exists for —
-    // recompute it (it may or may not actually move, see
-    // getEffectiveTargetWeightKg's doc comment) rather than assuming this
-    // new reading itself is the new anchor.
-    const effectiveTargetWeight = await getEffectiveTargetWeightKg(profile.id, weight ?? profile.weight_kg)
-    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
-    const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
+    // One function for the whole chain (nutrition-targets.ts), so the 7-day /
+    // 1 kg ruling it carries is run by a gate rather than read off this file.
+    const retarget = await retargetAfterWeighIn(profile.id, profile, exercisePlan)
+    const targets = retarget.targets
+    setLatestWeightKg(retarget.latestWeightKg)
+    setTargetWeightAnchorKg(retarget.anchorKg)
     setMacros(targets)
-    snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
+    retarget.recorded.then(result => {
       const moved = result.previous && targets ? targetsMoved(result.previous, targets, 'weigh_in') : null
       if (result.changedFromPrior && moved) {
         setAdaptationMessages(prev => [...prev, { text: moved }])
@@ -2827,7 +2834,7 @@ function App() {
         profileId: profile.id,
         profile,
         mesocycle,
-        basisWeightKg: effectiveTargetWeight.weightKg,
+        basisWeightKg: retarget.anchorKg,
         exclusions: compiledExerciseExclusions,
         planCreatedAt: mesocycleCreatedAt ?? profile.created_at ?? new Date().toISOString(),
         now: getAppNow(profile.id),
@@ -2850,7 +2857,7 @@ function App() {
     const goals = await getActiveGoals(profile.id).catch(() => [])
     const weightGoal = goals.find(g => g.metric === 'body_weight_kg')
     if (weightGoal) {
-      const info = effectiveTargetWeight.weightKg == null ? null : describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
+      const info = retarget.anchorKg == null ? null : describeGoalProximity(retarget.anchorKg, weightGoal)
       if (info && !isGoalProximityDismissed(info.goalId)) {
         setAdaptationMessages(prev => prev.some(m => m.goalId === info.goalId) ? prev : [...prev, { text: info.message, goalId: info.goalId }])
       }

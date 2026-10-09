@@ -12,7 +12,7 @@
 
 import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-store'
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
-import { getRecentWeighIns } from './nutrition-targets'
+import { getRecentWeighIns, getEarliestWeightKg } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
 import { getPRCache, type PRMetric } from './pr-engine'
 import { getActiveGoals } from './memory-store'
@@ -139,6 +139,8 @@ export interface DashboardData {
   weightSeries: WeightSeriesPoint[]
   /** The active body_weight_kg goal's target, if one exists — drawn as a reference line on the Home trend chart. Null when no goal has been set (no UI existed to set one before this; chat's record_goal was the only path). */
   weightGoalKg: number | null
+  /** Where she started: the weight given at sign-up, or the first weigh-in ever when none was given. What "since you started" is measured from — never the first row of the 14 the chart happens to hold. */
+  startingWeightKg: number | null
   recentPRs: RecentPR[]
   streak: number
   whatsLeftLine: string | null
@@ -319,6 +321,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // getRecentWeighIns returns newest-first; the Home trend chart plots
   // left-to-right chronologically, so this is the one place that reverses it.
   const weightSeries: WeightSeriesPoint[] = [...weighIns].reverse().map(w => ({ date: w.date, kg: w.weight_kg }))
+  const startingWeightKg = profile.weight_kg != null && profile.weight_kg > 0
+    ? profile.weight_kg
+    : await getEarliestWeightKg(profileId).catch(() => null)
 
   // ---- Recent PRs -----------------------------------------------------------
   const prCache = getPRCache(profileId)
@@ -538,6 +543,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     weightTrend,
     weightSeries,
     weightGoalKg: weightGoal?.target_value ?? null,
+    startingWeightKg,
     recentPRs,
     streak: streakResult.currentStreak,
     whatsLeftLine,

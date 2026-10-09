@@ -41,6 +41,20 @@ if (unknown.length) {
 
 const functions = requested.length ? requested : available
 
+// THE COACH'S COPIES OF SHARED CODE ARE GENERATED from the app's files, and a
+// stale one is exactly what logged two eggs as two grams of egg (9 Oct 2026).
+// Refused here, before any confirmation is asked for, so a stale copy cannot
+// ship.
+{
+  const { sharedSyncStates } = await import('./sync-shared-code.mjs')
+  const stale = sharedSyncStates().filter((state) => !state.fresh || state.problems.length > 0)
+  if (stale.length > 0) {
+    for (const state of stale) console.error(`${state.copy} is stale or cannot run on Deno${state.problems.length ? ` (${state.problems.join('; ')})` : ''}.`)
+    console.error('Run `npm run sync:shared`, commit, and deploy again. Nothing was deployed, nothing was linked.')
+    process.exit(1)
+  }
+}
+
 console.log(`About to deploy to ${label} (${target}):`)
 for (const f of functions) console.log(`  - ${f}`)
 console.log('')
