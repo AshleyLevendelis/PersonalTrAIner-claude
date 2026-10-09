@@ -26,7 +26,8 @@
  *   3. Send added load for weighted bodyweight work, where the whole
  *      prescription is the "+17.5kg" and `suggested_load` reads "Bodyweight".
  */
-import type { Exercise, WorkoutDay } from './types'
+import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
+import { filterLoggableSets, isDropRow } from './session-derive'
 import { buildCoachTechniqueSummary } from './exercise-technique'
 import { sessionForDate, dayNameOf, addDays, type SessionMove } from './session-move'
 import { describeExerciseTempo } from './periodization'
@@ -204,6 +205,177 @@ export interface CoachToday {
    */
   movedTo?: { dayName: string } | null
   movedFrom?: { dayName: string } | null
+  /**
+   * Today's session BY EXERCISE — logged working sets against planned, what
+   * was added, the finisher, today's cardio. See CoachTodayWork. When present
+   * the header's counts come from it, so "7 of 9" is like-for-like (working
+   * sets on PLANNED exercises) and not "every row in the log against the plan".
+   */
+  work?: CoachTodayWork | null
+}
+
+// ---------------------------------------------------------------------------
+// WHAT WAS ACTUALLY DONE TODAY, JOINED BY THE APP (H23, 9 Oct 2026).
+//
+// The tester finished a session at 7 of 9 sets with one exercise untouched and
+// asked the coach what he had done. It listed the untouched exercise as done.
+// It had been handed three things and no join between them: the PLAN row for
+// today (every prescribed exercise, tagged TODAY), the 14-day LOG (one line a
+// date), and a header written by the app that said "ALREADY DONE — finished
+// and logged. There is nothing left to train today." `finished` was only "the
+// session was closed", and `setsLogged` was every row in the log — warm-ups
+// and added exercises included — against a plan count that had neither.
+//
+// The app knows the answer exactly, so it states it: each planned exercise
+// with its logged working sets against its planned sets, anything logged that
+// was not on the plan, the day's finisher, and the cardio logged today.
+//
+// "NOT LOGGED", never "skipped" (decided as a coach, basis in BACKLOG): the
+// app knows it holds no record; it does not know the person did not do it,
+// and the coach's own rule is that their memory outranks the list.
+// ---------------------------------------------------------------------------
+export interface CoachTodayExercise {
+  name: string
+  setsPlanned: number
+  /** WORKING sets logged — no warm-up rows, no drops (filterLoggableSets, the same reader every tick on the Exercise tab uses). */
+  setsLogged: number
+  /** "20kg x 12, 20kg x 11" — '' when nothing is logged. */
+  logged: string
+}
+export interface CoachTodayWork {
+  exercises: CoachTodayExercise[]
+  /** Logged today and not on today's plan. */
+  added: { name: string; setsLogged: number; logged: string }[]
+  /** The finisher the plan prescribes after today's lifting, in the plan's own words. Null when there is none. */
+  finisher: string | null
+  /** Cardio logged today, worded as the cardio history words it. Null when none is. */
+  cardioLogged: string | null
+}
+
+function describeLoggedSet(l: ExerciseSetLog): string {
+  const amount = l.unit === 'seconds' ? `${l.reps_completed}s` : l.unit === 'meters' ? `${l.reps_completed}m` : `${l.reps_completed}`
+  return l.is_bodyweight || !(l.weight_kg > 0) ? `bodyweight x ${amount}` : `${l.weight_kg}kg x ${amount}`
+}
+
+/** A finisher as the coach reads it — the same fields describeNonLiftingDay prints for a cardio-only day. */
+export function describeFinisherForCoach(d: Pick<WorkoutDay, 'recommendedCardio'>): string | null {
+  const c = d.recommendedCardio
+  if (!c) return null
+  return `${c.activity}, ${c.duration} min at RPE ${c.targetRpe}/10`
+}
+
+/**
+ * The join. `session` is the session RUN today (moves taken into account —
+ * the caller holds the resolver's answer), `logs` are today's set rows, and
+ * `cardioLoggedToday` is today's line from the cardio history the coach is
+ * already sent, so the two can never word one walk two ways.
+ */
+export function summariseTodayWork(input: {
+  session: WorkoutDay | null | undefined
+  logs: ExerciseSetLog[]
+  cardioLoggedToday?: string | null
+}): CoachTodayWork | null {
+  const { session, logs } = input
+  const planned = session?.exercises ?? []
+  const cardioLogged = input.cardioLoggedToday?.trim() || null
+  if (planned.length === 0 && logs.length === 0 && !cardioLogged) return null
+
+  const claimed = new Set<ExerciseSetLog>()
+  const exercises: CoachTodayExercise[] = planned.map(e => {
+    // THE SAME READER EVERY TICK ON THE EXERCISE TAB USES: by id where the row
+    // has one, by name where it does not (a set logged through the chat),
+    // warm-ups and drops left out. One definition of "a logged set".
+    const rows = filterLoggableSets(logs, e.id ?? '', e.name)
+    // Its warm-up and drop rows are this exercise's too — never "added work".
+    for (const l of logs) if (l.exercise_id ? l.exercise_id === e.id : l.exercise_name === e.name) claimed.add(l)
+    return { name: e.name, setsPlanned: e.sets ?? 0, setsLogged: rows.length, logged: rows.map(describeLoggedSet).join(', ') }
+  })
+
+  const extra = new Map<string, ExerciseSetLog[]>()
+  for (const l of logs) {
+    if (claimed.has(l) || l.is_warmup || isDropRow(l)) continue
+    extra.set(l.exercise_name, [...(extra.get(l.exercise_name) ?? []), l])
+  }
+  const added = [...extra.entries()].map(([name, rows]) => ({ name, setsLogged: rows.length, logged: rows.map(describeLoggedSet).join(', ') }))
+
+  return { exercises, added, finisher: session ? describeFinisherForCoach(session) : null, cardioLogged }
+}
+
+/** Planned sets and the working sets logged against them — the only like-for-like "N of M". */
+export function todayWorkTotals(work: CoachTodayWork): { logged: number; planned: number; notLogged: CoachTodayExercise[] } {
+  return {
+    planned: work.exercises.reduce((n, e) => n + e.setsPlanned, 0),
+    // Capped per exercise: a fourth set on a three-set lift is extra work, not
+    // cover for a set missing somewhere else.
+    logged: work.exercises.reduce((n, e) => n + Math.min(e.setsLogged, e.setsPlanned), 0),
+    notLogged: work.exercises.filter(e => e.setsPlanned > 0 && e.setsLogged < e.setsPlanned),
+  }
+}
+
+/** The block under the header. '' when there is nothing to say (no session, nothing logged). */
+export function buildTodayByExercise(today: CoachToday): string {
+  const work = today.work
+  if (!work) return ''
+  const anythingLogged = work.exercises.some(e => e.setsLogged > 0) || work.added.length > 0 || !!work.cardioLogged
+  // Before anything is logged the header already says NOT LOGGED and the
+  // TODAY row lists the session; seven "0 of 3" lines would only be length.
+  if (!anythingLogged && !today.finished) return ''
+  const lines: string[] = []
+  for (const e of work.exercises) {
+    lines.push(e.setsLogged === 0
+      ? `- ${e.name}: 0 of ${e.setsPlanned} sets logged — NOT LOGGED`
+      : `- ${e.name}: ${e.setsLogged} of ${e.setsPlanned} sets logged (${e.logged})`)
+  }
+  for (const a of work.added) lines.push(`- Added, not on today's plan — ${a.name}: ${a.setsLogged} set${a.setsLogged === 1 ? '' : 's'} logged (${a.logged})`)
+  if (work.finisher) {
+    lines.push(`- Finisher on the plan after the lifting: ${work.finisher} — ${work.cardioLogged ? `cardio logged today: ${work.cardioLogged}` : 'no cardio logged today'}`)
+  } else if (work.cardioLogged) {
+    lines.push(`- Cardio logged today: ${work.cardioLogged}`)
+  }
+  if (lines.length === 0) return ''
+  return `TODAY, EXERCISE BY EXERCISE (the app's own record: working sets logged against sets planned. "NOT LOGGED" means the app holds no record of it — not that it was done, and not that it was skipped):\n${lines.join('\n')}`
+}
+
+// ---------------------------------------------------------------------------
+// HOW A REQUEST ENDED, said on the turn that made it (H22.1, 9 Oct 2026).
+//
+// Confirming, declining and timing out changed the card on screen and nothing
+// else; the text replayed to the coach next turn was still the card's own
+// lead, "Want me to …?". A refusal was saved as an ordinary sentence. So on
+// Friday the coach was shown Thursday's "I couldn't portion … salmon" as an
+// open problem, and answered a question about today's workout with a dinner
+// card for it. The app knows how each of those ended. It says so.
+//
+// FACTS, NOT INSTRUCTIONS — the same rule the header keeps. And like the time
+// stamp beside it, this is client-side: the edge function replays each turn's
+// content verbatim, so it reaches the coach on a frontend push.
+// ---------------------------------------------------------------------------
+export type TurnOutcome = 'open' | 'applied' | 'declined' | 'expired' | 'failed' | 'refused'
+
+/** A card's stored status, and whether its window has passed, as the outcome the coach is told. */
+export function outcomeOfCard(status: string, windowPassed: boolean): TurnOutcome {
+  switch (status) {
+    case 'done': case 'partial': return 'applied'
+    case 'declined': return 'declined'
+    case 'expired': case 'stale': return 'expired'
+    case 'failed': return 'failed'
+    // pending / claimed / executing: still open — unless the ten minutes have
+    // gone, which nothing tells the card until somebody taps it.
+    default: return windowPassed ? 'expired' : 'open'
+  }
+}
+
+const OUTCOME_STAMP: Record<TurnOutcome, string> = {
+  open: '[OPEN: the app is showing a card for this and they have not answered it yet]',
+  applied: '[CLOSED: they tapped Apply and the app made this change]',
+  declined: '[CLOSED: they declined this — nothing was changed]',
+  expired: '[CLOSED: this offer timed out unanswered — nothing was changed]',
+  failed: '[CLOSED: the app tried and could not apply this — nothing was changed]',
+  refused: '[CLOSED: the app could not do this — nothing was changed]',
+}
+
+export function stampTurnOutcome(content: string, outcome: TurnOutcome | null | undefined): string {
+  return outcome ? `${OUTCOME_STAMP[outcome]} ${content}` : content
 }
 
 /**
@@ -266,20 +438,39 @@ export function stampTurnTime(content: string, createdAt: string | null | undefi
 export function buildTodayHeader(today: CoachToday): string {
   const when = `It is ${today.dayName} ${partOfDay(today.hour)} (${today.clock}).`
 
+  // LIKE-FOR-LIKE COUNTS, when the caller has joined today's log to today's
+  // plan: working sets on planned exercises. Without that join the two bare
+  // numbers the caller sent are all there is, and they are used as they were.
+  const totals = today.work ? todayWorkTotals(today.work) : null
+  const setsLogged = totals ? totals.logged : today.setsLogged
+  const setsPlanned = totals ? totals.planned : today.setsPlanned
+  // CLOSED IS NOT THE SAME AS DONE (H23). A session finished at 7 of 9 sets
+  // used to be announced as "ALREADY DONE — finished and logged", and the
+  // coach then recited the two missing sets as work. "They closed it" and
+  // "these were not logged" are both true and both said; "ALREADY DONE" is
+  // kept for the session where every planned set really is in the log.
+  const closedShort = today.finished && setsPlanned > 0 && setsLogged < setsPlanned
+    ? `They CLOSED the session with ${setsLogged} of ${setsPlanned} planned sets logged${totals && totals.notLogged.length > 0
+        ? `. NOT LOGGED: ${totals.notLogged.map(e => `${e.name} (${e.setsLogged} of ${e.setsPlanned})`).join(', ')}`
+        : ''}. Nothing more is owed today, and the sets that are not logged were not recorded as done.`
+    : null
+
   let session: string
   if (today.movedTo) {
     session = `Today, ${today.dayName}, had ${today.focus ?? 'a session'} on it and THEY MOVED IT TO ${today.movedTo.dayName.toUpperCase()} — they told you so. It is not a rest day and it is not missed; the session is still owed, on ${today.movedTo.dayName}. They can still do it today if they want to.`
   } else if (today.movedFrom) {
-    session = `Today's session is ${today.movedFrom.dayName}'s ${today.focus}, MOVED TO TODAY at their request${today.finished ? ', and it is ALREADY DONE' : today.setsLogged > 0 ? `, with ${today.setsLogged} of ${today.setsPlanned} sets logged` : ', NOT LOGGED yet'}.`
+    session = `Today's session is ${today.movedFrom.dayName}'s ${today.focus}, MOVED TO TODAY at their request${today.finished ? (closedShort ? `. ${closedShort}` : ', and it is ALREADY DONE.') : setsLogged > 0 ? `, with ${setsLogged} of ${setsPlanned} sets logged.` : ', NOT LOGGED yet.'}`
   } else if (!today.focus) {
     session = `Today, ${today.dayName}, is a REST DAY on the plan — there is no session to do today.`
   } else if (!today.isGymSession) {
     session = `Today is ${today.dayName}: ${today.focus} — not a gym session; what it prescribes is on the ${today.dayName} row below.`
+  } else if (today.finished && closedShort) {
+    session = `Today's session is ${today.dayName}'s ${today.focus}. ${closedShort}`
   } else if (today.finished) {
     session = `Today's session is ${today.dayName}'s ${today.focus}, and it is ALREADY DONE — finished and logged. There is nothing left to train today.`
-  } else if (today.setsLogged > 0 && today.setsPlanned > 0 && today.setsLogged < today.setsPlanned) {
-    session = `Today's session is ${today.dayName}'s ${today.focus}, PART-DONE: ${today.setsLogged} of ${today.setsPlanned} sets logged.`
-  } else if (today.setsLogged > 0) {
+  } else if (setsLogged > 0 && setsPlanned > 0 && setsLogged < setsPlanned) {
+    session = `Today's session is ${today.dayName}'s ${today.focus}, PART-DONE: ${setsLogged} of ${setsPlanned} sets logged.`
+  } else if (setsLogged > 0) {
     session = `Today's session is ${today.dayName}'s ${today.focus}, and sets have been logged against it today.`
   } else {
     session = `Today's session is ${today.dayName}'s ${today.focus}, NOT LOGGED yet.`
@@ -345,6 +536,23 @@ export interface CoachWeekRow {
   movedTo?: { date: string; dayName: string } | null
   /** Set when another day's session has arrived here. */
   movedFrom?: { date: string; dayName: string } | null
+  /**
+   * WHAT HAPPENED TO THE DAY, as the week strip draws it (useTrainingWeek's
+   * own `state`): done, partial, missed, swapped, rest_chosen… Optional, and
+   * absent means "say nothing about it", which is what every caller that
+   * passes a bare row still gets.
+   *
+   * Added 9 Oct 2026 (H23/H22): the hook had handed these over all along and
+   * rowFor read none of them, so a Tuesday swapped for football reached the
+   * coach as "Tuesday: Back & Biceps - …", exactly like a session that was
+   * done or was still to come.
+   */
+  state?: string
+  /** "Football · 60 min · Hard" on a swapped day — the strip's own line. */
+  swappedLine?: string | null
+  swappedForActivity?: string | null
+  /** They SAID it was missed — as opposed to the strip inferring it from an empty past day. */
+  markedMissed?: boolean
 }
 
 export interface CoachWeekBrief {
@@ -403,8 +611,41 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
     return idx === (todayIdx + 1) % 7 ? ' (tomorrow)' : ''
   }
 
-  const listOf = (d: WorkoutDay): string =>
-    d.exercises.length > 0 ? d.exercises.map(describeExerciseForCoach).join(', ') : describeNonLiftingDay(d)
+  // A LIFTING DAY'S FINISHER IS PART OF THE DAY (H8/H23). The row listed the
+  // exercises and stopped, so the coach did not know a 30-minute walk was
+  // already prescribed after the session — and offered to schedule one, or
+  // could not say whether it "counted". A cardio-only day already printed it.
+  const listOf = (d: WorkoutDay): string => {
+    if (d.exercises.length === 0) return describeNonLiftingDay(d)
+    const finisher = describeFinisherForCoach(d)
+    const mobility = d.mobilityFiller
+    return d.exercises.map(describeExerciseForCoach).join(', ')
+      + (finisher ? ` | then the finisher: ${finisher}` : '')
+      + (mobility ? ` | then optionally ${mobility.activity}, ${mobility.duration} min` : '')
+  }
+
+  // WHAT HAPPENED TO THE DAY, in the row that names it. Empty for a day
+  // nothing has happened to yet (due / rest / before the plan) and whenever
+  // the caller sent no state.
+  const happened = (r: CoachWeekRow): string => {
+    // TODAY'S ROW SAYS NOTHING HERE: the header and the exercise-by-exercise
+    // block above carry today exactly, and the strip's 'done' means "closed
+    // with something logged" — on a session closed at 7 of 9 that word on the
+    // TODAY row would contradict both.
+    if (today && r.dayName === today.dayName) return ''
+    switch (r.state) {
+      // CLOSED, not "done": the strip's state says the session was finished
+      // with work in it, not that every set was. The log lines say which.
+      case 'done': return ' [CLOSED — work was logged that day]'
+      case 'partial': return ' [PART-DONE — some sets logged, session not closed]'
+      case 'swapped': return ` [NOT DONE AS PLANNED — they did ${r.swappedLine || r.swappedForActivity || 'something else'} instead, and said so; what the plan had is listed for reference]`
+      case 'rest_chosen': return ' [RESTED ON PURPOSE — they said so; not missed; what the plan had is listed for reference]'
+      case 'missed': return r.markedMissed
+        ? ' [MISSED — they said so]'
+        : ' [NOTHING LOGGED — the day has passed with no sets recorded]'
+      default: return ''
+    }
+  }
 
   // WHICH ROWS ARE VISIBLE, BY DATE, so a session moved out of this window is
   // not simply lost. Ashley's Sunday moving to the following Monday is the
@@ -437,10 +678,10 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
       // Named by where it came from, never by the weekday it landed on —
       // calling it Monday's session would quietly rename the work, which is
       // the same rule sessionForDate states and buildTodayHeader already uses.
-      return `${label}: ${r.movedFrom.dayName}'s ${r.session.focus}, MOVED HERE - ${listOf(r.session)}`
+      return `${label}: ${r.movedFrom.dayName}'s ${r.session.focus}, MOVED HERE${happened(r)} - ${listOf(r.session)}`
     }
     if (!r.session) return `${label}: Rest - no session prescribed`
-    return `${label}: ${r.session.focus} - ${listOf(r.session)}`
+    return `${label}: ${r.session.focus}${happened(r)} - ${listOf(r.session)}`
   }
 
   // `days.length > 0` GUARDS THE ROWS, not just the header. An empty `days`
@@ -456,7 +697,10 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
       ? week.map(rowFor).join('\n')
       : days.map(d => `${d.day}${tag(d.day)}: ${d.focus} - ${listOf(d)}`).join('\n')
 
+  const byExercise = today && days.length > 0 ? buildTodayByExercise(today) : ''
+
   return (today && days.length > 0 ? `${buildTodayHeader(today)}\n\n` : '')
+    + (byExercise ? `${byExercise}\n\n` : '')
     + rows
     + (coachNote ? `\nThis week's coaching note: ${coachNote}` : '')
     + (pendingLoadSuggestions && pendingLoadSuggestions.length > 0

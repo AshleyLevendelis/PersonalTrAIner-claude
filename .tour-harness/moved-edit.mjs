@@ -237,7 +237,9 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   const realFetch = window.fetch
   window.fetch = async (url, init) => {
     if (String(url).includes('chat-gemini')) {
-      const said = String(JSON.parse((init && init.body) || '{}').message || '')
+      const body = JSON.parse((init && init.body) || '{}')
+      const said = String(body.message || '')
+      window.__lastBody = body
       const names = window.__movedInExercises || []
       const last = names[names.length - 1]
       const proposal = /swap/i.test(said)
@@ -298,6 +300,17 @@ const takeReply = await settled(TAKE_SAID)
 check('9b. it finds the exercise (no "rest day", no "nothing on … to change")', takeReply.length > 0 && !/is a rest day/i.test(takeReply) && !/nothing (left )?on \w+ to change/i.test(takeReply), takeReply.slice(0, 260))
 check(`9c. ...and speaks of ${TODAY_NAME}, where the session now is`, takeReply.includes(TODAY_NAME), takeReply.slice(0, 260))
 await shoot('moved-edit-9-coach-remove')
+
+// --- what the coach was TOLD on that last turn (H22.1 / H23) ---------------
+// By now one card was applied and one was declined. The history sent with the
+// third message has to say so — a card's own words are "Want me to …?" for
+// ever, which is how a closed request used to look open.
+const sentHistory = (await ev(`(window.__lastBody && window.__lastBody.history || []).filter(t => t.role === 'assistant').map(t => t.content)`)) || []
+check('10a. the applied swap reaches the coach marked CLOSED — applied', sentHistory.some(t => /^\[CLOSED: they tapped Apply/.test(t) && /swap/i.test(t)), sentHistory.map(t => t.slice(0, 90)))
+check('10b. the declined shorten reaches it marked CLOSED — declined', sentHistory.some(t => /^\[CLOSED: they declined this/.test(t) && /cut .* down/i.test(t)), sentHistory.map(t => t.slice(0, 90)))
+check('10c. ...and neither is sent bare, looking like an open question', !sentHistory.some(t => /^Want me to (swap|cut)/.test(t)), sentHistory.map(t => t.slice(0, 90)))
+const sentSummary = String(await ev(`(window.__lastBody && window.__lastBody.context && window.__lastBody.context.exercise_summary) || ''`))
+check(`10d. the coach's week says today holds ${FROM_NAME}'s session, moved here`, new RegExp(`^${TODAY_NAME} \\(TODAY\\): ${FROM_NAME}'s .*MOVED HERE`, 'm').test(sentSummary), sentSummary.slice(0, 300))
 
 console.log(`\n${ran} checks ran`)
 console.log(failures === 0 ? 'A moved session swaps, shortens and loses an exercise from its own screen.\n' : `\n${failures} FAILED\n`)

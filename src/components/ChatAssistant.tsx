@@ -17,7 +17,7 @@ import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
@@ -77,7 +77,7 @@ import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDo
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
-import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime } from '@/lib/chat-plan-context'
+import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime, stampTurnOutcome, outcomeOfCard, summariseTodayWork, type TurnOutcome } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -1372,7 +1372,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // most recent write(s) hadn't landed yet (see chat-cache.ts). A
         // shorter DB result means it's missing something the user already
         // saw, not that the conversation actually shrank.
-        setMessages(prev => (loaded.length >= prev.length ? loaded : prev))
+        // HOW EACH REQUEST ENDED SURVIVES THE RE-READ. The server rows carry
+        // text only, so swapping them in used to forget that Thursday's card
+        // was declined or timed out — and the coach was then shown its
+        // "Want me to …?" as an open question. Carried across by message id
+        // from what this phone already knew (the cache restored just above).
+        setMessages(prev => {
+          if (loaded.length < prev.length) return prev
+          const known = new Map(prev.filter(m => m.id).map(m => [m.id, turnOutcomeOf(m)] as const))
+          return loaded.map(m => {
+            const outcome = m.id ? known.get(m.id) : null
+            // 'open' is not carried: a card that was open when it was dropped
+            // can no longer be answered, and nothing here knows how it ended.
+            return outcome && outcome !== 'open' ? { ...m, outcome } : m
+          })
+        })
         setHasMoreMessages((count ?? 0) > PAGE_SIZE)
       }
       setIsFirstEverChat((count ?? 0) === 0)
@@ -1532,6 +1546,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         isGymSession: (todayRow?.exercises.length ?? 0) > 0,
         setsLogged: activeSession.logs.length,
         setsPlanned: todayRow?.exercises.reduce((n, e) => n + (e.sets ?? 0), 0) ?? 0,
+        // TODAY, JOINED (H23): each planned exercise with its logged working
+        // sets, what was added, the finisher and today's cardio. The header's
+        // "N of M" is taken from this when it is present, so it is working
+        // sets on planned exercises — not every row against the plan, which is
+        // what `setsLogged` above still is and why it is no longer what is said.
+        work: summariseTodayWork({
+          session: todayMovedTo ? null : todayRow ?? null,
+          logs: activeSession.logs,
+          // Today's own line from the cardio history the coach is sent just
+          // below, so one walk is never worded two ways in one prompt.
+          cardioLoggedToday: cardioLogHistory.split('\n').find(l => l.startsWith(`${activeSession.date}: `))?.slice(activeSession.date.length + 2) ?? null,
+        }),
         // The session being CLOSED OUT, not merely logged against — the same
         // three-valued status the Exercise tab's start button reads, so the
         // coach and that button can never disagree about whether today is done.
@@ -1894,6 +1920,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     feelIntent?: { tool: 'record_session_feel'; rawArgs: Record<string, unknown> }
   }
 
+  /** How this turn's request ended, from the card it still carries or the note left when the card's view was dropped. */
+  const turnOutcomeOf = (m: ChatMessage): TurnOutcome | null =>
+    m.pendingAction ? outcomeOfCard(m.pendingAction.status, pendingWindowPassed(m.pendingAction.expiresAt)) : m.outcome ?? null
+
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
     // EVERY TURN SAYS WHEN IT WAS SAID — see stampTurnTime. History is
@@ -1905,7 +1935,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       .filter(m => m.status === 'complete' || m.status === undefined)
       .slice(1)
       .slice(-PAGE_SIZE)
-      .map(m => ({ role: m.role, content: stampTurnTime(m.content, m.created_at, historyNow) }))
+      // ...AND HOW IT ENDED (H22.1). A card's lead is "Want me to …?" for ever,
+      // and a refusal is an ordinary sentence, so yesterday's closed request
+      // read as an open one. The outcome goes on first, the time around it.
+      .map(m => ({ role: m.role, content: stampTurnTime(m.role === 'assistant' ? stampTurnOutcome(m.content, turnOutcomeOf(m)) : m.content, m.created_at, historyNow) }))
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -4667,6 +4700,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     pendingAction?: ChatPendingActionView
     receipt?: ChatReceiptView
     clarification?: ChatClarificationView
+    /** Set when this reply is the app declining to build a card — so the history says the request is closed. */
+    outcome?: TurnOutcome
   }> => {
     if (result.proposal && profile.id) {
       // I1: the client is the ONLY writer of pending_actions — this INSERT
@@ -5080,7 +5115,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
 
       if (!built) {
-        return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked." }
+        return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked.", outcome: 'refused' }
       }
 
       // ---------------------------------------------------------------
@@ -5164,7 +5199,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         preImage: built.preImage,
         diff: built.diff,
       })
-      const pendingAction: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff }
+      const pendingAction: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff, expiresAt: row.expires_at }
       return { text: describeProposalClientSide(pendingAction), pendingAction }
     }
     if (result.receipt) {
@@ -5289,6 +5324,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           pendingAction: processed.pendingAction,
           receipt: processed.receipt,
           clarification: processed.clarification,
+          outcome: processed.outcome,
           quickReplies,
         } : m
       ))
@@ -5372,6 +5408,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     let responseText: string | undefined
     let action: PlanAction | undefined
     let pendingAction: ChatPendingActionView | undefined
+    let turnOutcome: TurnOutcome | undefined
     let receipt: ChatReceiptView | undefined
     let clarification: ChatClarificationView | undefined
     let failed = false
@@ -5384,6 +5421,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       pendingAction = processed.pendingAction
       receipt = processed.receipt
       clarification = processed.clarification
+      turnOutcome = processed.outcome
       setLastFailedInput(null)
     } catch (err: unknown) {
       // Fix 0.13 (ux-sweep) — every failure path used to funnel through
@@ -5464,6 +5502,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       pendingAction,
       receipt,
       clarification,
+      outcome: turnOutcome,
       quickReplies,
     }
 
@@ -6172,7 +6211,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     await resolvePendingAction(row.id, status, receipt)
 
     setMessages(prev => prev.map((m, i) => i === msgIndex
-      ? { ...m, pendingAction: undefined, receipt: richReceipt ?? { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
+      // THE CARD'S VIEW GOES, SO ITS OUTCOME IS WRITTEN DOWN FIRST. The turn's
+      // text is still "Want me to …?"; without this the history sent to the
+      // coach showed an applied change as a question nobody had answered
+      // (found by verify:moved-edit §10, not by reading).
+      ? { ...m, pendingAction: undefined, outcome: outcomeOfCard(status, false), receipt: richReceipt ?? { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
       : m
     ))
   }

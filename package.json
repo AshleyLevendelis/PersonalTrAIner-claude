@@ -292,6 +292,7 @@
     "verify:session-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-edit.mjs",
     "verify:hurts": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/hurts.mjs",
     "test:session-ref": "tsx scripts/test-session-ref.ts",
+    "test:coach-happened": "tsx scripts/test-coach-happened.ts",
     "verify:moved-edit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/moved-edit.mjs",
     "verify:exercise-add": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/exercise-add.mjs",
     "verify:setup-answers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/setup-answers.mjs",
