@@ -1,6 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { isUnverifiedLoadSource } from '@/lib/load-prescription'
-import { describeTempo } from '@/lib/periodization'
+import { describeExerciseTempo } from '@/lib/periodization'
 import type { LoadSource } from './LoadChip'
 import type { Exercise } from '@/lib/types'
 import type { ExerciseGroup } from '@/lib/session-derive'
@@ -72,7 +72,7 @@ export function ExerciseLine({
           the progression lever for a lift with nothing to load. Stored as
           '3-0-1' and rendered in words — the notation means nothing to a
           trainee who has never seen it. */}
-      {describeTempo(ex.tempo) ? ` · ${describeTempo(ex.tempo)}` : ''}
+      {describeExerciseTempo(ex) ? ` · ${describeExerciseTempo(ex)}` : ''}
     </span>
   )
 

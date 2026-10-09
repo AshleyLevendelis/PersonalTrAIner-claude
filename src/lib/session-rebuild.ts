@@ -128,7 +128,7 @@ export async function rebuildDayAroundMainLift(params: RebuildSessionParams): Pr
     // isMainLiftReset false, always: a main lift never reaches this branch, so
     // passing true here could only ever mis-price an accessory as a new lift.
     const load = await recomputeLoad(pick.exercise, profile, slot.intensity || '', slot.sets, slot.reps, false)
-    next.push(applyReplacement(slot, pick.exercise, load, profile.session_duration_preference))
+    next.push(applyReplacement(slot, pick.exercise, load, profile))
     // The incoming name is claimed, and the outgoing one stays claimed too —
     // a later slot must not re-introduce the exercise this rebuild just took
     // out, which would read as the app changing nothing.

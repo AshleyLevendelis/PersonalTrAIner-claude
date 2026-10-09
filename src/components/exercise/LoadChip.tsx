@@ -1,5 +1,5 @@
 import { Dumbbell, Info, Timer } from 'lucide-react'
-import { describeTempo } from '@/lib/periodization'
+import { describeExerciseTempo } from '@/lib/periodization'
 import { ceilingLabel } from '@/lib/progression-ceiling'
 import type { Exercise } from '@/lib/types'
 import type { PrescribedLoadSource } from '@/lib/load-prescription'
@@ -156,8 +156,10 @@ function explainerFor(source: LoadSource | undefined, loadGuidance?: string, cal
  * weight, this is not a guess about the trainee — it is an instruction, and
  * the visual order on screen has to match the confidence order.
  */
-export function TempoChip({ tempo }: { tempo: string | undefined }) {
-  const described = describeTempo(tempo)
+export function TempoChip({ ex }: { ex: Pick<Exercise, 'name' | 'tempo' | 'reps' | 'prescription_type'> }) {
+  // Through describeExerciseTempo, not describeTempo: a plan saved before
+  // 9 Oct 2026 can still hold a tempo on a hold or a kettlebell swing.
+  const described = describeExerciseTempo(ex)
   if (!described) return null
   return (
     <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${CONFIDENT_CHIP_CLASS}`}>

@@ -1,6 +1,6 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
-import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
+import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded } from './load-prescription'
 import { resolveLoadFields } from './warmup'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
@@ -270,7 +270,12 @@ export async function recomputeLoad(
  * the `...slot` spread) — a primer needs it forced, since the outgoing slot
  * may not have been a primer at all.
  */
-export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: LoadPrescription, sessionDurationPreference?: UserProfile['session_duration_preference']): Exercise {
+export function applyReplacement(
+  slot: Exercise,
+  entry: ExerciseEntry,
+  load: LoadPrescription,
+  profile?: Pick<UserProfile, 'session_duration_preference' | 'training_experience'>,
+): Exercise {
   const isPrimer = entry.mechanics_tier === 'primer'
   const loadFields = resolveLoadFields(entry, isPrimer, load)
 
@@ -293,53 +298,99 @@ export function applyReplacement(slot: Exercise, entry: ExerciseEntry, load: Loa
   const looksLikeRepCount = /^\d+(\s*-\s*\d+)?$/.test(slot.reps)
   const fixedUnits = !typeChanged
     ? null
-    : fixedUnitPrescription(entry, sessionDurationPreference) ?? (looksLikeRepCount ? null : REPS_FALLBACK)
+    : fixedUnitPrescription(entry, profile?.session_duration_preference) ?? (looksLikeRepCount ? null : REPS_FALLBACK)
+  const programming = fixedUnits ?? { sets: slot.sets, reps: slot.reps, rest: slot.rest }
 
-  return {
-    ...slot,
+  // BUILT, NOT COPIED. Rewritten 9 Oct 2026.
+  //
+  // This used to be `{ ...slot, <the fields somebody remembered to reset> }`,
+  // and it leaked a field of the outgoing exercise four separate times — a
+  // working load onto a primer, then prescription units, the ramp block and
+  // the assistance figure, then (on a tester's plan) the tempo: "2s down ·
+  // drive up" printed on a Kettlebell Swing and on a timed Spanish Squat hold.
+  // Reading the type that day found three more riding along that nobody had
+  // reported: `load_hold` and `rep_bump` (why the OUTGOING weight was stuck,
+  // and the rep it bought for being stuck) and `load_source` (a reported
+  // working weight's provenance sitting on a lift nobody has reported).
+  //
+  // Each fix cleared one more field, which is exactly the shape that
+  // guarantees a next one: every optional field added to Exercise was carried
+  // across a swap by default, and stayed until someone was bitten. So the
+  // default is now the other way round. Every field below is written here on
+  // purpose, from one of three sources, and a field this object does not name
+  // DOES NOT EXIST on the result:
+  //   - the INCOMING exercise (what it is),
+  //   - its own load prescription (what it weighs, and why),
+  //   - the slot's PROGRAMMING (how much work this place in the session is).
+  // `test:slot-replacement` §9 holds it with a field the type does not have.
+  const replaced: Exercise = {
+    // --- what it is: the incoming exercise ---
     id: entry.id,
     name: entry.name,
-    substitution: '',
-    superset_label: undefined,
     prescription_type: entry.prescription_type,
-    ...(fixedUnits ? { sets: fixedUnits.sets, reps: fixedUnits.reps, rest: fixedUnits.rest } : {}),
+    movement_pattern: mapMovementPattern(entry.movement_pattern),
+    tier: mapTier(entry.mechanics_tier),
+    fatigue_cost: deriveFatigueCost(entry),
+    // The named alternative was the OUTGOING exercise's, and a superset pair
+    // was chosen for the lift that just left.
+    substitution: '',
+
+    // --- how much work this place in the session is: the slot ---
+    sets: programming.sets,
+    reps: programming.reps,
+    rest: programming.rest,
+    // A PRIMER'S EFFORT IS FORCED, not inherited — the outgoing slot may not
+    // have been a primer at all (see the doc comment above).
     intensity: isPrimer ? 'Light — movement prep' : slot.intensity,
+
+    // --- what it weighs: its own prescription ---
     // A PRIMER THAT NEEDS A BELL GETS ITS NUMBER — Ashley's ruling, 18 Sep
     // 2026, after swapping in Kettlebell Swings and being shown nothing.
     // Generation does the same thing at its own two sites; this stays in step
     // with them deliberately, because a swap must leave the plan in the state
-    // generation would have produced. The intensity and the guidance above
-    // are unchanged on both branches.
-    // Only these three of resolveLoadFields' four: this site has never written
-    // load_source, and spreading the whole object would quietly add a field
-    // the swap path does not own.
+    // generation would have produced.
     suggested_load: loadFields.suggested_load,
     suggested_load_kg: loadFields.suggested_load_kg,
     per_set_load: loadFields.per_set_load,
+    // WHERE THE NUMBER CAME FROM IS PART OF THE NUMBER. The old spread carried
+    // the outgoing lift's `load_source` and this site wrote none of its own,
+    // so a lift swapped in for a squat somebody had reported read
+    // 'known_weight' — the screen's "from the weight you told me" — over a
+    // pure estimate. resolveLoadFields already withholds it from a primer.
+    load_source: loadFields.load_source,
     load_guidance: isPrimer ? 'Stay light and controlled. This is preparation, not a working set.' : load.basis,
-    movement_pattern: mapMovementPattern(entry.movement_pattern),
-    tier: mapTier(entry.mechanics_tier),
-    fatigue_cost: deriveFatigueCost(entry),
-    // A ramp block is a per-set kg ladder built for ONE specific lift (see
-    // Exercise.ramp_up / warmup.ts). Carrying it across a replacement leaves
-    // the OUTGOING exercise's warm-up weights sitting under the incoming
-    // one's name — the same wrong-exercise-load leak this function's primer
-    // guard was added for. Nothing here can rebuild it (that needs the
-    // day-level warmup pass), so it is cleared rather than left wrong; the
-    // next generation recomputes it.
-    ramp_up: undefined,
-    // Assistance is likewise exercise-specific (only an assisted machine has
-    // it) and none of this function's callers recompute it. Clearing avoids
-    // a stale "-20kg assist" chip surviving onto an unassisted movement.
-    suggested_assistance_kg: undefined,
-    assistance_ready_to_graduate: undefined,
-    // Same reasoning as ramp_up above: `slot.selection_note` (if any)
-    // explains why the OUTGOING exercise won its generation-time comparison
-    // — nothing true about `entry`, the incoming replacement. A manual swap
-    // is deliberately outside "why this exercise"'s scope (see
-    // Exercise.selection_note's doc comment), so this must not survive.
-    selection_note: undefined,
+    // And what, if anything, is holding it there — the incoming prescription's
+    // own answer. The generator's two extra values ('matched',
+    // 'unaffordable_step') are decisions about a lift across a block and are
+    // never true of one that has just arrived.
+    ...(isPrimer || !load.hold ? {} : { load_hold: load.hold }),
   }
+
+  // TEMPO BELONGS TO THE LIFT THAT CAN USE IT. It is the block's lever for a
+  // rep-counted lift with no weight to add, so the block's value carries over
+  // only when the INCOMING exercise is one of those — asked of the slot as it
+  // now stands, with generation's own rule. A hold has no reps to slow, a
+  // loaded lift has its weight for a lever, and a swing has no lowering phase
+  // to control. Never invented here either: no tempo on the way in (a deload,
+  // a power block) means none on the way out.
+  if (slot.tempo && isTempoEligible(entry, replaced, profile?.training_experience)) {
+    replaced.tempo = slot.tempo
+  }
+
+  // DELIBERATELY ABSENT, each for a reason the old code spelled out one field
+  // at a time and the list above now makes true by construction:
+  //   superset_label   the pairing was built for the lift that left
+  //   ramp_up          a per-set kg ladder for ONE lift; the day-level warm-up
+  //                    pass (settleWeek) rebuilds it for this one
+  //   suggested_assistance_kg / assistance_ready_to_graduate
+  //                    only an assisted machine has them
+  //   suggested_added_load_kg
+  //                    a belt weight for the four lifts that take one
+  //   selection_note   why the OUTGOING exercise won its comparison
+  //   block_hold_note  the outgoing lift's stall across the last block
+  //   rep_bump / distance_bump
+  //                    what the frozen-weight lever did for the outgoing lift
+  return replaced
 }
 
 // clearOrphanedSupersetLabels MOVED to settle-week.ts on 13 Sep 2026 and is
@@ -402,7 +453,7 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
     if (!day || !slot) return week
 
     const load = await recomputeLoad(newExercise, profile, slot.intensity || '', slot.sets, slot.reps, isMainLift)
-    const replaced = applyReplacement(slot, newExercise, load, profile.session_duration_preference)
+    const replaced = applyReplacement(slot, newExercise, load, profile)
     const exercises = clearOrphanedSupersetLabels(
       day.exercises.map((e, i) => (i === exIndex ? replaced : e))
     )
@@ -458,7 +509,7 @@ export async function banExerciseFromMesocycle(params: BanExerciseParams): Promi
 
       const replacement = candidates[0].exercise
       const load = await recomputeLoad(replacement, profile, oldSlot.intensity || '', oldSlot.sets, oldSlot.reps, isMainLiftSlot(oldSlot))
-      const replaced = applyReplacement(oldSlot, replacement, load, profile.session_duration_preference)
+      const replaced = applyReplacement(oldSlot, replacement, load, profile)
       const exercises = clearOrphanedSupersetLabels(
         day.exercises.map((e, i) => (i === idx ? replaced : e))
       )

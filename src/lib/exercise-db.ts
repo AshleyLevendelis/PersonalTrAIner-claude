@@ -5363,6 +5363,38 @@ export function isBandEquipped(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => e === 'resistance band')
 }
 
+/**
+ * IS THIS MOVEMENT BALLISTIC — thrown, jumped or swung, with no lowering phase
+ * a person controls?
+ *
+ * Asked by exactly one rule: a ballistic movement never carries an eccentric
+ * tempo cue. "2s down · drive up" on a kettlebell swing is not a harder
+ * version of the swing, it is a different and worse exercise — the bell is
+ * meant to fall and be caught by the hips, and slowing it turns a hip snap
+ * into a front raise (NSCA exercise technique: ballistic and plyometric
+ * movements are prescribed for intent and speed, never for time under
+ * tension). Found 9 Oct 2026 on a tester's plan, where a knee adaptation
+ * swapped a tempo'd glute bridge for Kettlebell Swing (Heavy) and the cue came
+ * with it.
+ *
+ * NAMED BY WHAT THE ENTRY IS, not by a hand-kept list of names: the catalogue
+ * already files jumps and throws under the explosive substitution groups and
+ * the primer swing under 'swing'; the one working-set swing is filed under its
+ * hinge group (so it can substitute for a hinge), which is why the name is
+ * read too. `test:slot-replacement` holds the other direction — every entry
+ * whose own coaching note or cues call it ballistic or explosive must answer
+ * true here — so a new jump or throw cannot be added without this noticing.
+ */
+const BALLISTIC_GROUPS = new Set(['explosive_lower', 'explosive_upper', 'swing'])
+export function isBallisticMovement(entry: ExerciseEntry): boolean {
+  if (BALLISTIC_GROUPS.has(entry.substitution_group)) return true
+  // A swing is ballistic when there is a bell in the hand. "Leg Swings" is a
+  // mobility drill that shares the word and nothing else — the same trap
+  // load-prescription.ts's categorize() records falling into.
+  if (/\bswings?\b/i.test(entry.name)) return entry.equipment.some(e => e === 'kettlebell' || e === 'dumbbell')
+  return /\b(jumps?|slams?|snatch|cleans?|throws?|plyo|burpees?|bounds?)\b/i.test(entry.name)
+}
+
 /** True when this movement must be excluded for a trainee with these flagged joints. An indicated movement is never excluded, even if it loads the joint. */
 export function isContraindicatedFor(entry: ExerciseEntry, flaggedJoints: Set<string>): boolean {
   if (isIndicatedFor(entry, flaggedJoints)) return false

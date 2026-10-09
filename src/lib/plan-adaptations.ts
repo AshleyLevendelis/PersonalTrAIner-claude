@@ -98,7 +98,7 @@ async function substituteSlots(
         usedInDay.add(replacement.name)
         const load = await recomputeLoad(replacement, profile, slot.intensity || '', slot.sets, slot.reps, isMainLiftSlot(slot))
         touchedSlots.push({ weekNumber: week.week_number, dayName: day.day, before: slot.name, after: replacement.name })
-        exercises.push(applyReplacement(slot, replacement, load, profile.session_duration_preference))
+        exercises.push(applyReplacement(slot, replacement, load, profile))
       }
 
       if (!changed) return day
