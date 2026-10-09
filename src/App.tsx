@@ -35,9 +35,10 @@ import { useMealDays } from '@/hooks/useMealDays'
 import { watchFavouriteNames } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
-import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
-import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
+import { banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
+import { swapOnScreen } from '@/lib/screen-swap'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { reconcileToStatedCeilings } from '@/lib/ceiling-reconcile'
@@ -248,6 +249,9 @@ function App() {
    * mean the connection is down, and saying so twice adds nothing.
    */
   const [writeError, setWriteError] = useState<string | null>(null)
+  // A failure belongs to the screen it happened on (M29): leaving the tab
+  // puts it away rather than carrying "That swap didn't save" onto Nutrition.
+  useEffect(() => { setWriteError(null) }, [activeTab])
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
@@ -2491,44 +2495,13 @@ function App() {
     scope: SwapScope
   ) => {
     if (!profile || mesocycle.length === 0) return
-
-    const updatedMesocycle = await swapExerciseInMesocycle({
-      mesocycle,
-      profile,
-      currentWeekNumber: weekNumber,
-      dayName,
-      exIndex,
-      newExercise,
-      scope,
-    })
-    setMesocycle(updatedMesocycle)
-
-    if (!profile.id) return
-    try {
-      // THE THIRD COPY OF THIS BRANCH, removed 15 Sep 2026. saveScopedEdit
-      // was extracted to own it precisely so the screen's swap and the
-      // coach's could not disagree about which weeks reached the database —
-      // and then both kept their own copy anyway, the executor's under a
-      // comment promising it "mirrors handleSwapExercise exactly". This was
-      // the original the other two claimed to mirror. Identical behaviour:
-      // 'today' is one week, 'permanent' is the rest of that week's block.
-      await saveScopedEdit(profile.id, updatedMesocycle, weekNumber, scope)
-      // VISION-ARCHITECTURE.md §2.3 — "after any tap mutation, sweep pending
-      // proposals on the same target and mark them stale immediately, so
-      // the user never taps Confirm on a card invalidated by their own tap
-      // a second earlier." Same scope_key prefix the chat swap proposal
-      // uses (buildExerciseSwapProposal, ChatAssistant.tsx).
-      await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
-      setWriteError(null)
-    } catch (err) {
-      // Audit §3.1 — this used to be console.error alone, so a swap that
-      // never reached the database looked identical to one that did until
-      // the next reload put the old exercise back. Put the screen back to
-      // the truth AND say so: a silent revert is its own small betrayal.
-      console.error('Persisting swap failed:', err)
-      setMesocycle(mesocycle)
-      setWriteError("That swap didn't save — check your connection and try again.")
-    }
+    // ONE FUNCTION, shared with the browser harness (screen-swap.ts) so a
+    // driver taps the same swap this screen runs. It says when nothing
+    // changed, and puts the plan back when the write fails.
+    setWriteError(await swapOnScreen({
+      profile, mesocycle, weekNumber, dayName, exIndex, newExercise, scope,
+      show: setMesocycle,
+    }))
   }
 
   /**
@@ -3083,7 +3056,22 @@ function App() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+        {/* M29, 9 Oct 2026. This sat in the page's flow ABOVE the tabs, so a
+            failed swap mid-session printed its sentence a screen and a half
+            above the tap and the person saw nothing happen; it then followed
+            them from tab to tab until dismissed. It is now pinned to the top of
+            the VIEWPORT, under the offline pill, so it is on screen wherever
+            the page is scrolled, and it is cleared when the tab changes (the
+            effect beside `writeError`). Still one slot, still not a queue. */}
         {writeError && (
+          // Opaque underneath: the warning tint is translucent, and a
+          // message floating over a set grid has to be readable against it.
+          <div
+            role="alert"
+            data-testid="write-error"
+            className="fixed left-3 right-3 z-40 rounded-2xl bg-background shadow-lg"
+            style={{ top: 'calc(3.25rem + env(safe-area-inset-top))' }}
+          >
           <InsightBanner tone="warning" className="items-start justify-between">
             <span>{writeError}</span>
             <button
@@ -3094,6 +3082,7 @@ function App() {
               Dismiss
             </button>
           </InsightBanner>
+          </div>
         )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsContent value="dashboard">

@@ -58,6 +58,7 @@ import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { settleWeek } from '@/lib/settle-week'
+import { sessionRefFromCell, sessionRefForPlanDay, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
 import { executeCardioSession } from '@/lib/pending-action-executor'
@@ -125,7 +126,7 @@ export function TodayPanel({
   /** Fired when steps are logged here, so the always-mounted chat tab re-reads them. */
   devOverrideDay?: string | null
   onOpenProgram: () => void
-  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
+  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string, sayDay?: string) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
   /**
@@ -303,6 +304,20 @@ export function TodayPanel({
   // replaced with Muay Thai — the app agreeing with itself on one screen and
   // not the other. Same source as the glyph (useTrainingWeek), never a second
   // read of the same row.
+  // THE ONE REFERENCE EVERY EDIT ON THIS SCREEN TAKES (H19, 9 Oct 2026).
+  // The card above is drawn from the resolver; until now every edit below it
+  // was addressed by `effectiveDayName`, which is the weekday being LOOKED at.
+  // On Monday's session moved to Friday that is Friday's own empty row, and
+  // the screen answered "There's no session on Friday to shorten" about the
+  // session it was showing. `todayRef.planDayName` is the row the session
+  // lives in; `todayRef.sayDay` is the only name a sentence may use.
+  // Borrowing a day is a straight look at another weekday's prescription, so
+  // it is a plan-row reference with nothing to resolve.
+  const todayRef: SessionRef = borrowedDayName || !todayCell
+    ? sessionRefForPlanDay({ date: today, planDayName: effectiveDayName, session: workout, weekNumber: liveWeek })
+    : sessionRefFromCell(todayCell, liveWeek)
+  /** Says the day on screen in whatever an edit wrote with the plan row's name. */
+  const say = (text: string | null): string | null => sayDayIn(text, todayRef)
   const swappedToday = weekTrain.days.find(d => d.date === today)?.state === 'swapped'
     ? (weekTrain.days.find(d => d.date === today)?.swappedForActivity || 'something else')
     : null
@@ -328,7 +343,7 @@ export function TodayPanel({
     scope: SwapScope,
   ): Promise<string | null> => {
     if (!profileId || !mesocycle) return 'No plan to edit.'
-    if (!next.changed) return next.refusal ?? "That couldn't be changed."
+    if (!next.changed) return say(next.refusal ?? "That couldn't be changed.")
     onMesocycleUpdated?.(next.mesocycle)
     try {
       await saveScopedEdit(profileId, next.mesocycle, liveWeek, scope)
@@ -353,15 +368,19 @@ export function TodayPanel({
    */
   const handleAddCardio = async (activity: string, minutes: number, targetRpe: number): Promise<string | null> => {
     if (!profileId || !profile || !mesocycle || mesocycle.length === 0) return 'No plan to add it to yet.'
+    // Through the reference, so a day that has taken a session IN is never
+    // mistaken for the free day its own plan row still describes.
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
     const result = await executeCardioSession(profile, mesocycle, {
       weekNumber: liveWeek,
-      dayName: todayName,
+      dayName: target.planDayName,
       activity,
       minutes,
       targetRpe,
       scope: 'permanent',
     })
-    if (result.receipt.failed.length > 0) return result.receipt.failed[0].error
+    if (result.receipt.failed.length > 0) return say(result.receipt.failed[0].error)
     onMesocycleUpdated?.(result.mesocycle)
     weekTrain.refresh()
     onLogsUpdated?.()
@@ -370,8 +389,10 @@ export function TodayPanel({
 
   const dropExercise = async (exIndex: number, scope: SwapScope): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
     return applySessionEdit(
-      removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope }),
+      removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, exIndex, scope }),
       scope,
     )
   }
@@ -393,9 +414,11 @@ export function TodayPanel({
     if (!profile || !mesocycle) return 'No plan to edit.'
     const week = mesocycle.find(w => w.week_number === liveWeek)
     if (!week) return "I can't see this week on your plan just now."
-    const result = shortenDayTo(week, effectiveDayName, profile, minutes)
-    if (!result.changed) return result.refusal ?? "I couldn't shorten that one."
-    const settled = settleWeek(result.week, effectiveDayName, profile)
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
+    const result = shortenDayTo(week, target.planDayName, profile, minutes)
+    if (!result.changed) return say(result.refusal ?? "I couldn't shorten that one.")
+    const settled = settleWeek(result.week, target.planDayName, profile)
     return applySessionEdit(
       { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
       'today',
@@ -417,10 +440,12 @@ export function TodayPanel({
    */
   const rebuildToday = async (): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
     const result = await rebuildDayAroundMainLift({
-      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exclusions,
+      mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, exclusions,
     })
-    if (!result.changed) return result.refusal ?? "I couldn't rebuild that one."
+    if (!result.changed) return say(result.refusal ?? "I couldn't rebuild that one.")
     const saved = await applySessionEdit({ mesocycle: result.mesocycle, changed: true }, 'today')
     if (saved) return saved
     // WHAT IT COULD NOT DO IS SAID, NOT SWALLOWED. A rebuild that quietly left
@@ -458,7 +483,10 @@ export function TodayPanel({
   const lighterToday = async (): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
     const week = mesocycle.find(w => w.week_number === liveWeek)
-    const day = week?.days.find(d => d.day === effectiveDayName)
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
+    const planDay = target.planDayName
+    const day = week?.days.find(d => d.day === planDay)
     if (!week || !day) return "I can't see today's session just now."
     if (!isVolumeAdjustable(week)) return "This is a deload week — it's already lighter on purpose."
     const result = adjustDayVolume(day, 'lighter', profile)
@@ -468,8 +496,8 @@ export function TodayPanel({
         : 'Every exercise is already at its minimum.'
     }
     const settled = settleWeek(
-      { ...week, days: week.days.map(d => (d.day === effectiveDayName ? result.day : d)) },
-      effectiveDayName,
+      { ...week, days: week.days.map(d => (d.day === planDay ? result.day : d)) },
+      planDay,
       profile,
     )
     return applySessionEdit(
@@ -487,9 +515,11 @@ export function TodayPanel({
     // moving is one tap on a menu item and then the menu is gone, so without
     // this a failed save would look exactly like a move that happened and
     // then un-happened — the silent write the app is not allowed to have.
+    const target = editTarget(todayRef)
+    if (!target.ok) { setMoveError(target.refusal); return }
     setMoveError(
       await applySessionEdit(
-        moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
+        moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
         'today',
       ),
     )
@@ -510,13 +540,16 @@ export function TodayPanel({
    */
   const priceAddition = async (entry: ExerciseEntry) => {
     if (!profile || !mesocycle) return null
-    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === effectiveDayName)
+    const target = editTarget(todayRef)
+    if (!target.ok) return null
+    const planDay = target.planDayName
+    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === planDay)
     if (!day) return null
     const tier = mapTier(entry.mechanics_tier)
     const programming = peerProgrammingFor(day.exercises, tier)
     if (!programming) return null
     const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
-    return { load, day }
+    return { load, day, planDay }
   }
 
   const addExercise = async (entry: ExerciseEntry, scope: SwapScope): Promise<string | null> => {
@@ -524,7 +557,7 @@ export function TodayPanel({
     const priced = await priceAddition(entry)
     if (!priced) return `I couldn't work out what to prescribe for ${entry.name} here.`
     return applySessionEdit(
-      addExerciseToSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, entry, load: priced.load, scope }),
+      addExerciseToSession({ mesocycle, profile, weekNumber: liveWeek, dayName: priced.planDay, entry, load: priced.load, scope }),
       scope,
     )
   }
@@ -544,17 +577,19 @@ export function TodayPanel({
     const priced = await priceAddition(entry)
     if (!priced) return nothing
     const result = addExerciseToSession({
-      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName,
+      mesocycle, profile, weekNumber: liveWeek, dayName: priced.planDay,
       entry, load: priced.load, scope: 'today',
     })
     if (!result.changed) return nothing
     const afterWeek = result.mesocycle.find(w => w.week_number === liveWeek)
-    const afterDay = afterWeek?.days.find(d => d.day === effectiveDayName)
+    const afterDay = afterWeek?.days.find(d => d.day === priced.planDay)
     const minutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : null
     const capMinutes = Math.round(getSessionMaximumSeconds(profile.session_duration_preference) / 60)
     const overBy = minutes != null && minutes > capMinutes ? minutes - capMinutes : null
+    const impact = describeEditImpact(mesocycle.find(w => w.week_number === liveWeek), afterWeek, priced.planDay)
     return {
-      ...describeEditImpact(mesocycle.find(w => w.week_number === liveWeek), afterWeek, effectiveDayName),
+      cost: say(impact.cost),
+      balancing: say(impact.balancing),
       minutes,
       overBy,
     }
@@ -568,13 +603,16 @@ export function TodayPanel({
   const removalBalanceCost = (exIndex: number, scope: SwapScope): { cost: string | null; balancing: string | null } => {
     const nothing = { cost: null, balancing: null }
     if (!profile || !mesocycle) return nothing
-    const result = removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope })
+    const target = editTarget(todayRef)
+    if (!target.ok) return nothing
+    const result = removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, exIndex, scope })
     if (!result.changed) return nothing
-    return describeEditImpact(
+    const impact = describeEditImpact(
       mesocycle.find(w => w.week_number === liveWeek),
       result.mesocycle.find(w => w.week_number === liveWeek),
-      effectiveDayName,
+      target.planDayName,
     )
+    return { cost: say(impact.cost), balancing: say(impact.balancing) }
   }
 
   const openWhatHappened = () => {
@@ -773,6 +811,10 @@ export function TodayPanel({
   const peekWorkout = peekDay && !peekMovedTo
     ? (peekCell?.session ?? liveWeekPlan.find(d => d.day === peekDay))
     : null
+  // The peeked day's reference — a swap opened from the peek writes to the
+  // row the session LIVES in (Monday's, for a session moved to Friday), and
+  // a day swapped for football or rested on purpose opens none.
+  const peekRef: SessionRef | null = peekCell ? sessionRefFromCell(peekCell, liveWeek) : null
 
   // Turn 5: session-progress 2px line — total sets logged today across every
   // exercise on the live day, over total sets planned. Only meaningful (and
@@ -896,7 +938,7 @@ export function TodayPanel({
       </Suspense>
       <Suspense fallback={null}>
       <AddExerciseSheet
-        target={addOpen && workout ? { dayName: effectiveDayName, day: workout } : null}
+        target={addOpen && workout ? { dayName: todayRef.sayDay, day: workout } : null}
         onClose={() => setAddOpen(false)}
         profile={profile}
         exclusions={exclusions}
@@ -909,7 +951,7 @@ export function TodayPanel({
         target={removeTarget}
         onClose={() => setRemoveTarget(null)}
         onDrop={scope => dropExercise(removeTarget!.exIndex, scope)}
-        onSwapInstead={() => removeTarget && onOpenSwap(removeTarget.dayName, removeTarget.exIndex, removeTarget.exerciseName)}
+        onSwapInstead={() => removeTarget && onOpenSwap(todayRef.planDayName, removeTarget.exIndex, removeTarget.exerciseName, todayRef.sayDay)}
         balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : { cost: null, balancing: null })}
         onReason={handleRemoveReason}
       />
@@ -961,7 +1003,7 @@ export function TodayPanel({
                 dayLabel={peekDay}
                 movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
                 onExit={() => setPeekDay(null)}
-                onSwap={(exIndex, name) => peekDay && onOpenSwap(peekDay, exIndex, name)}
+                onSwap={(exIndex, name) => peekRef && editTarget(peekRef).ok && onOpenSwap(peekRef.planDayName, exIndex, name, peekRef.sayDay)}
                 onBan={handleBan}
                 onOpenDetail={onOpenDetail}
                 banBusyName={banBusy}
@@ -1189,7 +1231,8 @@ export function TodayPanel({
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
           <ExerciseList
             workout={workout!}
-            dayName={effectiveDayName}
+            dayName={todayRef.planDayName}
+            sayDay={todayRef.sayDay}
             currentMesoWeekObj={currentMesoWeekObj}
             progressedLoads={progressedLoads}
             progressedAddedLoads={progressedAddedLoads}
@@ -1201,7 +1244,7 @@ export function TodayPanel({
             onOpenDetail={onOpenDetail}
             banBusy={banBusy}
             onBan={handleBan}
-            onRemove={profileId && mesocycle ? (exIndex, name) => setRemoveTarget({ dayName: effectiveDayName, exIndex, exerciseName: name }) : undefined}
+            onRemove={profileId && mesocycle ? (exIndex, name) => setRemoveTarget({ dayName: todayRef.sayDay, exIndex, exerciseName: name }) : undefined}
             onMove={profileId && mesocycle ? moveExercise : undefined}
             onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
               const restSeconds = parseRestSeconds(restStr)
@@ -1326,6 +1369,7 @@ export function TodayPanel({
 function ExerciseList({
   workout,
   dayName,
+  sayDay,
   currentMesoWeekObj,
   progressedLoads,
   progressedAddedLoads,
@@ -1342,14 +1386,17 @@ function ExerciseList({
   onSetCompleted,
 }: {
   workout: WorkoutDay
+  /** The PLAN ROW this session lives in — the key a swap writes to. */
   dayName: string
+  /** The weekday it is shown on, when that differs (a moved-in session). */
+  sayDay?: string
   currentMesoWeekObj?: MesocycleWeek
   progressedLoads: Record<string, number>
   progressedAddedLoads: Record<string, number>
   progressionNotes: Record<string, { note: string; didProgress: boolean }>
   /** Reaches SetGrid via ExerciseRow, to judge a typed weight — see set-plausibility.ts. */
   profile?: UserProfile
-  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
+  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string, sayDay?: string) => void
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   onOpenDetail?: (exerciseName: string) => void
@@ -1433,7 +1480,7 @@ function ExerciseList({
       onOpenHistory,
       onOpenDetail,
       profile,
-      onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
+      onSwap: () => onOpenSwap(dayName, exIndex, ex.name, sayDay),
       onBan: () => onBan(ex.name),
       onRemove: onRemove ? () => onRemove(exIndex, ex.name) : undefined,
       onMove: onMove ? (direction: -1 | 1) => onMove(exIndex, direction) : undefined,

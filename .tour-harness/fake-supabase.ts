@@ -192,6 +192,15 @@ export function makeFakeSupabase(db: Db) {
         return api
       },
       in: (c: string, vs: unknown[]) => { filters.push(r => vs.includes(r[c])); return api },
+      // SQL LIKE — `%` any run, `_` one character, everything else literal.
+      // Missing until 9 Oct 2026, so the one production query that uses it
+      // (sweepStaleForTarget, after a tap-swap) threw here and read as "that
+      // swap didn't save": a fake must answer what the database answers.
+      like: (c: string, pattern: string) => {
+        const re = new RegExp('^' + pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$')
+        filters.push(r => typeof r[c] === 'string' && re.test(r[c] as string))
+        return api
+      },
       match: (obj: Row) => { for (const [c, v] of Object.entries(obj)) filters.push(r => r[c] === v); return api },
       order: (c: string, opts?: { ascending?: boolean }) => { orders.push([c, opts?.ascending !== false]); return api },
       limit: (n: number) => { limitN = n; return api },

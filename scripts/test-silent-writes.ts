@@ -60,10 +60,26 @@ console.log('\n1. Swapping an exercise')
 {
   const body = handlerBody(app, 'const handleSwapExercise')
   check('the handler exists', body.length > 0)
-  check('a failed save is reported, not only logged', /setWriteError\(/.test(body))
-  check('...and the screen is put back rather than left showing the swap', /setMesocycle\(mesocycle\)/.test(body))
+  // RE-ANCHORED 9 Oct 2026 (H19). The swap moved out of App.tsx into
+  // src/lib/screen-swap.ts so a browser driver can tap the same function the
+  // app ships (App.tsx is booted by no harness page). These three pinned the
+  // text of the old inline handler; the PROPERTIES are unchanged and are now
+  // read where the code lives: whatever swapOnScreen returns is shown, a save
+  // that throws puts the plan back through the caller's own setter, and no
+  // sentence it can return names a table. Driven end to end by
+  // verify:moved-edit, which a source check cannot replace.
+  const swap = stripComments(readFileSync(join(ROOT, 'src/lib/screen-swap.ts'), 'utf8'))
+  const caught = swap.slice(swap.indexOf('catch'))
+  check('a failed save is reported, not only logged',
+    /setWriteError\(\s*await swapOnScreen\(/.test(body) && /return SWAP_DID_NOT_SAVE/.test(caught))
+  check('...and the screen is put back rather than left showing the swap',
+    /show:\s*setMesocycle/.test(body) && /show\(mesocycle\)/.test(caught))
+  check('...and a swap that changed NOTHING says so instead of saving the same week and closing',
+    /if \(updated === mesocycle\) return SWAP_CHANGED_NOTHING/.test(swap)
+    && swap.indexOf('updated === mesocycle') < swap.indexOf('saveScopedEdit('))
+  const sentences = [...swap.matchAll(/export const SWAP_\w+ = "([^"]*)"/g)].map(m => m[1])
   check('the message does not blame the user or name a table',
-    !/supabase|mesocycle_weeks|postgrest/i.test((/setWriteError\((["'`])([^"'`]*)\1/.exec(body) ?? [])[2] ?? ''))
+    sentences.length === 2 && sentences.every(t => !/supabase|mesocycle_weeks|postgrest/i.test(t)), sentences)
 }
 
 console.log('\n2. Banning an exercise')

@@ -24,7 +24,14 @@ import type { UserProfile } from '@/lib/types'
 // ---------------------------------------------------------------------------
 
 export interface SwapTarget {
+  /** The PLAN ROW the exercise lives in — the key the swap writes to. */
   dayName: string
+  /**
+   * The weekday it is SHOWN on, when that is a different word: Monday's
+   * session moved to Friday is keyed "Monday" and said "Friday". Absent on an
+   * ordinary day, where the two agree.
+   */
+  sayDay?: string
   exIndex: number
   exerciseName: string
   /**
@@ -170,7 +177,7 @@ export function SwapDialog({
               // Two of the four answers never reach a replacement list at all,
               // so promising one above the question is the app describing
               // something it may not be about to do.
-              <>{target?.dayName}</>
+              <>{target?.sayDay ?? target?.dayName}</>
             ) : (
               <>Constraint-checked replacements for <span className="font-semibold text-foreground">{target?.exerciseName}</span></>
             )}

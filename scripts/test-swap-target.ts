@@ -23,6 +23,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { resolveDayName, resolveExerciseOnDay, resolveSwapTarget, type SwapDay } from '../src/lib/swap-target'
+import { sessionRefForDayArg } from '../src/lib/session-ref'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failures = 0
@@ -116,9 +117,24 @@ check('and the index is the plan\'s index, which is what the swap writes against
 console.log('\n6. The chat handler uses it, and says the reason out loud\n')
 
 const chat = code('src/components/ChatAssistant.tsx')
-check('the swap builder resolves through swap-target', /resolveSwapTarget\(\{/.test(chat))
-check('...defaulting an absent day to today, because "swap this exercise" names none',
-  /dayArg: dayArg \|\| 'today'/.test(chat))
+// RE-ANCHORED 9 Oct 2026 (H15). These two pinned the MECHANISM —
+// `resolveSwapTarget({` and the literal `dayArg || 'today'` — and that mechanism
+// was the bug: it resolved the day against the plan's raw weekday rows, so a
+// session moved to Friday read as "Friday is a rest day". The day is now
+// resolved by session-ref.ts from the week strip's cells and the exercise by
+// resolveExerciseOnSession. The PROPERTIES are unchanged and are what is held:
+// the builder still resolves the exercise through this module, and an absent
+// day still means today (asked of the resolver itself, not read off a line).
+check('the swap builder resolves the exercise through swap-target', /resolveExerciseOnSession\(\{/.test(chat))
+{
+  const cells = [
+    { date: '2026-10-08', dayName: 'Thursday', state: 'done', session: null },
+    { date: '2026-10-09', dayName: 'Friday', state: 'due', session: { day: 'Friday', focus: 'Legs', exercises: [{ name: 'Barbell Squats' }] } },
+  ] as unknown as Parameters<typeof sessionRefForDayArg>[1]['cells']
+  const absent = sessionRefForDayArg('', { todayDate: '2026-10-09', cells, weekNumber: 1 })
+  check('...defaulting an absent day to today, because "swap this exercise" names none',
+    !('refusal' in absent) && absent.sayDay === 'Friday' && absent.date === '2026-10-09', absent)
+}
 check('...and no longer demands an exact name match on the plan',
   !/day\.exercises\.findIndex\(e => e\.name\.toLowerCase\(\) === oldItem\.toLowerCase\(\)\)/.test(chat))
 check('the REPLACEMENT is resolved just as tolerantly',

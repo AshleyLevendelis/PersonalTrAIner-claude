@@ -251,7 +251,7 @@ export function ExerciseTab({
         onLogsUpdated={onLogsUpdated}
         devOverrideDay={devOverrideDay}
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
-        onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}
+        onOpenSwap={(dayName, exIndex, exerciseName, sayDay) => setSwapTarget({ dayName, sayDay, exIndex, exerciseName })}
           onInjury={applyInjury}
           onEquipment={applyEquipment}
         onBanExercise={onBanExercise}
