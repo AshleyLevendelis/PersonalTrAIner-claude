@@ -400,6 +400,8 @@
     "verify:dialog-shift": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/dialog-shift.mjs",
     "test:meal-knock-on": "tsx scripts/test-meal-knock-on.ts",
     "verify:meal-knock-on": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-knock-on.mjs",
+    "test:meal-regenerate": "tsx scripts/test-meal-regenerate.ts",
+    "verify:meal-regenerate": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-regenerate.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
     "test:chat-groups": "tsx scripts/test-chat-groups.ts",
     "test:grocery-display": "tsx scripts/test-grocery-display.ts",

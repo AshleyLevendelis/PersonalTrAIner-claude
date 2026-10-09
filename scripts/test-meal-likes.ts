@@ -195,8 +195,18 @@ async function main() {
     check('App\'s likes are typed likes plus hearted meal names',
       /const compiledSoftFoodPreferences = useMemo\(\s*\(\) => \[\.\.\.new Set\(\[\.\.\.typedFoodLikes, \.\.\.favouriteMealNames\]\)\]/.test(app))
     check('...hearts followed through the one watcher', /watchFavouriteNames\(profile\.id, /.test(app))
-    const calls = app.match(/generateMealPools\(\{[\s\S]*?\}\)/g) ?? []
-    check('the sanity check on this check: App generates meals in four places', calls.length === 4, calls.length)
+    // RE-ANCHORED 9 Oct 2026 (test log M22). It was "App generates meals in
+    // four places": the two regenerate buttons' handlers moved into
+    // src/lib/meal-plan-actions.ts, and App now hands them their inputs ONCE
+    // (the `generation` object given to useMealPlanActions). Same property —
+    // every generation is told the likes — counted where the code now is.
+    const directCalls = app.match(/generateMealPools\(\{[\s\S]*?\}\)/g) ?? []
+    const handedToButtons = app.match(/useMealPlanActions\(\{[\s\S]*?\n  \}\)/)?.[0] ?? ''
+    const calls = [...directCalls, ...(/generation: /.test(handedToButtons) ? [handedToButtons] : [])]
+    check('the sanity check on this check: App generates meals in two places itself, and hands the regenerate buttons their inputs once', directCalls.length === 2 && calls.length === 3, { direct: directCalls.length, all: calls.length })
+    const actions = read('src/lib/meal-plan-actions.ts')
+    check('...and both regenerate buttons pass those inputs to the generator untouched',
+      /\(ctx\.generate \?\? generateMealPools\)\(\{ \.\.\.ctx\.generation, onlySlots: \[slot\] \}\)/.test(actions) && /\(ctx\.generate \?\? generateMealPools\)\(ctx\.generation\)/.test(actions))
     // AND A FIFTH, since 28 Sep 2026: "Get more meal options" generates
     // through topUpMealPlan, handed the same likes by App.
     const topUp = app.match(/topUpMealPlan\(\{[\s\S]*?\n    \}\)/)?.[0] ?? ''

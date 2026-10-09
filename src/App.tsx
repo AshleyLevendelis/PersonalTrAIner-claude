@@ -26,12 +26,13 @@ import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshot
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
-import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
+import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { useMealPlanActions } from '@/hooks/useMealPlanActions'
 import { watchFavouriteNames } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
@@ -40,7 +41,6 @@ import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } f
 import { type SwapScope } from '@/lib/mesocycle-edit'
 import { swapOnScreen } from '@/lib/screen-swap'
 import { banOnScreen, type BanOutcome } from '@/lib/screen-ban'
-import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, endAdaptationEarly, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { effectiveConstraints, constraintProfile } from '@/lib/effective-constraints'
@@ -2085,98 +2085,39 @@ function App() {
   // wired to swapPoolMeal in M0). Picking a specific alternative just
   // records the choice as a session-local override (manualMealPicks) —
   // the pool itself doesn't change, only which option is "today's pick".
-  const handleSwapMealSlot = async (slot: MealSlotName, chooseName: string) => {
-    if (!profile?.id) return
-    const applied = await swapPoolMeal(profile.id, slot, chosenMeals[slot]?.name, chooseName)
-    if (!applied) return
-    // Persist BEFORE updating the on-screen pick (UX-sweep fix) — this used
-    // to update React state first, so a confirmed swap could look applied
-    // on screen even when the write below never landed.
-    const todayDate = getSessionDateContext(profile.id).date
-    try {
-      await setMealPick(profile.id, todayDate, slot, applied.name)
-    } catch (err) {
-      console.error('handleSwapMealSlot: setMealPick failed — not applying the swap on screen', err)
-      return
-    }
-    setManualMealPicks(prev => ({ ...prev, [slot]: applied.name }))
-    // §2.3 — same sweep as the exercise swap path, same scope_key prefix propose_meal_swap uses.
-    await sweepStaleForTarget(profile.id, `${profile.id}:propose_meal_swap:${slot}`)
-  }
-
-  const handleRegenerateMealSlot = async (slot: MealSlotName) => {
-    if (!profile?.id || !macros) return
-    setIsGeneratingMeals(true)
-    setMealRegenerateError(null)
-    const hadExistingOptions = (mealPools[slot]?.length ?? 0) > 0
-    try {
-      const result = await generateMealPools({
-        profileId: profile.id,
-        targets: macros,
-        dietaryPreferences: profile.dietary_preferences,
-        mealsPerDay: profile.meals_per_day,
-        includeSnacks: profile.include_snacks,
-        cookingTimePreference: profile.cooking_time_preference,
-        favoriteCuisines: profile.favorite_cuisines,
-        dislikedFoods: effectiveDislikedFoods,
-        timingRules: compiledTimingRules,
-        breakfastStyle: profile.breakfast_style,
-        likedFoods: typedFoodLikes,
-        favouriteMeals: steerableFavouriteMeals,
-        onlySlots: [slot],
-      })
-      // Surfacing round — a dietary_preferences value the app can't enforce
-      // fails every proposal identically, so this is checked before anything
-      // else and short-circuits: there's nothing a per-slot message or a
-      // retry can add once the actual cause is known.
-      if (result.unrecognisedPreferences.length > 0) {
-        setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
-        return
-      }
-      setUnrecognisedDietaryRestrictions(null)
-      // A total failure comes back as an empty array for the slot — persistPools
-      // already leaves that slot's DB rows untouched in that case, so mirror
-      // that here: don't overwrite the on-screen pool or clear the manual pick
-      // with nothing. Only apply/clear when generation actually produced
-      // options for this slot.
-      if ((result.accepted[slot]?.length ?? 0) === 0) {
-        // Don't claim options were "kept" when this slot never had any —
-        // that reads as a lie the first time generation fails on a fresh
-        // plan, when the pool was already empty going in. generatorReached
-        // distinguishes "the call worked, nothing fit" (deterministic — name
-        // what'd help) from "the call itself failed" (transient — try again
-        // is the honest advice there).
-        setMealRegenerateError(
-          result.generatorReached
-            ? (hadExistingOptions
-                ? `${couldNot(`fit a new ${MEAL_SLOT_LABEL[slot]} option`)} I've kept your existing one — try loosening a restriction or widening your calorie range.`
-                : `${MEAL_SLOT_LABEL[slot]} doesn't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off this slot.`)
-            : (hadExistingOptions
-                ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
-                : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`)
-        )
-        return
-      }
-      // READ BACK, not the generator's answer: what was stored also holds the
-      // meals that survive a regenerate (hearted, or asked for by name), and
-      // drops a fresh one sharing a kept one's name. Showing `accepted` left
-      // kept meals off the screen until the next reload. If the read fails,
-      // the generator's answer is still better than nothing.
-      const stored = await getPools(profile.id).catch(() => null)
-      setMealPools(prev => stored ?? ({ ...prev, ...result.accepted }))
-      setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
-      const todayDate = getSessionDateContext(profile.id).date
-      await clearMealPick(profile.id, todayDate, slot)
-    } catch {
-      setMealRegenerateError(
-        hadExistingOptions
-          ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
-          : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`
-      )
-    } finally {
-      setIsGeneratingMeals(false)
-    }
-  }
+  // SWAP, REGENERATE ONE, REGENERATE ALL live in src/lib/meal-plan-actions.ts
+  // since 9 Oct 2026 (test log M22), behind a hook the browser harness shares
+  // — they sat here as three inline handlers that no driver could reach. This
+  // hands the hook what the screen holds; the hook hands back the handlers.
+  const mealActions = useMealPlanActions({
+    profileId: profile?.id,
+    today: () => getSessionDateContext(profile?.id).date,
+    pools: mealPools,
+    picks: manualMealPicks,
+    showingName: slot => chosenMeals[slot]?.name,
+    generation: profile?.id && macros ? {
+      profileId: profile.id,
+      targets: macros,
+      dietaryPreferences: profile.dietary_preferences,
+      mealsPerDay: profile.meals_per_day,
+      includeSnacks: profile.include_snacks,
+      cookingTimePreference: profile.cooking_time_preference,
+      favoriteCuisines: profile.favorite_cuisines,
+      dislikedFoods: effectiveDislikedFoods,
+      timingRules: compiledTimingRules,
+      breakfastStyle: profile.breakfast_style,
+      likedFoods: typedFoodLikes,
+      favouriteMeals: steerableFavouriteMeals,
+    } : null,
+    slotLabel: MEAL_SLOT_LABEL,
+    setPools: setMealPools,
+    setPicks: setManualMealPicks,
+    setGenerating: setIsGeneratingMeals,
+    setError: setMealRegenerateError,
+    setUnrecognised: setUnrecognisedDietaryRestrictions,
+  })
+  const handleSwapMealSlot = mealActions.swap
+  const handleRegenerateMealSlot = mealActions.regenerateSlot
 
   /**
    * SAME MEALS, NEW AMOUNTS — the confirm half of Ashley's 17 Sep ruling.
@@ -2235,103 +2176,7 @@ function App() {
     setMealRefitDeclineTick(t => t + 1)
   }
 
-  const handleRegenerateAllMeals = async () => {
-    if (!profile?.id || !macros) return
-    setIsGeneratingMeals(true)
-    setMealRegenerateError(null)
-    const priorPools = mealPools
-    try {
-      const result = await generateMealPools({
-        profileId: profile.id,
-        targets: macros,
-        dietaryPreferences: profile.dietary_preferences,
-        mealsPerDay: profile.meals_per_day,
-        includeSnacks: profile.include_snacks,
-        cookingTimePreference: profile.cooking_time_preference,
-        favoriteCuisines: profile.favorite_cuisines,
-        dislikedFoods: effectiveDislikedFoods,
-        timingRules: compiledTimingRules,
-        breakfastStyle: profile.breakfast_style,
-        likedFoods: typedFoodLikes,
-        favouriteMeals: steerableFavouriteMeals,
-      })
-      // Surfacing round — checked first and short-circuits, same reasoning
-      // as the single-slot handler above: an unrecognised restriction fails
-      // every slot identically, so there's nothing the failure-count logic
-      // below needs to run for.
-      if (result.unrecognisedPreferences.length > 0) {
-        setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
-        return
-      }
-      setUnrecognisedDietaryRestrictions(null)
-
-      const requestedSlots = Object.keys(result.accepted) as MealSlotName[]
-      const failedSlots = requestedSlots.filter(s => (result.accepted[s]?.length ?? 0) === 0)
-
-      if (failedSlots.length === requestedSlots.length && requestedSlots.length > 0) {
-        // Total failure — every requested slot came back empty. Leave the
-        // existing plan and manual picks untouched entirely (persistPools
-        // already left the DB untouched too) rather than replacing a real
-        // plan with the cold-start empty state. generatorReached splits
-        // "the call worked, nothing fit your targets" (deterministic — name
-        // what'd help) from "the call itself failed" (transient — retrying
-        // is genuinely the right advice there).
-        setMealRegenerateError(
-          result.generatorReached
-            ? "Nothing fits your current targets right now. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot — then regenerate."
-            : `${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`
-        )
-        return
-      }
-
-      // Partial failure: keep the prior pool for any slot that came back
-      // empty instead of blanking it, matching persistPools' own per-slot
-      // skip-on-empty behavior at the DB layer.
-      setMealPools(prev => {
-        const next = { ...prev }
-        for (const [s, options] of Object.entries(result.accepted) as [MealSlotName, PoolOption[]][]) {
-          if (options.length > 0) next[s] = options
-        }
-        return next
-      })
-      // PICKS ARE CLEARED ONLY WHERE THE MEALS ACTUALLY CHANGED, which is the
-      // half the block above already got right and this line did not. It used
-      // to clear every pick unconditionally, so a slot whose regeneration
-      // FAILED kept its old meals — carefully, deliberately — and then lost
-      // the pick that made one of them hers anyway. The meal survived and
-      // stopped being her choice, for no reason anyone could see.
-      const regeneratedSlots = (Object.entries(result.accepted) as [MealSlotName, PoolOption[]][])
-        .filter(([, options]) => options.length > 0)
-        .map(([slot]) => slot)
-      setManualMealPicks(prev => {
-        const next = { ...prev }
-        for (const slot of regeneratedSlots) delete next[slot]
-        return next
-      })
-      const todayDate = getSessionDateContext(profile.id).date
-      for (const slot of regeneratedSlots) await clearMealPick(profile.id, todayDate, slot)
-
-      if (failedSlots.length > 0) {
-        // Split by whether each failed slot actually had prior options to
-        // "keep" — a fresh plan whose lunch pool has always been empty gets
-        // an honest "couldn't generate" message, not a false "kept" claim.
-        // Reaching this branch at all means at least one other slot DID
-        // fill, which is positive proof the generator was reached this run
-        // — so a failed slot here is provably the "nothing fit" case, not
-        // "the call failed" (that's the total-failure branch above).
-        const keptSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) > 0)
-        const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
-        const parts: string[] = []
-        if (keptSlots.length > 0) parts.push(`${couldNot(`fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')}`)} I've kept what you had.`)
-        if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} don't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off a slot.`)
-        setMealRegenerateError(parts.join(' '))
-      }
-    } catch {
-      setMealRegenerateError(`${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`)
-    } finally {
-      setIsGeneratingMeals(false)
-    }
-  }
+  const handleRegenerateAllMeals = mealActions.regenerateAll
 
   // Vision Step 6 — the one message in adaptationMessages that's an action
   // rather than a fact, so it needs real handlers instead of a plain
@@ -3198,6 +3043,7 @@ function App() {
               onRegenerateMealSlot={handleRegenerateMealSlot}
               onFindMoreOptions={handleFindMoreMealOptions}
               onRegenerateAllMeals={handleRegenerateAllMeals}
+              mealsRegeneratingAll={mealActions.regeneratingAll}
               mealRefit={mealRefitOffer}
               mealRefitBusy={mealRefitBusy}
               mealRefitError={mealRefitError}

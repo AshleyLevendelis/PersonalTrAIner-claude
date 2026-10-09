@@ -79,6 +79,8 @@ import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
 import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { useMealPlanActions } from '@/hooks/useMealPlanActions'
+import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { useServablePools } from '@/hooks/useServablePools'
 import { markRestrictionBreakers } from '@/lib/meal-restriction-check'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
@@ -958,14 +960,23 @@ const TOPFIT = new URLSearchParams(location.search).get('topfit') === '1'
 // the database underneath is fake, and a driver can make a write fail
 // (window.__failWrite) to prove a half-saved swap is put back.
 const DAYMOVE = new URLSearchParams(location.search).get('daymove') === '1'
+// ?regen=1 (with daymove=1) — "REGENERATE ALL", PRESSED FOR REAL (9 Oct 2026,
+// test log M22). The app's own hook (useMealPlanActions) is handed to the
+// Nutrition tab instead of `noop`, and the model call behind the meal writer
+// answers after ?regenwait=<ms> so the working state can be seen. Everything
+// between the tap and the screen — the generator's verification, what storage
+// keeps, the read back, the picks — is the app's own.
+const REGEN = new URLSearchParams(location.search).get('regen') === '1'
+const REGEN_WAIT_MS = Number(new URLSearchParams(location.search).get('regenwait') ?? '0')
 const NO_PINS = {}
-if (TOPUP) {
+if (TOPUP || REGEN) {
   const realFetch = window.fetch.bind(window)
   let made = 0
   window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
     if (!url.includes('/functions/v1/generate-meals')) return realFetch(input as RequestInfo, init)
     ;(window as unknown as { __generatorCalls: number }).__generatorCalls++
+    if (REGEN_WAIT_MS > 0) await new Promise(resolve => setTimeout(resolve, REGEN_WAIT_MS))
     if (TOPUP_FAIL) return new Response(JSON.stringify({ error: 'simulated cut-off reply' }), { status: 502 })
     const body = JSON.parse(String(init?.body ?? '{}')) as { slots: { slot: string; count: number }[] }
     // Shaped like generate-meals' output; the app verifies and sizes them.
@@ -1151,6 +1162,24 @@ function Harness() {
     reloadPools: DAYMOVE ? async () => { setLivePools(await getPools(PROFILE_ID) as never) } : undefined,
     dietaryPreferences: profile.dietary_preferences,
     dislikedFoods: () => [],
+  })
+  // SWAP, REGENERATE ONE, REGENERATE ALL — THE APP'S OWN HOOK, handed what
+  // this page's screen holds, exactly as App.tsx hands it what App's holds.
+  const [regenBusy, setRegenBusy] = useState(false)
+  const [regenError, setRegenError] = useState<string | null>(null)
+  const mealActions = useMealPlanActions({
+    profileId: PROFILE_ID,
+    today: () => today,
+    pools: livePools as never,
+    picks: dayMovePicks as never,
+    showingName: slot => (mealDays.today?.day.chosen as Record<string, PoolOption> | undefined)?.[slot]?.name,
+    generation: driftedMacros ? { profileId: PROFILE_ID, targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks } : null,
+    slotLabel: MEAL_SLOT_LABEL,
+    setPools: setLivePools as never,
+    setPicks: setDayMovePicks as never,
+    setGenerating: setRegenBusy,
+    setError: setRegenError,
+    setUnrecognised: () => {},
   })
   // ?topup=1: the button, through the app's own function. What App.tsx adds
   // around it (the first-build gate) is held by test:meal-top-up.
@@ -1366,13 +1395,17 @@ function Harness() {
             latestWeightKg={80} profileId={PROFILE_ID} date={today} planCreatedAt={profile.created_at}
             pools={servablePools as never} chosen={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
             avoidFoods={compileFoodDislikes(AVOID_FACTS)}
-            isGeneratingMeals={false} mealRegenerateError={null}
+            isGeneratingMeals={regenBusy} mealRegenerateError={regenError} mealsRegeneratingAll={mealActions.regeneratingAll}
+            onDismissRegenerateError={() => setRegenError(null)}
             onMealPickApplied={handleMealPickApplied as never}
             mealRefit={refit?.needed && !refitDeclined ? refit : null}
             mealRefitError={refitError}
             onMealRefitConfirm={() => { void handleRefitConfirm() }}
             onMealRefitDecline={() => setRefitDeclined(true)}
-            onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop}
+            // The app's own handlers in the one mode that holds picks the way App
+            // does (?daymove=1&regen=1); `noop` elsewhere, as every driver written
+            // before 9 Oct 2026 was built on.
+            onSwapMealSlot={REGEN ? mealActions.swap : noop} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}
             mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
             onMealTopUp={() => { void handleTopUp() }}
             onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}

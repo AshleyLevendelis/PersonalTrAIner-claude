@@ -128,6 +128,15 @@ interface MealPlanProps {
    * meal slots.
    */
   dayMove?: MealDayMoveController
+  /**
+   * "Regenerate all" is running (useMealPlanActions). It takes about twenty
+   * seconds, and until 9 Oct 2026 the only sign was a 12px spinner inside the
+   * link while the old meals sat there, tappable. While this is true the list
+   * says what is happening and the meals underneath are dimmed and cannot be
+   * tapped. Distinct from `isGenerating`, which is also true while ONE meal is
+   * being regenerated and must not grey out the other three.
+   */
+  regeneratingAll?: boolean
 }
 
 /**
@@ -144,7 +153,7 @@ export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
-  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming, dayMove,
+  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -414,7 +423,27 @@ export function MealPlan({
 
       {upcoming && <AddDayToGrocery key={date} upcoming={upcoming} />}
 
-      <div>
+      {/* THE WORKING STATE FOR "REGENERATE ALL" (test log M22). The same two
+          sentences the first build shows, because it is the same job; and a
+          third that says what the dimmed meals underneath are. */}
+      {regeneratingAll && (
+        <div role="status" aria-live="polite" data-testid="meals-regenerating" className="flex items-start gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-3">
+          <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-primary-text" aria-hidden />
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-foreground">Building your meals…</p>
+            <p className="text-xs text-muted-foreground">They arrive one meal at a time — this takes up to a minute. The meals below are the ones you had, until the new ones are ready.</p>
+          </div>
+        </div>
+      )}
+
+      <div
+        data-testid="meal-list"
+        aria-busy={regeneratingAll || undefined}
+        // `inert` takes the old meals out of reach of a thumb, the keyboard
+        // and a screen reader while they are being replaced.
+        inert={regeneratingAll}
+        className={regeneratingAll ? 'pointer-events-none opacity-45 transition-opacity' : 'transition-opacity'}
+      >
         {activeSlots.map((slot, idx) => (
           <MealSlotRow
             key={slot}
