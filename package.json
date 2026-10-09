@@ -378,6 +378,7 @@
     "verify:kitchen-amounts": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kitchen-amounts.mjs",
     "test:food-swaps": "tsx scripts/test-food-swaps.ts",
     "test:grocery-shopping": "tsx scripts/test-grocery-shopping.ts",
+    "verify:dialog-shift": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/dialog-shift.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
     "test:chat-groups": "tsx scripts/test-chat-groups.ts",
     "test:grocery-display": "tsx scripts/test-grocery-display.ts",

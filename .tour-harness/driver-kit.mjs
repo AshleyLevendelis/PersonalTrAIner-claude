@@ -45,8 +45,9 @@ export async function startDriver(o) {
   if (busy) { console.error(`    ✗ port ${port} already has a browser on it — another run of this driver is still alive`); process.exit(1) }
   const profileDir = mkdtempSync(join(tmpdir(), `${name}-`))
   const flags = ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`, '--no-sandbox', '--disable-gpu']
-  // A desktop window draws real scrollbars; headless hides them unless told not to.
-  if (!mobile) flags.push(`--window-size=${width},${height}`, '--hide-scrollbars=false', '--disable-features=OverlayScrollbar')
+  // A desktop window draws real scrollbars that take up room (15px here). No
+  // phone-size driver can see anything that depends on them.
+  if (!mobile) flags.push(`--window-size=${width},${height}`, '--disable-features=OverlayScrollbar')
   const chrome = spawn('/opt/pw-browsers/chromium', [...flags, 'about:blank'], { stdio: 'ignore' })
   const giveUp = why => { console.error(`    ✗ ${why}`); try { chrome.kill('SIGKILL') } catch {} ; process.exit(1) }
   const watchdog = setTimeout(() => giveUp(`the driver did not finish in ${Math.round(timeoutMs / 1000)} seconds`), timeoutMs)
