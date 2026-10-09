@@ -147,6 +147,7 @@
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
     "test:onboarding-corrections": "tsx scripts/test-onboarding-corrections.ts",
     "test:onboarding-chip-match": "tsx scripts/test-onboarding-chip-match.ts",
+    "test:onboarding-receipts": "tsx scripts/test-onboarding-receipts.ts",
     "verify:onboarding-turns": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/turns.mjs",
     "test:coach-logs-steps": "tsx scripts/test-coach-logs-steps.ts",
     "test:coach-injuries-context": "tsx scripts/test-coach-injuries-context.ts",

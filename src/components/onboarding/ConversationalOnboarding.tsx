@@ -26,6 +26,8 @@ import {
   detectAllergenTags,
   isStuckMessage,
   DIETARY_OPTIONS,
+  displaySlotValue,
+  editPromptFor,
   type OnboardingSlotValues,
   type SlotKey,
   type SlotDef,
@@ -35,6 +37,8 @@ import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
+import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn } from '@/lib/onboarding-capture'
+import type { SessionDuration } from '@/lib/types'
 import {
   loadOnboardingDraft,
   saveOnboardingDraft,
@@ -162,21 +166,6 @@ function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
       ({ role, content, slotCard, slotCardResolved, slotCardSuperseded, slotCardEditing, asksSlot }))
 }
 
-
-function displayValueFor(def: SlotDef, values: OnboardingSlotValues): string {
-  const v = values[def.key]
-  if (v === null || v === undefined || v === '') return '—'
-  if (Array.isArray(v)) {
-    if (v.length === 0) return 'none'
-    if (!def.options) return v.join(', ')
-    return v.map(x => def.options!.find(o => String(o.value) === String(x))?.label ?? String(x)).join(', ')
-  }
-  if (def.options) {
-    const opt = def.options.find(o => String(o.value) === String(v))
-    if (opt) return opt.label
-  }
-  return String(v)
-}
 
 function coerceSlotValue(def: SlotDef, raw: string): unknown {
   if (def.control === 'multi') {
@@ -480,6 +469,8 @@ function applySlot(
   showReceipt = true,
   /** Set when the value was converted from another unit — the receipt must show BOTH, so a wrong conversion is wrong on screen next to what they typed. */
   conversionNote?: string,
+  /** Anything else the tick owes the person about what was stored — see sessionLengthNote. */
+  storedNote?: string,
 ): boolean {
   const def = getSlotDef(key)
   if (!def || !def.validate(coerced)) return false
@@ -499,8 +490,9 @@ function applySlot(
       // Short noun, not the question — "Equipment — Home Gym" reads as the
       // coach noting something down; the full question read as a form field.
       role: 'assistant',
-      content: `${RECEIPT_PREFIX}${def.shortLabel} — ${displayValueFor(def, ws.values)}`
-        + (conversionNote ? ` (from ${conversionNote})` : ''),
+      content: `${RECEIPT_PREFIX}${def.shortLabel} — ${displaySlotValue(def, ws.values)}`
+        + (conversionNote ? ` (from ${conversionNote})` : '')
+        + (storedNote ? ` (${storedNote})` : ''),
       isReceipt: true,
     })
   }
@@ -827,7 +819,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       if (ws.confirmed.has(def.key)) {
         filled[def.key] = isDeclined(def.key, ws.values, ws.confirmed)
           ? "not given — they'd rather not say, don't ask again"
-          : displayValueFor(def, ws.values)
+          : displaySlotValue(def, ws.values)
       }
     }
     return {
@@ -898,7 +890,13 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         // receipt (caught live: typing "Hybrid" against a pending style card
         // committed instantly, then the model's response echoed the same
         // set_slot and printed "✓ Style — Hybrid" a second time).
-        if (!applySlot(ws, key, coerced, ws.values, true, conversionNoteFor(def, String(action.args.value ?? '')))) {
+        // "40 minutes tops" is stored as the 30-45 setting, and a session on
+        // that setting may run to 45. The tick says so, in the app's own
+        // words, rather than leaving it to the coach to mention (test log M5).
+        const storedNote = key === 'sessionDuration' && def.validate(coerced)
+          ? sessionLengthNote(coerced as SessionDuration, userText)
+          : undefined
+        if (!applySlot(ws, key, coerced, ws.values, true, conversionNoteFor(def, String(action.args.value ?? '')), storedNote)) {
           // Fail LOUD: the mapped value didn't validate — never store it,
           // re-ask with the real chips instead.
           ws.newMessages.push({
@@ -942,16 +940,15 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         const displayText = String(action.args.display_text ?? '').trim()
         const rawPhrase = String(action.args.raw_phrase ?? '').trim()
         if (displayText && rawPhrase && !ws.pendingGoals.some(g => g.displayText === displayText)) {
-          ws.pendingGoals = [
-            ...ws.pendingGoals,
-            {
-              metric: action.args.metric === 'body_weight_kg' ? 'body_weight_kg' : 'directional',
-              baselineValue: typeof action.args.baseline_value === 'number' ? action.args.baseline_value : undefined,
-              targetValue: typeof action.args.target_value === 'number' ? action.args.target_value : undefined,
-              rawPhrase,
-              displayText,
-            },
-          ]
+          // One sentence must not become two goals (test log L6). The exact-
+          // text check above only ever caught a word-for-word repeat.
+          ws.pendingGoals = mergePendingGoal(ws.pendingGoals, {
+            metric: action.args.metric === 'body_weight_kg' ? 'body_weight_kg' : 'directional',
+            baselineValue: typeof action.args.baseline_value === 'number' ? action.args.baseline_value : undefined,
+            targetValue: typeof action.args.target_value === 'number' ? action.args.target_value : undefined,
+            rawPhrase,
+            displayText,
+          })
         }
       } else if (action.name === 'complete_onboarding') {
         const stillMissing = missingRequiredSlots(ws.values)
@@ -1129,6 +1126,35 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           content: `✓ Flagged as a hard restriction, not just a preference — ${labels} will be kept out of every meal.`,
           isReceipt: true,
         })
+        immediateCommit = true
+      }
+    }
+
+    // SNACKS, SAID IN PASSING (test log L5). "3 meals and one snack" was
+    // ticked "Meals a day — 3 meals": the coach recorded the meals and not the
+    // snack, and the plan only had one because snacks default to ON. Said the
+    // other way round — "3 meals, no snacks" — the same miss builds a plan
+    // WITH a snack and nothing on screen says so. Both readings are certain,
+    // so the app takes them itself, on typed text only (a tapped chip has
+    // already recorded its own answer).
+    const snacks = preRecorded ? undefined : snackAnswerIn(trimmed)
+    if (snacks !== undefined) {
+      const meals = mealCountIn(trimmed)
+      const mealsDef = getSlotDef('mealsPerDay')!
+      const snacksWere = ws.confirmed.has('includeSnacks') ? ws.values.includeSnacks : undefined
+      const mealsWere = ws.confirmed.has('mealsPerDay') ? ws.values.mealsPerDay : undefined
+      const mealsTaken = meals !== undefined && applySlot(ws, 'mealsPerDay', meals, ws.values, false)
+      // One tick for the pair when they came together; the snack's own tick
+      // when it came alone. Nothing new, nothing ticked.
+      if (applySlot(ws, 'includeSnacks', snacks, ws.values, !mealsTaken)) {
+        if (mealsTaken && (snacksWere !== snacks || mealsWere !== meals)) {
+          ws.newMessages.push({
+            role: 'assistant',
+            content: `${RECEIPT_PREFIX}${mealsDef.shortLabel} — ${displaySlotValue(mealsDef, ws.values)}${snacks ? ' + a snack' : ', no snacks'}`,
+            isReceipt: true,
+          })
+        }
+        if (mealsTaken) answeredThisTurn = true
         immediateCommit = true
       }
     }
@@ -1497,14 +1523,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       ...prev.filter(m => !isOpenEdit(m)),
       {
         role: 'assistant',
-        // The slot's own question, which is written per question, rather than
-        // a sentence built around its label: "pick a different equipment" and
-        // "type what you'd like foods to avoid to be instead" were both
-        // templates meeting a noun they did not fit.
-        content: `Sure — let's change that. ${def.question}`
-          // A text slot has no card to render, so the composer is the only
-          // way to answer it — say so rather than leaving a dead prompt.
-          + (def.control === 'text' ? ' Type it in below.' : ''),
+        content: editPromptFor(def),
         slotCard: def.control === 'text' ? undefined : key,
         asksSlot: def.control === 'text' ? key : undefined,
         slotCardEditing: true,
@@ -1778,7 +1797,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         <div ref={contentRef} className="max-w-md w-full mx-auto flex flex-col gap-[22px]">
           {messages.map((msg, i) =>
             msg.isReceipt ? (
-              <div key={i} className="flex items-center gap-1.5 pl-1">
+              <div key={i} data-testid="onboarding-tick" className="flex items-center gap-1.5 pl-1">
                 <Check className="size-3 shrink-0 text-primary-text" />
                 <p className="text-xs text-muted-foreground">{msg.content.slice(RECEIPT_PREFIX.length)}</p>
               </div>
@@ -1879,7 +1898,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                   // my lifts" answer shouldn't leave three blank weight rows
                   // in the summary they're being asked to confirm.
                   .filter(s => isSlotApplicable(s, values))
-                  .filter(s => isSlotRequired(s, values) || confirmed.has(s.key))
+                  // Snacks are listed whether or not anyone mentioned them:
+                  // the plan includes one by default, and a default the
+                  // summary does not show is one nobody can turn off.
+                  .filter(s => isSlotRequired(s, values) || confirmed.has(s.key) || s.key === 'includeSnacks')
                   .map(def => (
                   <button
                     key={def.key}
@@ -1892,7 +1914,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                   >
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
                     <span className="text-muted-foreground">
-                      {isDeclined(def.key, values, confirmed) ? 'Not given' : displayValueFor(def, values)}
+                      {isDeclined(def.key, values, confirmed) ? 'Not given' : displaySlotValue(def, values)}
                     </span>
                   </button>
                 ))}

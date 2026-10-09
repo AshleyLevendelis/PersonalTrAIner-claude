@@ -208,6 +208,8 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     return { top: Math.round(r.top), bottom: Math.round(r.bottom) }
   }
   window.__body = () => document.body.innerText
+  window.__ticks = () => [...document.querySelectorAll('[data-testid="onboarding-tick"]')].map(el => (el.textContent || '').trim())
+  window.__draft = () => JSON.parse(localStorage.getItem('fitplan_onboarding_draft') || 'null')
 ` })
 
 // ---------------------------------------------------------------------------
@@ -489,6 +491,106 @@ await section(10, 'M4 — a reload part-way through an edit', async () => {
   // conversation it comes back as a second copy of the app's closing line.
   const closers = await ev(`(document.body.innerText.match(/That's everything I need/g) || []).length`)
   check('...and the closing line is not said twice', closers === 1, closers)
+})
+
+// ---------------------------------------------------------------------------
+const lastRequest = () => evj(`window.__onbRequests[window.__onbRequests.length - 1]`)
+
+await section(11, 'L2 — ticks and summary rows carry their units', async () => {
+  await open('h14')
+  await queue({
+    reply: 'Good to know. Which should I use for the maths — male or female?',
+    actions: [
+      { name: 'set_slot', args: { slot_key: 'recoveryCapacity', value: 'moderate' } },
+      { name: 'set_slot', args: { slot_key: 'heightCm', value: '178' } },
+      { name: 'set_slot', args: { slot_key: 'weightKg', value: '82' } },
+      { name: 'set_slot', args: { slot_key: 'maxDumbbellKg', value: '24' } },
+      { name: 'present_slot', args: { slot_key: 'gender' } },
+    ],
+  })
+  await say("sleep is fine. I'm 178cm and 82kg, and my dumbbells go up to 24kg")
+  const ticks = await evj(`__ticks()`)
+  check('Heaviest dumbbells — 24 kg', ticks.includes('Heaviest dumbbells — 24 kg'), ticks)
+  check('Height — 178 cm', ticks.includes('Height — 178 cm'), ticks)
+  check('Weight — 82 kg', ticks.includes('Weight — 82 kg'), ticks)
+  const told = await lastRequest()
+  await open('review')
+  const rows = (await review()).rows
+  check('the summary says the same, with the same units',
+    rows.heightCm === 'Height: 178 cm' && rows.weightKg === 'Weight: 82 kg' && rows.maxDumbbellKg === 'Heaviest dumbbells: 24 kg',
+    { h: rows.heightCm, w: rows.weightKg, d: rows.maxDumbbellKg })
+  check('harness: the turn reached the coach', !!told)
+})
+
+await section(12, 'L5 — "3 meals and one snack" records the snack and says so', async () => {
+  await open('h14')
+  // The coach hears the meals and forgets the snack — the miss in the log.
+  await queue({
+    reply: 'Three meals works well. Any allergies or dietary restrictions I should build around?',
+    actions: [{ name: 'set_slot', args: { slot_key: 'mealsPerDay', value: '3' } }, { name: 'present_slot', args: { slot_key: 'dietaryPreferences' } }],
+  })
+  await say('3 meals and one snack')
+  let ticks = await evj(`__ticks()`)
+  check('the tick reads "Meals a day — 3 meals + a snack"', ticks.includes('Meals a day — 3 meals + a snack'), ticks)
+  check('...once, not once from the app and again from the coach', ticks.filter(t => /^Meals a day/.test(t)).length === 1, ticks)
+  let told = await lastRequest()
+  check('the coach is told snacks are answered', told?.state?.filled?.includeSnacks === 'Snacks too', told?.state?.filled)
+  check('...and the draft holds it as an answer, not a default', (await evj(`__draft()`))?.confirmedSlots?.includes('includeSnacks'))
+
+  // The direction that bites: said plainly, missed by the coach, and the
+  // default would have built a plan WITH a snack.
+  await open('h14')
+  await queue({ reply: 'Three meals it is. Any allergies or dietary restrictions I should build around?', actions: [{ name: 'set_slot', args: { slot_key: 'mealsPerDay', value: '3' } }] })
+  await say('3 meals, no snacks')
+  ticks = await evj(`__ticks()`)
+  check('"3 meals, no snacks" is ticked as that', ticks.includes('Meals a day — 3 meals, no snacks'), ticks)
+  const draft = await evj(`__draft()`)
+  check('...and stored as no snacks', draft?.values?.includeSnacks === false && draft?.values?.mealsPerDay === 3, draft?.values)
+
+  await open('h14')
+  await queue({ reply: 'Noted. How many meals a day suits you?', actions: [{ name: 'present_slot', args: { slot_key: 'mealsPerDay' } }] })
+  await say('no snacks for me')
+  ticks = await evj(`__ticks()`)
+  check('a snack answer on its own gets its own tick', ticks.includes('Snacks — No snacks'), ticks)
+
+  await open('review')
+  const rows = (await review()).rows
+  check('the summary lists snacks even when nobody mentioned them, because the plan includes one by default',
+    rows.includeSnacks === 'Snacks: Snacks too', rows.includeSnacks)
+})
+
+await section(13, 'L6 — one sentence saves one goal', async () => {
+  await open('h14')
+  const said = "sleep's fine. I want to get to 12% body fat and I'm struggling to lose weight"
+  await queue({
+    reply: 'Struggling to shift it is the most common place to be stuck. How old are you?',
+    actions: [
+      { name: 'set_slot', args: { slot_key: 'recoveryCapacity', value: 'moderate' } },
+      { name: 'record_goal', args: { metric: 'directional', display_text: 'get to 12% body fat', raw_phrase: said } },
+      { name: 'record_goal', args: { metric: 'directional', display_text: 'reach 12% body fat (fat loss)', raw_phrase: 'get to 12% body fat' } },
+    ],
+  })
+  await say(said)
+  const goals = (await evj(`__draft()`))?.pendingGoals ?? []
+  check('two near-identical goals from one sentence are kept as one', goals.length === 1, goals.map(g => g.displayText))
+})
+
+await section(14, 'M5 — "40 minutes tops" is ticked as the setting it was stored as, with what that allows', async () => {
+  await open('m2')
+  await queue({
+    reply: 'Forty minutes is plenty to work with. How do you like to train?',
+    actions: [{ name: 'set_slot', args: { slot_key: 'sessionDuration', value: '30-45' } }, { name: 'present_slot', args: { slot_key: 'trainingStyle' } }],
+  })
+  await say('40 minutes tops, hard stop')
+  const ticks = await evj(`__ticks()`)
+  check('the tick names the 30-45 setting, the 40 they said, and the 45 it can run to',
+    ticks.includes('Session length — 30-45 min (the closest setting to 40 minutes — sessions can run to 45)'), ticks)
+  // A tapped chip is the setting itself: nothing to add.
+  await open('m2')
+  await queue({ reply: 'Good. How do you like to train?', actions: [{ name: 'present_slot', args: { slot_key: 'trainingStyle' } }] })
+  await tapOption('sessionDuration', '30-45 min')
+  await wait(600)
+  check('choosing the setting itself adds no note', !(await evj(`__ticks()`)).some(t => /closest setting/.test(t)), await evj(`__ticks()`))
 })
 
 if (!browserGone) {
