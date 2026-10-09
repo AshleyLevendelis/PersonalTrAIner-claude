@@ -25,6 +25,7 @@ import {
 } from './plan-guard'
 import { addDays } from './session-move'
 import { constraintProfile, NO_ACTIVE_ADAPTATIONS, type EffectiveConstraints } from './effective-constraints'
+import { travelProfile } from './kit-list'
 
 /**
  * WHAT EVERY PATH THAT REPLACES DAYS OF A LIVE PLAN MUST KNOW, and is not
@@ -701,12 +702,65 @@ export interface SubstituteForEquipmentParams {
  */
 export async function substituteForEquipment(params: SubstituteForEquipmentParams): Promise<SubstitutionResult> {
   const { mesocycle, profile, equipmentTier, targetDays, exclusions, context } = params
-  const candidateProfile: UserProfile = { ...constraintProfile(profile, context.constraints), equipment_access: equipmentTier }
+  // A TRAVEL TIER DESCRIBES SOMEWHERE ELSE: that tier's plain set, with the
+  // person's own kit list left at home (kit-list.ts `travelProfile` — which
+  // also keeps a bag or bands they have said they do not have out of it). The
+  // conflict test and the candidate pool read the SAME profile, so a slot is
+  // never called fine by one and unfillable by the other.
+  // (The injuries being eased off come along; a travel tier already running
+  // does not — this card's own tier replaces it, read against the person's
+  // own list rather than against the other trip's.)
+  const candidateProfile: UserProfile = travelProfile(
+    constraintProfile(profile, { ...context.constraints, temporaryEquipment: null }),
+    equipmentTier,
+  )
 
   const conflicts = (slot: Exercise): boolean => {
     const entry = getExerciseEntry(slot.name)
     if (!entry) return false
-    return !isEquipmentAllowed(entry, equipmentTier)
+    return !isEquipmentAllowed(entry, candidateProfile)
+  }
+
+  return substituteSlots(mesocycle, profile, targetDays, exclusions, conflicts, candidateProfile, context)
+}
+
+export interface SubstituteForKitParams {
+  mesocycle: MesocycleWeek[]
+  /**
+   * The profile WITH the kit the plan is being fitted to already attached
+   * (`profileWithKit`) — what the person has, as of the statement being
+   * applied. Nothing here reads the statement itself.
+   */
+  profile: UserProfile
+  /** The plan rows to change — from `planDaysInWindow`: today to the end of the plan. */
+  targetDays: PlanDayRef[]
+  exclusions: string[]
+  context: PlanEditContext
+}
+
+/**
+ * FIT THE PLAN TO THE KIT THE PERSON HAS SAID THEY HAVE. docs/plans/kit-list.md.
+ *
+ * For each slot on the given days whose exercise needs something the kit does
+ * not hold, a replacement from the pool that kit allows (on top of anything
+ * being eased off temporarily); dropped where nothing fits, like every other
+ * substitution here. A day already trained is never a target — the one guard
+ * in `substituteSlots`.
+ *
+ * LASTING, unlike `substituteForEquipment`: this is their own kit, not a week
+ * somewhere else, so it reads their list and reaches the end of the plan. The
+ * pure core of `recordKitStatement` (kit-change.ts) and of the coach's card.
+ */
+export async function substituteForKit(params: SubstituteForKitParams): Promise<SubstitutionResult> {
+  const { mesocycle, profile, targetDays, exclusions, context } = params
+  // An active travel week keeps its own tier: those days are fitted to where
+  // the person IS, and are put back when it ends. Only the injuries carry over.
+  const candidateProfile: UserProfile = constraintProfile(profile, { ...context.constraints, temporaryEquipment: null })
+
+  const conflicts = (slot: Exercise): boolean => {
+    const entry = getExerciseEntry(slot.name)
+    if (!entry) return false
+    return !isEquipmentAllowed(entry, candidateProfile)
   }
 
   return substituteSlots(mesocycle, profile, targetDays, exclusions, conflicts, candidateProfile, context)

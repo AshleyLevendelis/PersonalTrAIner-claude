@@ -208,7 +208,9 @@ async function main() {
       const pick = pickAutomaticReplacement(e.name, functional, [], new Set())
       if (!pick || pick.kind !== 'same' || pick.exercise.movement_pattern !== e.movement_pattern || list.find(c => c.exercise.name === pick.exercise.name)?.offStyle) wrong.push(`${e.name} -> ${pick?.exercise.name} (${pick?.kind})`)
     }
-    check(`where the swap list leads with an off-style option, the automatic pick is on-style and on-pattern (${cases} lifts)`, cases >= 5 && wrong.length === 0, { cases, wrong: wrong.slice(0, 4) })
+    // (At least four lifts: it was five until the dumbbell pack of 9 Oct 2026
+    // gave one of them an on-style loaded option to lead with.)
+    check(`where the swap list leads with an off-style option, the automatic pick is on-style and on-pattern (${cases} lifts)`, cases >= 4 && wrong.length === 0, { cases, wrong: wrong.slice(0, 4) })
 
     // Off-style only when the style has nothing for that movement, and said so.
     let offCases = 0
@@ -262,8 +264,14 @@ async function main() {
   {
     const record: AdaptationRecord = { version: 2, days: samTargets, changes: knee.changes }
     // The person bans an exercise while the adaptation is running (Run 2).
-    const banned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: knee.mesocycle, profile: sam, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
-    const hadKickback = plan.slice(0, 3).some(w => w.days.some(d => d.exercises.some(e => e.name === 'Band Tricep Kickback')))
+    // RE-ANCHORED 9 Oct 2026: the tester banned Band Tricep Kickback, and this
+    // fixture did too. Since the dumbbell pack (docs/plans/kit-list.md) his
+    // seeded plan holds the DUMBBELL kickback there instead — a band movement
+    // is no longer picked beside dumbbells he owns — so the fixture bans what
+    // the plan now holds. The property is unchanged.
+    const BANNED_MID_ADAPTATION = 'Dumbbell Tricep Kickback'
+    const banned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: knee.mesocycle, profile: sam, bannedName: BANNED_MID_ADAPTATION, exclusions: [BANNED_MID_ADAPTATION] }))
+    const hadKickback = plan.slice(0, 3).some(w => w.days.some(d => d.exercises.some(e => e.name === BANNED_MID_ADAPTATION)))
     check('the fixture has the banned exercise inside the window', hadKickback)
     // ...and swaps one of the adaptation's own replacements for something else.
     const swapped = knee.touchedSlots.find(s => s.weekNumber === 2 && s.dayName === 'Thursday' && s.after)!
@@ -272,9 +280,9 @@ async function main() {
     })
     // "End now" on Saturday 10 Oct, nothing logged that day.
     const guard = buildDayGuard(plan, { ...calendar('2026-10-10'), loggedDates: [], closedDates: [] })
-    const ended = silently(() => revertAdaptationChanges(edited, record, [1, 2, 3], guard, sam, adaptationConflictTest('injury', 'knees', null), ['Band Tricep Kickback']))
+    const ended = silently(() => revertAdaptationChanges(edited, record, [1, 2, 3], guard, sam, adaptationConflictTest('injury', 'knees', null), [BANNED_MID_ADAPTATION]))
     const all = (m: MesocycleWeek[]) => m.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
-    check('the ban made during the adaptation survives its ending', !all(ended.mesocycle).includes('Band Tricep Kickback'))
+    check('the ban made during the adaptation survives its ending', !all(ended.mesocycle).includes(BANNED_MID_ADAPTATION))
     check('a day nobody touched since goes back exactly as it was (same object)', dayOf(ended.mesocycle, 1, 'Saturday') === dayOf(plan, 1, 'Saturday') && dayOf(ended.mesocycle, 2, 'Saturday') === dayOf(plan, 2, 'Saturday'), namesOf(ended.mesocycle, 1, 'Saturday'))
     check('on the day the person edited, their swap stays', namesOf(ended.mesocycle, 2, 'Thursday').includes('Wall Sit') && !namesOf(ended.mesocycle, 2, 'Thursday').includes(swapped.before), namesOf(ended.mesocycle, 2, 'Thursday'))
     const others = knee.touchedSlots.filter(s => s.weekNumber === 2 && s.dayName === 'Thursday' && s !== swapped)
@@ -293,10 +301,10 @@ async function main() {
     // every day of plan weeks 1 and 2, trained or not.
     const everyDay = [1, 2].flatMap(w => plan[w - 1].days.map(d => ({ weekNumber: w, dayName: d.day })))
     const oldStyle = await silentlyAsync(() => substituteForInjury({ mesocycle: plan, profile: sam, injuryCode: 'knees', targetDays: everyDay, exclusions: [], context: untrainedPlanContext(calendar(THU)) }))
-    const oldBanned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: oldStyle.mesocycle, profile: sam, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
+    const oldBanned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: oldStyle.mesocycle, profile: sam, bannedName: BANNED_MID_ADAPTATION, exclusions: [BANNED_MID_ADAPTATION] }))
     const trained = buildDayGuard(plan, { ...calendar('2026-10-10'), loggedDates: [], closedDates: [] })
-    const oldEnded = silently(() => revertAdaptationChanges(oldBanned, plan.filter(w => w.week_number <= 2), [1, 2], trained, sam, adaptationConflictTest('injury', 'knees', null), ['Band Tricep Kickback']))
-    check('OLD stored shape: the ban still survives', !all(oldEnded.mesocycle.slice(0, 2)).includes('Band Tricep Kickback'))
+    const oldEnded = silently(() => revertAdaptationChanges(oldBanned, plan.filter(w => w.week_number <= 2), [1, 2], trained, sam, adaptationConflictTest('injury', 'knees', null), [BANNED_MID_ADAPTATION]))
+    check('OLD stored shape: the ban still survives', !all(oldEnded.mesocycle.slice(0, 2)).includes(BANNED_MID_ADAPTATION))
     check('OLD stored shape: the knee work comes back on days still ahead', oldStyle.touchedSlots.filter(s => s.weekNumber === 2 && s.dayName === 'Thursday').every(s => namesOf(oldEnded.mesocycle, 2, 'Thursday').includes(s.before)), namesOf(oldEnded.mesocycle, 2, 'Thursday'))
     check('OLD stored shape: the Thursday already trained stays as it now reads', dayOf(oldEnded.mesocycle, 1, 'Thursday') === dayOf(oldBanned, 1, 'Thursday'))
   }
@@ -351,7 +359,11 @@ async function main() {
     check('App builds the pool profile from the active adaptations', /const poolProfile = useMemo\(\s*\(\) => \(profile \? constraintProfile\(profile, effectiveConstraints\(profile, activeAdaptations, getAppNow\(profile\.id\)\)\) : null\)/.test(app))
     check('the Exercise tab (swap list, add, session rebuild, warm-up) is handed the pool profile', /<ExerciseTab[\s\S]{0,400}profile=\{poolProfile \?\? profile \?\? undefined\}/.test(app))
     check('...and the saved one separately, for anything that writes', /storedProfile=\{profile \?\? undefined\}/.test(app) && /const saved = storedProfile \?\? profile/.test(tab))
-    check('a ban\'s replacement is picked from the pool profile', /banExerciseFromMesocycle\(\{\s*mesocycle,\s*profile: poolProfile \?\? profile,/.test(app))
+    // RE-ANCHORED 9 Oct 2026: this was red on the merged round-2 tree before
+    // any change here. It pinned App calling `banExerciseFromMesocycle`
+    // directly; another lane moved the screen's ban into `banOnScreen`. The
+    // property is the one in the name: the ban is handed the pool profile.
+    check('a ban\'s replacement is picked from the pool profile', /banOnScreen\(\{[^}]{0,200}?profile: poolProfile \?\? profile,/.test(app))
     check('the coach is handed the pool profile and the adaptations', /<ChatAssistant[\s\S]{0,200}poolProfile=\{poolProfile \?\? profile\}\s*activeAdaptations=\{activeAdaptations\}/.test(app))
     check('the coach\'s add, session rebuild and ban use it', /resolveAdditionRequest\(item, poolProfile, exerciseExclusions\)/.test(chat) && /rebuildDayAroundMainLift\(\{\s*mesocycle, profile: poolProfile,/.test(chat) && /executeSessionRebuild\(poolProfile,/.test(chat) && /executeExerciseBan\(poolProfile,/.test(chat) && /executeExerciseAdd\(poolProfile,/.test(chat))
     check('the coach\'s context line is built with the adaptations', /buildCoachInjuriesSummary\(profile, activeAdaptations, getAppNow\(profile\.id\)\)/.test(chat))

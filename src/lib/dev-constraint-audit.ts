@@ -172,6 +172,121 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
   bodyweight: new Set(['bodyweight', 'pull-up bar', 'weighted backpack']),
 }
 
+// ---------------------------------------------------------------------------
+// THE KIT A PERSON HAS SAID THEY HAVE — the audit's OWN copy of the rule.
+// docs/plans/kit-list.md, 9 Oct 2026.
+//
+// Deliberately shares NO code with the engine (kit-list.ts,
+// allowedEquipmentFor): like EQUIPMENT_SETS above, this is a second, separate
+// statement of what is allowed, so a bug in the engine's reading of a kit list
+// cannot make the audit agree with it. `test:kit-list` holds that this file
+// imports neither. The only thing read off the profile is the list of
+// statements itself.
+//
+// The rule, restated: statements apply in order on top of the items the tier
+// assumes; `has` adds, `hasnt` removes, `only` makes the list the whole kit.
+// One of the nine is owned or it is not. Anything else (a cable stack, a box)
+// is as the tier has it, unless a list was given as the whole kit — then it is
+// not owned. `bodyweight` is always allowed.
+// ---------------------------------------------------------------------------
+const AUDIT_KIT_STRINGS: Record<string, string[]> = {
+  dumbbells: ['dumbbells', 'dumbbell'],
+  bench: ['bench'],
+  incline_bench: ['incline bench'],
+  barbell: ['barbell', 'EZ bar', 'trap bar', 't-bar'],
+  squat_rack: ['squat rack'],
+  kettlebell: ['kettlebell'],
+  bands: ['resistance band'],
+  pull_up_bar: ['pull-up bar'],
+  weighted_bag: ['weighted backpack'],
+}
+const AUDIT_NINE = Object.keys(AUDIT_KIT_STRINGS)
+const AUDIT_TIER_ITEMS: Record<EquipmentAccess, string[]> = {
+  full_gym: AUDIT_NINE,
+  home_gym: AUDIT_NINE,
+  minimalist: ['dumbbells', 'kettlebell', 'bands', 'pull_up_bar', 'weighted_bag'],
+  bodyweight: ['pull_up_bar', 'weighted_bag'],
+}
+
+interface AuditKit {
+  allows: (eq: string) => boolean
+  /** The tier the kit amounts to — what the audit's own tier-keyed relaxations read. */
+  tier: EquipmentAccess
+  inWords: string
+}
+
+/** Null when the profile carries no kit statement: the tier's set decides, as it always has. */
+function auditKitOf(profile: UserProfile): AuditKit | null {
+  const said = (profile.kit_statements ?? [])
+    .map(s => ({ mode: s.mode as string, items: (s.items as string[]).filter(i => AUDIT_NINE.includes(i)) }))
+    .filter(s => s.items.length > 0 && ['has', 'hasnt', 'only'].includes(s.mode))
+  if (said.length === 0) return null
+  const base = profile.equipment_access ?? 'full_gym'
+  const owned = new Set(AUDIT_TIER_ITEMS[base])
+  let wholeKit = false
+  for (const s of said) {
+    if (s.mode === 'only') { owned.clear(); wholeKit = true }
+    for (const item of s.items) { if (s.mode === 'hasnt') owned.delete(item); else owned.add(item) }
+  }
+  const stringToItem = new Map<string, string>()
+  for (const item of AUDIT_NINE) for (const eq of AUDIT_KIT_STRINGS[item]) stringToItem.set(eq, item)
+  const tierSet = EQUIPMENT_SETS[base]
+  const allows = (eq: string): boolean => {
+    if (eq === 'bodyweight') return true
+    const item = stringToItem.get(eq)
+    if (item) return owned.has(item)
+    if (wholeKit) return false
+    return tierSet ? tierSet.has(eq) : true
+  }
+  const tier: EquipmentAccess = base === 'full_gym' && !wholeKit ? 'full_gym'
+    : owned.has('barbell') ? 'home_gym'
+      : owned.has('dumbbells') || owned.has('kettlebell') || owned.has('bands') ? 'minimalist'
+        : 'bodyweight'
+  return { allows, tier, inWords: `said they have [${[...owned].join(', ') || 'nothing'}]${wholeKit ? ' and nothing else' : ''}` }
+}
+
+/**
+ * Every named exercise that needs something this person's kit does not hold,
+ * by the audit's own rule. Exported so `test:kit-list` can use it as a second
+ * opinion beside its own table. Empty for a full gym with no kit list.
+ */
+export function auditEquipmentViolations(profile: UserProfile, exerciseNames: string[]): { exercise: string; missing: string[] }[] {
+  const kit = auditKitOf(profile)
+  const tierSet = EQUIPMENT_SETS[profile.equipment_access ?? 'full_gym']
+  const allows = kit ? kit.allows : tierSet ? (eq: string) => tierSet.has(eq) : null
+  if (!allows) return []
+  const out: { exercise: string; missing: string[] }[] = []
+  for (const name of exerciseNames) {
+    const entry = EXERCISE_DATABASE.find(e => e.name === name)
+    if (!entry) continue
+    const missing = entry.equipment.filter(eq => !allows(eq))
+    // An either-or entry is satisfied by any ONE of its implements.
+    if (entry.equipment_alternatives ? missing.length === entry.equipment.length : missing.length > 0) out.push({ exercise: name, missing })
+  }
+  return out
+}
+
+/** A kit profile the audit sweeps beside the four tiers. */
+export interface AuditKitCase {
+  label: string
+  base: EquipmentAccess
+  statements: NonNullable<UserProfile['kit_statements']>
+}
+
+/**
+ * The kit profiles swept in every audit run (80 cases: 5 kits x 4 styles x 2
+ * session lengths x 2 injury sets). Small on purpose — the four tiers remain
+ * the grid; this is what makes the kit rule above something the audit
+ * exercises rather than carries.
+ */
+export const AUDIT_KIT_CASES: AuditKitCase[] = [
+  { label: 'kit: dumbbells + bench', base: 'minimalist', statements: [{ mode: 'only', items: ['dumbbells', 'bench'] }] },
+  { label: 'kit: dumbbells only', base: 'minimalist', statements: [{ mode: 'only', items: ['dumbbells'] }] },
+  { label: 'kit: bands only', base: 'minimalist', statements: [{ mode: 'only', items: ['bands'] }] },
+  { label: 'kit: dumbbells + bench + pull-up bar', base: 'home_gym', statements: [{ mode: 'only', items: ['dumbbells', 'bench'] }, { mode: 'has', items: ['pull_up_bar'] }] },
+  { label: 'kit: full gym, no bands', base: 'full_gym', statements: [{ mode: 'hasnt', items: ['bands'] }] },
+]
+
 // Style-required patterns
 const STYLE_REQUIRED_PATTERNS: Record<TrainingStyle, string[]> = {
   combat: ['core', 'carry'],
@@ -309,7 +424,7 @@ function repsMatchesPrescriptionType(reps: string, type: string | undefined): bo
 }
 
 function runSingleAudit(
-  equipment: EquipmentAccess,
+  baseEquipment: EquipmentAccess,
   injuries: string[],
   duration: SessionDuration,
   style: TrainingStyle,
@@ -317,9 +432,17 @@ function runSingleAudit(
   weightKg: number = 80,
   gender: 'male' | 'female' = 'male',
   activityLevel: ActivityLevel = 'moderate',
+  /** A kit the person has said they have, laid over the tier. Absent on the whole of the original grid. */
+  kitCase?: AuditKitCase,
 ): AuditTestCase {
-  const profile = buildTestProfile(equipment, injuries, duration, style, experience, weightKg, gender, activityLevel)
-  const comboLabel = `${equipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style} / ${experience} / ${weightKg}kg ${gender}${activityLevel === 'moderate' ? '' : ` / ${activityLevel}`}`
+  const baseProfile = buildTestProfile(baseEquipment, injuries, duration, style, experience, weightKg, gender, activityLevel)
+  const profile: UserProfile = kitCase ? { ...baseProfile, kit_statements: kitCase.statements } : baseProfile
+  const auditKit = auditKitOf(profile)
+  // Everything below that is about the KIND of trainee (which patterns may be
+  // relaxed, which labels) reads the tier the kit amounts to — worked out by
+  // the audit's own rule above, never asked of the engine.
+  const equipment: EquipmentAccess = auditKit ? auditKit.tier : baseEquipment
+  const comboLabel = `${kitCase ? `${kitCase.label} (on ${baseEquipment})` : baseEquipment} / ${injuries.length > 0 ? injuries.join('+') : 'none'} / ${duration} / ${style} / ${experience} / ${weightKg}kg ${gender}${activityLevel === 'moderate' ? '' : ` / ${activityLevel}`}`
   const failures: AuditFailure[] = []
 
   let result: PlanResult
@@ -354,7 +477,12 @@ function runSingleAudit(
   // than reimplementing isEquipmentAllowed's own boolean, so this audit
   // stays independent of a bug in that function while still respecting
   // the field's real, documented semantics.
-  const allowedSet = EQUIPMENT_SETS[equipment]
+  //
+  // WITH A KIT LIST the allowed set is the list's, by the audit's own copy of
+  // the rule (auditKitOf); with none it is the tier's set, as it always was.
+  const tierSet = EQUIPMENT_SETS[baseEquipment]
+  const allowedSet: { has(eq: string): boolean } | null = auditKit ? { has: auditKit.allows } : tierSet
+  const userHas = auditKit ? auditKit.inWords : `only has ${baseEquipment}`
   if (allowedSet) {
     for (const ex of allExercises) {
       const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
@@ -364,7 +492,7 @@ function runSingleAudit(
           failures.push({
             check: 'equipment',
             combination: comboLabel,
-            details: `Exercise requires one of [${entry.equipment.join(', ')}] but user only has ${equipment}`,
+            details: `Exercise requires one of [${entry.equipment.join(', ')}] but user ${userHas}`,
             exercise: ex.name,
           })
         }
@@ -375,7 +503,7 @@ function runSingleAudit(
           failures.push({
             check: 'equipment',
             combination: comboLabel,
-            details: `Exercise requires "${eq}" but user only has ${equipment}`,
+            details: `Exercise requires "${eq}" but user ${userHas}`,
             exercise: ex.name,
           })
         }
@@ -1502,10 +1630,16 @@ export async function runFullConstraintAudit(
   const levelsFor = (experience: TrainingExperience): ActivityLevel[] =>
     experience === 'beginner' ? BEGINNER_ACTIVITY_LEVELS : ['moderate']
 
+  // The kit profiles (docs/plans/kit-list.md): what each is crossed with.
+  const KIT_DURATIONS: SessionDuration[] = ['30-45', '60-90']
+  const KIT_INJURIES: string[][] = [[], ['shoulders']]
+  const kitCombinations = AUDIT_KIT_CASES.length * ALL_STYLES.length * KIT_DURATIONS.length * KIT_INJURIES.length
+
   const totalCombinations =
     ALL_EQUIPMENT.length * injuryCombinations.length * ALL_DURATIONS.length *
     ALL_STYLES.length * WEIGHT_GENDER_OPTIONS.length *
     ALL_EXPERIENCE.reduce((n, e) => n + levelsFor(e).length, 0)
+    + kitCombinations
   const results: AuditTestCase[] = []
   let done = 0
 
@@ -1523,6 +1657,21 @@ export async function runFullConstraintAudit(
              }
             }
           }
+        }
+      }
+    }
+  }
+
+  // THE KIT PROFILES — a person who has said what they have, laid over the
+  // tier they picked. After the four-tier grid and in a fixed order, so every
+  // case above keeps the seed (its own label) it has always had.
+  for (const kitCase of AUDIT_KIT_CASES) {
+    for (const style of ALL_STYLES) {
+      for (const duration of KIT_DURATIONS) {
+        for (const injuries of KIT_INJURIES) {
+          results.push(runSingleAudit(kitCase.base, injuries, duration, style, 'intermediate', 80, 'male', 'moderate', kitCase))
+          done++
+          onProgress?.(done, totalCombinations)
         }
       }
     }

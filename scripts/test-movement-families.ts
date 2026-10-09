@@ -56,7 +56,8 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     why: 'A push-up is not a bench press (bodyweight, closed chain). And since 9 Oct 2026 a neutral-grip dumbbell press is not a flat barbell or floor press: different implement, grip, bar path and loaded range — a coach programmes a barbell/floor press and a dumbbell press in one session routinely. Decided as a CSCS coach; it is what gives a shoulder-flagged chest day a second press.',
     families: {
       bench_press: ['Barbell Bench Press', 'Smith Machine Bench Press', 'Dumbbell Bench Press', 'Barbell Floor Press', 'Dumbbell Floor Press', 'Incline Dumbbell Press', 'Incline Machine Press', 'Incline Push-Ups', 'Deficit Push-Ups', 'Archer Push-Ups', 'Chest Press Machine', 'Knee Push-Ups', 'Wide Push-Ups'],
-      neutral_grip_press: ['Neutral-Grip Dumbbell Press'],
+      // + Close-Grip Dumbbell Press, 9 Oct 2026 (the dumbbell pack): the same press with the dumbbells together; a coach would not write both on one day.
+      neutral_grip_press: ['Neutral-Grip Dumbbell Press', 'Close-Grip Dumbbell Press'],
       push_up: ['Push-Ups'],
     },
   },
@@ -64,14 +65,15 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     why: 'Since 9 Oct 2026. Elbow extension with the shoulder neutral (pushdown), extended (kickback) and flexed (overhead, lying): three different lengths for the long head. The flexed arm keeps the group\'s own name, so Overhead Tricep Extension and Skull Crushers still exclude each other. Decided as a CSCS coach; both band triceps movements were one family, so a shoulder-flagged chest day had one triceps exercise.',
     families: {
       tricep_pushdown: ['Tricep Pushdowns', 'Rope Tricep Pushdown', 'Straight-Bar Tricep Pushdown', 'Band Tricep Pushdown'],
-      tricep_kickback: ['Band Tricep Kickback'],
-      tricep_extension: ['Overhead Tricep Extension', 'Skull Crushers', 'Chair Dips'],
+      // The dumbbell pack, 9 Oct 2026: a dumbbell and a cable kickback join the band one (a kickback is a kickback whatever is in the hand), and the lying dumbbell extension joins the flexed-arm family.
+      tricep_kickback: ['Band Tricep Kickback', 'Dumbbell Tricep Kickback', 'Cable Tricep Kickback'],
+      tricep_extension: ['Lying Dumbbell Tricep Extension', 'Overhead Tricep Extension', 'Skull Crushers', 'Chair Dips'],
     },
   },
   row: {
     why: 'Close-Grip Lat Pulldown is filed with rows and is a pulldown: it shares the Lat Pulldown\'s family so the two cannot share a day.',
     families: {
-      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine'],
+      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine'],
       pulldown: ['Close-Grip Lat Pulldown'],
     },
   },

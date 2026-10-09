@@ -24,6 +24,7 @@
 
 import type { EquipmentAccess, UserProfile } from './types'
 import { INJURY_OPTIONS } from './picker-options'
+import { travelProfile } from './kit-list'
 
 /** The fields of a stored adaptation this file reads. `PlanAdaptationRow` satisfies it. */
 export interface ActiveAdaptationLike {
@@ -72,15 +73,19 @@ export function effectiveConstraints(
  * constraints laid over it. Returns the same object when there are none, so a
  * person with no adaptation running gets byte-identical behaviour.
  */
-export function constraintProfile<P extends Pick<UserProfile, 'injuries' | 'equipment_access'>>(
+export function constraintProfile<P extends Pick<UserProfile, 'injuries' | 'equipment_access' | 'kit_statements'>>(
   profile: P,
   constraints: EffectiveConstraints,
 ): P {
   if (constraints.temporaryInjuries.length === 0 && !constraints.temporaryEquipment) return profile
+  // A TEMPORARY KIT CHANGE DESCRIBES SOMEWHERE ELSE ("bodyweight only while
+  // I'm away", "the hotel has a gym"), so it is that tier's plain set and the
+  // person's own kit list does not come with them — see `travelProfile`. A
+  // temporary injury leaves the kit exactly as it is.
+  const kitted = constraints.temporaryEquipment ? travelProfile(profile, constraints.temporaryEquipment) : profile
   return {
-    ...profile,
+    ...kitted,
     injuries: [...(profile.injuries ?? []), ...constraints.temporaryInjuries.filter(c => !(profile.injuries ?? []).includes(c))],
-    equipment_access: constraints.temporaryEquipment ?? profile.equipment_access,
   }
 }
 

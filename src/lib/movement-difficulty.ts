@@ -52,6 +52,7 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
   'Barbell Floor Press': 2,
   'Incline Dumbbell Press': 2,
   'Neutral-Grip Dumbbell Press': 2,
+  'Close-Grip Dumbbell Press': 2,
   'Dumbbell Floor Press': 2,
   'Chest Press Machine': 2,
   'Incline Machine Press': 2,
@@ -61,6 +62,7 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
 
   // horizontal_pull
   'Dumbbell Rows': 2,
+  'Bent-Over Dumbbell Row': 2,
   'T-Bar Rows': 2,
   'Chest-Supported Row': 2,
   'Seated Machine Row': 2,
@@ -83,6 +85,7 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
 
   // hip_hinge
   'Hip Thrust': 2,
+  'Dumbbell Hip Thrust': 1,
   'Kettlebell Swing (Heavy)': 2,
   'Single-Leg RDL (Bodyweight)': 1,
 
@@ -90,6 +93,7 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
   'Pistol Squat Progression': 2,
   'Bulgarian Split Squats': 2,
   'Walking Lunges': 1,
+  'Dumbbell Reverse Lunge': 1,
   'Step-Ups': 1,
   'Step-Down (Eccentric)': 1,
   'Split Squat (Bodyweight)': 1,

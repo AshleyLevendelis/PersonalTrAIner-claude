@@ -423,12 +423,25 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   // 20kg a bag is trusted with at his experience; a logged 26 cannot raise it
   // (that limit is about the bag, not about him), so nothing is rewritten and
   // nothing is announced.
-  const tue = samPlan[0].days.find(d => d.day === 'Tuesday')!
+  //
+  // RE-ANCHORED 9 Oct 2026. The tester's own Tuesday no longer holds a
+  // Backpack Row: since the dumbbell pack (docs/plans/kit-list.md) a man with
+  // dumbbells is given the bent-over dumbbell row instead, which is the point
+  // of that work. A bag is still what somebody gets when it is the only loaded
+  // row left to them — here the same man with a lower-back flag as well, which
+  // rules the bent-over row out — so the fixture is him.
+  const bagProfile = { ...sam, injuries: ['shoulders', 'lower_back'] } as unknown as UserProfile
+  setRandomSource(seededRngFromKey('sam:2'))
+  console.log = () => {}
+  const bagPlan = generateMesocycle(bagProfile)
+  console.log = quiet
+  resetRandomSource()
+  const tue = bagPlan[0].days.find(d => d.day === 'Tuesday')!
   const bagIndex = tue.exercises.findIndex(e => e.name === 'Backpack Row')
   const bagKg = (w: typeof week1) => w.days.find(d => d.day === 'Tuesday')!.exercises[bagIndex]?.suggested_load_kg
-  check('the fixture has a Backpack Row already at 20kg in weeks 1 to 3', bagIndex >= 0 && [0, 1, 2].every(i => bagKg(samPlan[i]) === 20), bagIndex >= 0 && [0, 1, 2].map(i => bagKg(samPlan[i])))
-  const bag = planCalibrationAnchors(samPlan, sam, 1, 'Tuesday', [log(1, 26, {}, 'Backpack Row')])
-  check('a logged 26kg on it rewrites no week and is not reported as applied', bag.applied.length === 0 && bag.changedWeeks.length === 0 && bag.next === samPlan, { applied: bag.applied, changed: bag.changedWeeks.map(w => w.week_number) })
+  check('the fixture has a Backpack Row already at 20kg in weeks 1 to 3', bagIndex >= 0 && [0, 1, 2].every(i => bagKg(bagPlan[i]) === 20), bagIndex >= 0 && [0, 1, 2].map(i => bagKg(bagPlan[i])))
+  const bag = planCalibrationAnchors(bagPlan, bagProfile, 1, 'Tuesday', [log(1, 26, {}, 'Backpack Row')])
+  check('a logged 26kg on it rewrites no week and is not reported as applied', bag.applied.length === 0 && bag.changedWeeks.length === 0 && bag.next === bagPlan, { applied: bag.applied, changed: bag.changedWeeks.map(w => w.week_number) })
 
   // ...and where ROUNDING hands it back. A deload's target is 70% of the
   // reachable weight (16.8kg for 24), which rounds to the 16kg dumbbell; a

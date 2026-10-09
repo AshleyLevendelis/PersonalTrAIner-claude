@@ -246,8 +246,24 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   ankles     19->20  Standing Calf Raise Machine
     //   the four cable variants load nothing their parents did not, and
     //   add to no count
-    lower_back: 17, knees: 37, shoulders: 68, neck: 7, wrists: 28,
-    hips: 19, ankles: 20, elbows: 21,
+    //
+    // RE-MEASURED 9 Oct 2026 after the dumbbell pack (+7 entries,
+    // docs/plans/kit-list.md). Every delta by name, each tag reviewed joint by
+    // joint and written on the entry; no pre-existing exercise moved:
+    //   lower_back 17->18  Bent-Over Dumbbell Row (an unsupported hinge under
+    //                      load, as Barbell Rows)
+    //   knees      37->38  Dumbbell Reverse Lunge
+    //   shoulders  68->69  Lying Dumbbell Tricep Extension (kept with Skull
+    //                      Crushers and Overhead Tricep Extension)
+    //   hips       19->20  Dumbbell Reverse Lunge
+    //   ankles     20->21  Dumbbell Reverse Lunge
+    //   elbows     21->24  Dumbbell Tricep Kickback, Lying Dumbbell Tricep
+    //                      Extension, Close-Grip Dumbbell Press
+    //   neck, wrists       unchanged. Cable Tricep Kickback and Dumbbell Hip
+    //                      Thrust are removed by no flag (as the cable
+    //                      pushdowns and the barbell hip thrust are not).
+    lower_back: 18, knees: 38, shoulders: 69, neck: 7, wrists: 28,
+    hips: 20, ankles: 21, elbows: 24,
   }
   const drift: string[] = []
   for (const code of CODES) {

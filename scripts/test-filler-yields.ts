@@ -194,7 +194,12 @@ console.log('\n[3] "I only have N minutes" takes the optional filler before any 
   const receipt3 = day ? (await executeSessionShorten({ ...profile, id: undefined } as UserProfile, meso, { weekNumber: week.week_number, dayName: day.day, minutes: tight })).receipt : null
   // Measured sentence: "Monday: about 43 min — 19 min of optional mobility
   // came off first, then out came Plank, and 5 sets off what stayed".
-  check('...and, when work went too, says the filler went first and THEN names the work', /\d+ min of optional mobility came off first, then out came \S/.test(receipt3?.landed?.[0] ?? ''), receipt3?.landed)
+  // RE-ANCHORED 9 Oct 2026 on the property (filler first, THEN the work): the
+  // sentence has two honest shapes and this pinned one. Since the dumbbell
+  // pack moved this fixture's plan, the same cut takes sets only and drops no
+  // exercise: "… 18 min of optional mobility came off first — 6 sets off what
+  // stayed". Either way the filler is named before the work that went.
+  check('...and, when work went too, says the filler went first and THEN names the work', /\d+ min of optional mobility came off first(, then out came \S| — \d+ sets? off what stayed)/.test(receipt3?.landed?.[0] ?? ''), receipt3?.landed)
 }
 
 // --- 4. "more volume" is not refused for want of room the padding holds -----

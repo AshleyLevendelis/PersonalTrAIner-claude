@@ -114,6 +114,19 @@ export interface UserProfile {
    * stays required.
    */
   equipment_access?: EquipmentAccess
+  /**
+   * What the person has SAID about their kit ("I've got dumbbells and a
+   * bench", "I don't own bands"), in the order they said it — applied on top
+   * of the tier above. See kit-list.ts.
+   *
+   * NOT A COLUMN, and never written to the profile row. It is compiled from
+   * `user_facts` and attached by `profileWithKit` in App, so everything the
+   * app hands a profile to sees the same kit. Absent for anyone who has said
+   * nothing, and then the tier decides exactly as it always has. Engine code
+   * reads the tier through `equipmentTierFor`, not `equipment_access`, so the
+   * list is never ignored.
+   */
+  kit_statements?: import('./kit-list').KitStatement[]
   training_style?: TrainingStyle
   training_experience?: TrainingExperience
   coaching_persona: CoachingPersona

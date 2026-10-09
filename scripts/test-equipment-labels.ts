@@ -185,8 +185,11 @@ console.log('\n9. The swap warning asks the generator, it does not re-implement 
 // The bug this replaced: `equipment.filter(eq => !allowed.has(eq))` warned on
 // EVERY missing implement, so an `equipment_alternatives` entry (one of the
 // two is enough) was reported unavailable to someone who owned the other.
+// RE-ANCHORED 9 Oct 2026 on the property rather than the argument's name: the
+// predicate is now asked about the PERSON (their tier plus what they have said
+// they own, docs/plans/kit-list.md), so the second argument is the profile.
 check('getExerciseCompatibilityWarnings calls isEquipmentAllowed',
-  /isEquipmentAllowed\(exercise, tier\)/.test(planSrc), null)
+  /export function getExerciseCompatibilityWarnings\([\s\S]{0,2500}?!isEquipmentAllowed\(exercise, profile\)/.test(planSrc), null)
 // Real catalogue entries, not stubs: a stub that forgets `loads_joints` sends
 // the injury half of this function down a different path, and the point is to
 // exercise the code exactly as the swap dialog calls it.

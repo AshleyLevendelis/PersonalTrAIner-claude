@@ -37,6 +37,7 @@
 import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
 import { EXERCISE_DATABASE, getExerciseEntry, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
 import type { WorkoutDay, UserProfile, MesocycleMovementPattern, EquipmentAccess } from './types'
+import { equipmentTierFor } from './kit-list'
 
 export interface AdditionCandidate {
   exercise: ExerciseEntry
@@ -102,7 +103,7 @@ export function getAdditionCandidates(
   const leastInDay = Math.min(...muscles.values())
   const present = new Set(day.exercises.map(e => e.name.toLowerCase()))
   const pool = getConstrainedPool(profile, exclusions)
-  const equipment = profile.equipment_access
+  const equipment = equipmentTierFor(profile)
 
   const scored = pool
     .filter(e => !present.has(e.name.toLowerCase()))

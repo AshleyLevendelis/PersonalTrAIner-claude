@@ -188,8 +188,18 @@ function main() {
     { sets: workingSets(samMon), optionalMinutes: optionalFillerSeconds(samMon) / 60 })
   {
     const triceps = monWorking.filter(x => x.entry.movement_pattern === 'isolation_tricep').map(x => x.entry)
-    check('Sam, Monday: two triceps movements, and they are different movements',
-      triceps.length >= 2 && !hasDuplicateFamily(triceps), triceps.map(e => `${e.name}=${getMovementFamily(e)}`))
+    // RE-ANCHORED 9 Oct 2026 (docs/plans/kit-list.md). This held "two triceps
+    // movements", and the second one was a BAND pushdown beside dumbbells he
+    // owns — the cost this gate's own author measured afterwards and did not
+    // fix. A band or bag movement is no longer a candidate where the person
+    // owns a properly loading equivalent, and with a shoulder flag his kit
+    // holds exactly one of those for the triceps (the dumbbell kickback the
+    // pack added). So: the day's triceps work is properly loaded, and no band
+    // stands beside it. Two different triceps movements is held where the pool
+    // holds two loaded ones (3q2 below).
+    const improvised = (e: ExerciseEntry) => e.equipment.some(q => q === 'resistance band' || q === 'weighted backpack')
+    check('Sam, Monday: a properly loaded triceps movement, and no band movement beside it',
+      triceps.length >= 1 && !hasDuplicateFamily(triceps) && triceps.every(e => !improvised(e)), triceps.map(e => `${e.name}=${getMovementFamily(e)}`))
   }
   check('Sam, Monday: still a chest day — the press is there and the day opens with it',
     samMon.focus === 'Chest & Triceps' && monWorking[0]?.entry.movement_pattern === 'horizontal_push',
@@ -482,11 +492,24 @@ function main() {
       own.map(r => r?.main.filter(e => e.substitution_group === 'row' || e.movement_pattern === 'isolation_bicep' || e.movement_pattern === 'isolation_trap').map(e => e.name)))
     // 90+: the count is ten. Where the day's own pool cannot reach it, it
     // borrows in list order — a row first — and never a tier-1.
+    // RE-ANCHORED 9 Oct 2026 (docs/plans/kit-list.md). This held "what it
+    // borrows first is a row", which is the lead this gate's own author left:
+    // a row on an UNINJURED Shoulders day makes the week's balance pass trim
+    // the back day. The row now stands in only for shoulder work that is
+    // missing; a day that has its press, in a pool that has raises, borrows
+    // traps and then biceps.
     const borrowedRows = runs.map(r => r ? r.main.filter(e => e.substitution_group === 'row') : [])
-    check('3n2. 90+: some seed has to borrow, and what it borrows first is a row that is not a main lift',
-      borrowedRows.some(rows => rows.length === 1) && borrowedRows.every(rows => rows.length <= 1 && rows.every(e => e.mechanics_tier !== 'tier1_compound')) &&
-      runs.every(r => !!r && (!r.main.some(e => e.movement_pattern === 'isolation_bicep' || e.movement_pattern === 'isolation_trap') || r.main.some(e => e.substitution_group === 'row'))),
+    const borrowedOther = runs.map(r => r ? r.main.filter(e => e.movement_pattern === 'isolation_bicep' || e.movement_pattern === 'isolation_trap') : [])
+    check('3n2. 90+, uninjured: some seed has to borrow, and it borrows traps (then biceps), never a row',
+      borrowedRows.every(rows => rows.length === 0) && borrowedOther.some(o => o.length >= 1) &&
+      borrowedOther.every(o => o.length === 0 || o.some(e => e.movement_pattern === 'isolation_trap')),
       runs.map(r => r?.main.filter(e => e.substitution_group === 'row' || e.movement_pattern === 'isolation_bicep' || e.movement_pattern === 'isolation_trap').map(e => e.name)))
+    // ...and where a flag has taken the raises, the row still comes (it stands in for them).
+    const flaggedLong = buildProfile(combo({ equipment: 'full_gym', injuries: ['shoulders'], duration: '90+' }))
+    const flaggedRuns = ['a', 'b', 'c'].map(s => pick('Shoulders & Abs', flaggedLong, `unit:${s}`))
+    check('3n3. 90+, shoulder flag: the row is still borrowed, and is not a main lift',
+      flaggedRuns.every(r => !!r && r.main.filter(e => e.substitution_group === 'row').length === 1 && r.main.filter(e => e.substitution_group === 'row').every(e => e.mechanics_tier !== 'tier1_compound')),
+      flaggedRuns.map(r => r?.main.map(e => e.name)))
     check('3o. no selection holds the same movement twice — at 90+, where the refill loop took three lateral raises in one pass',
       runs.every(r => !!r && sameMovementTwice(r.main).length === 0), runs.flatMap(r => r ? sameMovementTwice(r.main) : ['no handle']))
   }
@@ -498,9 +521,24 @@ function main() {
     check('3p. home gym, shoulder flag, four seeds: the chest day takes two presses of different families',
       runs.every(r => !!r && r.main.filter(e => e.movement_pattern === 'horizontal_push').length === 2 && !hasDuplicateFamily(r.main)),
       runs.map(r => r?.main.filter(e => e.movement_pattern === 'horizontal_push').map(e => e.name)))
-    check('3q. …and two triceps movements of different families',
-      runs.every(r => !!r && r.main.filter(e => e.movement_pattern === 'isolation_tricep').length === 2),
+    // RE-ANCHORED 9 Oct 2026, as the Sam check above: with a shoulder flag a
+    // home gym holds ONE properly loaded triceps isolation (the dumbbell
+    // kickback), and a band is not put beside it.
+    const isBandOrBag = (e: ExerciseEntry) => e.equipment.some(q => q === 'resistance band' || q === 'weighted backpack')
+    check('3q. …and its triceps work is the one properly loaded movement that flag leaves, with no band beside it',
+      runs.every(r => !!r && r.main.filter(e => e.movement_pattern === 'isolation_tricep').length === 1 && r.main.filter(e => e.movement_pattern === 'isolation_tricep').every(e => !isBandOrBag(e))),
       runs.map(r => r?.main.filter(e => e.movement_pattern === 'isolation_tricep').map(e => e.name)))
+    // Where the pool holds two loaded triceps movements, the split still gives two of different families.
+    const plainHome = buildProfile(combo({ equipment: 'home_gym', injuries: [], duration: '60-90' }))
+    const flaggedGym = buildProfile(combo({ equipment: 'full_gym', injuries: ['shoulders'], duration: '60-90' }))
+    const twoLoaded = [...['a', 'b', 'c', 'd'].map(s => pick('Chest & Triceps', plainHome, `unit:${s}`)), ...['a', 'b', 'c', 'd'].map(s => pick('Chest & Triceps', flaggedGym, `unit:${s}`))]
+    check('3q2. home gym with no flag, and a full gym with one: two triceps movements of different families, neither a band',
+      twoLoaded.every(r => {
+        if (!r) return false
+        const tri = r.main.filter(e => e.movement_pattern === 'isolation_tricep')
+        return tri.length === 2 && !hasDuplicateFamily(tri) && tri.every(e => !isBandOrBag(e))
+      }),
+      twoLoaded.map(r => r?.main.filter(e => e.movement_pattern === 'isolation_tricep').map(e => e.name)))
     check('3r. …and no overhead triceps work came in with the split (still out for a shoulder flag)',
       runs.every(r => !!r && !r.main.some(e => e.name === 'Overhead Tricep Extension' || e.name === 'Skull Crushers')))
   }

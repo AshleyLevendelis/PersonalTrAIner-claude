@@ -1,5 +1,6 @@
 import type { TrainingExperience, UserProfile } from './types'
 import type { ExerciseEntry } from './exercise-db'
+import { equipmentTierFor, ownsKitItem, type KitItem } from './kit-list'
 
 // ---------------------------------------------------------------------------
 // LOAD PRESCRIPTION
@@ -733,8 +734,32 @@ export function loadingMode(entry: ExerciseEntry): LoadingMode {
  */
 const SINGLE_IMPLEMENT_TRICEP_FACTOR = 0.65
 
+/**
+ * A KICKBACK IS NOT A PUSHDOWN EITHER — same category, a different lever.
+ * Added with the dumbbell pack, 9 Oct 2026 (docs/plans/kit-list.md); decided
+ * as a CSCS coach.
+ *
+ * With the upper arm level and the forearm swinging up behind, the weight's
+ * moment arm is longest exactly at lockout, where the triceps is shortest and
+ * weakest. So a kickback is trained at roughly half to two thirds of what the
+ * same person presses down per hand: 6-10kg for an intermediate man whose
+ * pushdown is 25kg (12.5 a side). Without this the pack's two kickbacks were
+ * priced as half a pushdown each — 12kg per hand, a weight most people cannot
+ * lock out without swinging it, on a lift whose whole value is strict form.
+ * 0.6 gives him about 8kg per hand, and errs light.
+ *
+ * Keyed on the WORD, inside one category, because nothing else on an entry
+ * says "kickback" (load-prescription reads entries, not the family table), and
+ * scoped to triceps so Glute Kickback Machine is untouched. It reaches the two
+ * loaded kickbacks; the band one carries no weight. A factor on the reference,
+ * not a new category, for the reasons above.
+ */
+const TRICEP_KICKBACK_FACTOR = 0.6
+
 function isolationImplementFactor(entry: ExerciseEntry, category: string): number {
-  if (category === 'isolation_tricep' && loadingMode(entry) === 'single_implement') return SINGLE_IMPLEMENT_TRICEP_FACTOR
+  if (category !== 'isolation_tricep') return 1
+  if (entry.name.toLowerCase().includes('kickback')) return TRICEP_KICKBACK_FACTOR
+  if (loadingMode(entry) === 'single_implement') return SINGLE_IMPLEMENT_TRICEP_FACTOR
   return 1
 }
 
@@ -870,7 +895,33 @@ export type LoadCeilingKind = 'dumbbell' | 'single_implement' | 'improvised'
  * answer also covers every dumbbell pair in the plan, so it is the more
  * useful one to have.
  */
-export function ceilingKindsFor(entry: ExerciseEntry): LoadCeilingKind[] {
+export function ceilingKindsFor(
+  entry: ExerciseEntry,
+  /**
+   * Whose lift it is. Optional: without it this is a fact about the exercise
+   * alone, as it was. WITH it, and with a kit list on it (kit-list.ts), an
+   * implement the person has said they do not have is not an answer for them:
+   * its number is never read as their cap, and they are never asked for it.
+   * So a dumbbell-or-kettlebell lift uses the dumbbell ceiling when there is
+   * no kettlebell — whatever kettlebell number is on file. Decided as a CSCS
+   * coach, 9 Oct 2026: a cap is the heaviest thing the person HAS that can do
+   * the lift. With no kit list nothing is filtered.
+   */
+  profile?: Pick<UserProfile, 'equipment_access' | 'kit_statements'> | null,
+): LoadCeilingKind[] {
+  const kinds = implementKindsOf(entry)
+  if (!profile) return kinds
+  return kinds.filter(kind => ownsKitItem(profile, KIT_ITEM_FOR_CEILING[kind]) !== false)
+}
+
+/** The thing a person would have to own for that ceiling to be theirs. */
+const KIT_ITEM_FOR_CEILING: Record<LoadCeilingKind, KitItem> = {
+  dumbbell: 'dumbbells',
+  single_implement: 'kettlebell',
+  improvised: 'weighted_bag',
+}
+
+function implementKindsOf(entry: ExerciseEntry): LoadCeilingKind[] {
   // Checked before loadingMode, because a weighted backpack falls through
   // that function's cases to 'stack' — it is not a cable machine, and pricing
   // it against one is how Backpack Row was once estimated at 45-65kg.
@@ -932,7 +983,7 @@ function statedKgForKind(profile: UserProfile, kind: LoadCeilingKind): number | 
  * Still only ever downward against the table — see effectiveLoadingCeilingKg.
  */
 export function statedCeilingKg(entry: ExerciseEntry, profile: UserProfile): number | null {
-  const stated = ceilingKindsFor(entry)
+  const stated = ceilingKindsFor(entry, profile)
     .map(kind => statedKgForKind(profile, kind))
     .filter((v): v is number => v != null)
   return stated.length === 0 ? null : Math.max(...stated)
@@ -948,7 +999,7 @@ export function statedCeilingKg(entry: ExerciseEntry, profile: UserProfile): num
  */
 function statedLimitFor(entry: ExerciseEntry, profile: UserProfile): { kg: number; noun: string } | null {
   let best: { kg: number; noun: string } | null = null
-  for (const kind of ceilingKindsFor(entry)) {
+  for (const kind of ceilingKindsFor(entry, profile)) {
     const kg = statedKgForKind(profile, kind)
     if (kg == null || (best && best.kg >= kg)) continue
     const noun = kind === 'improvised' ? 'bag'
@@ -2190,7 +2241,7 @@ export function prescribeLoad(
               //
               // full_gym is deliberately untouched: there the original
               // sentence is simply true.
-              : profile.equipment_access === 'home_gym' || profile.equipment_access === 'minimalist'
+              : equipmentTierFor(profile) === 'home_gym' || equipmentTierFor(profile) === 'minimalist'
                 ? 'A starting guess — I do not know which weights you actually have. ' +
                   'Use the closest thing you own, log it, and I will work from your number from next session.'
                 : 'Starting estimate from strength standards for your bodyweight, sex and experience — not a tested max. ' +
@@ -2490,7 +2541,7 @@ export function prescribeAddedLoad(
   // because BODYWEIGHT_ALLOWED_PHASES excludes strength and power, so a
   // bodyweight-tier plan never enters a phase this function loads. Kept so
   // that relaxing THAT restriction cannot hand someone a 25kg backpack.
-  if (profile.equipment_access === 'bodyweight') {
+  if (equipmentTierFor(profile) === 'bodyweight') {
     kg = Math.min(kg, IMPROVISED_IMPLEMENT_CEILING_KG[experience] ?? IMPROVISED_IMPLEMENT_CEILING_KG.novice)
   }
 

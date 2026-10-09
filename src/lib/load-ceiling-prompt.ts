@@ -26,6 +26,7 @@ import { supabase } from './supabase'
 import { ceilingKindsFor, isExternallyLoaded, statedCeilingKg, type LoadCeilingKind } from './load-prescription'
 import { getExerciseEntry } from './exercise-db'
 import type { UserProfile, WorkoutDay } from './types'
+import { equipmentTierFor } from './kit-list'
 
 /**
  * The implements a trainee can be asked about.
@@ -131,12 +132,17 @@ export function ceilingToAskFor(profile: UserProfile, day: WorkoutDay | null | u
   const p = profile as ProfileWithCeilings
   if (p.load_ceilings_declined === true) return null
   // A full-gym trainee is never asked. The tables describe a commercial gym,
-  // which is exactly where they are.
-  if (profile.equipment_access === 'full_gym') return null
+  // which is exactly where they are. (The tier their kit amounts to: a gym
+  // member who has since said "I only have dumbbells" is a home trainee.)
+  if (equipmentTierFor(profile) === 'full_gym') return null
   for (const ex of day.exercises) {
     const entry = getExerciseEntry(ex.name)
     if (!entry || !isExternallyLoaded(entry)) continue
-    const kind = ceilingKindsFor(entry)[0]
+    // NEVER ASK ABOUT AN IMPLEMENT THEY HAVE SAID THEY DO NOT HAVE. The kinds
+    // come back already narrowed to what this person owns (kit-list.ts), so a
+    // man with no kettlebell is never asked "What is your heaviest
+    // kettlebell?" — and a lift only a kettlebell can do raises no question.
+    const kind = ceilingKindsFor(entry, profile)[0]
     // NEVER RE-ASK WHAT IS ALREADY KNOWN. "Known" is the clamp's own answer
     // for this lift, not a second reading of the columns: a lift that can use
     // a dumbbell or a kettlebell is capped once either is on record, so it is

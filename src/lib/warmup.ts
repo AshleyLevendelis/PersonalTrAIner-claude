@@ -8,6 +8,7 @@ import {
 import { getExerciseEntry } from './exercise-db'
 import { getDurationBudgetSeconds } from './session-duration'
 import type { UserProfile, WorkoutDay } from './types'
+import { kitOf, equipmentTierFor, kitAllowsEquipment, type ResolvedKit } from './kit-list'
 
 // ---------------------------------------------------------------------------
 // WARM-UPS
@@ -309,6 +310,8 @@ const EQUIPMENT_AVAILABLE: Record<EquipmentAccess, string[]> = {
   minimalist: ['resistance band'],
   bodyweight: [],
 }
+/** Every piece of kit any warm-up drill asks for. Both are things a person can say they have or do not. */
+const WARMUP_DRILL_KIT = ['resistance band', 'pull-up bar']
 
 // ---------------------------------------------------------------------------
 // Ramp-up sets
@@ -516,6 +519,12 @@ export interface WarmupContext {
    */
   compounds: { entry: ExerciseEntry; suggestedLoadKg: number | null; loadSource?: PrescribedLoadSource }[]
   equipment: EquipmentAccess
+  /**
+   * What the person has said about their kit, resolved (kit-list.ts), or
+   * null/absent when they have said nothing. When present it answers "do they
+   * have bands / a bar to hang from" instead of the tier map below.
+   */
+  kit?: ResolvedKit | null
   injuries: string[]
   experience: TrainingExperience
   /** Hard ceiling. Warm-up must fit inside the session, not extend it. */
@@ -557,7 +566,15 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
     for (const j of PATTERN_JOINTS[p] ?? []) targetJoints.add(j)
   }
 
-  const haveEquipment = new Set(EQUIPMENT_AVAILABLE[ctx.equipment] ?? [])
+  // THE WARM-UP HAD ITS OWN TIER→KIT MAP, separate from the one the exercises
+  // are filtered by, so a man who had said he owns no bands could still be
+  // warmed up with Band Pull-Aparts. With a kit list, a drill's kit is asked
+  // of the same list as everything else (kit-list.ts `kitAllowsEquipment`);
+  // with none, the map below decides exactly as it always has.
+  const kit = ctx.kit ?? null
+  const haveEquipment = new Set(kit
+    ? WARMUP_DRILL_KIT.filter(eq => kitAllowsEquipment(kit, eq, false))
+    : EQUIPMENT_AVAILABLE[ctx.equipment] ?? [])
 
   const candidates = MOBILITY_DRILLS.filter(d =>
     d.prepares_joints.some(j => targetJoints.has(j)) &&
@@ -669,7 +686,8 @@ export function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay
         suggestedLoadKg: p.ex.suggested_load_kg ?? null,
         loadSource: p.ex.load_source,
       })),
-      equipment: profile.equipment_access || 'full_gym',
+      equipment: equipmentTierFor(profile) || 'full_gym',
+      kit: kitOf(profile),
       injuries: profile.injuries || [],
       experience: profile.training_experience || 'novice',
       budgetSeconds: getWarmupReserveSeconds(budgetSeconds),

@@ -440,6 +440,35 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 35,
   },
   {
+    // THE DUMBBELL PACK (see Bent-Over Dumbbell Row). REVIEWED TAGS.
+    // elbow: CONTRAINDICATED — with the dumbbells held together and the elbows
+    // tucked, the elbows take most of the load by design. shoulder:
+    // participates, KEPT — tucked elbows and a neutral grip are the
+    // shoulder-friendly press, kept on the same basis as Neutral-Grip Dumbbell
+    // Press and Dumbbell Floor Press. wrist: neutral and stacked, untagged.
+    // lower back, knee: supported on the bench.
+    //
+    // SHARES A FAMILY WITH Neutral-Grip Dumbbell Press (MOVEMENT_FAMILIES): a
+    // coach would not write both on one day.
+    name: 'Close-Grip Dumbbell Press',
+    id: 'close-grip-dumbbell-press',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps', 'chest', 'anterior deltoid'],
+    equipment: ['dumbbells', 'bench'],
+    joint_stress: 'low',
+    form_cues: ['Dumbbells pressed together over the chest, palms facing in', 'Keep them touching the whole way', 'Elbows brush the ribs on the way down', 'Press up and squeeze'],
+    coach_note_swap: 'A press that puts the triceps in charge — the dumbbells stay together and the elbows stay tucked.',
+    loads_joints: ['shoulder', 'elbow'],
+    contraindicated_joints: ['elbow'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  {
     name: 'Landmine Press',
     id: 'landmine-press',
     movement_pattern: 'vertical_push',
@@ -825,6 +854,39 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'row',
     unilateral: true,
     avg_duration_seconds: 30,
+  },
+  // THE DUMBBELL PACK, 9 Oct 2026 (docs/plans/kit-list.md) — decided as a CSCS
+  // coach. An honest kit list showed the catalogue thin exactly where a
+  // dumbbell trainee needs it: the only loaded dumbbell row needed a bench, and
+  // dumbbells with a shoulder flag left no triceps isolation at all. Each entry
+  // in the pack is the standard free-weight form of a movement the catalogue
+  // already holds on other kit. JOINT TAGS ARE REVIEWED, joint by joint, and
+  // written out on each entry — none is a default.
+  {
+    // REVIEWED TAGS. lower_back_axial: CONTRAINDICATED — an unsupported hip
+    // hinge held under load for the whole set, the same call as Barbell Rows
+    // and T-Bar Rows; a flagged lower back gets the bench-supported Dumbbell
+    // Rows instead. shoulder: participates, KEPT — a neutral-grip row below
+    // shoulder height, kept on the same basis as Chest-Supported Row. elbow,
+    // wrist: a neutral static grip, untagged like every row here. knee: soft
+    // and unloaded.
+    name: 'Bent-Over Dumbbell Row',
+    id: 'bent-over-dumbbell-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'rear deltoid', 'biceps'],
+    equipment: ['dumbbells'],
+    joint_stress: 'moderate',
+    form_cues: ['Hinge at the hips, back flat, knees soft', 'Dumbbells hang under the shoulders, palms facing in', 'Row both to the hips, elbows close', 'Lower with control, torso still'],
+    coach_note_swap: 'The dumbbell row that needs no bench — both arms at once from a hip hinge.',
+    loads_joints: ['lower_back_axial', 'shoulder'],
+    contraindicated_joints: ['lower_back_axial'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 32,
   },
   {
     name: 'T-Bar Rows',
@@ -2138,6 +2200,35 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     avg_duration_seconds: 32,
   },
   {
+    // THE DUMBBELL PACK (see Bent-Over Dumbbell Row). REVIEWED TAGS — the
+    // barbell Hip Thrust's, for the same reasons. hip: participates through a
+    // supported range, KEPT. lower back: the shoulders are on the bench and the
+    // spine carries nothing; the standard back-sparing hinge. knee: held near a
+    // right angle, unloaded. shoulder, wrist: steadying the dumbbell only.
+    name: 'Dumbbell Hip Thrust',
+    id: 'dumbbell-hip-thrust',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['glutes', 'hamstrings'],
+    equipment: ['dumbbell', 'bench'],
+    joint_stress: 'low',
+    form_cues: [
+      'Shoulder blades on the bench, one dumbbell across the hips',
+      'Feet flat, shins vertical at the top',
+      'Drive through the heels and squeeze the glutes',
+      'Ribs down — do not arch the lower back to gain height',
+    ],
+    coach_note_swap: 'The hip thrust with one dumbbell across the hips — glutes loaded, almost nothing on the spine.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'hip_thrust',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
+  {
     // MACHINE FLOOR: joint tags mirror Hip Thrust exactly — same movement,
     // the pad and lever replace the barbell-and-bench setup.
     name: 'Machine Hip Thrust',
@@ -2568,6 +2659,32 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Long stride', 'Back knee near floor', 'Upright torso', 'Push off front heel'],
     coach_note_swap: 'Dynamic unilateral work building balance and single-leg strength.',
     loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'single_leg',
+    unilateral: true,
+    avg_duration_seconds: 35,
+  },
+  {
+    // THE DUMBBELL PACK (see Bent-Over Dumbbell Row). REVIEWED TAGS.
+    // knee, hip, ankle: CONTRAINDICATED — kinder to the knee than a walking
+    // lunge (the front shin stays upright and there is no forward momentum to
+    // stop), but still loaded single-leg knee and hip flexion with a balance
+    // demand, so it goes on the same three flags as Walking Lunges and
+    // Bulgarian Split Squats. lower back, shoulder, wrist: dumbbells at the
+    // sides and an upright trunk, untagged as Walking Lunges is.
+    name: 'Dumbbell Reverse Lunge',
+    id: 'dumbbell-reverse-lunge',
+    movement_pattern: 'single_leg',
+    contraindicated_joints: ['ankle', 'hip', 'knee'],
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes', 'hamstrings'],
+    equipment: ['dumbbells'],
+    joint_stress: 'moderate',
+    form_cues: ['Dumbbells at your sides, stand tall', 'Step one foot straight back', 'Lower until the back knee is near the floor, front shin upright', 'Drive through the front heel to stand'],
+    coach_note_swap: 'Stepping back instead of forward keeps the front shin upright and needs no room to walk.',
+    loads_joints: ['knee', 'hip', 'ankle'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     substitution_group: 'single_leg',
     unilateral: true,
@@ -3378,6 +3495,87 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'tricep_extension',
     unilateral: true,
     avg_duration_seconds: 26,
+  },
+  {
+    // THE DUMBBELL PACK (see Bent-Over Dumbbell Row). REVIEWED TAGS.
+    // elbow: CONTRAINDICATED — a loaded, isolated extension whose resistance
+    // peaks at lockout. The app's standing position on an elbow flag is that
+    // free-weight elbow isolation goes (curls, extensions) and the cable and
+    // band pushdowns stay. shoulder: KEPT, and that is the point of it — the
+    // arm stays by the side, nothing goes overhead, the load is light. This is
+    // the shoulder-safe triceps movement a dumbbell kit did not have. lower
+    // back: one arm at a time with the free hand on the thigh or a bench, so
+    // nothing is held in an unsupported hinge. wrist, knee: not loaded.
+    name: 'Dumbbell Tricep Kickback',
+    id: 'dumbbell-tricep-kickback',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps'],
+    equipment: ['dumbbells'],
+    joint_stress: 'low',
+    form_cues: ['Lean forward with your free hand on your thigh or a bench', 'Upper arm level with your body, elbow pinned', 'Straighten the arm behind you and pause', 'Lower slowly — no swing'],
+    coach_note_swap: 'Elbow stays pinned at your side the whole set — the shoulder barely moves, unlike an overhead extension.',
+    loads_joints: ['elbow'],
+    contraindicated_joints: ['elbow'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: true,
+    avg_duration_seconds: 26,
+  },
+  {
+    // THE DUMBBELL PACK (see Bent-Over Dumbbell Row) — the catalogue's one
+    // kickback was a band, so a full gym's second triceps movement was a band
+    // beside a cable stack. REVIEWED TAGS. elbow: participates, KEPT — with
+    // the cable and band pushdowns, which are what a flagged elbow keeps:
+    // smooth resistance in small steps. shoulder: kept, arm by the side.
+    // lower back: free hand on the frame. wrist, knee: not loaded.
+    name: 'Cable Tricep Kickback',
+    id: 'cable-tricep-kickback',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps'],
+    equipment: ['cable machine'],
+    joint_stress: 'low',
+    form_cues: ['Cable set low, free hand on the frame', 'Lean forward, upper arm level with your body, elbow pinned', 'Straighten the arm behind you and pause', 'Let it back slowly'],
+    coach_note_swap: 'Elbow stays pinned at your side the whole set — the shoulder barely moves, unlike an overhead extension.',
+    loads_joints: ['elbow'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: true,
+    avg_duration_seconds: 26,
+  },
+  {
+    // THE DUMBBELL PACK (see Bent-Over Dumbbell Row). REVIEWED TAGS.
+    // elbow: CONTRAINDICATED — loaded deep elbow flexion, as Skull Crushers.
+    // shoulder: CONTRAINDICATED, KEPT WITH ITS FAMILY — Skull Crushers and
+    // Overhead Tricep Extension both go on a shoulder flag; the long head
+    // crosses the shoulder and the arm drifts behind the head under load. A
+    // neutral grip makes this kinder than the bar, and relaxing it would be its
+    // own reviewed decision, not something to arrive by default. wrist:
+    // neutral and stacked, NOT tagged (the bar version is). lower back, knee:
+    // lying and supported.
+    name: 'Lying Dumbbell Tricep Extension',
+    id: 'lying-dumbbell-tricep-extension',
+    movement_pattern: 'isolation_tricep',
+    contraindicated_joints: ['elbow', 'shoulder'],
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps'],
+    equipment: ['dumbbells', 'bench'],
+    joint_stress: 'moderate',
+    form_cues: ['Lie on the bench, dumbbells over the shoulders, palms facing in', 'Upper arms stay still', 'Lower the dumbbells beside your ears', 'Straighten without flaring the elbows'],
+    coach_note_swap: 'The skull crusher with dumbbells — palms in, which is kinder to the wrists and elbows than a bar.',
+    loads_joints: ['elbow', 'shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: false,
+    avg_duration_seconds: 30,
   },
   {
     name: 'Overhead Tricep Extension',
@@ -5614,6 +5812,13 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
   'Straight-Bar Tricep Pushdown': 'tricep_pushdown',
   'Band Tricep Pushdown': 'tricep_pushdown',
   'Band Tricep Kickback': 'tricep_kickback',
+  // The dumbbell pack, 9 Oct 2026: a kickback is a kickback whatever is in
+  // the hand ("every implement variant of the same movement", above).
+  'Dumbbell Tricep Kickback': 'tricep_kickback',
+  'Cable Tricep Kickback': 'tricep_kickback',
+  // ...and a neutral-grip dumbbell press with the dumbbells together is the
+  // same press a coach would not write twice on one day.
+  'Close-Grip Dumbbell Press': 'neutral_grip_press',
 }
 
 /**

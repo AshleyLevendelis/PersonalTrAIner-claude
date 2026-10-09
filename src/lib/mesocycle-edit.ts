@@ -3,6 +3,7 @@ import { getSmartReplacements, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, get
 import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded, DELOAD_LOAD_FRACTION } from './load-prescription'
 import { resolveLoadFields } from './warmup'
+import { equipmentTierFor } from './kit-list'
 import { PHASE_CONFIGS, getPhaseTempo, formatTempo, stepHoldSeconds } from './periodization'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
@@ -105,7 +106,7 @@ export function getReplacementCandidates(
   // their gym), scoped to this shortlist everywhere else — a trainee whose
   // kit really is a backpack never has the only thing they own demoted for
   // want of a peer that isn't even a real option.
-  const equipment = profile.equipment_access
+  const equipment = equipmentTierFor(profile)
   const demoted = new Set<string>()
   if (equipment && EQUIPMENT_QUALITY_TIERS.has(equipment)) {
     const peerPool = POOL_WIDE_IMPLEMENT_TIERS.has(equipment) ? pool : ranked.map(c => c.exercise)

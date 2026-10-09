@@ -148,7 +148,8 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import type { TrainerNudgeProps } from '@/components/TrainerNudge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
-import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, compileKitStatements, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { profileWithKit } from '@/lib/kit-list'
 import { favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { useServablePools } from '@/hooks/useServablePools'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
@@ -172,7 +173,32 @@ function App() {
   // Nutrition tab, because that is what it is built from — it stopped being a
   // section of Tools on 12 Sep 2026.
   const groceryFullScreen = route.kind === 'grocery'
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
+  // current profile, loaded once alongside it. fact-compiler.ts's pure
+  // functions turn these into the exact arguments generateExercisePlan/
+  // generateMealPools already accept; nothing here writes plan state.
+  // (Declared up here because the profile below is derived from them.)
+  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
+  /**
+   * THE PROFILE AS SAVED, and beside it THE PROFILE EVERYTHING IS HANDED.
+   *
+   * `storedProfile` is the row. `profile` is that row plus the kit the person
+   * has said they have ("I've got dumbbells and a bench", "I don't own bands"
+   * — Ashley's ruling of 9 Oct 2026, docs/plans/kit-list.md), compiled from
+   * their remembered facts. ONE derivation, here, so every tab, swap, added
+   * exercise, adaptation, rebuild and the coach's cards see the same kit: they
+   * all receive `profile`, and none of them can forget to ask.
+   *
+   * Nothing is stored by this. `kit_statements` is not a column, every profile
+   * write is a named patch, and a copy that reaches `storedProfile` through a
+   * spread is overwritten (or cleared) from the facts on the next pass. With
+   * no kit rows `profileWithKit` returns the very object it was given.
+   */
+  const [storedProfile, setProfile] = useState<UserProfile | null>(null)
+  const profile = useMemo(
+    () => (storedProfile ? profileWithKit(storedProfile, compileKitStatements(memoryFacts)) : null),
+    [storedProfile, memoryFacts],
+  )
   // WARM THE GROCERY CHUNK once there is a profile to shop for, while the
   // browser is idle, so the service worker has it before the shop (see
   // loadGroceryScreen). A failure here is harmless: opening the list fetches
@@ -319,11 +345,7 @@ function App() {
    * regenerating makes the banner go away on its own.
    */
   const [unrecognisedDietaryRestrictions, setUnrecognisedDietaryRestrictions] = useState<string[] | null>(null)
-  // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
-  // current profile, loaded once alongside it. fact-compiler.ts's pure
-  // functions turn these into the exact arguments generateExercisePlan/
-  // generateMealPools already accept; nothing here writes plan state.
-  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
+  // (memoryFacts is declared with the profile, which is derived from it.)
   const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
@@ -901,7 +923,7 @@ function App() {
     // walled behind a login screen mid-training-block.
     void shouldAskForEmail().then(setAskForEmail)
 
-    const restoredProfile: UserProfile = {
+    const savedProfile: UserProfile = {
       id: profileRow.id,
       // Number(null) is 0, not undefined — that silently turned "never given"
       // back into a fabricated measurement right at the restore boundary,
@@ -991,11 +1013,18 @@ function App() {
     const restoredExclusions: string[] = profileRow.exercise_exclusions || []
     setExerciseExclusions(restoredExclusions)
 
-    const [restoredPools, { data: exerciseRows }, fullMesocycle] = await Promise.all([
+    const [restoredPools, { data: exerciseRows }, fullMesocycle, restoredFacts] = await Promise.all([
       readPools(ownedId),
       supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
       restoreMesocycle(ownedId),
+      // What the person has said, read WITH the plan rather than after it:
+      // the block checks further down can rebuild weeks, and they run before
+      // React has any state to derive a kit from. A failed read falls back to
+      // the tier alone, as before any of this existed, and says so.
+      getActiveFacts(ownedId).catch(err => { console.error('Could not read what you have told the app, so your kit is being read from your equipment setting alone:', err); return [] as UserFactRow[] }),
     ])
+    // The same two functions as the derivation at the top of this component.
+    const restoredProfile: UserProfile = profileWithKit(savedProfile, compileKitStatements(restoredFacts))
 
     let restoredExercises: WorkoutDay[] = []
     let restoredMesocycle: MesocycleWeek[] = []
@@ -1121,7 +1150,9 @@ function App() {
       exercisePlan: restoredExercises,
     })
 
-    setProfile(restoredProfile)
+    // Both in one batch, so no render sees the saved profile without its kit.
+    setMemoryFacts(restoredFacts)
+    setProfile(savedProfile)
     setLatestWeightKg(restoredWeight)
     setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
     setMacros(liveTargets)
@@ -2763,6 +2794,10 @@ function App() {
       localStorage.removeItem('user_profile_cache')
       localStorage.removeItem('mesocycle_cache')
       setProfile(null)
+      // The remembered facts belong to the profile being left. The profile
+      // handed to every tab is derived from them (the kit list), so a new
+      // profile must not start life wearing the old one's kit.
+      setMemoryFacts([])
       setMacros(null)
       // Per-profile derived state — leaving this set leaked the previous
       // profile's last weigh-in into the NEXT profile's target derivation.

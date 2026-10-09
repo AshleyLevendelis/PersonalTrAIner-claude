@@ -117,11 +117,18 @@ console.log('\n[5b] The lower back was reviewed: the two paths diverge by exactl
   // deliberately do NOT carry this tag — Reverse Hyper mirrors Hip Thrust's
   // "almost nothing on the spine" tagging instead — so the count moves by
   // exactly two, not by the whole batch of six.
+  //
+  // MOVED 17 -> 18 on 9 Oct 2026, same shape: the dumbbell pack
+  // (docs/plans/kit-list.md) added Bent-Over Dumbbell Row, which mirrors
+  // Barbell Rows and T-Bar Rows — an unsupported hinge held under load. It
+  // loads the joint in BOTH paths. The pack's other six entries do not carry
+  // the tag (the hip thrust is supported on a bench, like the barbell one), so
+  // the count moves by exactly one.
   const j = getFlaggedJoints(['lower_back'])
   const viaNew = EXERCISE_DATABASE.filter(e => isContraindicatedFor(e, j))
   const viaOld = EXERCISE_DATABASE.filter(e => e.loads_joints.some(x => j.has(x)))
   const REHAB = ['Dead Bug', 'Side Plank', 'Bird Dog']
-  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 17, { viaNew: viaNew.length })
+  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 18, { viaNew: viaNew.length })
   check('...and none of the rehab movements is among the exclusions',
     REHAB.every(n => !viaNew.some(e => e.name === n)),
     viaNew.filter(e => REHAB.includes(e.name)).map(e => e.name).join(', '))

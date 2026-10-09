@@ -21,6 +21,7 @@ import { dayAnchorExercise, anchorScore } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS, yieldFillerTo, optionalFillerSeconds } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
+import { kitOf, equipmentTierFor, kitAllowsEquipment, kitInWords, type ResolvedKit } from './kit-list'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -47,6 +48,23 @@ type TrackFocus =
 interface BorrowSource {
   patterns?: MovementPattern[]
   groups?: string[]
+  /**
+   * Skip this source on a day that needs no stand-in: one that already holds
+   * one of `day_has` while the person's pool still holds one of `pool_has`.
+   *
+   * A Shoulders day borrows a row to stand in for shoulder work a flag (or the
+   * kit) took away. On an ordinary Shoulders day — it has its press, and the
+   * pool has raises — a freed slot was landing a row instead: on 375 uninjured
+   * days when the builder before this one tried to stop raise-stacking, with
+   * the week's balance pass answering by trimming the back day (9 Oct 2026,
+   * the reason that fix was withdrawn).
+   *
+   * BOTH halves, measured: skipping the row merely because the day has a press
+   * took it off flagged days too (a Landmine Press survives a shoulder flag,
+   * the raises do not), and the week's push:pull pass then removed a press
+   * from the chest day to match the lost pulling.
+   */
+  skip_when?: { day_has: MovementPattern[]; pool_has: MovementPattern[] }
 }
 
 interface TrackDefinition {
@@ -382,7 +400,12 @@ export const TRACKS: Record<TrackFocus, TrackDefinition> = {
     // volume to (upper-body pulling and the shoulder girdle), not a third leg
     // session forty-eight hours after leg day. Rows are tier-2 here by
     // construction — borrowed work never becomes the day's main lift.
-    borrow: [{ groups: ['row'] }, { patterns: ['isolation_trap'] }, { patterns: ['isolation_bicep'] }],
+    //
+    // THE ROW ONLY WHERE SHOULDER WORK IS MISSING (9 Oct 2026). It stands in
+    // for a press or for the raises a flag took away; a day that has its press
+    // and whose pool has raises moves on to traps and biceps. See
+    // BorrowSource.skip_when.
+    borrow: [{ groups: ['row'], skip_when: { day_has: ['vertical_push'], pool_has: ['isolation_shoulder'] } }, { patterns: ['isolation_trap'] }, { patterns: ['isolation_bicep'] }],
     slots: [
       { patterns: ['vertical_push'], tier: 'tier1_compound', required: true },
       { patterns: ['isolation_shoulder'], tier: 'tier3_isolation', required: false },
@@ -639,12 +662,25 @@ export const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
  */
 export function bestEquipmentRank(entry: ExerciseEntry): 'high' | 'medium' | 'low' | null {
   let best: 'high' | 'medium' | 'low' | null = null
+  let needsImprovised = false
   for (const eq of entry.equipment) {
     const rank = EQUIPMENT_QUALITY[eq]
     if (!rank) continue
     if (rank === 'high') return 'high'
+    if (rank === 'low') needsImprovised = true
     if (rank === 'medium' || best === null) best = rank
   }
+  // A BAG IS STILL A BAG WHEN THE ENTRY ALSO SAYS "BODYWEIGHT" (9 Oct 2026).
+  // Backpack Row and Loaded Backpack Walk list ['bodyweight', 'weighted
+  // backpack'] — every item REQUIRED — and the maximum above read them as
+  // 'medium', so neither was ever "improvised kit": a full-gym plan could hold
+  // a Backpack Row beside cable and dumbbell rows and nothing, here or in the
+  // quality scorer, called it a worse implement. It is the tester's "Backpack
+  // Row as Tuesday's main lift" (test log H1) one tier up. Where every listed
+  // item is needed, the improvised one IS the load and bodyweight is not a
+  // better tool for the same job. An either-or entry keeps the maximum: there
+  // the person really can pick the better option.
+  if (needsImprovised && !entry.equipment_alternatives) return 'low'
   return best
 }
 
@@ -906,12 +942,51 @@ export function getFlaggedJoints(injuries: string[]): Set<string> {
  * need only ONE listed item present; every other entry needs all of them,
  * the historical behaviour.
  */
-export function isEquipmentAllowed(entry: ExerciseEntry, tier: EquipmentAccess): boolean {
-  const allowed = EQUIPMENT_SETS[tier]
+export function isEquipmentAllowed(entry: ExerciseEntry, who: EquipmentAccess | EquipmentReader): boolean {
+  const allowed = typeof who === 'string' ? EQUIPMENT_SETS[who] : allowedEquipmentFor(who)
   if (!allowed) return true
   return entry.equipment_alternatives
     ? entry.equipment.some(eq => allowed.has(eq))
     : entry.equipment.every(eq => allowed.has(eq))
+}
+
+/** The two fields that decide what kit somebody has: the tier they picked and what they have said since. */
+export type EquipmentReader = Pick<UserProfile, 'equipment_access' | 'kit_statements'>
+
+/** What `allowedEquipmentFor` answers: can this person be given something that needs `eq`? `null` = everything (a full gym). */
+export interface EquipmentAllowance { has(eq: string): boolean }
+
+// One allowance object per resolved kit, so the per-exercise test stays a lookup.
+const kitAllowances = new WeakMap<ResolvedKit, EquipmentAllowance>()
+
+/**
+ * THE ONE ANSWER TO "WHAT KIT MAY THIS PERSON BE GIVEN WORK FOR".
+ * docs/plans/kit-list.md; Ashley's ruling of 9 Oct 2026 ("remember what they
+ * say").
+ *
+ * With no kit list it is the tier's own set, the very object it always was —
+ * `null` for a full gym — so a person who has said nothing gets byte-identical
+ * plans (`test:kit-list` §2). With one, each equipment string is answered by
+ * the list (kit-list.ts `kitAllowsEquipment`): one of the nine things a person
+ * can say they have is owned or not; anything else is as their tier has it,
+ * unless they gave a list as their whole kit.
+ *
+ * Read by `isEquipmentAllowed` and the equipment stage of the pool filter, and
+ * therefore by everything that goes through the pool: generation, the swap
+ * shortlist, add-an-exercise, injury substitution and rebuild, session
+ * rebuild, block rotation, the quality scorer. The warm-up's separate
+ * tier→kit map reads the same list (warmup.ts).
+ */
+export function allowedEquipmentFor(profile: EquipmentReader): EquipmentAllowance | null {
+  const kit = kitOf(profile)
+  if (!kit) return EQUIPMENT_SETS[(equipmentTierFor(profile) || 'full_gym')]
+  let allowance = kitAllowances.get(kit)
+  if (!allowance) {
+    const tierSet = EQUIPMENT_SETS[kit.baseTier]
+    allowance = { has: eq => kitAllowsEquipment(kit, eq, tierSet ? tierSet.has(eq) : true) }
+    kitAllowances.set(kit, allowance)
+  }
+  return allowance
 }
 
 // ---------------------------------------------------------------------------
@@ -950,24 +1025,26 @@ function shuffle<T>(arr: T[]): T[] {
 
 function stageEquipmentFilter(
   pool: ExerciseEntry[],
-  equipmentAccess: EquipmentAccess,
+  who: EquipmentReader,
   trace: ConstraintTrace
 ): ExerciseEntry[] {
-  const allowed = EQUIPMENT_SETS[equipmentAccess]
+  const allowed = allowedEquipmentFor(who)
   if (!allowed) {
     trace.pool_size_after_each_stage.equipment = pool.length
     return pool
   }
+  const kit = kitOf(who)
+  const has = kit ? `said they have ${kitInWords(kit.items) || 'no kit'}` : `has ${equipmentTierFor(who) || 'full_gym'} equipment`
   const result: ExerciseEntry[] = []
   for (const ex of pool) {
-    const hasAll = isEquipmentAllowed(ex, equipmentAccess)
+    const hasAll = isEquipmentAllowed(ex, who)
     if (hasAll) {
       result.push(ex)
     } else {
       trace.equipment_filtered.push({
         exercise: ex.name,
         stage: 'equipment',
-        reason: `user has ${equipmentAccess} equipment; exercise requires [${ex.equipment.join(', ')}]`,
+        reason: `user ${has}; exercise requires [${ex.equipment.join(', ')}]`,
       })
     }
   }
@@ -2545,15 +2622,43 @@ function selectExercisesForTrack(
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
   const forbidden = new Set(track.forbidden_patterns)
 
-  const trackPool = pool.filter(e =>
-    allPatterns.has(e.movement_pattern) &&
-    !forbidden.has(e.movement_pattern)
-  )
-
   // Computed once, from the WHOLE pool rather than trackPool: "do they own a
   // better tool for this movement" is a question about their gym, not about
   // what this track happens to cover.
   const implementPeerPool = equipmentAccess && POOL_WIDE_IMPLEMENT_TIERS.has(equipmentAccess) ? pool : undefined
+
+  // IMPROVISED KIT BESIDE BETTER KIT IS NOT A CANDIDATE AT ALL (9 Oct 2026,
+  // decided as a CSCS coach; docs/plans/kit-list.md).
+  //
+  // "A band or a bag loses to a real weight" was a RANKING penalty
+  // (scoreCandidate's equipment_fit), and a penalised candidate still wins
+  // when it is the only one left — which is exactly what the one-per-family
+  // rule arranges once the real weight is already on the day. Measured by the
+  // builder before this one on 2,304 seeded bodybuilding plans: a band triceps
+  // movement second on the chest day of 192 of 192 full-gym shoulder-flag
+  // plans, 343 of 384 home-gym and 378 of 384 Minimalist ones (every one of
+  // those people owns a cable stack or dumbbells), and a backpack or band
+  // raise beside the dumbbell one on 479 of 1,728 Shoulders days.
+  //
+  // So the day is filled from the pool block ROTATION has used since 8 Sep
+  // (`poolForRotation`): an improvised movement the person owns a properly
+  // loading equivalent of — the app's one definition, `hasBetterLoadingPeer`,
+  // same substitution group and tier, in THEIR pool — is left out. Rehab and
+  // trunk work are exempt inside that definition (her ruling), and someone
+  // whose only option is a band keeps it, because then there is no peer.
+  // The day's primer and its rehab movement are picked from the whole pool,
+  // as before: prep is not ranked by implement.
+  //
+  // What fills the slot instead is different work — the next family, or the
+  // track's borrow list — never the same job on a worse tool.
+  const selectionPool = implementPeerPool
+    ? pool.filter(e => e.mechanics_tier === 'primer' || !hasBetterLoadingPeer(e, pool))
+    : pool
+
+  const trackPool = selectionPool.filter(e =>
+    allPatterns.has(e.movement_pattern) &&
+    !forbidden.has(e.movement_pattern)
+  )
 
   // Every primer's own movement_pattern is 'activation' (see exercise-db.ts's
   // MovementPattern comment), so matching against it was a no-op — every
@@ -2640,13 +2745,13 @@ function selectExercisesForTrack(
   // day would be filled to its count and then given one more.
   const exerciseTarget = counts.tier1 + counts.tier2 + counts.tier3
   const legSupportSlot = weekTrainsLegsElsewhere ? undefined : track.slots.find(s => s.week_support === 'legs')
-  const legSupportPending = !!legSupportSlot && pool.some(e =>
+  const legSupportPending = !!legSupportSlot && selectionPool.some(e =>
     legSupportSlot.patterns.includes(e.movement_pattern) && e.mechanics_tier !== 'primer' && e.mechanics_tier !== 'tier1_compound')
   const fillTarget = exerciseTarget - (legSupportPending ? 1 : 0)
 
   function findForSlot(patterns: MovementPattern[], tier: TrackSlot['tier'] | null, respectWeeklyUsed: boolean, groups?: string[]): ExerciseEntry | null {
     const candidates = orderCandidates(
-      pool.filter(e =>
+      selectionPool.filter(e =>
         // A slot filled by GROUP is admitted whatever its pattern — that is
         // the point of it (see TrackSlot.groups). A slot filled by pattern
         // still answers to the track's forbidden list.
@@ -2688,10 +2793,16 @@ function selectExercisesForTrack(
     const sources = track.borrow ?? []
     for (let i = 0; i < sources.length; i++) {
       if (borrowUsed.has(i)) continue
-      borrowUsed.add(i)
       const source = sources[i]
+      // Not this source on a day that needs no stand-in (see
+      // BorrowSource.skip_when). Left unused, not used up: the day is judged
+      // again as it fills.
+      if (source.skip_when
+        && source.skip_when.day_has.some(p => selected.some(sel => sel.movement_pattern === p))
+        && source.skip_when.pool_has.some(p => selectionPool.some(e => e.movement_pattern === p && e.mechanics_tier !== 'primer'))) continue
+      borrowUsed.add(i)
       const candidates = orderCandidates(
-        pool.filter(e =>
+        selectionPool.filter(e =>
           ((source.groups?.includes(e.substitution_group) ?? false) || (source.patterns?.includes(e.movement_pattern) ?? false)) &&
           e.mechanics_tier !== 'primer' && e.mechanics_tier !== 'cardio' && e.mechanics_tier !== 'tier1_compound' &&
           !selected.some(sel => sel.name === e.name) &&
@@ -2765,7 +2876,7 @@ function selectExercisesForTrack(
     // day, in place of a second lat movement — measured as back sets up 5%
     // across 648 uninjured weeks. Borrowing is for a day the pool has left
     // short, not a new slot on a day that was already full.
-    const poolHasNothingForSlot = !pool.some(e =>
+    const poolHasNothingForSlot = !selectionPool.some(e =>
       e.mechanics_tier !== 'primer' &&
       (slot.groups
         ? slot.groups.includes(e.substitution_group)
@@ -3006,6 +3117,11 @@ function selectExercisesForTrack(
         // an implement in common. Three air squats, or a Plank beside a Dead
         // Bug, no longer get through; a second angle still does.
         if (respectFamilies && usedGroups.has(getMovementFamily(c.e)) && selected.some(sel => isGenuineDuplicate(sel, c.e))) continue
+        // ...AND NEVER A THIRD OF ONE FAMILY (9 Oct 2026). Two angles or two
+        // implements of a movement is what a coach writes on a long day; a
+        // third is padding. Measured before this: 24 full-gym Shoulders days of
+        // an hour or more held three or four lateral-raise variants.
+        if (respectFamilies && selected.filter(sel => getMovementFamily(sel) === getMovementFamily(c.e)).length >= 2) continue
         if (overFillCap(c.e)) continue
         if (wouldBeSecondMainLift(c.e)) continue
         selected.push(c.e)
@@ -3053,7 +3169,7 @@ function selectExercisesForTrack(
     for (const reqPattern of requiredPatterns) {
       if (!selected.some(e => e.movement_pattern === reqPattern)) {
         // PASS 1: Strict search (respect all constraints)
-        const fill = pool.find(e =>
+        const fill = selectionPool.find(e =>
           e.movement_pattern === reqPattern &&
           !wouldBeSecondMainLift(e) &&
           !selected.some(s => s.name === e.name) &&
@@ -3066,7 +3182,7 @@ function selectExercisesForTrack(
           usedGroups.add(getMovementFamily(fill))
         } else {
           // PASS 2: Relaxed search (allow reusing substitution groups)
-          const relaxedFill = pool.find(e =>
+          const relaxedFill = selectionPool.find(e =>
             e.movement_pattern === reqPattern &&
             !wouldBeSecondMainLift(e) &&
             !selected.some(s => s.name === e.name) &&
@@ -3151,7 +3267,7 @@ function selectExercisesForTrack(
       : Math.max(0, ...selected.map(e => anchorScore(e.mechanics_tier, e.name)))
     const findLegSupport = (tier: TrackSlot['tier'] | null, fresh: boolean): ExerciseEntry | null =>
       orderCandidates(
-        pool.filter(e =>
+        selectionPool.filter(e =>
           legSupportSlot.patterns.includes(e.movement_pattern) &&
           !slotForbidden.has(e.movement_pattern) &&
           e.mechanics_tier !== 'tier1_compound' && e.mechanics_tier !== 'primer' &&
@@ -3581,9 +3697,9 @@ export function selectDayExercises(
   }
   const { primer, rehab, main } = selectExercisesForTrack(
     track, pool, counts, new Set<string>(), styleConfig, trace, getGoalPolicy(profile.fitness_goal || 'hypertrophy'),
-    getFeaibleRequiredPatterns(styleConfig, profile.equipment_access || 'full_gym', profile.injuries || []),
+    getFeaibleRequiredPatterns(styleConfig, (equipmentTierFor(profile) || 'full_gym'), profile.injuries || []),
     new Map<string, number>(), profile.training_experience || 'novice', duration,
-    getFlaggedJoints(profile.injuries ?? []), profile.equipment_access || 'full_gym', trainingStyle,
+    getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle,
     opts.weekTrainsLegsElsewhere ?? false,
   )
   return { primer, rehab, main }
@@ -5470,10 +5586,10 @@ export function getConstrainedPool(
   let pool = EXERCISE_DATABASE.filter(
     e => !e.retired && !exclusions.some(ex => ex.toLowerCase() === e.name.toLowerCase())
   )
-  pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
+  pool = stageEquipmentFilter(pool, profile, throwaway)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
   if (!opts.skipStyle) {
-    pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+    pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
   }
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
   return pool
@@ -5506,14 +5622,22 @@ export function getExerciseCompatibilityWarnings(
   // generation considers fully allowed, i.e. the warning contradicted the
   // filter this function's own doc comment claims to reuse. Found 9 Sep 2026
   // while auditing the equipment labels (roadmap item 11).
-  const tier = profile.equipment_access || 'full_gym'
-  const allowedEquipment = EQUIPMENT_SETS[tier]
-  if (allowedEquipment && !isEquipmentAllowed(exercise, tier)) {
+  const allowedEquipment = allowedEquipmentFor(profile)
+  if (allowedEquipment && !isEquipmentAllowed(exercise, profile)) {
     const missing = exercise.equipment.filter(eq => !allowedEquipment.has(eq))
     // An alternatives entry only reaches here with NOTHING present, so listing
     // the misses with "or" is accurate: any one of them would do.
     const joiner = exercise.equipment_alternatives ? ' or ' : ', '
-    warnings.push(`Needs ${missing.join(joiner)} — outside your ${tier.replace(/_/g, ' ')} equipment.`)
+    // WITH A KIT LIST THE REASON IS WHAT THEY SAID, not a tier. "Outside your
+    // minimalist equipment" was printed on a dumbbell bench press for a man who
+    // owns dumbbells and a bench; once somebody has told the app what they
+    // have, the tier's name is no longer why (test log H1, 9 Oct 2026). The
+    // tier named otherwise is the one they PICKED, which is what Profile shows.
+    const kit = kitOf(profile)
+    const pickedTier = (kit ? kit.baseTier : equipmentTierFor(profile) || 'full_gym').replace(/_/g, ' ')
+    warnings.push(kit
+      ? `Needs ${missing.join(joiner)} — you've said you don't have one.`
+      : `Needs ${missing.join(joiner)} — outside your ${pickedTier} equipment.`)
   }
 
   const flaggedJoints = new Set<string>()
@@ -5581,7 +5705,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // Compute feasible required patterns based on equipment & injury constraints
   const feasiblePatterns = getFeaibleRequiredPatterns(
     styleConfig,
-    profile.equipment_access || 'full_gym',
+    (equipmentTierFor(profile) || 'full_gym'),
     profile.injuries || []
   )
 
@@ -5600,13 +5724,13 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   })
 
   // STAGE 1: Equipment
-  pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', trace)
+  pool = stageEquipmentFilter(pool, profile, trace)
 
   // STAGE 2: Injury (replacements sourced from equipment-filtered pool only)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
 
   // STAGE 3: Style
-  pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+  pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
 
   // STAGE 4: Skill / experience
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', trace)
@@ -5660,7 +5784,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const track = TRACKS[trackFocus]
     const legDaysElsewhere = resolvedTracks.filter((focus, i) => i !== index && isLegTrack(focus)).length
 
-    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), profile.equipment_access || 'full_gym', trainingStyle, legDaysElsewhere >= 2)
+    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -5770,7 +5894,8 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const warmup = buildWarmup({
       patterns: sessionEntries.map(e => e.movement_pattern),
       compounds,
-      equipment: profile.equipment_access || 'full_gym',
+      equipment: (equipmentTierFor(profile) || 'full_gym'),
+      kit: kitOf(profile),
       injuries: profile.injuries || [],
       experience: profile.training_experience || 'novice',
       budgetSeconds: warmupReserve,
@@ -7276,10 +7401,10 @@ export function generateMesocycle(
   // this function exists to solve). Bodyweight metabolic/conditioning
   // circuits are a legitimate, common variation regardless of the
   // trainee's primary goal.
-  const effectiveAllowedPhases = profile.equipment_access === 'bodyweight'
+  const effectiveAllowedPhases = equipmentTierFor(profile) === 'bodyweight'
     ? BODYWEIGHT_ALLOWED_PHASES
     : policy.allowedPhases
-  if (profile.equipment_access === 'bodyweight') {
+  if (equipmentTierFor(profile) === 'bodyweight') {
     sequence = restrictPhaseSequence(sequence, BODYWEIGHT_ALLOWED_PHASES)
   }
   // Any of the restrictions above (experience, goal, equipment) can each
@@ -7500,7 +7625,7 @@ export function generateMesocycle(
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
         )
-        const rotated = rotateVariation(ex.name, blockIndex, poolForRotation(pool, profile.equipment_access), experience, profile, usedNamesThisDay, avoidFamilies)
+        const rotated = rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
         usedNamesThisDay.add(rotated)
         if (rotated === ex.name) return { ...ex, name: rotated }
         // A rotation can land on an exercise with a different prescription
@@ -7729,7 +7854,7 @@ export function generateMesocycle(
               .map(e => getMovementFamily(e))
           )
           const weeklyName = rotatesWeekly
-            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), poolForRotation(pool, profile.equipment_access), experience, profile, usedWeeklyNames, weeklyFamilies)
+            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedWeeklyNames, weeklyFamilies)
             : ex.name
           if (rotatesWeekly) usedWeeklyNames.add(weeklyName)
 

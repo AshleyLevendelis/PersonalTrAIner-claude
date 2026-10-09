@@ -16,6 +16,7 @@
 import { searchExerciseCatalog } from './exercise-db'
 import type { UserFactRow, UserGoalRow } from './memory-store'
 import type { TrainingDay } from './types'
+import { isKitItem, type KitStatement } from './kit-list'
 
 // ---------------------------------------------------------------------------
 // Exercise resolution (write-time, called before createFact)
@@ -147,6 +148,38 @@ export function compileTrainingDayOverrides(facts: UserFactRow[], trainingDays: 
   )
   if (unavailableDays.size === 0) return trainingDays
   return trainingDays.map(d => (unavailableDays.has(d.day) ? { ...d, available: false } : d))
+}
+
+/**
+ * Kit statements ("I've got dumbbells and a bench", "I don't own bands") →
+ * `profile.kit_statements`, read by the engine's one equipment helper
+ * (exercise-plan.ts `allowedEquipmentFor`). docs/plans/kit-list.md.
+ *
+ * THE READER THE COACH'S EQUIPMENT FACTS NEVER HAD. `record_fact` has written
+ * `hard_constraint / equipment` rows since August and nothing read them: the
+ * same "written, shown back on Profile, read by nothing" shape as the soft
+ * food dislike above. Those rows are free text with no `resolved_refs`, so
+ * they stay inert here too — a sentence is not re-parsed into kit, ever. Only
+ * a row whose refs are item keys from the closed list of nine counts (the
+ * shape `kitStatementFact` writes).
+ *
+ * polarity like = has, dislike = hasn't, like + hardness 'hard' = the list is
+ * the WHOLE kit. In the order given, which `getActiveFacts` returns oldest
+ * first: statements are applied in the order they were said.
+ */
+export function compileKitStatements(facts: UserFactRow[]): KitStatement[] {
+  const statements: KitStatement[] = []
+  for (const f of facts) {
+    if (f.kind !== 'hard_constraint' || f.constraint_kind !== 'equipment') continue
+    if (f.polarity !== 'like' && f.polarity !== 'dislike') continue
+    const items = (f.resolved_refs ?? []).filter(isKitItem)
+    if (items.length === 0) continue
+    statements.push({
+      mode: f.polarity === 'dislike' ? 'hasnt' : f.hardness === 'hard' ? 'only' : 'has',
+      items,
+    })
+  }
+  return statements
 }
 
 // ---------------------------------------------------------------------------

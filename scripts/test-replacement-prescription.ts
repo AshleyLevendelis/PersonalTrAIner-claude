@@ -154,11 +154,22 @@ async function main() {
   // -------------------------------------------------------------------------
   // His plan was built WITH the shoulder flag and the ban was made after he
   // had cleared it, which is why Overhead Tricep Extension was on offer.
+  //
+  // RE-ANCHORED 9 Oct 2026. The tester banned Band Tricep Kickback, and until
+  // the dumbbell pack (docs/plans/kit-list.md) his seeded plan held it. It
+  // now holds the DUMBBELL kickback in that slot — a band is no longer put
+  // beside dumbbells he owns — so the row this reproduces is the same slot
+  // with what the plan holds today: a light lift whose reps have walked up
+  // (a 2kg step is a third of it), banned, with the overhead extension coming
+  // in. The property is unchanged: the replacement is prescribed as itself.
+  const KICKBACK = 'Dumbbell Tricep Kickback'
   const samPlan = silenced(() => build(sam(), 'sam:2'))
   const cleared = sam({ injuries: [] })
-  const wk2Before = samPlan.find(w => w.week_number === 2)!.days.find(d => d.day === 'Monday')!.exercises.find(e => e.name === 'Band Tricep Kickback')
-  check('the plan has the band kickback on Monday, walked up to 16-19', wk2Before?.reps === '16-19', wk2Before?.reps)
-  const banned = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: samPlan, profile: cleared, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
+  const wk2Before = samPlan.find(w => w.week_number === 2)!.days.find(d => d.day === 'Monday')!.exercises.find(e => e.name === KICKBACK)
+  const wk1Before = samPlan.find(w => w.week_number === 1)!.days.find(d => d.day === 'Monday')!.exercises.find(e => e.name === KICKBACK)
+  const lowOf = (reps: string | undefined) => Number((reps ?? '').split('-')[0])
+  check('the plan has the kickback on Monday, its reps walked up from week 1 (a range the outgoing lift earned)', !!wk1Before && !!wk2Before && lowOf(wk2Before.reps) > lowOf(wk1Before.reps), { wk1: wk1Before?.reps, wk2: wk2Before?.reps })
+  const banned = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: samPlan, profile: cleared, bannedName: KICKBACK, exclusions: [KICKBACK] }))
   const ote = getExerciseEntry('Overhead Tricep Extension')!
   const rows = banned.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => e.name === 'Overhead Tricep Extension').map(e => ({ w, e }))))
   check('Overhead Tricep Extension came in for it', rows.length >= 2, rows.length)
@@ -295,7 +306,9 @@ async function main() {
   // AND THE CALIBRATION WEEK STAYS LIGHT. Every unverified weight generation
   // prints in week 1 starts deliberately under its estimate; a lift swapped in
   // that week is just as unverified and used to be written at the full figure.
-  check(`replaced, weighted slots in the calibration week were seen (${calibrationSeen})`, calibrationSeen >= 3, calibrationSeen)
+  // (At least two: it was three until the dumbbell pack of 9 Oct 2026 moved
+  // which lifts these seeded plans hold in week 1.)
+  check(`replaced, weighted slots in the calibration week were seen (${calibrationSeen})`, calibrationSeen >= 2, calibrationSeen)
   check('...and each starts lighter than the same lift the week after', heavyCalibration.length === 0, heavyCalibration.slice(0, 4))
 
   // -------------------------------------------------------------------------
