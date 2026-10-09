@@ -81,6 +81,15 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // profile a reset creates can never match an old entry — it simply sends
   // its own facts the first time Home opens. Clearing it buys nothing.
   fitplan_moment_facts_sent_v1: { clear: false, why: 'reminder-facts send memo, keyed per profile — a new profile never matches an old entry' },
+
+  // THE PHONE'S OWN COPY OF WHAT THE SERVER HAS (H20, 9 Oct 2026) — the sets
+  // and cardio a failed read falls back on, so a dropped connection cannot make
+  // logged work read as "0 logged". Kept for the reason the memo above is:
+  // every entry is keyed by profile id (and date), so the new profile a reset
+  // creates can never read an old one. Bounded on their own — ten days of sets,
+  // sixty of cardio — and replaced by every read that lands.
+  fitplan_setlog_lastknown_v1: { clear: false, why: 'last-known sets per profile and date — a new profile never matches an old entry; ten days kept' },
+  fitplan_cardio_lastknown_v1: { clear: false, why: 'last-known cardio per profile — a new profile never matches an old entry; sixty days kept' },
 }
 
 /** Resolve `const SOME_KEY = 'literal'` across src/, so a key named by a constant is still found. */
