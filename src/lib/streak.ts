@@ -23,10 +23,13 @@
 // "must key on the plan week... or they straddle plan boundaries" rule.
 // ---------------------------------------------------------------------------
 
+import { sessionForDate, addDays, type SessionMove } from './session-move'
+import type { WorkoutDay } from './types'
+
 export interface StreakDayInput {
   /** YYYY-MM-DD, local calendar date. */
   date: string
-  /** Was this date a scheduled training day per the (current) mesocycle's day-of-week pattern? */
+  /** Did a planned session fall on THIS DATE — after any move, and never before the plan began? See buildStreakDays. */
   scheduled: boolean
   /** Was any set or cardio session logged on this date? */
   logged: boolean
@@ -83,4 +86,67 @@ export function computeStreak(days: StreakDayInput[]): StreakResult {
   }
 
   return { currentStreak: streak, brokenByMissedDay }
+}
+
+/**
+ * WHICH DATES HELD A PLANNED SESSION, AND WHETHER IT WAS DONE — the streak's
+ * input, built per DATE. Decided as a CSCS, 9 Oct 2026 (M16/M31): the unit of
+ * consistency is the planned session, on the day it was actually run.
+ *
+ * It was built from the plan's weekday pattern alone, and that got three
+ * things wrong, all seen by the tester in two days:
+ *   - A session MOVED to another day scored nothing there (not one of the
+ *     plan's weekdays) and was a miss where it came from, spending the week's
+ *     one make-up token — against the move card's own "won't count as missed,
+ *     and it won't count against your week". Two moved sessions in a week,
+ *     both done, broke the streak.
+ *   - An activity back-dated to before the plan existed scored a day ("2 days"
+ *     half an hour after sign-up).
+ *   - Football instead of a session scored as that session done.
+ *
+ * So, for each date, the resolver every screen already uses (sessionForDate):
+ *   - before the plan began: nothing counts and nothing breaks;
+ *   - the day a session was moved AWAY from: transparent;
+ *   - the day it landed on: a planned session, done or missed like any other;
+ *   - a day swapped for another activity: transparent — the streak is kept,
+ *     the planned session is not claimed as done. Unless she trained anyway;
+ *   - otherwise a planned day counts when anything was logged on it (sets, or
+ *     the cardio that IS the session on an activity-shaped plan).
+ *
+ * Today is left out while its session is still to do — "not done yet" is not
+ * a miss (computeStreak's contract). The make-up token is unchanged.
+ */
+export function buildStreakDays(input: {
+  todayStr: string
+  plan: WorkoutDay[]
+  /** Every move touching the window, origin or arrival. */
+  moves: SessionMove[]
+  /** Dates marked "I did something else instead". */
+  swappedDates: Set<string>
+  /** Dates with at least one logged set. */
+  setDates: Set<string>
+  /** Dates with at least one cardio log. */
+  cardioDates: Set<string>
+  /** The plan's first day, local. Null when unknown — then no date is ruled out by it. */
+  planStartStr: string | null
+  planWeekOf: (date: string) => number
+  /** How far back to look. */
+  days?: number
+}): StreakDayInput[] {
+  const out: StreakDayInput[] = []
+  for (let i = (input.days ?? 35) - 1; i >= 0; i--) {
+    const date = addDays(input.todayStr, -i)
+    const resolved = sessionForDate({ date, plan: input.plan, moves: input.moves })
+    const trained = input.setDates.has(date)
+    const planned = !!resolved.day && (resolved.day.is_scheduled ?? resolved.day.exercises.length > 0)
+    // (A day a session was moved AWAY from has no `day` at all — the resolver
+    // already answers that, so it is not asked twice here.)
+    const scheduled = planned
+      && (input.planStartStr == null || date >= input.planStartStr)
+      && !(input.swappedDates.has(date) && !trained)
+    const logged = trained || input.cardioDates.has(date)
+    if (date === input.todayStr && scheduled && !logged) continue
+    out.push({ date, scheduled, logged, planWeek: input.planWeekOf(date) })
+  }
+  return out
 }

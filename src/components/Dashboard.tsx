@@ -26,7 +26,7 @@ import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
 import { ShopDayCard } from '@/components/ShopDayCard'
-import { personalBest, bestReadingOf } from '@/lib/coach-voice'
+import { personalBest, bestReadingOf, streakLabel } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
 import { cardioLine } from '@/lib/cardio-lines'
 
@@ -496,10 +496,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <span
             className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1"
             style={{ background: 'var(--surface-raised)' }}
+            data-testid="home-streak"
           >
             <span aria-hidden className={`inline-block size-[5px] rounded-full ${data.streak > 0 ? 'bg-primary' : 'bg-[color:var(--text-dim)]'}`} />
             <span className="tabular-mono text-[0.8125rem] font-semibold">{data.streak}</span>
-            <span className="text-[0.6875rem] text-muted-foreground">day{data.streak === 1 ? '' : 's'} streak</span>
+            <span className="text-[0.6875rem] text-muted-foreground" data-testid="home-streak-label">{streakLabel(data.streak)}</span>
           </span>
         </div>
 

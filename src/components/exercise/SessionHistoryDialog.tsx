@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ChevronDown } from 'lucide-react'
-import { getSessionHistory, type SessionHistoryEntry } from '@/lib/exercise-history'
+import { getSessionHistory, sessionTitle, type SessionHistoryEntry } from '@/lib/exercise-history'
 import { getSetsForSession } from '@/lib/set-log-store'
 import type { ExerciseSetLog } from '@/lib/types'
 
@@ -85,7 +85,7 @@ export function SessionHistoryDialog({
               // button: there are no sets behind it to open, and its lines are
               // the whole of it. (H7: before 9 Oct 2026 it was in no list.)
               <div key={entry.sessionId} className="border-t pt-2 first:border-t-0 first:pt-0" style={{ borderColor: 'var(--hairline)' }} data-testid="history-cardio-day">
-                <p className="text-sm font-medium truncate">{entry.day} · {entry.date}</p>
+                <p className="text-sm font-medium truncate">{sessionTitle(entry)}</p>
                 {entry.cardio.map((line, i) => <p key={i} className="text-xs text-muted-foreground">{line}</p>)}
               </div>
             ) : (
@@ -96,11 +96,11 @@ export function SessionHistoryDialog({
                   className="w-full flex items-center justify-between gap-2 text-left"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{entry.day ?? entry.splitType} · {entry.date}</p>
+                    <p className="text-sm font-medium truncate">{sessionTitle(entry)}</p>
                     <p className="text-xs text-muted-foreground tabular-mono">
                       {entry.loadError
                         ? <span className="text-destructive">Couldn't load this session's sets</span>
-                        : <>{entry.durationMinutes != null ? `${entry.durationMinutes}m` : '—'} · {Math.round(entry.totalVolumeKg).toLocaleString()}kg · {entry.totalSets} sets</>}
+                        : <>{entry.durationMinutes != null ? `${entry.durationMinutes}m` : '—'} · {Math.round(entry.totalVolumeKg).toLocaleString()}kg · {entry.totalSets} set{entry.totalSets === 1 ? '' : 's'}</>}
                     </p>
                     {/* THE DAY'S CARDIO, AS ITS OWN LINES under the lifting's
                         figures, never added into them (H21). */}

@@ -40,7 +40,7 @@
 // caller's app clock, exactly as coach-opener.ts takes them.
 // ---------------------------------------------------------------------------
 
-import { recordPhrase, type RecordFact } from './coach-voice'
+import { recordPhrase, streakLabel, type RecordFact } from './coach-voice'
 
 export type NudgeKind =
   | 'session_feel'
@@ -82,7 +82,7 @@ export interface NudgeInput {
   missedYesterday: { date: string; dayName: string; focus: string } | null
   /** The most recent personal best inside the dashboard's own recent window, or null. */
   recentPR: (RecordFact & { date: string }) | null
-  /** Consecutive-day training streak (streak.ts). */
+  /** Planned sessions done in a row (streak.ts) — sessions, not days. */
   streak: number
   /** Today's session from the LIVE week. Null on a rest day OR when planKnown is false. */
   todaySession: NudgeSession | null
@@ -228,7 +228,7 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
     return {
       kind: 'streak_milestone',
       keys: [keys.streak],
-      text: `${input.streak} days in a row now. That's the part most people don't manage.`,
+      text: `${input.streak} ${streakLabel(input.streak)} now. That's the part most people don't manage.`,
       chips: ['How am I doing so far?'],
     }
   }

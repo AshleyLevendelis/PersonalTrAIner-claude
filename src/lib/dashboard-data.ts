@@ -18,7 +18,7 @@ import { getPRCache, getRecordsBeaten, refreshPRCacheFromDB, type PRMetric, type
 import { formatLoad, labelModeForEntry, isPerSideLoad, type LoadLabelMode } from './load-prescription'
 import { getExerciseEntry } from './exercise-db'
 import { getActiveGoals } from './memory-store'
-import { computeStreak, type StreakDayInput } from './streak'
+import { computeStreak, buildStreakDays, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
 import { selectCoachTipWithKey, type CoachTipContext } from './coach-tips'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
@@ -447,37 +447,43 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     getRecentLogs(profileId, 35),
     getRecentCardioLogs(profileId, 35),
   ])
-  const loggedDates = new Set<string>([...workingLogs.map(l => l.date), ...cardioLogs.map(c => c.date)])
 
-  // A day is scheduled if it SAYS it is (is_scheduled), falling back to the
-  // old "has exercises" inference only for plans stored before that field
-  // existed. Without the field, an activity-shaped day — a walk, a swim, no
-  // exercises array — would never count as scheduled, so logging it could
-  // never build a streak: streak.ts treats an unscheduled day as transparent,
-  // putting a completed walk in the same bucket as an untouched rest day.
-  const scheduledWeekdays = new Set(
-    exercisePlan.filter(d => (d.is_scheduled ?? d.exercises.length > 0)).map(d => d.day),
-  )
-  const streakDays: StreakDayInput[] = []
-  for (let i = 34; i >= 0; i--) {
-    // Same reason as tomorrow above: a fixed-millisecond walk back over
-    // five weeks crosses a clock change twice a year, and when it does it
-    // either repeats a date or skips one — silently, in the input to the
-    // streak. Stepped on the calendar date instead.
-    const d = new Date(`${addDays(todayStr, -i)}T12:00:00`)
-    // One date convention, and it is the local calendar one every write in
-    // this app uses. This was a ternary comparing the UTC date against
-    // todayStr and falling back to a hand-rolled local format — which took
-    // the local branch in every case that could differ, so the UTC half
-    // decided nothing and only made the line hard to read. Same helper as
-    // set-log-store, so "the day the user says it is" means one thing.
-    const dateStr = getLocalDateString(d)
-    const weekdayName = d.toLocaleDateString('en-US', { weekday: 'long' })
-    const scheduled = scheduledWeekdays.has(weekdayName)
-    const logged = loggedDates.has(dateStr)
-    if (dateStr === todayStr && scheduled && !logged) continue // today, not over yet — not a miss (streak.ts's contract)
-    streakDays.push({ date: dateStr, scheduled, logged, planWeek: getActiveMesocycleWeek(planCreatedAt, d, totalWeeks) })
-  }
+  // THE STREAK COUNTS PLANNED SESSIONS ON THE DATE THEY RAN (streak.ts's
+  // buildStreakDays, 9 Oct 2026). It asked only "is this weekday a training
+  // day?", so a moved session scored nothing where it was done and a miss
+  // where it was not; see that function for the rule and why.
+  //
+  // It needs every day note in the window, not just this week's moves: one
+  // read of the rows that carry them. `*`, so a database without one of the
+  // note columns still answers. A FAILED READ IS NOT "NO NOTES" — it falls
+  // back to the moves this screen was handed and says so, rather than
+  // silently scoring every moved session as a miss.
+  const windowStart = addDays(todayStr, -34)
+  const { data: noteRows, error: noteError } = await supabase
+    .from('workout_sessions')
+    .select('*')
+    .eq('profile_id', profileId)
+    // An arrival inside the window can come from an origin before it.
+    .gte('date', addDays(windowStart, -35))
+    .lte('date', addDays(todayStr, 35))
+  if (noteError) console.error('The streak could not read moved and swapped days; counting from this week\'s moves only:', noteError)
+  const notes = (noteRows ?? []) as { date: string; moved_to_date?: string | null; swapped_for_activity?: string | null }[]
+  const windowMoves: SessionMove[] = noteError
+    ? moves
+    : notes.filter(r => !!r.moved_to_date).map(r => ({ fromDate: r.date, toDate: r.moved_to_date as string }))
+  const planStartForStreak = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null
+  const streakDays: StreakDayInput[] = buildStreakDays({
+    todayStr,
+    plan: exercisePlan,
+    moves: windowMoves,
+    swappedDates: new Set(notes.filter(r => !!r.swapped_for_activity).map(r => r.date)),
+    setDates: new Set(workingLogs.map(l => l.date)),
+    cardioDates: new Set(cardioLogs.map(c => c.date)),
+    planStartStr: planStartForStreak,
+    // Noon, as every other date walk in this file: a fixed-millisecond step
+    // over five weeks crosses a clock change twice a year.
+    planWeekOf: date => getActiveMesocycleWeek(planCreatedAt, new Date(`${date}T12:00:00`), totalWeeks),
+  })
   const streakResult = computeStreak(streakDays)
 
   // DAYS BEFORE THE PLAN EXISTED ARE NOT PLAN WEEK 1.

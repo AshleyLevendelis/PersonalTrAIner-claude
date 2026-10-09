@@ -206,7 +206,13 @@ async function main() {
   check('one entry per date — the swapped day is not listed twice', entries.filter(e => e.date === TUE).length === 1, entries.filter(e => e.date === TUE).length)
   check('newest first — Friday\'s swim above Thursday\'s session, Sunday\'s walk last', entries.map(e => e.date).join(',') === [FRI, THU, TUE, SUN].join(','), entries.map(e => e.date))
   check('...a cardio-only day carries its weekday, like every other row', sun?.day === 'Sunday', sun?.day)
-  check('the lifting sessions are exactly the ones that were there before', entries.filter(e => !e.cardioOnly).map(e => e.date).sort().join(',') === [TUE, THU].join(','), entries.filter(e => !e.cardioOnly).map(e => e.date))
+  // RE-ANCHORED 9 Oct 2026 (M15/M30). This expected Tuesday among the LIFTING
+  // sessions: its row is the "swapped for football" note, with no set in it,
+  // and history listed every row ("swapped · 0m · 0kg · 0 sets"). A row with
+  // no working set is a note about a day; Tuesday is still in the history —
+  // once — as the activity it was.
+  check('the lifting sessions are the days somebody lifted: Thursday alone', entries.filter(e => !e.cardioOnly).map(e => e.date).sort().join(',') === [THU].join(','), entries.filter(e => !e.cardioOnly).map(e => e.date))
+  check('...and the swapped day is an activity entry, not a session with nothing in it', tue?.cardioOnly === true && tue?.totalSets === 0, tue)
 
   // ---- 4. Which logs a training day lists under "Additional work" --------------
   console.log('\n[4] the training day: what the finisher row shows, and what is left over')
@@ -270,8 +276,12 @@ async function main() {
   // History now lists a day of cardio with no lifting. The subtitle counted
   // rows; left alone it would have gone from "2 sessions" to 4 on this fixture
   // without anybody deciding a walk is a session.
-  check('the subtitle counts the entries that are not cardio-only', /sessions:\s*rows\.filter\(r => !r\.cardioOnly\)\.length/.test(tools))
-  check('...which on this history is 2, where every row would be 4', entries.filter(e => !e.cardioOnly).length === 2 && entries.length === 4, { lifting: entries.filter(e => !e.cardioOnly).length, all: entries.length })
+  // RE-ANCHORED 9 Oct 2026: the count moved into one function the history
+  // dialog's own gate calls (test:history-streak), and the swapped day's note
+  // is no longer a session — 1 of 4 here, where it was 2.
+  const { countSessions } = await import('../src/lib/exercise-history')
+  check('the subtitle counts sessions through the one function that leaves cardio-only days out', /sessions:\s*countSessions\(rows\)/.test(tools))
+  check('...which on this history is 1, where every entry would be 4', countSessions(entries as never) === 1 && entries.length === 4, { lifting: countSessions(entries as never), all: entries.length })
 
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.error(`${failures} cardio-reader check(s) FAILED.`); process.exitCode = 1; return }

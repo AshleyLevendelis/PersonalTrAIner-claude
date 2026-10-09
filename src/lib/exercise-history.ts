@@ -348,7 +348,7 @@ export function sumVolumeAndSets(sets: { weightKg: number; repsCompleted: number
 export async function getSessionHistory(userId: string, limit = 30): Promise<SessionHistoryEntry[]> {
   const { data, error } = await supabase
     .from('workout_sessions')
-    .select('id, date, split_type, day, duration_minutes, is_completed')
+    .select('*')
     .eq('profile_id', userId)
     .order('date', { ascending: false })
     .limit(limit)
@@ -369,7 +369,7 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
     cardioByDate.set(log.date, [...(cardioByDate.get(log.date) ?? []), cardioLine(log)])
   }
 
-  const sessionEntries: SessionHistoryEntry[] = await Promise.all(
+  const allRows: SessionHistoryEntry[] = await Promise.all(
     rows.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean }) => {
       const base = {
         sessionId: row.id,
@@ -397,8 +397,19 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
     })
   )
 
-  // A DATE WITH CARDIO AND NO SESSION ROW — a walk on a rest day, a class on a
-  // day off. It was done, so it is in the record; before this it was in none.
+  // A ROW IS NOT A SESSION (M15/M30, 9 Oct 2026). Marking a day as rest,
+  // moved, missed or swapped stores that note as a row in this same table
+  // (daily-tracking.ts) — so history listed "swapped · 0m · 0kg · 0 sets" as a
+  // session, and "moved · 2026-10-10" for a move away from a day that had not
+  // happened yet; two workouts read as five. And Start workout creates a row
+  // before any set exists. A session is the working sets in it: a row with
+  // none is a note about a day, and is not listed. A row whose sets could not
+  // be READ stays, saying so — unknown is not zero.
+  const sessionEntries = allRows.filter(e => e.loadError || e.totalSets > 0)
+
+  // A DATE WITH CARDIO AND NO SESSION ON IT — a walk on a rest day, a class on
+  // a day off, football on a day swapped for it. It was done, so it is in the
+  // record, as the activity it was.
   const listed = new Set(sessionEntries.map(e => e.date))
   const cardioEntries: SessionHistoryEntry[] = [...cardioByDate.entries()]
     .filter(([date]) => !listed.has(date))
@@ -407,6 +418,22 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
       isCompleted: true, totalVolumeKg: 0, totalSets: 0, cardio, cardioOnly: true,
     }))
   return [...sessionEntries, ...cardioEntries].sort((a, b) => b.date.localeCompare(a.date))
+}
+
+/**
+ * A history row's title, from the one thing every row has: its date.
+ *
+ * It read the session row's own `day`, which a session started with the
+ * button did not have — so Friday's was titled by its fallback, "training",
+ * beside "Thursday" (M30). The weekday is a fact about the date.
+ */
+export function sessionTitle(entry: Pick<SessionHistoryEntry, 'date'>): string {
+  return `${dayNameOf(entry.date)} · ${entry.date}`
+}
+
+/** "N sessions" — workouts. A day of cardio with no lifting is listed in history but is not one (decided 9 Oct 2026, unprompted: the number keeps the meaning it has always had). */
+export function countSessions(entries: SessionHistoryEntry[]): number {
+  return entries.filter(e => !e.cardioOnly).length
 }
 
 /**

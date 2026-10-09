@@ -76,7 +76,9 @@ async function main() {
   })
   const set = (sessionId: string, n: number, o: Record<string, unknown> = {}) => ({
     id: `${sessionId}-${n}`, session_id: sessionId, user_id: SAM, exercise_name: 'Goblet Squats', exercise_id: 'goblet-squats',
-    set_number: n, weight_kg: 16, reps_completed: 10, is_bodyweight: false, is_warmup: false, drop_index: 0, ...o,
+    set_number: n, weight_kg: 16, reps_completed: 10, is_bodyweight: false, is_warmup: false, drop_index: 0,
+    // Filled as the database fills it: the reader takes the day from it.
+    completed_at: `${db.workout_sessions.find(w => w.id === sessionId)?.date}T18:0${n}:00`, ...o,
   })
   db.workout_sessions.push(
     session('thu', THU8, { day: 'Thursday', duration_minutes: 52, is_completed: true }),
@@ -128,12 +130,14 @@ async function main() {
   const day = (name: string, training: boolean) => ({ day: name, focus: training ? 'Session' : 'Rest', exercises: training ? [{ name: 'Goblet Squats', sets: 3, reps: '10' }] : [] })
   const plan = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     .map(n => day(n, ['Monday', 'Tuesday', 'Thursday', 'Saturday'].includes(n))) as never
-  const planWeekOf = (date: string) => Math.max(1, Math.floor((new Date(`${date}T12:00:00`).getTime() - new Date(`${PLAN_START}T12:00:00`).getTime()) / (7 * 86400000)) + 1)
+  // Plan weeks run from the plan's own first day, as the app counts them — so
+  // two days in one calendar week of the fixture really do share a make-up token.
+  const weekFrom = (start: string) => (date: string) => Math.max(1, Math.floor((new Date(`${date}T12:00:00`).getTime() - new Date(`${start}T12:00:00`).getTime()) / (7 * 86400000)) + 1)
   const count = (o: { today: string; sets?: string[]; cardio?: string[]; moves?: { fromDate: string; toDate: string }[]; swapped?: string[]; planStart?: string | null }) =>
     streak.computeStreak(streak.buildStreakDays({
       todayStr: o.today, plan, moves: o.moves ?? [], swappedDates: new Set(o.swapped ?? []),
       setDates: new Set(o.sets ?? []), cardioDates: new Set(o.cardio ?? []),
-      planStartStr: o.planStart === undefined ? PLAN_START : o.planStart, planWeekOf,
+      planStartStr: o.planStart === undefined ? PLAN_START : o.planStart, planWeekOf: weekFrom(o.planStart ?? PLAN_START),
     })).currentStreak
 
   check('row 1 — the first workout only: 1', count({ today: THU8, sets: [THU8] }) === 1, count({ today: THU8, sets: [THU8] }))
@@ -154,6 +158,11 @@ async function main() {
   check('a rest day between them neither counts nor breaks', count({ today: '2026-10-28', sets: done, planStart: '2026-10-19' }) === 6)
   check('today\'s session, not done yet, is not a miss', count({ today, sets: done, planStart: '2026-10-19' }) === 6)
   check('...and counts once it is', count({ today, sets: [...done, today], planStart: '2026-10-19' }) === 7)
+  // WHERE "not done yet" BINDS: Monday 26th was missed, so this week's token
+  // is spent — were today a miss too, the streak would stop at Tuesday.
+  const missedMonday = ['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-24', '2026-10-27']
+  check('...even in a week whose one make-up token is already spent', count({ today, sets: missedMonday, planStart: '2026-10-19' }) === 5, count({ today, sets: missedMonday, planStart: '2026-10-19' }))
+  check('a second real miss in one week does stop it', count({ today: '2026-10-30', sets: missedMonday, planStart: '2026-10-19' }) === 1, count({ today: '2026-10-30', sets: missedMonday, planStart: '2026-10-19' }))
   // TWO MOVES IN ONE WEEK, BOTH DONE. Tue 20 → Wed 21, Sat 24 → Sun 25.
   const twoMoves = [{ fromDate: '2026-10-20', toDate: '2026-10-21' }, { fromDate: '2026-10-24', toDate: '2026-10-25' }]
   const movedDone = ['2026-10-19', '2026-10-21', '2026-10-22', '2026-10-25', '2026-10-26', '2026-10-27']

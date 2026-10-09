@@ -741,6 +741,18 @@ export const SET_WAITING_TO_SEND = 'on this phone, waiting to send'
  * question, default taken as instructed): nothing special beyond this one
  * quiet line. A first log is where a record STARTS; it is not one.
  */
+/**
+ * What the streak is CALLED, after its number: "2 sessions in a row".
+ *
+ * It said "2 days streak" over a count of planned sessions done — two
+ * sessions a week apart are a streak of 2 and are not two days. Decided
+ * unprompted on 9 Oct 2026, reversible (the owner question's default): keep
+ * the idea of a streak, name the unit it actually counts.
+ */
+export function streakLabel(count: number): string {
+  return `${count === 1 ? 'session' : 'sessions'} in a row`
+}
+
 export const FIRST_LOG_NOTE = 'First time logged — this is your baseline'
 /** Under a set row the server refused, beside its Retry. */
 export const SET_DID_NOT_SAVE = "didn't save"

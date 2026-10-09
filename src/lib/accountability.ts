@@ -100,7 +100,7 @@ export function pickAccountabilityCheckIn(input: AccountabilityInput): string | 
   //    and inventing a second one would just be a number that could disagree
   //    with the dashboard's.
   if (streak >= 5) {
-    return `They're on a ${streak}-day streak.`
+    return `They've done ${streak} planned sessions in a row.`
   }
 
   // 5. Protein — the macro that actually changes outcomes, so it outranks calories.

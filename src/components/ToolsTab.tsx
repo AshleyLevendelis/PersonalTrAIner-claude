@@ -9,7 +9,7 @@ const StopwatchPanel = lazy(() => import('@/components/timers/TimersPanel').then
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { getSessionHistory } from '@/lib/exercise-history'
+import { getSessionHistory, countSessions } from '@/lib/exercise-history'
 import { getRecordsBeaten, refreshPRCacheFromDB } from '@/lib/pr-engine'
 import { getAllItems, subscribeGroceryStore } from '@/lib/grocery-store'
 import { programHash, groceryHash } from '@/lib/app-route'
@@ -127,7 +127,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
         // LIFTING SESSIONS, as it has always counted: the history now also
         // lists a day of cardio with no lifting (H7), and that must not turn
         // "5 sessions" into 7 without anyone deciding it should.
-        setHistoryCount({ sessions: rows.filter(r => !r.cardioOnly).length, prs: getRecordsBeaten(profileId).length })
+        setHistoryCount({ sessions: countSessions(rows), prs: getRecordsBeaten(profileId).length })
       })
       .catch(() => { if (!cancelled) setHistoryCount(null) })
     return () => { cancelled = true }
