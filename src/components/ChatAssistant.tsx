@@ -12,7 +12,7 @@ import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-c
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
 import { supabase } from '@/lib/supabase'
-import { getRecentLogsWithWarmups, formatLogsForAI, getRecentCardioLogs, formatCardioLogsForAI } from '@/lib/daily-tracking'
+import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
@@ -1384,13 +1384,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
   const loadWorkoutLogs = async () => {
     if (!profile.id) return
+    // CARDIO THROUGH THE ONE READER, AND ON ITS OWN (H7, 9 Oct 2026). It was
+    // one half of a Promise.all over two server-only reads: a log that had not
+    // synced was not in it, and if the lifting read failed the coach was told
+    // about no cardio at all. This takes the phone's view — including what is
+    // still waiting here — and cannot be sunk by the read beside it. Re-run by
+    // the cardio store's own broadcast (ownWriteVersion, above), so a walk
+    // logged on the Exercise tab is in the next message's context.
+    void cardioHistoryForCoach(profile.id, getLocalDateString(getAppNow(profile.id)), 14).then(setCardioLogHistory)
     try {
-      const [logs, cardioLogs] = await Promise.all([
-        getRecentLogsWithWarmups(profile.id, 14),
-        getRecentCardioLogs(profile.id, 14),
-      ])
-      setWorkoutLogHistory(formatLogsForAI(logs))
-      setCardioLogHistory(formatCardioLogsForAI(cardioLogs))
+      setWorkoutLogHistory(formatLogsForAI(await getRecentLogsWithWarmups(profile.id, 14)))
     } catch (err) {
       console.error('Failed to load workout logs:', err)
     }

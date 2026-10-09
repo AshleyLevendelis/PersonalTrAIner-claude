@@ -121,7 +121,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek }: Tools
         if (cancelled) return
         // PRs come from the same cache the Home list and the set grid read;
         // counting them here rather than deriving a second definition.
-        setHistoryCount({ sessions: rows.length, prs: Object.keys(getPRCache(profileId)).length })
+        // LIFTING SESSIONS, as it has always counted: the history now also
+        // lists a day of cardio with no lifting (H7), and that must not turn
+        // "5 sessions" into 7 without anyone deciding it should.
+        setHistoryCount({ sessions: rows.filter(r => !r.cardioOnly).length, prs: Object.keys(getPRCache(profileId)).length })
       })
       .catch(() => { if (!cancelled) setHistoryCount(null) })
     return () => { cancelled = true }

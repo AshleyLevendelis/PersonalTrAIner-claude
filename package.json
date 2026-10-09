@@ -39,6 +39,8 @@
     "test:cardio-log": "tsx scripts/test-cardio-log.ts",
     "test:sets-never-lost": "tsx scripts/test-sets-never-lost.ts",
     "verify:sets-reconnect": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/sets-reconnect.mjs",
+    "test:cardio-reader": "tsx scripts/test-cardio-reader.ts",
+    "verify:cardio-shows": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-shows.mjs",
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",

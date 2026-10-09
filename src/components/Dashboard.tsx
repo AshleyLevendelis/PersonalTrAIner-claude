@@ -26,6 +26,8 @@ import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
 import { ShopDayCard } from '@/components/ShopDayCard'
 import { personalBest, bestReadingOf } from '@/lib/coach-voice'
+import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
+import { cardioLine } from '@/lib/cardio-lines'
 
 interface DashboardProps {
   profile: UserProfile
@@ -214,6 +216,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // Home's copy of the week — the RECORD. Exercise's strip is the navigator
   // and owns tap-to-peek; the two share only the glyph vocabulary.
   const week = useTrainingWeek(profile.id, activeSession.date, exercisePlan ?? [], planCreatedAt, logsVersion)
+  const cardioToday = useCardioLogsToday()
 
   // Bumped after a weigh-in save (from WeighInCard here, or a goal-weight
   // set) so the effect below re-fetches — nothing else that changes when a
@@ -629,6 +632,19 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 </Button>
               )}
             </>
+          )}
+
+          {/* TODAY'S CARDIO, whatever kind of day it is — H7/H21, 9 Oct 2026.
+              Home summarised the lifting and had no word for a logged walk, a
+              finisher, or the football that replaced the session. The same
+              hook the Exercise tab's rows read (one reader), the same line,
+              and it includes what is still waiting on this phone. */}
+          {cardioToday.length > 0 && (
+            <div className="mt-2" data-testid="home-cardio-today">
+              {cardioToday.map(l => (
+                <p key={l.clientId ?? l.id} className="text-[0.78125rem] text-muted-foreground">✓ {cardioLine(l)}</p>
+              ))}
+            </div>
           )}
 
           {week.days.length > 0 && (

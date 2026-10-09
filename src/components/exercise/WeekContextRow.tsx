@@ -2,7 +2,7 @@ import { ChevronDown, MoreVertical, History, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
-import { GLYPH, STATE_LABEL } from '@/lib/week-glyphs'
+import { GLYPH, dayLabel } from '@/lib/week-glyphs'
 
 // ---------------------------------------------------------------------------
 // Turn 5 — merges what were three separate rows (WeekStrip, ContextLine,
@@ -208,7 +208,9 @@ export function WeekContextRow({
               // announced "Monday: before_plan" — an identifier, not English.
               // The same defect STATE_LABEL was written to fix, still live
               // here because that fix went into the copy nothing renders.
-              aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
+              // dayLabel is that vocabulary's own sentence, shared with Home's
+              // strip, and names what a swapped day was swapped for (M14).
+              aria-label={dayLabel(d)}
             >
               <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
                 {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}

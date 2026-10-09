@@ -165,7 +165,12 @@ check('9b2. ...and with minutes given, asks how hard before it saves',
   /pick how hard it felt/i.test(await ev(`document.querySelector('[data-testid="what-happened-error"]')?.innerText || ''`)))
 check('9b3. ...in words, from the same effort box', await clickSel('[data-testid="what-happened-something-else"] [data-effort="steady"]'))
 await wait(200)
-check('9c. ...and saving swaps the day', await clickSel('[data-verb="save-something-else"]') && await untilClosed() && /swapped for another activity/.test(await untilCell(TODAY_NAME, /swapped/) || ''), await cell(TODAY_NAME))
+// RE-ANCHORED 9 Oct 2026 (M14). This matched "swapped for another activity",
+// which was all the strip could say about a day the app knew the whole story
+// of. The cell now names what the day was swapped FOR, with what was logged —
+// so this asserts that, which is the stronger claim: the activity, the minutes
+// and the effort typed two lines up are the ones on the strip.
+check('9c. ...and saving swaps the day, and the strip says what for', await clickSel('[data-verb="save-something-else"]') && await untilClosed() && new RegExp(`^${TODAY_NAME}: swapped for Swim · 30 min · Steady$`).test(await untilCell(TODAY_NAME, /swapped for Swim/) || ''), await cell(TODAY_NAME))
 let swapped = await ev(`document.querySelector('[data-testid="swapped-today"]')?.innerText || ''`)
 for (let i = 0; i < 10 && !/Swim/.test(swapped); i++) { await wait(300); swapped = await ev(`document.querySelector('[data-testid="swapped-today"]')?.innerText || ''`) }
 check('9d. ...and today’s panel says so, by name', /Swim/.test(swapped), swapped)

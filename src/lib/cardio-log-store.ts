@@ -440,10 +440,10 @@ function recordSynced(change: SyncedChange): void {
   saveLastKnown(all)
 }
 
-/** A range of days, both ends included. A single day is a range of one. */
-interface CardioRange {
+/** A range of days, both ends included. A single day is a range of one; no `to` means "up to now, and anything dated later". */
+export interface CardioRange {
   from: string
-  to: string
+  to?: string
 }
 
 /** What a cardio read came back with — the same shape set-log-store's read has, so a caller handles one kind of answer. */
@@ -473,23 +473,19 @@ export interface CardioLogsRead {
  * NEVER REJECTS, and since H20 it says whether it reached the server instead
  * of returning the same empty list for "nothing logged" and "could not ask".
  */
-async function readCardioLogs(userId: string, range: CardioRange): Promise<CardioLogsRead> {
+export async function readCardioLogs(userId: string, range: CardioRange): Promise<CardioLogsRead> {
   const startedAtSeq = syncSeq
   let server: CardioLog[] | null = null
   try {
-    const { data, error } = await supabase
-      .from('cardio_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('date', range.from)
-      .lte('date', range.to)
-      .order('completed_at', { ascending: false })
+    let query = supabase.from('cardio_logs').select('*').eq('user_id', userId).gte('date', range.from)
+    if (range.to) query = query.lte('date', range.to)
+    const { data, error } = await query.order('completed_at', { ascending: false })
     if (!error) server = (data || []) as CardioLog[]
   } catch {
     // Thrown rather than returned — the same failure, the same answer below.
   }
 
-  const inRange = (r: { date: string }) => r.date >= range.from && r.date <= range.to
+  const inRange = (r: { date: string }) => r.date >= range.from && (!range.to || r.date <= range.to)
   let base: CardioLog[]
   if (server) {
     for (const { seq, change } of recentlySynced) {

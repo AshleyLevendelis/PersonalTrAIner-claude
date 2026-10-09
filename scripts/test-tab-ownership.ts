@@ -96,8 +96,15 @@ check("Home's strip is not interactive — no handler", !/onClick/.test(homeStri
 check('...and not a button', !/<button/.test(homeStrip))
 check("Exercise's strip IS interactive", /onClick/.test(exStrip) && /<button/.test(exStrip))
 check('Home cells are 26px, Exercise is not', /h-\[26px\]/.test(homeStrip) && !/h-\[26px\]/.test(exStrip))
-check('the spoken label is English, not the raw state',
-  /STATE_LABEL\[d\.state\]/.test(exStrip) && !/\$\{d\.state\}/.test(exStrip))
+// RE-ANCHORED 9 Oct 2026 (M14). This asserted that Exercise's strip contains
+// the text `STATE_LABEL[d.state]` — the mechanism. Both strips now take their
+// sentence from one function in the shared vocabulary (dayLabel), which is what
+// lets a swapped day say what it was swapped for on both; the old check went
+// red on that, on correct code. The property is unchanged and now covers Home
+// too: the label is the vocabulary's English, never the raw state.
+check('the spoken label is English, not the raw state — one sentence for both strips',
+  /aria-label=\{dayLabel\(d\)\}/.test(exStrip) && /aria-label=\{dayLabel\(d\)\}/.test(homeStrip)
+  && /STATE_LABEL\[d\.state\]/.test(glyphs) && !/\$\{d\.state\}/.test(exStrip + homeStrip + glyphs))
 
 // A COMPONENT NOTHING IMPORTS PROVES NOTHING. The checks above read a file and
 // assert what it renders; that is worthless if no screen mounts it. Verified

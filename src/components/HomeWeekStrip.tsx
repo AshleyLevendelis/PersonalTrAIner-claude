@@ -11,7 +11,7 @@
 // meaning different things by the same mark.
 // ---------------------------------------------------------------------------
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
-import { GLYPH, STATE_LABEL, SHORT_DAY } from '@/lib/week-glyphs'
+import { GLYPH, dayLabel, SHORT_DAY } from '@/lib/week-glyphs'
 
 export function HomeWeekStrip({ days, todayName }: { days: TrainingWeekDay[]; todayName: string }) {
   return (
@@ -26,7 +26,7 @@ export function HomeWeekStrip({ days, todayName }: { days: TrainingWeekDay[]; to
             // keeps it legible to a screen reader without announcing seven
             // buttons that do nothing.
             role="img"
-            aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
+            aria-label={dayLabel(d)}
             className="flex h-[26px] flex-col items-center justify-center rounded-lg"
             style={{
               background: isToday

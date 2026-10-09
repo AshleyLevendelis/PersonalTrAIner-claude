@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
 import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
+import { swappedActivityLine } from '@/lib/cardio-lines'
 import type { WorkoutDay } from '@/lib/types'
 
 export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen' | 'moved'
@@ -31,6 +32,15 @@ export interface TrainingWeekDay {
    * come to disagree; the state and the name now travel together.
    */
   swappedForActivity?: string | null
+  /**
+   * The same activity WITH what was logged for it — "Football · 60 min ·
+   * Hard" — or just its name when no minutes were given. Null on a day that
+   * was not swapped. Built here, from the week's own cardio rows, for the
+   * reason `swappedForActivity` is carried here: the day card, the programme
+   * view and both strips all say it, and four readers of one fact is how they
+   * come to disagree (M14 — the strip drew ⇄ and nothing else said what for).
+   */
+  swappedLine?: string | null
   /** Set on the ORIGIN of a move — where this day's session went. */
   movedTo?: { date: string; dayName: string } | null
   /** Set on the TARGET of a move — where this day's session came from. */
@@ -285,6 +295,7 @@ export function useTrainingWeek(
       dayName,
       state,
       swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null,
+      swappedLine: swappedActivityLine(dashboardDay?.session?.swapped_for_activity, dashboardDay?.cardioLogs ?? []),
       markedMissed: !!dashboardDay?.session?.marked_missed,
       deliberateRest: !!dashboardDay?.session?.deliberate_rest,
       movedTo: resolved.movedTo,

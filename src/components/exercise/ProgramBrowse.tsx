@@ -404,6 +404,11 @@ export function ProgramBrowse({
           const sets = daySets(workout)
           const mins = trains ? Math.round(estimateDaySeconds(workout) / 60) : 0
           const main = trains ? mainLiftLine(workout) : null
+          // WHAT WAS DONE INSTEAD, on the live week only — for the reason a
+          // move is: a swap is a fact about one date, not an edit to the plan
+          // (M14, 9 Oct 2026). The row keeps the planned session and says what
+          // replaced it, in the words the day card uses.
+          const swappedFor = cell?.state === 'swapped' ? cell.swappedLine ?? null : null
           const restNote = movedTo
             ? `Moved to ${movedTo.dayName} — nothing to train here.`
             : isRest
@@ -531,6 +536,11 @@ export function ProgramBrowse({
                   {restNote && (
                     <span className="text-[0.71875rem]" style={{ color: 'color-mix(in srgb, var(--muted-foreground) 60%, transparent)' }}>
                       {restNote}
+                    </span>
+                  )}
+                  {swappedFor && (
+                    <span className="text-[0.71875rem] text-[color:var(--role-ai-text)]" data-testid="program-swapped">
+                      You did something else instead: {swappedFor}
                     </span>
                   )}
                 </div>

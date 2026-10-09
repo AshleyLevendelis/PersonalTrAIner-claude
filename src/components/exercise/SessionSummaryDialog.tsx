@@ -24,6 +24,15 @@ export interface SessionSummaryData {
    * own units into that sentence.
    */
   progressions: (readonly [string, { note: string; didProgress: boolean } | null])[]
+  /**
+   * The cardio logged today, one line each — "Brisk walk · 30 min · Easy".
+   *
+   * H21, 9 Oct 2026: the tester ticked the planned finisher, the row confirmed
+   * it with Undo, and this card — built from set logs alone — did not mention
+   * it. ITS OWN LINES, NOT FOLDED INTO THE TILES: Duration, Volume and Sets
+   * are the lifting's. (Decided unprompted, reversible — BACKLOG, 9 Oct.)
+   */
+  cardio?: string[]
 }
 
 export function SessionSummaryDialog({
@@ -81,6 +90,13 @@ export function SessionSummaryDialog({
                 <p className="ds-label-compact mt-0.5">Sets</p>
               </div>
             </div>
+
+            {(data.cardio?.length ?? 0) > 0 && (
+              <div className="space-y-1.5" data-testid="summary-cardio">
+                <p className="ds-label-compact">Cardio</p>
+                {data.cardio!.map((line, i) => <p key={i} className="text-sm">{line}</p>)}
+              </div>
+            )}
 
             {data.prs.length > 0 && (
               <div className="space-y-1.5">

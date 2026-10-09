@@ -3,8 +3,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Heart, ChevronRight, ArrowRight, Footprints, Bike, Waves, Dumbbell, CalendarDays } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, type CardioLogView } from '@/lib/cardio-log-store'
-import { PlannedCardioRow, UnplannedCardioEntry, CardioReadback, useCardioLogsToday, type CardioPick } from './CardioSetRow'
+import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES } from '@/lib/cardio-log-store'
+import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
 const AddCardioSession = lazy(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
 import type { WorkoutDay } from '@/lib/types'
@@ -113,8 +113,12 @@ function ActivityLogEntry({ alsoLabel = false, claimed = [] }: {
 }) {
   const { profileId } = useActiveSession()
   const [defaults, setDefaults] = useState<Record<string, number>>({})
-  const logs = useCardioLogsToday()
-  const [undone, setUndone] = useState<CardioLogView[]>([])
+  // WHAT WAS ALREADY LOGGED TODAY READS BACK ABOVE THE ROW, the way a set's
+  // saved rows sit above the next empty one. A log a prescribed row on this
+  // card has claimed is left out: it reads itself back there. The rule and its
+  // Undo live in CardioSetRow now, shared with the training day (H7).
+  const logged = useCardioReceiptsToday(claimed)
+  const receipts = logged.receipts
 
   // Their own recent durations, per chip. Starts empty and fills in — a chip
   // is tappable the whole time, just with the fallback on it until this lands.
@@ -134,14 +138,6 @@ function ActivityLogEntry({ alsoLabel = false, claimed = [] }: {
     Icon,
   }))
 
-  // WHAT WAS ALREADY LOGGED TODAY READS BACK ABOVE THE ROW, the way a set's
-  // saved rows sit above the next empty one. A log a prescribed row on this
-  // card has claimed is left out: it reads itself back there.
-  const isUndone = (l: CardioLogView) => undone.some(u =>
-    (!!u.clientId && u.clientId === l.clientId) || (!!u.id && u.id === l.id))
-  const live = logs.filter(l => !isUndone(l))
-  const taken = new Set(claimed.map(name => live.find(l => l.activity_name === name)).filter(Boolean))
-  const receipts = live.filter(l => !taken.has(l))
   const asked = alsoLabel || receipts.length > 0
   // ONE LIT ✓ PER CARD. Walk is pre-chosen only when nothing else on the card
   // is asking to be tapped: on a walking day the prescribed walk is the
@@ -161,13 +157,7 @@ function ActivityLogEntry({ alsoLabel = false, claimed = [] }: {
         </span>
         <span className={`${MICRO} text-muted-foreground`}>{preselect ? 'optional · one tap' : 'optional'}</span>
       </div>
-      {receipts.length > 0 && (
-        <div className="space-y-1" data-testid="activity-logged">
-          {receipts.map(r => (
-            <CardioReadback key={r.clientId ?? r.id} log={r} onUndone={() => setUndone(u => [...u, r])} />
-          ))}
-        </div>
-      )}
+      <CardioReceipts {...logged} testid="activity-logged" />
       {/* KEYED ON THE PRE-SELECTION, so the entry starts on Walk only while
           nothing is logged and nothing else on the card asks: after a save it
           comes back with nothing chosen, and a second tap on the ✓ cannot log

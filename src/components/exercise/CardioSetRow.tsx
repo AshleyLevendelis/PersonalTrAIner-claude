@@ -9,6 +9,7 @@ import {
   type CardioLogView,
 } from '@/lib/cardio-log-store'
 import { EFFORTS, effortForRpe, rpeToStore, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
+import { splitActivity, unclaimedCardio } from '@/lib/cardio-lines'
 import { prescriptionLine } from '@/lib/activity-day'
 
 // ---------------------------------------------------------------------------
@@ -78,15 +79,38 @@ const sameLog = (a: CardioLogView, b: CardioLogView) =>
   (!!a.clientId && a.clientId === b.clientId) || (!!a.id && a.id === b.id)
 
 /**
- * "Rowing Intervals — 6 rounds of 20s hard / 40s easy" → the name and the
- * protocol. An en/em dash or a spaced hyphen, because the catalogue uses more
- * than one. Moved here from FinisherRow with Ashley's 14 Sep report behind it:
- * the protocol is the instruction, not decoration, and a truncated one-liner
- * ate it.
+ * TODAY'S CARDIO THAT NO PLANNED ROW HAS CLAIMED — the receipts, with their
+ * Undo. H7, 9 Oct 2026.
+ *
+ * This was written once, inline, on the rest-day card, and nowhere else: so
+ * "Add unplanned work → Cardio → skipping rope, 12 min" on a TRAINING day
+ * saved, closed its panel and drew nothing. Lifted here so the rest day and
+ * the training day ask the same question the same way (see unclaimedCardio
+ * for the rule), instead of a second copy drifting from the first.
+ *
+ * An undone log is hidden at once and stays hidden even if a slower read still
+ * carries it — the same guard the planned row keeps.
  */
-export function splitActivity(activity: string): { name: string; protocol: string | null } {
-  const m = /^(.*?)\s+[—–-]\s+(.+)$/.exec(activity.trim())
-  return m ? { name: m[1], protocol: m[2] } : { name: activity.trim(), protocol: null }
+export function useCardioReceiptsToday(claimed: readonly (string | null | undefined)[]): {
+  receipts: CardioLogView[]
+  hide: (log: CardioLogView) => void
+} {
+  const logs = useCardioLogsToday()
+  const [undone, setUndone] = useState<CardioLogView[]>([])
+  return {
+    receipts: unclaimedCardio(logs.filter(l => !undone.some(u => sameLog(u, l))), claimed),
+    hide: log => setUndone(u => [...u, log]),
+  }
+}
+
+/** The receipts as rows — "✓ skipping rope · 12 min · Steady" with Undo. Draws nothing when there are none. */
+export function CardioReceipts({ receipts, hide, testid }: ReturnType<typeof useCardioReceiptsToday> & { testid: string }) {
+  if (receipts.length === 0) return null
+  return (
+    <div className="space-y-1" data-testid={testid}>
+      {receipts.map(r => <CardioReadback key={r.clientId ?? r.id} log={r} onUndone={() => hide(r)} />)}
+    </div>
+  )
 }
 
 /**

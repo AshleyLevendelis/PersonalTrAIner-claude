@@ -604,6 +604,21 @@ const driftedMacros: MacroTargets | null = REFIT
   : macros
 
 const today = isoOf(anchorDate())
+// ?swappedpast=1 — A DAY EARLIER THIS WEEK, REPLACED BY FOOTBALL. For M14
+// (9 Oct 2026): "I did something else instead — football, 60 min, Hard" left a
+// ⇄ on the strip and a day card that still showed the planned session.
+// ?swapped=1 above swaps TODAY, whose card has always said so; the gap was a
+// day you have to tap to look at, which a past day always is.
+//
+// Two days back is one of this fixture's four training days (availableIdx) and
+// sits inside the same Monday-to-Sunday week as the anchor Wednesday, so the
+// strip has a cell for it. The two rows are exactly what the What-happened
+// sheet writes: the day flag, and the activity's own cardio log.
+const SWAPPED_PAST = new URLSearchParams(location.search).get('swappedpast') === '1'
+const swappedPastDate = isoOf(new Date(anchorNowMs() - 2 * 86400000))
+;(window as unknown as { __swappedPast: unknown }).__swappedPast = SWAPPED_PAST
+  ? { date: swappedPastDate, dayName: DAYS[new Date(`${swappedPastDate}T12:00:00`).getDay()] }
+  : null
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
   // A weigh-in so the Dashboard's trend has something real to draw rather
@@ -695,8 +710,16 @@ const db: Db = {
         split_type: 'moved', duration_minutes: 0,
         moved_to_date: isoOf(new Date(anchorNowMs() + 86400000)),
       }]
+    : SWAPPED_PAST
+    ? [{ id: 'ws-swap-past', profile_id: PROFILE_ID, date: swappedPastDate, is_completed: false, split_type: 'swapped', duration_minutes: 0, swapped_for_activity: 'Football' }]
     : [],
-  cardio_logs: [],
+  cardio_logs: SWAPPED_PAST
+    ? [{
+        id: 'c-football', user_id: PROFILE_ID, date: swappedPastDate, activity_name: 'Football',
+        duration_minutes: 60, intensity_rpe: 7, notes: 'Swapped in place of the prescribed lifting session',
+        completed_at: new Date(anchorNowMs() - 2 * 86400000).toISOString(),
+      }]
+    : [],
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
   daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }],

@@ -10,6 +10,8 @@ import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, comp
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { reconnectingLine } from '@/lib/coach-voice'
+import { readCardioLogsForDate } from '@/lib/cardio-log-store'
+import { cardioLine } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
@@ -250,7 +252,11 @@ export function TodayPanel({
           return [ex.name, rec] as const
         })
     )
-    setSummaryData({ summary, prs, progressions })
+    // TODAY'S CARDIO, READ AT THE MOMENT OF FINISHING through the one reader
+    // (H21) — the finisher, anything unplanned, and anything still waiting on
+    // this phone. It never rejects, so a dead connection cannot stop the card.
+    const cardio = (await readCardioLogsForDate(profileId!, today)).rows.map(cardioLine)
+    setSummaryData({ summary, prs, progressions, cardio })
     setSummaryOpen(true)
   }
 
@@ -934,16 +940,34 @@ export function TodayPanel({
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
           </div>
         ) : (
-          <PeekPanel
-            workout={peekWorkout}
-            dayLabel={peekDay}
-            movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
-            onExit={() => setPeekDay(null)}
-            onSwap={(exIndex, name) => peekDay && onOpenSwap(peekDay, exIndex, name)}
-            onBan={handleBan}
-            onOpenDetail={onOpenDetail}
-            banBusyName={banBusy}
-          />
+          <>
+            {/* THE DAY SAYS WHAT WAS DONE ON IT — M14, 9 Oct 2026. Today's card
+                has said "You swapped today for…" since 8 Sep; a peeked day,
+                which a past one always is, fell straight through to the
+                planned session with the fact in hand and unused. So "football,
+                60 min, Hard" on Tuesday left a ⇄ on the strip and a Back &
+                Biceps card that had never heard of it. The planned list stays,
+                dimmed: it is what the plan had, not what happened. */}
+            {peekCell?.state === 'swapped' && peekCell.swappedLine && (
+              <InsightBanner tone="ai" data-testid="peek-swapped">
+                <span className="text-sm">
+                  You did something else instead: <span className="font-semibold">{peekCell.swappedLine}</span>.
+                </span>
+              </InsightBanner>
+            )}
+            <div className={peekCell?.state === 'swapped' ? 'opacity-60' : undefined}>
+              <PeekPanel
+                workout={peekWorkout}
+                dayLabel={peekDay}
+                movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
+                onExit={() => setPeekDay(null)}
+                onSwap={(exIndex, name) => peekDay && onOpenSwap(peekDay, exIndex, name)}
+                onBan={handleBan}
+                onOpenDetail={onOpenDetail}
+                banBusyName={banBusy}
+              />
+            </div>
+          </>
         )
       ) : isMovedAway && movedAwayTo ? (
         <MovedDayCard
@@ -1197,7 +1221,12 @@ export function TodayPanel({
               {workout!.mobilityFiller && <FinisherRow cardio={workout!.mobilityFiller} label="Optional" />}
             </>
           )}
-          <AdditionalWorkSection plannedExercises={workout!.exercises} profile={profile} onOpenPlateCalc={onOpenPlateCalc} />
+          <AdditionalWorkSection
+            plannedExercises={workout!.exercises}
+            plannedCardio={[workout!.recommendedCardio?.activity, workout!.mobilityFiller?.activity]}
+            profile={profile}
+            onOpenPlateCalc={onOpenPlateCalc}
+          />
           {/* VISIBLE AGAIN, and the "⋮" menu no longer carries it. Turn 5 put
               it behind that menu; the polish handoff puts it back at the foot
               of the list, which is where someone finishing a session looks

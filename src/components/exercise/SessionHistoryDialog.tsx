@@ -80,8 +80,16 @@ export function SessionHistoryDialog({
           <p className="text-sm text-muted-foreground">No completed sessions yet.</p>
         ) : (
           <div className="space-y-2">
-            {entries.map(entry => (
-              <div key={entry.sessionId} className="border-t pt-2 first:border-t-0 first:pt-0" style={{ borderColor: 'var(--hairline)' }}>
+            {entries.map(entry => entry.cardioOnly ? (
+              // A DAY OF CARDIO AND NO LIFTING — a walk on a rest day. Not a
+              // button: there are no sets behind it to open, and its lines are
+              // the whole of it. (H7: before 9 Oct 2026 it was in no list.)
+              <div key={entry.sessionId} className="border-t pt-2 first:border-t-0 first:pt-0" style={{ borderColor: 'var(--hairline)' }} data-testid="history-cardio-day">
+                <p className="text-sm font-medium truncate">{entry.day} · {entry.date}</p>
+                {entry.cardio.map((line, i) => <p key={i} className="text-xs text-muted-foreground">{line}</p>)}
+              </div>
+            ) : (
+              <div key={entry.sessionId} className="border-t pt-2 first:border-t-0 first:pt-0" style={{ borderColor: 'var(--hairline)' }} data-testid="history-session">
                 <button
                   type="button"
                   onClick={() => toggleExpand(entry.sessionId)}
@@ -94,6 +102,9 @@ export function SessionHistoryDialog({
                         ? <span className="text-destructive">Couldn't load this session's sets</span>
                         : <>{entry.durationMinutes != null ? `${entry.durationMinutes}m` : '—'} · {Math.round(entry.totalVolumeKg).toLocaleString()}kg · {entry.totalSets} sets</>}
                     </p>
+                    {/* THE DAY'S CARDIO, AS ITS OWN LINES under the lifting's
+                        figures, never added into them (H21). */}
+                    {entry.cardio.map((line, i) => <p key={i} className="text-xs text-muted-foreground" data-testid="history-cardio-line">{line}</p>)}
                   </div>
                   <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${expandedSessionId === entry.sessionId ? 'rotate-180' : ''}`} />
                 </button>

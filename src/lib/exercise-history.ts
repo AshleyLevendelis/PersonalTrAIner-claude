@@ -15,6 +15,9 @@ import type { BestReading } from './coach-voice'
 
 import { supabase } from './supabase'
 import { isMalformedZeroWeight, getSetsForSession } from './set-log-store'
+import { readCardioLogs } from './cardio-log-store'
+import { cardioLine } from './cardio-lines'
+import { dayNameOf } from './session-move'
 import { prMetricFor, calculateE1RM, type PRMetric } from './pr-engine'
 
 export interface ExerciseHistorySetRow {
@@ -317,6 +320,17 @@ export interface SessionHistoryEntry {
   totalSets: number
   /** True when the sets query for this session failed — totalVolumeKg/totalSets are 0 as a placeholder, NOT a real "nothing logged" result. Callers must render this distinctly (e.g. "Couldn't load"), never as a genuine zero. */
   loadError?: boolean
+  /**
+   * The cardio logged on this date, one line each — "Brisk walk · 30 min ·
+   * Easy". ITS OWN LINES, NEVER FOLDED INTO THE FIGURES ABOVE: duration,
+   * volume and sets are the lifting's, and a walk added to them would make
+   * every earlier session incomparable. (Decided unprompted, reversible —
+   * BACKLOG, 9 Oct 2026.) Joined on the date: `cardio_logs` has no session id,
+   * and "one fact, one home" (types.ts) says it should not grow one.
+   */
+  cardio: string[]
+  /** A date with cardio and no session row at all. Listed so the work is not lost; flagged so a count of LIFTING sessions can leave it out. */
+  cardioOnly?: boolean
 }
 
 /** Pure — sets × reps summed, and a raw count. Bodyweight sets (weight 0) contribute 0 volume, matching computeSessionSummary's convention. */
@@ -339,10 +353,21 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
     console.error(`getSessionHistory(${userId}) failed to load workout_sessions:`, error)
     throw error
   }
-  if (!data) return []
+  const rows = data ?? []
 
-  const entries = await Promise.all(
-    data.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean }) => {
+  // ONE RANGED READ of cardio through the one reader, joined on date below.
+  // From the oldest session listed when the list was cut at `limit` (cardio
+  // older than that belongs to a page nobody is looking at); from the
+  // beginning otherwise. It carries what is still waiting on this phone, so a
+  // finisher logged a moment ago is in the history it is opened from.
+  const oldest = rows.length >= limit ? rows[rows.length - 1].date : '0000-01-01'
+  const cardioByDate = new Map<string, string[]>()
+  for (const log of (await readCardioLogs(userId, { from: oldest })).rows) {
+    cardioByDate.set(log.date, [...(cardioByDate.get(log.date) ?? []), cardioLine(log)])
+  }
+
+  const sessionEntries: SessionHistoryEntry[] = await Promise.all(
+    rows.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean }) => {
       const base = {
         sessionId: row.id,
         date: row.date,
@@ -350,6 +375,7 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
         day: row.day,
         durationMinutes: row.duration_minutes,
         isCompleted: row.is_completed,
+        cardio: cardioByDate.get(row.date) ?? [],
       }
       // A failed sets query must render as "couldn't load", never as a
       // silent 0kg/0sets indistinguishable from a genuinely empty session —
@@ -367,7 +393,17 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
       }
     })
   )
-  return entries
+
+  // A DATE WITH CARDIO AND NO SESSION ROW — a walk on a rest day, a class on a
+  // day off. It was done, so it is in the record; before this it was in none.
+  const listed = new Set(sessionEntries.map(e => e.date))
+  const cardioEntries: SessionHistoryEntry[] = [...cardioByDate.entries()]
+    .filter(([date]) => !listed.has(date))
+    .map(([date, cardio]) => ({
+      sessionId: `cardio:${date}`, date, splitType: 'cardio', day: dayNameOf(date), durationMinutes: null,
+      isCompleted: true, totalVolumeKg: 0, totalSets: 0, cardio, cardioOnly: true,
+    }))
+  return [...sessionEntries, ...cardioEntries].sort((a, b) => b.date.localeCompare(a.date))
 }
 
 /**

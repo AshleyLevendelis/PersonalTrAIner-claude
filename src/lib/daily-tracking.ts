@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
-import type { SessionMove } from './session-move'
+import { addDays, type SessionMove } from './session-move'
+import { readCardioLogs } from './cardio-log-store'
 import type { DailyMetric, DailyNutritionTarget, WorkoutSession, WorkoutExerciseRow, ExerciseSetLog, CardioLog } from './types'
 import { setLabelLong, type SetRef } from './session-derive'
 import { isMalformedZeroWeight } from './set-log-store'
@@ -414,7 +415,7 @@ export async function getWeeklyDashboard(
   startDate: string,
   endDate: string
 ): Promise<WeeklyDashboardDay[]> {
-  const [metrics, nutrition, sessionsResult, cardioResult] = await Promise.all([
+  const [metrics, nutrition, sessionsResult, cardioRead] = await Promise.all([
     getDailyMetrics(profileId, startDate, endDate),
     getNutritionTargets(profileId, startDate, endDate),
     supabase
@@ -424,18 +425,16 @@ export async function getWeeklyDashboard(
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true }),
-    supabase
-      .from('cardio_logs')
-      .select('*')
-      .eq('user_id', profileId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('completed_at', { ascending: false }),
+    // THROUGH THE ONE CARDIO READER (H7/H21, 9 Oct 2026), not a query of its
+    // own: a log still waiting on this phone is part of the week, and a read
+    // that cannot reach the server answers with what the phone already knew
+    // instead of an empty week.
+    readCardioLogs(profileId, { from: startDate, to: endDate }),
   ])
 
   if (sessionsResult.error) throw sessionsResult.error
   const sessions = sessionsResult.data as WorkoutSession[]
-  const allCardio = (cardioResult.data || []) as CardioLog[]
+  const allCardio: CardioLog[] = cardioRead.rows
 
   // Set logs hang off sessions in the unified store (C0) — fetch by session id
   // and stamp each row with its session's date for the per-day view.
@@ -675,6 +674,24 @@ export async function getRecentCardioLogs(
 
   if (error) throw error
   return (data || []) as CardioLog[]
+}
+
+/**
+ * THE COACH'S CARDIO HISTORY — what it is handed as context, through the one
+ * reader.
+ *
+ * The tester logged "skipping rope, 12 min" on the Exercise tab and the coach
+ * said it "hasn't been written down yet". Two reasons, both in the read this
+ * replaces (getRecentCardioLogs): it asked the SERVER only, so a log that had
+ * not synced did not exist; and it threw on a dead connection, so the coach
+ * was told nothing at all. This takes the phone's view — server rows, plus
+ * whatever is still waiting here — and never throws.
+ *
+ * `today` is the app's date, passed in: the coach's window is counted from the
+ * day the person is living in, not from the machine's clock.
+ */
+export async function cardioHistoryForCoach(userId: string, today: string, days = 14): Promise<string> {
+  return formatCardioLogsForAI((await readCardioLogs(userId, { from: addDays(today, -days) })).rows)
 }
 
 export function formatCardioLogsForAI(logs: CardioLog[]): string {
