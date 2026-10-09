@@ -85,6 +85,14 @@ export interface OnboardingDraft {
   pendingContextFacts: PendingContextFact[]
   pendingGoals: PendingGoal[]
   /**
+   * Questions the coach parked ("I'll answer that properly once you're set
+   * up"), in the person's own words. Sent back to the coach each turn so the
+   * APP counts them — the cap of two is the owner's condition for parking at
+   * all — and handed to the first chat after setup, where the promise is kept
+   * (parked-questions.ts). Optional: a draft saved before this has none.
+   */
+  parkedQuestions?: string[]
+  /**
    * Stamped true by the conversational flow's Generate button just before it
    * hands off to App.tsx's completion pipeline. The flush of queued context
    * facts/goals onto the new profile runs ONLY for a completing draft — a
@@ -127,6 +135,7 @@ export function loadOnboardingDraft(): OnboardingDraft | null {
       messages: Array.isArray(parsed.messages) ? parsed.messages : [],
       pendingContextFacts: Array.isArray(parsed.pendingContextFacts) ? parsed.pendingContextFacts : [],
       pendingGoals: Array.isArray(parsed.pendingGoals) ? parsed.pendingGoals : [],
+      parkedQuestions: Array.isArray(parsed.parkedQuestions) ? parsed.parkedQuestions.filter(q => typeof q === 'string') : [],
     }
   } catch {
     localStorage.removeItem(DRAFT_KEY)

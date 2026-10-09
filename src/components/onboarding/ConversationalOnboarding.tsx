@@ -39,6 +39,7 @@ import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } fr
 import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
 import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn } from '@/lib/onboarding-capture'
 import type { SessionDuration } from '@/lib/types'
+import { addParkedQuestion, saveParkedQuestions } from '@/lib/parked-questions'
 import {
   loadOnboardingDraft,
   saveOnboardingDraft,
@@ -102,6 +103,8 @@ interface WorkingState {
   confirmed: Set<string>
   pendingContextFacts: PendingContextFact[]
   pendingGoals: PendingGoal[]
+  /** Questions the coach has parked this conversation — see parked-questions.ts. */
+  parkedQuestions: string[]
   newMessages: ChatMsg[]
   openReview: boolean
   resolveCards: Set<string>
@@ -560,6 +563,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   const [confirmed, setConfirmed] = useState<Set<string>>(() => new Set(draftLoaded?.confirmedSlots ?? []))
   const [pendingContextFacts, setPendingContextFacts] = useState<PendingContextFact[]>(() => draftLoaded?.pendingContextFacts ?? [])
   const [pendingGoals, setPendingGoals] = useState<PendingGoal[]>(() => draftLoaded?.pendingGoals ?? [])
+  const [parkedQuestions, setParkedQuestions] = useState<string[]>(() => draftLoaded?.parkedQuestions ?? [])
   const [messages, setMessages] = useState<ChatMsg[]>(() => {
     if (draftLoaded && draftLoaded.messages.length > 0) {
       return [
@@ -674,9 +678,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
+      parkedQuestions,
     }
     saveOnboardingDraft(draft)
-  }, [values, confirmed, messages, pendingContextFacts, pendingGoals])
+  }, [values, confirmed, messages, pendingContextFacts, pendingGoals, parkedQuestions])
 
   // KEEPING THE LATEST MESSAGE IN VIEW.
   //
@@ -784,6 +789,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     confirmed,
     pendingContextFacts,
     pendingGoals,
+    parkedQuestions,
     newMessages: [],
     openReview: false,
     resolveCards: new Set(),
@@ -796,6 +802,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     setConfirmed(ws.confirmed)
     setPendingContextFacts(ws.pendingContextFacts)
     setPendingGoals(ws.pendingGoals)
+    setParkedQuestions(ws.parkedQuestions)
     if (ws.newMessages.length > 0 || ws.resolveCards.size > 0) {
       setMessages(prev => [
         ...prev
@@ -826,6 +833,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       slotCatalog: buildSlotCatalog(ws.values),
       filled,
       remaining: openSlotsInOrder(ws.confirmed, ws.values),
+      // So the coach is TOLD how many questions it has parked rather than
+      // left to count its own history — the cap is the condition for parking.
+      parkedQuestions: ws.parkedQuestions,
     }
   }
 
@@ -950,6 +960,11 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             displayText,
           })
         }
+      } else if (action.name === 'park_question') {
+        // The coach has said it will answer this once setup is done. Keeping
+        // the question is what makes that true — it is put back in front of
+        // the person in the first chat after their plan is built.
+        ws.parkedQuestions = addParkedQuestion(ws.parkedQuestions, String(action.args.question ?? ''), userText)
       } else if (action.name === 'complete_onboarding') {
         const stillMissing = missingRequiredSlots(ws.values)
         const stillUnasked = unconfirmedOptionalSlots(ws.confirmed, ws.values)
@@ -1554,8 +1569,12 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
+      parkedQuestions,
       completing: true,
     })
+    // Handed to the first chat, which is where "I'll come back to it" is kept.
+    // Written even when empty, so an earlier setup's questions never resurface.
+    saveParkedQuestions(parkedQuestions)
     onComplete(assembleProfile(values))
   }
 

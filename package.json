@@ -150,6 +150,8 @@
     "test:onboarding-receipts": "tsx scripts/test-onboarding-receipts.ts",
     "test:style-picker": "tsx scripts/test-style-picker.ts",
     "verify:style-picker": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/style-picker.mjs",
+    "test:onboarding-detours": "tsx scripts/test-onboarding-detours.ts",
+    "verify:parked-question": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/parked-question.mjs",
     "verify:onboarding-turns": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/turns.mjs",
     "test:coach-logs-steps": "tsx scripts/test-coach-logs-steps.ts",
     "test:coach-injuries-context": "tsx scripts/test-coach-injuries-context.ts",

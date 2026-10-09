@@ -490,6 +490,44 @@ await section(15, 'M3 — the combat style is not offered, and cannot be recorde
   check('...and the three real options put back in front of them', cards.some(c => c.labels.length === 3 && c.inView && !c.labels.some(l => /combat/i.test(l))), cards)
 })
 
+await section(16, 'M1 — a parked question is kept, counted, and handed over when setup ends', async () => {
+  await open('m2')
+  await queue({
+    reply: "Good question, and I'd rather answer it properly than in passing — whether it's worth it for you depends on how you train and eat, which is exactly what I'm finding out. I'll come back to it as soon as you're set up. So, those three days: how long have you realistically got each time?",
+    actions: [
+      { name: 'park_question', args: { question: 'what does creatine actually do, should I take it?' } },
+      { name: 'present_slot', args: { slot_key: 'sessionDuration' } },
+    ],
+  })
+  await say('what does creatine actually do, should I take it?')
+  check('the question is saved with the conversation', ((await evj(`__draft()`))?.parkedQuestions ?? []).join() === 'what does creatine actually do, should I take it?', (await evj(`__draft()`))?.parkedQuestions)
+  check('...and the question it interrupted still has its chips, below the detour', (await evj(`__cards('sessionDuration')`)).some(c => c.inView && /realistically got each time/.test(c.under)))
+  // The next turn tells the coach how many it has parked — the app counts.
+  await queue({ reply: 'Thirty to forty-five it is. How do you like to train?', actions: [{ name: 'present_slot', args: { slot_key: 'trainingStyle' } }] })
+  await tapOption('sessionDuration', '30-45 min')
+  await wait(600)
+  const told = await lastRequest()
+  check('the coach is told on the next turn that one is parked', (told?.state?.parkedQuestions ?? []).length === 1, told?.state?.parkedQuestions)
+
+  // Finishing setup hands it to the first chat.
+  await ev(`(() => {
+    const d = JSON.parse(localStorage.getItem('fitplan_onboarding_draft'))
+    const all = { displayName: 'Sam', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate', activityLevel: 'moderate',
+      equipment: 'minimalist', injuries: [], trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '30-45', trainingStyle: 'functional',
+      conditioningPreference: 'tolerate', recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82', gender: 'male',
+      mealsPerDay: 3, dietaryPreferences: [], dislikedFoods: '' }
+    d.values = { ...d.values, ...all }; d.confirmedSlots = Object.keys(all)
+    localStorage.setItem('fitplan_onboarding_draft', JSON.stringify(d))
+    localStorage.removeItem('fitplan_parked_questions')
+  })()`)
+  await open('keep')
+  check('harness: the finished conversation still holds the parked question', ((await evj(`__draft()`))?.parkedQuestions ?? []).length === 1)
+  await tapButton('Generate My Plan')
+  const handed = await evj(`JSON.parse(localStorage.getItem('fitplan_parked_questions') || '[]')`)
+  check('"Generate My Plan" hands the question to the first chat', handed.join() === 'what does creatine actually do, should I take it?', handed)
+  check('...and the plan is built from the answers as usual', !!(await evj(`window.__onbCompleted`))?.fitness_goal)
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }
