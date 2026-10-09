@@ -1,5 +1,6 @@
 import type { BestReading } from './coach-voice'
 import { supabase } from './supabase'
+import { getLocalDateString } from './dev-clock'
 import type { ExerciseSetLog } from './types'
 
 /**
@@ -139,6 +140,53 @@ export const EMPTY_PR_RECORD: PRRecord = { maxWeight: 0, maxE1RM: 0, maxAddedLoa
 // was never reconciled against reality.
 const memCache = new Map<string, Record<string, PRRecord>>()
 
+/**
+ * THE SAME ROWS, KEPT BY DAY — 9 Oct 2026 (M12).
+ *
+ * "Is this a personal best?" needs the record as it stood BEFORE the day
+ * being asked about, and the all-time cache above cannot say: it is rebuilt
+ * after every set, so by the second set of a session it already holds the
+ * first. The finish card used to lean on a snapshot taken when Start workout
+ * was pressed — which a session opened by ticking a set never took, so that
+ * session compared every lift with nothing and called all of them records.
+ *
+ * Each exercise's best per calendar day, so any reader can ask for the record
+ * before a date (getPRBaseline). The baseline is derived, never remembered:
+ * two ways of starting a session cannot disagree about it.
+ */
+type DayBest = Omit<PRRecord, 'date'>
+const dayCache = new Map<string, Record<string, Record<string, DayBest>>>()
+
+/** False until the first read of this person's sets has come back. An empty
+ * baseline then means "not known yet", not "never lifted". */
+export function isPRCacheLoaded(userId: string): boolean {
+  return dayCache.has(userId)
+}
+
+function foldDay(into: PRRecord, day: DayBest, date: string): void {
+  if (day.maxWeight > into.maxWeight) { into.maxWeight = day.maxWeight; into.date = date }
+  if (day.maxE1RM > into.maxE1RM) { into.maxE1RM = day.maxE1RM; into.date = date }
+  if (day.maxAddedLoad > into.maxAddedLoad) { into.maxAddedLoad = day.maxAddedLoad; into.date = date }
+  if (day.maxReps > into.maxReps) { into.maxReps = day.maxReps; into.date = date }
+}
+
+/**
+ * Every exercise's record from the days strictly BEFORE `beforeDate`. An
+ * exercise first logged on or after that date is simply absent — which is
+ * what "no earlier record to beat" looks like.
+ */
+export function getPRBaseline(userId: string, beforeDate: string): Record<string, PRRecord> {
+  const out: Record<string, PRRecord> = {}
+  for (const [exerciseName, days] of Object.entries(dayCache.get(userId) ?? {})) {
+    const earlier = Object.keys(days).filter(d => d < beforeDate).sort()
+    if (earlier.length === 0) continue
+    const record = { ...EMPTY_PR_RECORD }
+    for (const d of earlier) foldDay(record, days[d], d)
+    out[exerciseName] = record
+  }
+  return out
+}
+
 export function calculateE1RM(weight: number, reps: number): number {
   if (reps <= 0 || weight <= 0) return 0
   if (reps === 1) return weight
@@ -183,6 +231,7 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
   if (error || !data) return
 
   const cache: Record<string, PRRecord> = {}
+  const byDay: Record<string, Record<string, DayBest>> = {}
   for (const row of data) {
     // A DROP IS NOT A PERSONAL BEST — Ashley's ruling, 19 Sep 2026, and the
     // CSCS basis recorded with it: a drop is performed already fatigued,
@@ -201,9 +250,24 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
     const metric = prMetricFor(shape)
     if (!metric) continue
 
-    const date = String(row.completed_at).split('T')[0] ?? ''
+    // THE LIFTER'S OWN CALENDAR DAY. This read the UTC date off the
+    // timestamp, which files an evening set under tomorrow for anyone west of
+    // Greenwich — harmless while the date was only a label, and wrong now
+    // that "before today" is decided on it.
+    const completed = new Date(String(row.completed_at))
+    const date = isNaN(completed.getTime()) ? (String(row.completed_at).split('T')[0] ?? '') : getLocalDateString(completed)
     const current = cache[row.exercise_name] ?? { ...EMPTY_PR_RECORD }
     cache[row.exercise_name] = current
+    const days = (byDay[row.exercise_name] ??= {})
+    const day = (days[date] ??= { maxWeight: 0, maxE1RM: 0, maxAddedLoad: 0, maxReps: 0 })
+    if (metric === 'load') {
+      day.maxWeight = Math.max(day.maxWeight, shape.weightKg)
+      day.maxE1RM = Math.max(day.maxE1RM, calculateE1RM(shape.weightKg, shape.reps))
+    } else if (metric === 'added_load') {
+      day.maxAddedLoad = Math.max(day.maxAddedLoad, Number(shape.addedLoadKg ?? 0))
+    } else {
+      day.maxReps = Math.max(day.maxReps, shape.reps)
+    }
 
     // date tracks whichever max this row most recently pushed forward —
     // dashboard-data.ts's "recent PRs" line filters on it, so it must be
@@ -222,6 +286,7 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
     }
   }
   memCache.set(userId, cache)
+  dayCache.set(userId, byDay)
 }
 
 /**

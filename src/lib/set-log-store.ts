@@ -678,15 +678,34 @@ export function deleteSet(params: {
 // Session resolution (Part 5 — auto-create today's workout_sessions row)
 // ---------------------------------------------------------------------------
 
-export async function ensureSessionSynced(userId: string, date: string, splitType: string = 'training'): Promise<string> {
+export async function ensureSessionSynced(
+  userId: string,
+  date: string,
+  splitType: string = 'training',
+  /**
+   * What the caller knows about this session, for a row created before any
+   * set exists. The first SET of a day has always recorded these (saveSet,
+   * above); Start workout creates the row with no set, so without them it was
+   * inserted with no day and no week and never corrected (M30: "training ·
+   * 2026-10-09" beside "Thursday · 2026-10-08"). Never overwrites what a set
+   * already recorded.
+   */
+  known?: { startedAt: string; weekNumber: number; day: string },
+): Promise<string> {
   const regKey = `${userId}|${date}`
   const registry = loadRegistry()
+  if (known && !registry[regKey]) {
+    registry[regKey] = { startedAt: known.startedAt, weekNumber: known.weekNumber, day: known.day }
+    saveRegistry(registry)
+  }
   const entry = registry[regKey]
   if (entry?.serverId) return entry.serverId
 
   const { data: existing, error: selectError } = await supabase
     .from('workout_sessions')
-    .select('id, started_at')
+    // `*`: a column list is rejected outright on a database that lacks one of
+    // them, and this read is on the path of every set that syncs.
+    .select('*')
     .eq('profile_id', userId)
     .eq('date', date)
     .maybeSingle()
@@ -702,6 +721,15 @@ export async function ensureSessionSynced(userId: string, date: string, splitTyp
         .update({ started_at: entry.startedAt, week_number: entry.weekNumber, day: entry.day })
         .eq('id', serverId)
         .is('started_at', null)
+    } else if (!existing.day && entry?.day) {
+      // A row that has its start but not its day: one created by Start
+      // workout before this fix, or by a day note (rest, moved, missed) on a
+      // day that was then trained after all.
+      await supabase
+        .from('workout_sessions')
+        .update({ week_number: entry.weekNumber, day: entry.day })
+        .eq('id', serverId)
+        .is('day', null)
     }
   } else {
     const { data: inserted, error: insertError } = await supabase

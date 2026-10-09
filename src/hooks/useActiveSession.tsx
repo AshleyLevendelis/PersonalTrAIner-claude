@@ -29,7 +29,7 @@ import {
   saveSet, deleteSet, retryFailedSet, getSetsForDate, readSetsForDate, getLocalSetsForDate, subscribeSetLogView, flushPending,
   getLastSessionSets, initSetLogStore, ensureSessionSynced, type SaveSetInput,
 } from '@/lib/set-log-store'
-import { refreshPRCacheFromDB, getPRCache, type PRRecord } from '@/lib/pr-engine'
+import { refreshPRCacheFromDB, getPRBaseline, isPRCacheLoaded, type PRRecord } from '@/lib/pr-engine'
 import { markSessionCompleted } from '@/lib/daily-tracking'
 import { filterLoggableSets } from '@/lib/session-derive'
 import {
@@ -37,6 +37,7 @@ import {
   saveActiveSessionRecord,
   getMostRecentActiveSessionRecord,
   isSessionStale,
+  sessionStartStamp,
   type ActiveSessionRecord,
 } from '@/lib/active-session-store'
 import type { ExerciseSetLog } from '@/lib/types'
@@ -75,7 +76,8 @@ export interface SetFocusRequest {
 export interface FinishSessionResult {
   startedAtIso: string
   finishedAtIso: string
-  prSnapshotAtStart: Record<string, PRRecord>
+  /** Every lift's record from before this session's day — what "a personal best today" is measured against. */
+  prBaseline: Record<string, PRRecord>
   /**
    * True when Finish was tapped with no working set logged. The session was
    * NOT marked completed on the server — see finishSession — so the day
@@ -529,8 +531,11 @@ export function ActiveSessionProvider({
       date: identity.date,
       dayName: identity.dayName,
       liveWeek: identity.liveWeek,
-      status: existing?.status ?? 'running',
-      startedAtIso: existing?.startedAtIso ?? now,
+      // A NOTE IS NOT A START. This defaulted to `running` with a start time
+      // of now, so typing one digit, answering "anything feeling tight?" or
+      // adding a row quietly opened a session in storage that the screen did
+      // not know about until the next reload. Only sessionStartStamp opens one.
+      status: existing?.status ?? 'idle',
       ...patch,
       lastActivityIso: now,
     })
@@ -548,34 +553,51 @@ export function ActiveSessionProvider({
     // nothing.
     if (!result) return null
     // Forgiving by design: a logged set with no session open silently opens
-    // one, backdated to "now" — patchRecord's own `existing?.startedAtIso ??
-    // now` default IS that backdating (there's no earlier timestamp to
-    // recover). Also transparently reopens a session the user had already
-    // explicitly finished, if they keep logging afterward.
-    patchRecord({ status: 'running', finishedAtIso: undefined })
+    // one, starting now (there is no earlier moment to recover). Also
+    // transparently reopens a session the user had already explicitly
+    // finished, if they keep logging afterward — keeping the start it had.
+    //
+    // THE SAME STAMP THE BUTTON MAKES (sessionStartStamp), and mirrored into
+    // state. This wrote the start time to storage only, so the dock's clock —
+    // which reads the state — sat on "Session running · 0:00" until a reload.
+    if (identity.profileId && identity.date) {
+      const stamp = sessionStartStamp(
+        getActiveSessionRecord(identity.profileId, identity.date),
+        getAppNow(identity.profileId).toISOString(),
+        getPRBaseline(identity.profileId, identity.date),
+        false,
+      )
+      patchRecord(stamp)
+      setStartedAtIso(stamp.startedAtIso ?? null)
+    }
     setStatus('running')
     refresh()
     return result
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refresh, patchRecord])
+  }, [refresh, patchRecord, identity.profileId, identity.date])
 
   // --- Explicit start/finish (Part 1) -----------------------------------
   const startSession = useCallback(() => {
     if (!identity.profileId || !identity.date) return
     const now = getAppNow(identity.profileId).toISOString()
-    patchRecord({
-      status: 'running',
-      startedAtIso: now,
-      finishedAtIso: undefined,
-      prSnapshotAtStart: getPRCache(identity.profileId),
-    })
+    const stamp = sessionStartStamp(
+      getActiveSessionRecord(identity.profileId, identity.date),
+      now,
+      getPRBaseline(identity.profileId, identity.date),
+      true,
+    )
+    patchRecord(stamp)
     setStatus('running')
-    setStartedAtIso(now)
+    setStartedAtIso(stamp.startedAtIso ?? null)
     // Stamps the DB row's started_at immediately, even before the first set
     // — same resolver the first-set sync path already uses, no parallel
-    // writer.
-    void ensureSessionSynced(identity.profileId, identity.date, 'training').catch(console.error)
-  }, [identity.profileId, identity.date, patchRecord])
+    // writer. WITH THE DAY AND THE WEEK: the row was inserted here before any
+    // set existed, so it carried neither, and history titled a session started
+    // with the button "training" where one started by a set said "Thursday".
+    void ensureSessionSynced(identity.profileId, identity.date, 'training', {
+      startedAt: now, weekNumber: identity.liveWeek, day: identity.dayName,
+    }).catch(console.error)
+  }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek, patchRecord])
 
   const finishSession = useCallback(async (): Promise<FinishSessionResult | null> => {
     if (!identity.profileId || !identity.date) return null
@@ -590,10 +612,22 @@ export function ActiveSessionProvider({
     // rest. A session is the sets in it; with none, Finish closes the local
     // session and leaves the day exactly as it was.
     const workingSets = (await getSetsForDate(identity.profileId, identity.date)).filter(s => !s.is_warmup)
+    // THE REST GOES WITH THE SESSION (L16). "Rest complete — ready for set 3?"
+    // stayed on every tab after Finish, for up to five minutes: nothing here
+    // cleared it, and the dock does not ask whether a session is open. Cleared
+    // in state and in the record, on both ways out.
+    setRestEndsAt(null); setRestLabel(null); setRestTargetSetNumber(null); setRestTotalMs(null)
+    const noRest = { restEndsAt: undefined, restLabel: undefined, restTargetSetNumber: undefined, restTotalMs: undefined }
+    // THE RECORD AS IT STOOD BEFORE TODAY, derived rather than remembered, so
+    // it cannot depend on how the session was opened. The copy stamped at the
+    // start is the fallback for a phone that never managed to read the sets.
+    const prBaseline = isPRCacheLoaded(identity.profileId)
+      ? getPRBaseline(identity.profileId, identity.date)
+      : record?.prSnapshotAtStart ?? {}
     if (workingSets.length === 0) {
-      patchRecord({ status: 'finished', finishedAtIso })
+      patchRecord({ status: 'finished', finishedAtIso, ...noRest })
       setStatus('finished')
-      return { startedAtIso: startedAt, finishedAtIso, prSnapshotAtStart: record?.prSnapshotAtStart ?? {}, nothingLogged: true }
+      return { startedAtIso: startedAt, finishedAtIso, prBaseline, nothingLogged: true }
     }
     let serverCloseFailed = false
     try {
@@ -606,9 +640,9 @@ export function ActiveSessionProvider({
     // The local finish happens either way: the tap is the user's decision and
     // a dead connection must not veto it. What changes is that the failure is
     // now RECORDED rather than swallowed — see serverCloseFailedAt.
-    patchRecord({ status: 'finished', finishedAtIso, serverCloseFailedAt: serverCloseFailed ? finishedAtIso : undefined })
+    patchRecord({ status: 'finished', finishedAtIso, serverCloseFailedAt: serverCloseFailed ? finishedAtIso : undefined, ...noRest })
     setStatus('finished')
-    return { startedAtIso: startedAt, finishedAtIso, prSnapshotAtStart: record?.prSnapshotAtStart ?? {}, serverCloseFailed }
+    return { startedAtIso: startedAt, finishedAtIso, prBaseline, serverCloseFailed }
   }, [identity.profileId, identity.date, patchRecord])
 
   /**

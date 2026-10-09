@@ -176,6 +176,8 @@ export function BottomDock() {
           type="button"
           onClick={() => { if (!window.location.hash.startsWith('#/tab/exercise')) window.location.hash = tabHash('exercise') }}
           className="w-full rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium tabular-nums text-left"
+          data-testid="session-running"
+          data-started-at={startedAtIso ?? ''}
         >
           <Timer className="h-3 w-3 text-primary-text shrink-0" />
           Session running · {formatDuration(elapsedMs)}
@@ -206,11 +208,16 @@ export function BottomDock() {
           <div className="p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <Timer className="h-4 w-4 text-primary-text shrink-0" />
-              <p className="text-sm font-medium truncate">
-                {restTargetSetNumber != null
-                  ? `Rest complete — ready for set ${restTargetSetNumber}?`
-                  : 'Rest complete'}
-              </p>
+              {/* TWO SHORT LINES, NEVER ONE CUT ONE (L16). This was a single
+                  truncated sentence beside two buttons that do not shrink, so
+                  on a phone it read "Rest complete — re…" — the half that
+                  says which set was the half that was lost. */}
+              <div className="min-w-0" data-testid="rest-complete">
+                <p className="text-sm font-medium leading-tight">Rest complete</p>
+                {restTargetSetNumber != null && (
+                  <p className="mt-0.5 text-xs leading-tight text-muted-foreground">Ready for set {restTargetSetNumber}?</p>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {restTargetSetNumber != null ? (

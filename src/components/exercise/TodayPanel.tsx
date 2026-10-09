@@ -228,7 +228,7 @@ export function TodayPanel({
     onCalibrationSessionFinished?.({ date: today, dayName: workout.day })
     const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
-    const prs = computeSessionPRs(result.prSnapshotAtStart, logs)
+    const prs = computeSessionPRs(result.prBaseline, logs)
     // "What next session prescribes" reuses the same function already called
     // above for the live progressedLoads badges — scoped to a date AFTER
     // today so today's own just-logged sets resolve as "last session" from

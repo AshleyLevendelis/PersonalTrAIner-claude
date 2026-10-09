@@ -62,6 +62,7 @@ import { AppearanceProvider } from '@/hooks/useAppearance'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
+import { BottomDock } from '@/components/BottomDock'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
@@ -742,6 +743,12 @@ const db: Db = {
   chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
+// A DRIVER'S OWN ROWS. A script the driver registers to run before the page
+// (Page.addScriptToEvaluateOnNewDocument) may define window.__seedDb; it is
+// handed the tables before the app reads anything. Nothing defines it by
+// default. It supplies INPUT only — rows as the database would hold them —
+// never anything the app derives.
+;(window as unknown as { __seedDb?: (tables: typeof db, ctx: { profileId: string; today: string }) => void }).__seedDb?.(db, { profileId: PROFILE_ID, today })
 setSupabaseClient(makeFakeSupabase(db) as never)
 // The stored rows, for a driver that must read the FIGURE the app wrote rather
 // than the words it drew — the cardio drivers check the RPE a tap stored, the
@@ -1250,6 +1257,11 @@ function Harness() {
         )}
       </main>
 
+      {/* ?dock=1 — the app's own dock (rest timer, "Session running"), mounted
+          where App.tsx mounts it. Off by default so every existing run of this
+          harness is unchanged: it is a fixed bar above the tab bar, and a
+          driver written before it existed never expected one there. */}
+      {new URLSearchParams(location.search).get('dock') === '1' && <BottomDock />}
       {/* As App.tsx does (the grocery screen is not mounted on this page). */}
       <BottomTabBar activeTab={activeTab} onTabChange={t => { window.location.hash = tabHash(t as Tab) }} flatChatDisc={activeTab === 'chat'} />
       {/* ?tour=off walks the screens on their own — the scrim covers most of
