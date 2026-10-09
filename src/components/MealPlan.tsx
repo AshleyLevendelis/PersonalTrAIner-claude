@@ -859,6 +859,9 @@ function MealSlotRow({
   // the true contribution of this row to today's totals, not option.macros.
   const duplicated = loggedEvents.length > 1
   const loggedKcal = loggedEvents.reduce((sum, e) => sum + (e.macros?.kcal ?? 0), 0)
+  // The record's own macros, as they were at log time (every copy, like the
+  // calories above). Shown in the "You logged" block when the plan has moved on.
+  const loggedMacro = (k: 'protein' | 'carbs' | 'fat') => loggedEvents.reduce((sum, e) => sum + (e.macros?.[k] ?? 0), 0)
 
   const handleLogToggle = async () => {
     if (!option) return
@@ -919,11 +922,10 @@ function MealSlotRow({
                       one place a user could have caught the discrepancy, and
                       it agreed with the wrong figure.
                       The events carry the macros as they were AT LOG TIME, so
-                      swapping the slot after logging leaves this number on the
-                      meal that was actually eaten while the name above shows
-                      the new pick. Considered and kept: what the day is
-                      carrying is the useful truth here, and unlogging and
-                      logging again corrects it in two taps. */}
+                      swapping the slot after logging leaves this number — and
+                      the name beside it — on the meal that was actually eaten.
+                      What the plan now holds for the slot is shown separately,
+                      in the open row (see `planMovedOn`). */}
                   <span className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
                     {Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal{isLogged ? ' ✓' : ''}
                     {duplicated ? ` ·×${loggedEvents.length}` : ''}
@@ -967,8 +969,55 @@ function MealSlotRow({
 
       {expanded && option && (
         <div className="mt-4 flex flex-col gap-4">
-          <div className="flex items-end gap-3">
-            <span className="tabular-mono ds-num-lg">{Math.round(option.macros.calories)}</span>
+          {/* THE RECORD AND THE PLAN ARE TWO BLOCKS (9 Oct 2026, test log M18).
+              Swap a meal after logging it and this card showed the LOGGED
+              title and tick over the NEW meal's calories, ingredients and
+              method, with the one sentence explaining it printed underneath
+              the details it called "below". The record is drawn first and
+              whole — what was logged, its calories and macros as they were
+              at log time, and the control that undoes the log — then a rule,
+              then what the plan now holds for this meal, named, with
+              everything of that meal's after it. Nothing of one is inside
+              the other. (Whether a logged meal may be swapped at all is an
+              owner decision still open; this only stops the card mixing them.) */}
+          {planMovedOn && (
+            <>
+              <section aria-label="What you logged" data-testid="meal-logged-record" className="flex flex-col gap-2 rounded-xl bg-primary/10 px-3.5 py-3">
+                <span className="ds-label-compact text-primary-text">You logged</span>
+                <span className="text-sm font-medium text-foreground" data-testid="meal-logged-name">{loggedName}</span>
+                <div className="flex items-end gap-3">
+                  <span className="tabular-mono ds-num-lg" data-testid="meal-logged-kcal">{Math.round(loggedKcal)}</span>
+                  <div className="flex flex-col gap-0.5 pb-0.5">
+                    <span className="text-xs text-foreground">kcal{duplicated ? ` · logged ${loggedEvents.length} times` : ''}</span>
+                    <span className="tabular-mono ds-label-compact">
+                      {Math.round(loggedMacro('protein'))} P · {Math.round(loggedMacro('carbs'))} C · {Math.round(loggedMacro('fat'))} F
+                    </span>
+                  </div>
+                </div>
+                {!upcoming && (
+                  <button
+                    type="button"
+                    onClick={handleLogToggle}
+                    disabled={busy}
+                    data-testid="meal-logged-undo"
+                    className="flex min-h-[44px] items-center gap-1.5 self-start rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary-text"
+                  >
+                    <Check className="size-3.5" /> {duplicated ? `Clear ${loggedEvents.length} logs` : 'Logged'}
+                  </button>
+                )}
+              </section>
+              <div data-testid="meal-plan-now" className="flex flex-col gap-1.5 pt-4" style={{ borderTop: '1px solid var(--hairline)' }}>
+                <span className="ds-label-compact">On your plan now</span>
+                <span className="text-[1rem] font-medium text-foreground" data-testid="meal-plan-now-name">{option.name}</span>
+                <p className="text-[0.71875rem] leading-snug text-muted-foreground">
+                  Your plan now shows {option.name} here. The details below are that meal, not the one you logged.
+                </p>
+              </div>
+            </>
+          )}
+          <div className="flex items-end gap-3" data-testid="meal-plan-macros">
+            {/* One big number a card: with a record above, that is the record's. */}
+            <span className={planMovedOn ? 'tabular-mono text-[1.1875rem] font-semibold' : 'tabular-mono ds-num-lg'}>{Math.round(option.macros.calories)}</span>
             <div className="flex flex-col gap-0.5 pb-0.5">
               <span className="text-xs text-foreground">kcal</span>
               <span className="tabular-mono ds-label-compact">
@@ -1081,15 +1130,6 @@ function MealSlotRow({
             </div>
           )}
 
-          {planMovedOn && (
-            /* The heading above is what was EATEN; everything in this block —
-               calories, ingredients, tags — is the slot's CURRENT option.
-               Without this line the two silently disagree. */
-            <p className="text-[0.71875rem] leading-snug text-muted-foreground">
-              Your plan now shows {option.name} here. The details below are that meal, not the one you logged.
-            </p>
-          )}
-
           {blocked && !isLogged && restriction?.message && (
             /* Above the buttons, not below: it explains why the one beside
                it is greyed out, and a reason that arrives after the action
@@ -1103,7 +1143,7 @@ function MealSlotRow({
             </p>
           )}
 
-          {duplicated && (
+          {duplicated && !planMovedOn && (
             /* SAID OUT LOUD, in the number that is wrong. The totals ring at
                the top of this screen has been counting this meal more than
                once; until this said so, the only visible symptom was a day's
@@ -1121,7 +1161,10 @@ function MealSlotRow({
           )}
 
           <div className="flex items-center gap-2">
-            {!upcoming && (
+            {/* With the plan moved on, "Logged" belongs to the record and sits
+                in the record's block above — not down here among the controls
+                for a different meal. */}
+            {!upcoming && !planMovedOn && (
             <button
               type="button"
               onClick={handleLogToggle}

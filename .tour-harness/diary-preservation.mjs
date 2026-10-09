@@ -55,7 +55,9 @@ const shoot = async name => {
 }
 
 let failures = 0
+let ran = 0
 const check = (name, ok, detail) => {
+  ran++
   if (ok) console.log(`    ✓ ${name}`)
   else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 400)}` : ''}`) }
 }
@@ -101,11 +103,58 @@ const expanded = await read()
 check('6. opening the moved-on row says whose details are below it',
   /Your plan now shows Chicken, rice and roasted peppers here/.test(expanded.text), expanded.sample)
 
+// --- THE RECORD AND THE PLAN ARE TWO BLOCKS (9 Oct 2026, test log M18) ------
+// The card used to show the logged title and tick over the plan's calories,
+// ingredients and method, with the sentence explaining it underneath them.
+const blocks = await ev(`(() => {
+  const box = n => { if (!n) return null; const r = n.getBoundingClientRect(); return { top: Math.round(r.top + scrollY), bottom: Math.round(r.bottom + scrollY) } }
+  const record = document.querySelector('[data-testid="meal-logged-record"]')
+  const plan = document.querySelector('[data-testid="meal-plan-now"]')
+  const macros = document.querySelector('[data-testid="meal-plan-macros"]')
+  const row = record ? record.closest('.py-4') : null
+  const firstIngredient = row ? row.querySelector('[data-ingredient-row]') ?? [...row.querySelectorAll('span')].find(x => /^\\d+\\s*g /.test(x.textContent || '')) : null
+  const size = n => (n ? parseFloat(getComputedStyle(n).fontSize) : 0)
+  return {
+    record: record ? record.innerText.replace(/\\s+/g, ' ').trim() : null,
+    plan: plan ? plan.innerText.replace(/\\s+/g, ' ').trim() : null,
+    macros: macros ? macros.innerText.replace(/\\s+/g, ' ').trim() : null,
+    recordBox: box(record), planBox: box(plan), macrosBox: box(macros), ingredientBox: box(firstIngredient),
+    recordKcalSize: size(record?.querySelector('[data-testid="meal-logged-kcal"]')), planKcalSize: size(macros?.querySelector('span')),
+    loggedControls: row ? [...row.querySelectorAll('button')].filter(b => /^\\s*Logged\\s*$/.test(b.textContent || '')).map(b => !!b.closest('[data-testid="meal-logged-record"]')) : [],
+    logThisMeal: row ? [...row.querySelectorAll('button')].some(b => /Log this meal/.test(b.textContent || '')) : null,
+    rowText: row ? row.innerText : '',
+  }
+})()`)
+check('8. the record is its own block: "You logged", the meal that was eaten, and its 610 kcal',
+  /^You logged Leftover chilli and rice 610 kcal/i.test(blocks?.record ?? ''), blocks?.record)
+check('9. ...with its own macros as they were logged, and the Logged tick inside it',
+  /\d+ P · \d+ C · \d+ F/.test(blocks?.record ?? '') && /Logged$/.test(blocks?.record ?? ''), blocks?.record)
+check('10. ...and NOTHING of the plan\'s meal inside it: not its name, not its 720 kcal',
+  !!blocks?.record && !/Chicken, rice and roasted peppers/.test(blocks.record) && !/720/.test(blocks.record), blocks?.record)
+check('11. the plan is a second block, named: "On your plan now" and the meal now planned',
+  /^On your plan now Chicken, rice and roasted peppers/i.test(blocks?.plan ?? ''), blocks?.plan)
+check('12. ...and it says which is which BEFORE the details it is about',
+  /The details below are that meal, not the one you logged\./.test(blocks?.plan ?? '') && !!blocks?.planBox && !!blocks?.macrosBox && blocks.planBox.bottom <= blocks.macrosBox.top, { plan: blocks?.planBox, macros: blocks?.macrosBox })
+check('13. the order on the page is record, then plan, then the plan\'s calories, then its ingredients — nothing interleaved',
+  !!blocks?.recordBox && !!blocks?.planBox && !!blocks?.macrosBox && !!blocks?.ingredientBox
+  && blocks.recordBox.bottom <= blocks.planBox.top && blocks.planBox.bottom <= blocks.macrosBox.top && blocks.macrosBox.bottom <= blocks.ingredientBox.top,
+  { record: blocks?.recordBox, plan: blocks?.planBox, macros: blocks?.macrosBox, ingredient: blocks?.ingredientBox })
+check('14. the plan\'s own calories (720) are under the plan\'s heading, and the logged 610 is not among the plan\'s details',
+  /^720 kcal/.test(blocks?.macros ?? '') && !/610/.test(blocks?.macros ?? ''), blocks?.macros)
+check('15. one big number on the card, and it is the record\'s', (blocks?.recordKcalSize ?? 0) > (blocks?.planKcalSize ?? 99), { record: blocks?.recordKcalSize, plan: blocks?.planKcalSize })
+check('16. exactly one "Logged" control, and it is in the record\'s block — not among the plan\'s buttons',
+  JSON.stringify(blocks?.loggedControls) === '[true]' && blocks?.logThisMeal === false, { logged: blocks?.loggedControls, logThisMeal: blocks?.logThisMeal })
+await ev(`document.querySelector('[data-testid="meal-logged-record"]')?.scrollIntoView({ block: 'start' })`)
+await wait(300)
+const onScreen = await ev(`(() => { const a = document.querySelector('[data-testid="meal-logged-record"]')?.getBoundingClientRect(); const b = document.querySelector('[data-testid="meal-plan-now"]')?.getBoundingClientRect(); return a && b ? { recordTop: Math.round(a.top), planBottom: Math.round(b.bottom), h: innerHeight } : null })()`)
+check('17. both headings fit on one screen together, so the split is seen at a glance', !!onScreen && onScreen.recordTop >= 0 && onScreen.planBottom <= onScreen.h, onScreen)
+
 await shoot('diary-preservation-expanded')
 
 const err = await ev('window.__err ?? null')
 check('7. no uncaught error on the page', err === null, err)
 
+console.log(`\n${ran} checks ran.`)
 console.log(failures === 0 ? '\nWhat she ate stays what she ate.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)
