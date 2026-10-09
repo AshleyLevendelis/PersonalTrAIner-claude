@@ -152,19 +152,19 @@ export function ExerciseTab({
   ): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
     const { applyInjuryFromRow } = await import('@/lib/screen-adaptations')
-    const r = await applyInjuryFromRow(profile, mesocycle, liveWeek, answer.hurt, answer.area)
+    const r = await applyInjuryFromRow(profile, mesocycle, liveWeek, answer.hurt, answer.area, exclusions)
     if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
     if (r.addInjuryCode) onProfileChanged?.({ injuries: [...(profile.injuries ?? []), r.addInjuryCode] })
     return r.message
-  }, [profile, mesocycle, liveWeek, onMesocycleUpdated, onProfileChanged])
+  }, [profile, mesocycle, liveWeek, exclusions, onMesocycleUpdated, onProfileChanged])
 
   const applyEquipment = useCallback(async (tier: string): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
     const { applyEquipmentFromRow } = await import('@/lib/screen-adaptations')
-    const r = await applyEquipmentFromRow(profile, mesocycle, liveWeek, tier)
+    const r = await applyEquipmentFromRow(profile, mesocycle, liveWeek, tier, exclusions)
     if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
     return r.message
-  }, [profile, mesocycle, liveWeek, onMesocycleUpdated])
+  }, [profile, mesocycle, liveWeek, exclusions, onMesocycleUpdated])
 
   /**
    * THE SWAP'S FOUR ANSWERS. Two of them are not swaps: "it hurts" is the

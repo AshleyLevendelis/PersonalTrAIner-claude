@@ -194,8 +194,14 @@ check('5a. reopening and saying the kit is missing',
   (await openRowMenu(swapVictim)) === 'open' && await tap('[data-testid="swap-exercise"]')
   && (await wait(900), await clickSel('[data-reason="no_kit"]')) && (await wait(500), await has('[data-testid="reason-kit"]')))
 const kits = await ev(`[...document.querySelectorAll('[data-kit]')].map(b => b.getAttribute('data-kit'))`)
-check('5b. ...offering the four tiers the engine builds for',
-  JSON.stringify(kits) === JSON.stringify(['full_gym', 'home_gym', 'minimalist', 'bodyweight']), kits)
+// RE-ANCHORED 9 Oct 2026. This asserted all FOUR tiers were on offer — the
+// person's own among them, which is the dead end the test log reported (H2):
+// a tester on Minimalist picked Minimalist and was told, in red, that there
+// was nothing to change. Picking the tier the plan is already built for can
+// never do anything, so it is no longer offered. The harness profile is a
+// full-gym one; the property is "every tier but your own".
+check('5b. ...offering every tier the engine builds for EXCEPT the one the plan is already on',
+  JSON.stringify(kits) === JSON.stringify(['home_gym', 'minimalist', 'bodyweight']), kits)
 await shoot('hurts-kit')
 const beforeKit = await order()
 await clickSel('[data-kit="bodyweight"]'); await wait(2500)
@@ -204,6 +210,38 @@ check('5c. ...and picking one rebuilds the week around it',
   JSON.stringify(afterKit) !== JSON.stringify(beforeKit), { beforeKit, afterKit })
 console.log(`  kit before: ${JSON.stringify(beforeKit)}`)
 console.log(`  kit after : ${JSON.stringify(afterKit)}`)
+
+// --- 5d-5g. A KIT CHANGE THAT CHANGES NOTHING IS AN ANSWER, NOT AN ERROR ----
+//
+// The week is now bodyweight work, which a minimalist kit can also do — so
+// asking for "minimalist" has nothing to change. That used to come back as
+// red error text. It is information: said in the note colour, naming the kit
+// that was checked, with the week left exactly as it was.
+const noOpVictim = (await order())[0]
+check('5d. reopening on the rebuilt week and asking for a kit it already works with',
+  (await openRowMenu(noOpVictim)) === 'open' && await tap('[data-testid="swap-exercise"]')
+  && (await wait(900), await clickSel('[data-reason="no_kit"]')) && (await wait(500), await clickSel('[data-kit="minimalist"]')))
+await wait(2500)
+const note = await ev(`(() => { const n = document.querySelector('[data-testid="swap-reason-note"]'); if (!n) return null; return { text: n.innerText, cls: n.className, color: getComputedStyle(n).color } })()`)
+const errorShown = await has('[data-testid="swap-reason-error"]')
+check('5e. ...it says there is nothing to change, naming the kit', !!note && /already works with minimalist/i.test(note.text) && /nothing to change/i.test(note.text), note)
+// Both halves: it is the note element, and it is not wearing the error colour
+// (read as the computed colour too, so a class rename cannot hide a red one).
+const errColor = await ev(`(() => { const p = document.createElement('p'); p.className = 'text-destructive'; document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c })()`)
+check('5f. ...as a note, not as a red error', !!note && !errorShown && !/text-destructive/.test(note.cls) && note.color !== errColor, { note, errorShown, errColor })
+// SHOWN MEANS READABLE. The first screenshot of this state had the sentence
+// running off the right-hand edge ("…already works with minimalist — nothing")
+// because the tier buttons above it do not wrap and dragged the sheet wide.
+const fits = await ev(`(() => {
+  const vw = window.innerWidth
+  const nodes = [document.querySelector('[data-testid="swap-reason-note"]'), ...document.querySelectorAll('[data-kit]')].filter(Boolean)
+  return nodes.map(n => { const r = n.getBoundingClientRect(); return { right: Math.round(r.right), left: Math.round(r.left), vw, clipped: n.scrollWidth > n.clientWidth + 1 } })
+})()`)
+check('5h. ...readable in full: the note and every kit button sit inside the screen, nothing clipped',
+  Array.isArray(fits) && fits.length === 4 && fits.every(f => f.left >= 0 && f.right <= f.vw && !f.clipped), fits)
+await shoot('hurts-kit-nothing-to-change')
+await escape(); await wait(600)
+check('5g. ...and the week is exactly as it was', JSON.stringify(await order()) === JSON.stringify(afterKit), { afterKit, now: await order() })
 
 const err = await ev('window.__err ?? null')
 check('6. no uncaught error on the page', err === null, err)

@@ -66,7 +66,7 @@ import {
   assessEdit, applyTradeoff, askText, askKey, shouldAsk, askIsAllowed, downgradeToCard,
   type Tradeoff, type EditContext,
 } from '@/lib/edit-tradeoff'
-import { reasonChipsFor, reasonQuestion, type ReasonedEditKind } from '@/lib/edit-reason'
+import { reasonChipsFor, reasonQuestion, equipmentNothingToChange, type ReasonedEditKind } from '@/lib/edit-reason'
 import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } from '@/lib/meal-tradeoff'
 import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
@@ -2701,10 +2701,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     payload: EquipmentAdaptationPayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
-  } | null> => {
+  } | { refusal: string } | null> => {
     const equipmentTier = String(rawArgs.equipment_tier ?? '') as UserProfile['equipment_access']
     const durationDays = Number(rawArgs.duration_days)
-    if (!equipmentTier || !durationDays || durationDays <= 0 || mesocycle.length === 0) return null
+    // SAID, NOT SWALLOWED. Each of the returns below used to be a bare `null`,
+    // and this branch — alone among its siblings — had no refusal of its own,
+    // so all three fell through to the generic "I couldn't find that on your
+    // current plan — it may have changed since you last looked". That sentence
+    // is about a stale plan; none of these is. Test log H3, 9 Oct 2026: a
+    // Minimalist-tier tester said he owned no bands, the model reached for
+    // this tool with his own tier, nothing conflicted, and he was told the app
+    // could not find it.
+    if (!equipmentTier || !EQUIPMENT_OPTIONS.some(o => o.value === equipmentTier) || !durationDays || durationDays <= 0) {
+      return { refusal: "Tell me what kit you'll have and for how many days, and I'll rebuild those days around it." }
+    }
+    if (mesocycle.length === 0) return null
 
     const startWeek = activeSession.liveWeek
     const weekSpan = Math.max(1, Math.ceil(durationDays / 7))
@@ -2716,7 +2727,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const result = await substituteForEquipment({
       mesocycle, profile, equipmentTier, weekNumbers, exclusions: exerciseExclusions,
     })
-    if (result.touchedSlots.length === 0) return null
+    if (result.touchedSlots.length === 0) {
+      // The same sentence the exercise row's kit step says for the same
+      // finding (edit-reason.ts) — one answer on both surfaces.
+      return {
+        refusal: equipmentNothingToChange({
+          sameTier: equipmentTier === profile.equipment_access,
+          tierLabel: EQUIPMENT_OPTIONS.find(o => o.value === equipmentTier)?.label ?? String(equipmentTier),
+          scope: `the next ${durationDays} day${durationDays === 1 ? '' : 's'}`,
+        }),
+      }
+    }
 
     const rows = result.touchedSlots.map(slot => ({
       field: `${slot.dayName} (Week ${slot.weekNumber})`,
@@ -4834,7 +4855,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         if (recovered) built = { scopeKey: recovered.scopeKey, preconditions: recovered.preconditions, payload: recovered.payload as unknown as Record<string, unknown>, diff: recovered.diff }
       } else if (result.proposal.kind === 'propose_equipment_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildEquipmentAdaptationProposal(result.proposal.rawArgs)
-        if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
+        if (adaptation && 'refusal' in adaptation) refusal = adaptation.refusal
+        else if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
       } else if (result.proposal.kind === 'propose_volume_change' && result.proposal.rawArgs) {
         const volume = buildVolumeChangeProposal(result.proposal.rawArgs)
         if (volume) built = { scopeKey: volume.scopeKey, preconditions: volume.preconditions, payload: volume.payload as unknown as Record<string, unknown>, preImage: volume.preImage, diff: volume.diff }
