@@ -6,12 +6,12 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
-import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { reconnectingLine } from '@/lib/coach-voice'
 import { readCardioLogsForDate } from '@/lib/cardio-log-store'
-import { cardioLine } from '@/lib/cardio-lines'
+import { cardioLine, splitActivity } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
@@ -71,6 +71,7 @@ const RemoveExerciseSheet = lazy(() => import('./RemoveExerciseSheet').then(m =>
 // Same bargain as the two above: a sheet reached from one button at the foot
 // of the list, carrying the whole exercise catalogue's search with it.
 const AddExerciseSheet = lazy(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
+const FinishCheckSheet = lazy(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
@@ -212,6 +213,31 @@ export function TodayPanel({
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
   const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
   const [summaryCloseFailed, setSummaryCloseFailed] = useState(false)
+  const [summarySavedCardio, setSummarySavedCardio] = useState<string[]>([])
+
+  // THE QUESTION BEFORE FINISHING (M12). Finish ended the session on one tap,
+  // whatever was left: the tester's stopped at 9 of 24 sets. Asked only when
+  // planned sets remain AND something has been logged — with nothing logged
+  // the line under the button already says what Finish will do, and with
+  // everything done there is nothing to ask.
+  const [finishCheck, setFinishCheck] = useState<{ done: number; planned: number; left: { name: string; sets: number }[] } | null>(null)
+  const requestFinish = () => {
+    if (!workout) { void handleFinish(); return }
+    const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
+    const progress = plannedSetProgress(logs, plannedExercises)
+    const anyLogged = logs.some(l => !l.is_warmup)
+    if (progress.remaining > 0 && anyLogged) {
+      setFinishCheck({
+        done: progress.done,
+        planned: progress.planned,
+        left: plannedExercises
+          .map(ex => ({ name: ex.name, sets: plannedSetProgress(logs, [ex]).remaining }))
+          .filter(l => l.sets > 0),
+      })
+      return
+    }
+    void handleFinish()
+  }
 
   const handleFinish = async () => {
     const result = await finishSession()
@@ -219,7 +245,10 @@ export function TodayPanel({
     setSummaryCloseFailed(!!result.serverCloseFailed)
     if (result.nothingLogged) {
       // No summary to compute — the point is to say the day did not close.
+      // What WAS saved is said, though: finishing after a walk and no set read
+      // "Nothing logged" over a walk the screen had just listed (H7's leftover).
       setSummaryData(null)
+      setSummarySavedCardio((await readCardioLogsForDate(profileId!, today)).rows.map(l => splitActivity(l.activity_name).name))
       setSummaryNothingLogged(true)
       setSummaryOpen(true)
       return
@@ -1074,7 +1103,7 @@ export function TodayPanel({
                 already declines to carry a second entry point for it. */}
             {status === 'running' && (
               <>
-                <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
+                <Button size="sm" className="mt-3" onClick={requestFinish}>Finish session</Button>
                 {/* The line between a look and a workout, said before Finish
                     is tapped rather than after: with nothing logged, Finish
                     closes the screen and counts nothing (useActiveSession).
@@ -1113,7 +1142,18 @@ export function TodayPanel({
               ? <TrainerNudge text={todayNudge.text} clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
               : <TrainerNudge text={todayNudge.text} openChat />
           )}
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} />
+          {finishCheck && (
+            <Suspense fallback={null}>
+              <FinishCheckSheet
+                done={finishCheck.done}
+                planned={finishCheck.planned}
+                left={finishCheck.left}
+                onKeepGoing={() => setFinishCheck(null)}
+                onFinish={() => { setFinishCheck(null); void handleFinish() }}
+              />
+            </Suspense>
+          )}
           {/* WHAT CAN YOU ACTUALLY LOAD — asked at first use, not in
               onboarding (Ashley's call: someone who has never trained cannot
               answer it, and onboarding is where people drop out). Rendered

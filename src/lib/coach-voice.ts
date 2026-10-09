@@ -753,6 +753,48 @@ export function streakLabel(count: number): string {
   return `${count === 1 ? 'session' : 'sessions'} in a row`
 }
 
+/**
+ * THE QUESTION BEFORE FINISHING WITH SETS STILL TO DO (M12, 9 Oct 2026).
+ *
+ * One tap on Finish ended a session at 9 of 24 sets with nothing asked. The
+ * layout design drew this sheet (LAYOUT-DESIGN.md §3.7 — the partial variant
+ * "lists the unlogged remainder ... without judgment") and it was never
+ * built. Decided unprompted, reversible, from the brief's own wording: asked
+ * only when planned sets remain; never when everything is done.
+ */
+export const FINISH_CHECK = {
+  title: (done: number, planned: number) => `${done} of ${planned} sets done — finish anyway?`,
+  finish: 'Finish',
+  keepGoing: 'Keep going',
+} as const
+
+/** "+1 extra" — sets beyond the plan, said beside the fraction and never inside it. Empty when there are none. */
+export function extraSetsNote(extraSets: number): string {
+  return extraSets > 0 ? `+${extraSets} extra` : ''
+}
+
+/** "7/9 planned · +1 extra" — planned sets done over planned sets, and anything beyond the plan beside it. */
+export function setsFraction(s: { setsCompleted: number; setsPrescribed: number; extraSets: number }): string {
+  const extra = extraSetsNote(s.extraSets)
+  return `${s.setsCompleted}/${s.setsPrescribed} planned${extra ? ` · ${extra}` : ''}`
+}
+
+/**
+ * Finish tapped with cardio logged and no set. The card said "Nothing logged"
+ * over a walk it had just listed as saved. Decided unprompted, reversible
+ * (X1's owner question, option b): say what IS saved, without deciding that a
+ * walk closes a lifting day.
+ */
+export function noSetsButCardio(activities: string[]): string {
+  const what = activities.length === 1 ? activities[0].toLowerCase() : 'cardio'
+  return `No sets logged — your ${what} is saved.`
+}
+
+/** The sync badge, in the words the waiting row itself uses ("on this phone, waiting to send"). It read "Saved Offline (2 sets queued)". */
+export function setsWaitingToSend(count: number): string {
+  return `${count} set${count === 1 ? '' : 's'} waiting to send`
+}
+
 export const FIRST_LOG_NOTE = 'First time logged — this is your baseline'
 /** Under a set row the server refused, beside its Retry. */
 export const SET_DID_NOT_SAVE = "didn't save"

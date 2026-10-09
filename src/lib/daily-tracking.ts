@@ -67,7 +67,17 @@ export async function getNutritionTargets(profileId: string, startDate: string, 
  * when it started (set-log-store stamps started_at on the first set of the
  * day) — records the real elapsed duration instead of the default estimate.
  */
-export async function markSessionCompleted(sessionId: string, finishedAt: Date = new Date()) {
+export async function markSessionCompleted(
+  sessionId: string,
+  finishedAt: Date = new Date(),
+  /**
+   * The session's TRAINING TIME (session-derive's trainingMinutes), when the
+   * caller has the sets to work it out from. The finish card shows that
+   * figure, and history reads this column — without it the two disagreed, and
+   * this one was the wall clock from the first set to the Finish tap.
+   */
+  durationMinutes?: number,
+) {
   const { data: session } = await supabase
     .from('workout_sessions')
     .select('started_at')
@@ -79,7 +89,9 @@ export async function markSessionCompleted(sessionId: string, finishedAt: Date =
     finished_at: finishedAt.toISOString(),
     updated_at: finishedAt.toISOString(),
   }
-  if (session?.started_at) {
+  if (durationMinutes != null && durationMinutes > 0 && durationMinutes < 24 * 60) {
+    update.duration_minutes = durationMinutes
+  } else if (session?.started_at) {
     const elapsedMin = Math.round((finishedAt.getTime() - new Date(session.started_at).getTime()) / 60000)
     if (elapsedMin > 0 && elapsedMin < 24 * 60) update.duration_minutes = elapsedMin
   }

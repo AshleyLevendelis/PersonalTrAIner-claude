@@ -12,7 +12,7 @@
 import { getExerciseEntry } from './exercise-db'
 import { anchorDifficultyBump } from './movement-difficulty'
 import { isMalformedZeroWeight } from './set-log-store'
-import { loadingMode, roundToPlate, getEquipmentFloorKg, isUnverifiedLoadSource } from './load-prescription'
+import { loadingMode, roundToPlate, getEquipmentFloorKg, isUnverifiedLoadSource, labelModeForEntry } from './load-prescription'
 import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
 import type { WarmupItem } from './warmup'
 
@@ -636,20 +636,111 @@ export interface SessionExerciseSummary {
 }
 
 export interface SessionSummary {
+  /** TRAINING TIME in whole minutes — see trainingMinutes. Not the time the screen was open. */
   durationMinutes: number
   totalVolumeKg: number
+  /** PLANNED sets done — never more than setsPrescribed. */
   setsCompleted: number
   setsPrescribed: number
+  /** Sets beyond the plan: extra rows on a planned exercise, and anything off-plan. */
+  extraSets: number
   exercises: SessionExerciseSummary[]
 }
 
 /**
- * Volume is literally sets × reps × load (weight_kg × reps_completed,
- * summed) — a bodyweight set (weight_kg 0, by SetGrid's own convention)
- * contributes 0, matching how the rest of the app treats bodyweight load.
- * Any logged exercise NOT in `plannedExercises` (off-plan/extra work, same
- * population `computeOffPlanWork` detects) is folded in with
- * setsPrescribed: 0 so the totals still count it honestly.
+ * VOLUME IS THE LOAD MOVED — decided as a CSCS, 9 Oct 2026 (L15).
+ *
+ * Volume load is sets x reps x the load lifted. The app asks for a dumbbell
+ * pair "per hand" (Ashley's wording, and the right thing to type), and volume
+ * multiplied that typed number by the reps — so 30 kg in each hand counted as
+ * 30, and a dumbbell day read as half the work of a barbell day doing the
+ * same job. Her ruling settled what the number is CALLED; it said nothing
+ * about volume, and the engine already doubles a per-hand load back wherever
+ * it compares total work (load-prescription's estimateEffectiveTotalKg).
+ *
+ * Doubled only where two implements really move together (the catalogue's
+ * per-hand lifts). One side at a time is counted as logged. A name the
+ * catalogue does not know is counted as logged too — never doubled on a guess.
+ *
+ * NOT for personal bests or progression: those compare a hand with a hand.
+ */
+export function setVolumeKg(log: Pick<ExerciseSetLog, 'exercise_name' | 'weight_kg' | 'reps_completed'>): number {
+  const entry = getExerciseEntry(log.exercise_name)
+  const both = entry != null && labelModeForEntry(entry) === 'per_hand'
+  return Number(log.weight_kg) * log.reps_completed * (both ? 2 : 1)
+}
+
+/** No single gap in a session counts for more than this toward its training time. */
+export const TRAINING_GAP_CAP_MS = 10 * 60 * 1000
+
+/**
+ * HOW LONG A SESSION WAS — training time, decided as a CSCS, 9 Oct 2026 (L29).
+ *
+ * It was the wall clock from start to the Finish tap, so the tester's session
+ * read 80 minutes with a ten-minute connection outage and a wander round the
+ * app inside it, and finishing next morning would have made it a day long.
+ *
+ * THE RULE: from the session's start (the Start tap, or the first set when
+ * there was none) to its LAST SET, adding up the gaps between one logged set
+ * and the next — and no single gap counts for more than ten minutes. The
+ * longest rest the plan prescribes is five; a set and a change of kit on top
+ * of that fits inside ten. Longer than that is an interruption, not training.
+ * Time after the last set (the cool-down, the cardio, forgetting to tap
+ * Finish) is not lifting time; cardio has its own line.
+ *
+ * At least one minute once a set exists. With no set times at all — a session
+ * the app has no timestamps for — it is the clock, start to finish, as it
+ * always was. Earlier durations are not comparable with these.
+ */
+export function trainingMinutes(startedAtIso: string, setTimesIso: (string | null | undefined)[], finishedAtIso: string): number {
+  const start = new Date(startedAtIso).getTime()
+  const times = setTimesIso
+    .map(t => (t ? new Date(t).getTime() : NaN))
+    .filter(t => !isNaN(t))
+    .sort((a, b) => a - b)
+  if (times.length === 0) {
+    return Math.max(0, Math.round((new Date(finishedAtIso).getTime() - start) / 60000))
+  }
+  let total = 0
+  let previous = Math.min(start, times[0])
+  for (const t of times) {
+    total += Math.min(Math.max(0, t - previous), TRAINING_GAP_CAP_MS)
+    previous = Math.max(previous, t)
+  }
+  return Math.max(1, Math.round(total / 60000))
+}
+
+/**
+ * HOW MUCH OF THE PLAN IS DONE — for the question asked before finishing.
+ * A set beyond what an exercise prescribes, or on an exercise that was never
+ * planned, is not a planned set done: four sets of one lift do not stand in
+ * for two missing on another.
+ */
+export function plannedSetProgress(
+  logs: ExerciseSetLog[],
+  plannedExercises: { id?: string; name: string; sets: number }[],
+): { done: number; planned: number; remaining: number } {
+  let done = 0
+  let planned = 0
+  for (const ex of plannedExercises) {
+    planned += ex.sets
+    done += Math.min(ex.sets, filterLoggableSets(logs, ex.id ?? ex.name, ex.name).length)
+  }
+  return { done, planned, remaining: Math.max(0, planned - done) }
+}
+
+/**
+ * Duration, volume and sets for one finished session. Pure.
+ *
+ * THE FRACTION IS PLANNED OVER PLANNED (L29). It folded off-plan work into
+ * the top half only — "so the totals still count it honestly" — which made
+ * "7/9" out of seven planned sets and... eight, with one added: the 9 left the
+ * added exercise out and the 7 did not. Planned sets done over planned sets,
+ * and everything beyond the plan in `extraSets`, beside it.
+ *
+ * Volume is setVolumeKg, summed; a bodyweight set (weight 0) contributes 0.
+ * Duration is trainingMinutes over every logged set's own time, build-ups
+ * included — warming up is training.
  */
 export function computeSessionSummary(
   logs: ExerciseSetLog[],
@@ -670,15 +761,23 @@ export function computeSessionSummary(
       exerciseName: planned.name,
       setsCompleted: loggedSets.length,
       setsPrescribed: planned.sets,
-      volumeKg: loggedSets.reduce((sum, s) => sum + s.weight_kg * s.reps_completed, 0),
+      volumeKg: loggedSets.reduce((sum, s) => sum + setVolumeKg(s), 0),
     })
   }
 
+  // A LOG BELONGS TO THE PLAN BY THE SAME TEST THAT COUNTED IT ABOVE. This
+  // compared `exercise_id ?? exercise_name` with the planned ids, so a row
+  // with no id (older rows, and anything matched by name) was counted under
+  // its planned exercise AND again as off-plan work — invisible while extras
+  // were folded into one total, and "20/20 planned · +19 extra" once they
+  // were shown beside it. Found by the browser driver.
+  const onPlan = (log: ExerciseSetLog) => plannedExercises.some(p =>
+    log.exercise_id ? log.exercise_id === (p.id ?? p.name) : log.exercise_name === p.name)
   const extraByExercise = new Map<string, ExerciseSetLog[]>()
   for (const log of logs) {
     if (log.is_warmup) continue
     const id = log.exercise_id ?? log.exercise_name
-    if (accountedIds.has(id)) continue
+    if (accountedIds.has(id) || onPlan(log)) continue
     const list = extraByExercise.get(id) ?? []
     list.push(log)
     extraByExercise.set(id, list)
@@ -689,20 +788,16 @@ export function computeSessionSummary(
       exerciseName: extraLogs[0].exercise_name,
       setsCompleted: extraLogs.length,
       setsPrescribed: 0,
-      volumeKg: extraLogs.reduce((sum, s) => sum + s.weight_kg * s.reps_completed, 0),
+      volumeKg: extraLogs.reduce((sum, s) => sum + setVolumeKg(s), 0),
     })
   }
 
-  const durationMinutes = Math.max(
-    0,
-    Math.round((new Date(finishedAtIso).getTime() - new Date(startedAtIso).getTime()) / 60000),
-  )
-
   return {
-    durationMinutes,
+    durationMinutes: trainingMinutes(startedAtIso, logs.map(l => l.completed_at), finishedAtIso),
     totalVolumeKg: exercises.reduce((sum, e) => sum + e.volumeKg, 0),
-    setsCompleted: exercises.reduce((sum, e) => sum + e.setsCompleted, 0),
+    setsCompleted: exercises.reduce((sum, e) => sum + Math.min(e.setsCompleted, e.setsPrescribed), 0),
     setsPrescribed: exercises.reduce((sum, e) => sum + e.setsPrescribed, 0),
+    extraSets: exercises.reduce((sum, e) => sum + Math.max(0, e.setsCompleted - e.setsPrescribed), 0),
     exercises,
   }
 }

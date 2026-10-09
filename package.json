@@ -54,6 +54,8 @@
     "verify:what-a-pr-is": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/what-a-pr-is.mjs",
     "test:history-streak": "tsx scripts/test-history-streak.ts",
     "verify:history-streak": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/history-streak.mjs",
+    "test:finish-check": "tsx scripts/test-finish-check.ts",
+    "verify:finish-check": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/finish-check.mjs",
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",

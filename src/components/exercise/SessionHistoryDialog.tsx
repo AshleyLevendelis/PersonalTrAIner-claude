@@ -100,7 +100,7 @@ export function SessionHistoryDialog({
                     <p className="text-xs text-muted-foreground tabular-mono">
                       {entry.loadError
                         ? <span className="text-destructive">Couldn't load this session's sets</span>
-                        : <>{entry.durationMinutes != null ? `${entry.durationMinutes}m` : '—'} · {Math.round(entry.totalVolumeKg).toLocaleString()}kg · {entry.totalSets} set{entry.totalSets === 1 ? '' : 's'}</>}
+                        : <>{entry.isCompleted && entry.durationMinutes != null ? `${entry.durationMinutes}m` : 'not finished'} · {Math.round(entry.totalVolumeKg).toLocaleString()}kg · {entry.totalSets} set{entry.totalSets === 1 ? '' : 's'}</>}
                     </p>
                     {/* THE DAY'S CARDIO, AS ITS OWN LINES under the lifting's
                         figures, never added into them (H21). */}

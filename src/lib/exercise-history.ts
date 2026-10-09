@@ -18,6 +18,7 @@ import { isMalformedZeroWeight, getSetsForSession } from './set-log-store'
 import { readCardioLogs } from './cardio-log-store'
 import { cardioLine } from './cardio-lines'
 import { dayNameOf } from './session-move'
+import { setVolumeKg } from './session-derive'
 import { prMetricFor, calculateE1RM, type PRMetric } from './pr-engine'
 
 export interface ExerciseHistorySetRow {
@@ -336,10 +337,17 @@ export interface SessionHistoryEntry {
   cardioOnly?: boolean
 }
 
-/** Pure — sets × reps summed, and a raw count. Bodyweight sets (weight 0) contribute 0 volume, matching computeSessionSummary's convention. */
-export function sumVolumeAndSets(sets: { weightKg: number; repsCompleted: number }[]): { totalVolumeKg: number; totalSets: number } {
+/**
+ * Pure — volume summed, and a raw count. Bodyweight sets (weight 0) contribute
+ * 0. A set that says which exercise it was is counted through setVolumeKg, so
+ * a pair of dumbbells counts both hands here exactly as on the finish card; a
+ * bare weight and reps is counted as given.
+ */
+export function sumVolumeAndSets(sets: { weightKg: number; repsCompleted: number; exerciseName?: string }[]): { totalVolumeKg: number; totalSets: number } {
   return {
-    totalVolumeKg: sets.reduce((sum, s) => sum + s.weightKg * s.repsCompleted, 0),
+    totalVolumeKg: sets.reduce((sum, s) => sum + (s.exerciseName
+      ? setVolumeKg({ exercise_name: s.exerciseName, weight_kg: s.weightKg, reps_completed: s.repsCompleted })
+      : s.weightKg * s.repsCompleted), 0),
     totalSets: sets.length,
   }
 }
@@ -386,8 +394,11 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
       // getSetsForSession, which now throws instead of swallowing the error).
       try {
         const sets = await getSetsForSession(row.id)
+        // Volume as the finish card counts it (session-derive's setVolumeKg:
+        // a pair of dumbbells counts both hands), so one session does not
+        // show two different totals on two screens.
         const { totalVolumeKg, totalSets } = sumVolumeAndSets(
-          sets.filter(s => !s.is_warmup).map(s => ({ weightKg: s.weight_kg, repsCompleted: s.reps_completed }))
+          sets.filter(s => !s.is_warmup).map(s => ({ weightKg: s.weight_kg, repsCompleted: s.reps_completed, exerciseName: s.exercise_name }))
         )
         return { ...base, totalVolumeKg, totalSets }
       } catch (setsError) {

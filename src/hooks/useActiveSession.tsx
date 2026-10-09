@@ -31,7 +31,7 @@ import {
 } from '@/lib/set-log-store'
 import { refreshPRCacheFromDB, getPRBaseline, isPRCacheLoaded, type PRRecord } from '@/lib/pr-engine'
 import { markSessionCompleted } from '@/lib/daily-tracking'
-import { filterLoggableSets } from '@/lib/session-derive'
+import { filterLoggableSets, trainingMinutes } from '@/lib/session-derive'
 import {
   getActiveSessionRecord,
   saveActiveSessionRecord,
@@ -611,7 +611,8 @@ export function ActiveSessionProvider({
     // could not undo any of it because a completed session outranks a chosen
     // rest. A session is the sets in it; with none, Finish closes the local
     // session and leaves the day exactly as it was.
-    const workingSets = (await getSetsForDate(identity.profileId, identity.date)).filter(s => !s.is_warmup)
+    const allSets = await getSetsForDate(identity.profileId, identity.date)
+    const workingSets = allSets.filter(s => !s.is_warmup)
     // THE REST GOES WITH THE SESSION (L16). "Rest complete — ready for set 3?"
     // stayed on every tab after Finish, for up to five minutes: nothing here
     // cleared it, and the dock does not ask whether a session is open. Cleared
@@ -632,7 +633,11 @@ export function ActiveSessionProvider({
     let serverCloseFailed = false
     try {
       const sessionId = await ensureSessionSynced(identity.profileId, identity.date, 'training')
-      await markSessionCompleted(sessionId) // real "now" — the explicit tap IS the finish moment
+      // The explicit tap IS the finish moment — on the app's clock, the same
+      // one the sets and the start were stamped with. The duration is the
+      // training time the finish card shows, so history says the same.
+      const minutes = trainingMinutes(startedAt, allSets.map(s => s.completed_at), finishedAtIso)
+      await markSessionCompleted(sessionId, new Date(finishedAtIso), minutes)
     } catch (e) {
       console.error(e)
       serverCloseFailed = true
@@ -688,13 +693,15 @@ export function ActiveSessionProvider({
     // Same rule as an explicit Finish: a session that was opened and then
     // abandoned with nothing logged is closed locally and never marked
     // completed on the server.
-    const hadWork = (await getSetsForDate(profileId, record.date)).some(s => !s.is_warmup)
+    const staleSets = await getSetsForDate(profileId, record.date)
+    const hadWork = staleSets.some(s => !s.is_warmup)
     if (hadWork) {
       try {
         const sessionId = await ensureSessionSynced(profileId, record.date, 'training')
         // NOT "now" — now could be hours later than when the user actually
         // stopped; lastActivityIso is the best-known real finish moment.
-        await markSessionCompleted(sessionId, new Date(record.lastActivityIso))
+        const minutes = trainingMinutes(record.startedAtIso ?? record.lastActivityIso, staleSets.map(s => s.completed_at), record.lastActivityIso)
+        await markSessionCompleted(sessionId, new Date(record.lastActivityIso), minutes)
       } catch (e) {
         console.error(e)
       }

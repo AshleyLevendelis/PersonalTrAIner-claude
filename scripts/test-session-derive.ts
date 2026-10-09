@@ -278,7 +278,16 @@ function main() {
   ]
   const summary = computeSessionSummary(summaryLogs, plannedForSummary, '2026-01-05T10:00:00.000Z', '2026-01-05T10:42:00.000Z')
   check('durationMinutes computed correctly', summary.durationMinutes === 42, summary.durationMinutes)
-  check('setsCompleted counts every logged set incl. off-plan', summary.setsCompleted === 4, summary.setsCompleted)
+  // RE-ANCHORED 9 Oct 2026 (L29). This expected 4 — every logged set, off-plan
+  // work included, over a denominator that left the off-plan work out, which
+  // is the "7/9" the tester could not make add up. The top half counts PLANNED
+  // sets done; anything beyond the plan is counted beside it.
+  check('setsCompleted counts the PLANNED sets done', summary.setsCompleted === 3, summary.setsCompleted)
+  check('...and the off-plan set is counted beside it, not inside it', summary.extraSets === 1, summary.extraSets)
+  // The clock, start to finish, ONLY because these fixture rows carry no time
+  // of their own; a session with timed sets is measured as training time
+  // (test:finish-check §3).
+  check('the duration above is the fallback for sets with no timestamps', summaryLogs.every(l => !(l as { completed_at?: string }).completed_at))
   check('setsPrescribed counts only the planned baseline', summary.setsPrescribed === 4, summary.setsPrescribed)
   check('bodyweight set contributes 0 volume', summary.exercises.find(e => e.exerciseId === 'push-ups')?.volumeKg === 0)
   check('volume is sets × reps × load, summed', summary.totalVolumeKg === 60 * 8 * 2 + 0 + 20 * 12, summary.totalVolumeKg)

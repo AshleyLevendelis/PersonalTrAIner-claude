@@ -145,10 +145,15 @@ await wait(300); await shoot('cardio-shows-training-day')
 
 console.log('\n  3. THE SESSION COMPLETE CARD')
 check('3a. Finish session is tapped', await tapExpr(byText('Finish session')))
-await until(`!!${q('[role="dialog"]')}`, 8000)
+// RE-ANCHORED 9 Oct 2026 (M12): one set is logged and the rest of the session
+// is not, so the app now asks before finishing. This driver is not about that
+// question (finish-check.mjs is) — it answers "Finish" and reads the card.
+await wait(600)
+if (await ev(`!!${q('[data-testid="finish-check"]')}`)) { await tapExpr(q('[data-testid="finish-anyway"]')); await wait(400) }
+await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Session (complete|saved)$/.test(h.textContent))`, 8000)
 await wait(600)
 const card = await ev(`(() => {
-  const d = document.querySelector('[role="dialog"]'); if (!d) return null
+  const d = [...document.querySelectorAll('[role="dialog"]')].find(x => /^Session (complete|saved)$/.test(x.querySelector('h2')?.textContent ?? '')); if (!d) return null
   return {
     title: d.querySelector('h2')?.textContent ?? null,
     cardio: [...d.querySelectorAll('[data-testid="summary-cardio"] p')].map(p => p.textContent.trim()),
@@ -161,10 +166,12 @@ check('3d. ...and the rope (H7)', (card?.cardio ?? []).includes(ROPE_LINE), card
 check('3e. ...under a heading that says what they are', card?.cardio?.[0] === 'Cardio', card?.cardio)
 // NOT FOLDED IN. One set was logged; forty-odd minutes of cardio must not turn
 // up in the lifting tiles.
-const setsTile = (card?.tiles ?? []).find(t => /sets$/i.test(t)) ?? ''
-const durationTile = (card?.tiles ?? []).find(t => /duration$/i.test(t)) ?? ''
+// RE-ANCHORED 9 Oct 2026 (L29): the tile reads "1/17 · Planned sets" now.
+const setsTile = (card?.tiles ?? []).find(t => /planned sets/i.test(t)) ?? ''
+// RE-ANCHORED 9 Oct 2026 (L29): the tile is labelled for what it now measures.
+const durationTile = (card?.tiles ?? []).find(t => /training time$/i.test(t)) ?? ''
 check('3f. the Sets tile still counts one set', /^1\s*\//.test(setsTile), card?.tiles)
-check(`3g. the Duration tile has not had ${target.duration + 12} minutes of cardio added to it`, /^\d+\s*m/.test(durationTile) && parseInt(durationTile, 10) < target.duration + 12, card?.tiles)
+check(`3g. the Training time tile has not had ${target.duration + 12} minutes of cardio added to it`, /^\d+\s*m/.test(durationTile) && parseInt(durationTile, 10) < target.duration + 12, card?.tiles)
 await shoot('cardio-shows-summary')
 await escape()
 
@@ -179,7 +186,8 @@ const todays = (hist ?? []).find(h => h.title.includes(target.date))
 check('4b. today\'s session is in the list', !!todays && todays.kind === 'history-session', hist)
 check('4c. IT LISTS THE FINISHER (H21)', (todays?.cardio ?? []).includes(FINISHER_LINE), todays)
 check('4d. ...and the rope (H7)', (todays?.cardio ?? []).includes(ROPE_LINE), todays)
-check('4e. ...beside the lifting figures, not inside them: still "1 sets"', /· 1 sets/.test(todays?.text ?? ''), todays?.text)
+// RE-ANCHORED 9 Oct 2026: "1 sets" was a slip this check had pinned word for word.
+check('4e. ...beside the lifting figures, not inside them: still "1 set"', /· 1 set( |$)/.test(todays?.text ?? ''), todays?.text)
 await shoot('cardio-shows-history')
 await escape()
 

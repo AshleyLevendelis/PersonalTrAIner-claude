@@ -8,7 +8,7 @@ import {
   getAllFailedItems, retryFailedItem, discardFailedItem, subscribeAllQueues,
   QUEUE_LABEL, plainSyncError, type FailedItem,
 } from '@/lib/queue-health'
-import { STILL_ON_THIS_DEVICE } from '@/lib/coach-voice'
+import { STILL_ON_THIS_DEVICE, setsWaitingToSend } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
 // THE COLOURS ARE THE THEME'S OWN — H20, 9 Oct 2026.
@@ -199,7 +199,7 @@ export function OfflineStatusIndicator() {
       <Badge variant="secondary" data-testid="saved-offline-badge" className="gap-1.5" style={chip('role-warn')}>
         <Zap className="h-3 w-3" />
         <span>
-          Saved Offline{state.queuedCount > 0 && ` (${state.queuedCount} set${state.queuedCount !== 1 ? 's' : ''} queued)`}
+          {state.queuedCount > 0 ? setsWaitingToSend(state.queuedCount) : 'Offline'}
         </span>
       </Badge>
     )
