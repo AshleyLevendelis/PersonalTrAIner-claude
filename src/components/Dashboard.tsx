@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
-import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
+import { loadDashboardData, leadLiftPhrase, type DashboardData } from '@/lib/dashboard-data'
 import { changeSinceStart } from '@/lib/weight-trend'
 import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
 import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
@@ -115,27 +115,6 @@ function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: num
 }
 
 
-/**
- * "Barbell Bench Press" -> "bench". The glance line has one line of a phone's
- * width to carry three facts; the catalogue's full names are written for a
- * plan screen where there is room for them.
- *
- * Falls back to the full name rather than a truncation, so an unrecognised
- * lift reads as itself instead of as "Kettlebell...".
- */
-const LIFT_SHORT_NAME: Record<string, string> = {
-  'Barbell Bench Press': 'bench',
-  'Barbell Squats': 'squat',
-  'Deadlifts': 'deadlift',
-  'Trap Bar Deadlift': 'trap bar',
-  'Overhead Press': 'overhead press',
-  'Romanian Deadlift': 'RDL',
-  'Front Squat': 'front squat',
-  'Incline Barbell Press': 'incline bench',
-}
-function shortLiftName(name: string): string {
-  return LIFT_SHORT_NAME[name] ?? name.toLowerCase()
-}
 
 /**
  * The two reply chips under a coach tip, keyed to the rule that produced it.
@@ -439,11 +418,13 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // next"; the app knows the session's heaviest lift but NOT the running
     // order, so "next" would be a claim it cannot support — the same class of
     // invention as a fabricated weight. The number is shown without the word.
-    if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} ${data.session.leadLift.kg} kg`)
+    const lift = data.session.leadLift ? leadLiftPhrase(data.session.leadLift, data.session.status) : null
+    if (lift) glanceParts.push(lift)
   } else {
     glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
     if (data.session.estimatedMinutes != null) glanceParts.push(`~${data.session.estimatedMinutes} min`)
-    if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} from ${data.session.leadLift.kg} kg`)
+    const lift = data.session.leadLift ? leadLiftPhrase(data.session.leadLift, data.session.status) : null
+    if (lift) glanceParts.push(lift)
   }
   const sessionGlance = glanceParts.join(' · ')
 
@@ -612,7 +593,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                   </span>
                 )}
               </div>
-              <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">{sessionGlance}</p>
+              <p className="mt-1.5 text-[0.78125rem] text-muted-foreground" data-testid="home-session-glance">{sessionGlance}</p>
               {/* THE RECEIVING END of a move: this session came from another
                   day, and the line says so. The day it LEFT is the 'moved'
                   branch above, not a line under a session that is no longer
@@ -835,7 +816,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         {/* 6. RECENT PRs — up to three, and the section is not there at all
             when there are none. */}
         {data.recentPRs.length > 0 && (
-          <div>
+          <div data-testid="home-recent-prs">
             <p className="ds-label">Recent PRs</p>
             <div className="mt-1.5" style={{ borderTop: '1px solid var(--hairline)' }}>
               {data.recentPRs.slice(0, 3).map(pr => (

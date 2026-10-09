@@ -66,7 +66,10 @@ const base: NudgeInput = {
 }
 const FEEL = { date: '2026-09-07', day: 'Push & Press', isToday: true }
 const MISSED = { date: '2026-09-06', dayName: 'Sunday', focus: 'Legs' }
-const PR = { exerciseName: 'Barbell Bench Press', weightKg: 80, date: '2026-09-07' }
+// THE KIND TRAVELS WITH THE NUMBER (re-anchored 9 Oct 2026, M16/L32): this
+// fixture carried a bare `weightKg`, the shape that printed "at 0kg" for a
+// reps record.
+const PR = { exerciseName: 'Barbell Bench Press', metric: 'load' as const, value: 80, date: '2026-09-07' }
 
 console.log('\n1. One thing, ranked by how actionable it is right now')
 {
@@ -102,12 +105,12 @@ console.log('\n2. Said once — and the key is the EVENT, not its kind')
   const again = pickNudge(withPR, said.keys)
   check('...and never announced twice', again?.kind !== 'personal_best', again?.kind)
 
-  const secondLift = { exerciseName: 'Back Squat', weightKg: 100, date: '2026-09-08' }
+  const secondLift = { exerciseName: 'Back Squat', metric: 'load' as const, value: 100, date: '2026-09-08' }
   const other = pickNudge({ ...withPR, recentPR: secondLift }, said.keys)
   check('a PR on a DIFFERENT lift is its own event, and does speak',
     other?.kind === 'personal_best' && other.text.includes('Back Squat'), other?.text)
 
-  const heavier = { ...PR, weightKg: 85, date: '2026-09-09' }
+  const heavier = { ...PR, value: 85, date: '2026-09-09' }
   const beaten = pickNudge({ ...withPR, recentPR: heavier }, said.keys)
   check('beating the same lift again is a new event too',
     beaten?.kind === 'personal_best' && beaten.text.includes('85'), beaten?.text)

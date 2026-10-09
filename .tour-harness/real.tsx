@@ -670,6 +670,19 @@ const db: Db = {
             completed_at: new Date(anchorNowMs() - back * 86400000).toISOString(),
             date: isoOf(new Date(anchorNowMs() - back * 86400000)),
           })),
+          // AN EARLIER, LIGHTER BELT SESSION — added 9 Oct 2026. The +12kg
+          // below used to be the only belt set ever logged, and reached Home's
+          // "Recent PRs" as a record. A first log is a baseline now (M12): it
+          // has to BEAT something to be one, so the fixture gives it something
+          // to beat.
+          {
+            id: 'bwbelt0', user_id: PROFILE_ID, session_id: 'bw-sess-belt0',
+            exercise_id: getExerciseId('Dips') ?? 'dips', exercise_name: 'Dips',
+            set_number: 1, weight_kg: 0, reps_completed: 5, added_load_kg: 10,
+            is_bodyweight: true, is_warmup: false,
+            completed_at: new Date(anchorNowMs() - 10 * 86400000).toISOString(),
+            date: isoOf(new Date(anchorNowMs() - 10 * 86400000)),
+          },
           {
             id: 'bwbelt', user_id: PROFILE_ID, session_id: 'bw-sess-belt',
             exercise_id: getExerciseId('Dips') ?? 'dips', exercise_name: 'Dips',

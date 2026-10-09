@@ -212,7 +212,11 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
 console.log('\n2. The counts are read, not written\n')
 {
   check('the history subtitle comes from the session history', /getSessionHistory\(profileId/.test(tools))
-  check('...and its PR half from the same cache everything else reads', /getPRCache\(profileId\)/.test(tools))
+  // RE-ANCHORED 9 Oct 2026 (M30): this required the count to come from the
+  // cache's KEYS, which is the number of exercises ever logged — "7 PRs" after
+  // two workouts. It is the number of records beaten, from the list Home's
+  // "Recent PRs" is drawn from.
+  check('...and its PR half from the list of records actually beaten', /getRecordsBeaten\(profileId\)\.length/.test(tools) && !/Object\.keys\(getPRCache/.test(tools))
   check('the program subtitle comes from the mesocycle it is describing', /mesocycle && mesocycle\.length > 0/.test(tools))
   // A count that cannot be read must not be invented: each subtitle falls
   // back to a sentence, never to a zero.

@@ -40,6 +40,8 @@
 // caller's app clock, exactly as coach-opener.ts takes them.
 // ---------------------------------------------------------------------------
 
+import { recordPhrase, type RecordFact } from './coach-voice'
+
 export type NudgeKind =
   | 'session_feel'
   | 'missed_yesterday'
@@ -79,7 +81,7 @@ export interface NudgeInput {
   /** Yesterday, when it was scheduled and nothing was logged, swapped or rested on purpose. */
   missedYesterday: { date: string; dayName: string; focus: string } | null
   /** The most recent personal best inside the dashboard's own recent window, or null. */
-  recentPR: { exerciseName: string; weightKg: number; date: string } | null
+  recentPR: (RecordFact & { date: string }) | null
   /** Consecutive-day training streak (streak.ts). */
   streak: number
   /** Today's session from the LIVE week. Null on a rest day OR when planKnown is false. */
@@ -118,7 +120,7 @@ export function nudgeKeys(input: NudgeInput): {
     feel: input.awaitingFeel ? `feel:${input.awaitingFeel.date}` : null,
     missed: input.missedYesterday ? `missed:${input.missedYesterday.date}` : null,
     pr: input.recentPR
-      ? `pr:${input.recentPR.exerciseName}:${input.recentPR.date}:${input.recentPR.weightKg}`
+      ? `pr:${input.recentPR.exerciseName}:${input.recentPR.date}:${input.recentPR.value}`
       : null,
     streak: milestone ? `streak:${milestone}` : null,
     // ONLY BEFORE THE CUTOFF. Past the hour she usually trains, "today's Push
@@ -179,7 +181,7 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
     const foldPR =
       unsaid(keys.pr) && input.recentPR != null && input.recentPR.date === input.awaitingFeel.date
     const lead = foldPR && input.recentPR
-      ? `Nice PR on ${input.recentPR.exerciseName} at ${input.recentPR.weightKg}kg. `
+      ? `Nice PR on ${recordPhrase(input.recentPR)}. `
       : ''
     const which = input.awaitingFeel.isToday
       ? 'that session'
@@ -214,7 +216,7 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
     return {
       kind: 'personal_best',
       keys: [keys.pr],
-      text: `That's a PR — ${input.recentPR.exerciseName} at ${input.recentPR.weightKg}kg, the best you've logged on it.`,
+      text: `That's a PR — ${recordPhrase(input.recentPR)}, the best you've logged on it.`,
       chips: ["What should I be lifting on that next time?"],
     }
   }

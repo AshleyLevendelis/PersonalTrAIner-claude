@@ -21,8 +21,8 @@ import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE } from '@/lib/coach-voice'
-import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
+import { lastTime, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
@@ -686,7 +686,7 @@ export function SetGrid({
       reps,
       isBodyweight: storedIsBodyweight,
       addedLoadKg,
-    })
+    }, today)
     if (pr) {
       setAnimatingPr(true)
       setTimeout(() => setAnimatingPr(false), 2000)
@@ -698,7 +698,7 @@ export function SetGrid({
       ...existingLogs.filter(l => l.set_number !== setNumber),
       { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: storedWeightKg, reps_completed: reps, is_bodyweight: storedIsBodyweight, added_load_kg: addedLoadKg },
     ]
-    const topPR = warm || drop ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs))
+    const topPR = warm || drop ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs), today)
     setPrBadgeSet(topPR ? { rowKey: rowKey({ kind: 'working', setNumber: topPR.setNumber }), result: topPR.result } : null)
 
     // THE REST TIMER AND THE SAME-SESSION TOAST BELONG TO WORKING SETS. A
@@ -1039,7 +1039,16 @@ export function SetGrid({
               ? `${logged.reps_completed} reps · Bodyweight`
               : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`
             const state = logged.syncStatus
+            // THE FIRST TIME A LIFT IS LOGGED, where a PR badge used to be.
+            // It was a trophy; a first log has nothing before it to beat
+            // (pr-engine's comparePR). Said once per exercise, under its
+            // first working set, and only when the app has read the history
+            // it is making a claim about.
+            const firstLog = !drop && !isWarm(ref) && !!profileId
+              && ref.setNumber === Math.min(...existingLogs.map(l => l.set_number))
+              && isFirstTimeLogged(profileId, exerciseName, today)
             return (
+              <>
               <div className={`flex items-center justify-between gap-2 -mt-0.5 ${drop ? 'pl-5 pr-1' : 'px-1'}`} data-testid="set-receipt">
                 <p className={`min-w-0 text-[0.625rem] ${state === 'failed' ? 'text-destructive' : state === 'waiting' ? 'text-[color:var(--role-warn-text)]' : 'text-primary-text'}`}>
                   {setLabelLong(ref)}: {reading}{state === 'failed' ? ` · ${SET_DID_NOT_SAVE}` : state === 'waiting' ? ` · ${SET_WAITING_TO_SEND}` : ' ✓'}
@@ -1066,6 +1075,10 @@ export function SetGrid({
                   {armed ? 'Tap to confirm' : 'Delete'}
                 </button>
               </div>
+              {firstLog && (
+                <p className="px-1 text-[0.625rem] text-muted-foreground" data-testid="first-log-note">{FIRST_LOG_NOTE}</p>
+              )}
+              </>
             )
           })()}
           {/* "+ ADD A DROP" — one link, under the last row of the last logged

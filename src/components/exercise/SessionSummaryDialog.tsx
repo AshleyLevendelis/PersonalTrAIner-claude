@@ -99,7 +99,7 @@ export function SessionSummaryDialog({
             )}
 
             {data.prs.length > 0 && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" data-testid="summary-prs">
                 <p className="ds-label-compact">New PRs</p>
                 {data.prs.map(pr => (
                   <p key={pr.exerciseName} className="flex items-center gap-1.5 text-sm">

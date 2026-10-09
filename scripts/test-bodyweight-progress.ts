@@ -47,6 +47,8 @@ import {
 } from '../src/lib/exercise-history'
 import { personalBest, BEST_SET_QUALIFIER } from '../src/lib/coach-voice'
 import type { ExerciseSetLog } from '../src/lib/types'
+import { refreshPRCacheFromDB } from '../src/lib/pr-engine'
+import { setSupabaseClient } from '../src/lib/supabase'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
@@ -62,6 +64,36 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 // engine falls through to EMPTY_PR_RECORD. That is the real first-ever-set
 // path, not a stub.
 const FRESH = 'gate-user-no-cache'
+
+// SOMEBODY WITH A HISTORY — re-anchored 9 Oct 2026 (M12). §3-§5 used to ask
+// about a FIRST-EVER set and expect a personal best, which pinned the defect:
+// the tester's first session finished on five "New PRs". A first log is a
+// baseline now (decided as a CSCS; pr-engine's comparePR), so the questions
+// are asked of somebody who has a record to beat, and the first-ever case is
+// asserted the other way round beside each. The history goes in through the
+// engine's own read, from rows shaped as the database holds them.
+const SEEDED = 'gate-user-with-history'
+const TODAY = '2026-09-16'
+const earlier = (exercise_name: string, o: Record<string, unknown>) => ({
+  user_id: SEEDED, exercise_name, set_number: 1, weight_kg: 0, reps_completed: 0,
+  is_bodyweight: true, is_warmup: false, drop_index: 0, added_load_kg: null,
+  completed_at: '2026-09-09T12:00:00', ...o,
+})
+const HISTORY = [
+  earlier('Chin-Up', { reps_completed: 8 }),
+  earlier('Chin-Up', { reps_completed: 4, added_load_kg: 10 }),
+  earlier('Press-Up', { reps_completed: 5 }),
+  earlier('Back Squat', { weight_kg: 60, reps_completed: 5, is_bodyweight: false }),
+]
+{
+  // The four calls the engine's read makes, and nothing else: every filter
+  // returns the same thenable, which resolves to this person's rows.
+  const answer = { data: HISTORY, error: null }
+  const chain: Record<string, unknown> = { then: (ok: (v: typeof answer) => unknown) => Promise.resolve(answer).then(ok) }
+  for (const m of ['select', 'eq', 'gt']) chain[m] = () => chain
+  setSupabaseClient({ from: () => chain } as never)
+  await refreshPRCacheFromDB(SEEDED)
+}
 
 const bw = (reps: number): SetShape => ({ weightKg: 0, reps, isBodyweight: true, addedLoadKg: null })
 const belt = (kg: number, reps: number): SetShape => ({ weightKg: 0, reps, isBodyweight: true, addedLoadKg: kg })
@@ -130,9 +162,14 @@ console.log('\n2. The classifier picks the right record for each kind of set')
 
 console.log('\n3. The live badge fires on a bodyweight set (exclusion 2)')
 {
-  const first = checkForPR(FRESH, 'Chin-Up', bw(8))
-  check('a first-ever bodyweight set is a PR', first !== null && first.metric === 'reps', first)
-  check('...and it carries the reps, not a weight', first?.newReps === 8 && first?.newWeight === 0, first)
+  const first = checkForPR(SEEDED, 'Chin-Up', bw(9), TODAY)
+  check('a bodyweight set that beats the last best is a PR', first !== null && first.metric === 'reps', first)
+  check('...and it carries the reps, not a weight', first?.newReps === 9 && first?.newWeight === 0, first)
+  check('...measured against the record from BEFORE today', first?.previousReps === 8, first)
+  check('matching the last best is not one', checkForPR(SEEDED, 'Chin-Up', bw(8), TODAY) === null)
+  check('A FIRST-EVER BODYWEIGHT SET IS A BASELINE, NOT A PR', checkForPR(FRESH, 'Chin-Up', bw(8), TODAY) === null)
+  check('...and the same set a week BEFORE the history began has nothing to beat either',
+    checkForPR(SEEDED, 'Chin-Up', bw(30), '2026-09-01') === null)
 
   // THE TWO CHECKS THAT STOOD HERE WERE TAUTOLOGIES — `13 > existing.maxReps`
   // is arithmetic this file performed itself, not a question asked of the
@@ -143,8 +180,9 @@ console.log('\n3. The live badge fires on a bodyweight set (exclusion 2)')
   // because the shape is the one CLAUDE.md warns about: asking a question of
   // evidence you just created.
 
-  const loaded = checkForPR(FRESH, 'Back Squat', barbell(60, 5))
-  check('a loaded set still behaves exactly as before', loaded?.metric === 'load' && loaded.newWeight === 60, loaded)
+  const loaded = checkForPR(SEEDED, 'Back Squat', barbell(62.5, 5), TODAY)
+  check('a loaded set that beats the last best still behaves as before', loaded?.metric === 'load' && loaded.newWeight === 62.5, loaded)
+  check('a first-ever loaded set is a baseline too', checkForPR(FRESH, 'Back Squat', barbell(60, 5), TODAY) === null)
 }
 
 console.log('\n4. The top-set badge lands on the right row (exclusion 3)')
@@ -152,14 +190,15 @@ console.log('\n4. The top-set badge lands on the right row (exclusion 3)')
   const sets = [bw(6), bw(11), bw(9)].map((set, i) => asSessionSet(set, i + 1))
   check('the fixture really carries a zero LOAD, so a restored weight guard can bite it',
     sets.every(s => s.weight === 0 && s.reps > 0), sets)
-  const top = getTopPRSet(FRESH, 'Press-Up', sets)
+  const top = getTopPRSet(SEEDED, 'Press-Up', sets, TODAY)
   check('the best bodyweight set in a session is found', top?.setNumber === 2, top)
   check('...and it is a reps record', top?.result.metric === 'reps' && top?.result.newReps === 11, top?.result)
+  check('on a first-ever session no row gets a badge', getTopPRSet(FRESH, 'Press-Up', sets, TODAY) === null)
 
   // A belt mid-session: it wins on its own terms, not by being a bigger
   // number. 15 (kg) < 20 (reps) numerically, and the belt still takes it.
   const mixed = [asSessionSet(bw(20), 1), asSessionSet(belt(15, 3), 2)]
-  const topMixed = getTopPRSet(FRESH, 'Chin-Up', mixed)
+  const topMixed = getTopPRSet(SEEDED, 'Chin-Up', mixed, TODAY)
   check('a belt set outranks a bigger rep count', topMixed?.setNumber === 2, topMixed)
   check('...and is reported as added weight', topMixed?.result.metric === 'added_load', topMixed?.result)
 }
@@ -170,12 +209,21 @@ console.log('\n5. The end-of-session list includes bodyweight work (exclusion 4)
     user_id: FRESH, date: '2026-09-16', exercise_name: 'Press-Up', set_number: 1,
     weight_kg: 0, reps_completed: 0, is_bodyweight: true, ...o,
   })
-  const hits = computeSessionPRs({}, [
+  const session = [
     log({ set_number: 1, reps_completed: 14 }),
     log({ set_number: 2, reps_completed: 9 }),
-  ])
-  check('a bodyweight session produces a PR hit', hits.length === 1, hits)
+  ]
+  const hits = computeSessionPRs({ 'Press-Up': { ...EMPTY_PR_RECORD, maxReps: 10 } }, session)
+  check('a bodyweight session that beats the last best produces a PR hit', hits.length === 1, hits)
   check('...on the best set, in reps', hits[0]?.result.newReps === 14 && hits[0]?.result.metric === 'reps', hits[0])
+  // THE DEFECT, PINNED THE RIGHT WAY ROUND. A session with no baseline at all
+  // — which is what one started by ticking a set was handed — listed every
+  // lift as a new PR.
+  check('THE SAME SESSION WITH NOTHING BEFORE IT PRODUCES NONE', computeSessionPRs({}, session).length === 0, computeSessionPRs({}, session))
+  check('...and a first belt set after a history of plain reps is where the belt record starts',
+    computeSessionPRs({ Dip: { ...EMPTY_PR_RECORD, maxReps: 12 } }, [log({ exercise_name: 'Dip', reps_completed: 5, added_load_kg: 10 })]).length === 0)
+  check('a drop never produces one, whatever it beats',
+    computeSessionPRs({ 'Press-Up': { ...EMPTY_PR_RECORD, maxReps: 10 } }, [log({ reps_completed: 30, drop_index: 1 })]).length === 0)
 
   const warmupOnly = computeSessionPRs({}, [log({ reps_completed: 20, is_warmup: true })])
   check('a warm-up is still not a PR', warmupOnly.length === 0, warmupOnly)
@@ -254,8 +302,10 @@ console.log('\n8. The PR list records the moment it happened')
 {
   const s = (date: string, reps: number) =>
     ({ sessionId: date, date, sets: [], topSetWeightKg: 0, topSetE1RM: 0, topSetReps: reps, topSetAddedLoadKg: 0 })
-  const moments = derivePRHistory([s('2026-09-01', 6), s('2026-09-08', 5), s('2026-09-15', 9)])
-  check('two reps PRs from three sessions', moments.length === 2, moments)
+  // Four sessions, re-anchored 9 Oct 2026: the first opens the record and is
+  // not a moment (it was counted as one).
+  const moments = derivePRHistory([s('2026-08-25', 6), s('2026-09-01', 8), s('2026-09-08', 5), s('2026-09-15', 9)])
+  check('two reps PRs from four sessions — the first is the baseline', moments.length === 2 && !moments.some(m => m.date === '2026-08-25'), moments)
   check('...newest first', moments[0]?.date === '2026-09-15', moments.map(m => m.date))
   check('...the middle session did not beat anything', !moments.some(m => m.date === '2026-09-08'), moments)
   check('...and each carries its metric so a reader cannot assume kilograms',

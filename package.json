@@ -50,6 +50,8 @@
     "verify:cardio-shows": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/cardio-shows.mjs",
     "test:session-start": "tsx scripts/test-session-start.ts",
     "verify:session-start": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-start.mjs",
+    "test:what-a-pr-is": "tsx scripts/test-what-a-pr-is.ts",
+    "verify:what-a-pr-is": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/what-a-pr-is.mjs",
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",

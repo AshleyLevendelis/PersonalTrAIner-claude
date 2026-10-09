@@ -14,7 +14,9 @@ import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-s
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
 import { getRecentWeighIns, getEarliestWeightKg } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
-import { getPRCache, type PRMetric } from './pr-engine'
+import { getPRCache, getRecordsBeaten, refreshPRCacheFromDB, type PRMetric, type RecordBeaten } from './pr-engine'
+import { formatLoad, labelModeForEntry, isPerSideLoad, type LoadLabelMode } from './load-prescription'
+import { getExerciseEntry } from './exercise-db'
 import { getActiveGoals } from './memory-store'
 import { computeStreak, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
@@ -62,8 +64,8 @@ export interface TodaySession {
   estimatedMinutes: number | null
   /** Minutes still to go, once sets have been logged. Null before that. */
   minutesLeft: number | null
-  /** The heaviest external load in the session, e.g. "bench from 92.5 kg". */
-  leadLift: { name: string; kg: number } | null
+  /** The heaviest external load in the session — see leadLiftPhrase for how it is said. */
+  leadLift: LeadLift | null
   /**
    * Set when today's session has been MOVED to another day ("I'll do it
    * tomorrow") — status is 'moved', focus names what left, and nothing else is
@@ -74,6 +76,55 @@ export interface TodaySession {
   movedTo?: { date: string; dayName: string } | null
   /** Set when today IS the day another session was moved onto — where it came from. */
   movedFrom?: { date: string; dayName: string } | null
+}
+
+export interface LeadLift {
+  name: string
+  /** What the plan prescribes, in the implement's own terms (one dumbbell of a pair, or the bar). */
+  kg: number
+  /** How that number is counted — per hand, per leg, or the whole load. Never printed as a bare "kg". */
+  labelMode: LoadLabelMode
+  /** The heaviest working set actually logged on it today, or null when it has not been lifted yet. */
+  loggedKg: number | null
+}
+
+/**
+ * "Barbell Bench Press" -> "Bench". The glance line has one line of a phone's
+ * width to carry three facts. Every key is a name the catalogue really has
+ * (test:what-a-pr-is checks each one): three of the eight that stood in
+ * Dashboard.tsx matched nothing — "Romanian Deadlift" for the catalogue's
+ * "Romanian Deadlifts", and two lifts the catalogue does not hold — so they
+ * fell to the full name, lower-cased ("romanian deadlifts from 16 kg").
+ */
+export const LIFT_SHORT_NAME: Record<string, string> = {
+  'Barbell Bench Press': 'Bench',
+  'Barbell Squats': 'Squat',
+  'Deadlifts': 'Deadlift',
+  'Trap Bar Deadlift': 'Trap bar',
+  'Overhead Press': 'Overhead press',
+  'Romanian Deadlifts': 'RDL',
+}
+
+/**
+ * Home's lift line (L9, 9 Oct 2026). It read "romanian deadlifts from 16 kg"
+ * after 30 per hand had been logged: the name lower-cased, a per-hand figure
+ * under a bare "kg", and the PLAN's number quoted over a session that had
+ * already happened.
+ *
+ * - The name as the catalogue writes it, or a short form of it.
+ * - The unit from the one formatter ("16kg per hand"), never hand-rolled.
+ * - What was LIFTED once it has been ("… 30kg per hand today"); the plan's
+ *   figure before that. A finished session whose lead lift was never logged
+ *   says nothing about it — the plan's number there would describe work that
+ *   did not happen.
+ * - No "next": the app knows the heaviest lift, not the running order.
+ */
+export function leadLiftPhrase(lead: LeadLift, status: TodaySession['status']): string | null {
+  const name = LIFT_SHORT_NAME[lead.name] ?? lead.name
+  if (lead.loggedKg != null) return `${name} ${formatLoad(lead.loggedKg, lead.labelMode).replace(/^~/, '')} today`
+  if (status === 'done') return null
+  const planned = formatLoad(lead.kg, lead.labelMode)
+  return status === 'in_progress' ? `${name} ${planned}` : `${name} from ${planned}`
 }
 
 export interface PhaseContext {
@@ -87,15 +138,45 @@ export interface PhaseContext {
 
 export interface RecentPR {
   exerciseName: string
-  /** Kept for callers that only ever meant external load. Legitimately 0 on
-   * a bodyweight or belt record — read `value` with `metric`, not this. */
-  weightKg: number
+  // NO `weightKg`. It was "kept for callers that only ever meant external
+  // load" and four sentence builders reached for it, printing "at 0kg" for a
+  // reps record. Removing the field is what makes that unwritable.
   /** What this record IS. Home must branch on it: a reps figure rendered
    * into a kilogram slot reads as a weight, and looks correct. */
   metric: PRMetric
   /** The number to show, in the metric's own units. */
   value: number
   date: string
+}
+
+/**
+ * Home's "Recent PRs", from the records that were actually BEATEN (9 Oct 2026).
+ *
+ * This took every PR-cache entry dated in the last week — and on somebody's
+ * first week that is every exercise they logged, in database order, so the
+ * list led with the session's warm-up moves and held no loaded lift at all.
+ * A first log is a baseline and movement prep holds no record (pr-engine).
+ * What is left is ordered as a coach would read it out: weight on the bar or
+ * the belt before bodyweight reps, the bigger improvement first, then the
+ * newer. One line per lift.
+ */
+export function pickRecentPRs(beaten: RecordBeaten[], todayStr: string): RecentPR[] {
+  const perLift = new Map<string, RecordBeaten>()
+  for (const r of beaten) {
+    const age = daysAgo(r.date, todayStr)
+    if (age < 0 || age > 7) continue
+    const held = perLift.get(r.exerciseName)
+    // A loaded record over a reps one, else the newer.
+    const loadedFirst = held ? Number(r.metric !== 'reps') - Number(held.metric !== 'reps') : 1
+    if (!held || loadedFirst > 0 || (loadedFirst === 0 && r.date >= held.date)) perLift.set(r.exerciseName, r)
+  }
+  const gain = (r: RecordBeaten) => (r.value - r.previous) / r.previous
+  return [...perLift.values()]
+    .sort((a, b) =>
+      Number(b.metric !== 'reps') - Number(a.metric !== 'reps')
+      || gain(b) - gain(a)
+      || b.date.localeCompare(a.date))
+    .map(r => ({ exerciseName: r.exerciseName, metric: r.metric, value: r.value, date: r.date }))
 }
 
 export interface WeightSeriesPoint {
@@ -260,10 +341,28 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // The heaviest externally-loaded lift, which is what people actually want to
   // know before deciding to go. Bodyweight and band work carry no kg and are
   // skipped rather than reported as 0.
-  const leadLift = (todayWorkoutDay?.exercises ?? [])
+  //
+  // RANKED BY WHAT IS ACTUALLY MOVED: a pair of 16kg dumbbells is 32, and
+  // sorting the per-hand 16 against a bar's total put it below lifts it
+  // outweighs.
+  const leadLift: LeadLift | null = (todayWorkoutDay?.exercises ?? [])
     .filter(e => typeof e.suggested_load_kg === 'number' && (e.suggested_load_kg ?? 0) > 0)
-    .sort((a, b) => (b.suggested_load_kg ?? 0) - (a.suggested_load_kg ?? 0))
-    .map(e => ({ name: e.name, kg: e.suggested_load_kg as number }))[0] ?? null
+    .map(e => {
+      const entry = getExerciseEntry(e.name)
+      const kg = e.suggested_load_kg as number
+      const logged = nonWarmupToday
+        .filter(l => l.exercise_name === e.name && !l.is_bodyweight && (l.drop_index ?? 0) === 0 && Number(l.weight_kg) > 0)
+        .map(l => Number(l.weight_kg))
+      return {
+        name: e.name,
+        kg,
+        labelMode: entry ? labelModeForEntry(entry) : 'total' as LoadLabelMode,
+        loggedKg: logged.length > 0 ? Math.max(...logged) : null,
+        moved: entry && isPerSideLoad(entry) ? kg * 2 : kg,
+      }
+    })
+    .sort((a, b) => b.moved - a.moved)
+    .map(({ moved: _moved, ...lead }) => lead)[0] ?? null
 
   const session: TodaySession = !planKnown
     ? { status: 'unknown', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
@@ -326,7 +425,6 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     : await getEarliestWeightKg(profileId).catch(() => null)
 
   // ---- Recent PRs -----------------------------------------------------------
-  const prCache = getPRCache(profileId)
   // WHICH of an exercise's records to show. A belt outranks bodyweight for
   // the same reason prMetricFor puts it first — a weighted chin-up is its
   // own lift — and external load outranks both because an exercise that has
@@ -335,15 +433,14 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // The KIND travels with the number. It used to be `weightKg: pr.maxWeight`
   // and Home printed it beside a "kg", so a reps record would have rendered
   // "12 kg" — a number in the wrong unit, which reads as true.
-  const recentPRs: RecentPR[] = Object.entries(prCache)
-    .filter(([, pr]) => daysAgo(pr.date, todayStr) >= 0 && daysAgo(pr.date, todayStr) <= 7)
-    .map(([exerciseName, pr]) => {
-      const metric: PRMetric = pr.maxWeight > 0 ? 'load' : pr.maxAddedLoad > 0 ? 'added_load' : 'reps'
-      const value = metric === 'load' ? pr.maxWeight : metric === 'added_load' ? pr.maxAddedLoad : pr.maxReps
-      return { exerciseName, weightKg: pr.maxWeight, metric, value, date: pr.date }
-    })
-    .filter(pr => pr.value > 0)
-    .sort((a, b) => b.date.localeCompare(a.date))
+  // READ AGAIN FIRST. The records are held in memory and re-read by the
+  // Exercise tab as each set is ticked — which is BEFORE that set has reached
+  // the server, so they run one set behind, and the set left out is the last
+  // one of the session: the likeliest to be the best. Found by a driver that
+  // beat a record on its final set and saw no "Recent PRs" on Home.
+  await refreshPRCacheFromDB(profileId).catch(() => {})
+  const recentPRs = pickRecentPRs(getRecordsBeaten(profileId), todayStr)
+  const prCache = getPRCache(profileId)
 
   // ---- Streak + session-pace + protein-adherence window (shared reads) ---
   const [workingLogs, cardioLogs] = await Promise.all([
@@ -487,7 +584,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     scheduledSoFarThisWeek,
     loggedOfScheduledSoFarThisWeek,
     weightTrend: weightTrend ? { ratePerWeekKg: weightTrend.ratePerWeekKg ?? 0, towardGoal: weightTrend.onTrackForGoal } : null,
-    recentPRs: recentPRs.map(p => ({ exerciseName: p.exerciseName, weightKg: p.weightKg })),
+    recentPRs,
     // Both already read above for the water tile — passed through rather than
     // re-fetched. The hour is read HERE, not inside coach-tips, which is a
     // pure function by design.

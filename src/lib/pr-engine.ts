@@ -1,6 +1,7 @@
 import type { BestReading } from './coach-voice'
 import { supabase } from './supabase'
 import { getLocalDateString } from './dev-clock'
+import { getExerciseEntry } from './exercise-db'
 import type { ExerciseSetLog } from './types'
 
 /**
@@ -187,6 +188,77 @@ export function getPRBaseline(userId: string, beforeDate: string): Record<string
   return out
 }
 
+/**
+ * WHICH MOVEMENTS CAN HOLD A RECORD AT ALL — decided as a CSCS, 9 Oct 2026.
+ *
+ * A personal best is progress on something being TRAINED. Movement prep (the
+ * catalogue's `primer` tier: band abductions, arm circles, wall slides) is
+ * done to get ready, at a deliberately easy dose, and a cardio machine is
+ * logged in minutes — neither has a "best" worth a trophy, and Home had been
+ * leading with them ("New PR this week: Standing Band Hip Abduction at 0kg").
+ * Left out where the records are BUILT, so every reader agrees: the badge,
+ * the finish card, Home, Tools and what the coach is told.
+ *
+ * A name the catalogue does not know (something typed under "add unplanned
+ * work") counts: it is a lift somebody chose to do.
+ */
+export function canHoldRecord(exerciseName: string): boolean {
+  const tier = getExerciseEntry(exerciseName)?.mechanics_tier
+  return tier !== 'primer' && tier !== 'cardio'
+}
+
+/** A day on which a lift's record genuinely moved: there was an earlier record, and this beat it. */
+export interface RecordBeaten {
+  exerciseName: string
+  metric: PRMetric
+  /** The new record, in the metric's own unit — kilograms, added kilograms, or reps. */
+  value: number
+  previous: number
+  date: string
+}
+
+/**
+ * EVERY REAL PERSONAL BEST, oldest first — what "N PRs" counts and what Home's
+ * "Recent PRs" lists.
+ *
+ * Both used to read the all-time cache instead: Tools counted its KEYS (the
+ * number of exercises ever logged — "7 PRs" after two workouts) and Home took
+ * every entry dated this week, which on a first week is every exercise.
+ *
+ * Only the top figure moving counts here (the bar, the belt, the reps). A best
+ * the ESTIMATE found — less weight for more reps — is celebrated where it
+ * happens, on the set and the finish card, as before.
+ */
+export function getRecordsBeaten(userId: string): RecordBeaten[] {
+  const out: RecordBeaten[] = []
+  for (const [exerciseName, days] of Object.entries(dayCache.get(userId) ?? {})) {
+    const best = { load: 0, added_load: 0, reps: 0 }
+    for (const date of Object.keys(days).sort()) {
+      const today = { load: days[date].maxWeight, added_load: days[date].maxAddedLoad, reps: days[date].maxReps }
+      for (const metric of ['load', 'added_load', 'reps'] as const) {
+        // `best > 0` IS THE BASELINE RULE: the first figure ever logged has
+        // nothing before it to beat.
+        if (best[metric] > 0 && today[metric] > best[metric]) {
+          out.push({ exerciseName, metric, value: today[metric], previous: best[metric], date })
+        }
+        best[metric] = Math.max(best[metric], today[metric])
+      }
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/**
+ * True when this lift has never been logged before `onDate` — the set being
+ * ticked is where its record STARTS. False while the records have not been
+ * read (nothing is claimed about history the app has not seen), and for a
+ * movement that holds no record.
+ */
+export function isFirstTimeLogged(userId: string, exerciseName: string, onDate: string): boolean {
+  if (!isPRCacheLoaded(userId) || !canHoldRecord(exerciseName)) return false
+  return !Object.keys(dayCache.get(userId)?.[exerciseName] ?? {}).some(d => d < onDate)
+}
+
 export function calculateE1RM(weight: number, reps: number): number {
   if (reps <= 0 || weight <= 0) return 0
   if (reps === 1) return weight
@@ -241,6 +313,9 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
     // in the comment above, and it is here rather than in the query for the
     // reason that comment now gives.
     if (((row as { drop_index?: number | null }).drop_index ?? 0) > 0) continue
+    // MOVEMENT PREP HOLDS NO RECORD — see canHoldRecord. Here, where the
+    // records are built, so no reader downstream has to remember it.
+    if (!canHoldRecord(row.exercise_name)) continue
     const shape: SetShape = {
       weightKg: Number(row.weight_kg),
       reps: row.reps_completed,
@@ -301,6 +376,10 @@ export function checkForPR(
   userId: string,
   exerciseName: string,
   set: SetShape,
+  /** The day the set belongs to. It is compared with the record from BEFORE
+   * that day: the live cache already holds this session's earlier sets, so
+   * read against it the second set of a first-ever session "beat" the first. */
+  onDate: string,
 ): PRResult | null {
   // TAKES THE WHOLE SET, not a bare weight. The old signature was
   // (weight, reps) and opened `if (weight <= 0) return null`, so a
@@ -311,12 +390,28 @@ export function checkForPR(
   // this for weeks.
   const metric = prMetricFor(set)
   if (!metric) return null
-  const existing = getPRCache(userId)[exerciseName] ?? EMPTY_PR_RECORD
+  const existing = getPRBaseline(userId, onDate)[exerciseName] ?? EMPTY_PR_RECORD
   return comparePR(metric, set, existing)
 }
 
-/** The comparison itself, shared by all three PR entry points so they
- * cannot answer differently about the same set. */
+/**
+ * The comparison itself, shared by all three PR entry points so they
+ * cannot answer differently about the same set.
+ *
+ * A FIRST LOG IS A BASELINE, NOT A PERSONAL BEST — decided as a CSCS, 9 Oct
+ * 2026 (M12). A record is an improvement on an earlier performance; with no
+ * earlier performance of the same kind there is nothing to have beaten, and
+ * calling it a best teaches somebody that turning up is the same as getting
+ * stronger. Until this, anything beat an empty record: the tester's first
+ * session finished on five "New PRs", all first-ever logs.
+ *
+ * "Of the same kind" matters: the first set under a belt has no earlier belt
+ * set to beat even after a year of bodyweight reps, and the first loaded set
+ * of a movement only ever done unloaded is where its weight record begins.
+ * Ashley's rulings on WHAT the record is (most reps in one set at bodyweight,
+ * added weight once a belt goes on, the whole set for an estimated best) are
+ * untouched — this is only about whether there was one to beat.
+ */
 function comparePR(metric: PRMetric, set: SetShape, existing: PRRecord): PRResult | null {
   const base = {
     metric,
@@ -331,16 +426,19 @@ function comparePR(metric: PRMetric, set: SetShape, existing: PRRecord): PRResul
   }
 
   if (metric === 'reps') {
+    if (!(existing.maxReps > 0)) return null
     if (!(set.reps > existing.maxReps)) return null
     return { ...base, type: 'reps', newReps: set.reps }
   }
 
   if (metric === 'added_load') {
     const added = Number(set.addedLoadKg ?? 0)
+    if (!(existing.maxAddedLoad > 0)) return null
     if (!(added > existing.maxAddedLoad)) return null
     return { ...base, type: 'added_load', newAddedLoadKg: added, newReps: set.reps }
   }
 
+  if (!(existing.maxWeight > 0 || existing.maxE1RM > 0)) return null
   const newE1RM = calculateE1RM(set.weightKg, set.reps)
   const isWeightPR = set.weightKg > existing.maxWeight
   const isE1RMPR = newE1RM > existing.maxE1RM
@@ -396,8 +494,10 @@ export function getTopPRSet(
   userId: string,
   exerciseName: string,
   sessionSets: SessionSet[],
+  /** The session's day — see checkForPR. */
+  onDate: string,
 ): { setNumber: number; result: PRResult } | null {
-  const existing = getPRCache(userId)[exerciseName] ?? EMPTY_PR_RECORD
+  const existing = getPRBaseline(userId, onDate)[exerciseName] ?? EMPTY_PR_RECORD
 
   let bestSetNumber: number | null = null
   let bestResult: PRResult | null = null
@@ -446,6 +546,13 @@ export function computeSessionPRs(
   const byExercise = new Map<string, ExerciseSetLog[]>()
   for (const log of todayLogs) {
     if (log.is_warmup) continue
+    // A DROP IS NOT A PERSONAL BEST (Ashley, 19 Sep 2026) — and this was the
+    // NINTH place one could take a record: the finish card is handed the
+    // day's raw rows, and nothing here asked. Movement prep likewise: it is
+    // absent from the baseline by construction, and is refused by name here
+    // so the rule does not lean on what a caller happens to pass.
+    if ((log.drop_index ?? 0) > 0) continue
+    if (!canHoldRecord(log.exercise_name)) continue
     // `if (log.is_bodyweight) continue // bodyweight sets have no comparable
     // load PR` stood here. True as written and wrong as a conclusion: they
     // have no comparable LOAD, which is a reason to compare something else,

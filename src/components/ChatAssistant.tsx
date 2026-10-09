@@ -42,7 +42,7 @@ import { executeMealMove } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE } from '@/lib/coach-voice'
 import { isHedged } from '@/lib/definite-mention'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
@@ -1667,7 +1667,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         ? `rolling average ${proactiveData.weightTrend.rollingAvgKg.toFixed(1)}kg, trending ${proactiveData.weightTrend.ratePerWeekKg >= 0 ? '+' : ''}${proactiveData.weightTrend.ratePerWeekKg.toFixed(2)}kg/week (${proactiveData.weightTrend.sampleCount} weigh-ins)${proactiveData.weightTrend.onTrackForGoal === false ? ', off track for their stated goal' : ''}`
         : null,
       recent_prs_summary: proactiveData && proactiveData.recentPRs.length > 0
-        ? proactiveData.recentPRs.slice(0, 3).map(pr => `${pr.exerciseName} ${pr.weightKg}kg (${pr.date})`).join('; ')
+        ? proactiveData.recentPRs.slice(0, 3).map(pr => `${recordPhrase(pr)} (${pr.date})`).join('; ')
         : null,
       adherence_note: proactiveData?.whatsLeftLine ?? null,
       // Chat round 2, item 4 — at most one, computed in code (never by the

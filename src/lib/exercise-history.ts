@@ -283,15 +283,18 @@ export function derivePRHistory(sessions: ExerciseHistorySession[]): PRMoment[] 
     // maxima now, and a session can push any of them.
     const where = { date: session.date, sessionId: session.sessionId }
 
-    if (session.topSetAddedLoadKg > runningMaxAdded) {
+    // A FIRST LOG IS A BASELINE (pr-engine's comparePR, 9 Oct 2026): each
+    // running best has to exist before a session can beat it, so the first
+    // session of a lift opens its record and is not listed as one.
+    if (runningMaxAdded > 0 && session.topSetAddedLoadKg > runningMaxAdded) {
       moments.push({ ...blank, ...where, addedLoadKg: session.topSetAddedLoadKg, kind: 'added_load', metric: 'added_load' })
     }
-    if (session.topSetReps > runningMaxReps) {
+    if (runningMaxReps > 0 && session.topSetReps > runningMaxReps) {
       moments.push({ ...blank, ...where, reps: session.topSetReps, kind: 'reps', metric: 'reps' })
     }
     const isWeightPR = session.topSetWeightKg > runningMaxWeight
     const isE1RMPR = session.topSetE1RM > runningMaxE1RM
-    if (isWeightPR || isE1RMPR) {
+    if ((runningMaxWeight > 0 || runningMaxE1RM > 0) && (isWeightPR || isE1RMPR)) {
       moments.push({
         ...blank,
         ...where,

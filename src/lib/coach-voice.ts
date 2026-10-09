@@ -572,6 +572,22 @@ export function bestReadingOf(metric: 'load' | 'added_load' | 'reps', value: num
   return { kind: 'load', weightKg: value }
 }
 
+/**
+ * "Back Squat at 62.5kg" / "Press-Up at 15 reps" / "Chin-Up at +10kg" — a
+ * record named in a sentence, with its unit, in ONE place.
+ *
+ * Four sentence builders (the Home tip, the coach's two nudges, and the text
+ * handed to the coach) each wrote `${name} at ${weightKg}kg` off a shape that
+ * carried only a weight — so a reps record, whose weight is legitimately 0,
+ * came out as "Standing Band Hip Abduction at 0kg" (M16/L32, 9 Oct 2026). The
+ * kind travels with the number now and none of them can drop it: the shape
+ * they are handed has no `weightKg` to reach for.
+ */
+export interface RecordFact { exerciseName: string; metric: 'load' | 'added_load' | 'reps'; value: number }
+export function recordPhrase(pr: RecordFact): string {
+  return `${pr.exerciseName} at ${personalBest(bestReadingOf(pr.metric, pr.value))}`
+}
+
 export function ask(verbPhrase: string): string {
   const trimmed = verbPhrase.trim().replace(/[.?!:]+$/, '')
   return `Want me to ${trimmed}?`
@@ -718,6 +734,14 @@ export function loggedCountLabel(count: number, state: { known: boolean; loading
 
 /** Under a set row that has not reached the server yet. */
 export const SET_WAITING_TO_SEND = 'on this phone, waiting to send'
+
+/**
+ * What the app says the first time a lift is logged, where it used to raise a
+ * trophy. Decided unprompted on 9 Oct 2026 (reversible — the tracer's owner
+ * question, default taken as instructed): nothing special beyond this one
+ * quiet line. A first log is where a record STARTS; it is not one.
+ */
+export const FIRST_LOG_NOTE = 'First time logged — this is your baseline'
 /** Under a set row the server refused, beside its Retry. */
 export const SET_DID_NOT_SAVE = "didn't save"
 

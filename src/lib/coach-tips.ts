@@ -15,6 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { seededRngFromKey } from './seeded-random'
+import { recordPhrase, type RecordFact } from './coach-voice'
 
 export interface CoachTipContext {
   /** YYYY-MM-DD, used only to seed rotation — never a data source itself. */
@@ -31,8 +32,8 @@ export interface CoachTipContext {
   loggedOfScheduledSoFarThisWeek: number
   /** null when there's not enough weigh-in history for a rolling trend yet. */
   weightTrend: { ratePerWeekKg: number; towardGoal: boolean | null } | null
-  /** PRs set within the last 7 days, from the PR cache. */
-  recentPRs: { exerciseName: string; weightKg: number }[]
+  /** Records genuinely beaten within the last 7 days — never a first log, never movement prep. The KIND travels with the number. */
+  recentPRs: RecordFact[]
   /**
    * Water so far today and the day's target, plus the LOCAL hour — the only
    * time-of-day-sensitive rule here, and the reason the hour is passed in
@@ -94,7 +95,7 @@ const RULES: Rule[] = [
     evaluate: ctx => {
       if (ctx.recentPRs.length === 0) return null
       const pr = ctx.recentPRs[0]
-      return `New PR this week: ${pr.exerciseName} at ${pr.weightKg}kg.`
+      return `New PR this week: ${recordPhrase(pr)}.`
     },
   },
   {

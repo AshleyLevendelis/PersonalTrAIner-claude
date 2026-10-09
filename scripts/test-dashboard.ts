@@ -221,7 +221,7 @@ async function main() {
   check('a near-zero weight-trend rate (<0.05kg/wk) is not specific enough to report — no tip from it', selectCoachTip(flatWeightCtx) === null, selectCoachTip(flatWeightCtx))
 
   // Rotation: same day -> same tip across repeated calls (deterministic, not re-randomized every render).
-  const multiSignalCtx = { ...emptyCtx, proteinAdherenceStreakDays: 4, recentPRs: [{ exerciseName: 'Barbell Squats', weightKg: 100 }] }
+  const multiSignalCtx = { ...emptyCtx, proteinAdherenceStreakDays: 4, recentPRs: [{ exerciseName: 'Barbell Squats', metric: 'load' as const, value: 100 }] }
   const first = selectCoachTip(multiSignalCtx)
   const second = selectCoachTip(multiSignalCtx)
   check('the same day + same context always selects the same tip (stable across re-renders)', first === second, { first, second })

@@ -10,7 +10,7 @@ import { PlateCalculator } from '@/components/PlateCalculator'
 import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getSessionHistory } from '@/lib/exercise-history'
-import { getPRCache } from '@/lib/pr-engine'
+import { getRecordsBeaten, refreshPRCacheFromDB } from '@/lib/pr-engine'
 import { getAllItems, subscribeGroceryStore } from '@/lib/grocery-store'
 import { programHash, groceryHash } from '@/lib/app-route'
 import { RoundField } from '@/components/timers/RoundField'
@@ -118,15 +118,16 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   useEffect(() => {
     if (!profileId) return
     let cancelled = false
-    void getSessionHistory(profileId, 100)
-      .then(rows => {
+    void Promise.all([getSessionHistory(profileId, 100), refreshPRCacheFromDB(profileId).catch(() => {})])
+      .then(([rows]) => {
         if (cancelled) return
-        // PRs come from the same cache the Home list and the set grid read;
-        // counting them here rather than deriving a second definition.
+        // RECORDS BEATEN, not exercises logged. This counted the cache's keys
+        // — one per exercise ever logged — so two workouts read "7 PRs" with
+        // no record broken. Same list Home's "Recent PRs" is drawn from.
         // LIFTING SESSIONS, as it has always counted: the history now also
         // lists a day of cardio with no lifting (H7), and that must not turn
         // "5 sessions" into 7 without anyone deciding it should.
-        setHistoryCount({ sessions: rows.filter(r => !r.cardioOnly).length, prs: Object.keys(getPRCache(profileId)).length })
+        setHistoryCount({ sessions: rows.filter(r => !r.cardioOnly).length, prs: getRecordsBeaten(profileId).length })
       })
       .catch(() => { if (!cancelled) setHistoryCount(null) })
     return () => { cancelled = true }
