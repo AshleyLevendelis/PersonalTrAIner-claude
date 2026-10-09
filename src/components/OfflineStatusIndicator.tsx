@@ -6,8 +6,31 @@ import { Zap, RefreshCw, CheckCircle2, AlertTriangle, X, RotateCcw, Trash2 } fro
 import { subscribeSyncState, type SyncState } from '@/lib/set-log-store'
 import {
   getAllFailedItems, retryFailedItem, discardFailedItem, subscribeAllQueues,
-  QUEUE_LABEL, type FailedItem,
+  QUEUE_LABEL, plainSyncError, type FailedItem,
 } from '@/lib/queue-health'
+import { STILL_ON_THIS_DEVICE } from '@/lib/coach-voice'
+
+// ---------------------------------------------------------------------------
+// THE COLOURS ARE THE THEME'S OWN — H20, 9 Oct 2026.
+//
+// Every surface here was written as a light/dark pair: `bg-red-50
+// dark:bg-red-950/20`, `text-red-700 dark:text-red-400`. Nothing in this app
+// ever adds the `dark` class (index.css says so: [data-theme] is the real
+// axis), so the `dark:` half never applied and every theme got the light-mode
+// half — a pale pink card under the theme's own muted lilac labels, which the
+// tester called "close to unreadable".
+//
+// These are the tokens InsightBanner and the cardio notice already use, mixed
+// over the page's own background so a badge floating over scrolling content
+// stays a solid chip rather than a 9% tint you can read the page through.
+// verify:sets-reconnect measures the contrast of the card's text on a real
+// screen, in a dark theme and a light one.
+// ---------------------------------------------------------------------------
+const chip = (role: string) => ({
+  background: `color-mix(in srgb, var(--${role}) 16%, var(--background))`,
+  borderColor: `var(--${role}-border)`,
+  color: `var(--${role}-text)`,
+})
 
 // ---------------------------------------------------------------------------
 // Audit §3.5 — this used to read ONE of the five local-first queues.
@@ -73,7 +96,7 @@ export function OfflineStatusIndicator() {
         <CardContent className="p-3 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold flex items-center gap-1.5">
-              <AlertTriangle className="size-3.5 text-red-500" />
+              <AlertTriangle className="size-3.5 text-[color:var(--role-warn-text)]" />
               Didn't save
             </span>
             <Button variant="ghost" size="icon" className="hit-slop-44 size-6" onClick={() => setReviewOpen(false)} aria-label="Close">
@@ -84,16 +107,30 @@ export function OfflineStatusIndicator() {
             <p className="text-xs text-muted-foreground py-2">Nothing pending — all clear.</p>
           ) : (
             <div className="space-y-2">
+              {/* Said once for the whole list, because it is true of every
+                  item on it whichever queue it came from. */}
+              <p className="text-xs text-muted-foreground">{STILL_ON_THIS_DEVICE}</p>
               {failedItems.map(item => (
-                <div key={`${item.queue}:${item.clientId}`} className="rounded-md border border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-950/20 p-2 space-y-1">
+                <div
+                  key={`${item.queue}:${item.clientId}`}
+                  data-testid="didnt-save-item"
+                  className="rounded-md border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] p-2 space-y-1"
+                >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium truncate">{item.label}</span>
-                    {item.date && <span className="text-[0.625rem] text-muted-foreground shrink-0">{item.date}</span>}
+                    <span className="text-xs font-medium text-foreground truncate">{item.label}</span>
+                    {item.date && <span className="text-[0.625rem] text-foreground/75 shrink-0">{item.date}</span>}
                   </div>
                   {/* Which queue it came from, because "500 ml" and "Chest Dips
                       · set 3" in one list need saying apart. */}
-                  <p className="text-[0.625rem] text-muted-foreground">{QUEUE_LABEL[item.queue]}</p>
-                  <p className="text-[0.625rem] text-red-700 dark:text-red-400">{item.errorMessage}</p>
+                  {/* Not `text-muted-foreground`: on this card's tint the theme's
+                      muted lilac measured 4.5:1 exactly at 10px — legal, and
+                      the very pairing the tester could not read. */}
+                  <p className="text-[0.625rem] text-foreground/75">{QUEUE_LABEL[item.queue]}</p>
+                  {/* IN WORDS. This line printed the failure as the browser
+                      threw it — "TypeError: Failed to fetch". */}
+                  <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]" data-testid="didnt-save-reason">
+                    {plainSyncError(item.errorMessage, { refused: item.refused })}
+                  </p>
                   <div className="flex gap-3 pt-0.5">
                     <Button variant="outline" size="sm" className="hit-slop-44 h-6 text-[0.625rem] px-2 gap-1" onClick={() => handleRetry(item)}>
                       <RotateCcw className="size-2.5" />
@@ -116,11 +153,11 @@ export function OfflineStatusIndicator() {
   if (showSyncSuccess) {
     return (
       <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80 animate-in fade-in slide-in-from-top-2 duration-300">
-        <Card className="border-green-300/50 bg-green-50/95 dark:bg-green-950/90 dark:border-green-700/30 backdrop-blur-sm shadow-lg">
+        <Card className="border-primary/40 shadow-lg" style={{ background: 'color-mix(in srgb, var(--primary) 14%, var(--background))' }}>
           <CardContent className="py-2.5 px-3">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
-              <span className="text-sm font-medium text-green-800 dark:text-green-200">
+              <CheckCircle2 className="h-4 w-4 text-primary-text shrink-0" />
+              <span className="text-sm font-medium text-foreground">
                 All offline workout logs synced!
               </span>
             </div>
@@ -136,10 +173,7 @@ export function OfflineStatusIndicator() {
     return (
       <>
         <button onClick={() => setReviewOpen(true)} aria-label="Review things that didn't save">
-          <Badge
-            variant="secondary"
-            className="gap-1.5 bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/70"
-          >
+          <Badge variant="secondary" data-testid="didnt-save-pill" className="gap-1.5 cursor-pointer" style={chip('role-warn')}>
             <AlertTriangle className="h-3 w-3" />
             <span>
               {failedItems.length} thing{failedItems.length !== 1 ? 's' : ''} didn't save — tap to review
@@ -153,10 +187,7 @@ export function OfflineStatusIndicator() {
 
   if (state.isSyncing) {
     return (
-      <Badge
-        variant="secondary"
-        className="gap-1.5 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800 animate-pulse"
-      >
+      <Badge variant="secondary" className="gap-1.5 animate-pulse" style={chip('role-ai')}>
         <RefreshCw className="h-3 w-3 animate-spin" />
         <span>Syncing logs...</span>
       </Badge>
@@ -165,10 +196,7 @@ export function OfflineStatusIndicator() {
 
   if (!state.isOnline || state.queuedCount > 0) {
     return (
-      <Badge
-        variant="secondary"
-        className="gap-1.5 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800"
-      >
+      <Badge variant="secondary" data-testid="saved-offline-badge" className="gap-1.5" style={chip('role-warn')}>
         <Zap className="h-3 w-3" />
         <span>
           Saved Offline{state.queuedCount > 0 && ` (${state.queuedCount} set${state.queuedCount !== 1 ? 's' : ''} queued)`}

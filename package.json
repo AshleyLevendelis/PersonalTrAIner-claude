@@ -37,6 +37,8 @@
     "test:round-presets": "tsx scripts/test-round-presets.ts",
     "test:timers": "tsx scripts/test-timers.ts",
     "test:cardio-log": "tsx scripts/test-cardio-log.ts",
+    "test:sets-never-lost": "tsx scripts/test-sets-never-lost.ts",
+    "verify:sets-reconnect": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/sets-reconnect.mjs",
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",

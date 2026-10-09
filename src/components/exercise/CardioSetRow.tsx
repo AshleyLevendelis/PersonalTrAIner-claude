@@ -58,6 +58,10 @@ export function useCardioLogsToday(): CardioLogView[] {
     let seq = 0
     const load = () => {
       const mine = ++seq
+      // The read never rejects, and a read that cannot reach the server
+      // answers with what this phone already knew (H20) — so a finisher
+      // logged before the connection dropped stays ticked instead of being
+      // offered a second time.
       void getCardioLogsForDateMerged(profileId, date).then(rows => {
         if (live && mine === seq) setLogs(rows)
       })

@@ -17,11 +17,11 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Check, Dumbbell, Plus, Trophy, Trash2 } from 'lucide-react'
+import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, loggedSetReading } from '@/lib/coach-voice'
+import { lastTime, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator } from '@/lib/load-prescription'
@@ -154,7 +154,7 @@ export function SetGrid({
   onOpenPlateCalc,
 }: SetGridProps) {
   const {
-    profileId, date: today, dayName, liveWeek, logs, setsFor, ghosts, loadGhosts, logSet, deleteSet, refresh,
+    profileId, date: today, dayName, liveWeek, logs, setsFor, ghosts, loadGhosts, logSet, deleteSet, retrySet, refresh,
     setDraft, saveSetDraft, clearSetDrafts, extraSetsFor, setExtraSets,
   } = useActiveSession()
 
@@ -785,6 +785,13 @@ export function SetGrid({
         const warm = isWarm(ref)
         const drop = isDrop(ref)
         const isSaved = !!loggedRowFor(ref)
+        // WHERE THE ROW STANDS WITH THE SERVER (H20, 9 Oct 2026). `failed` is
+        // a set the server refused: it stays on the grid — it used to leave
+        // it — but it does not wear the mint "saved" tint, and its tick is
+        // not announced as saved. `waiting` is held on this phone and sends
+        // itself; it keeps the tint, because held is what it is.
+        const sync = loggedRowFor(ref)?.syncStatus
+        const didNotSave = sync === 'failed'
         const input = inputFor(ref)
         const isBW = input.isBodyweight
         const isPRSet = prBadgeSet?.rowKey === k
@@ -846,6 +853,7 @@ export function SetGrid({
           )}
           <div
             data-testid={warm ? 'warmup-row' : drop ? 'drop-row' : 'working-row'}
+            data-sync={isSaved ? (sync ?? 'saved') : undefined}
             // THE TOUR'S TARGET IS THE WHOLE ROW when the weight must be typed:
             // the tour blocks every tap outside its spotlight, so a spotlight
             // on the ✓ alone would ask for a weight it will not let anyone
@@ -870,7 +878,7 @@ export function SetGrid({
             // working volume", which a drop does.
             style={railed ? { borderLeft: `2px solid ${warm ? 'var(--ramp-rail)' : 'color-mix(in srgb, var(--primary) 55%, transparent)'}` } : undefined}
             className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-r-[8px] py-0.5 transition-colors ${drop ? 'relative' : ''} ${padClass} ${
-              isSaved ? (warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : ''
+              isSaved ? (didNotSave ? 'bg-[color:var(--role-warn-bg)]' : warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : ''
             }`}
           >
             {/* The tether — an elbow from the row above into this one, so a
@@ -997,7 +1005,13 @@ export function SetGrid({
                 // reader — and every driver — could not tell the two tick
                 // buttons apart. setLabelLong was imported for this and never
                 // wired, which is the declared-but-not-rendered shape again.
-                aria-label={isSaved ? `${setLabelLong(ref)} saved` : `Save ${setLabelLong(ref).toLowerCase()}`}
+                aria-label={!isSaved
+                  ? `Save ${setLabelLong(ref).toLowerCase()}`
+                  : didNotSave
+                    ? `${setLabelLong(ref)} didn't save — save it again`
+                    : sync === 'waiting'
+                      ? `${setLabelLong(ref)} waiting to send`
+                      : `${setLabelLong(ref)} saved`}
               >
                 <Check className="size-3.5" />
               </Button>
@@ -1015,13 +1029,33 @@ export function SetGrid({
             const logged = loggedRowFor(ref)
             if (!logged) return null
             const armed = confirmDeleteSet === k
+            // THE RECEIPT SAYS WHAT IS TRUE OF THIS ROW. "✓" means the phone
+            // has it and nothing has gone wrong — which is what the tick has
+            // always meant here (the store is local-first; see its header).
+            // A set that has been waiting on a connection says so, and a set
+            // the server refused says so and offers the one thing to do
+            // about it. Neither ever just disappears.
+            const reading = logged.is_bodyweight
+              ? `${logged.reps_completed} reps · Bodyweight`
+              : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`
+            const state = logged.syncStatus
             return (
-              <div className={`flex items-center justify-between gap-2 -mt-0.5 ${drop ? 'pl-5 pr-1' : 'px-1'}`}>
-                <p className="text-[0.625rem] text-primary-text">
-                  {setLabelLong(ref)}: {logged.is_bodyweight
-                    ? `${logged.reps_completed} reps · Bodyweight`
-                    : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
+              <div className={`flex items-center justify-between gap-2 -mt-0.5 ${drop ? 'pl-5 pr-1' : 'px-1'}`} data-testid="set-receipt">
+                <p className={`min-w-0 text-[0.625rem] ${state === 'failed' ? 'text-destructive' : state === 'waiting' ? 'text-[color:var(--role-warn-text)]' : 'text-primary-text'}`}>
+                  {setLabelLong(ref)}: {reading}{state === 'failed' ? ` · ${SET_DID_NOT_SAVE}` : state === 'waiting' ? ` · ${SET_WAITING_TO_SEND}` : ' ✓'}
                 </p>
+                {state === 'failed' && profileId && (
+                  <button
+                    type="button"
+                    data-testid="set-retry"
+                    onClick={() => retrySet({ userId: profileId, date: today, exerciseId, setNumber: ref.setNumber, isWarmup: isWarm(ref), dropIndex: ref.dropIndex ?? 0 })}
+                    className="hit-slop-44 flex shrink-0 items-center gap-1 text-[0.625rem] font-medium text-foreground"
+                    aria-label={`Try saving ${setLabelLong(ref).toLowerCase()} again`}
+                  >
+                    <RotateCcw className="size-2.5" />
+                    Retry
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleDeleteSet(ref)}

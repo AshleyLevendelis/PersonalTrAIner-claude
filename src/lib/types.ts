@@ -960,6 +960,24 @@ export interface ExerciseSetLog {
   drop_index?: number
   completed_at?: string
   /**
+   * WHERE THIS ROW STANDS WITH THE SERVER. Absent on a row the server has —
+   * which is every row read from it, so nothing that predates this field has
+   * to change.
+   *
+   *   saving  — on this phone, its first attempt to send under way (normally
+   *             gone in under a second)
+   *   waiting — on this phone, an attempt has failed or the phone is offline;
+   *             it sends itself when a request gets through
+   *   failed  — the server refused it, or the app gave up. Kept on this phone
+   *             and on the grid until someone retries or deletes it.
+   *
+   * Never a column: it is set by set-log-store's read and nowhere else, and no
+   * write path spreads one of these rows. Added 9 Oct 2026 (H20) so a set that
+   * has not reached the server can be on the grid AND say so — before it, a
+   * set that gave up left the screen altogether.
+   */
+  syncStatus?: 'saving' | 'waiting' | 'failed'
+  /**
    * Assistance used (kg), for an assistance-loaded exercise (today, only
    * Pull-Ups (Assisted)) — undefined/null for every ordinary set. Column
    * exists (migration 20260811100000); the write path (SetGrid.tsx logging

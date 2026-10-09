@@ -18,9 +18,15 @@
 
 import { supabase } from './supabase'
 import { getAppNow } from './dev-clock'
+import { isConnectionFailure } from './connection-error'
 import type { CardioLog } from './types'
 
 const PENDING_KEY = 'fitplan_cardio_pending_v1'
+/** The server's cardio rows as this phone last saw them — see "THE PHONE'S OWN COPY" below. */
+const LAST_KNOWN_KEY = 'fitplan_cardio_lastknown_v1'
+/** How far back that copy reaches, and how many rows it may hold. History asks the server; this is for a bad connection, not an archive. */
+const LAST_KNOWN_DAYS = 60
+const LAST_KNOWN_MAX_ROWS = 300
 const MAX_ATTEMPTS = 5
 /** How long a synced entry stays undoable before it's pruned from the local queue. */
 export const CARDIO_UNDO_WINDOW_MS = 10 * 60 * 1000
@@ -215,6 +221,7 @@ export async function deleteCardioLog(clientId: string): Promise<void> {
   if (item.id) {
     const { error } = await supabase.from('cardio_logs').delete().eq('id', item.id)
     if (error) throw error
+    recordSynced({ kind: 'delete', id: item.id })
   }
   savePending(loadPending().filter(i => i.clientId !== clientId))
   notify()
@@ -314,6 +321,9 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
         // side since the server fetch already carries them.
         target.status = 'synced'
         target.id = insertedId
+        // INTO THE PHONE'S COPY BEFORE IT STOPS BEING "PENDING", so there is
+        // no instant in which a saved log is in neither place.
+        if (insertedId) recordSynced({ kind: 'insert', row: { ...serverShape(target), id: insertedId } })
         savePending(current)
       }
       consecutiveFailures = 0
@@ -322,9 +332,17 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
       const current = loadPending()
       const target = current.find(i => i.clientId === item.clientId)
       if (target) {
-        target.attempts += 1
-        target.errorMessage = err instanceof Error ? err.message : 'Sync failed'
-        if (target.attempts >= MAX_ATTEMPTS) target.status = 'failed'
+        // A DEAD CONNECTION IS NOT A FAILED ATTEMPT — the same rule the set
+        // queue took on 9 Oct 2026 (H20), for the same reason: on a
+        // connection that is up but dead (the browser still says online, so
+        // the guard in flushPending cannot see it) five tries pass in about a
+        // minute, and a perfectly good walk was then marked "didn't save" and
+        // left waiting for a tap on Retry. It stays pending and goes the
+        // moment a request gets through.
+        const noConnection = isConnectionFailure(err)
+        if (!noConnection) target.attempts += 1
+        target.errorMessage = (err as { message?: string } | null)?.message ?? 'Sync failed'
+        if (!noConnection && target.attempts >= MAX_ATTEMPTS) target.status = 'failed'
         savePending(current)
         consecutiveFailures += 1
         notify()
@@ -333,31 +351,170 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
   }
 }
 
-/** Server rows + pending (not-yet-synced or failed) rows for one date, so the UI always sees its own writes. */
-export async function getCardioLogsForDateMerged(userId: string, date: string): Promise<CardioLogView[]> {
-  let serverRows: CardioLog[] = []
+// ---------------------------------------------------------------------------
+// THE PHONE'S OWN COPY — the cardio half of H20, 9 Oct 2026.
+//
+// The same hole set-log-store had: a read that failed fell back to the pending
+// queue alone, and a log that has synced is not pending — so on a bad
+// connection a finisher logged ten minutes ago read back as not logged, and
+// the row offered to log it again.
+//
+// The server's rows are kept here as the phone last saw them: every read that
+// lands replaces its own date range, a log is added the moment it syncs, and
+// an undone one is taken out. A read that fails answers from this.
+//
+// A COPY, NOT A SOURCE — every read that lands replaces the range it asked
+// for, which is what stops a log deleted on another device living here.
+// ---------------------------------------------------------------------------
+
+function loadLastKnown(): Record<string, CardioLog[]> {
+  try {
+    const raw = localStorage.getItem(LAST_KNOWN_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveLastKnown(all: Record<string, CardioLog[]>): void {
+  try {
+    localStorage.setItem(LAST_KNOWN_KEY, JSON.stringify(all))
+  } catch {
+    // A full disk must not cost a log: this is a convenience for a bad
+    // connection, and the queue and the server are the record.
+  }
+}
+
+function isoDaysBefore(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() - days)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function trimKnown(rows: CardioLog[]): CardioLog[] {
+  const newest = rows.reduce((max, r) => (r.date > max ? r.date : max), '')
+  const floor = newest ? isoDaysBefore(newest, LAST_KNOWN_DAYS) : ''
+  return rows
+    .filter(r => r.date >= floor)
+    .sort((a, b) => String(b.completed_at ?? '').localeCompare(String(a.completed_at ?? '')))
+    .slice(0, LAST_KNOWN_MAX_ROWS)
+}
+
+function serverShape(p: PendingCardioLog): CardioLog {
+  return {
+    id: p.id,
+    user_id: p.userId,
+    date: p.date,
+    activity_name: p.activityName,
+    duration_minutes: p.durationMinutes,
+    intensity_rpe: p.intensityRpe,
+    avg_heart_rate: p.avgHeartRate ?? null,
+    notes: p.notes ?? null,
+    completed_at: p.completedAt,
+  }
+}
+
+type SyncedChange = { kind: 'insert'; row: CardioLog } | { kind: 'delete'; id: string }
+
+function applyChange(rows: CardioLog[], change: SyncedChange): CardioLog[] {
+  if (change.kind === 'delete') return rows.filter(r => r.id !== change.id)
+  return [change.row, ...rows.filter(r => r.id !== change.row.id)]
+}
+
+// A read can be answered before a log saves and arrive after it — see the
+// same note in set-log-store. Every change that reaches the server is
+// numbered, and a read replays the ones that landed while it was in flight.
+let syncSeq = 0
+let recentlySynced: { seq: number; change: SyncedChange }[] = []
+
+function recordSynced(change: SyncedChange): void {
+  syncSeq += 1
+  recentlySynced = [...recentlySynced, { seq: syncSeq, change }].slice(-40)
+  const all = loadLastKnown()
+  if (change.kind === 'insert') {
+    all[change.row.user_id] = trimKnown(applyChange(all[change.row.user_id] ?? [], change))
+  } else {
+    for (const user of Object.keys(all)) all[user] = applyChange(all[user], change)
+  }
+  saveLastKnown(all)
+}
+
+/** A range of days, both ends included. A single day is a range of one. */
+interface CardioRange {
+  from: string
+  to: string
+}
+
+/** What a cardio read came back with — the same shape set-log-store's read has, so a caller handles one kind of answer. */
+export interface CardioLogsRead {
+  rows: CardioLogView[]
+  /** `server`: the server answered. `cache`: THE READ FAILED and `rows` is what this phone already knew. */
+  source: 'server' | 'cache'
+}
+
+/**
+ * THE ONE CARDIO READER — H7, H21 and H20 share it.
+ *
+ * Every cardio log between two dates as this phone knows them: the server's
+ * rows (or, when the read fails, the phone's copy of them) with everything
+ * still waiting on this phone on top, so a log made a second ago — or one made
+ * with no connection — is in the answer.
+ *
+ * Until 9 Oct 2026 there were three partial readers. The rest-day card read
+ * one date and merged the queue. The coach and the streak read fourteen and
+ * thirty-five days from the server alone, so a log that had not synced did not
+ * exist for the coach ("it hasn't been written down yet"). Session history,
+ * the finish card and the training day read nothing at all, which is how a
+ * logged finisher and "skipping rope, 12 min" came to appear nowhere. They ask
+ * here now, and a screen that shows a cardio log shows the same one every
+ * other screen does.
+ *
+ * NEVER REJECTS, and since H20 it says whether it reached the server instead
+ * of returning the same empty list for "nothing logged" and "could not ask".
+ */
+async function readCardioLogs(userId: string, range: CardioRange): Promise<CardioLogsRead> {
+  const startedAtSeq = syncSeq
+  let server: CardioLog[] | null = null
   try {
     const { data, error } = await supabase
       .from('cardio_logs')
       .select('*')
       .eq('user_id', userId)
-      .eq('date', date)
+      .gte('date', range.from)
+      .lte('date', range.to)
       .order('completed_at', { ascending: false })
-    if (error) throw error
-    serverRows = (data || []) as CardioLog[]
+    if (!error) server = (data || []) as CardioLog[]
   } catch {
-    // Offline or transient failure — pending-only view, never throws.
+    // Thrown rather than returned — the same failure, the same answer below.
   }
+
+  const inRange = (r: { date: string }) => r.date >= range.from && r.date <= range.to
+  let base: CardioLog[]
+  if (server) {
+    for (const { seq, change } of recentlySynced) {
+      if (seq <= startedAtSeq) continue
+      if (change.kind === 'insert' && (change.row.user_id !== userId || !inRange(change.row))) continue
+      server = applyChange(server, change)
+    }
+    base = server
+    const all = loadLastKnown()
+    all[userId] = trimKnown([...(all[userId] ?? []).filter(r => !inRange(r)), ...server])
+    saveLastKnown(all)
+  } else {
+    base = (loadLastKnown()[userId] ?? []).filter(inRange)
+  }
+
   // 'synced' local rows are excluded here — they're already represented by
-  // serverRows below (kept locally only so deleteCardioLog can undo them by
-  // id within CARDIO_UNDO_WINDOW_MS, not for display).
+  // the base rows (kept locally only so deleteCardioLog can undo them by id
+  // within CARDIO_UNDO_WINDOW_MS, not for display).
   //
   // A TOMBSTONED ROW IS NOT A LOG. An undo that races an in-flight insert
   // marks the entry `pendingDelete` rather than dropping it (see
   // deleteCardioLog), and this read used to return it anyway — invisible
   // until 24 Sep 2026, when the cardio rows started reading themselves back
   // from here and an undone walk came straight back as "✓ Walk".
-  const local = loadPending().filter(i => i.userId === userId && i.date === date)
+  const local = loadPending().filter(i => i.userId === userId && inRange(i))
   const pendingRows = local
     .filter(i => i.status !== 'synced' && !i.pendingDelete)
     .map(pendingToView)
@@ -367,12 +524,25 @@ export async function getCardioLogsForDateMerged(userId: string, date: string): 
   // well inside the ten minutes the store promises.
   const clientIdByServerId = new Map(local.filter(i => i.status === 'synced' && i.id).map(i => [i.id!, i.clientId]))
   const tombstoned = new Set(local.filter(i => i.pendingDelete && i.id).map(i => i.id!))
-  return [
-    ...pendingRows,
-    ...serverRows
-      .filter(r => !(r.id && tombstoned.has(r.id)))
-      .map(r => ({ ...r, clientId: (r.id && clientIdByServerId.get(r.id)) || undefined, syncStatus: 'synced' as const })),
-  ]
+  return {
+    rows: [
+      ...pendingRows,
+      ...base
+        .filter(r => !(r.id && tombstoned.has(r.id)))
+        .map(r => ({ ...r, clientId: (r.id && clientIdByServerId.get(r.id)) || undefined, syncStatus: 'synced' as const })),
+    ],
+    source: server ? 'server' : 'cache',
+  }
+}
+
+/** One day through the one reader. */
+export function readCardioLogsForDate(userId: string, date: string): Promise<CardioLogsRead> {
+  return readCardioLogs(userId, { from: date, to: date })
+}
+
+/** Server rows + pending (not-yet-synced or failed) rows for one date, so the UI always sees its own writes. The rows of readCardioLogsForDate, for a caller that has nothing to say about a failed read. */
+export async function getCardioLogsForDateMerged(userId: string, date: string): Promise<CardioLogView[]> {
+  return (await readCardioLogsForDate(userId, date)).rows
 }
 
 /**

@@ -48,6 +48,29 @@ const SLOW_MS = (() => {
   }
 })()
 
+/**
+ * A CONNECTION THAT IS UP BUT DEAD — `window.__netDown = true`, or `?netdown=1`
+ * to start that way. Added 9 Oct 2026 for H20.
+ *
+ * Every request, read or write, comes back the way the real client reports a
+ * dead network: RESOLVED, with `{ data: null, error }` and an empty `code` —
+ * not thrown (postgrest-js, read in the installed package). `navigator.onLine`
+ * is left alone on purpose: the bug is the case where the browser never learns
+ * it is offline, so the app's `online`/`offline` guards cannot help.
+ *
+ * Until this existed the fake always answered, and that is why no driver had
+ * ever seen a logged set read back as "0 logged": a fake that cannot fail a
+ * read cannot show what a failed read does to the screen. Off by default, so
+ * every existing run is unchanged. Combine with `?slow=` for the seconds a real
+ * dead read takes to give up.
+ */
+const NET_DOWN_AT_START = (() => {
+  try { return new URLSearchParams(location.search).get('netdown') === '1' } catch { return false }
+})()
+if (NET_DOWN_AT_START) (window as unknown as { __netDown?: boolean }).__netDown = true
+const netDown = () => (window as unknown as { __netDown?: boolean }).__netDown === true
+const DEAD = () => ({ data: null, error: { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' } })
+
 export function makeFakeSupabase(db: Db) {
   const table = (name: string) => (db[name] ??= [])
 
@@ -63,6 +86,7 @@ export function makeFakeSupabase(db: Db) {
     const orders: [string, boolean][] = []
 
     const exec = () => {
+      if (netDown()) return DEAD()
       const rows0 = table(name)
       // A WRITE A DRIVER WANTS TO FAIL. Opt-in: a driver sets window.__failWrite
       // to a predicate over (table, operation, row); nothing sets it by

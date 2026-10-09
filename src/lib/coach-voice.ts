@@ -660,6 +660,68 @@ export function didNotSave(thing: string): string {
 }
 
 /**
+ * WHY SOMETHING ON THE "DIDN'T SAVE" LIST DID NOT SAVE, in words — H20, 9 Oct
+ * 2026.
+ *
+ * The card printed the failure exactly as the browser threw it: the tester
+ * read "Dumbbell Floor Press · set 4 · TypeError: Failed to fetch". Nobody
+ * should have to know what a TypeError is to find out whether their set is
+ * safe, and `queue-health.ts` already said so about its own field ("the
+ * underlying failure ... never the primary message") — the card ignored it.
+ *
+ * TWO SENTENCES, because there are two situations a person can act on
+ * differently: there was no connection (try again when there is one), or the
+ * app could not save it (trying again may not help). Everything else the raw
+ * text might say — a constraint name, a column, a status — is for the console,
+ * which still gets it.
+ *
+ * WHICH of the two applies is decided by `queue-health.plainSyncError`, which
+ * can see the failure; this holds the words and nothing else, so the
+ * phrasebook stays the leaf `test:coach-voice` §1 keeps it.
+ */
+export function didNotSaveReason(noConnection: boolean): string {
+  return noConnection ? 'There was no connection when this was saved.' : "The app couldn't save this."
+}
+
+/**
+ * What is true of ANYTHING on that list, whichever queue it came from: every
+ * one of them keeps a refused item on the phone until it is retried or thrown
+ * away. The same sentence the cardio notice has used since 30 Aug, so the two
+ * surfaces that say it cannot drift.
+ */
+export const STILL_ON_THIS_DEVICE = 'Still saved on this device, but not in your history yet.'
+
+/**
+ * THE SESSION SCREEN WHEN IT CANNOT REACH THE SERVER — H20.
+ *
+ * `known` is the claim's licence. "Your sets are safe" is only said when the
+ * rows on screen are ones this phone holds or the server has confirmed; when
+ * the phone has never managed to read the day, it does not know what is saved
+ * and says the one thing it does know — that whatever is logged now is kept.
+ */
+export function reconnectingLine(known: boolean): string {
+  return known
+    ? 'Reconnecting — your sets are safe.'
+    : "Reconnecting — can't check today's sets yet. Anything you log now is kept on this phone."
+}
+
+/**
+ * "3 working sets · 2 logged" — the second half, which is only a number when
+ * the phone has something to count from. On a reload with a dead connection
+ * and nothing remembered, "0 logged" is not a fact, it is the absence of one;
+ * that is what the tester read as six lost sets.
+ */
+export function loggedCountLabel(count: number, state: { known: boolean; loading: boolean }): string {
+  if (state.known || count > 0) return `${count} logged`
+  return state.loading ? 'checking what’s logged…' : 'can’t check what’s logged yet'
+}
+
+/** Under a set row that has not reached the server yet. */
+export const SET_WAITING_TO_SEND = 'on this phone, waiting to send'
+/** Under a set row the server refused, beside its Retry. */
+export const SET_DID_NOT_SAVE = "didn't save"
+
+/**
  * The narrator. The audit found "I", "We", "Couldn't" and the passive in one
  * file; a coach is one person, and that person is "I".
  */

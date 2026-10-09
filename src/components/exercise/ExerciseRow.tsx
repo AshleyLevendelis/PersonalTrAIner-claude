@@ -5,6 +5,7 @@ import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreV
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary, setProgress } from '@/lib/session-derive'
+import { loggedCountLabel } from '@/lib/coach-voice'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
 import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel, takesPlateCalculator } from '@/lib/load-prescription'
@@ -84,7 +85,7 @@ export function ExerciseRow({
   canMoveDown,
   profile,
 }: ExerciseRowProps) {
-  const { logs, setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
+  const { logs, setsFor, requestedSetFocus, clearSetFocusRequest, setsKnown, loadState } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
@@ -292,8 +293,11 @@ export function ExerciseRow({
                 )}
               </div>
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
-              <p className="mt-2 text-xs text-text-tertiary">
-                {ex.sets} working sets · {completedSets} logged
+              {/* ONE TEXT NODE, deliberately — verify:one-number finds this line
+                  as a leaf. The second half is only a number when the phone
+                  has something to count from (H20; see loggedCountLabel). */}
+              <p className="mt-2 text-xs text-text-tertiary" data-testid="logged-count">
+                {`${ex.sets} working sets · ${loggedCountLabel(completedSets, { known: setsKnown, loading: loadState === 'loading' })}`}
               </p>
               {/* REST, as a number you can read before you have trained.
                   Until now ex.rest reached this component only as

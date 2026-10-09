@@ -3,6 +3,7 @@ import { getAppNow, getLocalDateString } from './dev-clock'
 import type { ExerciseSetLog } from './types'
 import { isLoggableSetWeight, MAX_LOGGABLE_SET_KG } from './set-plausibility'
 import { isMissingColumnError } from './missing-column'
+import { isConnectionFailure } from './connection-error'
 
 // ---------------------------------------------------------------------------
 // set-log-store — THE single write path for logged sets (C0 Part 3).
@@ -24,10 +25,19 @@ import { isMissingColumnError } from './missing-column'
 const PENDING_KEY = 'fitplan_setlog_pending_v1'
 const SESSION_REGISTRY_KEY = 'fitplan_setlog_sessions_v1'
 const DEAD_LETTER_KEY = 'fitplan_setlog_deadletter_v1'
+/** The last answer the server gave for a day, plus every set that has synced since — see "THE PHONE'S OWN COPY" below. */
+const LAST_KNOWN_KEY = 'fitplan_setlog_lastknown_v1'
+/** How many days of that copy are kept. A day is a few kilobytes; the cap is so the key cannot grow for ever. */
+const LAST_KNOWN_MAX_DAYS = 10
 /** The pre-C0 offline queue (offline-sync.ts). Drained into the pending store on init so nothing a user queued before updating the app is lost. */
 const LEGACY_QUEUE_KEY = 'offline_log_queue'
 
-/** Per-item ceiling on transient-error retries before giving up and dead-lettering (defense in depth — most failures are classified permanent/immediate, this bounds the rest). */
+/**
+ * Per-item ceiling on retries before giving up and dead-lettering — for a
+ * failure that is neither a rejection (permanent, immediate) nor a dead
+ * connection (never gives up; see classifyError). It bounds what is left: a
+ * request that reached something and came back wrong in a way nobody named.
+ */
 const MAX_SYNC_ATTEMPTS = 5
 
 export type SetUnit = 'reps' | 'seconds' | 'meters'
@@ -76,6 +86,13 @@ interface PendingSet {
   addedLoadKg: number | null
   completedAt: string
   attempts: number
+  /**
+   * Sync attempts that failed because there was no connection. Counted apart
+   * from `attempts` so that twenty of them followed by one odd failure does
+   * not read as six odd failures and give up on the set. Absent on entries
+   * queued before 9 Oct 2026.
+   */
+  waits?: number
 }
 
 interface PendingDelete {
@@ -87,6 +104,8 @@ interface PendingDelete {
   isWarmup: boolean
   dropIndex: number
   attempts: number
+  /** As PendingSet.waits. */
+  waits?: number
 }
 
 type PendingOp =
@@ -253,8 +272,8 @@ export function retryDeadLetterItem(clientId: string): void {
   saveDeadLetter(items.filter(i => i !== item))
 
   const freshOp: PendingOp = item.op.kind === 'upsert'
-    ? { kind: 'upsert', set: { ...item.op.set, clientId: generateClientId(), attempts: 0 } }
-    : { kind: 'delete', del: { ...item.op.del, clientId: generateClientId(), attempts: 0 } }
+    ? { kind: 'upsert', set: { ...item.op.set, clientId: generateClientId(), attempts: 0, waits: 0 } }
+    : { kind: 'delete', del: { ...item.op.del, clientId: generateClientId(), attempts: 0, waits: 0 } }
   const ops = loadPending().filter(op => opNaturalKey(op) !== opNaturalKey(freshOp))
   ops.push(freshOp)
   savePending(ops)
@@ -276,9 +295,27 @@ export function discardDeadLetterItem(clientId: string): void {
  * No `.code` at all (a thrown TypeError from a failed fetch, a timeout, a
  * DNS failure) means the request never reached the server — worth retrying.
  */
-function classifyError(error: unknown): 'network' | 'permanent' {
+/**
+ * THREE ANSWERS SINCE 9 Oct 2026 (H20), where there were two.
+ *
+ * "No code" used to mean "network", and a network failure counted toward
+ * MAX_SYNC_ATTEMPTS — so on a connection that was up but dead (the browser
+ * still says online, which is the only case the `navigator.onLine` guard in
+ * flushPending cannot see) a perfectly good set was filed under "didn't save"
+ * after about a minute of backoff, and then WAITED FOR A PERSON TO TAP RETRY.
+ * The tester's "Dumbbell Floor Press · set 4 · TypeError: Failed to fetch" was
+ * exactly that: nothing was wrong with the set, and a lifter who never opened
+ * the pill would have kept it off the server for good.
+ *
+ * So a dead connection is its own class and never gives up: the set stays
+ * queued, visible, and goes the moment a request gets through. What is left —
+ * a failure with no code that is not a connection failure either — keeps the
+ * old bounded retry.
+ */
+function classifyError(error: unknown): 'connection' | 'transient' | 'permanent' {
   const code = (error as { code?: string } | null)?.code
-  return code ? 'permanent' : 'network'
+  if (code) return 'permanent'
+  return isConnectionFailure(error) ? 'connection' : 'transient'
 }
 
 // ---------------------------------------------------------------------------
@@ -301,6 +338,32 @@ function currentState(): SyncState {
 function notifyListeners(): void {
   const state = currentState()
   listeners.forEach(fn => fn(state))
+  viewListeners.forEach(fn => fn())
+}
+
+// ---------------------------------------------------------------------------
+// "THE DAY'S SETS MAY HAVE CHANGED" — a different question from sync state,
+// with a different asker.
+//
+// subscribeSyncState above answers "how is the queue doing" for the one
+// indicator that draws it (test:no-forked-state §4 keeps that to one consumer,
+// and this does not change it). This answers "re-read your rows": a set that
+// was waiting has saved, a set has been refused, a refused set was retried or
+// thrown away, the phone came back online. Without it the session screen only
+// re-read after its OWN writes, so a row marked "waiting to send" could never
+// learn it had been sent.
+//
+// No payload on purpose. The listener calls getLocalSetsForDate for the day it
+// is showing; handing it rows would be a second copy of the read model.
+// ---------------------------------------------------------------------------
+type ViewListener = () => void
+let viewListeners: ViewListener[] = []
+
+export function subscribeSetLogView(listener: ViewListener): () => void {
+  viewListeners.push(listener)
+  return () => {
+    viewListeners = viewListeners.filter(l => l !== listener)
+  }
 }
 
 export function subscribeSyncState(listener: SyncListener): () => void {
@@ -336,6 +399,135 @@ function toView(set: PendingSet): ExerciseSetLog {
     added_load_kg: set.addedLoadKg,
     completed_at: set.completedAt,
   }
+}
+
+// ---------------------------------------------------------------------------
+// THE PHONE'S OWN COPY OF A DAY — H20, 9 Oct 2026.
+//
+// A set used to live in exactly one place at a time: the pending queue until it
+// synced, the server afterwards. The moment it synced it was deleted from the
+// phone. So when a read failed there was nothing to fall back on, the read
+// answered "nothing logged", and the screen wiped six real sets — on reload,
+// and again after every tap of the tick, because each tap re-read.
+//
+// This keeps the last thing the phone was TOLD about each day: the rows of the
+// last server read that landed, plus every set that has synced since (a set is
+// copied here BEFORE it leaves the queue, so there is no instant at which it
+// is in neither place). A read that fails answers from this instead of from
+// nothing.
+//
+// IT IS A COPY, NOT A SOURCE. Every successful server read replaces it, which
+// is what bounds the one risk it carries: a set deleted on another device
+// showing here until the next read lands.
+//
+// `complete` records whether a server read has ever filled the day. A day
+// built only from sets that synced one at a time is real but partial — enough
+// to keep those sets on screen, not enough to say "that is everything".
+// ---------------------------------------------------------------------------
+
+interface LastKnownDay {
+  rows: ExerciseSetLog[]
+  complete: boolean
+  savedAt: number
+}
+
+function loadLastKnown(): Record<string, LastKnownDay> {
+  if (!hasStorage()) return {}
+  try {
+    const raw = localStorage.getItem(LAST_KNOWN_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveLastKnown(days: Record<string, LastKnownDay>): void {
+  if (!hasStorage()) return
+  const keep = Object.entries(days)
+    .sort((a, b) => b[1].savedAt - a[1].savedAt)
+    .slice(0, LAST_KNOWN_MAX_DAYS)
+  try {
+    localStorage.setItem(LAST_KNOWN_KEY, JSON.stringify(Object.fromEntries(keep)))
+  } catch {
+    // A FULL DISK MUST NOT COST A SET. This copy is a convenience for a bad
+    // connection; the queue and the server are the record. Keep today's only
+    // and carry on — and if even that will not fit, carry on without it.
+    try {
+      localStorage.setItem(LAST_KNOWN_KEY, JSON.stringify(Object.fromEntries(keep.slice(0, 1))))
+    } catch { /* nothing to keep it in */ }
+  }
+}
+
+function dayKey(userId: string, date: string): string {
+  return `${userId}|${date}`
+}
+
+function viewKey(userId: string, date: string, log: ExerciseSetLog): string {
+  return naturalKey(userId, date, log.exercise_id ?? log.exercise_name, log.set_number, log.is_warmup ?? false, log.drop_index ?? 0)
+}
+
+/** A copy never carries a sync mark: a row is in here BECAUSE the server has it. */
+function unmarked(log: ExerciseSetLog): ExerciseSetLog {
+  if (log.syncStatus === undefined) return log
+  const { syncStatus: _drop, ...rest } = log
+  return rest
+}
+
+function writeLastKnownDay(userId: string, date: string, rows: ExerciseSetLog[]): void {
+  const days = loadLastKnown()
+  days[dayKey(userId, date)] = { rows: rows.map(unmarked), complete: true, savedAt: Date.now() }
+  saveLastKnown(days)
+}
+
+/** One op that has just reached the server, applied to a day's rows. */
+function applySyncedOp(rows: ExerciseSetLog[], op: PendingOp): ExerciseSetLog[] {
+  const key = opNaturalKey(op)
+  const userId = op.kind === 'upsert' ? op.set.userId : op.del.userId
+  const date = op.kind === 'upsert' ? op.set.date : op.del.date
+  const rest = rows.filter(r => viewKey(userId, date, r) !== key)
+  return op.kind === 'upsert' ? [...rest, toView(op.set)] : rest
+}
+
+// ---------------------------------------------------------------------------
+// A READ CAN BE ANSWERED BEFORE A SET SAVES AND ARRIVE AFTER IT.
+//
+// The server reads its rows, the set then saves and leaves the queue, and only
+// then does the read's answer reach the phone — a set short. Rare on a good
+// connection and exactly what a bad one produces. Merged naively, that answer
+// would show the set as un-logged AND overwrite the copy that had it.
+//
+// So every op that syncs is numbered, and a read replays the ones that synced
+// while it was in flight onto its own answer before anything trusts it. In
+// memory only: a read in flight does not survive a reload, so neither does the
+// thing that protects it.
+// ---------------------------------------------------------------------------
+let syncSeq = 0
+let recentlySynced: { seq: number; op: PendingOp }[] = []
+
+/** Called the moment an op has reached the server, BEFORE it is removed from the queue. */
+function recordSynced(op: PendingOp): void {
+  syncSeq += 1
+  recentlySynced = [...recentlySynced, { seq: syncSeq, op }].slice(-60)
+  const userId = op.kind === 'upsert' ? op.set.userId : op.del.userId
+  const date = op.kind === 'upsert' ? op.set.date : op.del.date
+  const days = loadLastKnown()
+  const key = dayKey(userId, date)
+  const day = days[key] ?? { rows: [], complete: false, savedAt: 0 }
+  days[key] = { ...day, rows: applySyncedOp(day.rows, op), savedAt: Date.now() }
+  saveLastKnown(days)
+}
+
+function replaySyncedSince(sinceSeq: number, userId: string, date: string, rows: ExerciseSetLog[]): ExerciseSetLog[] {
+  let out = rows
+  for (const { seq, op } of recentlySynced) {
+    if (seq <= sinceSeq) continue
+    const opUser = op.kind === 'upsert' ? op.set.userId : op.del.userId
+    const opDate = op.kind === 'upsert' ? op.set.date : op.del.date
+    if (opUser !== userId || opDate !== date) continue
+    out = applySyncedOp(out, op)
+  }
+  return out
 }
 
 /**
@@ -412,9 +604,25 @@ export function saveSet(input: SaveSetInput): ExerciseSetLog | null {
   const ops = loadPending().filter(op => opNaturalKey(op) !== key)
   ops.push({ kind: 'upsert', set })
   savePending(ops)
+  supersedeRefused(key)
   notifyListeners()
   void flushPending()
   return toView(set)
+}
+
+/**
+ * A NEW WRITE FOR A SET REPLACES A REFUSED ONE FOR THE SAME SET.
+ *
+ * A refused set now stays on the grid (marked, with Retry) instead of
+ * vanishing. That makes this necessary: re-entering the set, or deleting it
+ * from the row, has to take the refused copy with it — otherwise the moment
+ * the replacement saved, the old refusal would paint "didn't save" back over a
+ * set that had.
+ */
+function supersedeRefused(key: string): void {
+  const dead = loadDeadLetter()
+  const kept = dead.filter(i => opNaturalKey(i.op) !== key)
+  if (kept.length !== dead.length) saveDeadLetter(kept)
 }
 
 /** Alias for saveSet — the natural-key upsert makes update and save the same operation. */
@@ -461,6 +669,7 @@ export function deleteSet(params: {
   const ops = loadPending().filter(op => opNaturalKey(op) !== key)
   ops.push({ kind: 'delete', del })
   savePending(ops)
+  supersedeRefused(key)
   notifyListeners()
   void flushPending()
 }
@@ -790,11 +999,16 @@ async function doFlush(): Promise<void> {
         if (op.kind === 'upsert') await syncUpsert(op.set)
         else await syncDelete(op.del)
 
+        // INTO THE PHONE'S COPY FIRST, OUT OF THE QUEUE SECOND. In the other
+        // order there is an instant where a saved set is in neither, and a
+        // read that fails in that instant shows it un-logged.
+        recordSynced(op)
         savePending(loadPending().filter(o => clientIdOf(o) !== clientId))
         consecutiveFailures = 0
         notifyListeners()
       } catch (err) {
-        if (classifyError(err) === 'permanent') {
+        const kind = classifyError(err)
+        if (kind === 'permanent') {
           moveToDeadLetter(op, err, 'permanent')
           notifyListeners()
           continue
@@ -803,11 +1017,14 @@ async function doFlush(): Promise<void> {
         const persisted = loadPending()
         const target = persisted.find(o => clientIdOf(o) === clientId)
         if (target) {
-          const attempts = (target.kind === 'upsert' ? target.set.attempts : target.del.attempts) + 1
-          if (target.kind === 'upsert') target.set.attempts = attempts
-          else target.del.attempts = attempts
+          // A DEAD CONNECTION IS COUNTED, BUT NOT TOWARD GIVING UP. `waits` is
+          // what lets the row say "waiting to send"; only a failure that is
+          // not a dead connection spends one of the bounded `attempts`.
+          const item = target.kind === 'upsert' ? target.set : target.del
+          if (kind === 'connection') item.waits = (item.waits ?? 0) + 1
+          else item.attempts += 1
           savePending(persisted)
-          if (attempts >= MAX_SYNC_ATTEMPTS) {
+          if (kind === 'transient' && item.attempts >= MAX_SYNC_ATTEMPTS) {
             moveToDeadLetter(target, err, 'max-attempts')
             notifyListeners()
             continue
@@ -886,7 +1103,24 @@ function serverRowToView(row: ServerSetRow, date: string): ExerciseSetLog {
   }
 }
 
-function mergePendingForDate(userId: string, date: string, base: ExerciseSetLog[]): ExerciseSetLog[] {
+/**
+ * THE DAY AS THE PHONE KNOWS IT: what the server has (or last had), then every
+ * set this phone is still holding, each saying where it stands.
+ *
+ *   base rows      — confirmed by the server. No mark.
+ *   refused        — the server said no, or the app gave up. `failed`. STAYS ON
+ *                    THE GRID: before 9 Oct 2026 only the queue was merged, so
+ *                    a set that gave up retrying left the screen while sitting
+ *                    safely in the dead-letter store (the tester's "Floor
+ *                    Press set 4").
+ *   queued         — `saving` while its first attempt is under way, `waiting`
+ *                    once an attempt has failed or the phone is offline.
+ *   queued delete  — hides the row, as it always has.
+ *
+ * The queue is applied last, so a set re-entered after a refusal shows the
+ * re-entry.
+ */
+function localViewForDate(userId: string, date: string, base: ExerciseSetLog[], includeRefused = true): ExerciseSetLog[] {
   const byKey = new Map<string, ExerciseSetLog>()
   for (const log of base) {
     // THE DROP INDEX BELONGS HERE TOO. Without it a server-side drop row and
@@ -894,12 +1128,19 @@ function mergePendingForDate(userId: string, date: string, base: ExerciseSetLog[
     // lifter logged, present in the database, missing from the screen. Caught
     // by test:drop-sets §9, which exists because the same omission in
     // naturalKey itself was a MISSED mutation.
-    byKey.set(naturalKey(userId, date, log.exercise_id ?? log.exercise_name, log.set_number, log.is_warmup ?? false, log.drop_index ?? 0), log)
+    byKey.set(viewKey(userId, date, log), unmarked(log))
   }
+  for (const item of includeRefused ? loadDeadLetter() : []) {
+    if (item.op.kind !== 'upsert') continue
+    if (item.op.set.userId !== userId || item.op.set.date !== date) continue
+    byKey.set(opNaturalKey(item.op), { ...toView(item.op.set), syncStatus: 'failed' })
+  }
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false
   for (const op of loadPending()) {
     if (op.kind === 'upsert') {
       if (op.set.userId !== userId || op.set.date !== date) continue
-      byKey.set(opNaturalKey(op), toView(op.set))
+      const held = offline || op.set.attempts > 0 || (op.set.waits ?? 0) > 0
+      byKey.set(opNaturalKey(op), { ...toView(op.set), syncStatus: held ? 'waiting' : 'saving' })
     } else {
       if (op.del.userId !== userId || op.del.date !== date) continue
       byKey.delete(opNaturalKey(op))
@@ -910,29 +1151,127 @@ function mergePendingForDate(userId: string, date: string, base: ExerciseSetLog[
   )
 }
 
-/** All sets for a (user, date) — server + pending merged. Never throws: offline returns the pending view. */
-export async function getSetsForDate(userId: string, date: string): Promise<ExerciseSetLog[]> {
-  let synced: ExerciseSetLog[] = []
+/** What a read of one day came back with — see readSetsForDate. */
+export interface SetsForDateRead {
+  rows: ExerciseSetLog[]
+  /**
+   * `server`: the server answered, and `rows` is that answer with this phone's
+   * own unsent work on top. `cache`: THE READ FAILED, and `rows` is the phone's
+   * own copy. The two used to be the same return value.
+   */
+  source: 'server' | 'cache'
+  /**
+   * False only when the read failed AND this phone has never had a full answer
+   * for the day. An empty `rows` then means "could not check", never "nothing
+   * logged" — the difference the "0 logged" bug came from.
+   */
+  lastKnown: boolean
+}
+
+/**
+ * The day as this phone knows it, with NO request — what the session screen
+ * draws while a read is in flight, and after one has failed. A dead connection
+ * takes several seconds to report itself (the client retries a read three
+ * times first), and those seconds are when the tester saw "0 logged".
+ */
+export function getLocalSetsForDate(userId: string, date: string): { rows: ExerciseSetLog[]; lastKnown: boolean } {
+  const day = loadLastKnown()[dayKey(userId, date)]
+  return { rows: localViewForDate(userId, date, day?.rows ?? []), lastKnown: !!day?.complete }
+}
+
+/**
+ * All sets for a (user, date), AND WHETHER THE SERVER ANSWERED.
+ *
+ * The Supabase client does not throw on a dead network — it resolves with
+ * `{ data: null, error }`. The read this replaces destructured `data` alone
+ * inside a try/catch that therefore never fired, so a failed read and an empty
+ * day were the same value: `[]`. Both queries check `error` now, and a client
+ * that DOES throw is treated as the same failure.
+ *
+ * Never rejects. A failed read is an answer ("ask the phone"), not an
+ * exception.
+ */
+export async function readSetsForDate(userId: string, date: string): Promise<SetsForDateRead> {
+  const startedAtSeq = syncSeq
+  return settleRead(userId, date, await fetchServerSets(userId, date), startedAtSeq, true)
+}
+
+/** The server's rows for a day, or null when it could not be asked. Never throws. */
+async function fetchServerSets(userId: string, date: string): Promise<ExerciseSetLog[] | null> {
+  let server: ExerciseSetLog[] | null = null
   try {
-    const { data: session } = await supabase
+    const { data: session, error: sessionError } = await supabase
       .from('workout_sessions')
       .select('id')
       .eq('profile_id', userId)
       .eq('date', date)
       .maybeSingle()
-    if (session) {
-      const { data } = await supabase
-        .from('exercise_set_logs')
-        .select('*')
-        .eq('session_id', session.id)
-        .order('exercise_name')
-        .order('set_number')
-      synced = ((data || []) as ServerSetRow[]).map(r => serverRowToView(r, date))
+    if (!sessionError) {
+      if (!session) {
+        server = []
+      } else {
+        const { data, error } = await supabase
+          .from('exercise_set_logs')
+          .select('*')
+          .eq('session_id', session.id)
+          .order('exercise_name')
+          .order('set_number')
+        if (!error) server = ((data || []) as ServerSetRow[]).map(r => serverRowToView(r, date))
+      }
     }
   } catch {
-    // Offline — pending-only view below.
+    // Thrown rather than returned — the same failure, the same answer.
   }
-  return mergePendingForDate(userId, date, synced)
+  return server
+}
+
+function settleRead(userId: string, date: string, server: ExerciseSetLog[] | null, startedAtSeq: number, includeRefused: boolean): SetsForDateRead {
+  if (server) {
+    const settled = replaySyncedSince(startedAtSeq, userId, date, server)
+    writeLastKnownDay(userId, date, settled)
+    return { rows: localViewForDate(userId, date, settled, includeRefused), source: 'server', lastKnown: true }
+  }
+  const day = loadLastKnown()[dayKey(userId, date)]
+  return { rows: localViewForDate(userId, date, day?.rows ?? [], includeRefused), source: 'cache', lastKnown: !!day?.complete }
+}
+
+/**
+ * The plain-array read every other caller already takes (progression,
+ * calibration, finishing a session).
+ *
+ * Two things about it, both deliberate:
+ *  - It falls back to the phone's own copy when the read fails, like the
+ *    screen does. Those callers used to get the queue alone on a bad
+ *    connection, so Finish could find "no sets" under a screen full of them.
+ *  - It still LEAVES OUT a set the server refused. That is what it always
+ *    returned (a refused set was in no read at all), and the readers here
+ *    decide what is prescribed next: showing a refused set on the grid is a
+ *    display fix, and letting one move next week's weight would be a coaching
+ *    change nobody asked for.
+ *
+ * Never throws.
+ */
+export async function getSetsForDate(userId: string, date: string): Promise<ExerciseSetLog[]> {
+  const startedAtSeq = syncSeq
+  return settleRead(userId, date, await fetchServerSets(userId, date), startedAtSeq, false).rows
+}
+
+/**
+ * Retry the refused set on one row — named by the set, not by a queue id,
+ * because the row knows which set it is and has no business knowing how the
+ * queue labels things.
+ */
+export function retryFailedSet(params: {
+  userId: string
+  date: string
+  exerciseId: string
+  setNumber: number
+  isWarmup: boolean
+  dropIndex: number
+}): void {
+  const key = naturalKey(params.userId, params.date, params.exerciseId, params.setNumber, params.isWarmup, params.dropIndex)
+  const item = loadDeadLetter().find(i => i.op.kind === 'upsert' && opNaturalKey(i.op) === key)
+  if (item) retryDeadLetterItem(clientIdOf(item.op))
 }
 
 /**
@@ -1124,6 +1463,9 @@ export async function clearAllSetLogs(userId: string): Promise<void> {
   if (hasStorage()) {
     localStorage.removeItem(PENDING_KEY)
     localStorage.removeItem(SESSION_REGISTRY_KEY)
+    // The phone's own copy goes with them — otherwise the next failed read
+    // would draw the sets this wipe has just deleted.
+    localStorage.removeItem(LAST_KNOWN_KEY)
   }
   notifyListeners()
 }
@@ -1213,6 +1555,9 @@ export function initSetLogStore(): void {
 /** Test seam — resets module state between test scenarios. */
 export function __resetForTests(): void {
   listeners = []
+  viewListeners = []
+  syncSeq = 0
+  recentlySynced = []
   flushPromise = null
   isSyncing = false
   consecutiveFailures = 0

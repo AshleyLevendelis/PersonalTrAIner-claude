@@ -25,7 +25,10 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useDeadlineTick } from './useDeadlineTick'
 import { getAppNow, getSessionDateContext } from '@/lib/dev-clock'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { saveSet, deleteSet, getSetsForDate, getLastSessionSets, initSetLogStore, ensureSessionSynced, type SaveSetInput } from '@/lib/set-log-store'
+import {
+  saveSet, deleteSet, retryFailedSet, getSetsForDate, readSetsForDate, getLocalSetsForDate, subscribeSetLogView, flushPending,
+  getLastSessionSets, initSetLogStore, ensureSessionSynced, type SaveSetInput,
+} from '@/lib/set-log-store'
 import { refreshPRCacheFromDB, getPRCache, type PRRecord } from '@/lib/pr-engine'
 import { markSessionCompleted } from '@/lib/daily-tracking'
 import { filterLoggableSets } from '@/lib/session-derive'
@@ -90,13 +93,37 @@ export interface FinishSessionResult {
   serverCloseFailed?: boolean
 }
 
+/**
+ * WHERE TODAY'S SETS STAND WITH THE SERVER — H20, 9 Oct 2026.
+ *
+ *   loading — a read is in flight and none has come back yet. `logs` is
+ *             already whatever this phone knows, so nothing is blank.
+ *   loaded  — the server answered. An empty `logs` means nothing is logged.
+ *   failed  — the read could not reach the server. `logs` is the phone's own
+ *             copy, and the hook keeps trying.
+ *
+ * Before this there was `logs: []` and a `ready` flag no session component
+ * read, so loading, failed and empty were the same pixels: "0 logged".
+ */
+export type SetsLoadState = 'loading' | 'loaded' | 'failed'
+
 export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
+  /** True once the first read of the day has SETTLED — answered or failed. Not a claim that the server was reached; that is `loadState`. */
   ready: boolean
+  loadState: SetsLoadState
+  /**
+   * False only when this phone has never had an answer for today — nothing
+   * from the server now, nothing remembered. A count drawn then is a guess,
+   * and the row says "checking" instead of "0 logged".
+   */
+  setsKnown: boolean
   logs: ExerciseSetLog[]
   setsFor: (exerciseId: string, exerciseName?: string) => ExerciseSetLog[]
   refresh: () => void
   logSet: (input: SaveSetInput) => ExerciseSetLog | null
   deleteSet: typeof deleteSet
+  /** Send a set the server refused again — the Retry on a row marked "didn't save". Raw store function, like deleteSet. */
+  retrySet: typeof retryFailedSet
   /** 'idle' before any session activity today; 'running' from an explicit
    * Start tap OR the first logged set (forgiving-by-design); 'finished'
    * after an explicit Finish tap or a silent stale auto-close. */
@@ -188,6 +215,18 @@ export function isRestOverrunExpired(restEndsAt: string, nowMs: number): boolean
   return nowMs - endsMs > REST_OVERRUN_GRACE_MS
 }
 
+/**
+ * Are these the same rows, in the same state? The store announces every queue
+ * change — three or four per logged set — and most of them leave the day as it
+ * was. Without this each one would hand React a new array and re-render every
+ * row of the session for nothing.
+ */
+function sameRows(a: ExerciseSetLog[], b: ExerciseSetLog[]): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
 export function ActiveSessionProvider({
   profileId,
   planCreatedAt,
@@ -271,7 +310,13 @@ export function ActiveSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, devOverrideWeek, devOverrideDay, planCreatedAt, totalWeeks, dayStamp])
 
-  const [logs, setLogs] = useState<ExerciseSetLog[]>([])
+  // SEEDED FROM THE PHONE, NOT FROM NOTHING. `[]` here was the first frame of
+  // the "0 logged" bug: a reload drew an empty session and held it for as long
+  // as the first read took — and on a dead connection the client retries a
+  // read three times before it will admit failure, about seven seconds.
+  const [logs, setLogs] = useState<ExerciseSetLog[]>(() => (profileId ? getLocalSetsForDate(profileId, dayStamp.date).rows : []))
+  const [setsKnown, setSetsKnown] = useState<boolean>(() => (profileId ? getLocalSetsForDate(profileId, dayStamp.date).lastKnown : false))
+  const [loadState, setLoadState] = useState<SetsLoadState>('loading')
   const [ready, setReady] = useState(false)
   const [status, setStatus] = useState<'idle' | 'running' | 'finished'>('idle')
   // Mirrored into a ref so the day-rollover check above can read it without
@@ -313,14 +358,48 @@ export function ActiveSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
 
+  // Which day the screen is on, for a read that comes back after it has moved.
+  const dayKeyRef = useRef('')
+  const readSeqRef = useRef(0)
+  const appliedSeqRef = useRef(0)
+  const loadStateRef = useRef<SetsLoadState>('loading')
+
+  /**
+   * The day as this phone knows it, applied with no request. Runs on every
+   * change the store announces — a tick, a delete, a set that has just saved,
+   * one the server refused, the phone coming back online — so a row's
+   * "waiting to send" clears itself, and a tick shows at once instead of
+   * after the read it used to wait for.
+   */
+  const applyLocal = useCallback(() => {
+    if (!identity.profileId || !identity.date) return
+    const local = getLocalSetsForDate(identity.profileId, identity.date)
+    setLogs(prev => (sameRows(prev, local.rows) ? prev : local.rows))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity.profileId, identity.date])
+
   const refresh = useCallback(() => {
     if (!identity.profileId || !identity.date) return
-    getSetsForDate(identity.profileId, identity.date)
-      .then(rows => {
-        setLogs(rows)
-        setReady(true)
-      })
-      .catch(console.error)
+    const forDay = `${identity.profileId}|${identity.date}`
+    const mine = ++readSeqRef.current
+    // readSetsForDate never rejects: a read that cannot reach the server comes
+    // back as `source: 'cache'` with the phone's own copy, and THAT is what
+    // stops a failed read wiping the screen. It used to resolve to the unsent
+    // queue alone, and setLogs took it at its word.
+    void readSetsForDate(identity.profileId, identity.date).then(read => {
+      if (dayKeyRef.current !== forDay) return          // the day moved on while this was in flight
+      if (mine < appliedSeqRef.current) return          // a later read has already answered
+      appliedSeqRef.current = mine
+      const reached = read.source === 'server'
+      setLogs(prev => (sameRows(prev, read.rows) ? prev : read.rows))
+      setSetsKnown(read.lastKnown)
+      // Back in touch after a failure: send what was waiting NOW rather than
+      // whenever the queue's own backoff next comes round (up to a minute).
+      if (reached && loadStateRef.current === 'failed') void flushPending()
+      loadStateRef.current = reached ? 'loaded' : 'failed'
+      setLoadState(loadStateRef.current)
+      setReady(true)
+    })
     // refresh() is the one place every mutation surface (logSet, a manual
     // deleteSet+refresh pairing, chat-logged sets via refreshToken) already
     // converges on — piggybacking the PR cache's DB refresh here means a
@@ -331,10 +410,47 @@ export function ActiveSessionProvider({
   }, [identity.profileId, identity.date])
 
   useEffect(() => {
+    dayKeyRef.current = `${identity.profileId ?? ''}|${identity.date}`
     setReady(false)
+    loadStateRef.current = 'loading'
+    setLoadState('loading')
+    // The new day's own copy, straight away — never the last day's rows, and
+    // never a blank while the read is out.
+    const local = identity.profileId && identity.date
+      ? getLocalSetsForDate(identity.profileId, identity.date)
+      : { rows: [], lastKnown: false }
+    setLogs(prev => (sameRows(prev, local.rows) ? prev : local.rows))
+    setSetsKnown(local.lastKnown)
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date])
+
+  useEffect(() => subscribeSetLogView(applyLocal), [applyLocal])
+
+  // KEEP TRYING WHILE THE READ IS FAILING. Nothing else would: the queue's own
+  // retry only runs while a set is waiting, and a phone on a dead connection
+  // never fires `online` because it never knew it was offline. One clock per
+  // outage — 3s, then 6, 12, 24, then every 30 — that a tick or a flapping
+  // signal cannot push back, and an immediate try when the phone does notice
+  // it is back or the app returns to the foreground.
+  useEffect(() => {
+    if (loadState !== 'failed') return
+    let round = 0
+    let timer: ReturnType<typeof setTimeout>
+    const schedule = () => {
+      timer = setTimeout(() => { round += 1; refresh(); schedule() }, Math.min(30_000, 3_000 * 2 ** round))
+    }
+    schedule()
+    const onOnline = () => refresh()
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
+    window.addEventListener('online', onOnline)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('online', onOnline)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loadState, refresh])
 
   useEffect(() => {
     if (refreshToken != null && refreshToken > 0) refresh()
@@ -758,11 +874,14 @@ export function ActiveSessionProvider({
   const value: ActiveSessionValue = {
     ...identity,
     ready,
+    loadState,
+    setsKnown,
     logs,
     setsFor,
     refresh,
     logSet,
     deleteSet,
+    retrySet: retryFailedSet,
     status,
     startedAtIso,
     startSession,

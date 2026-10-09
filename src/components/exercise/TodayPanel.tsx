@@ -9,6 +9,7 @@ import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkin
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
+import { reconnectingLine } from '@/lib/coach-voice'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
@@ -147,7 +148,7 @@ export function TodayPanel({
    */
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
 }) {
-  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas } = useActiveSession()
+  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas, loadState, setsKnown } = useActiveSession()
 
   // Audit §6.4 — hold the screen awake for as long as the session is
   // actually running, and no longer. Before this the phone dimmed and locked
@@ -1054,12 +1055,26 @@ export function TodayPanel({
                     is tapped rather than after: with nothing logged, Finish
                     closes the screen and counts nothing (useActiveSession).
                     Gone the moment a set lands. */}
-                {totalSetsLogged === 0 && (
+                {/* ...and only when the app KNOWS nothing is logged. On a
+                    reload with no connection and nothing remembered, zero is
+                    not a count (H20). */}
+                {totalSetsLogged === 0 && setsKnown && (
                   <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
                     Nothing logged yet — finishing now closes this screen without counting a workout. Log a set and it counts.
                   </p>
                 )}
               </>
+            )}
+            {/* THE READ FAILED, AND THE SCREEN SAYS SO — H20, 9 Oct 2026. The
+                sets drawn below are the phone's own copy, so nothing has gone
+                blank; this is the one line that explains why a set might read
+                "waiting to send". Quiet on purpose: nothing is wrong with the
+                workout. The sentence it shows is chosen by what is TRUE — see
+                reconnectingLine — and it goes the moment a read lands. */}
+            {loadState === 'failed' && (
+              <p role="status" data-testid="sets-reconnecting" className="mt-2 text-xs leading-[1.5] text-[color:var(--role-warn-text)]">
+                {reconnectingLine(setsKnown || logs.length > 0)}
+              </p>
             )}
           </div>
 

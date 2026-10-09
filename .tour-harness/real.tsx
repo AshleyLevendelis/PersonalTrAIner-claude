@@ -51,6 +51,7 @@ import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { ToolsTab } from '@/components/ToolsTab'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { ProfileMenu } from '@/components/ProfileMenu'
+import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { AppTour } from '@/components/AppTour'
 import { TOUR_STEPS } from '@/lib/app-tour-steps'
 // The app's own provider tree. Not decoration: useActiveSession throws
@@ -1174,6 +1175,14 @@ function Harness() {
       {/* App.tsx's own settings wrapper, reproduced — see the header note. */}
       <div data-tour="settings" className="fixed right-3 z-40" style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}>
         <ProfileMenu onOpenProfile={noop} onNewPlan={noop} />
+      </div>
+
+      {/* App.tsx's own wrapper for the sync badge, reproduced (App.tsx:3063).
+          Mounted 9 Oct 2026: it draws nothing unless something is waiting,
+          sending or has failed, and until it was here no driver could see the
+          "didn't save" card at all. */}
+      <div className="fixed left-3 right-14 z-40 flex justify-start" style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}>
+        <OfflineStatusIndicator />
       </div>
 
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
