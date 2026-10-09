@@ -1414,7 +1414,13 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const stillBuildable =
       missingRequiredSlots(ws.values).length === 0 && unconfirmedOptionalSlots(ws.confirmed, ws.values).length === 0
     if (!stillBuildable) return false // sendMessage closes the edit when its turn ends
-    setMessages(prev => [...prev, { role: 'user', content: said }])
+    setMessages(prev => [
+      // Whatever was answered, the edit is over: a prompt left open here (the
+      // answer came from a different card further up) would sit in the
+      // conversation looking live under a summary that has moved on.
+      ...prev.map(m => (isOpenEdit(m) ? { ...m, slotCardResolved: true } : m)),
+      { role: 'user', content: said },
+    ])
     commitWorkingState(ws)
     setJustEdited(editingKey)
     setEditingKey(null)

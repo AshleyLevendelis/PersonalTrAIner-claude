@@ -469,6 +469,21 @@ await section(14, 'M5 — "40 minutes tops" is ticked as the setting it was stor
   check('choosing the setting itself adds no note', !(await evj(`__ticks()`)).some(t => /closest setting/.test(t)), await evj(`__ticks()`))
 })
 
+await section(17, 'M4 — an edit left open is put away when a different card is answered', async () => {
+  await open('review-card')
+  await tapRow('equipment')
+  check('harness: the edit is open and another card is still live above it',
+    (await evj(`__cards('equipment')`)).length === 1 && (await evj(`__cards('cookingTime')`)).length === 1)
+  await ev(`document.querySelector('[data-slot-card="cookingTime"]').scrollIntoView({ block: 'center' })`)
+  await wait(300)
+  await tapOption('cookingTime', 'Quick')
+  const now = await review()
+  check('the summary returns', now.open, now)
+  check('...with the answer that WAS given recorded', /Quick/.test(now.rows.cookingTime ?? ''), now.rows.cookingTime)
+  check('...and no equipment prompt left looking live in the conversation', (await evj(`__cards('equipment')`)).length === 0, await evj(`__cards('equipment')`))
+  check('...equipment itself unchanged', /Minimalist/.test(now.rows.equipment ?? ''), now.rows.equipment)
+})
+
 await section(15, 'M3 — the combat style is not offered, and cannot be recorded by the coach either', async () => {
   await open('m2')
   await queue({ reply: 'Good. How do you like to train?', actions: [{ name: 'present_slot', args: { slot_key: 'trainingStyle' } }] })

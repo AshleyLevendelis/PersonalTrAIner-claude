@@ -96,7 +96,7 @@ if (state === 'm2') {
   ))
 }
 
-if (state === 'review') {
+if (state === 'review' || state === 'review-card') {
   // Everything the plan needs is answered, so the review opens by itself —
   // the component's own effect, not a flag set here.
   const all = {
@@ -108,6 +108,12 @@ if (state === 'review') {
     [
       { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
       { role: 'user', content: 'Sam' },
+      // review-card: one optional question was asked and never answered, so
+      // its card is still live above the summary — a second control on screen
+      // while a summary row is being changed.
+      ...(state === 'review-card'
+        ? [{ role: 'assistant', content: 'How much time do you want to spend cooking?', slotCard: 'cookingTime' }]
+        : []),
       { role: 'assistant', content: 'Anything else you would rather I left out?' },
       { role: 'user', content: 'mushrooms' },
       // The app's own closing line, as a finished conversation really has it.
