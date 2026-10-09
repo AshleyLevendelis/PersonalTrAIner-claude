@@ -2,6 +2,7 @@ import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-gen
 import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
 import { parseIngredientLines, withQuantity } from './portion-scaler'
 import { FOOD_DB, lookupIngredient, unitToGrams, type FoodEntry, type Macros100g } from './food-db'
+import { swapGroupOf } from './food-swap-groups'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
@@ -299,8 +300,17 @@ function suggestReplacements(input: BuildMealFoodEditInput, slot: MealSlotName, 
     + Math.abs(f.per100g.carbs - entry.per100g.carbs) * 4
     + Math.abs(f.per100g.fat - entry.per100g.fat) * 9
 
+  // ONLY A FOOD THAT DOES THE SAME JOB ON THE PLATE (food-swap-groups.ts).
+  // This was "the same database category", and `fruit` holds lime and avocado
+  // beside the berries: blueberries on pancakes offered "65g lime", first,
+  // because lime was in that week's chicken marinade and the pantry sort
+  // above put it there (9 Oct 2026, L19). Pantry-first still orders the
+  // list — inside the group. A seasoning or a one-off has no group, so
+  // nothing is offered for it and it is never offered for anything.
+  const group = swapGroupOf(entry.name)
+  if (!group) return []
   const candidates = FOOD_DB
-    .filter(f => f.category === entry.category && f.name !== entry.name && f.per100g[key] > 0)
+    .filter(f => swapGroupOf(f.name) === group && f.name !== entry.name && f.per100g[key] > 0)
     .sort((a, b) => (inPantry(b) ? 1 : 0) - (inPantry(a) ? 1 : 0) || distance(a) - distance(b))
     .slice(0, MAX_CANDIDATES_TRIED)
 

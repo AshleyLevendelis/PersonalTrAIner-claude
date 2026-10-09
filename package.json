@@ -376,6 +376,7 @@
     "verify:pace-clock": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/pace-clock.mjs",
     "test:kitchen-amounts": "tsx scripts/test-kitchen-amounts.ts",
     "verify:kitchen-amounts": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kitchen-amounts.mjs",
+    "test:food-swaps": "tsx scripts/test-food-swaps.ts",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
     "test:chat-groups": "tsx scripts/test-chat-groups.ts",
     "test:grocery-display": "tsx scripts/test-grocery-display.ts",
