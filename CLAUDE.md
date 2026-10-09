@@ -1264,6 +1264,23 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### Her rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
+- **Kit: "Remember what they say."** Asked how someone should tell the app what kit they have
+  (revisiting her 9 Sep "fix the words"), from options: keep the four equipment choices AND remember
+  the specifics people say in setup or to the coach ("I've got dumbbells and a bench", "I don't own
+  bands"), shown as ticks on Profile. No new setup question; nobody's plan changes unless they say
+  something. `MISSING` (lead: `wip/k3-kit-list`, design in `tracer-reports/A-equipment.md`)
+- **A surprising weigh-in: "Ask, and hold the target."** More than about 3% from the last one is
+  asked about ("That's 19 kg lighter than this morning — is 62 right?") and saved only on yes; even
+  then the calorie target waits for a second day that agrees. BUILT on the branch (N1), unverified
+  on a phone
+- **The allergy and diet path: "Build all four."** (1) "I don't eat pork" said in passing goes into
+  Foods to avoid with a visible tick; (2) setup stops promising "entirely nut-free" and uses the
+  honest wording the meal screens already use; (3) food matching gets stricter (a "chicken caesar
+  wrap" is not an empty tortilla; bare "chicken" must not match a meat-free product); (4) recipe
+  steps are checked against allergies and avoids. `MISSING`, all four; safety-adjacent, so each gets
+  a plan before a build (`docs/plans/ingredient-lookup-truth.md` exists for (3))
+
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an
    exercise, a workout, a meal or the plan supports every operation listed

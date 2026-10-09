@@ -2,6 +2,71 @@
 
 Newest first. One line each.
 
+- [~] **THE 9 OCT TEST-LOG FIXES — 88 ISSUES FROM TWO RUNS AS A NEW USER, BRANCH
+  `claude/test-log-fixes-oct9` (58 commits on `main` at `0df0bc12`; NOT on `main`, nothing deployed,
+  no migration).** Ashley asked a cloud session to use the live app as a new user ("Sam") and log
+  what breaks; two runs on 8-9 Oct found 23 High, 32 Medium, 33 Low (`docs/test-log-2026-10-09/test-log-runs-1-2.md`).
+  She said "resolve all those issues". Eight read-only tracers found each cause (`docs/test-log-2026-10-09/tracer-reports/`),
+  builders fixed them in parallel lanes, and the work arrived as a git bundle (that session could
+  not push). Hand-over: `docs/test-log-2026-10-09/HANDOVER.md`. **FOLDED IN 9 Oct 2026 by the session that picked it up;
+  each lane's full entry stays in `docs/test-log-2026-10-09/backlog-entries/`, one bullet per lane here** (pasting 3,700
+  lines of reports in five layouts would have broken this list; nothing is dropped, every bullet
+  names its file).
+  - **X1 (Exercise tab):** logged cardio shows on every screen that says what you did (H7, H21,
+    M14) through one cardio reader; sets never look lost when the connection drops. `X1.md`.
+  - **X2 (Exercise tab):** Finish asks first when sets are left; the summary counts planned sets,
+    training time and both hands; a first log is a baseline, not a PR; the streak counts planned
+    sessions done, on the day trained (M12, L29, L15, M15, M16, M30, M31). `X2.md`.
+  - **X3 (Exercise tab):** "Add an exercise" offers what the day is for (M13); "What happened?"
+    offers nothing before the plan began; a card cannot slide sideways (L27). `X3.md`.
+  - **N1 (Nutrition):** typed meals no longer logged far too low ("2 eggs" was two grams), H6
+    fixes 1-4; a surprising weigh-in is asked about and the target waits for a second day (H10,
+    L31); "on the number" (L20). `N1.md`.
+  - **N2 (Nutrition):** "behind" only once its time has passed (L28, L8); resized meals in
+    measurable amounts (L18); shopping-list aisles and first-run button (L26, M23); the favourite
+    heart saves or says it did not (M21); adding a food says which meals change (H9 card only);
+    Regenerate all, mechanical half (M22). H9's search preference NOT done. `N2.md`.
+  - **O1 (Onboarding and tour):** chips belong to their question (H14, M2); edits open where tapped
+    (M4, L3); "Combat / conditioning" no longer offered (M3, an August ruling never written down);
+    a question asked mid-setup is parked, at most twice, and comes back in the first chat (M1, L4,
+    M5). `O1.md`.
+  - **P2 (Coach):** the coach is told what actually happened (H23, H22 context half, H8 context);
+    moved sessions editable from their own screen and the coach (H15, H19); ban asks first and can
+    be undone, timed-out cards look it (M10, M27, M29, M8, M26, L22, L33). `P2.md`.
+  - **E1 (Engine):** swaps carry nothing over (L30), loads respect the kit owned (H18 mechanical
+    half, H1-H3 mechanical halves), M32, L12, L14; plans written for H4, H5, H11, M25. `E1.md`.
+  - **E2 (Engine):** a day named for a body part trains it; a day's length says what it is made of
+    (H4, L17). **Two measured costs**: a band triceps move second on chest days for people with
+    cables or dumbbells, and a band raise beside the dumbbell raise on 479 of 1,728 Shoulders days;
+    leg sets per week fell about 25% (median 36 → 27). Quality on a 768-plan sample 11.522 → 11.481,
+    all `worse_implement_than_available`. `E2.md`.
+  - **A2 (Adaptations):** temporary changes leave trained days alone, cover the dates asked for,
+    can be seen and ended (H11, H5, H17 partly, M25 line, M24). A ban and a ceiling re-price still
+    rewrite trained days. `A2.md`.
+  **HER RULINGS, 9 Oct 2026** (recorded in CLAUDE.md): (1) **kit: "Remember what they say"** — keep
+  the four choices, remember specifics said in setup or to the coach, show them as ticks on
+  Profile, no new setup question, nobody's plan changes unless they say something (NOT BUILT; lead
+  `wip/k3-kit-list`); (2) **surprising weigh-in: "Ask, and hold the target"** (BUILT, N1);
+  (3) **allergy and diet path: "Build all four"** — passing "I don't eat pork" goes into Foods to
+  avoid with a tick; setup stops promising "entirely nut-free"; stricter food matching; recipe steps
+  checked against allergies and avoids (NONE BUILT).
+  **DECIDED WITHOUT ASKING HER, reversible, to put to her one at a time:** logged cardio is its own
+  line on the finish card, history and Home; a first log says "First time logged — this is your
+  baseline", no PR; the streak counts planned sessions done ("2 sessions in a row"); Finish with
+  sets left asks first; "behind" only once its time has passed; the shopping list's button reads
+  "Build my list", aisles "Dairy & eggs"; "I don't like it — and not again" bans with confirm and
+  Undo; an expired coach suggestion is greyed "This suggestion has expired — ask again"; removing an
+  injury offers a rebuild from today; an active temporary change shows on Profile and Exercise with
+  "End now"; edits made during a temporary change survive its end; day length reads "~22 min · + 15
+  optional". Every new sentence is hers to reword (most in `coach-voice.ts`).
+  **STATE WHEN PICKED UP (relayed, then re-measured below):** 252 of 257 fast gates green; red:
+  `test:bundle` (all four budgets over), `test:adaptations-respect-trained`, `test:coach-voice`,
+  `test:home-week-strip`, `test:harness-clock`. Not run on the final tree: the drivers sweep,
+  audit, quality. Nothing seen on a phone; no edge-function handler executed.
+  **Deploys once merged (her word each):** frontend; `chat-gemini`; `onboarding-chat`. No migration.
+  **Open questions and remaining work:** `docs/test-log-2026-10-09/HANDOVER.md` sections "Outstanding work" and
+  "Questions still hers".
+
 - [x] **A LIBRARY OF OUR OWN MEALS BEHIND "MORE OPTIONS" — BUILT 30 Sep 2026,
   her ruling.** Ashley: *"We should add more meals ... search the Internet for
   hundreds of meals with recipes and cooking instructions and macros."* The
