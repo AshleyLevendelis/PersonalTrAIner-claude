@@ -235,7 +235,7 @@ export function WeekContextRow({
       </div>
 
       {onOpenProgram && (
-        <button type="button" className="mt-3 text-[0.71875rem] font-semibold text-primary-text" onClick={onOpenProgram}>
+        <button type="button" className="hit-slop-44 mt-3 text-[0.71875rem] font-semibold text-primary-text" onClick={onOpenProgram}>
           See the whole program ›
         </button>
       )}

@@ -157,6 +157,47 @@ function audit(MIN) {
   return { total: controls.length, small, stolen, offscreen, crowded }
 }
 
+// ---------------------------------------------------------------------------
+// NO EXERCISE CARD CAN BE SCROLLED SIDEWAYS (tester's L27, 9 Oct 2026).
+//
+// Every small button carries an invisible 44px tap area, which is what the
+// audit above measures. Inside a box that CLIPS, that same tap area is hidden
+// overflow: the card's "⋮" sat flush against its right edge, so the card was
+// 8px wider inside than out (the tester read scrollWidth 1128 against
+// clientWidth 1120), `overflow: hidden` made it a scroll box, and anything
+// that centred an element horizontally slid the card 8px — after which the
+// title read "3and Tricep Kickback" and nothing slid it back. The cardio row
+// had the same fault found and padded once (verify:finisher); the lift card
+// never got the check. One assertion here covers every card, open and closed:
+// nothing inside it is wider than it, and it cannot be moved.
+// ---------------------------------------------------------------------------
+const cardBoxes = []
+async function measureCards() {
+  const names = await call(() => [...document.querySelectorAll('[data-exercise-name]')].map(c => c.getAttribute('data-exercise-name')))
+  const out = []
+  for (const name of names) {
+    for (const state of ['as found', 'toggled']) {
+      if (state === 'toggled') {
+        await call(n => { const c = [...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === n); c?.querySelector('[role="button"]')?.click() }, name)
+        await wait(450)
+      }
+      out.push(await call((n, st) => {
+        const c = [...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === n)
+        if (!c) return { name: n, state: st, missing: true }
+        const open = c.querySelectorAll('[data-testid="working-row"]').length > 0
+        // What moved it for the tester: a scroll request that centres sideways.
+        const menu = c.querySelector('[aria-label="Exercise options"]')
+        ;(menu ?? c.querySelector('button') ?? c).scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
+        c.scrollLeft = 40
+        const r = { name: n, state: st, open, hasMenu: !!menu, scrollWidth: c.scrollWidth, clientWidth: c.clientWidth, scrollLeft: c.scrollLeft, overflowX: getComputedStyle(c).overflowX }
+        c.scrollLeft = 0
+        return r
+      }, name, state))
+    }
+  }
+  return out
+}
+
 let failures = 0
 const check = (l, ok, extra) => {
   if (ok) console.log(`  ok: ${l}`)
@@ -181,6 +222,7 @@ for (const tab of TABS) {
   console.log(`  ${tab.toUpperCase().padEnd(10)} ${String(r.small.length).padStart(2)} of ${String(r.total).padStart(2)} controls under reach${r.stolen.length ? `  — ${r.stolen.length} TAP(S) STOLEN` : ''}`)
   for (const s of r.small) console.log(`             ${String(s.h).padStart(3)}x${String(s.w).padStart(3)}  <${s.tag}> ${s.label}\n                        class="${s.cls}"`)
   for (const s of r.stolen) console.log(`     STOLEN: "${s.label}" (${s.h}x${s.w}) -> tap lands on ${s.coveredBy} "${s.coveredByText}"`)
+  if (tab === 'exercise') cardBoxes.push(...await measureCards())
 }
 
 console.log(`\n  TOTAL: ${grandSmall} of ${grandTotal} controls below a ${MIN}px tap reach` + (grandOffscreen ? ` (${grandOffscreen} unmeasurable, reported not counted)` : '') + '\n')
@@ -195,6 +237,13 @@ check('...and there were controls to check (sanity check on this harness)', gran
 
 console.log('\n[2] No control has had its tap stolen by a neighbour\'s expanded hit area')
 check('every control\'s own centre still resolves to itself', grandStolen === 0, grandStolen)
+
+console.log('\n[3] No exercise card can be scrolled sideways')
+const openCards = cardBoxes.filter(c => c.open)
+console.log(`  ${cardBoxes.length} card measurements (${openCards.length} open, ${cardBoxes.length - openCards.length} closed) over ${new Set(cardBoxes.map(c => c.name)).size} exercises`)
+check('every exercise card was measured both open and closed', cardBoxes.length >= 6 && cardBoxes.every(c => !c.missing) && openCards.length >= 3 && openCards.length < cardBoxes.length && openCards.every(c => c.hasMenu), cardBoxes.map(c => `${c.name}:${c.state}:${c.open ? 'open' : 'closed'}`))
+check('nothing inside a card is wider than the card (scrollWidth equals clientWidth)', cardBoxes.every(c => c.scrollWidth === c.clientWidth), cardBoxes.filter(c => c.scrollWidth !== c.clientWidth))
+check('...and a card asked to scroll sideways does not move', cardBoxes.every(c => c.scrollLeft === 0), cardBoxes.filter(c => c.scrollLeft !== 0))
 
 chrome.kill(); server.close()
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

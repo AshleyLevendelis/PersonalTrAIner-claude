@@ -152,7 +152,17 @@ export function ExerciseRow({
       data-exercise-name={ex.name}
       className={
         expanded
-          ? 'relative overflow-hidden rounded-[18px] pt-4 space-y-2.5'
+          // overflow-CLIP, NOT overflow-hidden (tester's L27, 9 Oct 2026).
+          // `hidden` still makes a SCROLLABLE box, and the "⋮" button's
+          // invisible 44px tap area reached 8px past the card's right edge —
+          // so the card was 8px wider inside than out, could be scrolled
+          // sideways by anything that centres an element horizontally, and
+          // never scrolled back: the title read "3and Tricep Kickback".
+          // `clip` trims the same pixels without making a scroll box, and the
+          // header below keeps the tap area inside the card (its pr-2), so
+          // there is nothing left over to scroll to. verify:tap-targets asks
+          // every card both questions.
+          ? 'relative overflow-clip rounded-[18px] pt-4 space-y-2.5'
           : `rounded-[10px] space-y-2 ${allSetsLogged ? 'opacity-70' : ''}`
       }
     >
@@ -220,7 +230,7 @@ export function ExerciseRow({
 
       {expanded && (
         <>
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 pr-2">
             <div className="min-w-0 flex-1">
               {/* THE STRIP IS GONE FROM TODAY'S CARD, 17 Sep 2026, and the
                   grid below has the build-up as real rows instead — Ashley's
