@@ -38,7 +38,8 @@ import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { resolveLoadFields } from '@/lib/warmup'
-import { computeTargets } from '@/lib/nutrition-targets'
+import { computeTargets, retargetAfterWeighIn } from '@/lib/nutrition-targets'
+import { targetsMoved } from '@/lib/coach-voice'
 import { getPools, setMealPick } from '@/lib/meal-store'
 import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
 import { checkMealRefit } from '@/lib/meal-refit'
@@ -78,6 +79,8 @@ import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
 import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { useMealPlanActions } from '@/hooks/useMealPlanActions'
+import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { useServablePools } from '@/hooks/useServablePools'
 import { markRestrictionBreakers } from '@/lib/meal-restriction-check'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
@@ -118,6 +121,8 @@ const TODAY_ISO = new URLSearchParams(location.search).get('today') ?? ANCHOR_IS
 // depends on the hour). Noon when absent, as every run before 9 Oct 2026 was.
 // Still the app's own seam (the dev clock), never the machine's.
 const CLOCK = new URLSearchParams(location.search).get('clock')
+const WEIGH_IN_ANCHOR = new URLSearchParams(location.search).get('anchor') === '1'
+const WEIGH_IN_HELD = new URLSearchParams(location.search).get('held') === '1'
 setDevClockOverride(PROFILE_ID, TODAY_ISO, CLOCK)
 // ?joined=today — the account was made today (no pace line is said that day).
 const JOINED_TODAY = new URLSearchParams(location.search).get('joined') === 'today'
@@ -690,7 +695,12 @@ const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
   // A weigh-in so the Dashboard's trend has something real to draw rather
   // than rendering its empty state, which is not what the tour spotlights.
-  daily_metrics: [
+  // ?held=1 (verify:weigh-in §5): yesterday's weigh-in was a surprising 62 kg
+  // that she confirmed, so it is saved and WAITING, and there is none today.
+  daily_metrics: WEIGH_IN_HELD ? [
+    { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: 62 },
+    { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
+  ] : [
     { id: 'm1', profile_id: PROFILE_ID, date: today, weight_kg: 80 },
     { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
   ],
@@ -820,7 +830,15 @@ const db: Db = {
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
-  daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
+  // ?anchor=1 / ?held=1: the target row every account has had since 9 Oct 2026
+  // — what set the targets at sign-up (anchorTargetsAtSignUp), at the 80 kg
+  // the fixture started on. Behind a flag because the drivers written before
+  // that date were built on an empty table.
+  daily_nutrition_targets: (WEIGH_IN_ANCHOR || WEIGH_IN_HELD) && macros ? [{
+    id: 't1', profile_id: PROFILE_ID, date: String(profile.created_at).slice(0, 10), workout_split: 'REST',
+    target_calories: macros.calories, target_protein_g: macros.protein, target_carbs_g: macros.carbs, target_fats_g: macros.fat,
+    calculated_weight_kg: profile.weight_kg,
+  }] : [], workout_exercises: [], weight_basis_offers: [],
 }
 // A DRIVER'S OWN ROWS. A script the driver registers to run before the page
 // (Page.addScriptToEvaluateOnNewDocument) may define window.__seedDb; it is
@@ -942,14 +960,23 @@ const TOPFIT = new URLSearchParams(location.search).get('topfit') === '1'
 // the database underneath is fake, and a driver can make a write fail
 // (window.__failWrite) to prove a half-saved swap is put back.
 const DAYMOVE = new URLSearchParams(location.search).get('daymove') === '1'
+// ?regen=1 (with daymove=1) — "REGENERATE ALL", PRESSED FOR REAL (9 Oct 2026,
+// test log M22). The app's own hook (useMealPlanActions) is handed to the
+// Nutrition tab instead of `noop`, and the model call behind the meal writer
+// answers after ?regenwait=<ms> so the working state can be seen. Everything
+// between the tap and the screen — the generator's verification, what storage
+// keeps, the read back, the picks — is the app's own.
+const REGEN = new URLSearchParams(location.search).get('regen') === '1'
+const REGEN_WAIT_MS = Number(new URLSearchParams(location.search).get('regenwait') ?? '0')
 const NO_PINS = {}
-if (TOPUP) {
+if (TOPUP || REGEN) {
   const realFetch = window.fetch.bind(window)
   let made = 0
   window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
     if (!url.includes('/functions/v1/generate-meals')) return realFetch(input as RequestInfo, init)
     ;(window as unknown as { __generatorCalls: number }).__generatorCalls++
+    if (REGEN_WAIT_MS > 0) await new Promise(resolve => setTimeout(resolve, REGEN_WAIT_MS))
     if (TOPUP_FAIL) return new Response(JSON.stringify({ error: 'simulated cut-off reply' }), { status: 502 })
     const body = JSON.parse(String(init?.body ?? '{}')) as { slots: { slot: string; count: number }[] }
     // Shaped like generate-meals' output; the app verifies and sizes them.
@@ -1136,6 +1163,24 @@ function Harness() {
     dietaryPreferences: profile.dietary_preferences,
     dislikedFoods: () => [],
   })
+  // SWAP, REGENERATE ONE, REGENERATE ALL — THE APP'S OWN HOOK, handed what
+  // this page's screen holds, exactly as App.tsx hands it what App's holds.
+  const [regenBusy, setRegenBusy] = useState(false)
+  const [regenError, setRegenError] = useState<string | null>(null)
+  const mealActions = useMealPlanActions({
+    profileId: PROFILE_ID,
+    today: () => today,
+    pools: livePools as never,
+    picks: dayMovePicks as never,
+    showingName: slot => (mealDays.today?.day.chosen as Record<string, PoolOption> | undefined)?.[slot]?.name,
+    generation: driftedMacros ? { profileId: PROFILE_ID, targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks } : null,
+    slotLabel: MEAL_SLOT_LABEL,
+    setPools: setLivePools as never,
+    setPicks: setDayMovePicks as never,
+    setGenerating: setRegenBusy,
+    setError: setRegenError,
+    setUnrecognised: () => {},
+  })
   // ?topup=1: the button, through the app's own function. What App.tsx adds
   // around it (the first-build gate) is held by test:meal-top-up.
   const topUpSlots = driftedMacros ? Object.keys(computeSlotBudgets(driftedMacros, mealShape.mealsPerDay, mealShape.includeSnacks)) as never[] : []
@@ -1173,6 +1218,15 @@ function Harness() {
   // The options each slot holds, by name, so a driver can see a resized copy added and taken away again.
   ;(window as unknown as { __libraryNames: string[] }).__libraryNames = MEAL_LIBRARY.map(d => d.name)
   ;(window as unknown as { __mealOptions: unknown }).__mealOptions = () => db.meal_plan_slots.map(r => ({ slot: r.slot, name: r.name }))
+  // The week as the app's hook serves it, by date and meal — for
+  // verify:meal-knock-on to compare with what a card SAID would change.
+  ;(window as unknown as { __weekMeals: unknown }).__weekMeals = () => {
+    const out: Record<string, Record<string, string>> = {}
+    const t = mealDays.today
+    if (t) out[t.date] = Object.fromEntries(Object.entries(t.day.chosen).map(([sl, o]) => [sl, (o as PoolOption).name]))
+    for (const d of mealDays.upcoming) out[d.date] = d.meals as Record<string, string>
+    return out
+  }
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
     if (DAYMOVE) setDayMovePicks(prev => ({ ...prev, [slot]: chosenName }))
@@ -1288,6 +1342,22 @@ function Harness() {
   const livePlan = planArrived ? exercisePlan : []
   const liveMeso = planArrived ? editedMeso : []
 
+  // A SAVED WEIGH-IN, AS App.tsx HANDLES IT (handleWeightLogged): the app's
+  // one retarget function, its targets onto the screen, its notice when the
+  // target really moved. App shows the notice in its banner; here it lands on
+  // the window for verify:weigh-in to read.
+  const [homeMacros, setHomeMacros] = useState(macros)
+  const handleWeightLogged = async () => {
+    const retarget = await retargetAfterWeighIn(PROFILE_ID, profile, exercisePlan)
+    setHomeMacros(retarget.targets)
+    const result = await retarget.recorded
+    const moved = result.previous && retarget.targets ? targetsMoved(result.previous, retarget.targets, 'weigh_in') : null
+    ;(window as unknown as { __weighInRetarget: unknown }).__weighInRetarget = {
+      calories: retarget.targets?.calories ?? null, anchorKg: retarget.anchorKg,
+      notice: result.changedFromPrior && moved ? moved : null,
+    }
+  }
+
   const noop = () => {}
   return (
     <AppearanceProvider>
@@ -1315,8 +1385,9 @@ function Harness() {
 
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
-          <Dashboard profile={profile} macros={macros} exercisePlan={livePlan}
+          <Dashboard profile={profile} macros={homeMacros} exercisePlan={livePlan}
             mesocycle={liveMeso} planCreatedAt={profile.created_at}
+            onWeightLogged={handleWeightLogged}
 />
         )}
         {activeTab === 'nutrition' && (
@@ -1324,13 +1395,17 @@ function Harness() {
             latestWeightKg={80} profileId={PROFILE_ID} date={today} planCreatedAt={profile.created_at}
             pools={servablePools as never} chosen={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
             avoidFoods={compileFoodDislikes(AVOID_FACTS)}
-            isGeneratingMeals={false} mealRegenerateError={null}
+            isGeneratingMeals={regenBusy} mealRegenerateError={regenError} mealsRegeneratingAll={mealActions.regeneratingAll}
+            onDismissRegenerateError={() => setRegenError(null)}
             onMealPickApplied={handleMealPickApplied as never}
             mealRefit={refit?.needed && !refitDeclined ? refit : null}
             mealRefitError={refitError}
             onMealRefitConfirm={() => { void handleRefitConfirm() }}
             onMealRefitDecline={() => setRefitDeclined(true)}
-            onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop}
+            // The app's own handlers in the one mode that holds picks the way App
+            // does (?daymove=1&regen=1); `noop` elsewhere, as every driver written
+            // before 9 Oct 2026 was built on.
+            onSwapMealSlot={REGEN ? mealActions.swap : noop} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}
             mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
             onMealTopUp={() => { void handleTopUp() }}
             onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}

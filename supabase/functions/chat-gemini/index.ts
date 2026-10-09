@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
-import { checkWeighIn, calendarDaysBetween } from "../_shared/weigh-in-check.ts";
+import { weighInQuestion } from "../_shared/weigh-in-check.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
@@ -1455,7 +1455,7 @@ const toolDeclarations = [
   {
     name: "log_weight",
     description:
-      "Records the user's body-weight for today. Call whenever the user reports a weigh-in (e.g. 'I weighed 86.4 this morning', 'scale said 190 lbs today'). Convert pounds to kilograms before calling (1 lb = 0.453592 kg). One entry per day — a second weigh-in today overwrites the first.",
+      "Records the user's body-weight for today. Call whenever the user reports a weigh-in (e.g. 'I weighed 86.4 this morning', 'scale said 190 lbs today'). Convert pounds to kilograms before calling (1 lb = 0.453592 kg). One entry per day — a second weigh-in today overwrites the first. A weight far from their last weigh-in is NOT saved by this call: the app shows them a card asking whether it is right, and saves it when they tap yes — so on that turn nothing has been logged and you must not say it has.",
     parameters: {
       type: "object",
       properties: {
@@ -3379,11 +3379,12 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
 
       if (name === "log_weight") {
-        // Server-side write is fine here (single table, (profile_id, date)
-        // unique upsert, no offline-sync complexity — same reasoning as
-        // cardio logs). The client refreshes targets when the action
-        // arrives, so a chat weigh-in updates the Nutrition tab's numbers
-        // exactly like the tab's own capture field does.
+        // Server-side write is fine here FOR A BELIEVABLE WEIGHT (single
+        // table, (profile_id, date) unique upsert, no offline-sync complexity
+        // — same reasoning as cardio logs). The client refreshes targets when
+        // the action arrives, so a chat weigh-in updates the Nutrition tab's
+        // numbers exactly like the tab's own capture field does. A weight far
+        // from the last one is not written here at all — see below.
         const profileId = context.profile_id;
         const weightKg = Number(args.weight_kg);
         if (!profileId || !Number.isFinite(weightKg) || weightKg < 25 || weightKg > 350) {
@@ -3393,36 +3394,67 @@ Keep this context in mind to ensure your greetings and questions naturally align
           );
         }
 
-        // IS IT BELIEVABLE, GIVEN THE LAST ONE? The same check the weigh-in
-        // card and the Profile field ask (_shared/weigh-in-check.ts is the
-        // app's own file, generated). 9 Oct 2026: 62 kg an hour after 81.2 kg
-        // was inside 25-350, so it was saved and the calorie target dropped
-        // 183 kcal on the spot.
+        // IS IT BELIEVABLE, GIVEN THE LAST ONE? The same question the weigh-in
+        // card asks (_shared/weigh-in-check.ts is the app's own file,
+        // generated). 9 Oct 2026: 62 kg an hour after 81.2 kg was inside
+        // 25-350, so it was saved and the calorie target dropped 183 kcal on
+        // the spot.
         //
-        // THE VERDICT IS LOGGED AND NOTHING ELSE. What a surprising weigh-in
-        // should DO — ask first, hold the target for a second day — is
-        // Ashley's decision and is open, so the weight is saved exactly as
-        // before, and the verdict is kept out of the reply and out of what the
-        // model is shown. The read is before the write on purpose: after it,
-        // "the last weigh-in" would be this one.
-        let weighInCheck: ReturnType<typeof checkWeighIn> = { verdict: "ok" };
+        // ASHLEY'S RULING, 9 Oct 2026 — "Ask, and hold the target": a weigh-in
+        // more than about 3% from the last one is asked about and saved only
+        // on yes. So a surprising one is NOT WRITTEN HERE. It goes back as a
+        // proposal; the app shows the question on a card ("That's 19.2 kg
+        // lighter than earlier today — is 62 kg right?") and writes the
+        // weigh-in itself when they tap yes. The hold on the calorie target is
+        // the app's (it re-derives it from the weigh-ins), not this function's.
+        //
+        // The reads are before any write on purpose: after one, "the last
+        // weigh-in" would be this one. If they fail, nothing can be compared
+        // and the weigh-in is saved as it always was — logged below so a
+        // failed read is not silent.
+        let weighInAsk: ReturnType<typeof weighInQuestion> = null;
         try {
-          const lastResp = await fetch(
-            `${supabaseUrl}/rest/v1/daily_metrics?profile_id=eq.${profileId}&select=*&order=date.desc&limit=1`,
-            { headers: { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey } }
-          );
-          const lastRows = lastResp.ok ? await lastResp.json() : [];
-          const last = Array.isArray(lastRows) && lastRows.length > 0 ? lastRows[0] : null;
-          const lastKg = last ? Number(last.weight_kg) : null;
+          const readHeaders = { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey };
+          const [metricsResp, targetsResp] = await Promise.all([
+            fetch(`${supabaseUrl}/rest/v1/daily_metrics?profile_id=eq.${profileId}&select=*&order=date.desc&limit=14`, { headers: readHeaders }),
+            fetch(`${supabaseUrl}/rest/v1/daily_nutrition_targets?profile_id=eq.${profileId}&select=*&order=date.asc`, { headers: readHeaders }),
+          ]);
+          const metricRows = metricsResp.ok ? await metricsResp.json() : [];
+          const targetRows = targetsResp.ok ? await targetsResp.json() : [];
           const today = context.current_local_date;
-          const daysSince = last && typeof last.date === "string" && typeof today === "string"
-            ? calendarDaysBetween(last.date, today)
-            : null;
-          weighInCheck = checkWeighIn(weightKg, lastKg, daysSince);
+          const readings = (Array.isArray(metricRows) ? metricRows : [])
+            .filter((r: { date?: unknown; weight_kg?: unknown }) => typeof r.date === "string" && Number(r.weight_kg) > 0)
+            .map((r: { date: string; weight_kg: unknown }) => ({ date: r.date, kg: Number(r.weight_kg) }));
+          const anchors = (Array.isArray(targetRows) ? targetRows : [])
+            .filter((r: { date?: unknown; calculated_weight_kg?: unknown }) => typeof r.date === "string" && Number(r.calculated_weight_kg) > 0)
+            .map((r: { date: string; calculated_weight_kg: unknown }) => ({ date: r.date, kg: Number(r.calculated_weight_kg) }));
+          if (typeof today === "string") weighInAsk = weighInQuestion(weightKg, today, readings, anchors);
         } catch (err) {
-          console.error("log_weight: could not read the last weigh-in to check against:", err);
+          console.error("log_weight: could not read the earlier weigh-ins to check against:", err);
         }
-        console.log(`weigh-in check verdict=${weighInCheck.verdict}${weighInCheck.verdict === "surprising" ? ` difference_kg=${weighInCheck.differenceKg} allowed_kg=${weighInCheck.allowedKg}` : ""}`);
+        console.log(`weigh-in check ask=${weighInAsk ? "yes" : "no"}${weighInAsk ? ` difference_kg=${weighInAsk.differenceKg} against_kg=${weighInAsk.againstKg} days_since=${weighInAsk.daysSince}` : ""}`);
+
+        if (weighInAsk) {
+          // Proposal, not a write. The figures are this function's own reads
+          // (the weight they gave, and what the database holds), never the
+          // model's; the sentence on the card is built by the app from them.
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              proposal: {
+                kind: "propose_weigh_in",
+                rawArgs: {
+                  weight_kg: weightKg,
+                  date: context.current_local_date,
+                  difference_kg: weighInAsk.differenceKg,
+                  against_kg: weighInAsk.againstKg,
+                  days_since: weighInAsk.daysSince,
+                },
+              },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
         let dbSuccess = true;
         try {

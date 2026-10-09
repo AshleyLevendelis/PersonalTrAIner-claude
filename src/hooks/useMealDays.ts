@@ -8,7 +8,8 @@ import { weekdayLong } from '@/lib/day-labels'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MealDayMoveArgs, MealDayMoveController, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import type { PendingActionReceipt } from '@/lib/pending-actions-store'
-import { DAY_MOVE } from '@/lib/coach-voice'
+import { DAY_MOVE, KNOCK_ON } from '@/lib/coach-voice'
+import type { MealKnockOn } from '@/lib/meal-knock-on'
 import type { MacroTargets } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -235,6 +236,32 @@ export function useMealDays(input: MealDaysInput) {
   }
 
   /**
+   * WHAT ELSE CHANGES when a new option becomes a date's meal (9 Oct 2026, the
+   * test log's H9): the trial behind the add-a-food card and the custom-meal
+   * card, run over THIS hook's week — the one the screen serves — with the
+   * same shopping-list read the day swap makes. Never throws: a trial that
+   * cannot run comes back as the line saying it could not be checked.
+   */
+  const knockOn = async (date: string, slot: MealSlotName, option: PoolOption): Promise<MealKnockOn> => {
+    const { knockOnOfPin } = await import('@/lib/meal-knock-on')
+    let listDates: string[] | null = null
+    if (profileId && targets) {
+      try {
+        listDates = await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate, { strict: true })
+      } catch { /* stays null: the card says the list could not be checked */ }
+    }
+    try {
+      return knockOnOfPin({
+        serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation },
+        date, slot, option, listDates,
+      })
+    } catch (err) {
+      console.error('useMealDays: the knock-on trial failed', err)
+      return { changes: [], lines: [{ severity: 'info', text: KNOCK_ON.unknown }] }
+    }
+  }
+
+  /**
    * Confirm re-plans against the live week and writes only if every day still
    * gets the dish the card named. A dish swapped on either day since the card
    * was built would otherwise be overwritten by a pick for a card she read
@@ -333,7 +360,7 @@ export function useMealDays(input: MealDaysInput) {
     dayMove: {
       dates, today,
       slots: targets ? (Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]) : [],
-      plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove,
+      plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn,
     } satisfies MealDayMoveController,
   }
 }

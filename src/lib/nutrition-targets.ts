@@ -26,6 +26,7 @@ import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets } from './d
 import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
+import { weighInStanding, heldWeighInOn, type WeighInStanding, type WeighInReading, type HeldWeighIn } from './weigh-in-check'
 
 export interface ComputeTargetsOptions {
   /** Latest daily_metrics weigh-in, if any — overrides profile.weight_kg. */
@@ -175,24 +176,69 @@ export interface EffectiveTargetWeight {
  * change) so it stays consistent across devices rather than drifting per
  * client, the way a localStorage-only tracker would.
  */
+/**
+ * WHICH WEIGH-INS THE TARGET MAY FOLLOW, read once for everything that asks.
+ *
+ * Ashley's ruling, 9 Oct 2026 ("Ask, and hold the target"): a weigh-in far
+ * from the last one is saved only on her yes, and even then the calorie
+ * target does not move until a second day agrees. The sorting itself is
+ * weigh-in-check.ts's `weighInStanding`; this reads what it needs — the last
+ * fourteen weigh-ins and every weight a target has been set from.
+ */
+export interface WeighInPicture {
+  today: string
+  /** Newest first, as stored — what the weigh-in card lists. */
+  recent: { date: string; weight_kg: number }[]
+  /** The weights targets have been set from, oldest first. */
+  anchors: WeighInReading[]
+  /** The weight the STANDING target was set from (the newest target row's), or null when that row carries none. */
+  lastAnchorKg: number | null
+  standing: WeighInStanding
+  /** The NEWEST weigh-in, when it is one the target is not following yet. */
+  heldLatest: HeldWeighIn | null
+}
+
+export async function getWeighInPicture(profileId: string): Promise<WeighInPicture> {
+  const today = targetsToday(profileId)
+  const recent = await getRecentWeighIns(profileId, 14)
+  const targetRows = await getNutritionTargets(profileId, '1970-01-01', today).catch(() => [])
+  const anchors = targetRows
+    .filter(r => r.calculated_weight_kg != null && Number(r.calculated_weight_kg) > 0)
+    .map(r => ({ date: r.date, kg: Number(r.calculated_weight_kg) }))
+  const lastAnchorKg = targetRows.length > 0 ? targetRows[targetRows.length - 1].calculated_weight_kg ?? null : null
+  const standing = weighInStanding(recent.map(w => ({ date: w.date, kg: w.weight_kg })), anchors)
+  return { today, recent, anchors, lastAnchorKg, standing, heldLatest: recent.length > 0 ? heldWeighInOn(standing, recent[0].date) : null }
+}
+
 /** fallbackWeightKg may be undefined when the user never gave a weight; callers then get whatever the weigh-in series holds, or nothing. */
 export async function getEffectiveTargetWeightKg(
   profileId: string,
   fallbackWeightKg?: number,
 ): Promise<EffectiveTargetWeight> {
   const todayStr = targetsToday(profileId)
-  const recentWeighIns = await getRecentWeighIns(profileId, 14)
+  const picture = await getWeighInPicture(profileId)
+  // THE AVERAGE IS TAKEN OVER THE WEIGH-INS THE TARGET TRUSTS. A held one —
+  // surprising, confirmed, and not yet agreed with by another day — is saved
+  // and shown, and is not in this sum.
   const trend = computeWeightTrend(
-    recentWeighIns.map(w => ({ date: w.date, weightKg: w.weight_kg })),
+    picture.standing.trusted.map(w => ({ date: w.date, weightKg: w.kg })),
     todayStr,
     null,
   )
-  if (!trend) return { weightKg: fallbackWeightKg }
+  const lastAnchorKg = picture.lastAnchorKg
 
-  const recentTargets = await getNutritionTargets(profileId, '1970-01-01', todayStr).catch(() => [])
-  const lastAnchorKg = recentTargets.length > 0
-    ? recentTargets[recentTargets.length - 1].calculated_weight_kg ?? null
-    : null
+  if (!trend) {
+    // No trusted weigh-in in the last week. With nothing held this is what it
+    // always was: the standing figure the caller passed. With something held
+    // that figure may BE the held weigh-in (callers pass the newest one), so
+    // the target stays on what last set it — or, with no record of that, on
+    // the newest weigh-in it does trust. (Something can only be held AGAINST
+    // one of those, so one of them exists.)
+    if (picture.standing.held.length === 0) return { weightKg: fallbackWeightKg }
+    const lastTrusted = picture.standing.trusted[picture.standing.trusted.length - 1]
+    const lastRecorded = picture.anchors[picture.anchors.length - 1]
+    return { weightKg: lastAnchorKg ?? lastTrusted?.kg ?? lastRecorded?.kg }
+  }
 
   if (lastAnchorKg == null) return { weightKg: trend.rollingAvgKg }
   if (Math.abs(trend.rollingAvgKg - lastAnchorKg) >= TARGET_WEIGHT_ANCHOR_THRESHOLD_KG) {

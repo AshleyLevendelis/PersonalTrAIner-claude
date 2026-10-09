@@ -102,6 +102,8 @@ export interface NutritionDisplayProps {
   chosen: Partial<Record<MealSlotName, PoolOption>>
   mealTotals: MacroTargets
   isGeneratingMeals: boolean
+  /** "Regenerate all" is running: the meal list shows a working state over the whole list (MealPlan). */
+  mealsRegeneratingAll?: boolean
   mealRegenerateError?: string | null
   onDismissRegenerateError?: () => void
   /** The compiled avoid-list — the same value generation is given, so the meals shown are judged by the rule that produced them. */
@@ -171,7 +173,7 @@ export interface MealRefitOffer {
 
 export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onMacroSplitChange,
-  profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
+  profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealsRegeneratingAll = false, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
@@ -554,6 +556,7 @@ export function NutritionDisplay({
           onRegenerateAll={onRegenerateAllMeals}
           upcoming={upcomingDay}
           dayMove={dayMove}
+          regeneratingAll={mealsRegeneratingAll}
         />
       ) : (
       <MealPlan
@@ -579,6 +582,7 @@ export function NutritionDisplay({
         onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}
         dayMove={dayMove}
+        regeneratingAll={mealsRegeneratingAll}
       />
       )}
 

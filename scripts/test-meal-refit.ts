@@ -413,20 +413,26 @@ console.log('\n13. Regenerating some meals no longer destroys picks for the othe
   // fixed here because it is the same promise: a meal the app kept on purpose
   // should not quietly stop being hers. The old code kept the prior pool for a
   // slot whose regeneration failed and then cleared EVERY pick anyway.
-  const app = strip(read('src/App.tsx'))
-  const i = app.indexOf('const handleRegenerateAllMeals')
-  const body = app.slice(i, i + 4000)
+  // RE-ANCHORED 9 Oct 2026 (test log M22): the handler moved out of App.tsx
+  // into src/lib/meal-plan-actions.ts, where test:meal-regenerate RUNS it.
+  // The rule also got narrower, on purpose: a pick is cleared for a meal that
+  // was regenerated AND whose picked dish is gone — a pick whose dish survived
+  // (hers, hearted or edited) now stays. These checks hold the same property
+  // as before, read off where the code now lives.
+  const lib = strip(read('src/lib/meal-plan-actions.ts'))
+  const i = lib.indexOf('export async function regenerateAllMeals')
+  const body = i < 0 ? '' : lib.slice(i, i + 6000)
   check('the regenerate path clears picks per slot', /clearMealPick\(/.test(body))
   check('...and not all of them at once', !/clearAllMealPicksForDate/.test(body))
   // DRIVEN BY THE DERIVED LIST, not merely accompanied by it. Found by
-  // mutation: pointing the loop at an empty array left "regeneratedSlots" in
+  // mutation: pointing the loop at an empty array left the list's name in
   // the file and every earlier version of this check green, while no pick was
   // cleared at all. The property is which collection the loop walks.
-  check('...for exactly the slots that actually got new meals',
-    /for \(const slot of regeneratedSlots\) await clearMealPick\(/.test(body))
+  check('...for exactly the meals that got new options and lost the dish that was picked',
+    /for \(const slot of lostPicks\) await clearMealPick\(/.test(body) && /const lostPicks = regeneratedSlots\.filter\(/.test(body))
   check('...and the on-screen picks are dropped from the same list',
-    /for \(const slot of regeneratedSlots\) delete next\[slot\]/.test(body))
-  check('...where that list is the slots whose pool came back non-empty',
+    /for \(const slot of lostPicks\) delete next\[slot\]/.test(body))
+  check('...where that list starts from the slots whose pool came back non-empty',
     /regeneratedSlots =[\s\S]{0,220}options\.length > 0/.test(body))
   // The blanket helper is gone rather than left exported — an unreferenced
   // "delete every pick for this day" is a loaded gun for the next reader.

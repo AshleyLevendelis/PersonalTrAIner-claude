@@ -3,6 +3,8 @@ import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, t
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
+import { shareLine } from './meal-food-add'
+import { dayLabel } from './day-labels'
 
 // ---------------------------------------------------------------------------
 // "I usually have eggs and greek yoghurt and fruit for breakfast" — the
@@ -107,8 +109,11 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
       // The inverse of the addition card's "portions adjusted" line, and
       // the whole point of the feature: nothing was adjusted.
       { severity: 'info', text: `Your portions, untouched — ${option.ingredients.map(i => `${i.name} ${Math.round(i.quantity)}${i.unit}`).join(', ')}.` },
-      { severity: 'info', text: `The rest of the day re-fits around it${vsBudget !== 0 ? ` (${vsBudget > 0 ? `${vsBudget} kcal over` : `${-vsBudget} kcal under`} the usual ${slot} share)` : ''}.` },
-      { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${date}.` },
+      // What the rest of the plan does is read off a trial by the caller and
+      // added to this card (withKnockOn in meal-food-add.ts) — this line used
+      // to assert "The rest of the day re-fits around it" (test log H9).
+      ...(vsBudget !== 0 ? [{ severity: 'info' as const, text: shareLine(slot, vsBudget) }] : []),
+      { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${dayLabel(date, input.todayDate)}.` },
     ],
     rationale: typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote.trim() ? rawArgs.origin_verbatim_quote.trim() : undefined,
     reversible: true,

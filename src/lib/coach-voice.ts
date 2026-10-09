@@ -269,6 +269,19 @@ const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 const poss = (day: string) => `${day}'s`
 
 /**
+ * What ELSE an edit to one meal changes — adding a food, a custom meal
+ * (meal-knock-on.ts). The changes themselves are said in the day swap's own
+ * sentences (DAY_MOVE, below); these are the three it has no use for.
+ */
+export const KNOCK_ON = {
+  /** The trial ran and no other meal moved. */
+  none: 'No other meal on your plan changes.',
+  /** There was no week to try it on, or the trial failed: said, never guessed. */
+  unknown: "I couldn't check what this does to your other meals.",
+  listUnknown: "I couldn't check your shopping list. If this day is on it, rebuild the list afterwards to match.",
+}
+
+/**
  * SWAPPING A MEAL WITH ANOTHER DAY'S — Ashley's ruling, 29 Sep 2026, from three
  * options: they SWAP PLACES (Monday's dinner goes to Wednesday and Wednesday's
  * comes to Monday), over giving the emptied day a fresh dinner and over eating
@@ -921,6 +934,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_missed_session: { done: 'Marked as missed', failed: "I couldn't mark that day" },
   propose_session_move: { done: 'Moved', failed: "I couldn't move that session" },
   propose_session_activity_swap: { done: 'Swapped', failed: "I couldn't swap that day" },
+  propose_weigh_in: { done: 'Weigh-in saved', failed: "I couldn't save that weigh-in" },
   propose_injury_adaptation: { done: 'Adapted', failed: "I couldn't adapt it" },
   propose_injury_as_lasting: { done: 'Saved', failed: "I couldn't save that" },
   propose_injury_recovered: { done: 'Cleared', failed: "I couldn't clear that" },

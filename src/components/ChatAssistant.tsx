@@ -19,6 +19,8 @@ import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
+import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, type WeighInPayload } from '@/lib/weigh-in-proposal'
+import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
   executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
@@ -32,7 +34,8 @@ import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
-import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
+import { buildMealFoodAddProposal, withKnockOn } from '@/lib/meal-food-add'
+import type { MealKnockOnFn } from '@/lib/meal-knock-on'
 import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
 import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
@@ -270,6 +273,13 @@ interface ChatAssistantProps {
   latestWeightKg?: number | null
   onPlanUpdate: (action: PlanAction) => void | Promise<void>
   onLogsUpdated?: () => void
+  /**
+   * What else on the plan changes if a new option becomes a date's meal — the
+   * app's own trial (useMealDays' dayMove.knockOn), the same function the
+   * Nutrition screen's add-a-food sheet is handed, so the two cards cannot
+   * disagree. Absent: the card says it could not check.
+   */
+  onMealKnockOn?: MealKnockOnFn
   /** Fired when a chat log_weight action lands so the app recomputes living targets. */
   onWeightLogged?: () => void | Promise<void>
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
@@ -416,7 +426,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1803,6 +1813,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     })
     if (line) checkInUsedRef.current = true
     return line
+  }
+
+  /** The knock-on trial for a meal card, or null when there is none to run or it failed (the card then says it could not check). */
+  const mealKnockOn = async (payload: MealAdditionPayload) => {
+    if (!onMealKnockOn) return null
+    try { return await onMealKnockOn(payload.date, payload.slot, payload.option) }
+    catch (err) { console.error('chat: the knock-on trial failed', err); return null }
   }
 
   /**
@@ -4916,7 +4933,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
-          if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: foodAdd.diff }
+          // WHAT ELSE CHANGES, READ OFF A TRIAL (test log H9): the app's own
+          // week served with and without this food, the same function the
+          // screen's sheet is handed. No trial available: the card says so.
+          if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: withKnockOn(foodAdd.diff, await mealKnockOn(foodAdd.payload)) }
           else refusal = foodAdd.reason
         }
       } else if (result.proposal.kind === 'propose_meal_move') {
@@ -5015,7 +5035,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
-          if (custom.ok) built = { scopeKey: custom.scopeKey, preconditions: custom.preconditions, payload: custom.payload as unknown as Record<string, unknown>, diff: custom.diff }
+          // The same trial as adding a food: her meal pinned, the week served again.
+          if (custom.ok) built = { scopeKey: custom.scopeKey, preconditions: custom.preconditions, payload: custom.payload as unknown as Record<string, unknown>, diff: withKnockOn(custom.diff, await mealKnockOn(custom.payload)) }
           else refusal = custom.reason
         }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
@@ -5154,6 +5175,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const rest = buildRestDayProposal(result.proposal.rawArgs)
         if (rest) built = { scopeKey: rest.scopeKey, preconditions: rest.preconditions, payload: rest.payload as unknown as Record<string, unknown>, diff: rest.diff }
         else refusal = "There's no session on that day to rest from — it's already a rest day on your plan."
+      } else if (result.proposal.kind === 'propose_weigh_in' && result.proposal.rawArgs) {
+        // A weight told to the coach that is far from the last one: asked
+        // about, not saved (Ashley, 9 Oct 2026). The card's question is worked
+        // out from the app's own read of the weigh-ins — weigh-in-proposal.ts.
+        const weighIn = buildWeighInProposal(profile.id, result.proposal.rawArgs, await getWeighInPicture(profile.id))
+        if (weighIn) built = { scopeKey: weighIn.scopeKey, preconditions: weighIn.preconditions, payload: weighIn.payload as unknown as Record<string, unknown>, diff: weighIn.diff }
+        else refusal = "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?"
       } else if (result.proposal.kind === 'propose_session_activity_swap' && result.proposal.rawArgs) {
         const sw = buildSwapForActivityProposal(result.proposal.rawArgs)
         if (sw) built = { scopeKey: sw.scopeKey, preconditions: sw.preconditions, payload: sw.payload as unknown as Record<string, unknown>, diff: sw.diff }
@@ -6189,6 +6217,22 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // touch the plan, so there is nothing to restore beyond clearing the
       // flag — which is exactly what undoRestDay does.
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_weigh_in') {
+      // Her yes to "is 62 kg right?". Written by the weigh-in box's own
+      // function, then the same refresh a weigh-in from the box triggers —
+      // which is where the calorie target is held or moved (the hold is
+      // re-derived from the weigh-ins, nutrition-targets.ts).
+      const payload = row.payload as unknown as WeighInPayload
+      const result = await executeWeighIn(profile.id, payload)
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_weigh_in'].done : RECEIPTS['propose_weigh_in'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      if (ok) {
+        await onWeightLogged?.()
+        const held = (await getWeighInPicture(profile.id)).heldLatest
+        if (held && held.date === payload.date) rows.push({ label: 'Calorie target', detail: WEIGH_IN_RECEIPT_HOLD_DETAIL })
+      }
     } else if (row.kind === 'propose_session_activity_swap') {
       const payload = row.payload as unknown as SwapForActivityPayload
       const result = await executeSwapForActivity(profile, payload)

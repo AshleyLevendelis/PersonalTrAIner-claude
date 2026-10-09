@@ -98,6 +98,13 @@ export interface MealDayMoveController {
    * both picks or neither, like the swap itself.
    */
   undo: (payload: MealDayMovePayload) => Promise<PendingActionReceipt>
+  /**
+   * What ELSE changes if this new option becomes that date's meal — the trial
+   * behind the add-a-food and custom-meal cards (meal-knock-on.ts). Here, on
+   * the one controller, because it has to be run over the same week the swap's
+   * own trial runs over, and because this object already reaches both surfaces.
+   */
+  knockOn: (date: string, slot: MealSlotName, option: PoolOption) => Promise<import('./meal-knock-on').MealKnockOn>
 }
 
 export interface BuildMealDayMoveInput {
