@@ -28,6 +28,8 @@
 // holds the real one; if these two ever disagree, believe that gate.
 // ---------------------------------------------------------------------------
 
+import { swapOnScreen } from '@/lib/screen-swap'
+import { banOnScreen } from '@/lib/screen-ban'
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -123,7 +125,16 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 // is that it is always the SAME training day, so the plan every driver reads
 // stops being reshaped once a night.
 const todayIdx = anchorDate().getDay()
-const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
+// ?freetoday=1 — YESTERDAY TRAINS AND TODAY DOES NOT, for verify:moved-edit
+// (9 Oct 2026). The only way to stand ON a session that was moved: the driver
+// moves yesterday's missed session onto today through the app's own "What
+// happened?" sheet and then edits it. Nothing about the move is seeded — the
+// fixture chooses the week's shape and the app does the rest. Off by default,
+// so every existing run of this harness is unchanged.
+const FREE_TODAY = new URLSearchParams(location.search).get('freetoday') === '1'
+const availableIdx = new Set(FREE_TODAY
+  ? [(todayIdx + 6) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
+  : [todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 
 // ?absurd=1 — the weight-plausibility check, on the screen it argues on.
 //
@@ -1256,7 +1267,20 @@ function Harness() {
           <ExerciseTab plan={exercisePlan} mesocycle={editedMeso} exclusions={[]}
             profile={profile} profileId={PROFILE_ID} planCreatedAt={profile.created_at}
             onMesocycleUpdated={setEditedMeso}
-            onSwapExercise={noop} onBanExercise={noop}
+            // THE APP'S OWN SWAP (screen-swap.ts), not a copy of it: App.tsx
+            // calls this same function, so a driver that taps a swap here is
+            // tapping the code that ships. Its sentence lands in the window
+            // for a driver to read, as App's lands in its banner.
+            onSwapExercise={async (weekNumber, dayName, exIndex, newExercise, scope) => {
+              const said = await swapOnScreen({ profile, mesocycle: editedMeso, weekNumber, dayName, exIndex, newExercise, scope, show: setEditedMeso })
+              ;(window as unknown as { __swapSaid: string | null }).__swapSaid = said
+            }}
+            // THE APP'S OWN BAN (screen-ban.ts), reached through the Exercise
+            // tab's own confirm sheet — App.tsx calls this same function.
+            onBanExercise={name => banOnScreen({
+              profile, mesocycle: editedMeso, exerciseName: name, exclusions: [],
+              planCreatedAt: profile.created_at, show: setEditedMeso, reloadMemory: async () => {},
+            })}
             onDevOverrideWeekChange={noop} onDevOverrideDayChange={noop}
             onDevBypassLocksChange={noop} onLogsSeeded={noop} />
         )}

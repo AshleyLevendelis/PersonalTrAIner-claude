@@ -186,6 +186,15 @@ const swapTarget = (() => {
 })()
 ;(window as unknown as { __swapTarget: unknown }).__swapTarget = swapTarget
 
+// THE SESSION THAT WAS MOVED ONTO TODAY, by name — for verify:moved-edit
+// (9 Oct 2026). Under ?movedin=1 today's own row is empty and __swapTarget is
+// null, which is exactly the situation: the exercises a person would ask the
+// coach about live on YESTERDAY's row. Facts about the fixture's plan only;
+// what the coach does with them is the app's own code.
+;(window as unknown as { __movedInExercises: unknown }).__movedInExercises = MOVED_IN
+  ? (mesocycle[0].days.find(d => d.day === DAYS[(todayIdx + 6) % 7])?.exercises ?? []).map(e => e.name)
+  : null
+
 // A REPLACEMENT FROM A DIFFERENT DAY'S FOCUS — for verify:swap-request's cost
 // section, added 14 Sep 2026 when the coach's swap card started stating what a
 // swap costs the week.

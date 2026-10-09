@@ -40,6 +40,12 @@ import type { PendingActionReceipt } from './pending-actions-store'
 export interface ExerciseSwapPayload {
   weekNumber: number
   dayName: string
+  /**
+   * The weekday this session is SHOWN on, when it is not the plan row's own
+   * name — Monday's session moved to Friday is `dayName: 'Monday'`,
+   * `sayDay: 'Friday'`. Never a key; only ever read to word a receipt.
+   */
+  sayDay?: string
   exIndex: number
   oldExerciseName: string
   newExerciseName: string
@@ -116,6 +122,12 @@ export async function executeExerciseSwap(
 export interface ExerciseRemovePayload {
   weekNumber: number
   dayName: string
+  /**
+   * The weekday this session is SHOWN on, when it is not the plan row's own
+   * name — Monday's session moved to Friday is `dayName: 'Monday'`,
+   * `sayDay: 'Friday'`. Never a key; only ever read to word a receipt.
+   */
+  sayDay?: string
   exIndex: number
   exerciseName: string
   scope: SwapScope
@@ -124,6 +136,12 @@ export interface ExerciseRemovePayload {
 export interface ExerciseAddPayload {
   weekNumber: number
   dayName: string
+  /**
+   * The weekday this session is SHOWN on, when it is not the plan row's own
+   * name — Monday's session moved to Friday is `dayName: 'Monday'`,
+   * `sayDay: 'Friday'`. Never a key; only ever read to word a receipt.
+   */
+  sayDay?: string
   exerciseName: string
   scope: SwapScope
 }
@@ -142,6 +160,12 @@ export interface ExerciseBanPayload {
 export interface ExerciseReorderPayload {
   weekNumber: number
   dayName: string
+  /**
+   * The weekday this session is SHOWN on, when it is not the plan row's own
+   * name — Monday's session moved to Friday is `dayName: 'Monday'`,
+   * `sayDay: 'Friday'`. Never a key; only ever read to word a receipt.
+   */
+  sayDay?: string
   fromIndex: number
   toIndex: number
   exerciseName: string
@@ -1073,6 +1097,12 @@ export async function executeEquipmentAdaptation(
 
 export interface VolumeChangePayload {
   dayName: string
+  /**
+   * The weekday this session is SHOWN on, when it is not the plan row's own
+   * name — Monday's session moved to Friday is `dayName: 'Monday'`,
+   * `sayDay: 'Friday'`. Never a key; only ever read to word a receipt.
+   */
+  sayDay?: string
   direction: VolumeDirection
   weekNumbers: number[]
   reason?: string
@@ -1140,6 +1170,12 @@ export async function executeVolumeChange(
 export interface SessionShortenPayload {
   weekNumber: number
   dayName: string
+  /**
+   * The weekday this session is SHOWN on, when it is not the plan row's own
+   * name — Monday's session moved to Friday is `dayName: 'Monday'`,
+   * `sayDay: 'Friday'`. Never a key; only ever read to word a receipt.
+   */
+  sayDay?: string
   minutes: number
   reason?: string
 }
@@ -1197,6 +1233,12 @@ export async function executeSessionShorten(
 export interface SessionRebuildPayload {
   weekNumber: number
   dayName: string
+  /**
+   * The weekday this session is SHOWN on, when it is not the plan row's own
+   * name — Monday's session moved to Friday is `dayName: 'Monday'`,
+   * `sayDay: 'Friday'`. Never a key; only ever read to word a receipt.
+   */
+  sayDay?: string
   /** The compiled exclusion list, resolved by the caller that has it. */
   exclusions: string[]
   reason?: string

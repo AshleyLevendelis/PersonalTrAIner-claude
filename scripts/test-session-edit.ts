@@ -483,7 +483,9 @@ console.log('\n6. One saver, two surfaces — and the coach on the proposal rail
   check('...trialling the real edit before offering it',
     /const trial = removeExerciseFromSession\(/.test(ui) && /const trial = moveExerciseInSession\(/.test(ui))
   check('...so a refusal reaches the person instead of a card that cannot apply',
-    /if \(!trial\.changed\) return \{ ok: false, reason: trial\.refusal/.test(ui))
+    // Re-anchored 9 Oct 2026: the refusal now passes through `on.say(…)` so it
+    // names the day on screen (a moved session's row has another weekday's name).
+    /if \(!trial\.changed\) return \{ ok: false, reason: (on\.say\()?trial\.refusal/.test(ui))
   check('...executes on confirm', /executeExerciseRemove\(/.test(ui) && /executeExerciseReorder\(/.test(ui))
   check('...and undoes from the pre-image', /undoSessionEdit\(profile\.id, preImage/.test(ui))
   const store = strip(read('src/lib/pending-actions-store.ts'))

@@ -83,7 +83,13 @@ console.log('\n[1] A turn carries when it was said')
   // and would stay green with the call site deleted — which is precisely the
   // defect, since the whole point is the turns the COACH is sent. So require
   // the call, on the history map, with the message's own content.
-  check('the history sent to the coach is actually stamped', /stampTurnTime\(m\.content/.test(CLIENT), 
+  // RE-ANCHORED 9 Oct 2026: the content now passes through stampTurnOutcome
+  // first (how a request ENDED goes inside the time stamp), so the literal
+  // `stampTurnTime(m.content` no longer appears. The property is unchanged:
+  // the history map calls stampTurnTime, on the message's own content, with
+  // the message's own created_at and the app's clock.
+  check('the history sent to the coach is actually stamped',
+    /\.map\(m => \(\{ role: m\.role, content: stampTurnTime\([^\n]{0,160}?m\.content[^\n]{0,40}?, m\.created_at, historyNow\)/.test(CLIENT),
     CLIENT.split('\n').filter(l => l.includes('stampTurnTime')).slice(0, 3))
   check('...against the app clock rather than a fresh Date', /const historyNow = getAppNow\(/.test(CLIENT))
   check('no timestamp means no claim about when it was said', stampTurnTime('x', null, now) === 'x')

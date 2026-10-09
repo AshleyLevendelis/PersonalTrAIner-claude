@@ -672,6 +672,14 @@ export interface ChatPendingActionView {
   kind: string
   status: import('./pending-actions-store').PendingActionStatus
   diff: import('./pending-actions-store').ProposalDiff
+  /**
+   * When the offer stops working (pending_actions.expires_at). Carried onto
+   * the card so it can LOOK expired once it is (L33) and so the coach's
+   * history can say the offer is closed (H22.1) — until 9 Oct 2026 the only
+   * way either found out was somebody tapping a dead button. Optional:
+   * cards cached before that date do not have it.
+   */
+  expiresAt?: string
 }
 
 export interface ChatReceiptView {
@@ -712,6 +720,14 @@ export interface ChatMessage {
   clarification?: ChatClarificationView
   quickReplies?: string[]
   created_at?: string
+  /**
+   * How this turn's request ENDED, when the turn itself no longer says:
+   * 'refused' on a reply that is the app declining to build a card, and the
+   * last known outcome of a card whose view was dropped when history was
+   * re-read from the server. Never rendered — read only by the history the
+   * coach is sent (chat-plan-context.ts, stampTurnOutcome).
+   */
+  outcome?: import('./chat-plan-context').TurnOutcome
 }
 
 // ReplaceFoodAction/ReplaceExerciseAction are gone — categorically

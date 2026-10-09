@@ -18,6 +18,7 @@ import { RoundCard } from '@/components/timers/RoundCard'
 import { ProtocolChips, protocolChoices } from '@/components/timers/ProtocolChips'
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
 import type { WorkoutDay, MesocycleWeek, EquipmentAccess } from '@/lib/types'
 import type { RoundLogSummary } from '@/lib/timer-engine'
@@ -91,13 +92,23 @@ export interface ToolsTabProps {
   equipmentAccess?: EquipmentAccess
 }
 
+/** Stable identity, so a missing plan does not hand the week hook a fresh array each render. */
+const EMPTY_PLAN: WorkoutDay[] = []
+
 export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
   // be a second answer to a question this app deliberately has one owner for.
-  const { dayName } = useActiveSession()
-  const todaysConditioning = (exercisePlan ?? []).find(d => d.day === dayName)?.recommendedCardio
+  const { date: todayDate } = useActiveSession()
+  // TODAY'S SESSION IS THE ONE RUN TODAY, moves taken into account — the same
+  // seven cells the week strip is drawn from. This looked the weekday up in
+  // the plan's raw rows, so on a day a session had moved ONTO it offered no
+  // conditioning timer, and on the day it had moved OFF it offered the timer
+  // for a session being done elsewhere (H19's twentieth reader, 9 Oct 2026).
+  const trainingWeek = useTrainingWeek(profileId, todayDate, exercisePlan ?? EMPTY_PLAN)
+  const todayCell = trainingWeek.days.find(d => d.date === todayDate)
+  const todaysConditioning = (todayCell?.movedTo ? null : todayCell?.session)?.recommendedCardio
 
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
   const [groceryCount, setGroceryCount] = useState<{ total: number; checked: number } | null>(null)

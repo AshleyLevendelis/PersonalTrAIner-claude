@@ -87,6 +87,19 @@ export interface PendingActionReceipt {
 
 const PENDING_WINDOW_MINUTES = 10
 
+/**
+ * Has this offer's window gone? ON THE REAL CLOCK, deliberately — the 24 Sep
+ * 2026 lesson: a window about elapsed time is measured on the clock that
+ * elapses, never the app's dev clock, which an override moves by days.
+ * `expiresAt` is the row's own value; unknown means "not known to have
+ * passed", so a card is never greyed out on a guess.
+ */
+export function pendingWindowPassed(expiresAt: string | null | undefined, nowMs: number = Date.now()): boolean {
+  if (!expiresAt) return false
+  const at = Date.parse(expiresAt)
+  return Number.isFinite(at) && nowMs >= at
+}
+
 function generateClientId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`

@@ -24,7 +24,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -72,7 +72,7 @@ check('0b. ...and that day carries no exercises, so the old readers saw a rest d
   !!want && want.exercises === 0, want)
 if (!want) {
   console.error('\nNo activity day in the fixture — nothing to read.\n')
-  writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/planned-activity.png',
+  writeFileSync(new URL('./planned-activity.png', import.meta.url).pathname,
     Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
   ws.close(); chrome.kill(); server.close(); process.exit(1)
 }
@@ -104,7 +104,7 @@ const card = await ev(`(() => {
   }
 })()`)
 
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/planned-activity.png',
+writeFileSync(new URL('./planned-activity.png', import.meta.url).pathname,
   Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 
 check('1. the day carries a prescription block at all (this is the empty card)', card.found === true, card)
@@ -182,7 +182,7 @@ check('4c. a second walk logged under "anything else" reads back there',
   // EXACTLY ONE receipt there, and it is the 30-minute one: the prescribed walk
   // must not ALSO be listed under "anything else" — the claim is what stops it.
   count === 2 && extra.length === 1 && extra[0].startsWith(`${want.activity} · 30 min`) && plannedStill.startsWith(`${want.activity} · ${want.duration} min`), { count, extra, plannedStill })
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/planned-activity-logged.png',
+writeFileSync(new URL('./planned-activity-logged.png', import.meta.url).pathname,
   Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 
 // THE HEADLINE. A prescribed session must not introduce itself as recovery.

@@ -62,7 +62,7 @@ interface ProgramBrowseProps {
    */
   refreshToken?: number
   /** Swaps carry the BROWSED week — a swap made while reading week 9 must land on week 9, not the live week. */
-  onOpenSwap: (target: { weekNumber: number; dayName: string; exIndex: number; exerciseName: string }) => void
+  onOpenSwap: (target: { weekNumber: number; dayName: string; sayDay?: string; exIndex: number; exerciseName: string }) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   /**
@@ -577,7 +577,11 @@ export function ProgramBrowse({
                   )}
                   <ReadOnlyDayList
                     workout={workout}
-                    onSwap={(exIndex, exerciseName) => onOpenSwap({ weekNumber: browseWeek, dayName, exIndex, exerciseName })}
+                    // Keyed by the row the session LIVES in, said as the
+                    // day it is listed under: a session moved onto this day
+                    // is another weekday's row, and the list's own weekday
+                    // is the empty one (H19).
+                    onSwap={(exIndex, exerciseName) => onOpenSwap({ weekNumber: browseWeek, dayName: workout.day, sayDay: dayName, exIndex, exerciseName })}
                     onBan={async exerciseName => {
                       setBanBusy(exerciseName)
                       try { await onBanExercise(exerciseName) } finally { setBanBusy(null) }

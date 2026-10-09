@@ -225,11 +225,13 @@ export function WhatHappenedSheet({
    * as though it were worth a tap.
    */
   const shortenChoices = useMemo(() => {
-    const day = plan.find(d => d.day === target?.dayName)
+    // The session RUN on this date, not the weekday's own row — on a day a
+    // session moved onto, that row is empty and no times were offered (H19).
+    const day = session
     if (!day || day.exercises.length === 0) return [] as number[]
     const nowMinutes = estimateDaySeconds(day) / 60
     return SHORTEN_CHOICES.filter(m => m <= nowMinutes - 5)
-  }, [plan, target?.dayName])
+  }, [session])
 
   const saveSomethingElse = () => {
     const name = activity.trim()

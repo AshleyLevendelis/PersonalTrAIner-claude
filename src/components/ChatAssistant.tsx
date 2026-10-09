@@ -17,7 +17,7 @@ import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
@@ -59,7 +59,9 @@ import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
-import { resolveSwapTarget } from '@/lib/swap-target'
+import { resolveExerciseOnSession } from '@/lib/swap-target'
+import { banBlastRadius, banConfirmLines } from '@/lib/screen-ban'
+import { sessionRefForDayArg, sessionRefFromCell, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import {
@@ -76,7 +78,7 @@ import { sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDo
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
 import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
-import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime } from '@/lib/chat-plan-context'
+import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime, stampTurnOutcome, outcomeOfCard, summariseTodayWork, type TurnOutcome } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
 import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
@@ -969,6 +971,50 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     : todayResolved.day && todayResolved.day.exercises.length > 0 ? todayResolved.day : undefined
   const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
 
+  // -------------------------------------------------------------------------
+  // THE ONE LOOKUP EVERY EXERCISE-GRAIN EDIT GOES THROUGH (H15, 9 Oct 2026).
+  //
+  // The context this component sends tells the coach the truth — "Friday
+  // (TODAY): Monday's Chest & Triceps, MOVED HERE" — so the coach says
+  // "Friday". Every builder below then looked "Friday" up in the plan's raw
+  // weekday rows, found Friday's own empty one, and answered "Friday is a rest
+  // day — there's nothing on it to swap." Two readers of one fact.
+  //
+  // They now ask the same seven cells the header was written from. What comes
+  // back is the plan row to WRITE (`day`, keyed by `day.day`) and the weekday
+  // to SAY (`sayDay`), and those are different words on a moved-in session.
+  // A day swapped for another activity, rested on purpose, marked missed or
+  // emptied by a move is refused in a sentence rather than edited.
+  // -------------------------------------------------------------------------
+  type EditDay =
+    | { ok: true; day: WorkoutDay; sayDay: string; ref: SessionRef; say: (text: string) => string }
+    | { ok: false; reason: string }
+  const editDayFor = (dayArg: string, week: MesocycleWeek, opts: { followMove?: boolean } = {}): EditDay => {
+    const ref = sessionRefForDayArg(dayArg, {
+      todayDate: activeSession.date,
+      cells: trainingWeek.days,
+      weekNumber: activeSession.liveWeek,
+      followMove: opts.followMove,
+    })
+    if ('refusal' in ref) return { ok: false, reason: ref.refusal }
+    const target = editTarget(ref)
+    if (!target.ok) return { ok: false, reason: target.refusal }
+    const day = week.days.find(d => d.day === target.planDayName)
+    if (!day) return { ok: false, reason: `I couldn't find ${target.sayDay} on your plan.` }
+    return { ok: true, day, sayDay: target.sayDay, ref, say: (text: string) => sayDayIn(text, ref) }
+  }
+  /** Today's reference — what a logged set is checked against, and what the coach is told is on today. */
+  const todayRef: SessionRef | null = (() => {
+    const cell = trainingWeek.days.find(d => d.date === activeSession.date)
+    return cell ? sessionRefFromCell(cell, activeSession.liveWeek) : null
+  })()
+  /** A receipt says the day the person sees, whatever row the executor wrote to. */
+  const sayReceipt = <R extends { landed: string[]; failed: { op: string; error: string }[] }>(receipt: R, payload: { dayName?: string; sayDay?: string }): R => {
+    if (!payload.dayName || !payload.sayDay || payload.dayName === payload.sayDay) return receipt
+    const names = { planDayName: payload.dayName, sayDay: payload.sayDay }
+    return { ...receipt, landed: receipt.landed.map(l => sayDayIn(l, names)), failed: receipt.failed.map(f => ({ ...f, error: sayDayIn(f.error, names) })) }
+  }
+
   // The next scheduled session after today, up to six days out. Hoisted for the
   // same reason todayPlan was: the opener, the unprompted message and the
   // coach's own context must not each walk the week their own way and then
@@ -1327,7 +1373,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         // most recent write(s) hadn't landed yet (see chat-cache.ts). A
         // shorter DB result means it's missing something the user already
         // saw, not that the conversation actually shrank.
-        setMessages(prev => (loaded.length >= prev.length ? loaded : prev))
+        // HOW EACH REQUEST ENDED SURVIVES THE RE-READ. The server rows carry
+        // text only, so swapping them in used to forget that Thursday's card
+        // was declined or timed out — and the coach was then shown its
+        // "Want me to …?" as an open question. Carried across by message id
+        // from what this phone already knew (the cache restored just above).
+        setMessages(prev => {
+          if (loaded.length < prev.length) return prev
+          const known = new Map(prev.filter(m => m.id).map(m => [m.id, turnOutcomeOf(m)] as const))
+          return loaded.map(m => {
+            const outcome = m.id ? known.get(m.id) : null
+            // 'open' is not carried: a card that was open when it was dropped
+            // can no longer be answered, and nothing here knows how it ended.
+            return outcome && outcome !== 'open' ? { ...m, outcome } : m
+          })
+        })
         setHasMoreMessages((count ?? 0) > PAGE_SIZE)
       }
       setIsFirstEverChat((count ?? 0) === 0)
@@ -1487,6 +1547,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         isGymSession: (todayRow?.exercises.length ?? 0) > 0,
         setsLogged: activeSession.logs.length,
         setsPlanned: todayRow?.exercises.reduce((n, e) => n + (e.sets ?? 0), 0) ?? 0,
+        // TODAY, JOINED (H23): each planned exercise with its logged working
+        // sets, what was added, the finisher and today's cardio. The header's
+        // "N of M" is taken from this when it is present, so it is working
+        // sets on planned exercises — not every row against the plan, which is
+        // what `setsLogged` above still is and why it is no longer what is said.
+        work: summariseTodayWork({
+          session: todayMovedTo ? null : todayRow ?? null,
+          logs: activeSession.logs,
+          // Today's own line from the cardio history the coach is sent just
+          // below, so one walk is never worded two ways in one prompt.
+          cardioLoggedToday: cardioLogHistory.split('\n').find(l => l.startsWith(`${activeSession.date}: `))?.slice(activeSession.date.length + 2) ?? null,
+        }),
         // The session being CLOSED OUT, not merely logged against — the same
         // three-valued status the Exercise tab's start button reads, so the
         // coach and that button can never disagree about whether today is done.
@@ -1849,6 +1921,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     feelIntent?: { tool: 'record_session_feel'; rawArgs: Record<string, unknown> }
   }
 
+  /** How this turn's request ended, from the card it still carries or the note left when the card's view was dropped. */
+  const turnOutcomeOf = (m: ChatMessage): TurnOutcome | null =>
+    m.pendingAction ? outcomeOfCard(m.pendingAction.status, pendingWindowPassed(m.pendingAction.expiresAt)) : m.outcome ?? null
+
   const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
     // EVERY TURN SAYS WHEN IT WAS SAID — see stampTurnTime. History is
@@ -1860,7 +1936,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       .filter(m => m.status === 'complete' || m.status === undefined)
       .slice(1)
       .slice(-PAGE_SIZE)
-      .map(m => ({ role: m.role, content: stampTurnTime(m.content, m.created_at, historyNow) }))
+      // ...AND HOW IT ENDED (H22.1). A card's lead is "Want me to …?" for ever,
+      // and a refusal is an ordinary sentence, so yesterday's closed request
+      // read as an open one. The outcome goes on first, the time around it.
+      .map(m => ({ role: m.role, content: stampTurnTime(m.role === 'assistant' ? stampTurnOutcome(m.content, turnOutcomeOf(m)) : m.content, m.created_at, historyNow) }))
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -2068,15 +2147,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
 
     // An absent day means TODAY. "Swap this exercise" names no day at all, and
     // demanding one was the commonest way into the dead end.
-    const target = resolveSwapTarget({
-      dayArg: dayArg || 'today',
-      exerciseArg: oldItem,
-      days: week.days,
-      todayName: activeSession.dayName,
-    })
+    const on = editDayFor(dayArg, week)
+    if (!on.ok) return on
+    const day = on.day
+    const target = resolveExerciseOnSession({ exerciseArg: oldItem, sayDay: on.sayDay, planDayName: day.day, exercises: day.exercises })
     if (!target.ok) return { ok: false, reason: target.message }
 
-    const day = week.days.find(d => d.day === target.dayName)!
     const exIndex = target.exIndex
     const oldEx = day.exercises[exIndex]
 
@@ -2099,6 +2175,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const payload: ExerciseSwapPayload = {
       weekNumber: activeSession.liveWeek,
       dayName: day.day,
+      sayDay: on.sayDay,
       exIndex,
       oldExerciseName: oldEx.name,
       newExerciseName: newEntry.name,
@@ -2154,7 +2231,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       diff: {
         lead: ask(`swap **${oldEx.name}** for **${newEntry.name}**`),
         rows: [{ field: 'Exercise', before: oldEx.name, after: newEntry.name }],
-        unchanged: [`${day.day}'s other ${day.exercises.length - 1} exercise${day.exercises.length - 1 === 1 ? '' : 's'}`, `Sets × reps: ${oldEx.sets}×${oldEx.reps}`],
+        unchanged: [`${on.sayDay}'s other ${day.exercises.length - 1} exercise${day.exercises.length - 1 === 1 ? '' : 's'}`, `Sets × reps: ${oldEx.sets}×${oldEx.reps}`],
         implications: [
           // THE WEIGHT STAYS DEFERRED, and that part of the old note was right:
           // the trial's weights are real, but confirm re-runs against the live
@@ -2203,12 +2280,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
-    const dayArg = String(rawArgs.day ?? '') || 'today'
-    const dayName = week.days.some(d => d.day.toLowerCase() === dayArg.toLowerCase())
-      ? week.days.find(d => d.day.toLowerCase() === dayArg.toLowerCase())!.day
-      : activeSession.dayName
-    const day = week.days.find(d => d.day === dayName)
-    if (!day) return { ok: false, reason: `I couldn't find ${dayArg} on your plan.` }
+    const on = editDayFor(String(rawArgs.day ?? ''), week)
+    if (!on.ok) return on
+    const day = on.day
+    // `dayName` is the PLAN ROW from here down — the key every call below
+    // writes to. Anything a person reads uses `on.sayDay`.
+    const dayName = day.day
 
     const entry = resolveAdditionRequest(item, profile, exerciseExclusions)
     if (!entry) {
@@ -2220,7 +2297,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       mesocycle, profile, weekNumber: activeSession.liveWeek,
       dayName, entry, load: null, scope,
     })
-    if (!trial.changed) return { ok: false, reason: trial.refusal ?? `I couldn't add ${entry.name} to ${dayName}.` }
+    if (!trial.changed) return { ok: false, reason: on.say(trial.refusal ?? `I couldn't add ${entry.name} to ${dayName}.`) }
 
     const afterWeek = trial.mesocycle.find(w => w.week_number === activeSession.liveWeek)
     const afterDay = afterWeek?.days.find(d => d.day === dayName)
@@ -2239,15 +2316,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       advice,
       scopeKey: `${profile.id}:propose_exercise_add:${dayName}:${entry.name}`,
       preconditions: { day: dayName, exerciseName: entry.name },
-      payload: { weekNumber: activeSession.liveWeek, dayName, exerciseName: entry.name, scope },
+      payload: { weekNumber: activeSession.liveWeek, dayName, sayDay: on.sayDay, exerciseName: entry.name, scope },
       preImage: mesocycle,
       diff: {
-        lead: ask(`add **${entry.name}** to ${dayName}`),
+        lead: ask(`add **${entry.name}** to ${on.sayDay}`),
         rows: [
-          { field: dayName, before: `${day.exercises.length} exercises`, after: `${day.exercises.length + 1} exercises` },
+          { field: on.sayDay, before: `${day.exercises.length} exercises`, after: `${day.exercises.length + 1} exercises` },
           { field: 'Session length', before: `~${wasMinutes} min`, after: `~${nowMinutes} min` },
         ],
-        unchanged: [`Everything else on ${dayName}`],
+        unchanged: [`Everything else on ${on.sayDay}`],
         implications: [
           // HER RULING, 13 Sep 2026: the session gets longer and the app says
           // so. It does NOT quietly take something out to pay for the work she
@@ -2329,16 +2406,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     // Count across the WHOLE plan, not this week: that is what a ban means.
-    let sessions = 0
-    const weeksTouched = new Set<number>()
-    for (const w of mesocycle) {
-      for (const d of w.days) {
-        if (d.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())) {
-          sessions++
-          weeksTouched.add(w.week_number)
-        }
-      }
-    }
+    // ONE COUNT AND ONE SET OF SENTENCES for the coach's card and the screen's
+    // confirm sheet (screen-ban.ts) — the screen gained its confirm on 9 Oct
+    // 2026 and must not describe the same change in different words.
+    const radius = banBlastRadius(mesocycle, name)
+    const banLines = banConfirmLines(radius)
+    const sessions = radius.sessions
     if (sessions === 0) {
       // Still worth recording: it keeps the exercise out of FUTURE plans and
       // out of every swap suggestion, which is what they actually asked for.
@@ -2353,7 +2426,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           rows: [{ field: 'On this plan', before: 'not scheduled', after: 'not scheduled' }],
           unchanged: ['Every session you already have'],
           implications: [
-            { severity: 'info', text: `It isn't on this plan anywhere, so nothing changes today — but it will never be chosen for you again, in this plan or the next one, and it won't be offered as a swap.` },
+            { severity: 'info', text: banLines.info },
           ],
           rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
           reversible: true,
@@ -2371,12 +2444,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         lead: ask(`stop giving you **${name}** for good`),
         rows: [
           { field: 'Sessions it appears in', before: `${sessions}`, after: '0' },
-          { field: 'Weeks affected', before: `${weeksTouched.size} of ${mesocycle.length}`, after: 'all rebuilt' },
+          { field: 'Weeks affected', before: `${radius.weeks} of ${radius.totalWeeks}`, after: 'all rebuilt' },
         ],
         unchanged: ['Every other exercise, and the shape of each session'],
         implications: [
-          { severity: 'warn', text: `This is every week of your plan, not just today — ${sessions} session${sessions === 1 ? '' : 's'} get${sessions === 1 ? 's' : ''} rebuilt. Each one gets the closest alternative your kit and injuries allow.` },
-          { severity: 'info', text: `Where there's no good alternative, that slot comes out rather than being filled with something worse. It will never be chosen for you again, in this plan or the next.` },
+          { severity: 'warn', text: banLines.warn ?? '' },
+          { severity: 'info', text: banLines.info },
         ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
@@ -2410,18 +2483,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
-    const target = resolveSwapTarget({
-      dayArg: String(rawArgs.day ?? '') || 'today',
-      exerciseArg: item,
-      days: week.days,
-      todayName: activeSession.dayName,
-    })
+    const on = editDayFor(String(rawArgs.day ?? ''), week)
+    if (!on.ok) return on
+    const day = on.day
+    const target = resolveExerciseOnSession({ exerciseArg: item, sayDay: on.sayDay, planDayName: day.day, exercises: day.exercises })
     if (!target.ok) return { ok: false, reason: target.message }
 
-    const day = week.days.find(d => d.day === target.dayName)!
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const trial = removeExerciseFromSession({ mesocycle, profile, weekNumber: activeSession.liveWeek, dayName: day.day, exIndex: target.exIndex, scope })
-    if (!trial.changed) return { ok: false, reason: trial.refusal ?? "I couldn't take that one out." }
+    // THE FLOOR'S REFUSAL NAMES THE DAY ON SCREEN. A moved session of three
+    // exercises is refused here — "That would leave Friday with fewer than 3
+    // exercises" — and the edit itself only knows the row's own name.
+    if (!trial.changed) return { ok: false, reason: on.say(trial.refusal ?? "I couldn't take that one out.") }
 
     const impact = describeEditImpact(week, trial.mesocycle.find(w => w.week_number === activeSession.liveWeek), day.day)
     const advice = adviseEdit({
@@ -2438,12 +2511,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       advice,
       scopeKey: `${profile.id}:propose_exercise_remove:${day.day}:${target.exIndex}`,
       preconditions: { day: day.day, exIndex: target.exIndex, currentExerciseName: target.exerciseName },
-      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, exIndex: target.exIndex, exerciseName: target.exerciseName, scope },
+      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, sayDay: on.sayDay, exIndex: target.exIndex, exerciseName: target.exerciseName, scope },
       preImage: mesocycle,
       diff: {
-        lead: ask(`take **${target.exerciseName}** out of ${day.day}`),
-        rows: [{ field: day.day, before: `${day.exercises.length} exercises`, after: `${day.exercises.length - 1} exercises` }],
-        unchanged: [`Everything else on ${day.day}`],
+        lead: ask(`take **${target.exerciseName}** out of ${on.sayDay}`),
+        rows: [{ field: on.sayDay, before: `${day.exercises.length} exercises`, after: `${day.exercises.length - 1} exercises` }],
+        unchanged: [`Everything else on ${on.sayDay}`],
         implications: [
           { severity: 'info', text: 'The session gets shorter. Weights on the rest of it are re-checked when you confirm.' },
           // Her ruling, 13 Sep 2026: the balancing may touch another day, and
@@ -2484,14 +2557,16 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return { ok: false, reason: WEEK_NOT_LOADED }
 
-    const dayArg = String(rawArgs.day ?? '') || 'today'
-    const moving = resolveSwapTarget({ dayArg, exerciseArg: item, days: week.days, todayName: activeSession.dayName })
+    const on = editDayFor(String(rawArgs.day ?? ''), week)
+    if (!on.ok) return on
+    const day = on.day
+    const onThisDay = { sayDay: on.sayDay, planDayName: day.day, exercises: day.exercises }
+    const moving = resolveExerciseOnSession({ exerciseArg: item, ...onThisDay })
     if (!moving.ok) return { ok: false, reason: moving.message }
-    const neighbour = resolveSwapTarget({ dayArg: moving.dayName, exerciseArg: beforeItem || afterItem, days: week.days, todayName: activeSession.dayName })
+    const neighbour = resolveExerciseOnSession({ exerciseArg: beforeItem || afterItem, ...onThisDay })
     if (!neighbour.ok) return { ok: false, reason: neighbour.message }
     if (neighbour.exIndex === moving.exIndex) return { ok: false, reason: `${moving.exerciseName} and that are the same exercise — which one should move?` }
 
-    const day = week.days.find(d => d.day === moving.dayName)!
     // "Before X" means landing on X's index when coming from below it, and on
     // the index just under X when coming from above — the array's own
     // arithmetic, kept here rather than in the model's head.
@@ -2499,18 +2574,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       ? (moving.exIndex < neighbour.exIndex ? neighbour.exIndex - 1 : neighbour.exIndex)
       : (moving.exIndex < neighbour.exIndex ? neighbour.exIndex : neighbour.exIndex + 1)
     const trial = moveExerciseInSession({ mesocycle, profile, weekNumber: activeSession.liveWeek, dayName: day.day, fromIndex: moving.exIndex, toIndex, scope: 'today' })
-    if (!trial.changed) return { ok: false, reason: trial.refusal ?? "I couldn't move that one." }
+    if (!trial.changed) return { ok: false, reason: on.say(trial.refusal ?? "I couldn't move that one.") }
 
     const order = trial.mesocycle.find(w => w.week_number === activeSession.liveWeek)!.days.find(d => d.day === day.day)!.exercises.map(e => e.name)
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_exercise_reorder:${day.day}:${moving.exIndex}`,
       preconditions: { day: day.day, exIndex: moving.exIndex, currentExerciseName: moving.exerciseName },
-      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, fromIndex: moving.exIndex, toIndex, exerciseName: moving.exerciseName, neighbourName: neighbour.exerciseName, placement: beforeItem ? 'before' : 'after', scope: 'today' },
+      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, sayDay: on.sayDay, fromIndex: moving.exIndex, toIndex, exerciseName: moving.exerciseName, neighbourName: neighbour.exerciseName, placement: beforeItem ? 'before' : 'after', scope: 'today' },
       preImage: mesocycle,
       diff: {
         lead: ask(`put **${moving.exerciseName}** ${beforeItem ? 'before' : 'after'} **${neighbour.exerciseName}**`),
-        rows: [{ field: `${day.day}'s order`, before: day.exercises.map(e => e.name).join(' → '), after: order.join(' → ') }],
+        rows: [{ field: `${on.sayDay}'s order`, before: day.exercises.map(e => e.name).join(' → '), after: order.join(' → ') }],
         unchanged: ['Every weight, set and rep on the day'],
         implications: [{ severity: 'info', text: 'Order only — nothing about the work itself changes.' }],
         reversible: true,
@@ -2789,7 +2864,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     payload: VolumeChangePayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
-  } | null => {
+  } | { refusal: string } | null => {
     const dayName = String(rawArgs.day ?? '').trim()
     const direction = rawArgs.direction === 'lighter' || rawArgs.direction === 'heavier' ? rawArgs.direction : null
     if (!dayName || !direction || mesocycle.length === 0) return null
@@ -2814,14 +2889,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (weekNumbers.length === 0) return null
 
     const liveWeek = mesocycle.find(w => w.week_number === startWeek)
-    const day = liveWeek?.days.find(d => d.day.toLowerCase() === dayName.toLowerCase())
-    if (!day) return null
+    if (!liveWeek) return null
+    const on = editDayFor(dayName, liveWeek)
+    // A day that cannot be edited says WHY ("Tuesday is down as football…"),
+    // rather than falling into the caller's "everything is at a limit".
+    if (!on.ok) return { refusal: on.reason }
+    const day = on.day
 
     const preview = adjustDayVolume(day, direction, profile)
     if (!preview.changed) return null
 
     const rows = [{
-      field: `${day.day} — total sets`,
+      field: `${on.sayDay} — total sets`,
       before: String(preview.setsBefore),
       after: String(preview.setsAfter),
     }]
@@ -2860,10 +2939,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return {
       scopeKey: `${profile.id}:propose_volume_change:${day.day}:${direction}:${startWeek}:${todayOnly ? 'today' : 'ongoing'}`,
       preconditions: { dayName: day.day, direction, startWeek, setsBefore: preview.setsBefore },
-      payload: { dayName: day.day, direction, weekNumbers, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      payload: { dayName: day.day, sayDay: on.sayDay, direction, weekNumbers, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
-        lead: ask(`make ${dayName} ${direction}${todayOnly ? ' just for today' : ''}`),
+        lead: ask(`make ${on.sayDay} ${direction}${todayOnly ? ' just for today' : ''}`),
         rows,
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
@@ -2894,21 +2973,21 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return null
 
-    // An absent day means today — the same default resolveSwapTarget uses, and
-    // the commonest shape of the request ("I've only got half an hour").
-    const wanted = String(rawArgs.day ?? '').trim() || activeSession.dayName
-    const day = week.days.find(d => d.day.toLowerCase() === wanted.toLowerCase())
-    if (!day) return null
+    // An absent day means today — the commonest shape of the request ("I've
+    // only got half an hour").
+    const on = editDayFor(String(rawArgs.day ?? ''), week)
+    if (!on.ok) return { refusal: on.reason }
+    const day = on.day
 
     const trial = shortenDayTo(week, day.day, profile, minutes)
-    if (!trial.changed) return { refusal: trial.refusal ?? "I couldn't shorten that one." }
+    if (!trial.changed) return { refusal: on.say(trial.refusal ?? "I couldn't shorten that one.") }
 
     const after = trial.week.days.find((d: WorkoutDay) => d.day === day.day)!
     const settled = settleWeek(trial.week, day.day, profile)
     const impact = describeEditImpact(week, settled.week, day.day)
 
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: SCOPE.today(day.day) },
+      { severity: 'info', text: SCOPE.today(on.sayDay) },
     ]
     // SAY IT WHEN IT COULD NOT GET THERE, rather than showing a card headed
     // "25 min" for a session that takes 32.
@@ -2928,10 +3007,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return {
       scopeKey: `${profile.id}:propose_session_shorten:${day.day}:${activeSession.liveWeek}`,
       preconditions: { day: day.day, exerciseCount: day.exercises.length },
-      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, minutes, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, sayDay: on.sayDay, minutes, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
-        lead: ask(`cut ${day.day} down to about ${trial.achievedMinutes} minutes`),
+        lead: ask(`cut ${on.sayDay} down to about ${trial.achievedMinutes} minutes`),
         rows: [
           { field: 'Time', before: `~${Math.round(estimateDaySeconds(day) / 60)} min`, after: `~${trial.achievedMinutes} min` },
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
@@ -2967,17 +3046,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (mesocycle.length === 0) return null
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return null
-    const wanted = String(rawArgs.day ?? '').trim() || activeSession.dayName
-    const day = week.days.find(d => d.day.toLowerCase() === wanted.toLowerCase())
-    if (!day) return null
+    const on = editDayFor(String(rawArgs.day ?? ''), week)
+    if (!on.ok) return { refusal: on.reason }
+    const day = on.day
 
     const trial = await rebuildDayAroundMainLift({
       mesocycle, profile, weekNumber: activeSession.liveWeek, dayName: day.day, exclusions: exerciseExclusions,
     })
-    if (!trial.changed) return { refusal: trial.refusal ?? "I couldn't rebuild that one." }
+    if (!trial.changed) return { refusal: on.say(trial.refusal ?? "I couldn't rebuild that one.") }
 
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: SCOPE.today(day.day) },
+      { severity: 'info', text: SCOPE.today(on.sayDay) },
     ]
     // WHAT IT COULD NOT CHANGE, BEFORE THE TAP. Not after, and not silently.
     if (trial.kept.length > 0) {
@@ -2990,10 +3069,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     return {
       scopeKey: `${profile.id}:propose_session_rebuild:${day.day}:${activeSession.liveWeek}`,
       preconditions: { day: day.day, exerciseCount: day.exercises.length },
-      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      payload: { weekNumber: activeSession.liveWeek, dayName: day.day, sayDay: on.sayDay, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
-        lead: ask(`rebuild ${day.day} around ${trial.mainLift ?? 'your main lift'}`),
+        lead: ask(`rebuild ${on.sayDay} around ${trial.mainLift ?? 'your main lift'}`),
         rows: trial.replaced.map((r: { from: string; to: string }) => ({ field: r.from, before: r.from, after: r.to })),
         unchanged: trial.mainLift ? [`${trial.mainLift} — same weight, same sets`] : [],
         implications,
@@ -3043,11 +3122,17 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return null
 
-    const wanted = String(rawArgs.day ?? '').trim() || activeSession.dayName
-    const day = week.days.find(d => d.day.toLowerCase() === wanted.toLowerCase())
-    if (!day) return null
+    // THE CALENDAR SLOT, not the session: "cardio on Monday" after Monday's
+    // lift moved to Friday is about Monday the day, so the move is not
+    // followed (and that emptied Monday is refused in its own words, because
+    // its plan row still holds the lift). A day a session moved ONTO resolves
+    // to that session's row and is refused as the training day it now is —
+    // looked up by weekday it read as free and the walk went on top of it.
+    const on = editDayFor(String(rawArgs.day ?? ''), week, { followMove: false })
+    if (!on.ok) return { refusal: on.reason }
+    const day = on.day
     if (day.exercises.length > 0) {
-      return { refusal: `${day.day} already has a session on it — do you want this instead of that one, or on a different day?` }
+      return { refusal: `${on.sayDay} already has a session on it — do you want this instead of that one, or on a different day?` }
     }
 
     const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
@@ -4435,7 +4520,10 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
    *   would have built on three sets that never happened.
    */
   const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false, userSaid = ''): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
-    const todaysWorkout = exercisePlan.find(d => d.day === activeSession.dayName)
+    // THE SESSION RUN TODAY, moves taken into account — the plan's own row
+    // for this weekday is empty on a day a session moved onto, and every
+    // plan name, set count and load below came back blank there (H15).
+    const todaysWorkout = todayRef?.session ?? undefined
     const todaysPlanExerciseNames = todaysWorkout?.exercises.map(e => e.name) ?? []
     // THE USER'S OWN MESSAGE IS THE ANCHOR. An exercise name the model
     // supplied from context — never typed — is asked about, not logged. See
@@ -4609,6 +4697,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     pendingAction?: ChatPendingActionView
     receipt?: ChatReceiptView
     clarification?: ChatClarificationView
+    /** Set when this reply is the app declining to build a card — so the history says the request is closed. */
+    outcome?: TurnOutcome
   }> => {
     if (result.proposal && profile.id) {
       // I1: the client is the ONLY writer of pending_actions — this INSERT
@@ -4866,7 +4956,8 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         else if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
       } else if (result.proposal.kind === 'propose_volume_change' && result.proposal.rawArgs) {
         const volume = buildVolumeChangeProposal(result.proposal.rawArgs)
-        if (volume) built = { scopeKey: volume.scopeKey, preconditions: volume.preconditions, payload: volume.payload as unknown as Record<string, unknown>, preImage: volume.preImage, diff: volume.diff }
+        if (volume && 'refusal' in volume) refusal = volume.refusal
+        else if (volume) built = { scopeKey: volume.scopeKey, preconditions: volume.preconditions, payload: volume.payload as unknown as Record<string, unknown>, preImage: volume.preImage, diff: volume.diff }
         else refusal = "There's no room to move that session — everything on it is already at a limit."
       } else if (result.proposal.kind === 'propose_session_shorten' && result.proposal.rawArgs) {
         const shorten = buildSessionShortenProposal(result.proposal.rawArgs)
@@ -5021,7 +5112,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       }
 
       if (!built) {
-        return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked." }
+        return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked.", outcome: 'refused' }
       }
 
       // ---------------------------------------------------------------
@@ -5105,7 +5196,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         preImage: built.preImage,
         diff: built.diff,
       })
-      const pendingAction: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff }
+      const pendingAction: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff, expiresAt: row.expires_at }
       return { text: describeProposalClientSide(pendingAction), pendingAction }
     }
     if (result.receipt) {
@@ -5230,6 +5321,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           pendingAction: processed.pendingAction,
           receipt: processed.receipt,
           clarification: processed.clarification,
+          outcome: processed.outcome,
           quickReplies,
         } : m
       ))
@@ -5313,6 +5405,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     let responseText: string | undefined
     let action: PlanAction | undefined
     let pendingAction: ChatPendingActionView | undefined
+    let turnOutcome: TurnOutcome | undefined
     let receipt: ChatReceiptView | undefined
     let clarification: ChatClarificationView | undefined
     let failed = false
@@ -5325,6 +5418,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       pendingAction = processed.pendingAction
       receipt = processed.receipt
       clarification = processed.clarification
+      turnOutcome = processed.outcome
       setLastFailedInput(null)
     } catch (err: unknown) {
       // Fix 0.13 (ux-sweep) — every failure path used to funnel through
@@ -5405,6 +5499,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       pendingAction,
       receipt,
       clarification,
+      outcome: turnOutcome,
       quickReplies,
     }
 
@@ -5580,7 +5675,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const scope: SwapScope = editedScope === 'permanent' ? 'permanent' : payload.scope
       const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope })
       onMesocycleUpdated(result.mesocycle)
-      receipt = result.receipt
+      receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_exercise_swap'].done : RECEIPTS['propose_exercise_swap'].failed
       rows = ok ? [{ label: payload.oldExerciseName, detail: `→ ${payload.newExerciseName}` }] : []
@@ -5863,7 +5958,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const payload = row.payload as unknown as SessionShortenPayload
       const result = await executeSessionShorten(profile, mesocycle, payload)
       onMesocycleUpdated(result.mesocycle)
-      receipt = result.receipt
+      receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_session_shorten'].done : RECEIPTS['propose_session_shorten'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
@@ -5872,7 +5967,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const payload = row.payload as unknown as SessionRebuildPayload
       const result = await executeSessionRebuild(profile, mesocycle, payload)
       onMesocycleUpdated(result.mesocycle)
-      receipt = result.receipt
+      receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_session_rebuild'].done : RECEIPTS['propose_session_rebuild'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
@@ -5890,7 +5985,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const payload = row.payload as unknown as VolumeChangePayload
       const result = await executeVolumeChange(profile, mesocycle, payload)
       onMesocycleUpdated(result.mesocycle)
-      receipt = result.receipt
+      receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_volume_change'].done : RECEIPTS['propose_volume_change'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
@@ -6007,7 +6102,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       onLogsUpdated?.()
     } else if (row.kind === 'propose_exercise_add') {
       const result = await executeExerciseAdd(profile, mesocycle, row.payload as unknown as ExerciseAddPayload, exerciseExclusions)
-      receipt = result.receipt
+      receipt = sayReceipt(result.receipt, row.payload as unknown as ExerciseAddPayload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_exercise_add'].done : RECEIPTS['propose_exercise_add'].failed
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
@@ -6034,7 +6129,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       const result = isRemove
         ? await executeExerciseRemove(profile, mesocycle, row.payload as unknown as ExerciseRemovePayload)
         : await executeExerciseReorder(profile, mesocycle, row.payload as unknown as ExerciseReorderPayload)
-      receipt = result.receipt
+      receipt = sayReceipt(result.receipt, row.payload as unknown as ExerciseRemovePayload)
       const ok = receipt.failed.length === 0
       title = ok
         ? (isRemove ? RECEIPTS['propose_exercise_remove'].done : RECEIPTS['propose_exercise_reorder'].done)
@@ -6113,7 +6208,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     await resolvePendingAction(row.id, status, receipt)
 
     setMessages(prev => prev.map((m, i) => i === msgIndex
-      ? { ...m, pendingAction: undefined, receipt: richReceipt ?? { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
+      // THE CARD'S VIEW GOES, SO ITS OUTCOME IS WRITTEN DOWN FIRST. The turn's
+      // text is still "Want me to …?"; without this the history sent to the
+      // coach showed an applied change as a question nobody had answered
+      // (found by verify:moved-edit §10, not by reading).
+      ? { ...m, pendingAction: undefined, outcome: outcomeOfCard(status, false), receipt: richReceipt ?? { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
       : m
     ))
   }
@@ -6464,7 +6563,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // z-30: over the page's own content, under the tab bar (z-40) and the
       // dock (z-50). Inside a force-mounted tab whose inactive state is
       // display:none, so it only covers the page while the chat is open.
-      className="fixed inset-x-0 top-0 z-30 mx-auto flex max-w-6xl flex-col bg-background"
+      // THE BOTTOM EDGE SLIDES, IT DOES NOT SNAP (L22, 9 Oct 2026). When a
+      // session ends the dock reports 0 and this edge drops by the pill's
+      // height plus its gap — about 40px — in one frame, so the input jumped
+      // under a thumb that was on its way to it. Only while the keyboard is
+      // shut: with it open this edge follows the keyboard, and easing that
+      // would leave the composer trailing behind the keys.
+      className={`fixed inset-x-0 top-0 z-30 mx-auto flex max-w-6xl flex-col bg-background ${composerKeyboardOpen ? '' : 'transition-[bottom] duration-200 ease-out motion-reduce:transition-none'}`}
       style={{ bottom: chatScreenBottom }}
     >
       <header data-testid="chat-header" className="shrink-0 border-b border-[color:var(--hairline)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>

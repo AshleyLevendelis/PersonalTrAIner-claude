@@ -28,7 +28,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -61,7 +61,7 @@ const check = (name, ok, detail) => {
 }
 const shoot = async name => {
   const d = (await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).result.data
-  writeFileSync(`/home/user/PersonalTrAIner-claude/.tour-harness/${name}.png`, Buffer.from(d, 'base64'))
+  writeFileSync(new URL(`./${name}.png`, import.meta.url).pathname, Buffer.from(d, 'base64'))
 }
 const tap = async sel => ev(`(() => {
   const n = document.querySelector(${JSON.stringify(sel)})

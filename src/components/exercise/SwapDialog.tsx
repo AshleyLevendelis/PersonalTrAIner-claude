@@ -24,7 +24,14 @@ import type { UserProfile } from '@/lib/types'
 // ---------------------------------------------------------------------------
 
 export interface SwapTarget {
+  /** The PLAN ROW the exercise lives in — the key the swap writes to. */
   dayName: string
+  /**
+   * The weekday it is SHOWN on, when that is a different word: Monday's
+   * session moved to Friday is keyed "Monday" and said "Friday". Absent on an
+   * ordinary day, where the two agree.
+   */
+  sayDay?: string
   exIndex: number
   exerciseName: string
   /**
@@ -45,6 +52,7 @@ export function SwapDialog({
   onConfirm,
   impactFor,
   onReason,
+  onDislike,
 }: {
   target: SwapTarget | null
   onClose: () => void
@@ -71,6 +79,8 @@ export function SwapDialog({
    * it did.
    */
   onReason?: (answer: ReasonAnswer) => Promise<string | null>
+  /** "I don't like it" — opens the ban confirm for this exercise. Absent, that answer is an ordinary swap. */
+  onDislike?: (exerciseName: string) => void
 }) {
   const [asked, setAsked] = useState(false)
   const [reasonBusy, setReasonBusy] = useState(false)
@@ -146,6 +156,18 @@ export function SwapDialog({
   const answerReason = async (a: ReasonAnswer) => {
     // Busy and don't-like-it are still swaps — the answer only says which
     // scope the person is really after, and the list below is the same list.
+    // "I DON'T LIKE IT" IS A BAN, NOT A SWAP (M27, 9 Oct 2026). The design's
+    // route table has said so since 15 Sep ("keep it out from now on") and
+    // this threw the answer away: busy and don't-like-it both just revealed
+    // the same list and then asked "Today only / Rest of block". It now hands
+    // the exercise to the same confirm the ⋮ menu's ban opens, which says
+    // what will replace it and can be undone. Unwired, it stays a swap.
+    if (a.type === 'reason' && a.reason === 'dislike' && onDislike && target) {
+      const name = target.exerciseName
+      handleClose()
+      onDislike(name)
+      return
+    }
     if (a.type === 'reason') { setAsked(true); return }
     setReasonBusy(true); setReasonError(null)
     const refusal = await onReason?.(a) ?? null
@@ -170,7 +192,7 @@ export function SwapDialog({
               // Two of the four answers never reach a replacement list at all,
               // so promising one above the question is the app describing
               // something it may not be about to do.
-              <>{target?.dayName}</>
+              <>{target?.sayDay ?? target?.dayName}</>
             ) : (
               <>Constraint-checked replacements for <span className="font-semibold text-foreground">{target?.exerciseName}</span></>
             )}
@@ -184,7 +206,11 @@ export function SwapDialog({
               exerciseName={target?.exerciseName ?? 'it'}
               busy={reasonBusy}
               onAnswer={answerReason}
-              onSkip={() => setAsked(true)}
+              onSkip={() => { setReasonError(null); setAsked(true) }}
+              // A REFUSAL BELONGS TO THE STEP THAT PRODUCED IT (M8). "Back" is
+              // the child's own state, so the red line from the kit step sat
+              // under the reasons, and under whatever was tapped next.
+              onStepChange={() => setReasonError(null)}
               currentEquipment={profile?.equipment_access}
             />
             {/* "NOTHING TO CHANGE" IS NOT AN ERROR. onReason hands back one

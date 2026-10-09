@@ -113,7 +113,17 @@ export function makeFakeSupabase(db: Db) {
           // sorts on it, and the sort threw — so the list read back EMPTY
           // while the table held every row. Read off the harness's one clock,
           // not the machine's, so a run gives the same answer on a Tuesday.
-          else { const row = { id: crypto.randomUUID(), created_at: new Date(anchorNowMs()).toISOString(), ...raw }; rows0.push(row); stored.push(row) }
+          // A DRIVER MAY CHOOSE ONE INPUT OF A NEW ROW (9 Oct 2026):
+          // `window.__rowPatch = { pending_actions: () => ({ expires_at }) }`.
+          // An offer's window is ten real minutes and no driver can wait that
+          // long; this lets one be made eight seconds from its end, so the
+          // card's OWN timer is what is watched. Opt-in, applied to inserts
+          // only, and absent on every run that does not set it.
+          else {
+            const patch = (window as unknown as { __rowPatch?: Record<string, (row: Row) => Row> }).__rowPatch?.[name]
+            const row = { id: crypto.randomUUID(), created_at: new Date(anchorNowMs()).toISOString(), ...raw, ...(patch ? patch(raw) : {}) }
+            rows0.push(row); stored.push(row)
+          }
         }
         const out = stored.map(r => ({ ...r }))
         return { data: single ? (out[0] ?? null) : out, error: null }
@@ -192,6 +202,15 @@ export function makeFakeSupabase(db: Db) {
         return api
       },
       in: (c: string, vs: unknown[]) => { filters.push(r => vs.includes(r[c])); return api },
+      // SQL LIKE — `%` any run, `_` one character, everything else literal.
+      // Missing until 9 Oct 2026, so the one production query that uses it
+      // (sweepStaleForTarget, after a tap-swap) threw here and read as "that
+      // swap didn't save": a fake must answer what the database answers.
+      like: (c: string, pattern: string) => {
+        const re = new RegExp('^' + pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$')
+        filters.push(r => typeof r[c] === 'string' && re.test(r[c] as string))
+        return api
+      },
       match: (obj: Row) => { for (const [c, v] of Object.entries(obj)) filters.push(r => r[c] === v); return api },
       order: (c: string, opts?: { ascending?: boolean }) => { orders.push([c, opts?.ascending !== false]); return api },
       limit: (n: number) => { limitN = n; return api },
