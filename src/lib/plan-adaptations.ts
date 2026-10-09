@@ -14,8 +14,7 @@ import { getExerciseEntry, isContraindicatedFor } from './exercise-db'
 import { getFlaggedJoints, isEquipmentAllowed } from './exercise-plan'
 import {
   getReplacementCandidates,
-  recomputeLoad,
-  applyReplacement,
+  buildReplacementSlot,
   clearOrphanedSupersetLabels,
   isMainLiftSlot,
 } from './mesocycle-edit'
@@ -96,9 +95,9 @@ async function substituteSlots(
 
         const replacement = candidates[0].exercise
         usedInDay.add(replacement.name)
-        const load = await recomputeLoad(replacement, profile, slot.intensity || '', slot.sets, slot.reps, isMainLiftSlot(slot))
+        const replaced = await buildReplacementSlot(slot, replacement, profile, week, isMainLiftSlot(slot))
         touchedSlots.push({ weekNumber: week.week_number, dayName: day.day, before: slot.name, after: replacement.name })
-        exercises.push(applyReplacement(slot, replacement, load, profile))
+        exercises.push(replaced)
       }
 
       if (!changed) return day

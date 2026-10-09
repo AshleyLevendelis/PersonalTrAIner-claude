@@ -1,8 +1,9 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
-import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
-import { prescribeLoad, type LoadPrescription, isExternallyLoaded } from './load-prescription'
+import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
+import { prescribeLoad, type LoadPrescription, isExternallyLoaded, DELOAD_LOAD_FRACTION } from './load-prescription'
 import { resolveLoadFields } from './warmup'
+import { PHASE_CONFIGS, getPhaseTempo, formatTempo, stepHoldSeconds } from './periodization'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
 // progression-engine.ts pulls in supabase.ts, which reads import.meta.env at
 // module-evaluation time. That's fine in the real (Vite) app, but it means
@@ -227,10 +228,25 @@ export async function recomputeLoad(
   sets: number,
   reps: string,
   isMainLiftReset: boolean,
+  /**
+   * True when the week being written is the plan's calibration week. Every
+   * unverified weight generation prints that week starts deliberately light
+   * (prescribeLoad's calibration conservatism, with its own sentence); a lift
+   * swapped in during it is just as unverified, and used to be written at its
+   * full estimate — about twice the relative weight of everything around it.
+   * Ignored where a logged number exists, which is no longer a guess.
+   */
+  isCalibrationWeek = false,
 ): Promise<LoadPrescription> {
   if (isMainLiftReset) {
+    // NOTE, 9 Oct 2026: `isFirstBlock` below is accepted by prescribeLoad and
+    // read by nothing — so the "conservative first-prescription" this
+    // function's doc comment promises a new main lift has only ever been the
+    // sentence, never a lighter number. Left exactly as it was (changing what
+    // a swapped-in main lift weighs is its own decision, recorded in BACKLOG);
+    // said here so the comment above stops being believed.
     const load = prescribeLoad(entry, profile, {
-      targetRpeLabel: intensity, isFirstBlock: true, sets, repRangeLabel: reps,
+      targetRpeLabel: intensity, isFirstBlock: true, sets, repRangeLabel: reps, isCalibrationWeek,
     })
     return { ...load, basis: `New lift — find your working weight this session, then let it ramp from here. ${load.basis}` }
   }
@@ -248,7 +264,133 @@ export async function recomputeLoad(
     sets,
     repRangeLabel: reps,
     forceStartingWeightKg: recommendation?.weightKg,
+    isCalibrationWeek,
   })
+}
+
+export interface ReplacementProgramming {
+  sets: number
+  reps: string
+  rest: string
+  /**
+   * The block's tempo for this week ('3-0-1'), or null where the week has
+   * none — a deload, or a phase that wants speed. applyReplacement writes it
+   * only onto a lift that can use it (isTempoEligible).
+   */
+  tempo: string | null
+}
+
+/**
+ * HOW MUCH WORK THE INCOMING EXERCISE DOES IN THIS SLOT, THIS WEEK — decided
+ * BEFORE it is priced, because the weight depends on the reps.
+ *
+ * Test log M32, 9 Oct 2026: banning a band kickback put Overhead Tricep
+ * Extension in its place at "3x16-19, ~22kg" — for someone whose heaviest
+ * dumbbell is 24kg. Two things were inherited that were never this lift's:
+ *   - the REP RANGE, which was the band's. An unloaded movement walks its reps
+ *     up every week because reps are all it has; that walked-up range was
+ *     handed to a loaded lift. (Measured the same day in the other direction:
+ *     a bodyweight step-up took over a walking lunge's 11-13, two reps the
+ *     lunge had bought for having a frozen weight, beside 10-12 neighbours.)
+ *   - and so the WEIGHT was priced for a range that was not its own.
+ *
+ * So, decided as a CSCS coach: a replacement is prescribed as that exercise
+ * would be prescribed in that place — its own rep bracket for its tier and
+ * this person's style, goal and experience, moved by this week's phase, and
+ * walked up through the block only where reps are that lift's lever. That is
+ * `repRangeForIncomingExercise`, which is the generator's own arithmetic for a
+ * lift it rotates into a slot mid-block. Basis: a rep target is part of an
+ * exercise's dose, set from what limits THAT movement; carrying a target
+ * earned by a different limiting factor prescribes neither.
+ *
+ * SETS AND REST STAY THE SLOT'S. They are the session's shape — how much of
+ * the hour this place gets — and have already been through the week's volume,
+ * deload and time-budget passes.
+ *
+ * A HOLD, CARRY OR INTERVAL keeps its canonical units when the type changes
+ * and the slot's own (already this week's) figures when it does not.
+ */
+export function replacementProgramming(
+  slot: Exercise,
+  entry: ExerciseEntry,
+  profile: UserProfile,
+  week: Pick<MesocycleWeek, 'phase_label' | 'week_in_block' | 'is_deload'>,
+): ReplacementProgramming {
+  const incomingType = entry.prescription_type ?? 'reps'
+  const typeChanged = incomingType !== (slot.prescription_type ?? 'reps')
+  // THE WEEK'S TEMPO, FROM THE WEEK — not from whatever the outgoing lift
+  // happened to carry. Carrying it meant the same step-up read "2s down"
+  // where it replaced a bodyweight squat and nothing where it replaced a
+  // loaded lunge, on the same card. Generation gives every eligible lift the
+  // phase's tempo and none on a deload; so does this.
+  const phase = Object.values(PHASE_CONFIGS).find(c => c.label === week.phase_label?.trim())?.phase
+  const phaseTempo = phase && !week.is_deload ? getPhaseTempo(phase) : null
+  const tempo = phaseTempo ? formatTempo(phaseTempo) : null
+
+  if (incomingType !== 'reps') {
+    const fixed = typeChanged ? fixedUnitPrescription(entry, profile.session_duration_preference) : null
+    if (!fixed) return { sets: slot.sets, reps: slot.reps, rest: slot.rest, tempo }
+    // A HOLD COMING IN FOR A REP LIFT takes this week's seconds, the same
+    // five-second step generation gives a hold (stepHoldSeconds), and never
+    // MORE sets than the place it is taking had — the canonical three would
+    // otherwise hand a deload week's two-set slot an extra set.
+    const isWorkingHold = incomingType === 'time' && entry.mechanics_tier !== 'primer'
+    return {
+      sets: isWorkingHold ? Math.min(fixed.sets, slot.sets) : fixed.sets,
+      reps: (isWorkingHold ? stepHoldSeconds(fixed.reps, week.week_in_block ?? 1, !!week.is_deload) : null) ?? fixed.reps,
+      rest: fixed.rest,
+      tempo,
+    }
+  }
+  const own = repRangeForIncomingExercise(entry, profile, week, slot.intensity)
+  if (own != null) return { sets: slot.sets, reps: own, rest: slot.rest, tempo }
+  // THE WEEK'S PHASE COULD NOT BE READ (a plan row saved under a phase name
+  // this build no longer has). Said out loud rather than guessed at: the
+  // slot's own range if it is a rep count, the conservative middle otherwise —
+  // what this function's predecessor did for every swap.
+  console.warn(`[replacement] no phase for "${week.phase_label ?? ''}" — ${entry.name} keeps the slot's rep range`)
+  const looksLikeRepCount = /^\d+(\s*-\s*\d+)?$/.test(slot.reps)
+  return { sets: slot.sets, reps: looksLikeRepCount ? slot.reps : '8-12', rest: slot.rest, tempo: slot.tempo ?? null }
+}
+
+/**
+ * THE ONE WAY A SLOT IS REPLACED: decide the incoming lift's work, price it
+ * for exactly that work, then build the slot.
+ *
+ * Three steps that four callers each did by hand (swap, ban, injury/kit
+ * adaptation, session rebuild), which is how the second could be priced for
+ * the outgoing lift's reps. Done in one place so the weight on the slot can
+ * never have been worked out for a rep range the slot does not show.
+ */
+export async function buildReplacementSlot(
+  slot: Exercise,
+  entry: ExerciseEntry,
+  profile: UserProfile,
+  week: Pick<MesocycleWeek, 'phase_label' | 'week_in_block' | 'is_deload' | 'isCalibrationWeek'>,
+  isMainLiftReset: boolean,
+): Promise<Exercise> {
+  const programming = replacementProgramming(slot, entry, profile, week)
+  const fresh = await recomputeLoad(entry, profile, slot.intensity || '', programming.sets, programming.reps, isMainLiftReset, week.isCalibrationWeek === true)
+  // A DELOAD STAYS A DELOAD. recomputeLoad prices a lift at its full working
+  // weight whatever the week, so a swap made "for the rest of the block" used
+  // to write the recovery week at the same weight as the weeks before it —
+  // with the deload's eased-up reps on top, which made it the hardest week of
+  // the block for that one lift. Generation already has the rule for a slot
+  // whose exercise changed and so has no week-3 number to take 70% of: 70% of
+  // the fresh estimate at this week's own reps and effort (exercise-plan.ts,
+  // "NO WEEK-3 ANCHOR FOR THIS SLOT, AND A DELOAD MUST STILL BACK OFF"). Same
+  // rule, same fraction, and prescribeLoad's own rounding holds it at the
+  // lightest thing that exists where 70% lands under it.
+  const load = week.is_deload && fresh.starting_weight_kg != null && entry.mechanics_tier !== 'primer'
+    ? prescribeLoad(entry, profile, {
+        targetRpeLabel: slot.intensity || '',
+        isFirstBlock: false,
+        sets: programming.sets,
+        repRangeLabel: programming.reps,
+        forceStartingWeightKg: fresh.starting_weight_kg * DELOAD_LOAD_FRACTION,
+      })
+    : fresh
+  return applyReplacement(slot, entry, load, profile, programming)
 }
 
 /**
@@ -275,6 +417,15 @@ export function applyReplacement(
   entry: ExerciseEntry,
   load: LoadPrescription,
   profile?: Pick<UserProfile, 'session_duration_preference' | 'training_experience'>,
+  /**
+   * The incoming exercise's OWN sets/reps/rest for this week, from
+   * `replacementProgramming` — and the same object the caller priced `load`
+   * with. Every replacement path passes it (see `buildReplacementSlot`, which
+   * is the only place the three steps are done, in order). Left out only by
+   * the ADD path, which has no outgoing exercise: an addition copies a peer's
+   * programming on purpose (session-edit.ts, Ashley's 13 Sep 2026 ruling).
+   */
+  programmingIn?: ReplacementProgramming,
 ): Exercise {
   const isPrimer = entry.mechanics_tier === 'primer'
   const loadFields = resolveLoadFields(entry, isPrimer, load)
@@ -299,7 +450,7 @@ export function applyReplacement(
   const fixedUnits = !typeChanged
     ? null
     : fixedUnitPrescription(entry, profile?.session_duration_preference) ?? (looksLikeRepCount ? null : REPS_FALLBACK)
-  const programming = fixedUnits ?? { sets: slot.sets, reps: slot.reps, rest: slot.rest }
+  const programming = programmingIn ?? fixedUnits ?? { sets: slot.sets, reps: slot.reps, rest: slot.rest }
 
   // BUILT, NOT COPIED. Rewritten 9 Oct 2026.
   //
@@ -367,14 +518,20 @@ export function applyReplacement(
   }
 
   // TEMPO BELONGS TO THE LIFT THAT CAN USE IT. It is the block's lever for a
-  // rep-counted lift with no weight to add, so the block's value carries over
+  // rep-counted lift with no weight to add, so the block's value is written
   // only when the INCOMING exercise is one of those — asked of the slot as it
   // now stands, with generation's own rule. A hold has no reps to slow, a
   // loaded lift has its weight for a lever, and a swing has no lowering phase
-  // to control. Never invented here either: no tempo on the way in (a deload,
-  // a power block) means none on the way out.
-  if (slot.tempo && isTempoEligible(entry, replaced, profile?.training_experience)) {
-    replaced.tempo = slot.tempo
+  // to control. Never invented: a week with no tempo (a deload, a power
+  // block) writes none.
+  //
+  // WHICH tempo: the week's own when the caller knows the week (every
+  // replacement path — see replacementProgramming), and the template slot's
+  // when it does not (the ADD path, which copies a peer from the same day and
+  // so the same week).
+  const blockTempo = programmingIn ? programmingIn.tempo : slot.tempo
+  if (blockTempo && isTempoEligible(entry, replaced, profile?.training_experience)) {
+    replaced.tempo = blockTempo
   }
 
   // DELIBERATELY ABSENT, each for a reason the old code spelled out one field
@@ -452,8 +609,7 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
     const slot = day?.exercises[exIndex]
     if (!day || !slot) return week
 
-    const load = await recomputeLoad(newExercise, profile, slot.intensity || '', slot.sets, slot.reps, isMainLift)
-    const replaced = applyReplacement(slot, newExercise, load, profile)
+    const replaced = await buildReplacementSlot(slot, newExercise, profile, week, isMainLift)
     const exercises = clearOrphanedSupersetLabels(
       day.exercises.map((e, i) => (i === exIndex ? replaced : e))
     )
@@ -508,8 +664,7 @@ export async function banExerciseFromMesocycle(params: BanExerciseParams): Promi
       }
 
       const replacement = candidates[0].exercise
-      const load = await recomputeLoad(replacement, profile, oldSlot.intensity || '', oldSlot.sets, oldSlot.reps, isMainLiftSlot(oldSlot))
-      const replaced = applyReplacement(oldSlot, replacement, load, profile)
+      const replaced = await buildReplacementSlot(oldSlot, replacement, profile, week, isMainLiftSlot(oldSlot))
       const exercises = clearOrphanedSupersetLabels(
         day.exercises.map((e, i) => (i === idx ? replaced : e))
       )

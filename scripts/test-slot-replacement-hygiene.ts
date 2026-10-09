@@ -85,11 +85,20 @@ console.log('\n[2] Units are re-derived the other way (rep lift -> carry)')
   }
 }
 
-console.log('\n[3] A reps -> reps swap KEEPS the block\'s own rep prescription')
+console.log('\n[3] With no programming handed in, the slot\'s own rep range is copied (the ADD path)')
 {
+  // RE-LABELLED 9 Oct 2026, behaviour unchanged. This used to read "a reps ->
+  // reps swap KEEPS the block's own rep prescription", and that was the rule
+  // for every replacement until M32 showed what it cost: a slot's reps are the
+  // block's range AFTER the outgoing lift's own levers have worked on it (a
+  // band kickback walked to 16-19 handed that to a loaded dumbbell lift).
+  // Swap, ban, injury/kit adaptation and session rebuild now pass the incoming
+  // lift's OWN programming (buildReplacementSlot; held by
+  // test:replacement-prescription). What is left on this bare call is the ADD
+  // path, which has no outgoing exercise and copies a peer on purpose.
   const a = EXERCISE_DATABASE.filter(e => e.prescription_type === 'reps' && e.mechanics_tier !== 'primer')
   const out = applyReplacement(slotFor(a[0].name, { reps: '6-8' }), a[1], loadFor(a[1].name))
-  check('reps unchanged on a same-units swap', out.reps === '6-8', out.reps)
+  check('reps copied from the template when no programming is passed', out.reps === '6-8', out.reps)
 }
 
 console.log('\n[4] No outgoing-exercise data survives the replacement')

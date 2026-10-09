@@ -691,6 +691,44 @@ export function loadingMode(entry: ExerciseEntry): LoadingMode {
  * table rather than re-deriving it.
  */
 /**
+ * ONE CATEGORY, MORE THAN ONE IMPLEMENT — and the category's fraction was
+ * written for the strongest of them.
+ *
+ * `isolation_tricep` is 0.32 of bench, annotated "pushdowns/extensions": a
+ * cable pushdown or an EZ-bar extension, where the elbows work from a stable,
+ * shortened position. A single dumbbell held in two hands behind the head is
+ * the same muscle in its weakest arrangement — the long head at full stretch,
+ * the load limited by the shoulder position and by holding the bell rather
+ * than by the triceps. It was priced as a pushdown anyway.
+ *
+ * Found 9 Oct 2026 (test log M32): Overhead Tricep Extension at ~22kg for
+ * 16-19 reps, for an 82kg intermediate whose heaviest dumbbell is 24kg — and
+ * ~24-26kg at 8-12, which is that dumbbell or past it. Only the person's own
+ * stated limit was keeping the number on the rack.
+ *
+ * DECIDED AS A CSCS COACH: the same reference, scaled for the implement. A
+ * two-hand single-dumbbell overhead extension works at roughly 60-70% of what
+ * the same person uses on a pushdown or an EZ-bar extension for the same
+ * reps; 0.65 is the middle of that. For the 82kg intermediate above it gives
+ * about 17kg for 8-12 and 14kg for 15-18, which is what that lift is actually
+ * trained at, and it errs light on a movement that is joint-limited before it
+ * is strength-limited — the right side to be wrong on for a first exposure.
+ *
+ * A FACTOR ON THE REFERENCE, NOT A NEW CATEGORY: categorize()'s answer also
+ * keys the safety ceilings, the load step, and which lifts are compared for
+ * coherence, and none of those should move. Scoped by what the implement IS
+ * (one dumbbell/kettlebell) inside one category, so it reaches one catalogue
+ * entry today and nothing else — measured with a before/after of every
+ * prescription in the catalogue (see the BACKLOG entry).
+ */
+const SINGLE_IMPLEMENT_TRICEP_FACTOR = 0.65
+
+function isolationImplementFactor(entry: ExerciseEntry, category: string): number {
+  if (category === 'isolation_tricep' && loadingMode(entry) === 'single_implement') return SINGLE_IMPLEMENT_TRICEP_FACTOR
+  return 1
+}
+
+/**
  * A deload week's weight as a fraction of the block's last loading week —
  * the number the trainee actually saw in week 3. generateMesocycle applies
  * it when it builds the deload; patchBlockFromLiftedKg (beat-target-offer.ts)
@@ -1806,7 +1844,9 @@ export function prescribeLoad(
         const referenceKg = resolveIsolationReferenceKg(category, profile)
         const referencePercent = percentOf1RM(KNOWN_WEIGHT_REFERENCE_REPS, KNOWN_WEIGHT_REFERENCE_RPE)
         const targetPercent = percentOf1RM(repsMidpoint, rpeMidpoint)
-        estimate = referenceKg != null ? referenceKg * (targetPercent / referencePercent) : 0
+        estimate = referenceKg != null
+          ? referenceKg * isolationImplementFactor(entry, category) * (targetPercent / referencePercent)
+          : 0
       }
     }
 

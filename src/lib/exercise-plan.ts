@@ -13,7 +13,7 @@ import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields 
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, type PhaseConfig, type TrainingPhase,
+  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
@@ -6585,6 +6585,114 @@ function carryRampUp(
 function repLowOf(reps: string | undefined): number | null {
   const m = String(reps ?? '').match(/^(\d+)/)
   return m ? Number(m[1]) : null
+}
+
+/**
+ * THE REP RANGE THIS EXERCISE WOULD BE GIVEN, IN THIS WEEK, IF GENERATION HAD
+ * PUT IT THERE — for a lift coming INTO a slot by swap, ban, injury or kit
+ * adaptation, or session rebuild.
+ *
+ * WHY IT EXISTS (test log M32, 9 Oct 2026). A replacement used to inherit the
+ * outgoing slot's `reps` whenever both were rep-counted. That string is not
+ * "the block's range for this slot" — it is the block's range AFTER the
+ * outgoing lift's own levers have worked on it:
+ *   - a weightless lift walks its reps up a rep a week (it has nothing else),
+ *   - a lift whose weight is frozen buys reps on top (`rep_bump`),
+ *   - and the base bracket itself belongs to the outgoing lift's TIER.
+ * So a band kickback that had walked to 16-19 handed 16-19 to a loaded
+ * dumbbell extension, and a walking lunge that had bought two reps handed
+ * 11-13 to a bodyweight step-up beside 10-12 neighbours.
+ *
+ * THE RULE IS GENERATION'S OWN, not a new one. When the generator rotates a
+ * different exercise into a slot mid-block (its weekly accessory rotation) it
+ * re-derives the base from the NEW exercise and applies this week's shifts.
+ * This is that arithmetic, lifted out so a replacement can ask for it:
+ *     the incoming exercise's bracket for its tier, style, goal and experience
+ *   + this block's phase shift (and the deload's)
+ *   + the week-in-block rep ramp, ONLY where reps are this lift's lever —
+ *     no weight to add, a goal whose accessories progress by reps, or a
+ *     weight so light that one real notch is too big a jump.
+ * `test:replacement-prescription` holds the two against each other: for every
+ * slot generation itself wrote, this returns what generation printed.
+ *
+ * WHAT IT DELIBERATELY LEAVES OUT: the frozen-weight rep bump. That is earned
+ * by one named lift across the weeks of a block (a streak keyed on its name),
+ * and a lift that arrived today has no streak — generation gives a newly
+ * rotated-in lift none either.
+ *
+ * ONE KNOWN APPROXIMATION, on a deload week only. Generation cuts a weightless
+ * lift's reps by two when cutting its SETS bought nothing (they were already
+ * at the two-set floor in the loading weeks). That needs the loading week's
+ * set count, which a single week does not carry, so a weightless lift coming
+ * in on a deload gets the phase's own range — at most two reps more than
+ * generation would have written, on a week that is still lighter than the one
+ * before it (no ramp, and the slot's sets are the deload's).
+ *
+ * Returns null — and the caller must say what it does then — for anything not
+ * counted in reps (holds, carries and intervals have their own fixed units)
+ * and for a week whose phase cannot be read.
+ */
+export function repRangeForIncomingExercise(
+  entry: ExerciseEntry,
+  profile: UserProfile,
+  week: Pick<MesocycleWeek, 'phase_label' | 'week_in_block' | 'is_deload'>,
+  /** The slot's effort target, used only to price the "is one notch too big a jump" question. */
+  intensity?: string,
+): string | null {
+  if ((entry.prescription_type ?? 'reps') !== 'reps') return null
+  const label = week.phase_label?.trim()
+  const phaseConfig = Object.values(PHASE_CONFIGS).find(c => c.label === label)
+  if (!phaseConfig) return null
+
+  const expConfig = getExperienceConfig(profile.training_experience || 'novice')
+  const styleConfig = STYLE_CONFIGS[profile.training_style || 'hybrid']
+  const policy = getGoalPolicy((profile.fitness_goal || 'hypertrophy') as FitnessGoal)
+  const base = assignSetsRepsFromConfig(entry, styleConfig, expConfig, policy, profile.session_duration_preference).reps
+
+  const isPrimer = entry.mechanics_tier === 'primer'
+  const isMainCompound = entry.mechanics_tier === 'tier1_compound'
+  const isDeload = !!week.is_deload
+  const w = Math.min(Math.max(1, week.week_in_block ?? 1), 4)
+  const category = categorize(entry)
+  // Generation's own definition, both halves (see `isBodyweight` in
+  // generateMesocycle): no external load, OR tagged loaded with no anchor to
+  // price it from. A primer is neither a weightless working lift nor a loaded
+  // one for this purpose.
+  const isBodyweight = !isPrimer && (!isExternallyLoaded(entry) || category == null)
+  const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
+
+  // A lift that has just arrived has no block baseline, so the two questions
+  // generation asks of one are asked of its own starting estimate instead.
+  const startingKg = (reps: string): number | null => (isBodyweight || isPrimer || category == null)
+    ? null
+    : prescribeLoad(entry, profile, { targetRpeLabel: intensity, repRangeLabel: reps }).starting_weight_kg
+
+  if (isDeload) {
+    // A deload's default move is a lighter weight and reps eased UP by two.
+    // Where there is no weight to take off — a weightless lift, a warm-up
+    // move, or a loaded one already so light that 70% of it rounds back up to
+    // the lightest thing that exists — easing reps up would make the recovery
+    // week harder, so they stay at the phase's range (generation's
+    // `deloadLoadLeverDead`). See the approximation note above for the further
+    // two-rep cut this cannot see.
+    const loadingReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+    const kg = isExternallyLoaded(entry) ? startingKg(loadingReps) : null
+    const atFloor = kg != null && kg * DELOAD_LOAD_FRACTION < getEquipmentFloorKg(entry)
+    const leverDead = !isExternallyLoaded(entry) || atFloor
+    return leverDead ? loadingReps : shiftReps(base, phaseConfig.rep_shift + 2, repFloor)
+  }
+  const phaseReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+
+  // IS ONE NOTCH OF THIS IMPLEMENT TOO BIG A JUMP? (generation's
+  // `loadStepUnaffordable`: more than 12% of the weight in one step.)
+  let loadStepUnaffordable = false
+  const start = startingKg(phaseReps)
+  if (start != null && start > 0 && category != null) {
+    loadStepUnaffordable = getLoadIncrementKg(entry, category, start) / start > 0.12
+  }
+  const rampReps = isBodyweight || loadStepUnaffordable
+    || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)
+  return shiftReps(phaseReps, rampReps ? w - 1 : 0, repFloor)
 }
 
 /** Carries progress by DISTANCE, not weight — see the load-floor comment. */
