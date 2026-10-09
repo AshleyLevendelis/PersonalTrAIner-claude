@@ -3136,6 +3136,7 @@ function App() {
               onMacroSplitChange={handleMacroSplitChange}
               profileId={profile.id}
               date={getSessionDateContext(profile.id).date}
+              planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
               pools={mealPools}
               chosen={chosenMeals}
               mealTotals={mealTotals}

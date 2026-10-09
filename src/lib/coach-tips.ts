@@ -15,6 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { seededRngFromKey } from './seeded-random'
+import { expectedByNow, WAKING_DAY, WAKING_START_HOUR, WAKING_END_HOUR, PACE_KEEPING_UP_FRACTION } from './pace'
 
 export interface CoachTipContext {
   /** YYYY-MM-DD, used only to seed rotation — never a data source itself. */
@@ -42,8 +43,14 @@ export interface CoachTipContext {
    */
   waterMl: number
   waterTargetMl: number
-  /** 0-23, local. */
+  /** 0-23, local, on the APP's clock (getAppNow) — never the machine's. */
   hourOfDay: number
+  /**
+   * True on the day the account or the plan was created. No pace line is
+   * said that day: at 21:53, seconds after signing up, the water rule said
+   * "about 1850ml behind" about a day the person had not been here for.
+   */
+  firstDay: boolean
 }
 
 interface Rule {
@@ -119,7 +126,7 @@ const RULES: Rule[] = [
     // and a rule that always won would be a daily nag.
     key: 'water_pace',
     evaluate: ctx => {
-      const START = 8, END = 22
+      const START = WAKING_START_HOUR, END = WAKING_END_HOUR
       // EVERY INPUT CHECKED FOR BEING A NUMBER AT ALL, not just for its value.
       // Written as `ctx.waterTargetMl <= 0`, this rule ran on a context that
       // carried no water fields — `undefined <= 0` is false, so it fell
@@ -132,9 +139,10 @@ const RULES: Rule[] = [
       if (![waterMl, waterTargetMl, hourOfDay].every(n => typeof n === 'number' && Number.isFinite(n))) return null
       if (waterTargetMl <= 0) return null
       if (hourOfDay < START + 2 || hourOfDay > END) return null
-      const elapsed = Math.min(hourOfDay - START, END - START)
-      const expected = waterTargetMl * (elapsed / (END - START))
-      if (waterMl >= expected * 0.6) return null
+      // The same "how much by now?" every pace rule asks (pace.ts). It is
+      // zero on the person's first day, which is what keeps this quiet then.
+      const expected = expectedByNow(waterTargetMl, { hour: hourOfDay, firstDay: ctx.firstDay === true }, WAKING_DAY)
+      if (expected <= 0 || waterMl >= expected * PACE_KEEPING_UP_FRACTION) return null
       const behind = Math.round((expected - waterMl) / 50) * 50
       if (behind < 250) return null
       return `You're about ${behind}ml behind on water for this time of day.`

@@ -372,6 +372,8 @@
     "verify:chat-top-up": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-top-up.mjs",
     "test:kept-meal-restriction": "tsx scripts/test-kept-meal-restriction.ts",
     "verify:grocery": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/grocery.mjs",
+    "test:pace-clock": "tsx scripts/test-pace-clock.ts",
+    "verify:pace-clock": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/pace-clock.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
     "test:chat-groups": "tsx scripts/test-chat-groups.ts",
     "test:grocery-display": "tsx scripts/test-grocery-display.ts",

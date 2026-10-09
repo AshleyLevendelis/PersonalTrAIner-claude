@@ -601,6 +601,64 @@ async function main() {
     else process.env.TZ = tzBefore
   }
 
+  // ---- 8. HOME'S TWO PACE LINES READ A CLOCK, AND IT IS THE APP'S ----------
+  //
+  // 9 Oct 2026, the test log's L28 and L8: an amber "no meals logged yet" at
+  // 07:01, and "about 1850ml behind on water for this time of day" seconds
+  // after signing up at 21:53. The first had no clock at all; the second read
+  // the MACHINE's (`new Date()` inside loadDashboardData) and counted a day
+  // the person had not been a user for. Both now ask pace.ts, with the `now`
+  // the caller hands in. Every case below is the same person and the same
+  // empty day; only the time, and whether today is their first day, changes.
+  console.log('\n[8] Home says "no meals yet" and "behind on water" by the clock')
+  {
+    const PACE_PROFILE = 'pace-profile'
+    const paceTargets = { calories: 2000, protein: 100, carbs: 200, fat: 60 }
+    db.meal_events = []
+    db.water_logs = []
+    const loadPace = (nowLocal: string, createdAt: string, planCreatedAt = createdAt) =>
+      loadDashboardData({
+        profile: { id: PACE_PROFILE, created_at: createdAt, water_target_ml: 2000 } as never,
+        macros: paceTargets, exercisePlan: [], mesocycle: [],
+        planCreatedAt, todayLogs: [], liveWeek: 1,
+        dayName: 'Thursday', todayStr: nowLocal.slice(0, 10), now: new Date(nowLocal),
+      })
+    const OLD = '2026-01-01T09:00:00'
+    const noMeals = (r: { whatsLeftLine: string | null }) => /no meals logged yet/.test(r.whatsLeftLine ?? '')
+
+    const at0701 = await loadPace('2026-01-15T07:01:00', OLD)
+    check('07:01, nothing eaten: no "no meals logged yet" (nobody is late for breakfast yet)', !noMeals(at0701), at0701.whatsLeftLine)
+    check('07:01: and nothing about water either', !/water/i.test(at0701.coachTip ?? ''), at0701.coachTip)
+    const at0959 = await loadPace('2026-01-15T09:59:00', OLD)
+    check('09:59: still not said', !noMeals(at0959), at0959.whatsLeftLine)
+    const at1200 = await loadPace('2026-01-15T12:00:00', OLD)
+    check('12:00, nothing eaten: "no meals logged yet" is said', noMeals(at1200), at1200.whatsLeftLine)
+    // Ashley's own example is this rule at noon; the arithmetic is 2000 x 4/14.
+    check('12:00, no water: the water line gives the pro-rata figure for noon (about 550ml)',
+      at1200.coachTip === "You're about 550ml behind on water for this time of day.", at1200.coachTip)
+    const at2153 = await loadPace('2026-01-15T21:53:00', OLD)
+    check('21:53 for somebody who has been here a fortnight: about 1850ml behind, as before',
+      at2153.coachTip === "You're about 1850ml behind on water for this time of day.", at2153.coachTip)
+    check('...and "no meals logged yet" is said', noMeals(at2153), at2153.whatsLeftLine)
+
+    // THE FIRST DAY. Signed up at 21:50, looked at Home at 21:53.
+    const firstDay = await loadPace('2026-01-15T21:53:00', '2026-01-15T21:50:00')
+    check('21:53 on the day the account was made: no water line at all', firstDay.coachTip === null, firstDay.coachTip)
+    check('...and no "no meals logged yet"', !noMeals(firstDay), firstDay.whatsLeftLine)
+    // An old account that started a NEW PLAN today is also on its first day.
+    const newPlan = await loadPace('2026-01-15T21:53:00', OLD, '2026-01-15T08:00:00')
+    check('the day a new plan was made is quiet too', newPlan.coachTip === null && !noMeals(newPlan), [newPlan.coachTip, newPlan.whatsLeftLine])
+    // ...and the day after, it speaks again: the silence is one day, not a switch.
+    const dayTwo = await loadPace('2026-01-16T21:53:00', '2026-01-15T21:50:00')
+    check('the next evening both lines are back', /1850ml behind/.test(dayTwo.coachTip ?? '') && noMeals(dayTwo), [dayTwo.coachTip, dayTwo.whatsLeftLine])
+
+    // THE CLOCK IS THE ONE HANDED IN. Whatever the machine's time is while
+    // this runs, 07:01 and 21:53 above gave different answers from one tree;
+    // and the function must not read the wall clock for the hour at all.
+    const src = fs.readFileSync('src/lib/dashboard-data.ts', 'utf-8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+    check('loadDashboardData never asks the machine what hour it is', !/new Date\(\)\s*\.getHours\(\)/.test(src))
+  }
+
   if (failures > 0) {
     console.error(`\n${failures} dashboard check(s) FAILED.`)
     process.exit(1)
