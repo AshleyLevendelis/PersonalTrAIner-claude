@@ -590,7 +590,11 @@ const priced = (slot: string, name: string, ingredients: { name: string; quantit
 const refitChosen = {
   breakfast: priced('breakfast', 'Porridge with milk', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 250, unit: 'ml' }]),
   lunch: priced('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 150, unit: 'g' }]),
-  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' }]),
+  // ?spoon=1 adds a spoon of oil to the dinner, so a resize has a spoon amount
+  // to round (verify:kitchen-amounts). Off by default: every other run of this
+  // fixture keeps the dinner, and therefore the targets, it always had.
+  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' },
+    ...(new URLSearchParams(location.search).get('spoon') === '1' ? [{ name: 'olive oil', quantity: 1, unit: 'tbsp' }] : [])]),
   snack: priced('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
 }
 const refitBase = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(

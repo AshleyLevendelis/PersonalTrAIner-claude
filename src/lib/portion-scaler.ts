@@ -59,26 +59,77 @@ export function withQuantity(line: string, quantity: number): string | null {
 }
 
 /**
- * Scales every ingredient line's quantity by scaleFactor, using the same
- * per-unit rounding conventions as macro-calibration's string scaler: gram/ml
- * quantities round to the nearest whole unit, tbsp/tsp round to one decimal,
- * and any other (named/count-like) unit rounds to the nearest whole with a
- * floor of 1 (you can't scale "2 eggs" down to 0.3 of an egg meaningfully).
- * A scaleFactor within SCALE_NOOP_THRESHOLD of 1 is left untouched.
+ * AMOUNTS SOMEBODY CAN ACTUALLY MEASURE — the one rounding rule for a scaled
+ * quantity, used by every path that resizes a dish.
+ *
+ * 9 Oct 2026, the test log's L18: "1.3 tsp", "0.8 tsp", "119g liquid egg
+ * whites", "239g raw king prawns". One 0.795x scale produced all four,
+ * because grams were rounded to the nearest 1 and spoons to one decimal, and
+ * nothing after the scaler tidied them.
+ *
+ * DECIDED AS A CSCS COACH / NUTRITION GENERALIST (the delegation covers
+ * population-level nutrition; basis recorded in BACKLOG):
+ *   - Grams and ml: to the nearest 5 from 20 upwards, to the nearest 1 below.
+ *     Five grams on a 240 g portion is 2%, well inside the 7% a meal is
+ *     allowed to miss its calories by and inside what a home scale and a
+ *     "medium" potato already vary by. Between 20 and 50 g the step is a
+ *     bigger share of the LINE (up to 2.5 g in 20), but never more than 2.5 g
+ *     of anything: at most 22 kcal for pure fat, under 5% of the smallest
+ *     main meal the app plans. Below 20 g the foods are the dense ones
+ *     (butter, oil by weight, honey, seeds), where a gram is real, so they
+ *     keep whole grams.
+ *   - Spoons: to the nearest quarter, never less than a quarter — the
+ *     smallest spoon in a measuring set. Shown as ¼ ½ ¾ (formatKitchenQuantity).
+ *   - Anything counted (eggs, slices, cloves): whole, never fewer than one.
+ *
+ * THE NUMBER ON THE CARD IS THE NUMBER COSTED: every caller recomputes the
+ * macros from the rounded lines (they already did, because whole grams and
+ * whole eggs were never the requested factor either).
+ */
+export const KITCHEN_GRAM_STEP = 5
+export const KITCHEN_FINE_BELOW_G = 20
+export const KITCHEN_SPOON_STEP = 0.25
+
+export function kitchenRound(quantity: number, unit: string): number {
+  const u = unit.toLowerCase().trim()
+  if (!Number.isFinite(quantity)) return quantity
+  if (GRAM_LIKE_UNITS.has(u)) {
+    const q = Math.max(0, quantity)
+    return q < KITCHEN_FINE_BELOW_G ? Math.round(q) : Math.round(q / KITCHEN_GRAM_STEP) * KITCHEN_GRAM_STEP
+  }
+  if (VOLUME_UNITS.has(u)) return Math.max(KITCHEN_SPOON_STEP, Math.round(quantity / KITCHEN_SPOON_STEP) * KITCHEN_SPOON_STEP)
+  return Math.max(1, Math.round(quantity))
+}
+
+const QUARTER_GLYPH: Record<string, string> = { '0.25': '¼', '0.5': '½', '0.75': '¾' }
+
+/**
+ * A quantity as a person reads it: spoons in quarters ("1¼", "½"), everything
+ * else as the plain number. DISPLAY ONLY — the stored line and every string
+ * handed to a builder keep the decimal, which is what the ingredient reader
+ * parses ("1.25 tsp olive oil"); "1¼" is not a number it knows.
+ */
+export function formatKitchenQuantity(quantity: number, unit: string): string {
+  const plain = String(Number.isInteger(quantity) ? quantity : Math.round(quantity * 10) / 10)
+  if (!VOLUME_UNITS.has(unit.toLowerCase().trim())) return plain
+  const whole = Math.floor(quantity)
+  const glyph = QUARTER_GLYPH[String(Math.round((quantity - whole) * 100) / 100)]
+  if (quantity === whole) return String(whole)
+  // A spoon amount that is not on a quarter was typed by a person or stored
+  // before 9 Oct 2026: shown as it is, never bent to the nearest glyph.
+  if (!glyph) return String(Math.round(quantity * 100) / 100)
+  return whole > 0 ? `${whole}${glyph}` : glyph
+}
+
+/**
+ * Scales every ingredient line's quantity by scaleFactor and rounds each to
+ * an amount somebody can measure (kitchenRound, above). A scaleFactor within
+ * SCALE_NOOP_THRESHOLD of 1 is left untouched.
  */
 export function scaleIngredients(ingredients: MealIngredientLine[], scaleFactor: number): MealIngredientLine[] {
   if (Math.abs(scaleFactor - 1) < SCALE_NOOP_THRESHOLD) return ingredients
 
-  return ingredients.map(line => {
-    const unit = line.unit.toLowerCase().trim()
-    if (GRAM_LIKE_UNITS.has(unit)) {
-      return { ...line, quantity: Math.max(0, Math.round(line.quantity * scaleFactor)) }
-    }
-    if (VOLUME_UNITS.has(unit)) {
-      return { ...line, quantity: Math.max(0, Math.round(line.quantity * scaleFactor * 10) / 10) }
-    }
-    return { ...line, quantity: Math.max(1, Math.round(line.quantity * scaleFactor)) }
-  })
+  return ingredients.map(line => ({ ...line, quantity: kitchenRound(line.quantity * scaleFactor, line.unit) }))
 }
 
 export function isWithinCalorieTolerance(actualCalories: number, targetCalories: number, tolerance = CALORIE_TOLERANCE): boolean {

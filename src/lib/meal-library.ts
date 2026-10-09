@@ -2,7 +2,7 @@ import type { RawProposal } from './meal-generation'
 import type { MealSlotName } from './meal-store'
 import type { CookingTimePreference } from './types'
 import { containsPhrase } from './meal-ingredients'
-import { parseIngredientLine, withQuantity, scaleToTarget, meetsProteinFloor, isWithinCalorieTolerance } from './portion-scaler'
+import { parseIngredientLine, withQuantity, kitchenRound, scaleToTarget, meetsProteinFloor, isWithinCalorieTolerance } from './portion-scaler'
 import { computeMealMacros } from './food-db'
 import type { MacroTargets } from './types'
 
@@ -129,7 +129,10 @@ export function fitDishToBudget(dish: RawProposal, budget: MacroTargets): { dish
     const lines = cand.a === 1 && cand.b === 1 ? dish.ingredients : dish.ingredients.map((text, i) => {
       const factor = role[i] === 'P' ? cand.a : role[i] === 'C' ? cand.b : 1
       if (factor === 1) return text
-      return withQuantity(text, Math.max(5, Math.round(parsed[i].quantity * factor))) ?? text
+      // Rounded as the scaler rounds (kitchenRound). The scaler leaves a dish
+      // alone when it is already within 3% of the budget, so a re-portion that
+      // wrote "137g" here would reach the card as 137g.
+      return withQuantity(text, Math.max(5, kitchenRound(parsed[i].quantity * factor, parsed[i].unit))) ?? text
     })
     const fittedParsed = lines.map(parseIngredientLine)
     const fm = computeMealMacros(fittedParsed)
