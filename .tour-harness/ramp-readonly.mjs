@@ -19,7 +19,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -144,7 +144,7 @@ check('3. the program surface still shows the build-up', strip.found === true, s
 check('4. ...as a plan to read, with nothing on it to tap', strip.buttons === 0, strip)
 check('5. ...saying what it is for, on screen and not in a tooltip', /ramp up first/i.test(strip.text || '') && /then set 1/i.test(strip.text || ''), strip.text)
 check('6. ...and its weights climb', (strip.kgs ?? []).length >= 2 && (strip.kgs ?? []).every((n, i) => i === 0 || n >= strip.kgs[i - 1]), strip.kgs)
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/ramp-readonly.png',
+writeFileSync(new URL('./ramp-readonly.png', import.meta.url).pathname,
   Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 
 await finish()

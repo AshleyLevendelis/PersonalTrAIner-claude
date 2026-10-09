@@ -35,7 +35,7 @@ import { nearestAnchorDate } from './anchor.mjs'
 // and Monday. Section 9 needs the Monday — see its own note.
 const MONDAY = nearestAnchorDate('Monday')
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -125,7 +125,7 @@ check('0b. the lift’s own card is on screen with its set grid open', card.foun
 await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${NAME}); if(n) n.scrollIntoView({block:'center'})})()`)
 await wait(600)
 const shot = await send('Page.captureScreenshot', { format: 'png' })
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/one-number.png', Buffer.from(shot.result.data, 'base64'))
+writeFileSync(new URL('./one-number.png', import.meta.url).pathname, Buffer.from(shot.result.data, 'base64'))
 
 console.log('\nONE LIFT, ONE NUMBER\n')
 
@@ -302,7 +302,7 @@ if (marked.grid) {
   })()`)
   await wait(600)
   const shot8 = await send('Page.captureScreenshot', { format: 'png' })
-  writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/one-number-lasttime.png', Buffer.from(shot8.result.data, 'base64'))
+  writeFileSync(new URL('./one-number-lasttime.png', import.meta.url).pathname, Buffer.from(shot8.result.data, 'base64'))
 }
 
 // ---------------------------------------------------------------------------
@@ -403,7 +403,7 @@ await ev(`(() => {
 })()`)
 await wait(700)
 const shot9 = await send('Page.captureScreenshot', { format: 'png' })
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/one-number-chips.png', Buffer.from(shot9.result.data, 'base64'))
+writeFileSync(new URL('./one-number-chips.png', import.meta.url).pathname, Buffer.from(shot9.result.data, 'base64'))
 
 const err = await ev('window.__err ?? null')
 check('10. no uncaught error on the page', err === null, err)
