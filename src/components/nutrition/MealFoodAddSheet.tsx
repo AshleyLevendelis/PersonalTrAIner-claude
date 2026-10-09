@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
-import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
+import { buildMealFoodAddProposal, withKnockOn } from '@/lib/meal-food-add'
+import type { MealKnockOn, MealKnockOnFn } from '@/lib/meal-knock-on'
 import { applyMealOptionToSlot } from '@/lib/pending-action-executor'
 import { FOOD_DB } from '@/lib/food-db'
 import type { MealAdditionPayload } from '@/lib/meal-addition'
@@ -50,8 +51,14 @@ function unitsFor(name: string): string[] {
   return ['g', ...named]
 }
 
-export function MealFoodAddSheet({ ctx, onPick, onDone, onCancel }: {
+export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
   ctx: MealFoodAddContext
+  /**
+   * What else on the plan changes if this food is added — the app's own trial
+   * (useMealDays), the same function the coach's card is given. Absent only
+   * where no week is being served; the sheet then says it could not check.
+   */
+  knockOn?: MealKnockOnFn
   onPick: (slot: MealSlotName, chosenName: string) => Promise<boolean>
   onDone: (summary: string) => void
   onCancel: () => void
@@ -91,8 +98,38 @@ export function MealFoodAddSheet({ ctx, onPick, onDone, onCancel }: {
     })
   }, [food, amount, unit, ctx])
 
+  // THE REST OF THE PLAN, READ OFF A TRIAL (test log H9, 9 Oct 2026). The
+  // builder above is instant and says what happens to THIS meal; what the tap
+  // does to every other meal needs the week served twice, so it arrives a
+  // moment later. `undefined` is "still working it out" — and the button waits
+  // for it, so nobody can agree to a card that has not finished saying what it
+  // will do.
+  const [trial, setTrial] = useState<{ for: string; knockOn: MealKnockOn | null } | undefined>(undefined)
+  const trialKey = proposal?.ok ? `${proposal.payload.slot}|${proposal.payload.date}|${proposal.payload.option.name}|${Math.round(proposal.payload.option.macros.calories)}` : null
+  // Held in a ref: the function is rebuilt on every render of the screen above,
+  // and a trial must be re-run when the FOOD changes, not when the page redraws.
+  const knockOnRef = useRef(knockOn)
+  knockOnRef.current = knockOn
+  useEffect(() => {
+    if (!proposal?.ok || !trialKey) { setTrial(undefined); return }
+    const run = knockOnRef.current
+    if (!run) { setTrial({ for: trialKey, knockOn: null }); return }
+    let stale = false
+    setTrial(undefined)
+    // A beat, so a figure still being typed does not serve the week per keystroke.
+    const timer = setTimeout(() => {
+      run(proposal.payload.date, proposal.payload.slot as MealSlotName, proposal.payload.option)
+        .then(result => { if (!stale) setTrial({ for: trialKey, knockOn: result }) })
+        .catch(() => { if (!stale) setTrial({ for: trialKey, knockOn: null }) })
+    }, 250)
+    return () => { stale = true; clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trialKey])
+  const trialReady = trial !== undefined && trial.for === trialKey
+  const card = proposal?.ok && trialReady ? withKnockOn(proposal.diff, trial.knockOn) : null
+
   const confirm = async () => {
-    if (!proposal?.ok) return
+    if (!proposal?.ok || !trialReady) return
     setBusy(true)
     setError(null)
     const result = await applyMealOptionToSlot(
@@ -186,9 +223,14 @@ export function MealFoodAddSheet({ ctx, onPick, onDone, onCancel }: {
                   <span className="text-muted-foreground"> · {r.before} → {r.after}{r.note ? ` (${r.note})` : ''}</span>
                 </p>
               ))}
-              {proposal.diff.implications?.map((imp, i) => (
+              {(card ?? proposal.diff).implications?.map((imp, i) => (
                 <p key={i} className={`text-[0.65625rem] ${imp.severity === 'warn' ? 'text-[color:var(--role-warn)]' : 'text-muted-foreground'}`}>{imp.text}</p>
               ))}
+              {!trialReady && (
+                <p className="flex items-center gap-1.5 text-[0.65625rem] text-muted-foreground" data-testid="meal-food-add-checking" role="status">
+                  <Loader2 className="size-3 animate-spin" aria-hidden /> Checking what this does to your other meals…
+                </p>
+              )}
             </div>
           )}
           {error && <p className="text-[0.71875rem] text-[color:var(--role-warn)]" data-testid="meal-food-add-error">{error}</p>}
@@ -196,7 +238,7 @@ export function MealFoodAddSheet({ ctx, onPick, onDone, onCancel }: {
             <button
               type="button"
               onClick={confirm}
-              disabled={busy || !proposal?.ok}
+              disabled={busy || !proposal?.ok || !trialReady}
               className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
               data-testid="meal-food-add-confirm"
             >

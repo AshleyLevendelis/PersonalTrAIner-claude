@@ -34,7 +34,8 @@ import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
-import { buildMealFoodAddProposal } from '@/lib/meal-food-add'
+import { buildMealFoodAddProposal, withKnockOn } from '@/lib/meal-food-add'
+import type { MealKnockOnFn } from '@/lib/meal-knock-on'
 import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
 import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
@@ -272,6 +273,13 @@ interface ChatAssistantProps {
   latestWeightKg?: number | null
   onPlanUpdate: (action: PlanAction) => void | Promise<void>
   onLogsUpdated?: () => void
+  /**
+   * What else on the plan changes if a new option becomes a date's meal — the
+   * app's own trial (useMealDays' dayMove.knockOn), the same function the
+   * Nutrition screen's add-a-food sheet is handed, so the two cards cannot
+   * disagree. Absent: the card says it could not check.
+   */
+  onMealKnockOn?: MealKnockOnFn
   /** Fired when a chat log_weight action lands so the app recomputes living targets. */
   onWeightLogged?: () => void | Promise<void>
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
@@ -418,7 +426,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1805,6 +1813,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     })
     if (line) checkInUsedRef.current = true
     return line
+  }
+
+  /** The knock-on trial for a meal card, or null when there is none to run or it failed (the card then says it could not check). */
+  const mealKnockOn = async (payload: MealAdditionPayload) => {
+    if (!onMealKnockOn) return null
+    try { return await onMealKnockOn(payload.date, payload.slot, payload.option) }
+    catch (err) { console.error('chat: the knock-on trial failed', err); return null }
   }
 
   /**
@@ -4918,7 +4933,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
-          if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: foodAdd.diff }
+          // WHAT ELSE CHANGES, READ OFF A TRIAL (test log H9): the app's own
+          // week served with and without this food, the same function the
+          // screen's sheet is handed. No trial available: the card says so.
+          if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: withKnockOn(foodAdd.diff, await mealKnockOn(foodAdd.payload)) }
           else refusal = foodAdd.reason
         }
       } else if (result.proposal.kind === 'propose_meal_move') {
@@ -5017,7 +5035,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
-          if (custom.ok) built = { scopeKey: custom.scopeKey, preconditions: custom.preconditions, payload: custom.payload as unknown as Record<string, unknown>, diff: custom.diff }
+          // The same trial as adding a food: her meal pinned, the week served again.
+          if (custom.ok) built = { scopeKey: custom.scopeKey, preconditions: custom.preconditions, payload: custom.payload as unknown as Record<string, unknown>, diff: withKnockOn(custom.diff, await mealKnockOn(custom.payload)) }
           else refusal = custom.reason
         }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {

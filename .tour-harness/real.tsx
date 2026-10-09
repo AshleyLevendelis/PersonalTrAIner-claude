@@ -1189,6 +1189,15 @@ function Harness() {
   // The options each slot holds, by name, so a driver can see a resized copy added and taken away again.
   ;(window as unknown as { __libraryNames: string[] }).__libraryNames = MEAL_LIBRARY.map(d => d.name)
   ;(window as unknown as { __mealOptions: unknown }).__mealOptions = () => db.meal_plan_slots.map(r => ({ slot: r.slot, name: r.name }))
+  // The week as the app's hook serves it, by date and meal — for
+  // verify:meal-knock-on to compare with what a card SAID would change.
+  ;(window as unknown as { __weekMeals: unknown }).__weekMeals = () => {
+    const out: Record<string, Record<string, string>> = {}
+    const t = mealDays.today
+    if (t) out[t.date] = Object.fromEntries(Object.entries(t.day.chosen).map(([sl, o]) => [sl, (o as PoolOption).name]))
+    for (const d of mealDays.upcoming) out[d.date] = d.meals as Record<string, string>
+    return out
+  }
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
     if (DAYMOVE) setDayMovePicks(prev => ({ ...prev, [slot]: chosenName }))

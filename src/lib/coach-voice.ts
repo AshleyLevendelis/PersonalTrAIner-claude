@@ -269,6 +269,19 @@ const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 const poss = (day: string) => `${day}'s`
 
 /**
+ * What ELSE an edit to one meal changes — adding a food, a custom meal
+ * (meal-knock-on.ts). The changes themselves are said in the day swap's own
+ * sentences (DAY_MOVE, below); these are the three it has no use for.
+ */
+export const KNOCK_ON = {
+  /** The trial ran and no other meal moved. */
+  none: 'No other meal on your plan changes.',
+  /** There was no week to try it on, or the trial failed: said, never guessed. */
+  unknown: "I couldn't check what this does to your other meals.",
+  listUnknown: "I couldn't check your shopping list. If this day is on it, rebuild the list afterwards to match.",
+}
+
+/**
  * SWAPPING A MEAL WITH ANOTHER DAY'S — Ashley's ruling, 29 Sep 2026, from three
  * options: they SWAP PLACES (Monday's dinner goes to Wednesday and Wednesday's
  * comes to Monday), over giving the emptied day a fresh dinner and over eating

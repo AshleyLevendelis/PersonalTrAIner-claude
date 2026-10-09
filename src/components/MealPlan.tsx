@@ -1200,6 +1200,7 @@ function MealSlotRow({
                   dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods,
                   meal: ctx.meal,
                 }}
+                knockOn={dayMove?.knockOn}
                 onPick={onMealPickApplied}
                 onDone={summary => { setAddOpen(false); setAddNote(summary) }}
                 onCancel={() => setAddOpen(false)}

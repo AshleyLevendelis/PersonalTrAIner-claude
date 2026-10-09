@@ -77,8 +77,10 @@ console.log('\n1. Her portions are facts')
       Math.abs(r.payload.option.macros.calories - 375) < 15, r.payload.option.macros)
     check('the card says the portions were untouched',
       r.diff.implications.some(i => /untouched/i.test(i.text)), r.diff.implications.map(i => i.text))
-    check('...and that the rest of the day re-fits',
-      r.diff.implications.some(i => /re-?fits/i.test(i.text)))
+    // RE-ANCHORED 9 Oct 2026 (test log H9): the card used to ASSERT this. It is
+    // read off a trial by the caller now (test:meal-knock-on).
+    check('...and asserts nothing about the rest of the day (that is read off a trial now)',
+      !r.diff.implications.some(i => /re-?fits/i.test(i.text)))
   }
 }
 
