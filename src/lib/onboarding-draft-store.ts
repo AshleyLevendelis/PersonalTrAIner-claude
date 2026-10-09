@@ -44,6 +44,13 @@ export interface DraftMessage {
   /** Chip card already answered/locked (so resume doesn't re-open it). */
   slotCardResolved?: boolean
   /**
+   * A NEWER message now carries this question's card, so this copy no longer
+   * renders. The coach asked the same thing again further down and the chips
+   * moved with the question. `slotCard` is kept — it is how the conversation
+   * counts how many times a question has been asked.
+   */
+  slotCardSuperseded?: boolean
+  /**
    * This card was re-opened by the user to CHANGE an answer they already
    * gave, rather than asked for the first time.
    *

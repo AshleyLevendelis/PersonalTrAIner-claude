@@ -129,7 +129,7 @@ export function SlotNumericCard({
   const allBlank = fields.every(d => rawOf(d.key).trim() === '')
 
   return (
-    <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+    <div data-slot-card={def.key} className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
       {fields.map(d => {
         const bad = showErrors && !isOk(d)
         return (

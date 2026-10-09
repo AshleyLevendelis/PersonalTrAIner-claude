@@ -420,9 +420,20 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
     // The model asks for them itself, in the same turn it asks the question,
     // so this file still makes ONE call per turn rather than two — the cost
     // and latency saving that deleting the forced call bought is kept.
-    // ConversationalOnboarding.tsx carries a deterministic backstop for the
-    // turn where the model forgets, which is the same model-first/
-    // deterministic-behind shape the rest of this file already uses.
+    //
+    // WHAT STANDS BEHIND THE MODEL, STATED EXACTLY (rewritten 9 Oct 2026 —
+    // this paragraph used to claim "a deterministic backstop for the turn
+    // where the model forgets", and no such thing existed). The client reads
+    // the reply and decides the card itself (src/lib/onboarding-chip-match.ts):
+    //   - chips asked for under a sentence that asks a DIFFERENT question are
+    //     not shown; if the sentence plainly asks one other open question,
+    //     that question's card is shown instead;
+    //   - a question re-asked while its earlier card is still unanswered
+    //     takes that card with it, asked for or not;
+    //   - a first asking where the model simply forgot present_slot gets NO
+    //     chips. That is deliberate: inventing a menu from prose alone is the
+    //     forced-chips leg again by another route. The typing box still
+    //     works, and the stuck-rescue and stall-breaker still bring chips.
     //
     // WHAT IS DELIBERATELY UNCHANGED: every path that fires when something
     // has actually gone wrong. A set_slot value that fails validation still

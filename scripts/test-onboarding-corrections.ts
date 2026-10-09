@@ -32,6 +32,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync } from 'fs'
+import { chooseCard } from '../src/lib/onboarding-chip-match'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
@@ -72,15 +73,43 @@ check('...read BEFORE the write that would make everything look answered',
   src.indexOf('const wasAnswered = ws.confirmed.has(key)') < src.indexOf('ws.confirmed = new Set(ws.confirmed).add(key)'))
 
 console.log('\n2. A corrected question gets its buttons back — and nothing else does')
-check('an answered slot is still refused',
-  /if \(ws\.confirmed\.has\(key\) && !ws\.corrected\.has\(key\)\) continue/.test(src))
-check('...with the correction as the only exception', !/if \(ws\.confirmed\.has\(key\)\) continue/.test(src))
-// The old duplicate-card guard would otherwise swallow the re-ask, since a
-// correction's own card is the thing being replaced.
-check('the duplicate-card guard does not swallow the re-ask',
-  /if \(alreadyLive && !ws\.corrected\.has\(key\)\) continue/.test(src))
-check('...but two cards for the same slot in one turn are still impossible',
-  /if \(ws\.newMessages\.some\(m => m\.slotCard === key\)\) continue/.test(src))
+// RE-ANCHORED 9 Oct 2026, deliberately. These checks used to pin four literal
+// lines of the component, and one of them —
+//
+//     if (alreadyLive && !ws.corrected.has(key)) continue
+//
+// — was the DEFECT behind test log M2 and the second half of H14: it dropped
+// a re-asked question's chips whenever an older card for that question was
+// still unanswered, so the only chips were on the first asking, off screen.
+// The gate was enforcing the bug. The decision now lives in one function
+// (chooseCard), so the property is checked by CALLING it; the screen half —
+// exactly one card, under the newest asking, inside the viewport — is
+// verify:onboarding-turns.
+{
+  const ask = 'No problem. How much training have you done?'
+  const base = {
+    hostText: ask, requested: ['trainingExperience'], liveCards: [] as string[],
+    values: { ...initialSlotValues(), trainingExperience: 'advanced' } as OnboardingSlotValues,
+    confirmed: new Set(['trainingExperience']), corrected: new Set<string>(), cardedThisTurn: [] as string[],
+  }
+  check('an answered slot is still refused', chooseCard(base) === undefined, chooseCard(base))
+  check('...with the correction as the only exception',
+    chooseCard({ ...base, corrected: new Set(['trainingExperience']) }) === 'trainingExperience'
+    && !/if \(ws\.confirmed\.has\(key\)\) continue/.test(src))
+  const unanswered = { ...base, values: initialSlotValues(), confirmed: new Set<string>() }
+  check('a re-ask is NOT swallowed because an older card for it is still unanswered',
+    chooseCard({ ...unanswered, liveCards: ['trainingExperience'] }) === 'trainingExperience',
+    chooseCard({ ...unanswered, liveCards: ['trainingExperience'] }))
+  check('...but two cards for the same slot in one turn are still impossible',
+    chooseCard({ ...unanswered, cardedThisTurn: ['trainingExperience'] }) === undefined)
+  // ...and the component really does take its card from that decision.
+  check('the screen shows the card that decision returns',
+    /const cardKey = chooseCard\(\{/.test(src) && /host\.slotCard = cardKey/.test(src))
+  check('the older copy of a moved card stops rendering, and stays in the record',
+    /\? \{ \.\.\.m, slotCardSuperseded: true \}/.test(src)
+    && (src.match(/msg\.slotCard && !msg\.slotCardSuperseded &&/g) ?? []).length === 2,
+    (src.match(/msg\.slotCard && !msg\.slotCardSuperseded &&/g) ?? []).length)
+}
 
 console.log('\n3. The turn is judged once it has finished happening')
 // Actions arrive in the model's order. Deciding present_slot mid-loop judged
@@ -88,9 +117,9 @@ console.log('\n3. The turn is judged once it has finished happening')
 // might not have been applied yet, and the message meant to host the chips
 // might not have been pushed.
 check('present_slot is collected during the loop', /presentRequests\.push\(/.test(src))
-check('...and resolved after it', /for \(const rawKey of presentRequests\)/.test(src))
+check('...and resolved after it', /requested: presentRequests\.map\(normalizeSlotKey\)/.test(src))
 check('...so the decision sees the whole turn',
-  src.indexOf('presentRequests.push(') < src.indexOf('for (const rawKey of presentRequests)'))
+  src.indexOf('presentRequests.push(') > 0 && src.indexOf('presentRequests.push(') < src.indexOf('const cardKey = chooseCard({'))
 check('the host message is still chosen backwards past receipts',
   /\.find\(m => m\.role === 'assistant' && !m\.isReceipt && !m\.slotCard && m\.content\.trim\(\)\)/.test(src))
 

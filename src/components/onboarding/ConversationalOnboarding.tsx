@@ -34,6 +34,7 @@ import { measureParserFor } from '@/lib/body-units'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
+import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
 import {
   loadOnboardingDraft,
   saveOnboardingDraft,
@@ -110,7 +111,19 @@ interface WorkingState {
    * wrong answer got in and it should be how it gets out.
    */
   corrected: Set<string>
+  /**
+   * Slots whose OLDER unanswered card has just been replaced by a newer one
+   * further down. The coach asked again, so the chips moved with the question
+   * (test log M2: after a detour the re-asked question had no chips, because
+   * the only card for it was on the first asking, by then off screen). The old
+   * message keeps its `slotCard` — the stall-breaker counts how many times a
+   * slot has been asked by reading it — and simply stops rendering one.
+   */
+  supersedeCards: Set<string>
 }
+
+/** An unanswered card that is still the one on screen for its question. */
+const isLiveCard = (m: DraftMessage) => !!m.slotCard && !m.slotCardResolved && !m.slotCardSuperseded
 
 const RECEIPT_PREFIX = '✓ '
 
@@ -135,8 +148,10 @@ function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
     // I call you?" is the built-in one — lost that fact on every reload, and
     // the composer's "what is on screen" lookup went blind. The DraftMessage
     // type has always declared the field; only this mapper dropped it.
-    .map(({ role, content, slotCard, slotCardResolved, slotCardEditing, asksSlot }) =>
-      ({ role, content, slotCard, slotCardResolved, slotCardEditing, asksSlot }))
+    // slotCardSuperseded rides along for the same reason: without it a reload
+    // would bring back the old copy of a card that had moved.
+    .map(({ role, content, slotCard, slotCardResolved, slotCardSuperseded, slotCardEditing, asksSlot }) =>
+      ({ role, content, slotCard, slotCardResolved, slotCardSuperseded, slotCardEditing, asksSlot }))
 }
 
 
@@ -743,6 +758,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     openReview: false,
     resolveCards: new Set(),
     corrected: new Set(),
+    supersedeCards: new Set(),
   })
 
   const commitWorkingState = (ws: WorkingState) => {
@@ -752,7 +768,11 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     setPendingGoals(ws.pendingGoals)
     if (ws.newMessages.length > 0 || ws.resolveCards.size > 0) {
       setMessages(prev => [
-        ...prev.map(m => (m.slotCard && ws.resolveCards.has(m.slotCard) && !m.slotCardResolved ? { ...m, slotCardResolved: true } : m)),
+        ...prev
+          .map(m => (m.slotCard && ws.resolveCards.has(m.slotCard) && !m.slotCardResolved ? { ...m, slotCardResolved: true } : m))
+          // Only what was already on screen: the card that replaces it is in
+          // newMessages, appended below, and must stay live.
+          .map(m => (isLiveCard(m) && ws.supersedeCards.has(m.slotCard!) ? { ...m, slotCardSuperseded: true } : m)),
         ...ws.newMessages,
       ])
     }
@@ -785,17 +805,6 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     /** What the user actually typed this turn — the unnamed-lift guard needs to know which lifts they named, not which the question listed. */
     userText: string,
   ) => {
-    // Caught by re-running the audit's personas against the deployed fixes:
-    // the prompt says "one present_slot per turn" but the model still
-    // sometimes calls it twice. The FIRST call correctly attaches to the
-    // turn's own text; the second found no unclaimed host message and fell
-    // through to the raw-canonical-question fallback below — spawning a
-    // brand-new message in form voice, with its own duplicate chip card.
-    // That fallback exists for the genuine dead-air case (a turn with NO
-    // text at all); a second present_slot in an already-answered turn is a
-    // different situation and should just be dropped, not treated as dead
-    // air a second time.
-    let presentedThisTurn = false
     const presentRequests: string[] = []
     for (const action of actions) {
       if (action.name === 'set_slot') {
@@ -923,57 +932,54 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       }
     }
 
-    // --- deferred present_slot, now that the turn is fully assembled -------
+    // --- which card, if any, goes under this turn's words -----------------
+    //
+    // Decided ONCE, after the loop, and by reading the coach's sentence rather
+    // than by trusting the request. See onboarding-chip-match.ts for the whole
+    // argument; the short version is that the words and the chips arrive
+    // separately (often from two different model calls) and used to be stapled
+    // together unchecked, which put "2 meals / 3 meals / 4 meals" under "how
+    // old are you?". chooseCard also holds the older rules that lived here: an
+    // answered slot is refused unless this turn corrected it, a slot that no
+    // longer applies is refused, and a slot never gets two cards in one turn.
+    //
+    // The host is found BACKWARDS past confirmation lines rather than taken
+    // from the last message. A turn that both records an answer and asks the
+    // next question emits [coach text, ✓ confirmation], so a last-only check
+    // found the confirmation, gave up, and printed the slot's raw form
+    // question underneath the coach's own words.
     for (const rawKey of presentRequests) {
-      const key = normalizeSlotKey(rawKey)
-      const def = getSlotDef(key)
-      if (!def) {
-        console.warn('onboarding: present_slot with unknown slot_key', rawKey)
-        continue
+      if (!getSlotDef(normalizeSlotKey(rawKey))) console.warn('onboarding: present_slot with unknown slot_key', rawKey)
+    }
+    const host = [...ws.newMessages]
+      .reverse()
+      .find(m => m.role === 'assistant' && !m.isReceipt && !m.slotCard && m.content.trim())
+    const cardKey = chooseCard({
+      hostText: host?.content,
+      requested: presentRequests.map(normalizeSlotKey),
+      liveCards: messages.filter(isLiveCard).map(m => m.slotCard!),
+      values: ws.values,
+      confirmed: ws.confirmed,
+      corrected: ws.corrected,
+      cardedThisTurn: ws.newMessages.flatMap(m => (m.slotCard ? [m.slotCard] : [])),
+    })
+    if (cardKey) {
+      // ONE LIVE CARD PER QUESTION, ON THE NEWEST MESSAGE THAT ASKS IT. An
+      // older unanswered card for the same question is retired rather than the
+      // new one being dropped: dropping it is what left a re-asked question
+      // with its chips a screen and a half above it.
+      const sameQuestion = numericGroupFor(cardKey) as string[]
+      for (const m of messages) {
+        if (isLiveCard(m) && sameQuestion.includes(m.slotCard!)) ws.supersedeCards.add(m.slotCard!)
       }
-      // An answered slot is normally refused, so the model cannot re-ask what
-      // it already knows. The exception is a slot THIS TURN corrected: the
-      // user said the last answer was wrong, and Ashley's ruling is that they
-      // get the buttons back rather than having to describe the fix in prose.
-      // Reported by her: "if you make a wrong selection and then send the
-      // right answer after it, it messes with the next question and the next
-      // quick reply."
-      if (ws.confirmed.has(key) && !ws.corrected.has(key)) continue
-      if (!isSlotApplicable(def, ws.values)) continue
-      // One live card per question. The model can ask for the same chips on
-      // both legs of the round trip, and the second copy found the coach's
-      // message already taken, so it fell through to the raw-question
-      // fallback — the same question twice, the second time in form voice.
-      //
-      // A corrected slot's OLD card is resolved and so is not "live"; the
-      // check still stops a second card for the same correction.
-      const alreadyLive = [...messages, ...ws.newMessages].some(
-        m => m.slotCard === key && !m.slotCardResolved && !ws.resolveCards.has(key),
-      )
-      if (alreadyLive && !ws.corrected.has(key)) continue
-      if (ws.newMessages.some(m => m.slotCard === key)) continue
-      // A second present_slot in the same turn is a prompt-compliance miss,
-      // not a fresh instance of dead air — drop it rather than spawning a
-      // duplicate form-voice message.
-      if (presentedThisTurn) continue
-      presentedThisTurn = true
-      // Attach the chip card to the model's own turn when it produced text
-      // this round; otherwise render the slot's canonical question.
-      //
-      // Search BACKWARDS past confirmation lines rather than looking only at
-      // the last message. A turn that both records an answer and asks the
-      // next question emits [coach text, ✓ confirmation], so a last-only
-      // check found the confirmation, gave up, and printed the slot's raw
-      // form question underneath the coach's own words — the questionnaire
-      // voice reappearing directly below the conversational one.
-      const host = [...ws.newMessages]
-        .reverse()
-        .find(m => m.role === 'assistant' && !m.isReceipt && !m.slotCard && m.content.trim())
-      if (host) {
-        host.slotCard = key
-      } else {
-        ws.newMessages.push({ role: 'assistant', content: def.question, slotCard: key })
-      }
+      if (host) host.slotCard = cardKey
+      // No words at all this turn: render the slot's own question with it.
+      else ws.newMessages.push({ role: 'assistant', content: getSlotDef(cardKey)!.question, slotCard: cardKey })
+    } else if (host && presentRequests.length > 0) {
+      // Loud on purpose. Every line here is a turn where chips were asked for
+      // and withheld; if it shows up often, the patterns are too tight.
+      console.warn('onboarding: chips withheld — the message does not ask that question',
+        presentRequests, JSON.stringify(questionPartOf(host.content)))
     }
   }
 
@@ -1030,7 +1036,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // whenever two of their cards were simultaneously pending the stricter
       // version silently captured nothing at all, reproducing the exact
       // failure this backstop exists to close.
-      const pendingCards = [...messages].reverse().filter(m => m.role === 'assistant' && m.slotCard && !m.slotCardResolved)
+      const pendingCards = [...messages].reverse().filter(m => m.role === 'assistant' && isLiveCard(m))
       for (const pendingCard of pendingCards) {
         const pendingDef = getSlotDef(pendingCard.slotCard!)
         // A slot's requiredIf gate can close after its card was shown (an
@@ -1138,14 +1144,16 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         newMessages: [],
         openReview: false,
         resolveCards: new Set(),
-    corrected: new Set(),
+        corrected: new Set(),
+        supersedeCards: new Set(),
       }
       if (result.reply && result.reply.trim()) {
         responseWs.newMessages.push({ role: 'assistant', content: result.reply.trim() })
       }
-      if (Array.isArray(result.actions) && result.actions.length > 0) {
-        executeActions(responseWs, result.actions, trimmed)
-      }
+      // Always, even with no actions: which card sits under the coach's
+      // words is decided in there, and a re-asked question brings its card
+      // along whether or not the model asked for one.
+      executeActions(responseWs, Array.isArray(result.actions) ? result.actions : [], trimmed)
       // NEVER A LIVE QUESTION BESIDE THE GENERATE BUTTON.
       //
       // Ashley photographed the coach asking "how much time do you want to
@@ -1221,7 +1229,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         const target = openNow[0]
         const def = target ? getSlotDef(target) : undefined
         const alreadyHasCard = [...priorMessages, ...responseWs.newMessages].some(
-          m => m.slotCard === target && !m.slotCardResolved && !responseWs.resolveCards.has(target as SlotKey),
+          m => m.slotCard === target && isLiveCard(m) && !responseWs.resolveCards.has(target as SlotKey),
         )
         // Only slots that genuinely HAVE a list. "I don't know" against age
         // or weight is a refusal, not someone needing options — that already
@@ -1272,7 +1280,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             // completion, so we come back to it.
             const askCount = (k: SlotKey) => allMsgs.filter(m => m.slotCard === k).length
             const hasLiveCard = (k: SlotKey) =>
-              allMsgs.some(m => m.slotCard === k && !m.slotCardResolved && !responseWs.resolveCards.has(k)) ||
+              allMsgs.some(m => m.slotCard === k && isLiveCard(m) && !responseWs.resolveCards.has(k)) ||
               responseWs.newMessages.some(m => m.slotCard === k)
             const target = pickSlotToForce(openSlots, responseWs.values, askCount, hasLiveCard)
             const def = target ? getSlotDef(target) : undefined
@@ -1514,7 +1522,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     let coachQuestionIdx = -1
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i]
-      if (askedIdx < 0 && ((m.slotCard && !m.slotCardResolved) || (m.asksSlot && !confirmed.has(m.asksSlot)))) askedIdx = i
+      if (askedIdx < 0 && (isLiveCard(m) || (m.asksSlot && !confirmed.has(m.asksSlot)))) askedIdx = i
       if (
         coachQuestionIdx < 0 && m.role === 'assistant' && !m.isReceipt
         && m.content !== RESUME_BANNER && m.content.includes('?')
@@ -1529,7 +1537,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const staleCard = askedIdx >= 0 && coachQuestionIdx > askedIdx
     const key = staleCard
       ? undefined
-      : asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot
+      : asked && isLiveCard(asked) ? asked.slotCard : asked?.asksSlot
     if (key) {
       // A GROUPED CARD ASKS THREE THINGS, so naming one of them is wrong —
       // and the first member is the likeliest to be the one already filled in.
@@ -1696,7 +1704,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                 >
                   {msg.content}
                 </div>
-                {msg.slotCard && getSlotDef(msg.slotCard)?.control === 'numeric' && (
+                {msg.slotCard && !msg.slotCardSuperseded && getSlotDef(msg.slotCard)?.control === 'numeric' && (
                   <SlotNumericCard
                     slotKey={msg.slotCard}
                     values={values}
@@ -1708,7 +1716,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     onDecline={handleDecline}
                   />
                 )}
-                {msg.slotCard && (
+                {msg.slotCard && !msg.slotCardSuperseded && (
                   <SlotChipsCard
                     slotKey={msg.slotCard}
                     values={values}
