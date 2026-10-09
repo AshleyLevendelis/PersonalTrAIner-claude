@@ -84,6 +84,7 @@ import { classifyConfirmationReply } from '@/lib/confirmation-reply'
 import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
+import { GROCERY_AISLE_LABEL } from '@/lib/grocery-display'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
 import { subscribeCardioLogStore, deleteCardioLog } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
@@ -211,9 +212,7 @@ function extractQuickReplies(text: string): string[] {
     .filter(Boolean)
 }
 
-const CATEGORY_LABEL_FOR_RECEIPT: Record<GroceryCategory, string> = {
-  produce: 'Produce', meat_fish: 'Meat & Fish', dairy: 'Dairy', dry_goods: 'Dry Goods', frozen: 'Frozen', other: 'Other',
-}
+const CATEGORY_LABEL_FOR_RECEIPT = GROCERY_AISLE_LABEL
 
 // THE FIVE ALLERGENS WITH NO TAG MECHANISM AT ALL (chat-gemini's
 // ALLERGEN_HONESTY_BLOCK names the same five) — keyed by the exact word a

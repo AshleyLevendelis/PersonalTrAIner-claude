@@ -86,7 +86,11 @@ const option = (slot: 'breakfast' | 'lunch' | 'dinner', name: string, ingredient
   macros: { calories: kcal, protein: Math.round(kcal * 0.3 / 4), carbs: Math.round(kcal * 0.45 / 4), fat: Math.round(kcal * 0.25 / 9) } as MacroTargets,
 })
 const mealPools = {
-  breakfast: [option('breakfast', 'Yogurt bowl', [{ name: 'greek yogurt', quantity: 200, unit: 'g' }, { name: 'banana', quantity: 1, unit: 'medium' }], 450)],
+  // ?eggs=1 puts two eggs and a knob of butter in the breakfast, so a build has
+  // something for the "Dairy & eggs" aisle (verify:grocery section 12). Off by
+  // default: every other section builds the list it always built.
+  breakfast: [option('breakfast', 'Yogurt bowl', [{ name: 'greek yogurt', quantity: 200, unit: 'g' }, { name: 'banana', quantity: 1, unit: 'medium' },
+    ...(params.get('eggs') === '1' ? [{ name: 'egg', quantity: 2, unit: 'whole' }, { name: 'butter', quantity: 10, unit: 'g' }, { name: 'tofu firm', quantity: 100, unit: 'g' }] : [])], 450)],
   lunch: [option('lunch', 'Tuna rice bowl', [{ name: 'tuna', quantity: 120, unit: 'g' }, { name: 'brown rice', quantity: 80, unit: 'g' }], 650)],
   dinner: [option('dinner', 'Chicken traybake', [{ name: 'chicken breast', quantity: 180, unit: 'g' }, { name: 'sweet potato', quantity: 200, unit: 'g' }, { name: 'broccoli', quantity: 150, unit: 'g' }], 700)],
 }

@@ -135,7 +135,7 @@ check('"Grocery" 28px bold; the ring 92px reading 3/15; 12 left at 46px', R.titl
 check('the compact title is hidden while the hero is on screen', R.compactOpacity === '0', R.compactOpacity)
 const chipAisles = (R.chipList || []).map(c => c.aisle).join()
 check('one chip per aisle with something left in it (Frozen\'s only item is in the trolley), each counting what is left',
-  chipAisles === 'produce,meat_fish,dairy,dry_goods' && (R.chipList || []).map(c => c.text).join('|') === 'Produce4|Meat & Fish3|Dairy3|Dry Goods2', R.chipList)
+  chipAisles === 'produce,meat_fish,dairy,dry_goods' && (R.chipList || []).map(c => c.text).join('|') === 'Produce4|Meat & fish3|Dairy & eggs3|Dry goods2', R.chipList)
 check('chips are 32px; the first aisle\'s chip is the active one, lit from the accent\'s own glow',
   (R.chipList || []).length === 4 && R.chipList.every(c => near(c.h, 32)) && R.chipList[0].on && R.chipList.slice(1).every(c => !c.on)
   && R.chipList[0].border === R.tokens.onBorder && R.chipList[0].bg === R.tokens.onBg && R.chipList[1].bg === R.tokens.raised,
@@ -281,7 +281,7 @@ const X1 = await page(`
   const db = (window.__fakeDb?.grocery_items ?? []).find(r => r.id === 'g-9')
   return { onScreen: !!row('Cheddar'), dismissed: db ? db.dismissed === true : true, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null }
 `)
-check('Remove takes it off the list, through the store, and the aisle\'s count follows', !X1.onScreen && X1.dismissed && X1.chip === 'Dairy2', X1)
+check('Remove takes it off the list, through the store, and the aisle\'s count follows', !X1.onScreen && X1.dismissed && X1.chip === 'Dairy & eggs2', X1)
 
 console.log('\n[4] A tick lands, waits a beat, leaves — and Undo brings it back')
 const K0 = await page(`
@@ -300,7 +300,7 @@ const K0 = await page(`
 `)
 check('the tick fills the circle with the main colour and its glow', K0.filled && /px/.test(K0.glow || ''), K0)
 check('the row stays in its aisle, struck through at 55%, for a beat', K0.stillInAisle === 'produce' && K0.opacity === '0.55' && /line-through/.test(K0.struck || ''), K0)
-check('a toast says "Spinach is in the trolley", 12px above the add bar', /^Spinach is in the trolley\s*Undo$/.test(K0.toast || '') && near(K0.toastBottom, K0.barTop - 12, 1.5), K0)
+check('a toast says "Spinach — in the trolley", 12px above the add bar', /^Spinach — in the trolley\s*Undo$/.test(K0.toast || '') && near(K0.toastBottom, K0.barTop - 12, 1.5), K0)
 await wait(800)
 const K1 = await page(`return { aisle: aisleOf('Spinach'), trolley: q('[data-testid="grocery-trolley-summary"]')?.textContent.trim() ?? null, ring: q('[data-testid="grocery-ring-count"]')?.textContent.trim() ?? null, left: q('[data-testid="grocery-left"]')?.textContent.trim() ?? null, stored: dbRow('Spinach')?.checked ?? null }`)
 check('after the beat it has left the aisle and is in the trolley, written through the store', K1.aisle === null && /^4 items · .*Spinach/.test(K1.trolley || '') && K1.stored === true, K1)
@@ -316,7 +316,7 @@ const K2 = await page(`
   row('Sweet potato')?.querySelector('[data-testid="grocery-check"]')?.click(); await new Promise(r => setTimeout(r, 150))
   return qa('[data-testid="grocery-toast"]').map(t => t.textContent.trim())
 `)
-check('a newer tick replaces the toast — one toast, the latest item', K2.length === 1 && /^Sweet potato is in the trolley/.test(K2[0]), K2)
+check('a newer tick replaces the toast — one toast, the latest item', K2.length === 1 && /^Sweet potato — in the trolley/.test(K2[0]), K2)
 await wait(5300)
 const K3 = await page(`return !!q('[data-testid="grocery-toast"]')`)
 check('the toast leaves on its own after five seconds', K3 === false, K3)
@@ -433,11 +433,51 @@ check('Home is a trend line, Nutrition a knife and fork, Exercise a dumbbell', i
 console.log('\n[11] Empty, and a list this phone never built')
 await open('?empty=1')
 const EM = await page(`return { ring: q('[data-testid="grocery-ring-count"]')?.textContent.trim() ?? null, empty: q('[data-testid="grocery-empty"]')?.textContent.trim() ?? null, chips: !!q('[data-testid="grocery-chips"]'), addbar: !!q('[data-testid="grocery-addbar"] input'), hero: !!q('[data-testid="grocery-hero"]') }`)
-check('an empty list keeps the hero and the add bar, drops the chips, and points at Rebuild — the button that exists', EM.hero && EM.addbar && !EM.chips && EM.ring === '0/0' && /tap Rebuild above/.test(EM.empty || '') && !/Regenerate/.test(EM.empty || ''), EM)
+check('an empty list keeps the hero and the add bar, drops the chips, and points at "Build my list" — the button that exists, by its own words', EM.hero && EM.addbar && !EM.chips && EM.ring === '0/0' && /tap Build my list above/.test(EM.empty || '') && !/Rebuild|Regenerate/.test(EM.empty || ''), EM)
 await open('?nomemo=1')
 await tapRow('Chicken breast')
 const NM = await page(`return { note: q('[data-testid="grocery-note"]')?.textContent.trim() ?? null, first: row('Chicken breast')?.querySelector('[data-testid="grocery-meals"] li')?.textContent.trim() ?? null }`)
 check('with no record of when it was built, it says "Day 1" and makes no claim about how many days', NM.first === 'Day 1 · Lunch · Chicken rice bowl' && /^Built from the meals on your Nutrition tab\./.test(NM.note || '') && !/next \d+ days/.test(NM.note || ''), NM)
+
+console.log('\n[12] A list built for the first time: the button, the names, the amounts and the aisles')
+// 9 Oct 2026 (M23, L26). A list the plan has never filled says "Build my list",
+// not "Rebuild"; the rows it builds are named and weighed as you buy them
+// ("brown rice", dry weight — never "brown rice cooked"); eggs and butter are
+// under "Dairy & eggs" and tofu is not beside the meat.
+await open('?empty=1&eggs=1')
+const FB0 = await page(`return { button: q('[data-testid="grocery-rebuild"]')?.textContent.trim() ?? null, rows: qa('[data-testid="grocery-row"]').length }`)
+check('a list that was never built offers "Build my list"', FB0.button === 'Build my list' && FB0.rows === 0, FB0)
+const FB1 = await page(`
+  q('[data-testid="grocery-rebuild"]')?.click()
+  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (qa('[data-testid="grocery-row"]').length >= 6) break }
+  await new Promise(r => setTimeout(r, 500))
+  const stored = window.__fakeDb?.grocery_items ?? []
+  return {
+    button: q('[data-testid="grocery-rebuild"]')?.textContent.trim() ?? null,
+    names: qa('[data-testid="grocery-row"]').map(r => r.dataset.item),
+    rice: stored.find(r => r.canonical_key === 'brown rice cooked') ?? null,
+    riceShown: row('brown rice')?.textContent.replace(/\\s+/g, ' ').trim() ?? null,
+    aisles: { egg: aisleOf('egg'), butter: aisleOf('butter'), tofu: aisleOf('tofu firm'), chicken: aisleOf('chicken breast') },
+    dairyHeading: q('[data-testid="grocery-aisle"][data-aisle="dairy"] [data-testid="grocery-aisle-heading"]')?.textContent.trim() ?? null,
+    dairyChip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null,
+  }
+`)
+check('her tap builds it from the meals, and the button then reads "Rebuild"', FB1.button === 'Rebuild' && FB1.names.length >= 8, FB1)
+check('no row is named "... cooked"; the rice is "brown rice"', FB1.names.includes('brown rice') && !FB1.names.some(n => /cooked/i.test(n)), FB1.names)
+// 80g of cooked rice a day for seven days is 560g on the plate and 190g from the bag (x0.34).
+check('the rice is the dry weight to buy (190g for the week, not 560g), under its own unchanged key', FB1.rice?.quantity === 190 && FB1.rice?.unit === 'g' && FB1.rice?.display_name === 'brown rice', FB1.rice)
+check('...and the row shows it (190g)', /190g/.test(FB1.riceShown || '') && !/560|600/.test(FB1.riceShown || ''), FB1.riceShown)
+check('eggs and butter are under dairy, tofu is in dry goods, chicken is still with the meat', FB1.aisles.egg === 'dairy' && FB1.aisles.butter === 'dairy' && FB1.aisles.tofu === 'dry_goods' && FB1.aisles.chicken === 'meat_fish', FB1.aisles)
+check('...and the aisle is called "Dairy & eggs", on its heading and on its chip', /^Dairy & eggs/.test(FB1.dairyHeading || '') && /^Dairy & eggs\d+$/.test(FB1.dairyChip || ''), [FB1.dairyHeading, FB1.dairyChip])
+const FB2 = await page(`
+  row('egg')?.scrollIntoView({ block: 'center' })
+  row('egg')?.querySelector('[data-testid="grocery-check"]')?.click()
+  await new Promise(r => setTimeout(r, 330))
+  const t = q('[data-testid="grocery-toast"]'); const b = box(t)
+  return { toast: t?.textContent.trim() ?? null, onScreen: !!b && b.top >= 0 && b.bottom <= innerHeight }
+`)
+check('ticking the eggs says "Egg — in the trolley", on screen (no "is")', /^Egg — in the trolley\s*Undo$/.test(FB2.toast || '') && FB2.onScreen === true, FB2)
+await send('Page.captureScreenshot', { format: 'png' }).then(s => writeFileSync(new URL('./grocery-first-build.png', import.meta.url).pathname, Buffer.from(s.result.data, 'base64')))
 
 const errs = await call(() => window.__errs ?? [])
 check('nothing on the page threw', errs.length === 0, errs)

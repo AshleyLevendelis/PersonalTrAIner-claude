@@ -9,8 +9,47 @@
 // ---------------------------------------------------------------------------
 
 import { lookupIngredient } from '@/lib/food-db'
-import type { GroceryItemRow, MealRef } from '@/lib/grocery-store'
+import type { GroceryItemRow, GroceryCategory, MealRef } from '@/lib/grocery-store'
 import { weekdayShort, weekdayLong, dayOfMonth } from '@/lib/day-labels'
+
+/**
+ * What each aisle is called — one table, read by the list and by the coach's
+ * receipt (they each had their own copy). "Dairy & eggs" since 9 Oct 2026:
+ * eggs moved there from the meat aisle (L26), so the label says they are
+ * there. The other two-word aisles went to sentence case with it ("Meat &
+ * fish", "Dry goods"): three chips in a row in two different cases read as a
+ * slip. Wording, so Ashley's to change back.
+ */
+export const GROCERY_AISLE_LABEL: Record<GroceryCategory, string> = {
+  produce: 'Produce',
+  meat_fish: 'Meat & fish',
+  dairy: 'Dairy & eggs',
+  dry_goods: 'Dry goods',
+  frozen: 'Frozen',
+  other: 'Other',
+}
+
+/**
+ * The line shown when a row is ticked: "Blueberries — in the trolley".
+ * It was "{name} is in the trolley", which is wrong for every plural on the
+ * list ("blueberries is"). No verb, so it is right for one egg and for eggs.
+ */
+export function trolleyToast(name: string): string {
+  const n = name.trim()
+  return `${n.charAt(0).toUpperCase()}${n.slice(1)} — in the trolley`
+}
+
+/**
+ * What the button that builds the list from the meal plan is called.
+ *
+ * "Build my list" until the plan has put something on it, "Rebuild" after.
+ * A brand-new list said "tap Rebuild above" about a list that had never been
+ * built (L26). The tap itself stays: the list is never built behind her back
+ * (Ashley's standing ruling), so the first build is hers too.
+ */
+export function buildListLabel(items: Pick<GroceryItemRow, 'source'>[]): 'Build my list' | 'Rebuild' {
+  return items.some(i => i.source === 'generated') ? 'Rebuild' : 'Build my list'
+}
 
 /**
  * The largest quantity one shopping line will hold. Line items are stored in
