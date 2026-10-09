@@ -42,7 +42,7 @@ export function WeekContextRow({
   isCalibrationWeek,
   phaseFocus,
   coachNote,
-  estimatedMinutes,
+  sessionLength,
   shortfallNote,
   onOpenProgram,
   onOpenSessionHistory,
@@ -62,7 +62,12 @@ export function WeekContextRow({
   isCalibrationWeek?: boolean
   phaseFocus?: string
   coachNote?: string
-  estimatedMinutes?: number
+  /**
+   * The length of the day ON SCREEN, already worded by formatDayLength
+   * ("~22 min · + 15 optional"). A string, not a number, so this row cannot
+   * print a day's length any other way than the programme list and Home do.
+   */
+  sessionLength?: string
   /** Why today runs shorter than the length they asked for — see session-shortfall.ts. Absent when it does not. */
   shortfallNote?: string
   onOpenProgram?: () => void
@@ -87,7 +92,7 @@ export function WeekContextRow({
   // this round but never actually rendered).
   const headerParts = [`Wk ${weekNumber}/${totalWeeks}`]
   if (phaseToken) headerParts.push(blockNumber != null ? `B${blockNumber} ${phaseToken}` : phaseToken)
-  if (estimatedMinutes != null) headerParts.push(`~${estimatedMinutes} min`)
+  if (sessionLength) headerParts.push(sessionLength)
 
   return (
     // NO CARD. The --surface-raised box around this row went on 6 Sep 2026
@@ -101,6 +106,7 @@ export function WeekContextRow({
           type="button"
           className="min-w-0 flex-1 text-left text-[0.78125rem] text-text-tertiary"
           onClick={onOpenProgram}
+          data-testid="week-context-header"
         >
           {headerParts.join(' · ')}
         </button>
@@ -202,6 +208,7 @@ export function WeekContextRow({
               key={d.date}
               type="button"
               onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
+              data-strip-day={d.dayName}
               className="hit-slop-day flex flex-col items-center gap-1 rounded-[9px] px-1.5 py-1"
               style={isToday ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.4)' } : undefined}
               // This used to interpolate the raw state, so a screen reader

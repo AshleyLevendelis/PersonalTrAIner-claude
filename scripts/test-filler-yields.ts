@@ -105,8 +105,22 @@ console.log('\n[1] the filler gives way — and only the filler')
 console.log('\n[2] a short day that already has its cardio gets the rest of its time')
 const OFFENDERS: { key: string; week: number; day: string }[] = [
   // Pinned from the 23 Sep grid run: the first day the scorer failed on each.
-  { key: 'full_gym|shoulders|30-45|bodybuilding|beginner|fat_loss|high|love', week: 1, day: 'Monday' },          // 19 min, cardio a separate session
-  { key: 'full_gym|shoulders|60-90|bodybuilding|beginner|fat_loss|moderate|tolerate', week: 1, day: 'Monday' },  // 43 min
+  //
+  // TWO OF THE FOUR WERE REPLACED 9 Oct 2026, deliberately, because they
+  // stopped being offenders for the right reason. Both were shoulder-flagged
+  // "Chest & Triceps" days that ran short because the day held ONE press and
+  // ONE triceps movement (19 minutes at 30-45; 43 at 60-90) — and that day is
+  // fixed at its source now (docs/plans/a-shoulders-day-with-shoulder-work.md),
+  // so it has no spare time to hand to mobility and carries no close-out. A
+  // fixture whose subject has gone is replaced, not kept as a check that
+  // cannot fail. The replacements were named the same way the originals were:
+  // by running the grid on the current engine and taking days that still carry
+  // assigned cardio AND still run short (a 90-minute session a flagged pool
+  // cannot fill even after borrowing).
+  //   was: 'full_gym|shoulders|30-45|bodybuilding|beginner|fat_loss|high|love'  Monday
+  //   was: 'full_gym|shoulders|60-90|bodybuilding|beginner|fat_loss|moderate|tolerate'  Monday
+  { key: 'full_gym|shoulders|90+|bodybuilding|beginner|fat_loss|high|love', week: 1, day: 'Monday' },
+  { key: 'home_gym|knees+shoulders+lower_back|90+|bodybuilding|intermediate|fat_loss|high|love', week: 1, day: 'Monday' },
   { key: 'full_gym|shoulders|90+|functional|advanced|fat_loss|moderate|love', week: 1, day: 'Tuesday' },          // 52 min
   { key: 'bodyweight|none|90+|bodybuilding|beginner|fat_loss|high|love', week: 1, day: 'Monday' },               // 47 min, no injury at all
 ]

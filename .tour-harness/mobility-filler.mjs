@@ -19,7 +19,9 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+// Path-independent since 9 Oct 2026: this read another checkout's bundle from
+// any worktree but the main one, and so measured the wrong tree.
+const DIST = join(import.meta.dirname, 'dist/')
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -87,7 +89,7 @@ const last = rows[rows.length - 1]
 if (last) await ev(`window.scrollTo(0, ${Math.max(0, last.top - 500)})`)
 await wait(400)
 const shot = await send('Page.captureScreenshot', { format: 'png' })
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/mobility-filler.png', Buffer.from(shot.result.data, 'base64'))
+writeFileSync(join(import.meta.dirname, 'mobility-filler.png'), Buffer.from(shot.result.data, 'base64'))
 
 console.log('\nA SHORT DAY WITH ITS CARDIO, AND THE OPTIONAL REST OF ITS TIME\n')
 const cardioRow = rows.find(r => r.label === 'Finisher') ?? null

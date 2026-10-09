@@ -557,16 +557,6 @@ export interface WorkoutDay {
    */
   is_scheduled?: boolean
   /**
-   * Plain-language note for the (rare) case a required movement pattern for
-   * this day genuinely has nothing eligible under the trainee's equipment
-   * and injury constraints, even after trying a nearest-pattern substitute
-   * (see fillSlot's "(none)" case in exercise-plan.ts). Previously this only
-   * reached an internal trace (constraint_trace.structure_adjusted) — never
-   * the trainee. Set once on the base plan and carried through periodized
-   * weeks unchanged (same convention as conditioning_note).
-   */
-  pattern_gap_note?: string
-  /**
    * Plain-language note for the case a block's exercise structure had to
    * lose a whole exercise (not just sets) to fit that block's own real
    * rest cost — see sizeBlockToRestBudget in exercise-plan.ts. Set once per

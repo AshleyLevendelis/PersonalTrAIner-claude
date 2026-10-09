@@ -202,6 +202,7 @@ export function ExerciseTab({
           plan={plan}
           mesocycle={mesocycle}
           profileId={profileId}
+          injuries={profile?.injuries}
           initialWeek={route.kind === 'program' ? route.week : undefined}
           // WIRED, not merely available. ExerciseTab has had logsVersion since
           // the week strip needed it and never passed it down, so the program

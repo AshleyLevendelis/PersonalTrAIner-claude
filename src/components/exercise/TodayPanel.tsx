@@ -15,7 +15,7 @@ import { cardioLine } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId } from '@/lib/exercise-db'
-import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '@/lib/session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds, dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -40,7 +40,7 @@ import type { TightnessAnswer } from './TightnessSheet'
 import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
-import { FinisherRow } from './FinisherRow'
+import { FinishSection } from './FinisherRow'
 import { isScheduledDay, dayDetail } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
@@ -75,6 +75,7 @@ import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
+import { describeDayGap } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
@@ -788,7 +789,16 @@ export function TodayPanel({
   // a WeekContextRow prop and documented in its header — it had simply never
   // been passed, so the "~52 min" chip it describes never rendered at all.
   const sessionEstimate = (() => {
-    if (!workout || workout.exercises.length === 0) return { minutes: undefined, note: undefined }
+    // THE HEADER SHOWS THE DAY THAT IS OPEN (test log L17). It printed today's
+    // minutes while another day was being looked at: a 40-minute leg day read
+    // "~22 min" because today was the short one. While peeking, the length is
+    // the peeked day's — and the shortfall note, which is about TODAY's
+    // session against the length asked for, is not shown at all.
+    if (peekDay) {
+      const shown = peekWorkout && peekWorkout.exercises.length > 0 ? peekWorkout : null
+      return { length: shown ? formatDayLength(dayLengthParts(shown)) : undefined, note: undefined }
+    }
+    if (!workout || workout.exercises.length === 0) return { length: undefined, note: undefined }
     const seconds = estimateDaySeconds(workout)
     // A DAY SOMEBODY SHORTENED SAYS SO. Otherwise the only trace of "I've only
     // got 25 minutes" is a session that is quietly two exercises thinner than
@@ -819,7 +829,9 @@ export function TodayPanel({
       shortenedToMinutes: shortened,
     })
     return {
-      minutes: actual,
+      // Work and optional, apart — one helper, shared with the programme list
+      // and Home (see dayLengthParts).
+      length: formatDayLength(dayLengthParts(workout)),
       note: [shortenedLine, shortfall?.note].filter(Boolean).join(' ') || undefined,
     }
   })()
@@ -868,7 +880,7 @@ export function TodayPanel({
         isCalibrationWeek={currentMesoWeekObj?.isCalibrationWeek}
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
-        estimatedMinutes={sessionEstimate.minutes}
+        sessionLength={sessionEstimate.length}
         shortfallNote={sessionEstimate.note}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
@@ -1142,11 +1154,13 @@ export function TodayPanel({
               />
             )
           })()}
-          {workout!.pattern_gap_note && (
-            <InsightBanner tone="warning" className="text-xs">
-              {workout!.pattern_gap_note}
-            </InsightBanner>
-          )}
+          {/* Derived from the day as it is and the profile as it is — it used
+              to be stamped at generation and went on naming a flag nobody had.
+              A plain note, not a warning: nothing is wrong with the day. */}
+          {(() => {
+            const gap = describeDayGap(workout!, { injuries: profile?.injuries ?? [] })
+            return gap ? <p className="text-xs text-muted-foreground" data-testid="day-gap-note">{gap}</p> : null
+          })()}
           {workout!.block_size_note && (
             <div className="flex items-start gap-2">
               <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
@@ -1211,16 +1225,9 @@ export function TodayPanel({
               }
             }}
           />
-          {(workout!.recommendedCardio || workout!.mobilityFiller) && (
-            <>
-              <p className="ds-label-compact">Finish</p>
-              {workout!.recommendedCardio && <FinisherRow cardio={workout!.recommendedCardio} />}
-              {/* The optional mobility close-out on a day that already had its
-                  cardio and still ran short — applyDurationFiller. Its own row,
-                  after the cardio, because that is the order to do them in. */}
-              {workout!.mobilityFiller && <FinisherRow cardio={workout!.mobilityFiller} label="Optional" />}
-            </>
-          )}
+          {/* "Finish" for what ends the session; "Also today" for a session the
+              plan set apart from it. FinishSection decides which is which. */}
+          <FinishSection cardio={workout!.recommendedCardio} mobilityFiller={workout!.mobilityFiller} />
           <AdditionalWorkSection
             plannedExercises={workout!.exercises}
             plannedCardio={[workout!.recommendedCardio?.activity, workout!.mobilityFiller?.activity]}

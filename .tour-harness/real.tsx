@@ -66,6 +66,7 @@ import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { getExerciseId, getExerciseEntry, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
+import { estimateDaySeconds, optionalFillerSeconds } from '@/lib/session-duration'
 import { prescribeLoad, isExternallyLoaded } from '@/lib/load-prescription'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
 import '@/index.css'
@@ -164,6 +165,14 @@ const FINISHER = new URLSearchParams(location.search).get('finisher') === '1'
 // running the harness's own day pattern and seed across 108 variants, not by
 // guessing — the first guess (30-45) gave the live week no such day at all.
 const MOBILITY = new URLSearchParams(location.search).get('mobility') === '1'
+// ?sam=1 — THE TESTER'S PROFILE (test log H4), for verify:day-length. Minimalist
+// kit, bodybuilding, four days, 30-45 minutes, intermediate, fat loss, and a
+// shoulder flag. It is the profile where a day's printed length was "9 sets ·
+// ~37 min" over seven working sets, a 30-minute walk the engine had made a
+// SEPARATE session was drawn as the session's "Finisher", and "Shoulders & Abs"
+// carried "not a bug, just a real gap". The plan is generated, never
+// hand-built: the driver asks the page which day holds what.
+const SAM = new URLSearchParams(location.search).get('sam') === '1'
 // ?walker=1 — THE BEGINNER'S WALKING PLAN, the only plan the app generates
 // whose days hold a prescribed ACTIVITY instead of exercises.
 //
@@ -194,7 +203,7 @@ const profile: UserProfile = {
   // old size. The app now SAYS so (meal-refit's residue line), and the harness
   // stops describing a profile that eats a snack it does not budget for.
   meals_per_day: 3, include_snacks: true,
-  fitness_goal: FINISHER || WALKER || MOBILITY ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
+  fitness_goal: FINISHER || WALKER || MOBILITY || SAM ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   ...(WALKER ? { start_preference: 'move_more' as const } : {}),
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
   //
@@ -204,10 +213,10 @@ const profile: UserProfile = {
   // three splits and three seeds before picking this one, rather than
   // hand-seeding a plan row, which would have proved only that a string I
   // wrote myself renders.
-  equipment_access: WALKER ? 'bodyweight' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: MOBILITY ? ['shoulders'] : [],
-  training_style: WALKER || OFF_STYLE ? 'functional' : MOBILITY ? 'bodybuilding' : 'hybrid',
-  training_experience: WALKER || MOBILITY ? 'beginner' : 'intermediate', session_duration_preference: MOBILITY ? '90+' : '45-60',
-  workout_split_preference: LEG_CURL ? 'push_pull_legs' : 'upper_lower',
+  equipment_access: WALKER ? 'bodyweight' : SAM ? 'minimalist' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: MOBILITY || SAM ? ['shoulders'] : [],
+  training_style: WALKER || OFF_STYLE ? 'functional' : MOBILITY || SAM ? 'bodybuilding' : 'hybrid',
+  training_experience: WALKER || MOBILITY ? 'beginner' : 'intermediate', session_duration_preference: MOBILITY ? '90+' : SAM ? '30-45' : '45-60',
+  workout_split_preference: LEG_CURL ? 'push_pull_legs' : SAM ? 'ai_recommendation' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
@@ -473,6 +482,40 @@ const loggedTarget = (() => {
     day: hit.day, date: nearestAnchorDate(hit.day),
     cardio: hit.recommendedCardio!.activity, cardioMinutes: hit.recommendedCardio!.duration,
     mobility: hit.mobilityFiller!.activity, mobilityMinutes: hit.mobilityFiller!.duration,
+  }
+})()
+
+// WHAT EACH DAY OF THE LIVE WEEK IS MADE OF — published for verify:day-length.
+//
+// The INPUTS a length is built from, never the worded length itself: the
+// driver reads "~22 min · + 15 optional" off the screen and checks it against
+// these seconds, so a helper that worded the wrong number cannot agree with
+// itself. From the live week, training days only, like the targets above.
+;(window as unknown as { __dayLengthTargets: unknown }).__dayLengthTargets = (() => {
+  // THE WEEK OF THE DATE ON SCREEN, not the anchor's. A driver that pins
+  // `today=` to a weekday's nearest date can land in the plan week before or
+  // after the anchor's, where the same day runs a minute longer or shorter —
+  // found on this driver's first run, as a header "arguing" with a programme
+  // row about a figure both had right.
+  const shown = new Date(`${TODAY_ISO}T12:00:00`)
+  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, shown, mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan
+  return {
+    liveWeek,
+    today: DAYS[shown.getDay()],
+    days: liveDays.filter(d => d.exercises.length > 0).map(d => ({
+      day: d.day,
+      date: nearestAnchorDate(d.day),
+      focus: d.focus,
+      totalSeconds: estimateDaySeconds(d),
+      optionalSeconds: optionalFillerSeconds(d),
+      workingSets: d.exercises.filter(e => (e as unknown as { tier?: string }).tier !== 'tier_0_primer').reduce((n, e) => n + e.sets, 0),
+      allSets: d.exercises.reduce((n, e) => n + e.sets, 0),
+      cardio: d.recommendedCardio ? { activity: d.recommendedCardio.activity, minutes: d.recommendedCardio.duration, timing: d.recommendedCardio.timing, filler: !!d.recommendedCardio.is_filler } : null,
+      mobilityMinutes: d.mobilityFiller?.duration ?? null,
+      hasOverheadPress: d.exercises.some(e => getExerciseEntry(e.name)?.movement_pattern === 'vertical_push'),
+      warmupMinutes: Math.round((d.warmup?.total_seconds ?? 0) / 60),
+    })),
   }
 })()
 

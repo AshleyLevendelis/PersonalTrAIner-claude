@@ -21,7 +21,9 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+// Path-independent since 9 Oct 2026: this read another checkout's bundle from
+// any worktree but the main one, and so measured the wrong tree.
+const DIST = join(import.meta.dirname, 'dist/')
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -117,7 +119,7 @@ check('5b. ...holding the plan\'s minutes and its effort before any tap',
   row.minutesHint === String(target.duration) && row.effort.join(',') === word(target.rpe).toLowerCase(), row)
 
 const shot = await send('Page.captureScreenshot', { format: 'png' })
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/finisher-detail.png', Buffer.from(shot.result.data, 'base64'))
+writeFileSync(join(import.meta.dirname, 'finisher-detail.png'), Buffer.from(shot.result.data, 'base64'))
 
 const tapSave = await ev(`(() => {
   const n = document.querySelector('[data-testid="finisher-row"] [data-testid="cardio-save"]')
@@ -137,7 +139,7 @@ const stored = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => ({ a: r.a
 check('8. ...stored at the plan\'s own minutes and its exact RPE',
   stored.length === 1 && stored[0].a === target.activity && stored[0].m === target.duration && stored[0].rpe === target.rpe,
   { stored, want: { a: target.activity, m: target.duration, rpe: target.rpe } })
-await send('Page.captureScreenshot', { format: 'png' }).then(r => writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/finisher-logged.png', Buffer.from(r.result.data, 'base64')))
+await send('Page.captureScreenshot', { format: 'png' }).then(r => writeFileSync(join(import.meta.dirname, 'finisher-logged.png'), Buffer.from(r.result.data, 'base64')))
 
 // AND IT IS STILL LOGGED WHEN YOU COME BACK — the old "Logged" was component
 // state, and a tab change offered to log the same finisher a second time.

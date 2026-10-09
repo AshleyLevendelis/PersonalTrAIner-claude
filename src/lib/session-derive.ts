@@ -225,6 +225,19 @@ export interface NormalizedWarmup {
   coachNote?: string
 }
 
+/**
+ * The closed section's badge. Without today-only drills it is the plan's own
+ * warm-up, the same on every screen: "4 moves · ~6 min". With them, the plan's
+ * part and today's part are said apart, so the number matches the programme
+ * view's and the difference is explained: "4 moves + 3 for today · ~6 + 4 min".
+ */
+export function warmupBadgeText(planMoves: number, planMinutes: number, todayMoves: number, todayMinutes: number): string {
+  const moves = (n: number) => `${n} ${n === 1 ? 'move' : 'moves'}`
+  return todayMoves > 0
+    ? `${moves(planMoves)} + ${todayMoves} for today · ~${planMinutes} + ${todayMinutes} min`
+    : `${moves(planMoves)} · ~${planMinutes} min`
+}
+
 /** Returns null when there is genuinely nothing renderable — callers should render nothing, exactly like the old `!warmup` guard. */
 export function normalizeWarmup(warmup: WorkoutDay['warmup'] | null | undefined): NormalizedWarmup | null {
   if (!warmup || typeof warmup !== 'object') return null

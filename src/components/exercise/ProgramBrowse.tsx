@@ -3,7 +3,9 @@ import { ChevronDown, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { tabHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { estimateDaySeconds } from '@/lib/session-duration'
+import { dayLengthParts, formatDayLength, isSeparateSession } from '@/lib/session-duration'
+import { describeDayGap } from '@/lib/day-gap-note'
+import { SEPARATE_SESSION_LABEL } from './FinisherRow'
 import { groupExercises, mainLiftGroupIndex } from '@/lib/session-derive'
 import { getLoggedPlanDays } from '@/lib/exercise-history'
 import { weekNoteText } from '@/lib/week-note'
@@ -52,6 +54,8 @@ interface ProgramBrowseProps {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
   profileId?: string
+  /** The person's current flags — the day's gap note is derived from them when the day is shown, never stored. */
+  injuries?: string[]
   /** From the route hash (`#/exercise/program/{n}`) — where paging starts. */
   initialWeek?: number
   /**
@@ -115,6 +119,7 @@ export function ProgramBrowse({
   plan,
   mesocycle,
   profileId,
+  injuries,
   initialWeek,
   refreshToken,
   onOpenSwap,
@@ -402,7 +407,10 @@ export function ProgramBrowse({
           const dim = done && !isToday
           const open = openDay === dayName && trains
           const sets = daySets(workout)
-          const mins = trains ? Math.round(estimateDaySeconds(workout) / 60) : 0
+          // ONE helper for a day's printed length, shared with the Exercise tab's
+          // header and Home — see dayLengthParts. The bar beside it still scales
+          // on every row's sets (`sets`), which is a comparison between days.
+          const length = trains ? dayLengthParts(workout) : null
           const main = trains ? mainLiftLine(workout) : null
           // WHAT WAS DONE INSTEAD, on the live week only — for the reason a
           // move is: a swap is a fact about one date, not an edit to the plan
@@ -442,6 +450,7 @@ export function ProgramBrowse({
                 role="button"
                 tabIndex={trains ? 0 : -1}
                 aria-expanded={trains ? open : undefined}
+                data-program-day={dayName}
                 onClick={() => { if (trains) { setOpenDay(prev => (prev === dayName ? null : dayName)); setWarmupOpen(false) } }}
                 onKeyDown={e => {
                   if (trains && (e.key === 'Enter' || e.key === ' ')) {
@@ -528,7 +537,7 @@ export function ProgramBrowse({
                           />
                         </div>
                         <span className="tabular-mono text-[0.65625rem] shrink-0" style={{ color: 'color-mix(in srgb, var(--muted-foreground) 70%, transparent)' }}>
-                          {sets} sets · ~{mins} min
+                          <span data-testid="program-day-length">{length ? `${length.workingSets} sets · ${formatDayLength(length)}` : ''}</span>
                         </span>
                       </div>
                     </div>
@@ -556,7 +565,8 @@ export function ProgramBrowse({
                 <div style={{ padding: '4px 2px 18px 46px' }} className="flex flex-col gap-3">
                   {/* Day-level notes the old cards carried — kept, quietly. */}
                   {workout.recommendedCardio && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground" data-testid="program-day-cardio">
+                      {isSeparateSession(workout.recommendedCardio) ? `${SEPARATE_SESSION_LABEL}: ` : ''}
                       {prescriptionLine(workout.recommendedCardio)}
                       {workout.recommendedCardio.timing === 'post_session' ? ' — after the lifting' : ''}
                     </p>
@@ -569,9 +579,10 @@ export function ProgramBrowse({
                   {workout.conditioning_note && !workout.recommendedCardio && (
                     <p className="text-xs text-muted-foreground">{workout.conditioning_note}</p>
                   )}
-                  {workout.pattern_gap_note && (
-                    <p className="text-xs" style={{ color: 'var(--role-warn)' }}>{workout.pattern_gap_note}</p>
-                  )}
+                  {(() => {
+                    const gap = describeDayGap(workout, { injuries: injuries ?? [] })
+                    return gap ? <p className="text-xs text-muted-foreground" data-testid="day-gap-note">{gap}</p> : null
+                  })()}
                   {workout.block_size_note && (
                     <p className="text-xs text-muted-foreground">{workout.block_size_note}</p>
                   )}

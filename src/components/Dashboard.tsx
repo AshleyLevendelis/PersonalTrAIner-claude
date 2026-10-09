@@ -442,7 +442,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} ${data.session.leadLift.kg} kg`)
   } else {
     glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
-    if (data.session.estimatedMinutes != null) glanceParts.push(`~${data.session.estimatedMinutes} min`)
+    if (data.session.sessionLength) glanceParts.push(data.session.sessionLength)
     if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} from ${data.session.leadLift.kg} kg`)
   }
   const sessionGlance = glanceParts.join(' · ')
@@ -564,8 +564,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         <div data-tour="hero">
           <div className="flex items-baseline justify-between gap-3">
             <p className="ds-label">Today&apos;s session</p>
-            {data.session.status !== 'rest' && data.session.status !== 'unknown' && data.session.status !== 'moved' && data.session.estimatedMinutes != null && (
-              <span className="text-[0.6875rem] text-muted-foreground">~{data.session.estimatedMinutes} min</span>
+            {data.session.status !== 'rest' && data.session.status !== 'unknown' && data.session.status !== 'moved' && data.session.sessionLength && (
+              <span className="text-[0.6875rem] text-muted-foreground" data-testid="home-session-length">{data.session.sessionLength}</span>
             )}
           </div>
 
