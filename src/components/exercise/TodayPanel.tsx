@@ -1223,6 +1223,7 @@ export function TodayPanel({
             open={unplannedWorkOpen}
             onOpenChange={setUnplannedWorkOpen}
             hideTrigger
+            equipmentAccess={profile?.equipment_access}
           />
           {/* Clears the fixed CTA bar below, so the last row is never sitting
               underneath it. Matches the bar's own height plus its fade. */}
