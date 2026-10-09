@@ -21,6 +21,8 @@ import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import type { ReasonAnswer } from './EditReasonStep'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
+import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { ActiveAdaptationLines } from './ActiveAdaptationLines'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §5.1 — the view switcher: 'today' (TodayPanel, the
@@ -35,7 +37,20 @@ interface ExerciseTabProps {
   exclusions: string[]
   /** Soft likes/dislikes — reorders the swap list, removes nothing. */
   softExercisePreferences?: { liked: string[]; disliked: string[] }
+  /**
+   * The profile a POOL is built from — the saved one plus anything temporarily
+   * being eased off (effective-constraints.ts). Read by the swap list, add,
+   * the session rebuild and the warm-up. Never saved.
+   */
   profile?: UserProfile
+  /** The profile as SAVED. Anything here that writes the profile uses this one. */
+  storedProfile?: UserProfile
+  /** Temporary changes running now — drawn as a line above today's session. */
+  activeAdaptations?: PlanAdaptationRow[]
+  endingAdaptationId?: string | null
+  onEndAdaptation?: (id: string) => Promise<string | null>
+  /** Fired when a row here starts a temporary change, so App re-reads them. */
+  onAdaptationsChanged?: () => void
   profileId?: string
   /** Fired when steps are logged HERE, so the chat tab (which never unmounts) re-reads them. */
   planCreatedAt?: string
@@ -65,6 +80,11 @@ export function ExerciseTab({
   exclusions,
   softExercisePreferences,
   profile,
+  storedProfile,
+  activeAdaptations,
+  endingAdaptationId,
+  onEndAdaptation,
+  onAdaptationsChanged,
   profileId,
   planCreatedAt,
   devOverrideWeek,
@@ -150,21 +170,26 @@ export function ExerciseTab({
   const applyInjury = useCallback(async (
     answer: Extract<ReasonAnswer, { type: 'injury' }>,
   ): Promise<string | null> => {
-    if (!profile || !mesocycle) return 'No plan to edit.'
+    // THE SAVED PROFILE, not the pool one: a lasting injury is written to the
+    // profile from here, and a temporary one must never ride along with it.
+    const saved = storedProfile ?? profile
+    if (!saved || !mesocycle) return 'No plan to edit.'
     const { applyInjuryFromRow } = await import('@/lib/screen-adaptations')
-    const r = await applyInjuryFromRow(profile, mesocycle, liveWeek, answer.hurt, answer.area, exclusions)
+    const r = await applyInjuryFromRow(saved, mesocycle, planCreatedAt, answer.hurt, answer.area, exclusions)
     if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
-    if (r.addInjuryCode) onProfileChanged?.({ injuries: [...(profile.injuries ?? []), r.addInjuryCode] })
+    if (r.addInjuryCode) onProfileChanged?.({ injuries: [...(saved.injuries ?? []), r.addInjuryCode] })
+    if (r.mesocycle) onAdaptationsChanged?.()
     return r.message
-  }, [profile, mesocycle, liveWeek, exclusions, onMesocycleUpdated, onProfileChanged])
+  }, [storedProfile, profile, mesocycle, planCreatedAt, exclusions, onMesocycleUpdated, onProfileChanged, onAdaptationsChanged])
 
   const applyEquipment = useCallback(async (tier: string): Promise<string | null> => {
-    if (!profile || !mesocycle) return 'No plan to edit.'
+    const saved = storedProfile ?? profile
+    if (!saved || !mesocycle) return 'No plan to edit.'
     const { applyEquipmentFromRow } = await import('@/lib/screen-adaptations')
-    const r = await applyEquipmentFromRow(profile, mesocycle, liveWeek, tier, exclusions)
-    if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
+    const r = await applyEquipmentFromRow(saved, mesocycle, planCreatedAt, tier, exclusions)
+    if (r.mesocycle) { onMesocycleUpdated?.(r.mesocycle); onAdaptationsChanged?.() }
     return r.message
-  }, [profile, mesocycle, liveWeek, exclusions, onMesocycleUpdated])
+  }, [storedProfile, profile, mesocycle, planCreatedAt, exclusions, onMesocycleUpdated, onAdaptationsChanged])
 
   /**
    * THE SWAP'S FOUR ANSWERS. Two of them are not swaps: "it hurts" is the
@@ -240,11 +265,21 @@ export function ExerciseTab({
       {/* A cardio log that failed to sync used to be invisible and
           unrecoverable — the store's retry/discard functions had no caller. */}
       <FailedCardioNotice />
+      {/* A temporary change to the plan says so here for as long as it runs,
+          with the way to end it (M25). The same component as Profile's. */}
+      <ActiveAdaptationLines
+        adaptations={activeAdaptations ?? []}
+        profileId={profileId}
+        endingId={endingAdaptationId}
+        onEnd={onEndAdaptation}
+        className="mb-3 space-y-2"
+      />
       <TodayPanel
         plan={plan}
         mesocycle={mesocycle}
         exclusions={exclusions}
         profile={profile}
+        storedProfile={storedProfile}
         profileId={profileId}
         planCreatedAt={planCreatedAt}
         logsVersion={logsVersion}

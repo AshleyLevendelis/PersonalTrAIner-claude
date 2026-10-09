@@ -38,6 +38,13 @@ import { applyReplacement, banExerciseFromMesocycle, swapExerciseInMesocycle, re
 import { substituteForInjury } from '../src/lib/plan-adaptations'
 import { rebuildDayAroundMainLift } from '../src/lib/session-rebuild'
 import type { Exercise, MesocycleWeek, UserProfile } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// These gates address whole plan weeks on a plan nobody has trained on: every
+// row of the named weeks, and no day protected. (A live plan addresses days by
+// date and loads the real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
+const rowsOfWeeks = (m: { week_number: number; days: { day: string }[] }[], weeks: number[]) =>
+  m.filter(w => weeks.includes(w.week_number)).flatMap(w => w.days.map(d => ({ weekNumber: w.week_number, dayName: d.day })))
 
 let failures = 0
 let ran = 0
@@ -239,7 +246,7 @@ async function main() {
 
   // (a) injury adaptation — the tester's knee card.
   const kneeProfile = sam()
-  const knee = await silencedAsync(() => substituteForInjury({ mesocycle: samPlan, profile: kneeProfile, injuryCode: 'knees', weekNumbers: [1, 2], exclusions: [] }))
+  const knee = await silencedAsync(() => substituteForInjury({ mesocycle: samPlan, profile: kneeProfile, injuryCode: 'knees', targetDays: rowsOfWeeks(samPlan, [1, 2]), exclusions: [], context: GATE_CONTEXT }))
   inspect('knee adaptation', samPlan, knee.mesocycle, kneeProfile, 8)
   const stepUp = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Thursday')!.exercises.find(e => e.name === 'Low Box Step-Up')
   check('the step-up that replaced a walking lunge reads 10-12, not the lunge\'s bought 11-13', stepUp?.reps === '10-12', stepUp?.reps)
@@ -347,9 +354,22 @@ async function main() {
   // The tempo is the WEEK's, not whatever the outgoing lift carried.
   check('the week\'s tempo is offered in a loading week (Adaptation: 2-0-1)', prog.tempo === '2-0-1', prog.tempo)
   check('...and none on a deload', twoSets.tempo === null, twoSets.tempo)
-  const thuStepUp = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Thursday')!.exercises.find(e => e.name === 'Low Box Step-Up')
-  const satStepUp = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Saturday')!.exercises.find(e => e.name === 'Low Box Step-Up')
-  check('the same step-up reads the same on both days — tempo whether it replaced a loaded lunge or a bodyweight squat', thuStepUp?.tempo === '2-0-1' && satStepUp?.tempo === '2-0-1', { thu: thuStepUp?.tempo, sat: satStepUp?.tempo })
+  // RE-ANCHORED 9 Oct 2026 (adaptations-respect-the-week-already-trained).
+  // This used to find Low Box Step-Up on BOTH leg days of the week, which was
+  // itself the defect: an adaptation's substitutes were unique per day only,
+  // so one stand-in landed on every leg day. They are now varied across the
+  // week where another fits, so Saturday holds a different single-leg lift.
+  // The property is unchanged and is held for whatever came in: a swapped-in
+  // lift that may carry a tempo carries THIS week's, whatever it replaced.
+  const cameIn = (day: string) => {
+    const before = new Set(samPlan.find(w => w.week_number === 2)!.days.find(d => d.day === day)!.exercises.map(e => e.name))
+    return knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === day)!.exercises.filter(e => !before.has(e.name))
+  }
+  const thuStepUp = cameIn('Thursday').find(e => e.name === 'Low Box Step-Up')
+  const withTempo = [...cameIn('Thursday'), ...cameIn('Saturday')].filter(e => e.tempo != null)
+  check('a swapped-in lift reads this week\'s tempo on both leg days — whether it replaced a loaded lunge or a bodyweight squat',
+    thuStepUp?.tempo === '2-0-1' && cameIn('Saturday').some(e => e.tempo != null) && withTempo.every(e => e.tempo === '2-0-1'),
+    { thu: cameIn('Thursday').map(e => `${e.name}:${e.tempo}`), sat: cameIn('Saturday').map(e => `${e.name}:${e.tempo}`) })
   const spanish = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Thursday')!.exercises.find(e => e.name === 'Spanish Squat')
   check('...and the Spanish Squat that came in beside it is a 35-50s hold with no tempo', spanish?.reps === '35-50s' && spanish?.tempo === undefined, spanish && { reps: spanish.reps, tempo: spanish.tempo })
   check('a hold swapped for a rep lift takes that lift\'s own range, not a fallback', replacementProgramming(holdSlot, ote, cleared, wkAA).reps === repRangeForIncomingExercise(ote, cleared, wkAA, 'RPE 6-7'), replacementProgramming(holdSlot, ote, cleared, wkAA))

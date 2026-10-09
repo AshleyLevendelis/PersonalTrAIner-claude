@@ -48,7 +48,11 @@ import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
-import { createPlanAdaptation } from '@/lib/plan-adaptations-store'
+import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
+import { planDaysInWindow, describeDateSpan, dayAndMonth, type PlanDayOnDate } from '@/lib/plan-guard'
+import { areaInWords, endsOn, isAdaptationActive } from '@/lib/effective-constraints'
+import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { updateProfileField } from '@/lib/profile-store'
 import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from '@/lib/plan-adaptations'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -238,6 +242,21 @@ interface FavoriteMeal {
 
 interface ChatAssistantProps {
   profile: UserProfile
+  /**
+   * The profile a POOL of exercises is built from: `profile` plus anything
+   * temporarily being eased off (effective-constraints.ts). Used wherever the
+   * coach picks or offers an exercise. Never saved — every profile write below
+   * uses `profile`.
+   */
+  poolProfile?: UserProfile
+  /** Temporary changes to the plan running now, loaded by App with the plan. */
+  activeAdaptations?: PlanAdaptationRow[]
+  /** Fired when a card here starts a temporary change, so App re-reads them. */
+  onAdaptationsChanged?: () => void
+  /** Ends a temporary change early; resolves to a sentence when it could not. */
+  onEndAdaptation?: (id: string) => Promise<string | null>
+  /** The rebuild offer — App asks, and only a yes rebuilds. Same road as Profile's. */
+  onPlanInvalidated?: (invalidation: PlanInvalidation) => void
   /** Living targets from computeTargets (M0) — the SAME numbers the Nutrition tab shows, respecting the user's selected macro mode. Null when a body metric is missing; already guarded internally (line ~355) before any use. */
   macros: MacroTargets | null
   exercisePlan: WorkoutDay[]
@@ -396,11 +415,14 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
   const activeSession = useActiveSession()
+  // What a pool is built from. Falls back to the saved profile, so a caller
+  // that passes nothing gets exactly the old behaviour.
+  const poolProfile = poolProfileProp ?? profile
   // Turn 6 composer fix: `sticky bottom-0` was inert inside CardContent's
   // `overflow-hidden` (overflow:hidden ancestors don't give sticky anything
   // to stick within — only overflow:auto/scroll do), and the Card's own
@@ -1451,7 +1473,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // carried no prescribed weight while the Exercise tab showed that weight
     // on the next screen.
     const stepsSummary = buildCoachStepsSummary(todaySteps, profile)
-    const injuriesSummary = buildCoachInjuriesSummary(profile)
+    const injuriesSummary = buildCoachInjuriesSummary(profile, activeAdaptations, getAppNow(profile.id))
     // Same shape as steps_summary below, and the same shared source: reads
     // proactiveData rather than re-deriving it, so the coach's number and
     // the Dashboard's number cannot drift apart.
@@ -2210,7 +2232,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const day = week.days.find(d => d.day === dayName)
     if (!day) return { ok: false, reason: `I couldn't find ${dayArg} on your plan.` }
 
-    const entry = resolveAdditionRequest(item, profile, exerciseExclusions)
+    const entry = resolveAdditionRequest(item, poolProfile, exerciseExclusions)
     if (!entry) {
       return { ok: false, reason: `I can't add ${item} — it isn't something I can prescribe with your equipment and injuries. Tell me what you have available and I'll find the closest thing.` }
     }
@@ -2519,10 +2541,24 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   }
 
   /**
+   * Which days are already trained, what is temporarily being eased off, and
+   * what today is — read fresh for each card and each confirm, because a
+   * session finished in between is trained. Every adaptation and rebuild below
+   * is handed this and cannot run without it.
+   */
+  const loadEditContext = () => loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
+
+  /** "Thursday 15 Oct" — a card row is named by the day it is trained, so the rows read in date order. */
+  const adaptationRowLabel = (slot: { weekNumber: number; dayName: string }, days: PlanDayOnDate[]): string => {
+    const on = days.find(d => d.weekNumber === slot.weekNumber && d.dayName === slot.dayName)
+    if (!on) return `${slot.dayName} (Week ${slot.weekNumber})`
+    return `${slot.dayName} ${dayAndMonth(on.date)}`
+  }
+
+  /**
    * Mirrors buildExerciseSwapProposal's shape exactly, for the injury
-   * adaptation middle tier (§3a). Converts duration_days into a week-number
-   * range starting at the live week (mesocycle weeks are the only
-   * granularity slots actually have) and runs substituteForInjury client-
+   * adaptation middle tier (§3a). Converts duration_days into the plan rows
+   * trained on those dates (plan-guard.ts) and runs substituteForInjury client-
    * side to build the real diff — same I1 reasoning as the swap proposal:
    * the server never touches the plan.
    */
@@ -2537,15 +2573,18 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     const durationDays = Number(rawArgs.duration_days)
     if (!injuryCode || !durationDays || durationDays <= 0 || mesocycle.length === 0) return null
 
+    // THE WINDOW IS DATES (test log H11, 9 Oct 2026). It used to be "every
+    // plan week from the live one, for ceil(days / 7) weeks": said on a
+    // Thursday, a 14-day change rewrote the four days of the week already
+    // past, the finished session among them, and stopped three days short.
+    const context = await loadEditContext()
+    const targetDays = planDaysInWindow(mesocycle, context.calendar, durationDays)
+    const weekNumbers = [...new Set(targetDays.map(d => d.weekNumber))]
     const startWeek = activeSession.liveWeek
-    const weekSpan = Math.max(1, Math.ceil(durationDays / 7))
-    const weekNumbers = mesocycle
-      .map(w => w.week_number)
-      .filter(n => n >= startWeek && n < startWeek + weekSpan)
-    if (weekNumbers.length === 0) return null
+    if (targetDays.length === 0) return null
 
     const result = await substituteForInjury({
-      mesocycle, profile, injuryCode, weekNumbers, exclusions: exerciseExclusions,
+      mesocycle, profile, injuryCode, targetDays, exclusions: exerciseExclusions, context,
     })
     if (result.touchedSlots.length === 0) return null
 
@@ -2554,31 +2593,33 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     // hollow programme is still two weeks of not training.
     const verdict = assessAdaptation(result, countSlots(mesocycle))
     const mode: 'substitute' | 'rebuild' = verdict.shouldRebuild ? 'rebuild' : 'substitute'
+    const span = describeDateSpan(context.calendar.today, durationDays)
 
     const rows = mode === 'rebuild'
       ? [{
-          field: `Weeks ${weekNumbers[0]}–${weekNumbers[weekNumbers.length - 1]}`,
-          before: `${verdict.dropped} exercises you can't train right now`,
+          field: span,
+          before: `${verdict.dropped} exercise${verdict.dropped === 1 ? '' : 's'} you can't train right now`,
           after: 'rebuilt around it, same number of sessions',
         }]
       : result.touchedSlots.map(slot => ({
-          field: `${slot.dayName} (Week ${slot.weekNumber})`,
+          field: adaptationRowLabel(slot, targetDays),
           before: slot.before,
           after: slot.after ?? '— removed (no safe alternative)',
+          note: slot.note,
         }))
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Applies for ${durationDays} day${durationDays === 1 ? '' : 's'}, then eases back in automatically.` },
+      { severity: 'info', text: `Covers ${span}, then eases back in automatically. Anything you have already trained stays as it is.` },
     ]
     if (mode === 'rebuild') {
-      implications.unshift({ severity: 'warn', text: `This rules out too much to patch exercise by exercise, so I'd rebuild these weeks around it rather than leave gaps — your original plan comes back automatically when it expires.` })
-    } else if (result.droppedPatterns.length > 0) {
+      implications.unshift({ severity: 'warn', text: `This rules out too much to patch exercise by exercise, so I'd rebuild those days around it rather than leave gaps — your original plan comes back automatically when it ends.` })
+    } else if (result.touchedSlots.some(slot => slot.after === null)) {
       implications.push({ severity: 'warn', text: `Some movements had no safe alternative this round and were dropped rather than faked.` })
     }
 
     return {
       scopeKey: `${profile.id}:propose_injury_adaptation:${injuryCode}:${startWeek}`,
       preconditions: { injuryCode, startWeek, weekNumbers },
-      payload: { injuryCode, durationDays, weekNumbers, exclusions: exerciseExclusions, mode, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      payload: { injuryCode, durationDays, weekNumbers, startDate: context.calendar.today, exclusions: exerciseExclusions, mode, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
         lead: ask(`work around your ${injuryCode.replace('_', ' ')} for the next ${durationDays} days`),
@@ -2609,11 +2650,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!injuryCode || mesocycle.length === 0) return null
 
     const startWeek = activeSession.liveWeek
-    const weekNumbers = mesocycle.map(w => w.week_number).filter(n => n >= startWeek)
+    // From today to the end of the plan, by date — never the whole live week,
+    // which holds the days already trained.
+    const context = await loadEditContext()
+    const targetDays = planDaysInWindow(mesocycle, context.calendar)
+    const weekNumbers = [...new Set(targetDays.map(d => d.weekNumber))]
     if (weekNumbers.length === 0) return null
 
     const result = await substituteForInjury({
-      mesocycle, profile, injuryCode, weekNumbers, exclusions: exerciseExclusions,
+      mesocycle, profile, injuryCode, targetDays, exclusions: exerciseExclusions, context,
     })
     // Substituting slot by slot only works when the injury removes SOME
     // exercises. When it removes whole movement patterns there is nothing to
@@ -2632,11 +2677,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           field: `${slot.dayName} (Week ${slot.weekNumber})`,
           before: slot.before,
           after: slot.after ?? '— removed (no safe alternative)',
+          note: slot.note,
         }))
     rows.push({
       field: 'Injuries',
       before: profile.injuries.includes(injuryCode) ? injuryCode.replace('_', ' ') : 'not listed',
       after: `${injuryCode.replace('_', ' ')} — added`,
+      note: undefined,
     })
     const implications: { severity: 'info' | 'warn'; text: string }[] = mode === 'rebuild'
       ? [
@@ -2646,7 +2693,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       : [
           { severity: 'info', text: `Adjusts your plan for the rest of this program AND adds this to your injuries, so future plans avoid it too — this does not revert on its own.` },
         ]
-    if (mode === 'substitute' && result.droppedPatterns.length > 0) {
+    if (mode === 'substitute' && result.touchedSlots.some(slot => slot.after === null)) {
       implications.push({ severity: 'warn', text: `Some movements had no safe alternative this round and were dropped rather than faked.` })
     }
 
@@ -2679,7 +2726,29 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     diff: import('@/lib/pending-actions-store').ProposalDiff
   } | null => {
     const injuryCode = String(rawArgs.affected_area ?? '')
-    if (!injuryCode || !profile.injuries.includes(injuryCode)) return null
+    if (!injuryCode) return null
+
+    // "TELL ME ANYTIME TO END IT EARLY" — the coach's own words when it sets a
+    // temporary change up, and until 9 Oct 2026 nothing could (test log M24).
+    // Saying an area has cleared while a temporary change for it is running
+    // ends that change, through this same card.
+    const running = activeAdaptations.find(a => a.kind === 'injury' && a.injury_code === injuryCode && isAdaptationActive(a, getAppNow(profile.id)))
+    if (running && !profile.injuries.includes(injuryCode)) {
+      return {
+        scopeKey: `${profile.id}:propose_injury_recovered:${injuryCode}`,
+        preconditions: { injuryCode, adaptationId: running.id },
+        payload: { injuryCode, endAdaptationId: running.id },
+        diff: {
+          lead: ask(`stop easing off ${areaInWords(injuryCode)} now`),
+          rows: [{ field: 'Easing off', before: `until ${endsOn(running.expires_at)}`, after: 'ends today' }],
+          implications: [
+            { severity: 'info', text: `From today your sessions go back to the exercises they had before. Anything you have already trained, and anything you have changed yourself since, stays as it is.` },
+          ],
+          reversible: false,
+        },
+      }
+    }
+    if (!profile.injuries.includes(injuryCode)) return null
 
     return {
       scopeKey: `${profile.id}:propose_injury_recovered:${injuryCode}`,
@@ -2690,7 +2759,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         rows: [{ field: 'Injuries', before: injuryCode.replace('_', ' '), after: 'removed' }],
         implications: [
           { severity: 'info', text: `Future plans stop avoiding this area.` },
-          { severity: 'warn', text: `This won't undo any exercise already swapped out for it — those stay as they are unless you swap them back yourself.` },
+          // THE SAME OFFER THE PROFILE TICK MAKES (H5, 9 Oct 2026). The card
+          // used to end at "this won't undo any exercise already swapped out",
+          // while the coach was telling the tester the plan "will immediately
+          // bring back your full chest and shoulder volume". Taking it off the
+          // list still changes no session by itself; the rebuild is asked for
+          // next, and only happens on a yes.
+          { severity: 'info', text: `This alone doesn't change any session. Once it's off the list I'll ask whether to rebuild your plan from today so the work it was leaving out comes back.` },
         ],
         reversible: false,
       },
@@ -2721,14 +2796,20 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (mesocycle.length === 0) return null
 
     const startWeek = activeSession.liveWeek
-    const weekSpan = Math.max(1, Math.ceil(durationDays / 7))
-    const weekNumbers = mesocycle
-      .map(w => w.week_number)
-      .filter(n => n >= startWeek && n < startWeek + weekSpan)
-    if (weekNumbers.length === 0) return null
+    // THE DAYS, FROM DATES, STARTING TODAY (test log H17). It used to be whole
+    // plan weeks from the live one, so "5 days" was every day of this week
+    // including the ones already trained. WHEN a trip starts ("next week") is
+    // still always today: that is an open question for the owner and is not
+    // changed here. What is changed is that the card now says which dates it
+    // covers, so a wrong start is visible before the tap.
+    const context = await loadEditContext()
+    const targetDays = planDaysInWindow(mesocycle, context.calendar, durationDays)
+    const weekNumbers = [...new Set(targetDays.map(d => d.weekNumber))]
+    if (targetDays.length === 0) return null
+    const span = describeDateSpan(context.calendar.today, durationDays)
 
     const result = await substituteForEquipment({
-      mesocycle, profile, equipmentTier, weekNumbers, exclusions: exerciseExclusions,
+      mesocycle, profile, equipmentTier, targetDays, exclusions: exerciseExclusions, context,
     })
     if (result.touchedSlots.length === 0) {
       // The same sentence the exercise row's kit step says for the same
@@ -2743,21 +2824,22 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     const rows = result.touchedSlots.map(slot => ({
-      field: `${slot.dayName} (Week ${slot.weekNumber})`,
+      field: adaptationRowLabel(slot, targetDays),
       before: slot.before,
       after: slot.after ?? '— removed (not trainable with this equipment)',
+      note: slot.note,
     }))
     const implications: { severity: 'info' | 'warn'; text: string }[] = [
-      { severity: 'info', text: `Applies for ${durationDays} day${durationDays === 1 ? '' : 's'}, then reverts to your normal plan automatically.` },
+      { severity: 'info', text: `Covers ${span}, starting today, then goes back to your normal plan automatically. Anything you have already trained stays as it is.` },
     ]
-    if (result.droppedPatterns.length > 0) {
+    if (result.touchedSlots.some(slot => slot.after === null)) {
       implications.push({ severity: 'warn', text: `A pattern genuinely can't be trained with this equipment this round — skipped, not faked.` })
     }
 
     return {
       scopeKey: `${profile.id}:propose_equipment_adaptation:${equipmentTier}:${startWeek}`,
       preconditions: { equipmentTier, startWeek, weekNumbers },
-      payload: { equipmentTier, durationDays, weekNumbers, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      payload: { equipmentTier, durationDays, weekNumbers, startDate: context.calendar.today, exclusions: exerciseExclusions, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
         lead: ask(`rebuild around ${(EQUIPMENT_OPTIONS.find(o => o.value === equipmentTier)?.label ?? equipmentTier).toLowerCase()} for the next ${durationDays} days`),
@@ -2972,7 +3054,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     if (!day) return null
 
     const trial = await rebuildDayAroundMainLift({
-      mesocycle, profile, weekNumber: activeSession.liveWeek, dayName: day.day, exclusions: exerciseExclusions,
+      mesocycle, profile: poolProfile, weekNumber: activeSession.liveWeek, dayName: day.day, exclusions: exerciseExclusions,
     })
     if (!trial.changed) return { refusal: trial.refusal ?? "I couldn't rebuild that one." }
 
@@ -5796,7 +5878,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload
-      const result = await executeInjuryAdaptation(profile, mesocycle, payload)
+      const result = await executeInjuryAdaptation(profile, mesocycle, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
@@ -5812,14 +5894,15 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           injuryCode: payload.injuryCode,
           reason: payload.reason,
           affectedWeekNumbers: payload.weekNumbers,
-          preImage: result.preImage,
+          record: result.record,
           pendingActionId: row.id,
           durationDays: payload.durationDays,
         })
+        onAdaptationsChanged?.()
       }
     } else if (row.kind === 'propose_injury_as_lasting') {
       const payload = row.payload as unknown as LastingInjuryPayload
-      const result = await executeLastingInjury(profile, mesocycle, payload)
+      const result = await executeLastingInjury(profile, mesocycle, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       // executeLastingInjury already wrote fitness_profiles.injuries — keep
       // App.tsx's profile state in lockstep, same reasoning onMesocycleUpdated
@@ -5833,15 +5916,32 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // No plan_adaptations row — nothing time-bounded here to expire.
     } else if (row.kind === 'propose_injury_recovered') {
       const payload = row.payload as unknown as InjuryRecoveredPayload
-      const result = await executeInjuryRecovered(profile, payload)
-      onProfileChanged({ injuries: profile.injuries.filter(i => i !== payload.injuryCode) })
-      receipt = result.receipt
+      if (payload.endAdaptationId) {
+        // "It's cleared", said about a temporary change: end it now. One road
+        // with Profile's and the Exercise tab's "End now" (App owns the plan).
+        const problem = onEndAdaptation ? await onEndAdaptation(payload.endAdaptationId) : "I can't end that from here just now."
+        receipt = problem
+          ? { landed: [], failed: [{ op: 'propose_injury_recovered', error: problem }] }
+          : { landed: [`Easing off ${areaInWords(payload.injuryCode)}: ended today`], failed: [] }
+      } else {
+        const result = await executeInjuryRecovered(profile, payload)
+        const nextInjuries = profile.injuries.filter(i => i !== payload.injuryCode)
+        receipt = result.receipt
+        if (receipt.failed.length === 0) {
+          // THE SAME OFFER, FROM THE SAME FUNCTION, AS THE PROFILE TICK (H5).
+          // Asked, never silent: App shows the dialog, and only a yes rebuilds.
+          // Worked out against the profile as it WAS, like Profile does.
+          const offer = detectPlanInvalidation(profile, { injuries: nextInjuries })
+          onProfileChanged({ injuries: nextInjuries })
+          if (offer) onPlanInvalidated?.(offer)
+        }
+      }
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_injury_recovered'].done : RECEIPTS['propose_injury_recovered'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
     } else if (row.kind === 'propose_equipment_adaptation') {
       const payload = row.payload as unknown as EquipmentAdaptationPayload
-      const result = await executeEquipmentAdaptation(profile, mesocycle, payload)
+      const result = await executeEquipmentAdaptation(profile, mesocycle, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
@@ -5854,10 +5954,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           equipmentOverride: payload.equipmentTier,
           reason: payload.reason,
           affectedWeekNumbers: payload.weekNumbers,
-          preImage: result.preImage,
+          record: result.record,
           pendingActionId: row.id,
           durationDays: payload.durationDays,
         })
+        onAdaptationsChanged?.()
       }
     } else if (row.kind === 'propose_session_shorten') {
       const payload = row.payload as unknown as SessionShortenPayload
@@ -5870,7 +5971,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_session_rebuild') {
       const payload = row.payload as unknown as SessionRebuildPayload
-      const result = await executeSessionRebuild(profile, mesocycle, payload)
+      const result = await executeSessionRebuild(poolProfile, mesocycle, payload)
       onMesocycleUpdated(result.mesocycle)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
@@ -5900,7 +6001,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // expire. The 10-minute undo restores pre_image, same as a swap.
     } else if (row.kind === 'propose_schedule_change') {
       const payload = row.payload as unknown as ScheduleChangePayload
-      const result = await executeScheduleChange(profile, mesocycle, exerciseExclusions, payload)
+      const result = await executeScheduleChange(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       // executeScheduleChange writes fitness_profiles.training_days itself —
       // same lockstep reason executeLastingInjury's branch has: the executor
@@ -5915,7 +6016,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_session_length') {
       const payload = row.payload as unknown as SessionLengthPayload
-      const result = await executeSessionLength(profile, mesocycle, exerciseExclusions, payload)
+      const result = await executeSessionLength(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       // executeSessionLength writes the column itself; mirror it into App
       // state the same way the style branch does, so the Profile screen and
@@ -5928,7 +6029,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_style_change') {
       const payload = row.payload as unknown as StyleChangePayload
-      const result = await executeStyleChange(profile, mesocycle, exerciseExclusions, payload)
+      const result = await executeStyleChange(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       // executeStyleChange writes fitness_profiles.training_style itself;
       // mirror it into App state the same way the schedule branch does.
@@ -5940,7 +6041,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_goal_change') {
       const payload = row.payload as unknown as GoalChangePayload
-      const result = await executeGoalChange(profile, mesocycle, exerciseExclusions, payload)
+      const result = await executeGoalChange(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       // executeGoalChange writes fitness_profiles.fitness_goal itself; mirror
       // it into App state the same way the style branch does.
@@ -5966,7 +6067,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_concurrent_activity') {
       const payload = row.payload as unknown as ConcurrentActivityPayload
-      const result = await executeConcurrentActivity(profile, mesocycle, exerciseExclusions, payload)
+      const result = await executeConcurrentActivity(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
       onMesocycleUpdated(result.mesocycle)
       // The executor writes the profile itself; mirror what it wrote into
       // App state, same lockstep as the schedule and style branches.
@@ -6006,7 +6107,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // no pre_image, because the plan itself is untouched.
       onLogsUpdated?.()
     } else if (row.kind === 'propose_exercise_add') {
-      const result = await executeExerciseAdd(profile, mesocycle, row.payload as unknown as ExerciseAddPayload, exerciseExclusions)
+      const result = await executeExerciseAdd(poolProfile, mesocycle, row.payload as unknown as ExerciseAddPayload, exerciseExclusions)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_exercise_add'].done : RECEIPTS['propose_exercise_add'].failed
@@ -6016,7 +6117,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     } else if (row.kind === 'propose_exercise_ban') {
       // The live ban list is passed in, not read off the profile — the same
       // reason the add path does it: this surface holds the fresh one.
-      const result = await executeExerciseBan(profile, mesocycle, row.payload as unknown as ExerciseBanPayload, exerciseExclusions, planCreatedAt)
+      const result = await executeExerciseBan(poolProfile, mesocycle, row.payload as unknown as ExerciseBanPayload, exerciseExclusions, planCreatedAt)
       receipt = result.receipt
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_exercise_ban'].done : RECEIPTS['propose_exercise_ban'].failed

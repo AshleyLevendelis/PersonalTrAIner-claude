@@ -37,6 +37,13 @@ process.on('exit', () => resetRandomSource())
 import { substituteForInjury, assessAdaptation, rebuildForInjury, countSlots } from '../src/lib/plan-adaptations'
 import { getExerciseEntry, isContraindicatedFor, isIndicatedFor } from '../src/lib/exercise-db'
 import type { UserProfile } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// These gates address whole plan weeks on a plan nobody has trained on: every
+// row of the named weeks, and no day protected. (A live plan addresses days by
+// date and loads the real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
+const rowsOfWeeks = (m: { week_number: number; days: { day: string }[] }[], weeks: number[]) =>
+  m.filter(w => weeks.includes(w.week_number)).flatMap(w => w.days.map(d => ({ weekNumber: w.week_number, dayName: d.day })))
 
 let failures = 0
 const check = (label: string, ok: boolean, extra?: unknown) => {
@@ -67,7 +74,7 @@ async function main() {
   const weekNumbers = meso.map(w => w.week_number)
 
   console.log('\n[1] A shoulder injury is detected as unviable for pointwise substitution')
-  const sub = await substituteForInjury({ mesocycle: meso, profile, injuryCode: 'shoulders', weekNumbers, exclusions: [] })
+  const sub = await substituteForInjury({ mesocycle: meso, profile, injuryCode: 'shoulders', targetDays: rowsOfWeeks(meso, weekNumbers), exclusions: [], context: GATE_CONTEXT })
   const totalSlots = countSlots(meso)
   const verdict = assessAdaptation(sub, totalSlots)
   console.log(`     touched=${verdict.touched} dropped=${verdict.dropped} planLoss=${(verdict.planLossRatio * 100).toFixed(1)}% of ${totalSlots}`)
@@ -84,7 +91,7 @@ async function main() {
   check('flagged shouldRebuild', verdict.shouldRebuild, verdict)
 
   console.log('\n[2] A neck injury (thins patterns, wipes none) is NOT flagged for rebuild')
-  const subNeck = await substituteForInjury({ mesocycle: meso, profile, injuryCode: 'neck', weekNumbers, exclusions: [] })
+  const subNeck = await substituteForInjury({ mesocycle: meso, profile, injuryCode: 'neck', targetDays: rowsOfWeeks(meso, weekNumbers), exclusions: [], context: GATE_CONTEXT })
   const verdictNeck = assessAdaptation(subNeck, totalSlots)
   console.log(`     touched=${verdictNeck.touched} dropped=${verdictNeck.dropped} planLoss=${(verdictNeck.planLossRatio*100).toFixed(1)}%`)
   check('a thinning injury does not trigger a rebuild', !verdictNeck.shouldRebuild, verdictNeck)
@@ -126,7 +133,7 @@ async function main() {
   }
 
   console.log('\n[3] The rebuild produces a real plan, not a hollow one')
-  const rebuilt = await rebuildForInjury({ profile, injuryCode: 'shoulders', exclusions: [], mesocycle: meso })
+  const rebuilt = await rebuildForInjury({ profile, injuryCode: 'shoulders', exclusions: [], mesocycle: meso, targetDays: rowsOfWeeks(meso, meso.map(w => w.week_number)), context: GATE_CONTEXT })
   const slotsBefore = meso.flatMap(w => w.days.flatMap(d => d.exercises)).length
   const slotsAfter = rebuilt.flatMap(w => w.days.flatMap(d => d.exercises)).length
   const survivingAfterSub = slotsBefore - verdict.dropped
@@ -231,6 +238,7 @@ async function main() {
         return await executeLastingInjury(
           { ...profile, id: undefined } as UserProfile, meso,
           { injuryCode: 'shoulders', weekNumbers, exclusions: [], mode },
+          GATE_CONTEXT,
         )
       } finally { resetRandomSource() }
     }

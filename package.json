@@ -55,6 +55,8 @@
     "test:exercise-history": "tsx scripts/test-exercise-history.ts",
     "test:plan-adaptations-separation": "tsx scripts/test-plan-adaptations-separation.ts",
     "test:injury-adaptation-safety": "tsx scripts/test-injury-adaptation-safety.ts",
+    "test:adaptations-respect-trained": "tsx scripts/test-adaptations-respect-trained.ts",
+    "verify:adaptation-line": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/adaptation-line.mjs",
     "test:quality": "NODE_ENV=production tsx scripts/run-quality-score.ts",
     "measure:volume": "NODE_ENV=production tsx scripts/measure-volume.ts",
     "test:differentiation": "tsx scripts/run-differentiation-audit.ts",

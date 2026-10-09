@@ -23,6 +23,13 @@ import { generateExercisePlan, generateMesocycle, isTempoEligible, setRandomSour
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { substituteForInjury } from '../src/lib/plan-adaptations'
 import type { Exercise, UserProfile } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// These gates address whole plan weeks on a plan nobody has trained on: every
+// row of the named weeks, and no day protected. (A live plan addresses days by
+// date and loads the real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
+const rowsOfWeeks = (m: { week_number: number; days: { day: string }[] }[], weeks: number[]) =>
+  m.filter(w => weeks.includes(w.week_number)).flatMap(w => w.days.map(d => ({ weekNumber: w.week_number, dayName: d.day })))
 
 const profile = {
   age: 34, gender: 'male', height_cm: 178, weight_kg: 82,
@@ -365,7 +372,7 @@ async function endToEnd() {
     const meso = generateMesocycle(sam, generateExercisePlan(sam, []).plan)
     const before = new Map<string, string>()
     for (const w of meso) for (const d of w.days) for (const e of d.exercises) before.set(`${w.week_number}|${d.day}|${e.name}`, e.reps)
-    const { mesocycle: after, touchedSlots } = await substituteForInjury({ mesocycle: meso, profile: sam, injuryCode: 'knees', weekNumbers: [1, 2], exclusions: [] })
+    const { mesocycle: after, touchedSlots } = await substituteForInjury({ mesocycle: meso, profile: sam, injuryCode: 'knees', targetDays: rowsOfWeeks(meso, [1, 2]), exclusions: [], context: GATE_CONTEXT })
     check('the adaptation changed something, so this has teeth', touchedSlots.filter(t => t.after).length >= 4, touchedSlots.length)
 
     const incoming = new Set(touchedSlots.filter(t => t.after).map(t => `${t.weekNumber}|${t.dayName}|${t.after}`))

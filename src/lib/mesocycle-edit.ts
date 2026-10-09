@@ -1,5 +1,5 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
-import { getSmartReplacements, type ExerciseEntry, getExerciseEntry} from './exercise-db'
+import { getSmartReplacements, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, getExerciseEntry} from './exercise-db'
 import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded, DELOAD_LOAD_FRACTION } from './load-prescription'
 import { resolveLoadFields } from './warmup'
@@ -198,6 +198,80 @@ export function getReplacementCandidates(
     .map(x => x.c)
   return bySoftPreference(weighted)
 }
+
+/**
+ * What an automatic path picked, and whether the row needs a sentence.
+ * `kind` is a fact; the words live with the card that prints them.
+ */
+export interface AutomaticPick {
+  exercise: ExerciseEntry
+  /** 'same' pattern and style; 'off_style'; 'nearest' related pattern; 'cross' different work entirely. */
+  kind: 'same' | 'off_style' | 'nearest' | 'cross'
+  /** The swap list's own explanation for a cross-training pick, when there is one. */
+  note: string
+}
+
+/**
+ * THE ONE PICK AN AUTOMATIC PATH MAKES — an adaptation or a kit change, where
+ * nobody is looking at a list.
+ *
+ * `getReplacementCandidates` is ranked for a person CHOOSING: since 18 Sep
+ * 2026 it shows options outside their training style (marked, lower down),
+ * and puts anything loaded above anything unloaded whatever its style. Both
+ * are rulings about what is SHOWN. Taking `candidates[0]` from that list, as
+ * the adaptation did, let an automatic path prescribe work nobody chose
+ * (test log H11, 9 Oct 2026) and, when a pattern was empty, fill a triceps
+ * slot with a squat (H17).
+ *
+ * Decided as a CSCS coach, basis recorded in BACKLOG:
+ *  - A substitute chosen FOR someone meets the bar an exercise generated for
+ *    them meets: same movement pattern and their own style first; the same
+ *    pattern outside their style only when their style has nothing; then the
+ *    nearest related pattern.
+ *  - An ISOLATION slot is never filled from unrelated work. A third squat in
+ *    place of a triceps kickback trains nothing the slot was for and adds leg
+ *    volume the week did not programme. It is dropped, and the row says so.
+ *  - A COMPOUND slot keeps Ashley's 30 Aug 2026 ruling ("swap in different
+ *    work" when an injury has emptied the pattern), and the row carries why.
+ *  - Variety is a preference, not a rule: a substitute already used elsewhere
+ *    this week is taken only when nothing fresh is left, and is never a reason
+ *    to drop a slot.
+ */
+export function pickAutomaticReplacement(
+  outgoingName: string,
+  poolProfile: UserProfile,
+  exclusions: string[],
+  /** Already on this day — never picked. */
+  onDay: ReadonlySet<string>,
+  /** Already brought in elsewhere this week by the same change — avoided where possible. */
+  usedThisWeek: ReadonlySet<string> = new Set(),
+): AutomaticPick | null {
+  const outgoing = getExerciseEntry(outgoingName)
+  if (!outgoing) return null
+  const all = getReplacementCandidates(outgoingName, poolProfile, exclusions)
+    .filter(c => !onDay.has(c.exercise.name))
+  if (all.length === 0) return null
+
+  const nearestPatterns = NEAREST_PATTERN_FALLBACK[outgoing.movement_pattern] ?? []
+  const same = all.filter(c => c.exercise.movement_pattern === outgoing.movement_pattern)
+  const nearest = all.filter(c => nearestPatterns.includes(c.exercise.movement_pattern))
+  const isIsolation = outgoing.mechanics_tier === 'tier3_isolation' || outgoing.movement_pattern.startsWith('isolation_')
+  const stage = same.length > 0 ? same : nearest.length > 0 ? nearest : isIsolation ? [] : all
+  if (stage.length === 0) return null
+  const stageKind: AutomaticPick['kind'] = same.length > 0 ? 'same' : nearest.length > 0 ? 'nearest' : 'cross'
+
+  // Stable: the ranker's order survives inside each band.
+  const ordered = stage
+    .map((c, i) => ({ c, i, style: c.offStyle ? 1 : 0, repeat: usedThisWeek.has(c.exercise.name) ? 1 : 0 }))
+    .sort((a, b) => a.style - b.style || a.repeat - b.repeat || a.i - b.i)
+  const chosen = ordered[0].c
+  return {
+    exercise: chosen.exercise,
+    kind: stageKind === 'same' && chosen.offStyle ? 'off_style' : stageKind,
+    note: chosen.note,
+  }
+}
+
 
 function parseRepsHigh(reps: string): number | null {
   const range = reps.match(/(\d+)\s*-\s*(\d+)/)

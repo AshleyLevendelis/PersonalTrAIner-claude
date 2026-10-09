@@ -35,7 +35,7 @@
 
 import type { MesocycleWeek, UserProfile } from './types'
 import { getActiveMesocycleWeek } from './calculations'
-import { rebuildForWeightBasis } from './plan-adaptations'
+import { rebuildForWeightBasis, type PlanEditContext } from './plan-adaptations'
 import { saveMesocycle } from './mesocycle-persistence'
 import { supabase } from './supabase'
 
@@ -271,6 +271,8 @@ export interface CheckWeightBasisOfferParams {
   exclusions: string[]
   planCreatedAt: string
   now?: Date
+  /** Which days are already trained — the preview and the rebuild both leave them alone. */
+  context: PlanEditContext
 }
 
 /**
@@ -316,7 +318,7 @@ export async function checkForWeightBasisOffer(
 
   // Compute the rebuild WITHOUT applying it, purely to show them what they
   // would be agreeing to.
-  const preview = await rebuildForWeightBasis({ profile, basisWeightKg, exclusions, mesocycle, weekNumbers })
+  const preview = await rebuildForWeightBasis({ profile, basisWeightKg, exclusions, mesocycle, weekNumbers, context: params.context })
   // Nothing on screen would move, so there is nothing to consent to. This is
   // also what makes a confirmed offer stay answered: a second preview built
   // from the same weight reproduces the stored plan exactly.
@@ -353,6 +355,8 @@ export interface ConfirmWeightBasisOfferParams {
   /** The plan's ORIGINAL creation time — see the save call below for why this is not optional in practice. */
   mesocycleCreatedAt?: string
   now?: Date
+  /** Which days are already trained — a rebuild never rewrites one. */
+  context: PlanEditContext
 }
 
 /**
@@ -381,6 +385,7 @@ export async function confirmWeightBasisOffer(
     exclusions,
     mesocycle,
     weekNumbers,
+    context: params.context,
   })
 
   // Preserve the plan's original creation time. This is an EDIT of the live

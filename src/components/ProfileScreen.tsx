@@ -47,6 +47,8 @@ import {
   DAYS_FULL, partitionInjuries, GOAL_OPTIONS,
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
+import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { ActiveAdaptationLines } from '@/components/exercise/ActiveAdaptationLines'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference, FitnessGoal } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
@@ -109,6 +111,10 @@ interface ProfileScreenProps {
    * explicit confirm changes a plan.
    */
   onPlanInvalidated?: (invalidation: PlanInvalidation) => void
+  /** Temporary changes to the plan running now — listed under Injuries with "End now" (M25). */
+  activeAdaptations?: PlanAdaptationRow[]
+  endingAdaptationId?: string | null
+  onEndAdaptation?: (id: string) => Promise<string | null>
   /**
    * Fired after a corrected implement ceiling is SAVED — the three numbers
    * that cap every prescribed weight.
@@ -414,7 +420,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
@@ -1347,6 +1353,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <h3 className="ds-label">Injuries</h3>
           <div className="space-y-2.5 text-sm">
             <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
+            {/* WHAT IS BEING EASED OFF RIGHT NOW (M25). A temporary change is
+                deliberately not one of the toggles below — it ends on its own
+                and must never become a lasting injury — so until 9 Oct 2026 it
+                was shown nowhere, and this is where the tester looked. */}
+            <ActiveAdaptationLines
+              adaptations={activeAdaptations ?? []}
+              profileId={profileId}
+              endingId={endingAdaptationId}
+              onEnd={onEndAdaptation}
+              className="space-y-2"
+            />
             <ToggleGroup
               type="multiple"
               value={injuryCodes}

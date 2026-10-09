@@ -339,7 +339,9 @@ async function kitAndExclusions() {
     training_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => ({ day, available: ['Monday', 'Tuesday', 'Thursday', 'Saturday'].includes(day) })),
     weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], macro_calculation_mode: 'STANDARD_STATIC',
     coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate', max_dumbbell_kg: 24,
-    created_at: '2026-10-05T00:00:00.000Z',
+    // The plan starts NOW: the appliers address days by date from the app's
+    // clock, so a fixed start would make this gate depend on the day it is run.
+    created_at: new Date(new Date().setHours(0, 0, 0, 0)).toISOString(),
   } as never
   setRandomSource(seededRngFromKey('sam:2'))
   const plan = await hush(async () => generateMesocycle(sam))
@@ -348,32 +350,35 @@ async function kitAndExclusions() {
     new Set(meso.find(w => w.week_number === week)!.days.flatMap(d => d.exercises.map(e => e.name)))
 
   // INJURY. First find what the knee adaptation reaches for with nothing banned…
-  const open = await hush(() => applyInjuryFromRow(sam, plan, 1, 'niggle', 'knees', []))
+  const open = await hush(() => applyInjuryFromRow(sam, plan, (sam as { created_at: string }).created_at, 'niggle', 'knees', []))
   const brought = [...namesIn(open.mesocycle ?? [], 1)].filter(n => !namesIn(plan, 1).has(n))
   check('with nothing banned, easing the knees off brings in other exercises', open.message === null && brought.length >= 2, { message: open.message, brought })
   // …then ban the first of them and ask again.
   const banned = brought[0]
-  const honoured = await hush(() => applyInjuryFromRow(sam, plan, 1, 'niggle', 'knees', [banned]))
+  const honoured = await hush(() => applyInjuryFromRow(sam, plan, (sam as { created_at: string }).created_at, 'niggle', 'knees', [banned]))
   check(`with ${banned} banned, the same change does not bring it in`, !!honoured.mesocycle && !namesIn(honoured.mesocycle, 1).has(banned), honoured.mesocycle ? [...namesIn(honoured.mesocycle, 1)] : honoured.message)
 
   // KIT. Same shape: bodyweight for the week, with and without a ban.
-  const kitOpen = await hush(() => applyEquipmentFromRow(sam, plan, 1, 'bodyweight', []))
+  const kitOpen = await hush(() => applyEquipmentFromRow(sam, plan, (sam as { created_at: string }).created_at, 'bodyweight', []))
   const kitBrought = [...namesIn(kitOpen.mesocycle ?? [], 1)].filter(n => !namesIn(plan, 1).has(n))
   check('with nothing banned, switching to bodyweight brings in other exercises', kitOpen.message === null && kitBrought.length >= 1, { message: kitOpen.message, kitBrought })
   const kitBanned = kitBrought[0]
-  const kitHonoured = await hush(() => applyEquipmentFromRow(sam, plan, 1, 'bodyweight', [kitBanned]))
+  const kitHonoured = await hush(() => applyEquipmentFromRow(sam, plan, (sam as { created_at: string }).created_at, 'bodyweight', [kitBanned]))
   check(`with ${kitBanned} banned, the kit change does not bring it in`, !!kitHonoured.mesocycle && !namesIn(kitHonoured.mesocycle, 1).has(kitBanned), kitHonoured.mesocycle ? [...namesIn(kitHonoured.mesocycle, 1)] : kitHonoured.message)
 
   // And the tester's own tap: his own tier, which the picker no longer
   // offers but the function must still answer honestly if it is ever asked.
-  const own = await hush(() => applyEquipmentFromRow(sam, plan, 1, 'minimalist', []))
+  const own = await hush(() => applyEquipmentFromRow(sam, plan, (sam as { created_at: string }).created_at, 'minimalist', []))
   check('picking his own tier changes nothing and says so as information', own.mesocycle === undefined && isNothingToChangeMessage(own.message) && /already built around minimalist/.test(own.message ?? ''), own.message)
 
   // The tab hands the appliers the person's real list.
   const tab = strip(readFileSync('src/components/exercise/ExerciseTab.tsx', 'utf8'))
   check('the exercise tab passes its exclusions to both appliers',
-    /applyInjuryFromRow\(profile, mesocycle, liveWeek, answer\.hurt, answer\.area, exclusions\)/.test(tab)
-    && /applyEquipmentFromRow\(profile, mesocycle, liveWeek, tier, exclusions\)/.test(tab))
+    // Re-anchored 9 Oct 2026: both now take the SAVED profile (never the pool
+    // one, which carries temporary constraints) and the plan's start, because
+    // they address days by date rather than "this plan week".
+    /applyInjuryFromRow\(saved, mesocycle, planCreatedAt, answer\.hurt, answer\.area, exclusions\)/.test(tab)
+    && /applyEquipmentFromRow\(saved, mesocycle, planCreatedAt, tier, exclusions\)/.test(tab))
   const appliers = strip(readFileSync('src/lib/screen-adaptations.ts', 'utf8'))
   check('...and neither applier hard-codes an empty list any more', !/exclusions:\s*\[\]/.test(appliers), appliers.match(/exclusions:\s*\[\]/g))
 }

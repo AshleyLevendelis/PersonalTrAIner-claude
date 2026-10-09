@@ -284,7 +284,7 @@ console.log('\n8. The client can actually execute what the server proposes')
   check('the volume executor never touches a week outside the payload',
     /payload\.weekNumbers\.includes\(week\.week_number\)/.test(exec))
   check('the schedule executor rebuilds from a week, not from week 1',
-    /rebuildFromCurrentWeek\(updated, exclusions, mesocycle, payload\.fromWeek\)/.test(exec))
+    /rebuildFromCurrentWeek\(updated, exclusions, mesocycle, payload\.fromWeek, context\)/.test(exec))
   check('...and only saves from that week forward',
     /week\.week_number < payload\.fromWeek/.test(exec))
   check('undo is forward-only too', /week\.week_number < fromWeek/.test(exec))

@@ -39,7 +39,9 @@ import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } fr
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
-import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { checkAndRevertExpiredAdaptations, endAdaptationEarly, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
+import { effectiveConstraints, constraintProfile } from '@/lib/effective-constraints'
 import { reconcileToStatedCeilings } from '@/lib/ceiling-reconcile'
 import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
@@ -622,6 +624,32 @@ function App() {
   const [newPlanResetting, setNewPlanResetting] = useState(false)
   /** Injury/equipment plan_adaptations still active when the New Plan dialog opens — New Plan creates a brand-new profile row (see handleReset), which orphans anything tied to the old profile_id, including these. Fetched fresh on open (Part 3, injury-persistence fix) so the loss is named and consented-to rather than silent. */
   const [activeAdaptationsForReset, setActiveAdaptationsForReset] = useState<PlanAdaptationRow[]>([])
+  /**
+   * EVERY TEMPORARY CHANGE RUNNING NOW ("easing off your knees until 22 Oct").
+   *
+   * Loaded with the plan and re-read whenever one starts or ends. Until 9 Oct
+   * 2026 the only reader of this table was the "Start a new plan" warning
+   * above, so nothing that picked an exercise knew an adaptation existed: the
+   * travel card put Box Squat back five minutes after the knee adaptation
+   * (H17), Profile showed no sign of it (M25), and the coach was told there
+   * were no injuries on file. See effective-constraints.ts.
+   */
+  const [activeAdaptations, setActiveAdaptations] = useState<PlanAdaptationRow[]>([])
+  const [endingAdaptationId, setEndingAdaptationId] = useState<string | null>(null)
+  const refreshAdaptations = () => {
+    if (!profile?.id) return
+    getActiveAdaptations(profile.id).then(setActiveAdaptations).catch(console.error)
+  }
+  /**
+   * THE PROFILE A POOL OF EXERCISES IS BUILT FROM: the saved one, plus what is
+   * temporarily being eased off. Handed to everything that picks or offers an
+   * exercise (swap list, add, ban's replacement, session rebuild, the coach's
+   * cards). NEVER to anything that saves the profile — those keep `profile`.
+   */
+  const poolProfile = useMemo(
+    () => (profile ? constraintProfile(profile, effectiveConstraints(profile, activeAdaptations, getAppNow(profile.id))) : null),
+    [profile, activeAdaptations],
+  )
   // Chat typewriter reveal-speed preference — per-profile (reveal-speed-store.ts),
   // read once the profile resolves and written back on every change from Settings.
   const [revealSpeed, setRevealSpeedState] = useState<RevealSpeed>(DEFAULT_REVEAL_SPEED)
@@ -1125,21 +1153,42 @@ function App() {
     }
 
     // Lazy check-on-load sweep (no scheduled-job infra exists in this
-    // codebase) — silently restores any injury/equipment adaptation whose
-    // stated period has passed, surfacing only a client-authored message,
-    // never a model-narrated one.
-    if (restoredProfile.id) {
-      checkAndRevertExpiredAdaptations(restoredProfile.id).then(result => {
-        if (result.mesocycle) {
-          setMesocycle(prev => {
-            const byWeek = new Map(prev.map(w => [w.week_number, w]))
-            for (const w of result.mesocycle!) byWeek.set(w.week_number, w)
-            return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
-          })
-        }
-        if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages.map(text => ({ text }))])
-      }).catch(console.error)
-    }
+    // codebase) — ends any injury/equipment adaptation whose stated period has
+    // passed, surfacing only a client-authored message, never a model-narrated
+    // one.
+    //
+    // IT RUNS FIRST AND THE BLOCK CHECKS BELOW WAIT FOR IT (9 Oct 2026). It
+    // used to be a sibling fire-and-forget: two writers of the same weeks
+    // starting from the same snapshot, which is the exact hazard the comment
+    // on the chain below describes. And it loads the edit context once — which
+    // days are already trained, what is temporarily being eased off — for
+    // everything in that chain that rebuilds.
+    let sweptMesocycle = restoredMesocycle
+    const editContextReady = restoredProfile.id && restoredMesocycle.length > 0
+      ? loadPlanEditContext(restoredProfile, restoredMesocycle, fullMesocycle?.createdAt ?? restoredProfile.created_at ?? undefined)
+      : null
+    const adaptationSweep = editContextReady
+      ? editContextReady.then(async context => {
+          try {
+            const result = await checkAndRevertExpiredAdaptations(restoredProfile.id!, {
+              mesocycle: restoredMesocycle, isProtected: context.isProtected, profile: restoredProfile, exclusions: restoredExclusions,
+            })
+            if (result.mesocycle) {
+              sweptMesocycle = result.mesocycle
+              setMesocycle(prev => {
+                const byWeek = new Map(prev.map(w => [w.week_number, w]))
+                for (const w of result.mesocycle!) byWeek.set(w.week_number, w)
+                return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+              })
+            }
+            if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages.map(text => ({ text }))])
+          } catch (err) {
+            console.error(err)
+          }
+          setActiveAdaptations(context.adaptations)
+          return context
+        })
+      : null
 
     // VISION.md Step 4 + Step 5 — same lazy check-on-load sweep pattern as
     // the adaptation-expiry check just above, run right after it. Both fire
@@ -1164,7 +1213,14 @@ function App() {
       // over, is what lets Step 6 see Step 4 and 5's patches without
       // threading them through each promise's resolved value.
       let workingMesocycle = restoredMesocycle
-      checkForBlockReview(restoredProfile.id, restoredMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+      // Set by the first link and read by the two rebuilds further down.
+      let editContext: Awaited<NonNullable<typeof editContextReady>> | null = null
+      ;(adaptationSweep ?? Promise.resolve(null))
+        .then(context => {
+          editContext = context
+          workingMesocycle = sweptMesocycle
+          return checkForBlockReview(restoredProfile.id!, workingMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+        })
         .then(blockReviewResult => {
           if (blockReviewResult.mesocycle) {
             workingMesocycle = blockReviewResult.mesocycle
@@ -1201,12 +1257,16 @@ function App() {
           // already trained against would change what their own logs are
           // measured against. Idempotent — it looks for prescribed loads
           // above the ceiling, so after a rebuild there is nothing to find.
+          // No context means the plan could not be checked for trained days,
+          // and a rebuild that cannot check does not run.
+          if (!editContext) return { messages: [], violations: [] }
           return reconcileToStatedCeilings(
             restoredProfile.id!,
             workingMesocycle,
             restoredProfile,
             restoredExclusions,
             getActiveMesocycleWeek(blockCheckPlanCreatedAt, blockCheckNow, workingMesocycle.length),
+            editContext,
           )
         })
         .then(ceilingResult => {
@@ -1251,7 +1311,7 @@ function App() {
           // than the confirm, and could name a banned lift in the offer text.
           return getActiveFacts(restoredProfile.id!)
             .catch(() => [] as UserFactRow[])
-            .then(facts => checkForWeightBasisOffer({
+            .then(facts => editContext ? checkForWeightBasisOffer({
               profileId: restoredProfile.id!,
               profile: restoredProfile,
               mesocycle: workingMesocycle,
@@ -1259,7 +1319,8 @@ function App() {
               exclusions: compileExerciseExclusions(facts),
               planCreatedAt: blockCheckPlanCreatedAt,
               now: blockCheckNow,
-            }))
+              context: editContext,
+            }) : null)
         })
         .then(weightBasisOffer => {
           if (weightBasisOffer) {
@@ -2317,6 +2378,7 @@ function App() {
         planCreatedAt: mesocycleCreatedAt ?? profile.created_at ?? new Date().toISOString(),
         mesocycleCreatedAt: mesocycleCreatedAt ?? profile.created_at,
         now: getAppNow(profile.id),
+        context: await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at),
       })
       if (!rebuilt) {
         // confirmWeightBasisOffer returns null when it did NOT rebuild — the
@@ -2460,7 +2522,8 @@ function App() {
     if (mesocycle.length === 0) return
     const updatedMesocycle = await banExerciseFromMesocycle({
       mesocycle,
-      profile,
+      // The replacement must not be something a running adaptation rules out.
+      profile: poolProfile ?? profile,
       bannedName: exerciseName,
       exclusions: updated,
     })
@@ -2583,6 +2646,40 @@ function App() {
     if (text) setAdaptationMessages(prev => [...prev, { text }])
   }
 
+  /**
+   * "END NOW" — Profile's line, the Exercise tab's line and the coach's
+   * "recovered" card all land here. The coach has always said "tell me anytime
+   * to end it early"; until 9 Oct 2026 nothing could.
+   *
+   * Puts back what the adaptation itself changed, on days not yet trained,
+   * and keeps anything the person has edited on those days since
+   * (revertAdaptationChanges). Returns a sentence when it could not, so the
+   * caller says so instead of the line quietly staying put.
+   */
+  const handleEndAdaptation = async (adaptationId: string): Promise<string | null> => {
+    if (!profile?.id || endingAdaptationId) return null
+    setEndingAdaptationId(adaptationId)
+    try {
+      const context = await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at)
+      const result = await endAdaptationEarly(profile.id, adaptationId, {
+        mesocycle, isProtected: context.isProtected, profile, exclusions: effectiveExclusions,
+      })
+      if (!result.mesocycle) {
+        refreshAdaptations()
+        return "That didn't end just now — try again in a moment."
+      }
+      setMesocycle(result.mesocycle)
+      setActiveAdaptations(prev => prev.filter(a => a.id !== adaptationId))
+      setLogsVersion(v => v + 1)
+      return null
+    } catch (err) {
+      console.error('Ending an adaptation early failed:', err)
+      return "That didn't end just now — try again in a moment."
+    } finally {
+      setEndingAdaptationId(null)
+    }
+  }
+
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
     setRebuilding(true)
@@ -2590,7 +2687,10 @@ function App() {
       const currentWeek = getActiveMesocycleWeek(
         mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4,
       )
-      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek)
+      // Which days are already trained, read at the moment of the tap: the
+      // rebuild leaves every one of them exactly as it is.
+      const context = await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at)
+      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context)
       if (!result.ok || !result.mesocycle) {
         setWriteError(result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`)
         return
@@ -2838,15 +2938,16 @@ function App() {
     // deliberately-light plan forever. Ashley's ruling was to ask rather than
     // rebuild silently, so this only ever surfaces an offer.
     if (mesocycle.length > 0 && planHasAssumedBodyLoads(mesocycle)) {
-      checkForWeightBasisOffer({
-        profileId: profile.id,
+      loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at).then(context => checkForWeightBasisOffer({
+        profileId: profile.id!,
         profile,
         mesocycle,
         basisWeightKg: retarget.anchorKg,
         exclusions: compiledExerciseExclusions,
         planCreatedAt: mesocycleCreatedAt ?? profile.created_at ?? new Date().toISOString(),
         now: getAppNow(profile.id),
-      })
+        context,
+      }))
         .then(offer => {
           // Never stacks: checkForWeightBasisOffer returns the SAME row while
           // one is outstanding, so a second weigh-in re-surfaces the existing
@@ -3174,7 +3275,12 @@ function App() {
               mesocycle={mesocycle}
               exclusions={effectiveExclusions}
               softExercisePreferences={compiledSoftExercisePreferences}
-              profile={profile ?? undefined}
+              profile={poolProfile ?? profile ?? undefined}
+              storedProfile={profile ?? undefined}
+              activeAdaptations={activeAdaptations}
+              endingAdaptationId={endingAdaptationId}
+              onEndAdaptation={handleEndAdaptation}
+              onAdaptationsChanged={refreshAdaptations}
               profileId={profile?.id}
               planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
               devOverrideWeek={devOverrideWeek}
@@ -3205,6 +3311,11 @@ function App() {
             <Suspense fallback={<ScreenLoading />}>
             <ChatAssistant
               profile={profile}
+              poolProfile={poolProfile ?? profile}
+              activeAdaptations={activeAdaptations}
+              onAdaptationsChanged={refreshAdaptations}
+              onEndAdaptation={handleEndAdaptation}
+              onPlanInvalidated={setPlanInvalidation}
               macros={macros}
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
@@ -3290,6 +3401,9 @@ function App() {
         latestWeightKg={latestWeightKg}
         onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
         onPlanInvalidated={setPlanInvalidation}
+        activeAdaptations={activeAdaptations}
+        endingAdaptationId={endingAdaptationId}
+        onEndAdaptation={handleEndAdaptation}
         onCeilingsCorrected={handleCeilingsCorrected}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}

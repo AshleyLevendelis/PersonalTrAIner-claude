@@ -488,7 +488,7 @@ async function main() {
     resolveAdditionRequest(limitedCands[0].exercise.name.toLowerCase(), limited, [])?.name === limitedCands[0].exercise.name)
   check('an empty name resolves to nothing rather than to the first thing in the pool',
     resolveAdditionRequest('   ', limited, []) === null)
-  check('...and the client calls that executor on confirm', /executeExerciseAdd\(profile, mesocycle/.test(client))
+  check('...and the client calls that executor on confirm', /executeExerciseAdd\(poolProfile, mesocycle/.test(client))
   check('...and can be undone from the pre-image',
     /propose_exercise_add/.test(store) && /undoSessionEdit/.test(client))
 
