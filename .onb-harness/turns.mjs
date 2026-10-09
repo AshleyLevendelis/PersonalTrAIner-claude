@@ -17,12 +17,13 @@
 // history of synthetic clicks behaving differently from taps.
 // ---------------------------------------------------------------------------
 import { createServer } from 'http'
-import { readFileSync, writeFileSync, existsSync, statSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
 import { join, extname } from 'path'
-import { spawn } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
+import { connect } from 'net'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
-const PORT = 9700
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -34,27 +35,97 @@ const server = createServer((q, r) => {
 await new Promise(r => server.listen(0, r))
 const port = server.address().port
 
-const chrome = spawn('/opt/pw-browsers/chromium',
-  ['--headless=new', `--remote-debugging-port=${PORT}`, '--no-sandbox', '--disable-gpu', 'about:blank'],
-  { stdio: 'ignore' })
+// A BROWSER OF ITS OWN, AND NO WAITING ON ANYTHING WITHOUT A DEADLINE.
+//
+// While this driver was being written, on a machine where other checks were
+// running at the same time, it stalled repeatedly in ways that looked exactly
+// like the page hanging. None of them were the page:
+//   - killing Chromium's main process leaves its children holding the debug
+//     port's listening socket for a while. The next run connected to that
+//     dead socket and waited for an answer that could never come;
+//   - a run that was killed from outside left its browser alive on the fixed
+//     port, and the next run attached to THAT one;
+//   - Chromium started without its own profile directory can hand itself to
+//     an instance that is already running and exit.
+// So: a port counts as free only when a connection to it is REFUSED; the
+// browser gets a throwaway profile and is killed as a whole process group
+// however the run ends; and every wait below has a time limit.
 const wait = ms => new Promise(r => setTimeout(r, ms))
-let target
-for (let i = 0; i < 60; i++) {
-  try {
-    const l = await fetch(`http://127.0.0.1:${PORT}/json/list`).then(r => r.json())
-    const g = l.find(x => x.type === 'page')
-    if (g) { target = g.webSocketDebuggerUrl; break }
-  } catch {}
-  await wait(250)
+const refused = p => new Promise(res => {
+  const sock = connect({ port: p, host: '127.0.0.1' })
+  const done = v => { sock.destroy(); res(v) }
+  sock.once('connect', () => done(false))
+  sock.once('error', e => done(e.code === 'ECONNREFUSED'))
+  sock.setTimeout(1000, () => done(false))
+})
+let PORT = 0
+for (let p = 9700; p <= 9749 && !PORT; p++) if (await refused(p)) PORT = p
+if (!PORT) { console.error('  FAIL: no free debug port in 9700-9749'); process.exit(1) }
+const profile = mkdtempSync(join(tmpdir(), 'onb-turns-'))
+const chrome = spawn('/opt/pw-browsers/chromium',
+  ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--no-sandbox', '--disable-gpu', 'about:blank'],
+  { stdio: 'ignore', detached: true })
+// THE BROWSER CAN BE KILLED FROM OUTSIDE, and on a shared machine it was:
+// measured, the stalls that survived everything above were Chromium itself
+// gone mid-run (its own HTTP endpoint dead), not the page. That is not a
+// result about the app, so it is never reported as one: every call waiting on
+// the browser fails at once, the run says plainly what happened, and it starts
+// again from the top (twice at most).
+let browserGone = null
+chrome.on('exit', (code, signal) => {
+  if (closing) return
+  browserGone = signal ? `signal ${signal}` : `exit code ${code}`
+  for (const fail of dead.splice(0)) fail()
+})
+let closing = false
+const dead = []
+const shutDown = () => {
+  closing = true
+  // The whole group, so no child is left holding the port.
+  try { process.kill(-chrome.pid, 'SIGKILL') } catch {}
+  try { rmSync(profile, { recursive: true, force: true }) } catch {}
+  server.close()
 }
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { shutDown(); process.exit(130) })
+let target
+for (let i = 0; i < 80 && !target; i++) {
+  try {
+    const l = await fetch(`http://127.0.0.1:${PORT}/json/list`, { signal: AbortSignal.timeout(2000) }).then(r => r.json())
+    target = l.find(x => x.type === 'page')?.webSocketDebuggerUrl
+  } catch {}
+  if (!target) await wait(250)
+}
+if (!target) { console.error('  FAIL: the browser never came up'); shutDown(); process.exit(1) }
 const ws = new WebSocket(target)
-await new Promise(r => ws.addEventListener('open', r, { once: true }))
+const attached = await Promise.race([
+  new Promise(r => ws.addEventListener('open', () => r(true), { once: true })),
+  wait(15000).then(() => false),
+])
+if (!attached) { console.error('  FAIL: could not attach to the browser'); shutDown(); process.exit(1) }
 let id = 0; const pend = new Map()
 ws.addEventListener('message', e => {
   const m = JSON.parse(e.data)
   if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id) }
 })
-const send = (m, p = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method: m, params: p })) })
+// Every call has a deadline: a page that stops answering must FAIL the check
+// that was waiting on it, not hang the run until something kills it.
+// Date.now() here is a stopwatch (elapsed milliseconds), never a calendar date.
+const send = (m, p = {}) => new Promise((r, reject) => {
+  if (browserGone) { reject(new Error('the browser is gone')); return }
+  const i = ++id
+  dead.push(() => { pend.delete(i); reject(new Error('the browser is gone')) })
+  const began = Date.now()
+  const timer = setTimeout(() => { pend.delete(i); reject(new Error(`the page did not answer ${m} within 60s`)) }, 60000)
+  pend.set(i, v => {
+    clearTimeout(timer)
+    // Said out loud, because a slow machine and a stuck page look the same
+    // from outside until one of them finally answers.
+    const took = Date.now() - began
+    if (took > 5000) console.log(`      (slow: ${m} took ${Math.round(took / 1000)}s)`)
+    r(v)
+  })
+  ws.send(JSON.stringify({ id: i, method: m, params: p }))
+})
 const ev = x => send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true }).then(r => r.result?.result?.value)
 const evj = async x => JSON.parse(await ev(`JSON.stringify(${x})`) ?? 'null')
 
@@ -67,6 +138,17 @@ const check = (label, ok, extra) => {
   ran++
   if (ok) console.log(`  ok: ${label}`)
   else { failures++; console.error(`  FAIL: ${label}${extra !== undefined ? ` — ${typeof extra === 'string' ? extra : JSON.stringify(extra)}` : ''}`) }
+}
+
+// One section per behaviour. A step that throws (an element missing or off
+// screen, a page that stopped answering) is a FAILED check in its own section
+// rather than a crash that silently skips the rest; ONLY=4,7 runs a subset.
+const only = process.env.ONLY ? process.env.ONLY.split(',') : null
+async function section(n, title, fn) {
+  if (only && !only.includes(String(n))) return
+  if (browserGone) return
+  console.log(`\n[${n}] ${title}`)
+  try { await fn() } catch (e) { check(`section ${n} ran to its end — ${e instanceof Error ? e.message : String(e)}`, false) }
 }
 
 const INPUT = '.ob-composer-fade input'
@@ -115,6 +197,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
       under: (el.parentElement.firstElementChild.textContent || '').trim(),
       top: Math.round(r.top), bottom: Math.round(r.bottom),
       inView: r.top >= scroller.top - 1 && r.bottom <= composer.top + 1,
+      underInView: (() => { const u = el.parentElement.firstElementChild.getBoundingClientRect(); return u.top >= scroller.top - 1 && u.bottom <= composer.top + 1 })(),
       labels: [...el.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.textContent || '').trim()),
     }
   })
@@ -127,12 +210,8 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   window.__body = () => document.body.innerText
 ` })
 
-// A step that throws (an element missing or off screen) is a FAILED check, not
-// a crash: one exit, and the browser is always closed on the way out.
-try {
 // ---------------------------------------------------------------------------
-console.log('\n[1] H14 — chips belong to the question the message asks')
-{
+await section(1, 'H14 — chips belong to the question the message asks', async () => {
   await open('h14')
   check('harness: the recovery card is on screen to begin with', (await evj(`__cards('recoveryCapacity')`)).length === 1)
   // The model's two legs, stapled: leg 1 recorded the answer and asked for
@@ -178,10 +257,9 @@ console.log('\n[1] H14 — chips belong to the question the message asks')
   check('the real meals question has its chips', meals.length === 1, meals)
   check('...under the message that asks it', meals.length === 1 && /how many meals a day/i.test(meals[0].under), meals)
   check('...and on screen', meals.length === 1 && meals[0].inView, meals)
-}
+})
 
-console.log('\n[2] H14 — both legs asked for chips: the ones that fit the words win')
-{
+await section(2, 'H14 — both legs asked for chips: the ones that fit the words win', async () => {
   await open('h14')
   await queue({
     reply: 'Good, that helps. Which should I use for your calorie maths — male or female?',
@@ -197,10 +275,9 @@ console.log('\n[2] H14 — both legs asked for chips: the ones that fit the word
   check('the sex question gets the sex options, not the first card the model named',
     under.length === 1 && under[0].key === 'gender', all)
   check('no meals chips on the page at all', !all.some(c => c.key === 'mealsPerDay'), all)
-}
+})
 
-console.log('\n[3] H14 — a question the app cannot place gets no chips rather than wrong ones')
-{
+await section(3, 'H14 — a question the app cannot place gets no chips rather than wrong ones', async () => {
   await open('h14')
   await queue({
     reply: "Glad it's steady. What's the longest you've ever stuck with a routine?",
@@ -213,11 +290,10 @@ console.log('\n[3] H14 — a question the app cannot place gets no chips rather 
   const all = await evj(`__cards()`)
   check('no card at all under a question that belongs to no slot', all.length === 0, all)
   check('...and the typing box still works for it', (await ev(`document.querySelector(${JSON.stringify(INPUT)}).readOnly`)) === false)
-}
+})
 
 // ---------------------------------------------------------------------------
-console.log('\n[4] M2 — a re-asked question brings its chips with it')
-{
+await section(4, 'M2 — a re-asked question brings its chips with it', async () => {
   await open('m2')
   const before = await evj(`__cards('sessionDuration')`)
   check('harness: the session-length card starts on the first asking', before.length === 1 && /realistically got/i.test(before[0].under), before)
@@ -245,19 +321,17 @@ console.log('\n[4] M2 — a re-asked question brings its chips with it')
   const sent = await evj(`window.__onbRequests[window.__onbRequests.length - 1]`)
   check('tapping the moved card records the answer', sent?.state?.filled?.sessionDuration !== undefined, sent?.state?.filled)
   check('...and the card goes away once answered', (await evj(`__cards('sessionDuration')`)).length === 0)
-}
+})
 
-console.log('\n[5] M2 — a detour that does NOT re-ask leaves the question where it was')
-{
+await section(5, 'M2 — a detour that does NOT re-ask leaves the question where it was', async () => {
   await open('m2')
   await queue({ reply: "Good question. I'll come back to it properly once we're set up.", actions: [] })
   await say('what does creatine actually do, should I take it?')
   const cards = await evj(`__cards('sessionDuration')`)
   check('the original card is still there, once', cards.length === 1 && /realistically got/i.test(cards[0].under), cards)
-}
+})
 
-console.log('\n[6] M2 — the coach re-asks but forgets to ask for the chips: they still come along')
-{
+await section(6, 'M2 — the coach re-asks but forgets to ask for the chips: they still come along', async () => {
   await open('m2')
   await queue({
     reply: "Short version: it helps you squeeze out a bit more on hard sets. Now, how long can your sessions usually run?",
@@ -267,14 +341,169 @@ console.log('\n[6] M2 — the coach re-asks but forgets to ask for the chips: th
   const cards = await evj(`__cards('sessionDuration')`)
   check('still exactly one session-length card', cards.length === 1, cards)
   check('...and it has moved down to the re-asked question', cards.length === 1 && /how long can your sessions usually run/i.test(cards[0].under) && cards[0].inView, cards)
+})
+
+// ---------------------------------------------------------------------------
+// M4. Page-side: what the summary and any edit prompt look like right now.
+const REVIEW = `(() => {
+  const card = document.querySelector('[data-testid="onboarding-review"]')
+  const composer = document.querySelector('.ob-composer-fade input').getBoundingClientRect()
+  const scroller = document.querySelector('[class*="overflow-y-auto"]').getBoundingClientRect()
+  const inView = el => { if (!el) return false; const r = el.getBoundingClientRect(); return r.top >= scroller.top - 1 && r.bottom <= composer.top + 1 }
+  const rows = card ? Object.fromEntries([...card.querySelectorAll('[data-review-row]')].map(b => [b.getAttribute('data-review-row'), b.textContent.trim()])) : {}
+  const prompts = [...document.querySelectorAll('.ob-message-in')].filter(d => /let.s change that/i.test(d.textContent || ''))
+  const generate = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Generate My Plan')
+  return {
+    open: !!card, rows,
+    prompts: prompts.map(p => ({ text: p.textContent.trim(), inView: inView(p) })),
+    generate: generate ? { disabled: generate.disabled } : null,
+    requests: window.__onbRequests.length,
+    placeholder: document.querySelector('.ob-composer-fade input').placeholder,
+    rowInView: key => inView(card && card.querySelector('[data-review-row="' + key + '"]')),
+  }
+})()`
+const review = () => evj(REVIEW)
+const rowInView = key => ev(`(${REVIEW}).rowInView(${JSON.stringify(key)})`)
+/** Scroll a summary row to where a thumb could reach it, then tap it — the row is often above the fold of a card taller than the screen. */
+async function tapRow(key) {
+  await ev(`document.querySelector('[data-review-row="${key}"]')?.scrollIntoView({ block: 'center' })`)
+  await wait(250)
+  await tapEl(`document.querySelector('[data-review-row="${key}"]')`, `the ${key} row`)
+  await wait(350)
+}
+/** The same tap with the row sitting just above the typing box — the person has scrolled up through the summary and its top rows are low on the screen, so anything that opens "where the summary started" would open below the fold. */
+async function tapRowLow(key) {
+  await ev(`(() => {
+    const row = document.querySelector('[data-review-row="${key}"]')
+    const scroller = document.querySelector('[class*="overflow-y-auto"]')
+    const composerTop = document.querySelector('.ob-composer-fade').getBoundingClientRect().top
+    scroller.scrollTop += row.getBoundingClientRect().bottom - (composerTop - 8)
+  })()`)
+  await wait(300)
+  await tapEl(`document.querySelector('[data-review-row="${key}"]')`, `the ${key} row`)
+  await wait(450)
+}
+const tapButton = async text => {
+  await ev(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})?.scrollIntoView({ block: 'center' })`)
+  await wait(200)
+  await tapEl(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})`, `the "${text}" button`)
+  await wait(400)
+}
+const tapOption = async (slot, label) => {
+  await tapEl(`[...document.querySelectorAll('[data-slot-card="${slot}"] button')].find(b => b.textContent.includes(${JSON.stringify(label)}))`, `the "${label}" option`)
+  await wait(500)
 }
 
-check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0)
-} catch (e) {
-  check(`the run reached its end — ${e instanceof Error ? e.message : String(e)}`, false)
+await section(7, 'M4 — tapping a summary row puts its prompt where the tap was', async () => {
+  // "Meals a day" on purpose: it sits low in a summary taller than the
+  // screen, which is where the tester was looking when the tap looked dead —
+  // the old prompt was appended ABOVE the summary, a screen away.
+  await open('review')
+  const start = await review()
+  check('harness: the summary is open with the answers in it', start.open && /3 meals/.test(start.rows.mealsPerDay ?? ''), start.rows)
+  await tapRow('mealsPerDay')
+  // A second and third tap, if the row is still there to be tapped (it was,
+  // before: each one stacked another copy of the prompt).
+  for (let i = 0; i < 2; i++) {
+    if (await ev(`!!document.querySelector('[data-review-row="mealsPerDay"]')`)) await tapRow('mealsPerDay')
+  }
+  let now = await review()
+  let cards = await evj(`__cards('mealsPerDay')`)
+  check('exactly one set of options appears, however many times the row is tapped', cards.length === 1, cards.length)
+  check('...on screen', cards.length >= 1 && cards[cards.length - 1].inView, cards)
+  check('...with the sentence that introduces it on screen too', cards.length >= 1 && cards[cards.length - 1].underInView, cards)
+  check('...and that sentence reads as English ("pick a different meals a day" did not)',
+    cards.length >= 1 && !/a different |to be instead/i.test(cards[0].under) && /How many meals a day suits you\?/.test(cards[0].under), cards.map(c => c.under))
+  check('the summary is put away while one answer is being changed', !now.open)
+  await shot('m4-editing')
+
+  // Changing your mind is a way out, not a dead end.
+  await tapButton('Review and build my plan')
+  now = await review()
+  check('"Review and build my plan" goes back with nothing changed',
+    now.open && /3 meals/.test(now.rows.mealsPerDay ?? '') && (await evj(`__cards('mealsPerDay')`)).length === 0, now.rows)
+  await tapRow('mealsPerDay')
+  cards = await evj(`__cards('mealsPerDay')`)
+  check('opening it again still shows one, not one per visit', cards.length === 1, cards.length)
+
+  await tapOption('mealsPerDay', '4 meals')
+  now = await review()
+  check('answering brings the summary back', now.open, now)
+  check('...with the new value in its row', /4 meals/.test(now.rows.mealsPerDay ?? ''), now.rows.mealsPerDay)
+  check('...and that row on screen, not a screen above the button', await rowInView('mealsPerDay'))
+  check('...Generate is there and live', now.generate && now.generate.disabled === false, now.generate)
+  check('...and no trip to the coach was needed for it', now.requests === start.requests, { before: start.requests, after: now.requests })
+  await shot('m4-after-edit')
+})
+
+await section(8, 'M4 — an edit that opens a new question asks it at the bottom, and the summary waits', async () => {
+  await open('review')
+  await tapRowLow('equipment')
+  const opened = await evj(`__cards('equipment')`)
+  check('a row tapped from low on the screen still opens its options fully in view',
+    opened.length === 1 && opened[0].inView && opened[0].underInView, opened)
+  await queue({
+    reply: 'A barbell at home changes things. Do you know your working weights for squat, bench and deadlift?',
+    actions: [{ name: 'present_slot', args: { slot_key: 'knowsWorkingLifts' } }],
+  })
+  await tapOption('equipment', 'Home gym')
+  await wait(700)
+  let now = await review()
+  const lifts = await evj(`__cards('knowsWorkingLifts')`)
+  check('the summary stays away while something is still needed', !now.open, now)
+  check('the new question and its options are on screen', lifts.length === 1 && lifts[0].inView, lifts)
+  await queue({ reply: 'A calibration week it is, then.', actions: [] })
+  await tapOption('knowsWorkingLifts', 'Not sure')
+  await wait(700)
+  now = await review()
+  check('once it is answered the summary returns by itself', now.open && /Home gym/.test(now.rows.equipment ?? ''), now.rows)
+  check('...with Generate live', now.generate && now.generate.disabled === false, now.generate)
+})
+
+await section(9, 'M4 — an answer you type rather than tap', async () => {
+  await open('review')
+  await tapRow('displayName')
+  let now = await review()
+  check('the prompt says to type it', now.prompts.length === 1 && now.prompts[0].inView && /What should I call you\? Type it in below\./.test(now.prompts[0].text), now.prompts)
+  check('...and the typing box says what it is for', now.placeholder === 'Your name…', now.placeholder)
+  await queue({ reply: 'Samuel it is.', actions: [{ name: 'set_slot', args: { slot_key: 'displayName', value: 'Samuel' } }] })
+  await say('Samuel')
+  now = await review()
+  check('the summary returns with the new name', now.open && /Samuel/.test(now.rows.displayName ?? ''), now.rows.displayName)
+  // If the coach does NOT record the change, the person must still get out.
+  await tapRow('dislikedFoods')
+  await queue({ reply: 'Got it.', actions: [] })
+  await say('actually leave that as it is')
+  now = await review()
+  check('a typed reply the coach did not act on still returns to the summary', now.open && /mushrooms/.test(now.rows.dislikedFoods ?? '') && now.generate && now.generate.disabled === false, now)
+})
+
+await section(10, 'M4 — a reload part-way through an edit', async () => {
+  await open('review')
+  await tapRow('equipment')
+  await open('keep')
+  const now = await review()
+  check('comes back to the summary, answers intact, with no orphaned prompt',
+    now.open && /Minimalist/.test(now.rows.equipment ?? '') && now.prompts.length === 0 && (await evj(`__cards('equipment')`)).length === 0, now)
+  // The abandoned prompt must not survive in ANY form. Left in the saved
+  // conversation it comes back as a second copy of the app's closing line.
+  const closers = await ev(`(document.body.innerText.match(/That's everything I need/g) || []).length`)
+  check('...and the closing line is not said twice', closers === 1, closers)
+})
+
+if (!browserGone) {
+  try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }
 
-chrome.kill(); server.close()
+shutDown()
+if (browserGone) {
+  const attempt = Number(process.env.ONB_TURNS_ATTEMPT ?? '1')
+  console.log(`\nNOT A RESULT: the browser went away mid-run (${browserGone}) after ${ran} checks — something outside this check ended it.`)
+  if (attempt >= 3) { console.error('Three attempts, three lost browsers. Run this again on a quieter machine.\n'); process.exit(2) }
+  console.log(`Starting again from the top (attempt ${attempt + 1} of 3).\n`)
+  const again = spawnSync(process.execPath, process.argv.slice(1), { stdio: 'inherit', env: { ...process.env, ONB_TURNS_ATTEMPT: String(attempt + 1) } })
+  process.exit(again.status ?? 2)
+}
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`${failures} check(s) failed.\n`); process.exit(1) }
 console.log('Every turn put its chips under the question it asked.\n')

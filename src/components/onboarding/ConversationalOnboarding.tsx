@@ -122,6 +122,9 @@ interface WorkingState {
   supersedeCards: Set<string>
 }
 
+/** A "let's change that" prompt opened from the summary and not yet answered or put away. */
+const isOpenEdit = (m: DraftMessage) => !!m.slotCardEditing && !m.slotCardResolved
+
 /** An unanswered card that is still the one on screen for its question. */
 const isLiveCard = (m: DraftMessage) => !!m.slotCard && !m.slotCardResolved && !m.slotCardSuperseded
 
@@ -143,6 +146,11 @@ const RESUME_BANNER = "Welcome back — picking up right where we left off. Say 
 function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
   return messages
     .filter(m => m.content.trim().length > 0 && m.content !== RESUME_BANNER)
+    // An edit prompt that is still open is not saved. "Which row is being
+    // changed" lives in memory only, so after a reload nothing would hide the
+    // summary and the prompt would sit above it with no way to tell it was
+    // live. The answer being edited is untouched either way (see handleEditSlot).
+    .filter(m => !isOpenEdit(m))
     // asksSlot RIDES ALONG. It was missing from this list, so a turn that
     // asked about a slot WITHOUT a card — the scripted opener's "what should
     // I call you?" is the built-in one — lost that fact on every reload, and
@@ -586,6 +594,12 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
+  // The summary row being changed right now, if any. While it is set the
+  // summary is put away, so the prompt and its control are the LAST thing on
+  // screen — see handleEditSlot.
+  const [editingKey, setEditingKey] = useState<SlotKey | null>(null)
+  // The row the last edit changed, so the summary can come back showing it.
+  const [justEdited, setJustEdited] = useState<SlotKey | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -732,7 +746,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   // way out. A stall here is uniquely costly, so it gets a guard that no
   // request path can route around.
   useEffect(() => {
-    if (busy || reviewOpen) return
+    // An edit in progress has put the summary away on purpose; it comes back
+    // here by itself the moment the edit is answered or abandoned.
+    if (busy || reviewOpen || editingKey) return
     if (!readyToGenerate) return
     setMessages(prev => {
       // Sweep FIRST, then append. This net opens the review without the model
@@ -747,7 +763,29 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         : [...swept, { role: 'assistant', content: COMPLETE_MESSAGE }]
     })
     setReviewOpen(true)
-  }, [values, confirmed, busy, reviewOpen])
+  }, [values, confirmed, busy, reviewOpen, editingKey])
+
+  // An edit prompt must be SEEN. Forced past the near-bottom guard: the row
+  // that opened it is often near the top of a summary taller than the screen,
+  // so the person is by definition scrolled away from the bottom.
+  useEffect(() => { if (editingKey) scrollToBottom(true) }, [editingKey, scrollToBottom])
+
+  // ...and when the summary comes back, it comes back showing the row that
+  // changed rather than the Generate button a screen below it. Two frames:
+  // the first is the stick-to-bottom observer reacting to the card appearing.
+  useEffect(() => {
+    if (!reviewOpen || !justEdited) return
+    // Stand the stick-to-bottom observer down first, or it answers the card
+    // appearing by scrolling to the foot of it a frame after this runs.
+    isNearBottomRef.current = false
+    let second = 0
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => {
+        document.querySelector(`[data-review-row="${justEdited}"]`)?.scrollIntoView({ block: 'center' })
+      })
+    })
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second) }
+  }, [reviewOpen, justEdited])
 
   const makeWorkingState = (): WorkingState => ({
     values,
@@ -1303,8 +1341,43 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         { role: 'assistant', content: 'Connection hiccup on my end — say that again and we’ll keep going.' },
       ])
     } finally {
+      // A typed reply to an edit prompt has now been through the coach. Put
+      // the prompt away whatever came back, so the summary can return: with
+      // the summary hidden and no tab bar, a prompt left open here would be a
+      // dead end. If the change did not take, the row still says so.
+      if (editingKey) {
+        setMessages(prev => prev.map(m => (isOpenEdit(m) ? { ...m, slotCardResolved: true } : m)))
+        setEditingKey(null)
+        setJustEdited(editingKey)
+      }
       setBusy(false)
     }
+  }
+
+  /**
+   * An answer given to an edit prompt opened from the summary. Returns true
+   * when it was settled here, with no trip to the coach.
+   *
+   * Nothing needs asking when the change leaves the plan buildable: the value
+   * is validated and recorded like any other tap, the person's own bubble says
+   * what they chose, and the summary comes straight back with the new value in
+   * its row. The coach used to be sent this turn too, and whatever it said —
+   * sometimes a fresh question — landed above a summary that was still open.
+   *
+   * When the change OPENS a question (a barbell tier makes the working-lifts
+   * question apply), the summary stays away and the coach is asked, so the new
+   * question arrives at the bottom of the conversation like any other.
+   */
+  const settleEdit = (ws: WorkingState, said: string): boolean => {
+    if (!editingKey) return false
+    const stillBuildable =
+      missingRequiredSlots(ws.values).length === 0 && unconfirmedOptionalSlots(ws.confirmed, ws.values).length === 0
+    if (!stillBuildable) return false // sendMessage closes the edit when its turn ends
+    setMessages(prev => [...prev, { role: 'user', content: said }])
+    commitWorkingState(ws)
+    setJustEdited(editingKey)
+    setEditingKey(null)
+    return true
   }
 
   // --- chip interactions -------------------------------------------------
@@ -1324,6 +1397,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     // false: a tap is not a mapping — see applySlot's note.
     if (!applySlot(ws, key, coerceSlotValue(def, value), values, false)) return
     const label = def.options?.find(o => String(o.value) === value)?.label ?? value
+    if (settleEdit(ws, label)) return
     void sendMessage(label, ws)
   }
 
@@ -1342,6 +1416,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const labels = selected.length > 0
       ? selected.map(v => def.options?.find(o => String(o.value) === v)?.label ?? v).join(', ')
       : 'none'
+    if (settleEdit(ws, labels)) return
     void sendMessage(labels, ws)
   }
 
@@ -1371,6 +1446,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       setMessages(prev => [...prev, { role: 'assistant', content: 'That didn’t look right — check the numbers and try again.' }])
       return
     }
+    if (settleEdit(ws, saved.join(', '))) return
     void sendMessage(saved.join(', '), ws)
   }
 
@@ -1384,6 +1460,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const declined = declineSlots(ws, keys)
     if (declined.length === 0) return
     const labels = declined.map(k => getSlotDef(k)?.shortLabel.toLowerCase() ?? k)
+    if (settleEdit(ws, `I'd rather not say — skip ${labels.join(', ')}`)) return
     void sendMessage(`I'd rather not say — skip ${labels.join(', ')}`, ws)
   }
 
@@ -1407,19 +1484,42 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     if (busy) return
     const def = getSlotDef(key)
     if (!def || !isSlotApplicable(def, values)) return
+    // THE PROMPT GOES WHERE THE PERSON IS LOOKING (test log M4, 9 Oct 2026).
+    // It used to be appended to the conversation while the summary stayed
+    // open underneath it — so it rendered ABOVE a card taller than the screen,
+    // the tap looked dead, and every further tap stacked another copy. Now the
+    // summary is put away while one row is being changed: the prompt and its
+    // control are the last thing on screen, there is only ever one of them,
+    // and the summary returns by itself when the edit is answered or dropped.
+    if (editingKey === key) { scrollToBottom(true); return }
     setMessages(prev => [
-      ...prev,
+      // One edit at a time: a prompt still open for another row is replaced.
+      ...prev.filter(m => !isOpenEdit(m)),
       {
         role: 'assistant',
-        content: def.control === 'text'
+        // The slot's own question, which is written per question, rather than
+        // a sentence built around its label: "pick a different equipment" and
+        // "type what you'd like foods to avoid to be instead" were both
+        // templates meeting a noun they did not fit.
+        content: `Sure — let's change that. ${def.question}`
           // A text slot has no card to render, so the composer is the only
           // way to answer it — say so rather than leaving a dead prompt.
-          ? `Sure — type what you'd like ${def.shortLabel.toLowerCase()} to be instead.`
-          : `Sure — pick a different ${def.shortLabel.toLowerCase()}.`,
+          + (def.control === 'text' ? ' Type it in below.' : ''),
         slotCard: def.control === 'text' ? undefined : key,
-        slotCardEditing: def.control === 'text' ? undefined : true,
+        asksSlot: def.control === 'text' ? key : undefined,
+        slotCardEditing: true,
       },
     ])
+    setJustEdited(null)
+    setEditingKey(key)
+    setReviewOpen(false)
+  }
+
+  /** Back to the summary with nothing changed. */
+  const handleLeaveEdit = () => {
+    setMessages(prev => prev.filter(m => !isOpenEdit(m)))
+    setEditingKey(null)
+    setReviewOpen(true)
   }
 
   const handleGenerate = () => {
@@ -1513,6 +1613,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   }
 
   const pendingHint = (() => {
+    // A text answer being changed from the summary is typed here, so say which.
+    const editingDef = editingKey ? getSlotDef(editingKey) : undefined
+    if (editingDef?.control === 'text' && editingDef.inputHint) return editingDef.inputHint
     // Indices, not just the message, because WHICH IS NEWER decides it.
     // Fourth failure in this block, reported by Ashley: correct an answer and
     // the coach's next question arrives with no card of its own, so this
@@ -1759,14 +1862,17 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
               dietary restrictions had ever been asked — neither is required,
               so an unconfirmed injuries slot silently assembles into an empty
               array, indistinguishable from a real "no injuries" answer. */}
+          {/* While one answer is being changed this same button is the way
+              back with nothing changed — the edit prompt is put away and the
+              summary returns. */}
           {!reviewOpen && readyToGenerate && (
-            <Button onClick={() => setReviewOpen(true)} className="w-full h-11">
+            <Button onClick={editingKey ? handleLeaveEdit : () => setReviewOpen(true)} className="w-full h-11">
               Review and build my plan
             </Button>
           )}
 
           {reviewOpen && (
-            <Card className="bg-muted/50 border-dashed">
+            <Card data-testid="onboarding-review" className="bg-muted/50 border-dashed">
               <CardContent className="pt-4 text-sm space-y-1.5">
                 {ONBOARDING_SLOTS
                   // Only what actually applies to this person: a "don't know
@@ -1780,7 +1886,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     type="button"
                     onClick={() => handleEditSlot(def.key)}
                     disabled={busy}
-                    className="w-full text-left min-h-[32px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+                    data-review-row={def.key}
+                    className={`w-full text-left min-h-[32px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 ${justEdited === def.key ? 'bg-muted' : ''}`}
                     aria-label={`Change ${def.shortLabel}`}
                   >
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}

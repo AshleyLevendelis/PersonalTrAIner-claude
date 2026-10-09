@@ -19,6 +19,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ConversationalOnboarding } from '@/components/onboarding/ConversationalOnboarding'
+import { COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import '@/index.css'
 
 type Scripted = { reply?: string; actions?: Array<{ name: string; args: Record<string, unknown> }> }
@@ -109,6 +110,8 @@ if (state === 'review') {
       { role: 'user', content: 'Sam' },
       { role: 'assistant', content: 'Anything else you would rather I left out?' },
       { role: 'user', content: 'mushrooms' },
+      // The app's own closing line, as a finished conversation really has it.
+      { role: 'assistant', content: COMPLETE_MESSAGE },
     ],
     all,
     Object.keys(all),
