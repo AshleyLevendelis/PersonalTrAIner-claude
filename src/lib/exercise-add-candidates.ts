@@ -29,12 +29,42 @@
 // session the useful question is the opposite one, so this file now scores
 // overlap with what the day already trains and drops anything with none.
 //
+// THE DAY'S OWN WORK DEFINES IT, AND ITS PURPOSE COMES FIRST — decided as a
+// CSCS coach, 9 Oct 2026, after the tester's leg day offered Arm Circles, Band
+// Face Pulls and Band Pull-Aparts under "Your shoulders gets the least work in
+// this session" (reproduced on 8 of 8 generated leg days for a shoulder-flagged,
+// limited-kit profile). Three things were wrong, and the fourth is grammar:
+//   1. MOVEMENT PREP IS NOT WORK. A shoulder flag puts a two-set shoulder-care
+//      primer on every day, so "shoulders" became a muscle leg day trains — the
+//      one with the fewest sets, which is exactly what the ranking rewards. The
+//      session's theme is now read from its working exercises only, and a
+//      primer is never offered as an addition (the search box still reaches
+//      one): an added exercise extends the training stimulus, and prep is
+//      dosed to prepare, not to be added to.
+//   2. THE DAY'S PURPOSE FIRST. Each track names the work without which its
+//      name is untrue (`defining_patterns`, asked through
+//      dayHoldsDefiningWork); a candidate that IS that work sorts above one
+//      that merely shares a muscle with the session. Leg day offers leg work.
+//   3. A FLAGGED JOINT IS NOT A GAP TO FILL. With a shoulder or lower-back
+//      flag on the profile the app does not volunteer more loading for it:
+//      nothing whose lead muscle sits on the flagged area is suggested, that
+//      muscle is never the "least work" a suggestion is ranked up for, and it
+//      is not a reason for anything else to be on the list. She can still
+//      choose one by search — her 13 Sep ruling, show everything — and the
+//      plan's own dose is untouched. (The other six areas have no muscle group
+//      of their own; for those the catalogue's contraindication tags, already
+//      applied to the pool, are the whole answer. A rule that also dropped
+//      everything the catalogue marks as GOOD for a flagged joint was built
+//      and taken out again: it removed leg curls for a bad knee and trunk work
+//      for a bad back, which is the opposite of what a coach would offer.)
+//
 // CHOSEN, NOT SHUFFLED. Every row carries the reason it is there, in the same
 // `{ exercise, note }` shape the swap list uses, so the sheet can render both
 // through one row component, and ties break on name so the same day offers
 // the same list twice.
 // ---------------------------------------------------------------------------
-import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, EQUIPMENT_QUALITY_TIERS } from './exercise-plan'
+import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, EQUIPMENT_QUALITY_TIERS, dayHoldsDefiningWork, isWeekSupportLeg } from './exercise-plan'
+import { isExternallyLoaded } from './load-prescription'
 import { EXERCISE_DATABASE, getExerciseEntry, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
 import type { WorkoutDay, UserProfile, MesocycleMovementPattern, EquipmentAccess } from './types'
 
@@ -58,7 +88,26 @@ export interface AdditionCandidate {
 const STRUCTURAL_PATTERNS: ReadonlySet<MesocycleMovementPattern> =
   new Set(['squat', 'hinge', 'lunge'] as MesocycleMovementPattern[])
 
-/** Sets per muscle group in one day, by the reckoning weekMuscleBalance uses. */
+/** Movement prep — a warm-up drill on the day's list. Dosed to prepare, so it is neither the session's work nor something to add more of. */
+function isMovementPrep(entry: ExerciseEntry | undefined): boolean {
+  return entry?.mechanics_tier === 'primer'
+}
+
+/**
+ * IS THIS ROW PART OF WHAT THE SESSION IS FOR? Not movement prep, and not the
+ * one light leg accessory a shoulders day carries for the WEEK's sake
+ * (isWeekSupportLeg — "not a second leg day"). Counting that two-set bridge
+ * made hamstrings the thinnest muscle of a shoulders day and filled the list
+ * with seven leg curls: the same fault as the primer, by the other door.
+ */
+function isSessionWork(day: WorkoutDay, entry: ExerciseEntry | undefined): entry is ExerciseEntry {
+  return !!entry && !isMovementPrep(entry) && !isWeekSupportLeg(day.focus, entry)
+}
+
+/**
+ * Sets per muscle group in one day's WORK, by the reckoning weekMuscleBalance
+ * uses. Movement prep is left out: see point 1 in the header.
+ */
 function dayMuscleSets(day: WorkoutDay): Map<MuscleGroup, number> {
   const counts = new Map<MuscleGroup, number>()
   for (const ex of day.exercises) {
@@ -66,10 +115,35 @@ function dayMuscleSets(day: WorkoutDay): Map<MuscleGroup, number> {
     // planned exercise whose name no longer resolves contributes nothing
     // rather than throwing — the tolerance muscleSetTotal already keeps.
     const entry = getExerciseEntry(ex.name)
-    if (!entry) continue
+    if (!isSessionWork(day, entry)) continue
     for (const g of muscleGroupsOf(entry)) counts.set(g, (counts.get(g) ?? 0) + ex.sets)
   }
   return counts
+}
+
+/**
+ * The muscle group that sits ON an area somebody can flag, where the app's two
+ * vocabularies have one. Only these two do: a knee, hip, ankle, elbow, wrist
+ * or neck has no muscle group of its own here, and for those the catalogue's
+ * own contraindication tags (already applied to the pool) are the whole answer.
+ */
+const GROUPS_ON_A_FLAGGED_AREA: Record<string, MuscleGroup[]> = {
+  shoulders: ['shoulders'],
+  lower_back: ['erectors'],
+}
+
+/**
+ * "Your shoulders get", "Your chest gets". The sentence printed "Your
+ * shoulders gets the least work" for every plural group. A SWITCH WITH NO
+ * DEFAULT, so a twelfth muscle group cannot be added without somebody deciding
+ * which verb it takes.
+ */
+export function leastWorkVerb(group: MuscleGroup): 'get' | 'gets' {
+  switch (group) {
+    case 'chest': case 'back': case 'core': return 'gets'
+    case 'erectors': case 'shoulders': case 'biceps': case 'triceps':
+    case 'quads': case 'hamstrings': case 'glutes': case 'calves': return 'get'
+  }
 }
 
 /** A real, loadable tool sorts before an improvised one (band, backpack) when both are tied on everything else — the same shared question generation, rotation, the swap list and the scorer all ask. */
@@ -98,16 +172,40 @@ export function getAdditionCandidates(
 ): AdditionCandidate[] {
   const muscles = dayMuscleSets(day)
   if (muscles.size === 0) return []
-  const patterns = new Set(day.exercises.map(e => e.movement_pattern).filter(Boolean) as MesocycleMovementPattern[])
-  const leastInDay = Math.min(...muscles.values())
+  const patterns = new Set(day.exercises
+    .filter(e => isSessionWork(day, getExerciseEntry(e.name)))
+    .map(e => e.movement_pattern).filter(Boolean) as MesocycleMovementPattern[])
+  const injuries = profile.injuries ?? []
+  const flaggedGroups = new Set(injuries.flatMap(i => GROUPS_ON_A_FLAGGED_AREA[i] ?? []))
+  // The thinnest part of the session — never a muscle on a flagged area, which
+  // is thin on purpose (point 3 in the header). AND ONLY WHEN SOMETHING IS
+  // THINNER THAN SOMETHING ELSE: on a day whose muscles all carry the same
+  // sets, every candidate used to be told its muscle "gets the least work —
+  // 7 sets", which is not true of any of them.
+  const openSets = [...muscles].filter(([g]) => !flaggedGroups.has(g)).map(([, sets]) => sets)
+  const leastInDay = Math.min(...openSets)
+  const somethingIsThinner = leastInDay < Math.max(...openSets)
   const present = new Set(day.exercises.map(e => e.name.toLowerCase()))
   const pool = getConstrainedPool(profile, exclusions)
   const equipment = profile.equipment_access
+  // Does this day's name make a claim at all? Asked with nothing in hand: a
+  // track with no defining work answers yes to anything, and then purpose is
+  // not a way to tell two candidates apart.
+  const dayHasAPurpose = !dayHoldsDefiningWork(day.focus, [])
 
   const scored = pool
     .filter(e => !present.has(e.name.toLowerCase()))
+    // Movement prep is never offered as an addition.
+    .filter(e => !isMovementPrep(e))
+    // Nor is more loading for a flagged area: nothing that leads with the
+    // muscle sitting on it.
+    .filter(e => { const lead = muscleGroupsOf(e)[0]; return !lead || !flaggedGroups.has(lead) })
     .map(exercise => {
-      const overlap = muscleGroupsOf(exercise).filter(g => muscles.has(g))
+      // What it shares with the session's work. A muscle on a flagged area is
+      // not something to add to, so it is not a reason to be here either —
+      // "Jump Rope: trains shoulders, like the rest of this session" was the
+      // one suggestion on a shoulder-flagged chest day.
+      const overlap = muscleGroupsOf(exercise).filter(g => muscles.has(g) && !flaggedGroups.has(g))
       if (overlap.length === 0) return null
       const pattern = mapMovementPattern(exercise.movement_pattern)
       if (STRUCTURAL_PATTERNS.has(pattern) && !patterns.has(pattern)) return null
@@ -125,20 +223,36 @@ export function getAdditionCandidates(
       const leadSets = muscles.get(leads) ?? 0
       const isMainLift = exercise.mechanics_tier === 'tier1_compound'
 
+      const thinnest = somethingIsThinner && leadSets <= leastInDay
+
       const score = 2
-        + (leadSets <= leastInDay ? 2 : 0)
+        + (thinnest ? 2 : 0)
         + (!isMainLift ? 1 : 0)
 
-      const note = leadSets <= leastInDay
-        ? `Your ${leads} gets the least work in this session — ${leadSets} ${leadSets === 1 ? 'set' : 'sets'}. This adds more.`
+      const note = thinnest
+        ? `Your ${leads} ${leastWorkVerb(leads)} the least work in this session — ${leadSets} ${leadSets === 1 ? 'set' : 'sets'}. This adds more.`
         : `Trains ${overlap.slice(0, 2).join(' and ')}, like the rest of this session.`
 
-      return { exercise, note, score, thinnestSets: leadSets }
+      // THE DAY'S OWN WORK — the thing its name promises (point 2).
+      const ofTheDay = dayHasAPurpose && dayHoldsDefiningWork(day.focus, [exercise]) ? 1 : 0
+
+      // SOMETHING SHE CAN ADD WEIGHT TO, before something she cannot — the
+      // tie used to fall to the alphabet, so a lifter with dumbbells was
+      // offered Air Squat, Bodyweight Good Morning and Box Squat (Bodyweight)
+      // ahead of Goblet Squats. Added work should be work that can progress;
+      // her 18 Sep ruling on the swap list is the same call ("weight always
+      // wins"). With no kit nothing in the pool is loaded and this is silent.
+      const loadable = isExternallyLoaded(exercise) ? 1 : 0
+
+      return { exercise, note, score, ofTheDay, loadable, thinnestSets: leadSets }
     })
     .filter((c): c is NonNullable<typeof c> => c !== null)
     .sort((a, b) =>
-      (b.score - a.score)
+      // OUTERMOST: what the day is for, before what it happens to touch.
+      (b.ofTheDay - a.ofTheDay)
+      || (b.score - a.score)
       || (a.thinnestSets - b.thinnestSets)
+      || (b.loadable - a.loadable)
       // A REAL TOOL BEFORE AN IMPROVISED ONE, ADDED 21 Sep 2026. Every tied
       // candidate used to fall straight to alphabetical order — the exact
       // "Backpack Lateral Raise sorts to index 0" shape this whole line of
