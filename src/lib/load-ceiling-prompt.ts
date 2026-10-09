@@ -23,7 +23,7 @@
 // ---------------------------------------------------------------------------
 
 import { supabase } from './supabase'
-import { isImprovisedLoadImplement, loadingMode, isExternallyLoaded } from './load-prescription'
+import { ceilingKindsFor, isExternallyLoaded, statedCeilingKg, type LoadCeilingKind } from './load-prescription'
 import { getExerciseEntry } from './exercise-db'
 import type { UserProfile, WorkoutDay } from './types'
 
@@ -35,7 +35,7 @@ import type { UserProfile, WorkoutDay } from './types'
  * are already asked their squat/bench/deadlift; 'stack' is excluded because a
  * cable machine means a gym, and a gym's stack really does go to 100kg.
  */
-export type LoadCeilingKind = 'dumbbell' | 'single_implement' | 'improvised'
+export type { LoadCeilingKind }
 
 export const LOAD_CEILING_COLUMN: Record<LoadCeilingKind, string> = {
   dumbbell: 'max_dumbbell_kg',
@@ -75,18 +75,21 @@ export function isValidCeilingKg(v: unknown): boolean {
   return typeof n === 'number' && Number.isFinite(n) && n >= LOAD_CEILING_MIN_KG && n <= LOAD_CEILING_MAX_KG
 }
 
-/** Which implement an exercise would be asked about, or null if it is one we never ask about. */
+/**
+ * Which implement an exercise would be asked about, or null if it is one we
+ * never ask about.
+ *
+ * THE IMPLEMENT COMES FROM load-prescription's `ceilingKindsFor`, the same
+ * function the clamp reads — never worked out again here. This function used
+ * to switch on the loading mode by itself, and a lone DUMBBELL shares a mode
+ * with a kettlebell: a tester with a stated 24kg dumbbell limit was asked
+ * "What is your heaviest kettlebell?" by a one-dumbbell leg curl, and the
+ * answer would have capped nothing (9 Oct 2026).
+ */
 export function ceilingKindFor(exerciseName: string): LoadCeilingKind | null {
   const entry = getExerciseEntry(exerciseName)
   if (!entry || !isExternallyLoaded(entry)) return null
-  // Checked first: a weighted backpack falls through loadingMode's cases to
-  // 'stack', and it is emphatically not a cable machine.
-  if (isImprovisedLoadImplement(entry)) return 'improvised'
-  switch (loadingMode(entry)) {
-    case 'dumbbell': return 'dumbbell'
-    case 'single_implement': return 'single_implement'
-    default: return null
-  }
+  return ceilingKindsFor(entry)[0] ?? null
 }
 
 /**
@@ -131,8 +134,15 @@ export function ceilingToAskFor(profile: UserProfile, day: WorkoutDay | null | u
   // which is exactly where they are.
   if (profile.equipment_access === 'full_gym') return null
   for (const ex of day.exercises) {
-    const kind = ceilingKindFor(ex.name)
-    if (kind && !hasStatedCeiling(profile, kind)) return kind
+    const entry = getExerciseEntry(ex.name)
+    if (!entry || !isExternallyLoaded(entry)) continue
+    const kind = ceilingKindsFor(entry)[0]
+    // NEVER RE-ASK WHAT IS ALREADY KNOWN. "Known" is the clamp's own answer
+    // for this lift, not a second reading of the columns: a lift that can use
+    // a dumbbell or a kettlebell is capped once either is on record, so it is
+    // not asked about; a one-dumbbell lift is capped by the dumbbell answer,
+    // so it never raises the kettlebell question.
+    if (kind && statedCeilingKg(entry, profile) == null) return kind
   }
   return null
 }

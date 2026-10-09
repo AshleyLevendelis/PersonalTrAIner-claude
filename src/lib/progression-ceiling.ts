@@ -28,6 +28,8 @@
 // ---------------------------------------------------------------------------
 
 import type { Exercise } from './types'
+import { getExerciseEntry } from './exercise-db'
+import { loadingMode } from './load-prescription'
 
 /**
  * The weight is pinned by something structural, not by choice.
@@ -47,7 +49,29 @@ import type { Exercise } from './types'
 function weightCannotMove(ex: Exercise): boolean {
   return ex.load_hold === 'ceiling'
     || ex.load_hold === 'implement'
+    || ex.load_hold === 'stated_limit'
     || ex.load_hold === 'unaffordable_step'
+}
+
+/**
+ * "your 24kg dumbbells" — the thing a lift held at a STATED limit is held by,
+ * in the person's own terms. Read off the row (its weight IS the limit) and
+ * the catalogue (which implement the lift uses); a lift a dumbbell or a
+ * kettlebell can do does not guess which one they meant.
+ */
+function statedLimitWords(ex: Exercise): string {
+  const kg = ex.suggested_load_kg
+  const entry = getExerciseEntry(ex.name)
+  const equipment = entry?.equipment ?? []
+  const noun = !entry ? null
+    : equipment.includes('weighted backpack') ? 'bag'
+    : loadingMode(entry) === 'dumbbell' ? 'dumbbells'
+      : equipment.includes('dumbbell') && equipment.includes('kettlebell') ? null
+        : equipment.includes('kettlebell') ? 'kettlebell'
+          : equipment.includes('dumbbell') ? 'dumbbell'
+            : null
+  if (kg == null) return noun ? `your heaviest ${noun}` : 'the heaviest you have'
+  return noun ? `your ${kg}kg ${noun}` : `the ${kg}kg you have`
 }
 
 /**
@@ -92,6 +116,15 @@ export function atPrescribedCeiling(ex: Exercise): boolean {
  * exists to remove.
  */
 export function ceilingLabel(ex: Exercise): string | null {
+  // A FOURTH WORDING, and the one case that does not wait for "no lever left"
+  // (9 Oct 2026, test log H18: a lift sat at a tester's 24kg dumbbell limit
+  // "with 14 weeks to go" and nothing on the row said why). The other three
+  // describe the week — "the app has run out of things to add" — so they stay
+  // silent while a rep is still being bought. This one describes the WEIGHT,
+  // and it is a fact about the person's own kit that is true every week it
+  // sits there: it cannot be alarming, because they told us, and it is what
+  // stops a flat number reading as an app that has forgotten to progress.
+  if (ex.load_hold === 'stated_limit') return `held at ${statedLimitWords(ex)}`
   if (!atPrescribedCeiling(ex)) return null
   if (ex.load_hold === 'implement') return 'as heavy as this gets'
   if (ex.load_hold === 'unaffordable_step') return 'next weight up is too big a jump'
@@ -108,6 +141,10 @@ export function ceilingLabel(ex: Exercise): string | null {
  * ask.
  */
 export function ceilingNoteForCoach(ex: Exercise): string | null {
+  // Told whenever it is true, for the same reason the card is: the coach was
+  // otherwise free to promise a heavier dumbbell next week.
+  if (ex.load_hold === 'stated_limit')
+    return `this is ${statedLimitWords(ex)}, the heaviest they have said they own, so the weight will not rise — do not present it as progression; reps are the lever, and if they say they have something heavier their limit can be raised`
   if (!atPrescribedCeiling(ex)) return null
   if (ex.load_hold === 'implement')
     return 'this is the heaviest the implement goes, so the weight will not rise again — do not present it as progression'

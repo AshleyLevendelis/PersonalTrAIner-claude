@@ -2397,7 +2397,11 @@ function App() {
       })
       if (r.applied.length === 0 || r.nextWeekNumber == null) return
       setMesocycle(r.next)
-      setAdaptationMessages(prev => [...prev, { text: calibrationAnchorMessage(r.nextWeekNumber!, r.applied) }])
+      // Null when next week's own number did not move (a later week of the
+      // block did): the plan is adopted either way, and nothing is announced
+      // that the person could not go and see.
+      const said = calibrationAnchorMessage(r.nextWeekNumber!, r.applied)
+      if (said) setAdaptationMessages(prev => [...prev, { text: said }])
     } catch (err) {
       console.error('[calibration-anchor] failed to re-anchor the program:', err)
     }

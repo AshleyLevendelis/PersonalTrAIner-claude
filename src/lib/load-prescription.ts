@@ -97,6 +97,16 @@ export interface LoadPrescription {
    * a held bar (Ashley's ruling); this is so the measurement can say whether
    * the app already knows why.
    *   'implement'  clamped by the improvised-implement safety ceiling
+   *   'stated_limit'
+   *                sitting AT the heaviest dumbbell or kettlebell the trainee
+   *                has told us they own. Added 9 Oct 2026: before it, a
+   *                dumbbell pinned at a stated 24kg read as held by nothing —
+   *                or, once the ramp arrived, as 'ceiling', whose sentence
+   *                promises "log a set and the number can start moving
+   *                again", which is untrue of somebody with nothing heavier
+   *                to pick up. "At", not "clamped to": a week re-anchored to
+   *                the limit from a logged set never passes through the clamp
+   *                and is held by it all the same.
    *   'floor'      the estimate sat below the equipment floor (bar only,
    *                lightest pair) and was rounded UP to it
    *   'ceiling'    the unverified ramp has caught up with the standards
@@ -107,7 +117,7 @@ export interface LoadPrescription {
    * The binding one wins when several apply (an implement cap or a floor is
    * the number on the screen whatever the ramp did).
    */
-  hold: 'implement' | 'floor' | 'ceiling' | null
+  hold: 'implement' | 'stated_limit' | 'floor' | 'ceiling' | null
 }
 
 /**
@@ -831,14 +841,66 @@ export function getLoadingCeilingKg(entry: ExerciseEntry, category: string | nul
 }
 
 /**
- * A single-implement movement done with a dumbbell and nothing else — so the
- * ceiling that applies to it is "your heaviest dumbbell", not "your heaviest
- * kettlebell". An entry offering both is excluded: it can be done with either,
- * and narrowing it to the dumbbell answer would cap a trainee below the
- * kettlebell they own.
+ * The three things a trainee can be asked the weight of. Named for the
+ * profile column each answer lives in (`max_dumbbell_kg`,
+ * `max_single_implement_kg` — the KETTLEBELL answer — and
+ * `max_improvised_kg`).
  */
-function usesDumbbellOnly(entry: ExerciseEntry): boolean {
-  return entry.equipment.includes('dumbbell') && !entry.equipment.includes('kettlebell')
+export type LoadCeilingKind = 'dumbbell' | 'single_implement' | 'improvised'
+
+/**
+ * WHICH STATED ANSWERS CAN CAP THIS EXERCISE — the one place that decides it.
+ *
+ * Two functions used to answer this separately and disagreed. The CLAMP
+ * (statedCeilingKg, below) was re-routed by implement on 10 Sep 2026; the
+ * QUESTION (ceilingKindFor in load-ceiling-prompt.ts) still keyed on the
+ * loading mode. So a tester who had said his heaviest dumbbells are 24kg was
+ * asked "What is your heaviest kettlebell?" by Dumbbell Leg Curl — one
+ * dumbbell — whose limit the app already held and whose clamp would have
+ * ignored the kettlebell answer anyway (test log H1, 9 Oct 2026). Both read
+ * this now, and `test:load-ceilings` §8 holds that they cannot disagree for
+ * any exercise in the catalogue.
+ *
+ * ROUTE BY THE IMPLEMENT, NOT BY THE MODE. 'single_implement' covers both a
+ * kettlebell and ONE dumbbell, but max_single_implement_kg is only ever
+ * captured from kettlebell words (onboarding-slots.ts's kettlebell slot, and
+ * ceilingIsInUserWords' matcher).
+ *
+ * In ASKING order: for a lift that can use either, dumbbells first — that
+ * answer also covers every dumbbell pair in the plan, so it is the more
+ * useful one to have.
+ */
+export function ceilingKindsFor(entry: ExerciseEntry): LoadCeilingKind[] {
+  // Checked before loadingMode, because a weighted backpack falls through
+  // that function's cases to 'stack' — it is not a cable machine, and pricing
+  // it against one is how Backpack Row was once estimated at 45-65kg.
+  if (isImprovisedLoadImplement(entry)) return ['improvised']
+  switch (loadingMode(entry)) {
+    case 'dumbbell': return ['dumbbell']
+    case 'single_implement': {
+      const dumbbell = entry.equipment.includes('dumbbell')
+      const kettlebell = entry.equipment.includes('kettlebell')
+      return dumbbell && kettlebell ? ['dumbbell', 'single_implement']
+        : dumbbell ? ['dumbbell']
+          : ['single_implement']
+    }
+    // A barbell trainee is already asked their squat/bench/deadlift, and a
+    // cable stack means a gym. Neither is asked, so neither has an answer.
+    default: return []
+  }
+}
+
+function statedKgForKind(profile: UserProfile, kind: LoadCeilingKind): number | null {
+  // NO LOCAL INTERSECTION TYPE. These three are declared on UserProfile now,
+  // and widening the type here is precisely how they went missing: with the
+  // columns known only inside this function, TypeScript never asked App.tsx's
+  // restoreSession to map them, so they were written to Postgres and read
+  // back as undefined on every reload. A cast that adds fields the profile
+  // does not really have will always compile and can never be checked.
+  const v = kind === 'dumbbell' ? profile.max_dumbbell_kg
+    : kind === 'single_implement' ? profile.max_single_implement_kg
+      : profile.max_improvised_kg
+  return v ?? null
 }
 
 /**
@@ -852,42 +914,50 @@ function usesDumbbellOnly(entry: ExerciseEntry): boolean {
  * as it did before that migration is applied. Same degradation rule as
  * added_load_kg — profiles are read with select('*'), so a missing column is
  * simply absent rather than an error.
+ *
+ * A LIFT THAT CAN USE EITHER IMPLEMENT (goblet squats, the carries) IS CAPPED
+ * BY THE HEAVIEST THING THE PERSON HAS TOLD US THEY OWN THAT CAN DO IT.
+ * Decided as a CSCS coach, 9 Oct 2026:
+ *   - both stated: the heavier of the two. They would pick up the heavier
+ *     one; capping at the dumbbell would hold them under a kettlebell they
+ *     own (the reason the 10 Sep routing left these lifts alone).
+ *   - only one stated: THAT one. This is the change. It used to read the
+ *     kettlebell answer only, so someone who had given a dumbbell limit and
+ *     never mentioned a kettlebell fell back to the commercial-gym table —
+ *     Goblet Squats at ~32kg for a man whose heaviest dumbbell is 24kg. A
+ *     prescription should not exceed what we know the person can load; if
+ *     they do own a heavier kettlebell, saying so (Profile) raises it, and
+ *     being light until then is the safe side to be wrong on.
+ *   - neither stated: null, as ever.
+ * Still only ever downward against the table — see effectiveLoadingCeilingKg.
  */
 export function statedCeilingKg(entry: ExerciseEntry, profile: UserProfile): number | null {
-  // NO LOCAL INTERSECTION TYPE. These three are declared on UserProfile now,
-  // and widening the type here is precisely how they went missing: with the
-  // columns known only inside this function, TypeScript never asked App.tsx's
-  // restoreSession to map them, so they were written to Postgres and read
-  // back as undefined on every reload. A cast that adds fields the profile
-  // does not really have will always compile and can never be checked.
-  const p = profile
-  // Checked before loadingMode, because a weighted backpack falls through
-  // that function's cases to 'stack' — it is not a cable machine, and pricing
-  // it against one is how Backpack Row was once estimated at 45-65kg.
-  if (isImprovisedLoadImplement(entry)) return p.max_improvised_kg ?? null
-  switch (loadingMode(entry)) {
-    case 'dumbbell': return p.max_dumbbell_kg ?? null
-    // ROUTE BY THE IMPLEMENT, NOT BY THE MODE. 'single_implement' covers both
-    // a kettlebell and ONE dumbbell, but max_single_implement_kg is only ever
-    // captured from kettlebell words (onboarding-slots.ts's kettlebell slot,
-    // and ceilingIsInUserWords' matcher). So a lift performed with a dumbbell
-    // was checked against her KETTLEBELL answer — and against nothing at all
-    // if she has never owned one.
-    //
-    // That gap was harmless while every dumbbell movement in the catalogue was
-    // a pair. Correcting Dumbbell Leg Curl to one dumbbell (10 Sep 2026) moved
-    // the first real lift into it, which would have removed a clamp while
-    // fixing a label. Narrow on purpose: a mixed dumbbell/kettlebell entry
-    // (goblet squats, the carries) can be done with either, so it keeps
-    // exactly the answer it had. This can only ADD a ceiling, never raise one.
-    case 'single_implement':
-      return usesDumbbellOnly(entry)
-        ? p.max_dumbbell_kg ?? null
-        : p.max_single_implement_kg ?? null
-    // A barbell trainee is already asked their squat/bench/deadlift, and a
-    // cable stack means a gym. Neither is asked, so neither has an answer.
-    default: return null
+  const stated = ceilingKindsFor(entry)
+    .map(kind => statedKgForKind(profile, kind))
+    .filter((v): v is number => v != null)
+  return stated.length === 0 ? null : Math.max(...stated)
+}
+
+/**
+ * The stated limit that caps this exercise, WITH THE WORD FOR THE THING — so
+ * a sentence can say "your 24kg dumbbells" rather than "your limit".
+ *
+ * The same choice statedCeilingKg makes (the heaviest stated implement that
+ * can do the lift), kept beside it so the two cannot drift; that function
+ * stays the number-only door every clamp reads.
+ */
+function statedLimitFor(entry: ExerciseEntry, profile: UserProfile): { kg: number; noun: string } | null {
+  let best: { kg: number; noun: string } | null = null
+  for (const kind of ceilingKindsFor(entry)) {
+    const kg = statedKgForKind(profile, kind)
+    if (kg == null || (best && best.kg >= kg)) continue
+    const noun = kind === 'improvised' ? 'bag'
+      : kind === 'single_implement' ? 'kettlebell'
+        // One dumbbell or a pair, as the lift uses them.
+        : loadingMode(entry) === 'dumbbell' ? 'dumbbells' : 'dumbbell'
+    best = { kg, noun }
   }
+  return best
 }
 
 /**
@@ -934,6 +1004,47 @@ export function plateStepKg(mode: LoadingMode): number {
 }
 
 /**
+ * THE NEXT-SET LADDER — the weights offered above the one just lifted, in a
+ * calibration week ("After 30kg: same · +2 · +4").
+ *
+ * Lifted out of SetGrid on 9 Oct 2026 so it could be given the one fact it
+ * was missing and so a gate could run it. The rules it already had, unchanged:
+ * the targets are 5% and 10% above the last logged set (the cue says "go up
+ * 5-10%"), each snapped to the implement's real step, and each at least one
+ * step above the rung before it — at 27.5kg on a bar both percentages snap to
+ * 30kg, which collapsed the ladder to one rung wearing two labels.
+ *
+ * THE NEW RULE: IT STOPS AT WHAT THE PERSON HAS SAID THEY OWN. A tester with
+ * 24kg dumbbells who had just logged 30 was offered "+2 · 32" and "+4 · 34"
+ * (test log H18). The plan already refuses to prescribe past a stated limit;
+ * the chips are the app suggesting a weight, so they keep the same promise.
+ * Only a STATED limit does this — the table ceilings are a formula backstop,
+ * not a fact about anybody's rack. And it only removes rungs: what somebody
+ * actually lifted is never second-guessed here (the base stays whatever was
+ * logged), so a borrowed heavier pair can still be repeated with one tap.
+ *
+ * Returns the rungs ABOVE the base — two, one, or none.
+ */
+export function nextSetRungsKg(
+  baseKg: number,
+  entry: ExerciseEntry | undefined,
+  profile: UserProfile | null | undefined,
+): number[] {
+  if (!(baseKg > 0)) return []
+  const mode = entry ? loadingMode(entry) : 'stack'
+  const step = plateStepKg(mode)
+  const stated = entry && profile ? statedCeilingKg(entry, profile) : null
+  const rungs: number[] = []
+  for (const target of [baseKg * 1.05, baseKg * 1.10]) {
+    const floor = (rungs[rungs.length - 1] ?? baseKg) + step
+    const rung = Math.max(roundToPlate(target, mode), floor)
+    if (stated != null && rung > stated) break
+    rungs.push(rung)
+  }
+  return rungs
+}
+
+/**
  * IS THERE ANYTHING FOR A PLATE CALCULATOR TO WORK OUT?
  *
  * On a cable machine the number IS the weight: you move a pin to the plate
@@ -954,10 +1065,39 @@ export function plateStepKg(mode: LoadingMode): number {
  * mine: you pick a fixed bell off a rack, so there is usually nothing to
  * calculate — but an adjustable pair is plate-loaded and the catalogue cannot
  * tell the two apart. The handoff said cable; this does cable.
+ *
+ * AND NOT WHERE THERE IS NOTHING TO LOAD PLATES ONTO, since 9 Oct 2026 (test
+ * log L12): a tester with no barbell had the calculator — which opens on a
+ * 20kg bar — on every set row, kettlebell swings, backpack rows, band work
+ * and bodyweight squats included. Three more cases, each named for what the
+ * implement IS rather than inferred from 'stack', as the paragraph above
+ * requires:
+ *   - nothing carries a weight at all (a press-up, a plank, a band, a pull-up
+ *     bar). The exercise row's header link already had this guard and the set
+ *     row's button did not. The four lifts that take a belt are kept: a dip
+ *     belt is loaded with plates.
+ *   - a kettlebell, a weighted bag, a band. A bag is filled, not plated; an
+ *     adjustable kettlebell takes its own inserts, not bar plates. (This
+ *     reverses the 23 Sep note that kept the kettlebell because an adjustable
+ *     one exists.)
+ * "Uses that implement" means it is the ONLY thing that could carry the load:
+ * a lift a dumbbell can also do (goblet squats, the carries) is a dumbbell
+ * row for this purpose and is left exactly as it was.
  */
 export function takesPlateCalculator(entry: ExerciseEntry | undefined): boolean {
   if (!entry) return true
-  return !(entry.equipment ?? []).some(e => /cable/i.test(e) || NEVER_PLATE_LOADED.has(e))
+  const equipment = entry.equipment ?? []
+  if (equipment.some(e => /cable/i.test(e))) return false
+  if (!isExternallyLoaded(entry) && !entry.accepts_added_load) return false
+  // What could carry the load. 'bodyweight' is listed beside a backpack or a
+  // dumbbell on lifts that use both the person and the implement.
+  const implementsUsed = equipment.filter(e => e !== 'bodyweight')
+  if (implementsUsed.length === 0) return true
+  // "Any one of these" needs EVERY option to be plate-free before the control
+  // goes; "all of these" needs only one, because that one is the load.
+  return entry.equipment_alternatives
+    ? !implementsUsed.every(e => NEVER_PLATE_LOADED.has(e))
+    : !implementsUsed.some(e => NEVER_PLATE_LOADED.has(e))
 }
 
 /**
@@ -969,7 +1109,7 @@ export function takesPlateCalculator(entry: ExerciseEntry | undefined): boolean 
  * drivers checking "no plate calculator where there are no plates" went red.
  * Named rather than inferred from 'stack', for the reason recorded above.
  */
-const NEVER_PLATE_LOADED = new Set(['medicine ball'])
+const NEVER_PLATE_LOADED = new Set(['medicine ball', 'kettlebell', 'weighted backpack', 'resistance band'])
 
 /** Round to something actually loadable rather than a number like 43.7kg. */
 export function roundToPlate(kg: number, mode: LoadingMode): number {
@@ -1952,6 +2092,17 @@ export function prescribeLoad(
     implementHeld = rounded < beforeImplementCap
   }
 
+  // HELD AT THEIR OWN LIMIT? Asked after every clamp, of the number that is
+  // actually going on the plan. A bag held by the strap/posture cap keeps its
+  // own reason ('implement') and the label Ashley ruled on (19 Sep 2026) —
+  // that cap is a judgement about the implement. A bag held by what the
+  // person SAID it holds is this case, and used to carry no reason at all
+  // under a sentence reading "I have no way to know what your bag holds".
+  const statedLimit = statedLimitFor(entry, profile)
+  // (No "and not strap-held" term is needed: where the strap cap is what
+  // bound, the number is BELOW anything the person stated, so this is false.)
+  const statedHeld = statedLimit != null && rounded >= statedLimit.kg
+
   // Only compounds in a strength/power phase ramp; hypertrophy-phase work and
   // any accessory/isolation exercise (any phase) is a straight, flat weight
   // across all sets.
@@ -1959,7 +2110,18 @@ export function prescribeLoad(
   const ramping = isCompoundTier && (options.phase === 'strength' || options.phase === 'power' || options.phase === 'consolidation')
   const per_set = buildPerSetLoads(rounded, options.sets ?? 1, mode, labelMode, ramping)
 
-  const basis = options.forceStartingWeightKg != null
+  const basis = statedHeld
+    // AHEAD OF EVERYTHING ELSE, the forced path included. Every sentence
+    // below either tells the trainee to add weight ("Add 2kg next time", "add
+    // load next set") or promises the number will move once a set is logged —
+    // and at the heaviest dumbbell somebody owns neither is true. This says
+    // what is holding it and what moves instead: generation buys reps on a
+    // weight that has stopped (the frozen-load rep bump), so "the reps go up"
+    // describes what the plan actually does.
+    ? (statedLimit!.noun === 'bag'
+        ? `Held at ${statedLimit!.kg}kg — as much as you've told me your bag holds. The reps go up instead.`
+        : `Held at your ${statedLimit!.kg}kg ${statedLimit!.noun} — the heaviest you've told me you have. The reps go up instead.`)
+    : options.forceStartingWeightKg != null
     ? (options.loadIsProgressing === false
         ? buildRepsProgressionBasis(options.repRangeLabel)
         : buildProgressionBasis(options.repRangeLabel, getLoadIncrementKg(entry, category, rounded), labelMode))
@@ -2040,7 +2202,7 @@ export function prescribeLoad(
     basis,
     load_source: fromKnownWeight ? 'known_weight' : bodyAssumed ? 'assumed_body' : 'estimate',
     per_set,
-    hold: implementHeld ? 'implement' : floorHeld ? 'floor' : rampArrived ? 'ceiling' : null,
+    hold: implementHeld ? 'implement' : statedHeld ? 'stated_limit' : floorHeld ? 'floor' : rampArrived ? 'ceiling' : null,
   }
 }
 

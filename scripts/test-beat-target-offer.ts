@@ -141,9 +141,18 @@ console.log('\n5. The half that needs a database is wired to the half that does 
   // happened to sit on before the two callers existed.
   check('confirm hands the logged weight to the one patch helper',
     /patchBlockFromLiftedKg\(mesocycle, profile, \{/.test(src) && /liftedKg: payload\.liftedKg/.test(src))
+  // RE-ANCHORED 9 Oct 2026. This pinned `const targetKg = …anchor.liftedKg`,
+  // and went red when the target became the lifted weight CAPPED at what the
+  // person has said they own (test log H18: a 30kg set against 24kg dumbbells
+  // was written as 24 but its deload was 70% of 30, and the week was reported
+  // as changed when the number had not moved). The property was always "the
+  // number written comes from the lifted weight, through prescribeLoad" — so
+  // that is what is read: lifted -> what prescribeLoad can actually write for it -> target -> prescribeLoad.
+  // test:calibration-search §6 holds the behaviour, on a real plan.
   check('...which rebuilds the load through prescribeLoad, never field by field',
     /prescribeLoad\(/.test(src) && /forceStartingWeightKg: targetKg/.test(src)
-    && /const targetKg = [^\n]*anchor\.liftedKg/.test(src))
+    && /const reachableKg = prescribeLoad\([^\n]*forceStartingWeightKg: anchor\.liftedKg/.test(src)
+    && /const targetKg = [^\n]*reachableKg/.test(src))
   check('...and all three load fields are written from that one result',
     /suggested_load: load\.display/.test(src)
     && /suggested_load_kg: load\.starting_weight_kg/.test(src)

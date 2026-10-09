@@ -213,7 +213,9 @@ export function LoadChip({
   // Suppressed once a real logged number is driving the weight: 'logged'
   // means the progression engine is working from what this person actually
   // lifted, so the estimate's ceiling is no longer what is holding it.
-  const ceiling = source === 'logged' ? null : ceilingLabel(ex)
+  // ...EXCEPT a limit the person told us about, which a logged set cannot
+  // move: the heaviest dumbbell they own is still the heaviest they own.
+  const ceiling = source === 'logged' && ex.load_hold !== 'stated_limit' ? null : ceilingLabel(ex)
 
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">

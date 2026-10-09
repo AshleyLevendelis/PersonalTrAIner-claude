@@ -704,8 +704,12 @@ console.log('\n8. A week that repeats itself SAYS so — Ashley\'s ruling, 5 Sep
   const chip = readFileSync(join(ROOT, 'src/components/exercise/LoadChip.tsx'), 'utf8')
   check('the card computes the label', /ceilingLabel\(ex\)/.test(chip))
   check('...and RENDERS it outside the explainer', /\{ceiling && \(/.test(chip))
-  check('...and drops it once a logged number is driving the weight',
-    /source === 'logged' \? null : ceilingLabel\(ex\)/.test(chip))
+  // RE-ANCHORED 9 Oct 2026: the condition gained a term. A logged set still
+  // silences the three ESTIMATE labels (the estimate is no longer what holds
+  // the weight) but not "held at your 24kg dumbbells" — the heaviest dumbbell
+  // somebody owns is still the heaviest they own after they log a set.
+  check('a real logged number silences the estimate labels — and only those',
+    /source === 'logged' && ex\.load_hold !== 'stated_limit' \? null : ceilingLabel\(ex\)/.test(chip))
 
   // --- AND THE COACH GETS THE SAME FACT. Two surfaces describing one week
   // differently is the disagreement this repo keeps producing.

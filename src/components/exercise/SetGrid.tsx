@@ -24,7 +24,7 @@ import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropS
 import { lastTime, loggedSetReading } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
 import type { UserProfile } from '@/lib/types'
 
@@ -1085,14 +1085,12 @@ export function SetGrid({
           {calibrationProbe && !warm && !drop && setNumber > 1 && !isSaved && (() => {
             const prev = existingLogs.find(l => l.set_number === setNumber - 1)
             if (!prev || prev.is_bodyweight || !(Number(prev.weight_kg) > 0)) return null
-            const mode = catalogEntry ? loadingMode(catalogEntry) : 'stack'
-            const step = plateStepKg(mode)
             const base = Number(prev.weight_kg)
-            const rungs: number[] = []
-            for (const target of [base * 1.05, base * 1.10]) {
-              const floor = (rungs[rungs.length - 1] ?? base) + step
-              rungs.push(Math.max(roundToPlate(target, mode), floor))
-            }
+            // The ladder itself lives in load-prescription.ts (nextSetRungsKg)
+            // so that it stops at a dumbbell or kettlebell limit the person
+            // has told us — "+2 · 32" was offered to someone whose heaviest
+            // dumbbells are 24kg.
+            const rungs = nextSetRungsKg(base, catalogEntry, profile)
             const opts = [base, ...rungs].map(kg => ({
               kg,
               // Trailing .0 trimmed: "+5", not "+5.0", and "+2.5" intact.
