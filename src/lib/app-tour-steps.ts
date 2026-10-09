@@ -79,14 +79,23 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     key: 'hero', tab: 'dashboard', target: 'hero',
-    copy: "Home answers one question — what's next. Today's session sits up top, and Start session hands you to Exercise, where every set gets logged. Home shows; it never logs.",
+    // "Home shows; it never logs." stood here from 3 Sep 2026, when Home was a
+    // read-out. Three days later water, steps and the weigh-in became things
+    // you log ON Home, the very next stop started saying so ("logged right
+    // here"), and this sentence was never revisited — so for a month the tour
+    // contradicted itself across two consecutive cards (test log L7, 9 Oct
+    // 2026). What is still true is narrower: Home never logs a SET. The claim
+    // is scoped to that rather than dropped, and test:app-tour §10 now holds
+    // any "never logs" line to what that tab's own code does.
+    copy: "Home answers one question — what's next. Today's session sits up top, and Start session hands you to Exercise, where every set gets logged. Home shows your training; it never logs a set.",
   },
   {
     key: 'tiles', tab: 'dashboard', target: 'tiles',
-    // THREE tiles, and they no longer all lead to one place: steps moved to
-    // Exercise on 5 Sep 2026, so the copy can't say "all logged in Nutrition"
-    // any more without sending someone to the wrong tab. Each tile still
-    // takes you to wherever that number is logged — which is now two tabs.
+    // WHERE EACH NUMBER IS LOGGED, as of 6 Sep 2026 ("Home becomes the day"):
+    // water, steps and the weigh-in are logged on Home itself; calories are
+    // the one read-out here, owned by Nutrition. (This comment used to
+    // describe the 5 Sep arrangement, when steps lived on Exercise — a day
+    // out of date for a month. The copy below was right; the note was not.)
     copy: 'Your day so far. Calories are a read-out — tap through to Nutrition, which owns them. Water, steps and your weigh-in are logged right here.',
   },
   {

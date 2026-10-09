@@ -2715,6 +2715,10 @@ function App() {
       // not plan data, and queued sets carry their own profile id so they can
       // still sync). `test:reset-clears-draft` holds the whole list.
       clearOnboardingDraft()
+      // A question parked during the OLD plan's setup ("I'll answer that once
+      // you're set up") is owed to that setup's first chat, not the next
+      // one's. test:reset-clears-draft caught this key the day it was added.
+      localStorage.removeItem('fitplan_parked_questions')
       // Found by that same audit: the tab the OLD profile was last on would
       // otherwise greet the new one after onboarding.
       localStorage.removeItem(LAST_TAB_KEY)

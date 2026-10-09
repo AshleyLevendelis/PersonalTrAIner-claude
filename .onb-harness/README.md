@@ -94,3 +94,43 @@ no working way to answer it.
 Mutations proven to turn it red: blanking `displayName`'s hint (1 check),
 pointing `dislikedFoods` at another slot's hint (1 check), and emptying
 `fitnessGoal`'s options (1 check). Each bit only its own assertion.
+
+## What happens when a turn comes back (`npm run verify:onboarding-turns`)
+
+Everything above seeds a state and reads it. None of it can show what happens
+when the coach REPLIES, because the sandbox cannot reach the model — so the
+defects that only exist on a reply were found by a person on a phone (test
+log, 9 Oct 2026): meal-count chips under "how old are you?", a re-asked
+question whose chips stayed on the older message off screen, and a tap on the
+summary whose prompt opened above the card.
+
+`scripted.tsx` mounts the **real `ConversationalOnboarding`** and answers its
+`fetch` to `onboarding-chat` from a queue the driver fills, in the edge
+function's own `{ reply, actions }` shape. Everything after the reply lands is
+the component's own code: validating `set_slot`, choosing which message hosts
+the chips, moving a card, the summary, the edit rows, the ticks. An unscripted
+request is counted and answered 500, so a forgotten turn is a failure, not a
+pass.
+
+`?state=` picks the fixture (`h14`, `m2`, `review`); `?state=keep` is a RELOAD
+— the draft the last page saved is left alone. `ONLY=4,7` runs a subset of the
+sections.
+
+What it cannot tell you is whether the model sends those turns. The scripted
+replies are the shapes the tracer measured or the prompt now asks for; whether
+the deployed coach produces them needs `scripts/probe-onboarding-tone.mts` on
+a machine that can reach it.
+
+### `own-browser.mjs` — read this before copying an older driver
+
+The older drivers here start Chromium on a fixed debug port with the default
+profile and stop it with `chrome.kill()`. On a machine running other checks at
+the same time that stalled repeatedly, in ways that looked exactly like the
+page hanging and were not: a dead browser's children still holding the port, a
+killed run's browser still alive on it, and — measured — the browser itself
+ended from outside mid-run. `own-browser.mjs` takes the first port in its
+range that REFUSES a connection, gives the browser a throwaway profile, kills
+it as a process group, puts a deadline on every call, and treats a browser
+that went away as "NOT A RESULT" and starts the run again (three attempts)
+rather than reporting it as failures of the app. `verify:onboarding-turns`,
+`verify:style-picker` and `verify:parked-question` use it.

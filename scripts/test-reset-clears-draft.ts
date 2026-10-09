@@ -39,6 +39,10 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   mesocycle_cache: { clear: true, why: "the old profile's mesocycle" },
   fitplan_onboarding_draft: { clear: true, why: 'THE INCIDENT — a kept draft restores every answer and arms Generate' },
   fitplan_last_tab: { clear: true, why: 'found by this gate: the old profile\'s last tab would greet the new one' },
+  // Added 9 Oct 2026, and this gate is what asked the question: a question
+  // the setup coach parked is handed to the FIRST chat after that setup. Left
+  // behind by a reset, it could greet a later plan's first chat instead.
+  fitplan_parked_questions: { clear: true, why: "a question parked during the old plan's setup is not owed to the new one's first chat" },
 
   fitplan_appearance_v1: { clear: false, why: 'a theme choice is not plan data; resetting it would be a surprise' },
   fitplan_appearance_v2: { clear: false, why: 'same — appearance survives a new plan on purpose' },

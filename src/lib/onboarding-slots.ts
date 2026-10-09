@@ -138,6 +138,42 @@ export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string;
 ]
 
 /**
+ * STYLES THE APP STILL RUNS BUT NO LONGER OFFERS.
+ *
+ * Ashley's ruling, August 2026 (recorded in her notes, written into the repo
+ * for the first time here, 9 Oct 2026): "remove combat from the picker for now
+ * and backlog it properly. It's a real audience she wants to come back to, but
+ * not at this stage. Removal must handle existing profiles that already have
+ * combat set."
+ *
+ * So `combat` leaves every place a style can be CHOSEN — onboarding, the
+ * Profile screen, and the coach's change-your-style proposal — and stays
+ * everywhere a style is READ. A profile that already holds it keeps it, keeps
+ * its plan, and regenerates exactly as before: the type, the engine's
+ * STYLE_CONFIGS entry, the catalogue's 85 style tags and every gate that
+ * builds a combat plan are untouched on purpose. Nothing is migrated.
+ *
+ * STYLE_OPTIONS stays the full list because it is also how a stored value
+ * gets its label ("Combat / conditioning" on the Profile row and the summary).
+ * Anything that OFFERS a choice reads OFFERED_STYLE_OPTIONS or
+ * styleOptionsFor instead; test:style-picker holds that for every surface.
+ */
+const STYLES_NOT_OFFERED: readonly TrainingStyle[] = ['combat']
+
+/** The styles someone can pick today. */
+export const OFFERED_STYLE_OPTIONS = STYLE_OPTIONS.filter(o => !STYLES_NOT_OFFERED.includes(o.value))
+
+/**
+ * The options for a picker shown to someone who ALREADY HAS a style: what is
+ * offered, plus the one they hold if it is no longer offered — so their own
+ * style is named and can be kept, and nobody else can choose it. Moving off
+ * it is one-way while it stays unoffered.
+ */
+export function styleOptionsFor(current: TrainingStyle | null | undefined): typeof STYLE_OPTIONS {
+  return STYLE_OPTIONS.filter(o => !STYLES_NOT_OFFERED.includes(o.value) || o.value === current)
+}
+
+/**
  * All 8 codes are live somewhere: 5 (lower_back/knees/shoulders/neck/wrists)
  * drive exercise-selection joint filtering (INJURED_JOINTS, exercise-plan.ts),
  * and warmup.ts's mobility-drill contraindications additionally consume
@@ -528,6 +564,13 @@ export interface SlotDef {
   min?: number
   max?: number
   /**
+   * The unit a stored number is IN, shown wherever the value is echoed back.
+   * The value travels as a bare string ("82"), so without this the tick read
+   * "Weight — 82" and "Heaviest dumbbells — 24" (test log L2). Age carries
+   * none on purpose: "Age — 31" is not missing anything.
+   */
+  unit?: string
+  /**
    * 'column'     → a fitness_profiles column via assembleProfile.
    * 'user_facts' → NOT a profile column (dislikedFoods → user_facts rows).
    * 'derived'    → feeds a transform, stored only in collapsed form.
@@ -772,14 +815,20 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: 'Squat working weight (kg)?',
-    inputHint: 'Your squat, in kg…', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+    inputHint: 'Your squat, in kg…', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, unit: 'kg', destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'knownBenchKg', question: 'Bench working weight (kg)?',
-    inputHint: 'Your bench, in kg…', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, destination: 'column', validate: isNumberIn(1, 400) },
+    inputHint: 'Your bench, in kg…', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, unit: 'kg', destination: 'column', validate: isNumberIn(1, 400) },
   { key: 'knownDeadliftKg', question: 'Deadlift working weight (kg)?',
-    inputHint: 'Your deadlift, in kg…', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, destination: 'column', validate: isNumberIn(1, 500) },
+    inputHint: 'Your deadlift, in kg…', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, unit: 'kg', destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'trainingDays', question: 'Which days can you actually train?', inputHint: 'Which days?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
   { key: 'sessionDuration', question: 'How long can your sessions usually run?', inputHint: 'How long have you got?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
-  { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column', validate: isOneOf(STYLE_OPTIONS) },
+  { key: 'trainingStyle', question: "What's your training style?", inputHint: 'How do you like to train?', shortLabel: 'Style', control: 'single', required: true, options: STYLE_OPTIONS, destination: 'column',
+    // A NEW answer must be one that is offered. `options` stays the full list
+    // so a value already stored still shows its label, but an unoffered one
+    // can no longer be written here — not by a tap (the chips do not show it),
+    // not by typing its label, and not by the coach mapping "I box" onto it.
+    // A draft saved before this that holds it is simply asked again.
+    validate: isOneOf(OFFERED_STYLE_OPTIONS) },
   { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'Love it or loathe it?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
   //
@@ -819,8 +868,8 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // someone volunteers it, which is exactly the case this exists for.
   { key: 'dislikedExercises', question: "Any exercises you'd rather never see?", inputHint: 'Exercises to skip…', shortLabel: 'Exercises to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
   { key: 'age', question: 'How old are you?', inputHint: 'Your age…', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
-  { key: 'heightCm', question: 'How tall are you?', inputHint: 'cm, or 5\'10…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, destination: 'column', validate: isNumberIn(100, 250) },
-  { key: 'weightKg', question: 'What do you weigh right now?', inputHint: 'kg, or 13st…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, destination: 'column', validate: isNumberIn(25, 350) },
+  { key: 'heightCm', question: 'How tall are you?', inputHint: 'cm, or 5\'10…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, unit: 'cm', destination: 'column', validate: isNumberIn(100, 250) },
+  { key: 'weightKg', question: 'What do you weigh right now?', inputHint: 'kg, or 13st…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, unit: 'kg', destination: 'column', validate: isNumberIn(25, 350) },
   { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
   { key: 'mealsPerDay', question: 'How many meals a day suits you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
   { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
@@ -871,17 +920,52 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // for the same reason. Bounds match LOAD_CEILING_MIN_KG/MAX_KG.
   { key: 'maxDumbbellKg', question: 'What are your heaviest dumbbells?',
     inputHint: 'kg per hand…', shortLabel: 'Heaviest dumbbells', control: 'numeric', required: false,
-    min: 1, max: 100, requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+    min: 1, max: 100, unit: 'kg', requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
   { key: 'maxSingleImplementKg', question: 'What is your heaviest kettlebell?',
     inputHint: 'kg…', shortLabel: 'Heaviest kettlebell', control: 'numeric', required: false,
-    min: 1, max: 100, requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+    min: 1, max: 100, unit: 'kg', requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
   { key: 'maxImprovisedKg', question: 'How much can your bag actually hold?',
     inputHint: 'kg, roughly…', shortLabel: 'Loaded bag', control: 'numeric', required: false,
-    min: 1, max: 100, requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+    min: 1, max: 100, unit: 'kg', requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {
   return ONBOARDING_SLOTS.find(s => s.key === key)
+}
+
+/**
+ * A recorded answer as it is shown back to the person: the option's label for
+ * a closed set, and a number WITH ITS UNIT. One function for the tick in the
+ * conversation, the row on the summary, and the "already answered" list the
+ * coach is sent — so none of them can show "82" where another shows "82 kg".
+ */
+export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): string {
+  const v = values[def.key]
+  if (v === null || v === undefined || v === '') return '—'
+  if (Array.isArray(v)) {
+    if (v.length === 0) return 'none'
+    if (!def.options) return v.join(', ')
+    return v.map(x => def.options!.find(o => String(o.value) === String(x))?.label ?? String(x)).join(', ')
+  }
+  if (def.options) {
+    const opt = def.options.find(o => String(o.value) === String(v))
+    if (opt) return opt.label
+  }
+  return def.unit ? `${v} ${def.unit}` : String(v)
+}
+
+/**
+ * What the app says when someone taps a summary row to change that answer.
+ *
+ * Built on the slot's own QUESTION, which is written per question, and not on
+ * its short label. The label is a noun for a tick ("Equipment", "Foods to
+ * avoid", "Meals a day") and the old prompts dropped it into a sentence:
+ * "Sure — pick a different equipment.", "Sure — type what you'd like foods to
+ * avoid to be instead." (test log L3). A text answer has no card, so it says
+ * where to type.
+ */
+export function editPromptFor(def: SlotDef): string {
+  return `Sure — let's change that. ${def.question}` + (def.control === 'text' ? ' Type it in below.' : '')
 }
 
 /**
@@ -906,15 +990,16 @@ export function isSlotApplicable(def: SlotDef, values: OnboardingSlotValues): bo
 }
 
 /**
- * The options a slot should OFFER right now.
+ * The options a slot should OFFER right now — the single choke point for
+ * hiding a value (VISION.md's "Only offer what's built"), so it happens in
+ * one place rather than at each render site. The chips and the catalogue the
+ * coach is sent both read this.
  *
- * Nothing is filtered today. Kept as the single choke point so that if a
- * value ever needs hiding until the engine can honour it (VISION.md's "Only
- * offer what's built"), it happens in one place rather than at each render
- * site.
+ * One value is hidden today: the combat training style. See
+ * STYLES_NOT_OFFERED for the ruling and for what is deliberately left alone.
  */
 export function offeredOptionsFor(def: SlotDef): readonly SlotOption[] | undefined {
-  return def.options
+  return def.key === 'trainingStyle' ? OFFERED_STYLE_OPTIONS : def.options
 }
 
 /**

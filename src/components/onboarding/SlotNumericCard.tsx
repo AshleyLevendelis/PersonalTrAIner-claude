@@ -129,7 +129,7 @@ export function SlotNumericCard({
   const allBlank = fields.every(d => rawOf(d.key).trim() === '')
 
   return (
-    <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+    <div data-slot-card={def.key} className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
       {fields.map(d => {
         const bad = showErrors && !isOk(d)
         return (
@@ -141,7 +141,10 @@ export function SlotNumericCard({
                 are on one card, so the sentence naming kg belongs to only one
                 of them. */}
             <label className="text-xs text-muted-foreground" htmlFor={`slot-${d.key}`}>
-              {d.shortLabel}{UNIT[d.key] ? <span className="text-muted-foreground/70"> ({UNIT[d.key]})</span> : null}
+              {/* The slot's own unit where this card has nothing richer to
+                  say — the three load ceilings were missing from the map
+                  above and so asked for "Heaviest dumbbells" in no unit. */}
+              {d.shortLabel}{(UNIT[d.key] ?? d.unit) ? <span className="text-muted-foreground/70"> ({UNIT[d.key] ?? d.unit})</span> : null}
             </label>
             <Input
               id={`slot-${d.key}`}

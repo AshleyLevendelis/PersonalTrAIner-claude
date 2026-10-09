@@ -26,6 +26,8 @@ import {
   detectAllergenTags,
   isStuckMessage,
   DIETARY_OPTIONS,
+  displaySlotValue,
+  editPromptFor,
   type OnboardingSlotValues,
   type SlotKey,
   type SlotDef,
@@ -34,6 +36,10 @@ import { measureParserFor } from '@/lib/body-units'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
+import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
+import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn } from '@/lib/onboarding-capture'
+import type { SessionDuration } from '@/lib/types'
+import { addParkedQuestion, saveParkedQuestions } from '@/lib/parked-questions'
 import {
   loadOnboardingDraft,
   saveOnboardingDraft,
@@ -97,6 +103,8 @@ interface WorkingState {
   confirmed: Set<string>
   pendingContextFacts: PendingContextFact[]
   pendingGoals: PendingGoal[]
+  /** Questions the coach has parked this conversation — see parked-questions.ts. */
+  parkedQuestions: string[]
   newMessages: ChatMsg[]
   openReview: boolean
   resolveCards: Set<string>
@@ -110,7 +118,22 @@ interface WorkingState {
    * wrong answer got in and it should be how it gets out.
    */
   corrected: Set<string>
+  /**
+   * Slots whose OLDER unanswered card has just been replaced by a newer one
+   * further down. The coach asked again, so the chips moved with the question
+   * (test log M2: after a detour the re-asked question had no chips, because
+   * the only card for it was on the first asking, by then off screen). The old
+   * message keeps its `slotCard` — the stall-breaker counts how many times a
+   * slot has been asked by reading it — and simply stops rendering one.
+   */
+  supersedeCards: Set<string>
 }
+
+/** A "let's change that" prompt opened from the summary and not yet answered or put away. */
+const isOpenEdit = (m: DraftMessage) => !!m.slotCardEditing && !m.slotCardResolved
+
+/** An unanswered card that is still the one on screen for its question. */
+const isLiveCard = (m: DraftMessage) => !!m.slotCard && !m.slotCardResolved && !m.slotCardSuperseded
 
 const RECEIPT_PREFIX = '✓ '
 
@@ -130,30 +153,22 @@ const RESUME_BANNER = "Welcome back — picking up right where we left off. Say 
 function toDraftMessages(messages: ChatMsg[]): DraftMessage[] {
   return messages
     .filter(m => m.content.trim().length > 0 && m.content !== RESUME_BANNER)
+    // An edit prompt that is still open is not saved. "Which row is being
+    // changed" lives in memory only, so after a reload nothing would hide the
+    // summary and the prompt would sit above it with no way to tell it was
+    // live. The answer being edited is untouched either way (see handleEditSlot).
+    .filter(m => !isOpenEdit(m))
     // asksSlot RIDES ALONG. It was missing from this list, so a turn that
     // asked about a slot WITHOUT a card — the scripted opener's "what should
     // I call you?" is the built-in one — lost that fact on every reload, and
     // the composer's "what is on screen" lookup went blind. The DraftMessage
     // type has always declared the field; only this mapper dropped it.
-    .map(({ role, content, slotCard, slotCardResolved, slotCardEditing, asksSlot }) =>
-      ({ role, content, slotCard, slotCardResolved, slotCardEditing, asksSlot }))
+    // slotCardSuperseded rides along for the same reason: without it a reload
+    // would bring back the old copy of a card that had moved.
+    .map(({ role, content, slotCard, slotCardResolved, slotCardSuperseded, slotCardEditing, asksSlot }) =>
+      ({ role, content, slotCard, slotCardResolved, slotCardSuperseded, slotCardEditing, asksSlot }))
 }
 
-
-function displayValueFor(def: SlotDef, values: OnboardingSlotValues): string {
-  const v = values[def.key]
-  if (v === null || v === undefined || v === '') return '—'
-  if (Array.isArray(v)) {
-    if (v.length === 0) return 'none'
-    if (!def.options) return v.join(', ')
-    return v.map(x => def.options!.find(o => String(o.value) === String(x))?.label ?? String(x)).join(', ')
-  }
-  if (def.options) {
-    const opt = def.options.find(o => String(o.value) === String(v))
-    if (opt) return opt.label
-  }
-  return String(v)
-}
 
 function coerceSlotValue(def: SlotDef, raw: string): unknown {
   if (def.control === 'multi') {
@@ -457,6 +472,8 @@ function applySlot(
   showReceipt = true,
   /** Set when the value was converted from another unit — the receipt must show BOTH, so a wrong conversion is wrong on screen next to what they typed. */
   conversionNote?: string,
+  /** Anything else the tick owes the person about what was stored — see sessionLengthNote. */
+  storedNote?: string,
 ): boolean {
   const def = getSlotDef(key)
   if (!def || !def.validate(coerced)) return false
@@ -476,8 +493,9 @@ function applySlot(
       // Short noun, not the question — "Equipment — Home Gym" reads as the
       // coach noting something down; the full question read as a form field.
       role: 'assistant',
-      content: `${RECEIPT_PREFIX}${def.shortLabel} — ${displayValueFor(def, ws.values)}`
-        + (conversionNote ? ` (from ${conversionNote})` : ''),
+      content: `${RECEIPT_PREFIX}${def.shortLabel} — ${displaySlotValue(def, ws.values)}`
+        + (conversionNote ? ` (from ${conversionNote})` : '')
+        + (storedNote ? ` (${storedNote})` : ''),
       isReceipt: true,
     })
   }
@@ -545,6 +563,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   const [confirmed, setConfirmed] = useState<Set<string>>(() => new Set(draftLoaded?.confirmedSlots ?? []))
   const [pendingContextFacts, setPendingContextFacts] = useState<PendingContextFact[]>(() => draftLoaded?.pendingContextFacts ?? [])
   const [pendingGoals, setPendingGoals] = useState<PendingGoal[]>(() => draftLoaded?.pendingGoals ?? [])
+  const [parkedQuestions, setParkedQuestions] = useState<string[]>(() => draftLoaded?.parkedQuestions ?? [])
   const [messages, setMessages] = useState<ChatMsg[]>(() => {
     if (draftLoaded && draftLoaded.messages.length > 0) {
       return [
@@ -571,6 +590,12 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
+  // The summary row being changed right now, if any. While it is set the
+  // summary is put away, so the prompt and its control are the LAST thing on
+  // screen — see handleEditSlot.
+  const [editingKey, setEditingKey] = useState<SlotKey | null>(null)
+  // The row the last edit changed, so the summary can come back showing it.
+  const [justEdited, setJustEdited] = useState<SlotKey | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -653,9 +678,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
+      parkedQuestions,
     }
     saveOnboardingDraft(draft)
-  }, [values, confirmed, messages, pendingContextFacts, pendingGoals])
+  }, [values, confirmed, messages, pendingContextFacts, pendingGoals, parkedQuestions])
 
   // KEEPING THE LATEST MESSAGE IN VIEW.
   //
@@ -717,7 +743,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   // way out. A stall here is uniquely costly, so it gets a guard that no
   // request path can route around.
   useEffect(() => {
-    if (busy || reviewOpen) return
+    // An edit in progress has put the summary away on purpose; it comes back
+    // here by itself the moment the edit is answered or abandoned.
+    if (busy || reviewOpen || editingKey) return
     if (!readyToGenerate) return
     setMessages(prev => {
       // Sweep FIRST, then append. This net opens the review without the model
@@ -732,17 +760,41 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         : [...swept, { role: 'assistant', content: COMPLETE_MESSAGE }]
     })
     setReviewOpen(true)
-  }, [values, confirmed, busy, reviewOpen])
+  }, [values, confirmed, busy, reviewOpen, editingKey])
+
+  // An edit prompt must be SEEN. Forced past the near-bottom guard: the row
+  // that opened it is often near the top of a summary taller than the screen,
+  // so the person is by definition scrolled away from the bottom.
+  useEffect(() => { if (editingKey) scrollToBottom(true) }, [editingKey, scrollToBottom])
+
+  // ...and when the summary comes back, it comes back showing the row that
+  // changed rather than the Generate button a screen below it. Two frames:
+  // the first is the stick-to-bottom observer reacting to the card appearing.
+  useEffect(() => {
+    if (!reviewOpen || !justEdited) return
+    // Stand the stick-to-bottom observer down first, or it answers the card
+    // appearing by scrolling to the foot of it a frame after this runs.
+    isNearBottomRef.current = false
+    let second = 0
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => {
+        document.querySelector(`[data-review-row="${justEdited}"]`)?.scrollIntoView({ block: 'center' })
+      })
+    })
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second) }
+  }, [reviewOpen, justEdited])
 
   const makeWorkingState = (): WorkingState => ({
     values,
     confirmed,
     pendingContextFacts,
     pendingGoals,
+    parkedQuestions,
     newMessages: [],
     openReview: false,
     resolveCards: new Set(),
     corrected: new Set(),
+    supersedeCards: new Set(),
   })
 
   const commitWorkingState = (ws: WorkingState) => {
@@ -750,9 +802,14 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     setConfirmed(ws.confirmed)
     setPendingContextFacts(ws.pendingContextFacts)
     setPendingGoals(ws.pendingGoals)
+    setParkedQuestions(ws.parkedQuestions)
     if (ws.newMessages.length > 0 || ws.resolveCards.size > 0) {
       setMessages(prev => [
-        ...prev.map(m => (m.slotCard && ws.resolveCards.has(m.slotCard) && !m.slotCardResolved ? { ...m, slotCardResolved: true } : m)),
+        ...prev
+          .map(m => (m.slotCard && ws.resolveCards.has(m.slotCard) && !m.slotCardResolved ? { ...m, slotCardResolved: true } : m))
+          // Only what was already on screen: the card that replaces it is in
+          // newMessages, appended below, and must stay live.
+          .map(m => (isLiveCard(m) && ws.supersedeCards.has(m.slotCard!) ? { ...m, slotCardSuperseded: true } : m)),
         ...ws.newMessages,
       ])
     }
@@ -769,13 +826,16 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       if (ws.confirmed.has(def.key)) {
         filled[def.key] = isDeclined(def.key, ws.values, ws.confirmed)
           ? "not given — they'd rather not say, don't ask again"
-          : displayValueFor(def, ws.values)
+          : displaySlotValue(def, ws.values)
       }
     }
     return {
       slotCatalog: buildSlotCatalog(ws.values),
       filled,
       remaining: openSlotsInOrder(ws.confirmed, ws.values),
+      // So the coach is TOLD how many questions it has parked rather than
+      // left to count its own history — the cap is the condition for parking.
+      parkedQuestions: ws.parkedQuestions,
     }
   }
 
@@ -785,17 +845,6 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     /** What the user actually typed this turn — the unnamed-lift guard needs to know which lifts they named, not which the question listed. */
     userText: string,
   ) => {
-    // Caught by re-running the audit's personas against the deployed fixes:
-    // the prompt says "one present_slot per turn" but the model still
-    // sometimes calls it twice. The FIRST call correctly attaches to the
-    // turn's own text; the second found no unclaimed host message and fell
-    // through to the raw-canonical-question fallback below — spawning a
-    // brand-new message in form voice, with its own duplicate chip card.
-    // That fallback exists for the genuine dead-air case (a turn with NO
-    // text at all); a second present_slot in an already-answered turn is a
-    // different situation and should just be dropped, not treated as dead
-    // air a second time.
-    let presentedThisTurn = false
     const presentRequests: string[] = []
     for (const action of actions) {
       if (action.name === 'set_slot') {
@@ -851,7 +900,13 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         // receipt (caught live: typing "Hybrid" against a pending style card
         // committed instantly, then the model's response echoed the same
         // set_slot and printed "✓ Style — Hybrid" a second time).
-        if (!applySlot(ws, key, coerced, ws.values, true, conversionNoteFor(def, String(action.args.value ?? '')))) {
+        // "40 minutes tops" is stored as the 30-45 setting, and a session on
+        // that setting may run to 45. The tick says so, in the app's own
+        // words, rather than leaving it to the coach to mention (test log M5).
+        const storedNote = key === 'sessionDuration' && def.validate(coerced)
+          ? sessionLengthNote(coerced as SessionDuration, userText)
+          : undefined
+        if (!applySlot(ws, key, coerced, ws.values, true, conversionNoteFor(def, String(action.args.value ?? '')), storedNote)) {
           // Fail LOUD: the mapped value didn't validate — never store it,
           // re-ask with the real chips instead.
           ws.newMessages.push({
@@ -895,17 +950,21 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         const displayText = String(action.args.display_text ?? '').trim()
         const rawPhrase = String(action.args.raw_phrase ?? '').trim()
         if (displayText && rawPhrase && !ws.pendingGoals.some(g => g.displayText === displayText)) {
-          ws.pendingGoals = [
-            ...ws.pendingGoals,
-            {
-              metric: action.args.metric === 'body_weight_kg' ? 'body_weight_kg' : 'directional',
-              baselineValue: typeof action.args.baseline_value === 'number' ? action.args.baseline_value : undefined,
-              targetValue: typeof action.args.target_value === 'number' ? action.args.target_value : undefined,
-              rawPhrase,
-              displayText,
-            },
-          ]
+          // One sentence must not become two goals (test log L6). The exact-
+          // text check above only ever caught a word-for-word repeat.
+          ws.pendingGoals = mergePendingGoal(ws.pendingGoals, {
+            metric: action.args.metric === 'body_weight_kg' ? 'body_weight_kg' : 'directional',
+            baselineValue: typeof action.args.baseline_value === 'number' ? action.args.baseline_value : undefined,
+            targetValue: typeof action.args.target_value === 'number' ? action.args.target_value : undefined,
+            rawPhrase,
+            displayText,
+          })
         }
+      } else if (action.name === 'park_question') {
+        // The coach has said it will answer this once setup is done. Keeping
+        // the question is what makes that true — it is put back in front of
+        // the person in the first chat after their plan is built.
+        ws.parkedQuestions = addParkedQuestion(ws.parkedQuestions, String(action.args.question ?? ''), userText)
       } else if (action.name === 'complete_onboarding') {
         const stillMissing = missingRequiredSlots(ws.values)
         const stillUnasked = unconfirmedOptionalSlots(ws.confirmed, ws.values)
@@ -923,57 +982,54 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       }
     }
 
-    // --- deferred present_slot, now that the turn is fully assembled -------
+    // --- which card, if any, goes under this turn's words -----------------
+    //
+    // Decided ONCE, after the loop, and by reading the coach's sentence rather
+    // than by trusting the request. See onboarding-chip-match.ts for the whole
+    // argument; the short version is that the words and the chips arrive
+    // separately (often from two different model calls) and used to be stapled
+    // together unchecked, which put "2 meals / 3 meals / 4 meals" under "how
+    // old are you?". chooseCard also holds the older rules that lived here: an
+    // answered slot is refused unless this turn corrected it, a slot that no
+    // longer applies is refused, and a slot never gets two cards in one turn.
+    //
+    // The host is found BACKWARDS past confirmation lines rather than taken
+    // from the last message. A turn that both records an answer and asks the
+    // next question emits [coach text, ✓ confirmation], so a last-only check
+    // found the confirmation, gave up, and printed the slot's raw form
+    // question underneath the coach's own words.
     for (const rawKey of presentRequests) {
-      const key = normalizeSlotKey(rawKey)
-      const def = getSlotDef(key)
-      if (!def) {
-        console.warn('onboarding: present_slot with unknown slot_key', rawKey)
-        continue
+      if (!getSlotDef(normalizeSlotKey(rawKey))) console.warn('onboarding: present_slot with unknown slot_key', rawKey)
+    }
+    const host = [...ws.newMessages]
+      .reverse()
+      .find(m => m.role === 'assistant' && !m.isReceipt && !m.slotCard && m.content.trim())
+    const cardKey = chooseCard({
+      hostText: host?.content,
+      requested: presentRequests.map(normalizeSlotKey),
+      liveCards: messages.filter(isLiveCard).map(m => m.slotCard!),
+      values: ws.values,
+      confirmed: ws.confirmed,
+      corrected: ws.corrected,
+      cardedThisTurn: ws.newMessages.flatMap(m => (m.slotCard ? [m.slotCard] : [])),
+    })
+    if (cardKey) {
+      // ONE LIVE CARD PER QUESTION, ON THE NEWEST MESSAGE THAT ASKS IT. An
+      // older unanswered card for the same question is retired rather than the
+      // new one being dropped: dropping it is what left a re-asked question
+      // with its chips a screen and a half above it.
+      const sameQuestion = numericGroupFor(cardKey) as string[]
+      for (const m of messages) {
+        if (isLiveCard(m) && sameQuestion.includes(m.slotCard!)) ws.supersedeCards.add(m.slotCard!)
       }
-      // An answered slot is normally refused, so the model cannot re-ask what
-      // it already knows. The exception is a slot THIS TURN corrected: the
-      // user said the last answer was wrong, and Ashley's ruling is that they
-      // get the buttons back rather than having to describe the fix in prose.
-      // Reported by her: "if you make a wrong selection and then send the
-      // right answer after it, it messes with the next question and the next
-      // quick reply."
-      if (ws.confirmed.has(key) && !ws.corrected.has(key)) continue
-      if (!isSlotApplicable(def, ws.values)) continue
-      // One live card per question. The model can ask for the same chips on
-      // both legs of the round trip, and the second copy found the coach's
-      // message already taken, so it fell through to the raw-question
-      // fallback — the same question twice, the second time in form voice.
-      //
-      // A corrected slot's OLD card is resolved and so is not "live"; the
-      // check still stops a second card for the same correction.
-      const alreadyLive = [...messages, ...ws.newMessages].some(
-        m => m.slotCard === key && !m.slotCardResolved && !ws.resolveCards.has(key),
-      )
-      if (alreadyLive && !ws.corrected.has(key)) continue
-      if (ws.newMessages.some(m => m.slotCard === key)) continue
-      // A second present_slot in the same turn is a prompt-compliance miss,
-      // not a fresh instance of dead air — drop it rather than spawning a
-      // duplicate form-voice message.
-      if (presentedThisTurn) continue
-      presentedThisTurn = true
-      // Attach the chip card to the model's own turn when it produced text
-      // this round; otherwise render the slot's canonical question.
-      //
-      // Search BACKWARDS past confirmation lines rather than looking only at
-      // the last message. A turn that both records an answer and asks the
-      // next question emits [coach text, ✓ confirmation], so a last-only
-      // check found the confirmation, gave up, and printed the slot's raw
-      // form question underneath the coach's own words — the questionnaire
-      // voice reappearing directly below the conversational one.
-      const host = [...ws.newMessages]
-        .reverse()
-        .find(m => m.role === 'assistant' && !m.isReceipt && !m.slotCard && m.content.trim())
-      if (host) {
-        host.slotCard = key
-      } else {
-        ws.newMessages.push({ role: 'assistant', content: def.question, slotCard: key })
-      }
+      if (host) host.slotCard = cardKey
+      // No words at all this turn: render the slot's own question with it.
+      else ws.newMessages.push({ role: 'assistant', content: getSlotDef(cardKey)!.question, slotCard: cardKey })
+    } else if (host && presentRequests.length > 0) {
+      // Loud on purpose. Every line here is a turn where chips were asked for
+      // and withheld; if it shows up often, the patterns are too tight.
+      console.warn('onboarding: chips withheld — the message does not ask that question',
+        presentRequests, JSON.stringify(questionPartOf(host.content)))
     }
   }
 
@@ -1030,7 +1086,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // whenever two of their cards were simultaneously pending the stricter
       // version silently captured nothing at all, reproducing the exact
       // failure this backstop exists to close.
-      const pendingCards = [...messages].reverse().filter(m => m.role === 'assistant' && m.slotCard && !m.slotCardResolved)
+      const pendingCards = [...messages].reverse().filter(m => m.role === 'assistant' && isLiveCard(m))
       for (const pendingCard of pendingCards) {
         const pendingDef = getSlotDef(pendingCard.slotCard!)
         // A slot's requiredIf gate can close after its card was shown (an
@@ -1089,6 +1145,35 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       }
     }
 
+    // SNACKS, SAID IN PASSING (test log L5). "3 meals and one snack" was
+    // ticked "Meals a day — 3 meals": the coach recorded the meals and not the
+    // snack, and the plan only had one because snacks default to ON. Said the
+    // other way round — "3 meals, no snacks" — the same miss builds a plan
+    // WITH a snack and nothing on screen says so. Both readings are certain,
+    // so the app takes them itself, on typed text only (a tapped chip has
+    // already recorded its own answer).
+    const snacks = preRecorded ? undefined : snackAnswerIn(trimmed)
+    if (snacks !== undefined) {
+      const meals = mealCountIn(trimmed)
+      const mealsDef = getSlotDef('mealsPerDay')!
+      const snacksWere = ws.confirmed.has('includeSnacks') ? ws.values.includeSnacks : undefined
+      const mealsWere = ws.confirmed.has('mealsPerDay') ? ws.values.mealsPerDay : undefined
+      const mealsTaken = meals !== undefined && applySlot(ws, 'mealsPerDay', meals, ws.values, false)
+      // One tick for the pair when they came together; the snack's own tick
+      // when it came alone. Nothing new, nothing ticked.
+      if (applySlot(ws, 'includeSnacks', snacks, ws.values, !mealsTaken)) {
+        if (mealsTaken && (snacksWere !== snacks || mealsWere !== meals)) {
+          ws.newMessages.push({
+            role: 'assistant',
+            content: `${RECEIPT_PREFIX}${mealsDef.shortLabel} — ${displaySlotValue(mealsDef, ws.values)}${snacks ? ' + a snack' : ', no snacks'}`,
+            isReceipt: true,
+          })
+        }
+        if (mealsTaken) answeredThisTurn = true
+        immediateCommit = true
+      }
+    }
+
     // Captured before the round trip: the rescue below needs to know the
     // user said "I don't know" even after the model's reply has come back.
     //
@@ -1138,14 +1223,16 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         newMessages: [],
         openReview: false,
         resolveCards: new Set(),
-    corrected: new Set(),
+        corrected: new Set(),
+        supersedeCards: new Set(),
       }
       if (result.reply && result.reply.trim()) {
         responseWs.newMessages.push({ role: 'assistant', content: result.reply.trim() })
       }
-      if (Array.isArray(result.actions) && result.actions.length > 0) {
-        executeActions(responseWs, result.actions, trimmed)
-      }
+      // Always, even with no actions: which card sits under the coach's
+      // words is decided in there, and a re-asked question brings its card
+      // along whether or not the model asked for one.
+      executeActions(responseWs, Array.isArray(result.actions) ? result.actions : [], trimmed)
       // NEVER A LIVE QUESTION BESIDE THE GENERATE BUTTON.
       //
       // Ashley photographed the coach asking "how much time do you want to
@@ -1221,7 +1308,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         const target = openNow[0]
         const def = target ? getSlotDef(target) : undefined
         const alreadyHasCard = [...priorMessages, ...responseWs.newMessages].some(
-          m => m.slotCard === target && !m.slotCardResolved && !responseWs.resolveCards.has(target as SlotKey),
+          m => m.slotCard === target && isLiveCard(m) && !responseWs.resolveCards.has(target as SlotKey),
         )
         // Only slots that genuinely HAVE a list. "I don't know" against age
         // or weight is a refusal, not someone needing options — that already
@@ -1272,7 +1359,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             // completion, so we come back to it.
             const askCount = (k: SlotKey) => allMsgs.filter(m => m.slotCard === k).length
             const hasLiveCard = (k: SlotKey) =>
-              allMsgs.some(m => m.slotCard === k && !m.slotCardResolved && !responseWs.resolveCards.has(k)) ||
+              allMsgs.some(m => m.slotCard === k && isLiveCard(m) && !responseWs.resolveCards.has(k)) ||
               responseWs.newMessages.some(m => m.slotCard === k)
             const target = pickSlotToForce(openSlots, responseWs.values, askCount, hasLiveCard)
             const def = target ? getSlotDef(target) : undefined
@@ -1295,8 +1382,49 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         { role: 'assistant', content: 'Connection hiccup on my end — say that again and we’ll keep going.' },
       ])
     } finally {
+      // A typed reply to an edit prompt has now been through the coach. Put
+      // the prompt away whatever came back, so the summary can return: with
+      // the summary hidden and no tab bar, a prompt left open here would be a
+      // dead end. If the change did not take, the row still says so.
+      if (editingKey) {
+        setMessages(prev => prev.map(m => (isOpenEdit(m) ? { ...m, slotCardResolved: true } : m)))
+        setEditingKey(null)
+        setJustEdited(editingKey)
+      }
       setBusy(false)
     }
+  }
+
+  /**
+   * An answer given to an edit prompt opened from the summary. Returns true
+   * when it was settled here, with no trip to the coach.
+   *
+   * Nothing needs asking when the change leaves the plan buildable: the value
+   * is validated and recorded like any other tap, the person's own bubble says
+   * what they chose, and the summary comes straight back with the new value in
+   * its row. The coach used to be sent this turn too, and whatever it said —
+   * sometimes a fresh question — landed above a summary that was still open.
+   *
+   * When the change OPENS a question (a barbell tier makes the working-lifts
+   * question apply), the summary stays away and the coach is asked, so the new
+   * question arrives at the bottom of the conversation like any other.
+   */
+  const settleEdit = (ws: WorkingState, said: string): boolean => {
+    if (!editingKey) return false
+    const stillBuildable =
+      missingRequiredSlots(ws.values).length === 0 && unconfirmedOptionalSlots(ws.confirmed, ws.values).length === 0
+    if (!stillBuildable) return false // sendMessage closes the edit when its turn ends
+    setMessages(prev => [
+      // Whatever was answered, the edit is over: a prompt left open here (the
+      // answer came from a different card further up) would sit in the
+      // conversation looking live under a summary that has moved on.
+      ...prev.map(m => (isOpenEdit(m) ? { ...m, slotCardResolved: true } : m)),
+      { role: 'user', content: said },
+    ])
+    commitWorkingState(ws)
+    setJustEdited(editingKey)
+    setEditingKey(null)
+    return true
   }
 
   // --- chip interactions -------------------------------------------------
@@ -1316,6 +1444,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     // false: a tap is not a mapping — see applySlot's note.
     if (!applySlot(ws, key, coerceSlotValue(def, value), values, false)) return
     const label = def.options?.find(o => String(o.value) === value)?.label ?? value
+    if (settleEdit(ws, label)) return
     void sendMessage(label, ws)
   }
 
@@ -1334,6 +1463,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const labels = selected.length > 0
       ? selected.map(v => def.options?.find(o => String(o.value) === v)?.label ?? v).join(', ')
       : 'none'
+    if (settleEdit(ws, labels)) return
     void sendMessage(labels, ws)
   }
 
@@ -1363,6 +1493,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       setMessages(prev => [...prev, { role: 'assistant', content: 'That didn’t look right — check the numbers and try again.' }])
       return
     }
+    if (settleEdit(ws, saved.join(', '))) return
     void sendMessage(saved.join(', '), ws)
   }
 
@@ -1376,6 +1507,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const declined = declineSlots(ws, keys)
     if (declined.length === 0) return
     const labels = declined.map(k => getSlotDef(k)?.shortLabel.toLowerCase() ?? k)
+    if (settleEdit(ws, `I'd rather not say — skip ${labels.join(', ')}`)) return
     void sendMessage(`I'd rather not say — skip ${labels.join(', ')}`, ws)
   }
 
@@ -1399,19 +1531,35 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     if (busy) return
     const def = getSlotDef(key)
     if (!def || !isSlotApplicable(def, values)) return
+    // THE PROMPT GOES WHERE THE PERSON IS LOOKING (test log M4, 9 Oct 2026).
+    // It used to be appended to the conversation while the summary stayed
+    // open underneath it — so it rendered ABOVE a card taller than the screen,
+    // the tap looked dead, and every further tap stacked another copy. Now the
+    // summary is put away while one row is being changed: the prompt and its
+    // control are the last thing on screen, there is only ever one of them,
+    // and the summary returns by itself when the edit is answered or dropped.
+    if (editingKey === key) { scrollToBottom(true); return }
     setMessages(prev => [
-      ...prev,
+      // One edit at a time: a prompt still open for another row is replaced.
+      ...prev.filter(m => !isOpenEdit(m)),
       {
         role: 'assistant',
-        content: def.control === 'text'
-          // A text slot has no card to render, so the composer is the only
-          // way to answer it — say so rather than leaving a dead prompt.
-          ? `Sure — type what you'd like ${def.shortLabel.toLowerCase()} to be instead.`
-          : `Sure — pick a different ${def.shortLabel.toLowerCase()}.`,
+        content: editPromptFor(def),
         slotCard: def.control === 'text' ? undefined : key,
-        slotCardEditing: def.control === 'text' ? undefined : true,
+        asksSlot: def.control === 'text' ? key : undefined,
+        slotCardEditing: true,
       },
     ])
+    setJustEdited(null)
+    setEditingKey(key)
+    setReviewOpen(false)
+  }
+
+  /** Back to the summary with nothing changed. */
+  const handleLeaveEdit = () => {
+    setMessages(prev => prev.filter(m => !isOpenEdit(m)))
+    setEditingKey(null)
+    setReviewOpen(true)
   }
 
   const handleGenerate = () => {
@@ -1427,8 +1575,12 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       messages: toDraftMessages(messages),
       pendingContextFacts,
       pendingGoals,
+      parkedQuestions,
       completing: true,
     })
+    // Handed to the first chat, which is where "I'll come back to it" is kept.
+    // Written even when empty, so an earlier setup's questions never resurface.
+    saveParkedQuestions(parkedQuestions)
     onComplete(assembleProfile(values))
   }
 
@@ -1505,6 +1657,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   }
 
   const pendingHint = (() => {
+    // A text answer being changed from the summary is typed here, so say which.
+    const editingDef = editingKey ? getSlotDef(editingKey) : undefined
+    if (editingDef?.control === 'text' && editingDef.inputHint) return editingDef.inputHint
     // Indices, not just the message, because WHICH IS NEWER decides it.
     // Fourth failure in this block, reported by Ashley: correct an answer and
     // the coach's next question arrives with no card of its own, so this
@@ -1514,7 +1669,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     let coachQuestionIdx = -1
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i]
-      if (askedIdx < 0 && ((m.slotCard && !m.slotCardResolved) || (m.asksSlot && !confirmed.has(m.asksSlot)))) askedIdx = i
+      if (askedIdx < 0 && (isLiveCard(m) || (m.asksSlot && !confirmed.has(m.asksSlot)))) askedIdx = i
       if (
         coachQuestionIdx < 0 && m.role === 'assistant' && !m.isReceipt
         && m.content !== RESUME_BANNER && m.content.includes('?')
@@ -1529,7 +1684,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const staleCard = askedIdx >= 0 && coachQuestionIdx > askedIdx
     const key = staleCard
       ? undefined
-      : asked?.slotCard && !asked.slotCardResolved ? asked.slotCard : asked?.asksSlot
+      : asked && isLiveCard(asked) ? asked.slotCard : asked?.asksSlot
     if (key) {
       // A GROUPED CARD ASKS THREE THINGS, so naming one of them is wrong —
       // and the first member is the likeliest to be the one already filled in.
@@ -1667,7 +1822,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         <div ref={contentRef} className="max-w-md w-full mx-auto flex flex-col gap-[22px]">
           {messages.map((msg, i) =>
             msg.isReceipt ? (
-              <div key={i} className="flex items-center gap-1.5 pl-1">
+              <div key={i} data-testid="onboarding-tick" className="flex items-center gap-1.5 pl-1">
                 <Check className="size-3 shrink-0 text-primary-text" />
                 <p className="text-xs text-muted-foreground">{msg.content.slice(RECEIPT_PREFIX.length)}</p>
               </div>
@@ -1696,7 +1851,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                 >
                   {msg.content}
                 </div>
-                {msg.slotCard && getSlotDef(msg.slotCard)?.control === 'numeric' && (
+                {msg.slotCard && !msg.slotCardSuperseded && getSlotDef(msg.slotCard)?.control === 'numeric' && (
                   <SlotNumericCard
                     slotKey={msg.slotCard}
                     values={values}
@@ -1708,7 +1863,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     onDecline={handleDecline}
                   />
                 )}
-                {msg.slotCard && (
+                {msg.slotCard && !msg.slotCardSuperseded && (
                   <SlotChipsCard
                     slotKey={msg.slotCard}
                     values={values}
@@ -1751,33 +1906,40 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
               dietary restrictions had ever been asked — neither is required,
               so an unconfirmed injuries slot silently assembles into an empty
               array, indistinguishable from a real "no injuries" answer. */}
+          {/* While one answer is being changed this same button is the way
+              back with nothing changed — the edit prompt is put away and the
+              summary returns. */}
           {!reviewOpen && readyToGenerate && (
-            <Button onClick={() => setReviewOpen(true)} className="w-full h-11">
+            <Button onClick={editingKey ? handleLeaveEdit : () => setReviewOpen(true)} className="w-full h-11">
               Review and build my plan
             </Button>
           )}
 
           {reviewOpen && (
-            <Card className="bg-muted/50 border-dashed">
+            <Card data-testid="onboarding-review" className="bg-muted/50 border-dashed">
               <CardContent className="pt-4 text-sm space-y-1.5">
                 {ONBOARDING_SLOTS
                   // Only what actually applies to this person: a "don't know
                   // my lifts" answer shouldn't leave three blank weight rows
                   // in the summary they're being asked to confirm.
                   .filter(s => isSlotApplicable(s, values))
-                  .filter(s => isSlotRequired(s, values) || confirmed.has(s.key))
+                  // Snacks are listed whether or not anyone mentioned them:
+                  // the plan includes one by default, and a default the
+                  // summary does not show is one nobody can turn off.
+                  .filter(s => isSlotRequired(s, values) || confirmed.has(s.key) || s.key === 'includeSnacks')
                   .map(def => (
                   <button
                     key={def.key}
                     type="button"
                     onClick={() => handleEditSlot(def.key)}
                     disabled={busy}
-                    className="w-full text-left min-h-[32px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+                    data-review-row={def.key}
+                    className={`w-full text-left min-h-[32px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 ${justEdited === def.key ? 'bg-muted' : ''}`}
                     aria-label={`Change ${def.shortLabel}`}
                   >
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
                     <span className="text-muted-foreground">
-                      {isDeclined(def.key, values, confirmed) ? 'Not given' : displayValueFor(def, values)}
+                      {isDeclined(def.key, values, confirmed) ? 'Not given' : displaySlotValue(def, values)}
                     </span>
                   </button>
                 ))}

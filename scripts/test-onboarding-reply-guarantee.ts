@@ -118,8 +118,76 @@ const run = async () => {
     check('reply comes from the text-only leg', r.reply.includes('after'))
     check('two recovery calls: tools then no tools', r.invocations.map((i) => i.withTools).join(',') === 'true,false')
     check('duplicate set_slot from the round trip is dropped', r.actions.filter((a) => a.name === 'set_slot').length === 1)
-    check('new present_slot from the round trip is merged', r.actions.some((a) => a.name === 'present_slot' && a.args.slot_key === 'fitnessGoal'))
+    // Still forwarded — the text-only leg cannot ask for chips itself — but
+    // as a request the CLIENT checks against the words, not as a fact.
+    check('a present_slot from the silent round trip is forwarded for the client to judge', r.actions.some((a) => a.name === 'present_slot' && a.args.slot_key === 'fitnessGoal'))
     check('text-only nudge forbids call syntax instead of requesting chips', r.invocations[1].lastText.includes('plain text only'))
+  }
+
+  // -------------------------------------------------------------------------
+  // THE SAME-LEG RULE (test log H14, 9 Oct 2026). Leg 1 recorded the recovery
+  // answer and asked for MEALS chips without a word; leg 2 wrote "how old are
+  // you, and what are your current height and weight?". The two were merged
+  // with no record of which leg produced what, and the meals chips went out
+  // as if they belonged to that sentence.
+  // -------------------------------------------------------------------------
+  console.log('same-leg rule — chips asked for by a leg that said nothing:')
+  {
+    const leg1 = calls(
+      { name: 'set_slot', args: { slot_key: 'recoveryCapacity', value: 'moderate' } },
+      { name: 'present_slot', args: { slot_key: 'mealsPerDay' } },
+    )
+    const mock = scripted([ok([...text('How old are you, and what are your current height and weight?'), ...calls({ name: 'present_slot', args: { slot_key: 'age' } })])])
+    let sentBack: unknown[] = []
+    const r = await resolveReply({
+      firstParts: leg1, contents: CONTENTS, catalog: CATALOG, remaining: ['age'], log: () => {},
+      callGemini: async (turns, withTools) => { sentBack = turns; return mock.callGemini(turns, withTools) },
+    })
+    const presents = r.actions.filter((a) => a.name === 'present_slot').map((a) => a.args.slot_key)
+    check('the chips from the leg that wrote the words come first', presents[0] === 'age', JSON.stringify(presents))
+    check('...the silent leg\'s request is only a fallback behind them', presents.join(',') === 'age,mealsPerDay', JSON.stringify(presents))
+    check('...and every present_slot comes after the answers it rode in with',
+      r.actions.map((a) => a.name).join(',') === 'set_slot,present_slot,present_slot', r.actions.map((a) => a.name).join(','))
+    const responses = (sentBack as Array<{ parts?: Array<{ functionResponse?: { name: string; response: { status: string } } }> }>)
+      .flatMap((t) => t.parts ?? []).map((p) => p.functionResponse).filter(Boolean) as Array<{ name: string; response: { status: string } }>
+    check('the model is told its silent present_slot was NOT shown',
+      /^not shown/.test(responses.find((f) => f.name === 'present_slot')?.response.status ?? ''), JSON.stringify(responses))
+    check('...while the recorded answer is still reported as recorded',
+      responses.find((f) => f.name === 'set_slot')?.response.status === 'recorded', JSON.stringify(responses))
+    check('...and the nudge says so too, in words', /NO CHIPS ARE ON SCREEN YET/.test(mock.invocations[0].lastText))
+  }
+  {
+    // Both silent legs asked; the tools-less leg wrote the words and cannot
+    // ask at all. The later request is the better guess, so it goes first.
+    const r = await resolve(
+      calls({ name: 'set_slot', args: { slot_key: 'age', value: '41' } }, { name: 'present_slot', args: { slot_key: 'trainingDays' } }),
+      [ok(calls({ name: 'present_slot', args: { slot_key: 'fitnessGoal' } })), ok(text('And what are you actually after?'))],
+    )
+    const presents = r.actions.filter((a) => a.name === 'present_slot').map((a) => a.args.slot_key)
+    check('with no speaking leg to ask, the most recent request leads', presents.join(',') === 'fitnessGoal,trainingDays', JSON.stringify(presents))
+    const twice = await resolve(
+      calls({ name: 'present_slot', args: { slot_key: 'trainingDays' } }),
+      [ok([...text('Which days work?'), ...calls({ name: 'present_slot', args: { slot_key: 'trainingDays' } })])],
+    )
+    check('the same chips asked for on both legs go out once',
+      twice.actions.filter((a) => a.name === 'present_slot').length === 1, JSON.stringify(twice.actions))
+  }
+  {
+    // A turn that spoke on the first leg is one leg: nothing is reordered.
+    const r = await resolve(
+      [...calls({ name: 'present_slot', args: { slot_key: 'trainingDays' } }), ...text('Which days work?'), ...calls({ name: 'set_slot', args: { slot_key: 'age', value: '41' } })],
+      [],
+    )
+    check('a single-leg turn passes through in the order the model wrote it',
+      r.actions.map((a) => a.name).join(',') === 'present_slot,set_slot', r.actions.map((a) => a.name).join(','))
+  }
+
+  console.log('a second, different fact from a later leg is not mistaken for a repeat:')
+  {
+    const fact = (d: string) => ({ name: 'record_context_fact', args: { display_text: d, raw_phrase: d } })
+    const r = await resolve(calls(fact('works nights')), [ok([...text('Noted.'), ...calls(fact('works nights'), fact('two kids under five'))])])
+    const facts = r.actions.filter((a) => a.name === 'record_context_fact').map((a) => a.args.display_text)
+    check('both facts survive, and the true repeat is dropped', facts.join('|') === 'works nights|two kids under five', JSON.stringify(facts))
   }
 
   console.log('every model leg ok-but-empty (the loosened-prompt shape) — floor, no wasted retry:')

@@ -22,7 +22,7 @@ import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
   executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
-import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
+import { STYLE_OPTIONS, OFFERED_STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -3521,7 +3521,11 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
   } | null => {
     // Validate against the real option list, never the model's spelling —
     // an unrecognised style is dropped and the proposal doesn't happen.
-    const wantedOpt = STYLE_OPTIONS.find(o => o.value === String(rawArgs.training_style ?? '').trim().toLowerCase())
+    // OFFERED, not merely known: a style the pickers no longer show (combat,
+    // by Ashley's August 2026 ruling) cannot be proposed here either. The
+    // `before` label below still reads the full list, so someone already on
+    // it sees their own style named on the card that moves them off it.
+    const wantedOpt = OFFERED_STYLE_OPTIONS.find(o => o.value === String(rawArgs.training_style ?? '').trim().toLowerCase())
     if (!wantedOpt || mesocycle.length === 0) return null
     const beforeValue = profile.training_style ?? 'hybrid'
     if (wantedOpt.value === beforeValue) return null

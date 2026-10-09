@@ -57,6 +57,11 @@ const FULL_GYM = new URLSearchParams(location.search).get('fullgym') === '1'
 // mistake of 18 Sep 2026, which spent weeks proving a fixture's own number
 // reached the screen.
 const KETO = new URLSearchParams(location.search).get('keto') === '1'
+// ?style=combat — a profile that ALREADY HOLDS a training style the pickers
+// no longer offer (Ashley's August 2026 ruling took combat out of them). The
+// fixture only sets the stored value; what the Style row then shows and
+// offers is ProfileScreen's own doing.
+const STYLE = new URLSearchParams(location.search).get('style')
 // ?reminders=live — the profile row as it reads AFTER the reach-out migration:
 // the switches column is present (empty = all on). Without it the row is as
 // it reads today, and the Reminders section must say "not live yet" and offer
@@ -86,7 +91,7 @@ const baseProfile: UserProfile = {
   // value outside its own union is invisible until something reads it.
   fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   equipment_access: FULL_GYM ? 'full_gym' : 'home_gym',
-  injuries: [], training_style: 'bodybuilding',
+  injuries: [], training_style: (STYLE ?? 'bodybuilding') as UserProfile['training_style'],
   training_experience: 'intermediate', session_duration_preference: '60-90',
   workout_split_preference: 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),

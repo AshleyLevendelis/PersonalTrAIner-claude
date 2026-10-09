@@ -115,7 +115,7 @@ export function SlotChipsCard({
   const groupRole = def.control === 'single' ? { role: 'radiogroup' as const, 'aria-label': def.question } : {}
 
   return (
-    <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+    <div data-slot-card={def.key} className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
       {shape === 'rows' && (
         <div
           {...groupRole}
