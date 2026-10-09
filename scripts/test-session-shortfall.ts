@@ -94,8 +94,14 @@ console.log('\n4. It changed what is said, and not one set')
   // the shortfall one — so the check failed on a change that improved the
   // screen. The property is that the DESCRIBER'S VERDICT is what reaches the
   // row, whatever else is alongside it.
-  check('...and passes both the number and the reason',
-    /estimatedMinutes=\{sessionEstimate\.minutes\}/.test(panel) &&
+  // RE-ANCHORED AGAIN 9 Oct 2026, deliberately. The row no longer takes a bare
+  // number: it takes the day's length already worded by the one shared helper
+  // ("~22 min · + 15 optional"), so the header, the programme list and Home
+  // cannot print three different lengths for one day. The property is the
+  // same — the length AND the describer's verdict both reach the row.
+  check('...and passes both the length and the reason',
+    /sessionLength=\{sessionEstimate\.length\}/.test(panel) &&
+    /length: formatDayLength\(dayLengthParts\(workout\)\)/.test(panel) &&
     /shortfallNote=\{sessionEstimate\.note\}/.test(panel) &&
     /describeSessionShortfall\(/.test(panel) &&
     /note: \[[^\]]*shortfall\?\.note[^\]]*\]/.test(panel))
@@ -125,9 +131,10 @@ console.log('\n4. It changed what is said, and not one set')
   check('the reason is shown next to the number, not hidden behind the expander',
     /\{shortfallNote &&/.test(row) && !/expanded && shortfallNote/.test(row))
   // estimatedMinutes was a documented prop that nothing ever passed, so the
-  // "~52 min" chip its own header describes never rendered.
-  check('the minutes chip it always described now actually renders',
-    /estimatedMinutes != null\) headerParts\.push/.test(row))
+  // "~52 min" chip its own header describes never rendered. (Since 9 Oct 2026
+  // the prop is `sessionLength`, a worded length — see above.)
+  check('the length chip it always described now actually renders',
+    /if \(sessionLength\) headerParts\.push\(sessionLength\)/.test(row))
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

@@ -111,11 +111,24 @@ console.log('\n[1] The profiles the measurement named')
   // seeded the way it seeded them. Bodyweight + low recovery is the corner
   // where all three levers can run out at once, and it is not a corner anyone
   // would have guessed from reading the code.
+  //
+  // RE-ANCHORED 9 Oct 2026, deliberately. The four keys that stood here
+  // (bodyweight + shoulders or knees, bodybuilding; bodyweight, functional)
+  // stopped being the dead-end case: check 1b read 0 on correct code, because
+  // the weeks they named were rebuilt by the day-purpose work — a bodyweight
+  // bodybuilding week with a shoulder flag is no longer four leg days, and its
+  // pulling days hold a loaded backpack curl, which is a weight to shed. 1c
+  // still passed on them, for the wrong reason, which is exactly what 1b
+  // exists to stop. Replaced the way the originals were chosen: by scanning
+  // the grid's bodyweight, low-recovery corner (768 plans) on the current
+  // engine for block pairs with no loaded row and sets already at the floor.
+  // It named these four and no others in the first 768 — the corner is
+  // smaller than it was.
   const OFFENDERS = [
-    'bodyweight|shoulders|30-45|bodybuilding|beginner|conditioning|low|tolerate',
-    'bodyweight|knees|45-60|bodybuilding|beginner|conditioning|low|love',
-    'bodyweight|none|45-60|functional|intermediate|functional|low|tolerate',
-    'bodyweight|shoulders|30-45|bodybuilding|novice|fat_loss|low|avoid',
+    'bodyweight|wrists|45-60|combat|beginner|fat_loss|low|love',
+    'bodyweight|wrists|45-60|combat|novice|hypertrophy|low|tolerate',
+    'bodyweight|wrists|60-90|combat|novice|conditioning|low|avoid',
+    'bodyweight|wrists|90+|combat|beginner|conditioning|low|tolerate',
   ]
 
   let pairsSeen = 0

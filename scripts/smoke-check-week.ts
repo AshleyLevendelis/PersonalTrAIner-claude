@@ -67,7 +67,7 @@ const JARGON_PATTERNS = [/tier_0_primer/, /tier_1_primary/, /tier_2_/, /substitu
 // internal keys mapped to clean display text (e.g. tier 'tier_0_primer' ->
 // rendered label "Primer") and would false-positive on any jargon-pattern
 // scan of the raw data object.
-const RENDERED_TEXT_FIELDS = new Set(['name', 'focus', 'conditioning_note', 'load_guidance', 'coach_note', 'pattern_gap_note', 'label', 'substitution', 'suggested_load'])
+const RENDERED_TEXT_FIELDS = new Set(['name', 'focus', 'conditioning_note', 'load_guidance', 'coach_note', 'label', 'substitution', 'suggested_load'])
 
 function scanJargon(obj: any, path: string, hits: string[], key?: string) {
   if (typeof obj === 'string') {

@@ -27,7 +27,7 @@ import { getActiveMesocycleWeek } from './calculations'
 import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
-import { estimateDaySeconds } from './session-duration'
+import { dayLengthParts, formatDayLength } from './session-duration'
 import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
 
 /**
@@ -61,8 +61,18 @@ export interface TodaySession {
    * Every value here was already in the plan; none of it was surfaced.
    */
   exerciseCount: number
-  /** Whole minutes, from the same estimator the time cap and the audit use. */
+  /**
+   * Whole minutes of the session's WORK, from the same estimator the time cap
+   * and the audit use. The optional stretch on the end is not in this number
+   * since 9 Oct 2026 — it is in `sessionLength`, said as optional.
+   */
   estimatedMinutes: number | null
+  /**
+   * The day's length as every screen prints it — "~22 min · + 15 optional" —
+   * from dayLengthParts/formatDayLength, the one helper the programme list
+   * and the Exercise tab's header also read. Null where there is no session.
+   */
+  sessionLength: string | null
   /** Minutes still to go, once sets have been logged. Null before that. */
   minutesLeft: number | null
   /** The heaviest external load in the session — see leadLiftPhrase for how it is said. */
@@ -333,12 +343,14 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   }
 
   // The glance line's three facts, derived here rather than in the component:
-  // Dashboard.tsx renders, this file is the one aggregator. estimateDaySeconds
-  // is the SAME estimator the plan's time cap and test:audit use, so the
-  // number on Home cannot disagree with the number the plan was built to.
-  const estimatedMinutes = todayWorkoutDay && todayWorkoutDay.exercises.length > 0
-    ? Math.round(estimateDaySeconds(todayWorkoutDay) / 60)
-    : null
+  // Dashboard.tsx renders, this file is the one aggregator. dayLengthParts
+  // is built on the SAME estimator the plan's time cap and test:audit use, so
+  // the number on Home cannot disagree with the number the plan was built to
+  // — and it is the same helper the programme list and the Exercise tab's
+  // header read, so the three cannot disagree with each other.
+  const lengthParts = todayWorkoutDay && todayWorkoutDay.exercises.length > 0 ? dayLengthParts(todayWorkoutDay) : null
+  const estimatedMinutes = lengthParts ? lengthParts.workMinutes : null
+  const sessionLength = lengthParts ? formatDayLength(lengthParts) : null
   // The heaviest externally-loaded lift, which is what people actually want to
   // know before deciding to go. Bodyweight and band work carry no kg and are
   // skipped rather than reported as 0.
@@ -367,16 +379,16 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
 
   const session: TodaySession = !planKnown
     ? { status: 'unknown', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
-        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
+        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null }
     // AHEAD OF REST: a moved day has no session on it either, and the whole
     // point is that it is not called a rest day.
     : todayResolved.movedTo
     ? { status: 'moved', focus: movedAwayFocus, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
-        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null,
+        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null,
         movedTo: todayResolved.movedTo }
     : isRestDay
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
-        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
+        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null }
     : {
         movedTo: todayResolved.movedTo,
         movedFrom: todayResolved.movedFrom,
@@ -391,6 +403,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
         setsPlanned,
         exerciseCount: todayWorkoutDay!.exercises.length,
         estimatedMinutes,
+        sessionLength,
         // Pro-rated by sets remaining rather than re-estimated: the estimator
         // works on a whole day, and a part-finished day is not a smaller day.
         minutesLeft: estimatedMinutes != null && setsPlanned > 0 && nonWarmupToday.length > 0

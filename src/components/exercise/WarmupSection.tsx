@@ -1,7 +1,7 @@
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, Thermometer } from 'lucide-react'
-import { normalizeWarmup } from '@/lib/session-derive'
+import { normalizeWarmup, warmupBadgeText } from '@/lib/session-derive'
 import type { WorkoutDay } from '@/lib/types'
 import type { WarmupItem } from '@/lib/warmup'
 
@@ -52,7 +52,12 @@ export function WarmupSection({
   // THE COUNT ON THE CLOSED SECTION HAS TO INCLUDE THEM. She adds three drills
   // and the badge still says 4 moves would read as the answer not landing —
   // which is the shape of defect this repo keeps paying for.
-  const moveCount = general.length + mobility.length + rampCount + extra.length
+  //
+  // AND IT SAYS WHICH OF THEM ARE TODAY'S (test log L17). The programme view
+  // shows this same warm-up without the drills, so "7 moves · ~10 min" here
+  // against "4 moves · ~6 min" there read as the two screens disagreeing about
+  // one warm-up. They are counted, and they are named: warmupBadgeText.
+  const planMoves = general.length + mobility.length + rampCount
   const extraMinutes = Math.round(extra.reduce((n, e) => n + e.duration_seconds, 0) / 60)
 
   return (
@@ -61,7 +66,7 @@ export function WarmupSection({
         <span className="flex items-center gap-2 text-xs font-medium text-foreground">
           <Thermometer className="size-3.5 text-primary-text" />
           Warm-up
-          <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4">{moveCount} {moveCount === 1 ? 'move' : 'moves'} · ~{totalMinutes + extraMinutes} min</Badge>
+          <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0 h-4" data-testid="warmup-badge">{warmupBadgeText(planMoves, totalMinutes, extra.length, extraMinutes)}</Badge>
         </span>
         <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>

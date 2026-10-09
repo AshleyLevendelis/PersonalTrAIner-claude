@@ -17,6 +17,7 @@
 // land in the one triage rather than a copy of it.
 // ---------------------------------------------------------------------------
 
+import { warmupBadgeText } from '../src/lib/session-derive'
 import { readFileSync } from 'node:fs'
 import {
   TIGHT_AREAS, AREA_JOINTS, tightnessWarmup, uncoveredNote,
@@ -205,8 +206,15 @@ console.log('\n6. Today only — it cannot reach tomorrow')
   // THE CLOSED SECTION MUST COUNT THEM. Adding three drills and leaving the
   // badge saying "4 moves" reads as the answer not landing.
   const section = strip(read('src/components/exercise/WarmupSection.tsx'))
-  check('the move count includes them', /rampCount \+ extra\.length/.test(section))
-  check('...and so does the minutes estimate', /totalMinutes \+ extraMinutes/.test(section))
+  // RE-ANCHORED 9 Oct 2026, deliberately. These two pinned the expressions
+  // `rampCount + extra.length` and `totalMinutes + extraMinutes`. The badge
+  // still counts the drills and their minutes — and now NAMES them as today's
+  // ("4 moves + 3 for today · ~6 + 4 min"), because the programme view shows
+  // the same warm-up without them and the two read as disagreeing (test log
+  // L17). Held on what the badge SAYS, by calling the function that words it.
+  const badge = warmupBadgeText(4, 6, 3, 4)
+  check('the move count includes them', /warmupBadgeText\(planMoves, totalMinutes, extra\.length, extraMinutes\)/.test(section) && /\b3 for today\b/.test(badge) && /^4 moves/.test(badge), badge)
+  check('...and so does the minutes estimate', /~6 \+ 4 min$/.test(badge) && warmupBadgeText(4, 6, 0, 0) === '4 moves · ~6 min', badge)
   check('the caveat has somewhere to render', /extraCaveat/.test(section))
 }
 

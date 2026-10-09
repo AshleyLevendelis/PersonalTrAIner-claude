@@ -132,10 +132,24 @@ console.log('\n1. A style may not starve a movement')
   // PUSHING AND PULLING ONLY. Reaching every pattern brought legs back as
   // three near-identical air squats on one day and took duplicate movements
   // from 37 bodyweight plans to 139 on the grid — measured, then narrowed.
-  const PUSH_PULL = ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull']
-  check('...and at bodyweight it brings back only pushes and pulls, never a third air squat',
+  //
+  // RE-ANCHORED 9 Oct 2026, deliberately: AND THE TRUNK. Every core movement a
+  // bodyweight trainee can do is tagged functional/combat/hybrid, so a
+  // bodybuilding bodyweight pool held no trunk work at all — which made
+  // "Shoulders & Abs", and the named fallback for a chest or shoulders day
+  // ("Upper Pull & Core"), unbuildable at that tier (a bodyweight,
+  // shoulder-flagged week was four leg days). The property this check protects
+  // is unchanged and is in its name: never a third air squat — no LEG pattern
+  // comes back. And the duplicate-movement cost that kept the floor to pushes
+  // and pulls is held at its source now (test:movement-families §3).
+  const PUSH_PULL = ['horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull', 'core']
+  check('...and at bodyweight it brings back only pushes, pulls and trunk work, never a third air squat',
     bwOffStyle.every(e => PUSH_PULL.includes(e.movement_pattern)),
     bwOffStyle.filter(e => !PUSH_PULL.includes(e.movement_pattern)).map(e => `${e.name} (${e.movement_pattern})`))
+  check('...the trunk did come back (so "Shoulders & Abs" can be built with no kit)',
+    bwStyled.some(e => e.movement_pattern === 'core'), bwStyled.filter(e => e.movement_pattern === 'core').map(e => e.name))
+  check('...and no leg pattern did',
+    !bwOffStyle.some(e => ['knee_dominant', 'hip_hinge', 'single_leg', 'isolation_quad', 'isolation_hamstring', 'isolation_calf'].includes(e.movement_pattern)))
   const sore = { ...profileFor('bodyweight', 'bodybuilding', 'beginner'), injuries: ['lower_back', 'knees'] } as UserProfile
   const sorePulls = getConstrainedPool(sore, []).filter(e => e.movement_pattern === 'horizontal_pull' || e.movement_pattern === 'vertical_pull')
   check('a style can no longer leave a bodyweight trainee one way to pull (the 23 Sep offender)',
@@ -341,6 +355,12 @@ console.log('\n3. A movement family is listed whole, or not at all')
     // Single-leg calf work apart from bilateral. Settled in its own round with
     // Ashley and deliberately not reopened here.
     'calf|tier3_isolation|isolation_calf',
+    // 9 Oct 2026: pushdown / kickback / overhead-and-lying are three movements
+    // (three lengths for the long head). Decided as a CSCS coach; the full
+    // table, with each split's reason, is in test:movement-families. (The
+    // neutral-grip press split needs no entry here: it is in the bench_press
+    // signature already listed above.)
+    'tricep_extension|tier3_isolation|isolation_tricep',
   ])
   const split: string[] = []
   for (const [sig, names] of bySig) {
