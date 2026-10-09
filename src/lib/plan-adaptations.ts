@@ -3,136 +3,265 @@
 // equipment/travel) — no I/O, mirrors mesocycle-edit.ts's own contract
 // exactly and reuses its helpers (clearOrphanedSupersetLabels,
 // applyReplacement, recomputeLoad, getReplacementCandidates, isMainLiftSlot)
-// rather than re-deriving any of them. Bounded by an explicit week-number
-// range (from the stated duration), not mesocycle-edit's block concept —
-// models banExerciseFromMesocycle's "sweep every week" shape, scoped to the
-// given weeks instead of every week ever.
+// rather than re-deriving any of them. Bounded by an explicit list of PLAN
+// DAYS worked out from dates (plan-guard.ts), never a week range: a week was
+// the smallest thing this could address until 9 Oct 2026, which is how a
+// 14-day change rewrote four days already trained and missed its last three.
 // ---------------------------------------------------------------------------
 
-import type { MesocycleWeek, Exercise, UserProfile, EquipmentAccess } from './types'
+import type { MesocycleWeek, Exercise, UserProfile, EquipmentAccess, WorkoutDay } from './types'
 import { getExerciseEntry, isContraindicatedFor } from './exercise-db'
 import { getFlaggedJoints, isEquipmentAllowed } from './exercise-plan'
 import {
-  getReplacementCandidates,
+  pickAutomaticReplacement,
   buildReplacementSlot,
   clearOrphanedSupersetLabels,
   isMainLiftSlot,
 } from './mesocycle-edit'
+import { settleWeek } from './settle-week'
+import {
+  comparePlanDays, planWeeksOnDate, weekdayIndex, NOTHING_TRAINED,
+  type DayGuard, type PlanCalendar, type PlanDayOnDate, type PlanDayRef,
+} from './plan-guard'
+import { addDays } from './session-move'
+import { constraintProfile, NO_ACTIVE_ADAPTATIONS, type EffectiveConstraints } from './effective-constraints'
+
+/**
+ * WHAT EVERY PATH THAT REPLACES DAYS OF A LIVE PLAN MUST KNOW, and is not
+ * allowed to run without: which days have already been trained, what the
+ * person is temporarily working around, and what today is.
+ *
+ * REQUIRED on purpose, never defaulted. Until 9 Oct 2026 an adaptation and
+ * every rebuild offer took week numbers and nothing else, so each of them
+ * rewrote the days of the current week the person had already trained, and
+ * none of them knew another adaptation was running. A parameter that can be
+ * left out is how that happens again; the compiler now refuses the call.
+ * Loaded by `loadPlanEditContext` (plan-edit-context.ts).
+ */
+export interface PlanEditContext {
+  /** True for a plan row already trained. Nothing rewrites one. */
+  isProtected: DayGuard
+  /** Temporary injuries and kit laid over the profile when a pool is built. */
+  constraints: EffectiveConstraints
+  /** Today on the app's clock, the plan's start, and any moved sessions. */
+  calendar: PlanCalendar
+  /** The day the last active temporary injury change ends (YYYY-MM-DD), or null. */
+  constrainedUntil: string | null
+}
+
+/**
+ * For gates, and for a plan nobody has trained on. A live plan loads the real
+ * one; `test:adaptations-respect-trained` fails if `src/` names this outside
+ * this file.
+ */
+export function untrainedPlanContext(calendar: PlanCalendar): PlanEditContext {
+  return { isProtected: NOTHING_TRAINED, constraints: NO_ACTIVE_ADAPTATIONS, calendar, constrainedUntil: null }
+}
 
 export interface TouchedSlot {
   weekNumber: number
   dayName: string
+  /** Where the slot sat in the session before the change. */
+  position: number
   before: string
   after: string | null
+  /** Why this row is not a like-for-like swap, when it is not. Printed on the card. */
+  note?: string
+}
+
+/** One day an adaptation changed: exactly what it was, and what was left on it. */
+export interface AdaptationDayChange {
+  weekNumber: number
+  dayName: string
+  /** The day as it stood before, whole. */
+  was: WorkoutDay
+  /** The exercise names the adaptation left on the day, in order. */
+  became: string[]
+  /** Each slot it changed. Empty when the day was rebuilt whole. */
+  slots: { position: number; was: Exercise; became: string | null }[]
+}
+
+/**
+ * What is stored with an adaptation (`plan_adaptations.pre_image`) so that
+ * ending it puts back what IT changed and nothing else. Before 9 Oct 2026 the
+ * column held whole weeks, and ending wrote them back over anything the
+ * person had done to those weeks since. `revertAdaptationChanges` reads both.
+ */
+export interface AdaptationRecord {
+  version: 2
+  /** Every plan row the adaptation covers, with its date. */
+  days: PlanDayOnDate[]
+  changes: AdaptationDayChange[]
+}
+
+export function isAdaptationRecord(value: unknown): value is AdaptationRecord {
+  return !!value && !Array.isArray(value) && (value as { version?: unknown }).version === 2
 }
 
 export interface SubstitutionResult {
   mesocycle: MesocycleWeek[]
+  /** Sorted by week, weekday, then position — the one order the card and the receipt both print. */
   touchedSlots: TouchedSlot[]
+  /**
+   * Movement patterns that lost a slot with nothing to put in its place — the
+   * signal `assessAdaptation` reads to say a rebuild would serve better than
+   * a patch. Unchanged in meaning: every dropped slot counts, including an
+   * isolation slot left out rather than filled with unrelated work.
+   */
   droppedPatterns: string[]
+  /** What ending this change would need to put back. */
+  changes: AdaptationDayChange[]
+}
+
+const ROW_NOTES = {
+  off_style: 'Outside your usual style. Nothing in your style fits this slot right now.',
+  nearest: 'The closest movement that fits.',
+  dropped_isolation: 'Nothing related fits, so this one is left out rather than filled with different work.',
+} as const
+
+/**
+ * Keeps every day that must not change exactly as it was (the same object),
+ * and takes the rest from `next`. Used after anything that works on a whole
+ * week, so "protected" is a property of the result and not of each step.
+ */
+function keepDays(original: MesocycleWeek, next: MesocycleWeek, mayChange: (dayName: string) => boolean): MesocycleWeek {
+  const names = [...new Set([...original.days.map(d => d.day), ...next.days.map(d => d.day)])]
+    .sort((a, b) => weekdayIndex(a) - weekdayIndex(b))
+  const days: WorkoutDay[] = []
+  for (const name of names) {
+    const before = original.days.find(d => d.day === name)
+    const after = next.days.find(d => d.day === name)
+    const chosen = mayChange(name) ? after : before
+    if (chosen) days.push(chosen)
+  }
+  return { ...next, days }
 }
 
 async function substituteSlots(
   mesocycle: MesocycleWeek[],
   profile: UserProfile,
-  weekNumbers: number[],
+  targetDays: PlanDayRef[],
   exclusions: string[],
   conflicts: (slot: Exercise) => boolean,
   candidateProfile: UserProfile,
+  context: PlanEditContext,
 ): Promise<SubstitutionResult> {
-  const targetWeeks = new Set(weekNumbers)
+  // RULE 1, at the one place slots are replaced: a day already trained is not
+  // a target, whoever asked.
+  const targets = new Set(
+    targetDays.filter(d => !context.isProtected(d.weekNumber, d.dayName)).map(d => `${d.weekNumber}|${d.dayName}`),
+  )
   const touchedSlots: TouchedSlot[] = []
   const droppedPatterns: string[] = []
+  const changes: AdaptationDayChange[] = []
 
   const weeks = await Promise.all(mesocycle.map(async week => {
-    if (!targetWeeks.has(week.week_number)) return week
+    const isTarget = (dayName: string) => targets.has(`${week.week_number}|${dayName}`)
+    if (!week.days.some(d => isTarget(d.day))) return week
 
-    const days = await Promise.all(week.days.map(async day => {
-      let changed = false
-
-      // SEQUENTIAL WITHIN A DAY, and that is the whole fix.
-      //
-      // This used to be `await Promise.all(day.exercises.map(...))`, with a
-      // duplicate guard that could not possibly work: it read the ORIGINAL
-      // `day.exercises` (so it only knew names that were already there, never
-      // ones picked during this pass), and every slot resolved in parallel
-      // (so no slot could observe another's choice). Two conflicting slots in
-      // one session therefore computed the same "already used" set, got the
-      // same ranked candidates, and both took candidates[0]. Measured on a
-      // shoulder injury: 28 duplicate placements, producing sessions like
-      //   Band Dislocates | Barbell Floor Press | Landmine Press |
-      //   Landmine Press | Tricep Pushdowns | Side Plank | Barbell Floor Press
-      // — seven "exercises", four movements. The comment explaining the
-      // filtering gave false confidence over a mechanism that never ran.
-      //
-      // Days and weeks stay parallel; only slots inside one day need
-      // ordering, because that is the only place the collision can occur.
-      const usedInDay = new Set(day.exercises.filter(e => !conflicts(e)).map(e => e.name))
+    // DAYS IN ORDER WITHIN A WEEK, SLOTS IN ORDER WITHIN A DAY. Both orders
+    // carry information the next pick reads: a slot must not take a movement
+    // already on its day (measured before this was sequential: 28 duplicate
+    // placements for a shoulder injury), and a day should not take the
+    // substitute the previous leg day just took when a fresh one exists.
+    const usedThisWeek = new Set<string>()
+    const changedDays: string[] = []
+    const days: WorkoutDay[] = []
+    for (const day of week.days) {
+      if (!isTarget(day.day)) { days.push(day); continue }
+      const onDay = new Set(day.exercises.filter(e => !conflicts(e)).map(e => e.name))
       const exercises: (Exercise | null)[] = []
+      const slots: AdaptationDayChange['slots'] = []
 
-      for (const slot of day.exercises) {
+      for (const [position, slot] of day.exercises.entries()) {
         if (!conflicts(slot)) { exercises.push(slot); continue }
         const entry = getExerciseEntry(slot.name)
         if (!entry) { exercises.push(slot); continue }
 
-        // getReplacementCandidates already filters against candidateProfile's
-        // constraint pool (equipment/injury/style/skill), so every candidate
-        // here is already guaranteed conflict-free — no re-check needed.
-        const candidates = getReplacementCandidates(slot.name, candidateProfile, exclusions)
-          .filter(c => !usedInDay.has(c.exercise.name))
-
-        changed = true
-        if (candidates.length === 0) {
-          // No UNIQUE candidate left. Dropping is the honest outcome — a
-          // session listing the same lift twice is not an extra exercise,
-          // and this raises `dropped`, which is what assessAdaptation reads
-          // to decide a rebuild would serve the user better.
-          touchedSlots.push({ weekNumber: week.week_number, dayName: day.day, before: slot.name, after: null })
+        const pick = pickAutomaticReplacement(slot.name, candidateProfile, exclusions, onDay, usedThisWeek)
+        if (!pick) {
+          // Dropping is the honest outcome — a session listing the same lift
+          // twice, or a squat where a kickback was, is not an extra exercise.
+          const isolation = entry.mechanics_tier === 'tier3_isolation' || entry.movement_pattern.startsWith('isolation_')
+          touchedSlots.push({
+            weekNumber: week.week_number, dayName: day.day, position, before: slot.name, after: null,
+            note: isolation ? ROW_NOTES.dropped_isolation : undefined,
+          })
           droppedPatterns.push(slot.movement_pattern ?? entry.movement_pattern)
+          slots.push({ position, was: slot, became: null })
           exercises.push(null)
           continue
         }
 
-        const replacement = candidates[0].exercise
-        usedInDay.add(replacement.name)
-        const replaced = await buildReplacementSlot(slot, replacement, profile, week, isMainLiftSlot(slot))
-        touchedSlots.push({ weekNumber: week.week_number, dayName: day.day, before: slot.name, after: replacement.name })
+        onDay.add(pick.exercise.name)
+        usedThisWeek.add(pick.exercise.name)
+        const replaced = await buildReplacementSlot(slot, pick.exercise, profile, week, isMainLiftSlot(slot))
+        touchedSlots.push({
+          weekNumber: week.week_number, dayName: day.day, position, before: slot.name, after: pick.exercise.name,
+          note: pick.kind === 'off_style' ? ROW_NOTES.off_style
+            : pick.kind === 'nearest' ? ROW_NOTES.nearest
+            : pick.kind === 'cross' ? (pick.note || undefined)
+            : undefined,
+        })
+        slots.push({ position, was: slot, became: pick.exercise.name })
         exercises.push(replaced)
       }
 
-      if (!changed) return day
+      if (slots.length === 0) { days.push(day); continue }
+      changedDays.push(day.day)
       const kept = exercises.filter((e): e is Exercise => e !== null)
-      return { ...day, exercises: clearOrphanedSupersetLabels(kept) }
-    }))
+      days.push({ ...day, exercises: clearOrphanedSupersetLabels(kept) })
+      changes.push({ weekNumber: week.week_number, dayName: day.day, was: day, became: [], slots })
+    }
+    if (changedDays.length === 0) return week
 
-    return { ...week, days }
+    // THE SHARED TAIL (CLAUDE.md rule 3, "adjustment keeps the bar"): warm-up
+    // rebuilt for the exercises now on the day, set hierarchy, one weight per
+    // lift. Swap, ban, move and volume changes have ended here since 13 Sep
+    // 2026; adaptations did not. Settled against the CANDIDATE profile, so the
+    // warm-up it builds respects the area being eased off.
+    let settled: MesocycleWeek = { ...week, days }
+    for (const dayName of changedDays) settled = settleWeek(settled, dayName, candidateProfile).week
+    // ...and its week-level passes are not allowed to reach a day this change
+    // was not aimed at: a trained day, or one outside the window.
+    const result = keepDays({ ...week, days }, settled, name => changedDays.includes(name))
+    for (const change of changes) {
+      if (change.weekNumber !== week.week_number) continue
+      change.became = result.days.find(d => d.day === change.dayName)?.exercises.map(e => e.name) ?? []
+    }
+    return result
   }))
 
-  return { mesocycle: weeks, touchedSlots, droppedPatterns }
+  touchedSlots.sort(comparePlanDays)
+  changes.sort(comparePlanDays)
+  return { mesocycle: weeks, touchedSlots, droppedPatterns, changes }
 }
 
 export interface SubstituteForInjuryParams {
   mesocycle: MesocycleWeek[]
   profile: UserProfile
   injuryCode: string
-  weekNumbers: number[]
+  /** The plan rows to change — from `planDaysInWindow`, never a week range. */
+  targetDays: PlanDayRef[]
   exclusions: string[]
+  context: PlanEditContext
 }
 
 /**
- * For each slot in the given weeks whose exercise loads a joint flagged by
+ * For each slot on the given days whose exercise loads a joint flagged by
  * injuryCode, finds a same-constraint-pool replacement that doesn't — the
  * candidate pool is filtered against a LOCAL profile clone with injuryCode
  * added to `injuries` (never written to the real profile, so
  * test:injury-separation's guarantees hold: this function never touches
- * fitness_profiles.injuries). No candidate -> the slot is dropped, matching
- * banExerciseFromMesocycle's own fallback rather than leaving the
- * injury-conflicting exercise in place.
+ * fitness_profiles.injuries), on top of anything else the person is
+ * temporarily working around. No candidate -> the slot is dropped rather than
+ * leaving the injury-conflicting exercise in place.
  */
 export async function substituteForInjury(params: SubstituteForInjuryParams): Promise<SubstitutionResult> {
-  const { mesocycle, profile, injuryCode, weekNumbers, exclusions } = params
+  const { mesocycle, profile, injuryCode, targetDays, exclusions, context } = params
   const flaggedJoints = getFlaggedJoints([injuryCode])
-  const candidateProfile: UserProfile = { ...profile, injuries: [...profile.injuries, injuryCode] }
+  const base = constraintProfile(profile, context.constraints)
+  const candidateProfile: UserProfile = base.injuries.includes(injuryCode) ? base : { ...base, injuries: [...base.injuries, injuryCode] }
 
   const conflicts = (slot: Exercise): boolean => {
     const entry = getExerciseEntry(slot.name)
@@ -142,7 +271,141 @@ export async function substituteForInjury(params: SubstituteForInjuryParams): Pr
     return isContraindicatedFor(entry, flaggedJoints)
   }
 
-  return substituteSlots(mesocycle, profile, weekNumbers, exclusions, conflicts, candidateProfile)
+  return substituteSlots(mesocycle, profile, targetDays, exclusions, conflicts, candidateProfile, context)
+}
+
+/** A whole-day change (a rebuild) as the record an adaptation stores. */
+export function dayChangesBetween(before: MesocycleWeek[], after: MesocycleWeek[]): AdaptationDayChange[] {
+  const changes: AdaptationDayChange[] = []
+  for (const week of before) {
+    const next = after.find(w => w.week_number === week.week_number)
+    if (!next || next === week) continue
+    for (const day of week.days) {
+      const now = next.days.find(d => d.day === day.day)
+      if (now === day) continue
+      changes.push({ weekNumber: week.week_number, dayName: day.day, was: day, became: now?.exercises.map(e => e.name) ?? [], slots: [] })
+    }
+  }
+  return changes.sort(comparePlanDays)
+}
+
+/** What ending an adaptation did, for the caller to save and to say. */
+export interface RevertOutcome {
+  mesocycle: MesocycleWeek[]
+  changedWeeks: number[]
+  /** Days put back exactly as they were. */
+  restoredDays: number
+  /** Days where the person's own later edit was kept. */
+  keptEdits: number
+}
+
+/**
+ * RULE 4 — ENDING PUTS BACK WHAT THE ADAPTATION CHANGED, AND ONLY THAT.
+ *
+ * A day nobody has touched since goes back exactly as it was. On a day the
+ * person has edited since, each slot is put back only if it still holds what
+ * the adaptation put there; a slot they have swapped, banned or removed keeps
+ * their edit. A day already trained is never touched: what was logged was
+ * logged against what the day showed.
+ *
+ * This is the plan's owner question 4, built as its recommended answer (B) and
+ * recorded as decided unprompted and reversible.
+ *
+ * `stored` is either the record (written since 9 Oct 2026) or the whole weeks
+ * older rows hold. For the old shape there is no list of what the adaptation
+ * changed, so it is worked out: a slot is put back only where the exercise it
+ * held is one this adaptation would have removed (`wouldHaveRemoved`), is not
+ * already on the day, and is not something the person has since banned.
+ */
+export function revertAdaptationChanges(
+  mesocycle: MesocycleWeek[],
+  stored: AdaptationRecord | MesocycleWeek[],
+  affectedWeekNumbers: number[],
+  isProtected: DayGuard,
+  profile: UserProfile,
+  wouldHaveRemoved: (slot: Exercise) => boolean,
+  exclusions: string[] = [],
+): RevertOutcome {
+  const banned = new Set(exclusions.map(e => e.toLowerCase()))
+  const changes: AdaptationDayChange[] = isAdaptationRecord(stored)
+    ? stored.changes
+    : (Array.isArray(stored) ? stored : [])
+        .filter(week => affectedWeekNumbers.includes(week.week_number))
+        .flatMap(week => week.days.map(day => ({
+          weekNumber: week.week_number, dayName: day.day, was: day, became: [] as string[],
+          slots: day.exercises
+            .map((was, position) => ({ position, was, became: null as string | null }))
+            .filter(s => wouldHaveRemoved(s.was)),
+        })))
+        .filter(c => c.slots.length > 0)
+  const legacy = !isAdaptationRecord(stored)
+
+  let restoredDays = 0
+  let keptEdits = 0
+  const changedWeeks = new Set<number>()
+  const next = mesocycle.map(week => {
+    const mine = changes.filter(c => c.weekNumber === week.week_number && !isProtected(c.weekNumber, c.dayName))
+    if (mine.length === 0) return week
+    let working = week
+    const settle: string[] = []
+    for (const change of mine) {
+      const day = working.days.find(d => d.day === change.dayName)
+      if (!day) { keptEdits++; continue }
+      const names = day.exercises.map(e => e.name)
+      const untouched = !legacy && names.length === change.became.length && names.every((n, i) => n === change.became[i])
+      if (untouched) {
+        working = { ...working, days: working.days.map(d => (d.day === change.dayName ? change.was : d)) }
+        restoredDays++
+        changedWeeks.add(week.week_number)
+        continue
+      }
+      if (change.slots.length === 0) { keptEdits++; continue }
+      const exercises = [...day.exercises]
+      let put = 0
+      for (const slot of change.slots) {
+        if (exercises.some(e => e.name === slot.was.name)) continue
+        if (banned.has(slot.was.name.toLowerCase())) continue
+        if (legacy) {
+          // No record of what replaced it. Put it back in its old place only
+          // when that place now holds something that was not there before.
+          const before = new Set(change.was.exercises.map(e => e.name))
+          const at = exercises[slot.position]
+          if (at && !before.has(at.name)) { exercises[slot.position] = slot.was; put++ }
+          else if (!at || exercises.length < change.was.exercises.length) { exercises.splice(Math.min(slot.position, exercises.length), 0, slot.was); put++ }
+          continue
+        }
+        if (slot.became === null) {
+          exercises.splice(Math.min(slot.position, exercises.length), 0, slot.was)
+          put++
+          continue
+        }
+        const at = exercises.findIndex(e => e.name === slot.became)
+        if (at !== -1) { exercises[at] = slot.was; put++ }
+      }
+      if (put < change.slots.length) keptEdits++
+      if (put === 0) continue
+      working = { ...working, days: working.days.map(d => (d.day === change.dayName ? { ...d, exercises: clearOrphanedSupersetLabels(exercises) } : d)) }
+      settle.push(change.dayName)
+      changedWeeks.add(week.week_number)
+    }
+    if (settle.length === 0) return working
+    let settled = working
+    for (const dayName of settle) settled = settleWeek(settled, dayName, profile).week
+    return keepDays(working, settled, name => settle.includes(name))
+  })
+  return { mesocycle: next, changedWeeks: [...changedWeeks].sort((a, b) => a - b), restoredDays, keptEdits }
+}
+
+/** The "would this adaptation have removed that exercise" test, for an old stored row. */
+export function adaptationConflictTest(kind: 'injury' | 'equipment', injuryCode: string | null, equipmentTier: string | null): (slot: Exercise) => boolean {
+  if (kind === 'injury' && injuryCode) {
+    const joints = getFlaggedJoints([injuryCode])
+    return slot => { const entry = getExerciseEntry(slot.name); return !!entry && isContraindicatedFor(entry, joints) }
+  }
+  if (kind === 'equipment' && equipmentTier) {
+    return slot => { const entry = getExerciseEntry(slot.name); return !!entry && !isEquipmentAllowed(entry, equipmentTier as EquipmentAccess) }
+  }
+  return () => false
 }
 
 /**
@@ -218,13 +481,13 @@ export interface RebuildForInjuryParams {
   /** Preserved from the outgoing mesocycle so week numbering/labels/blocks stay stable for anything referencing them. */
   mesocycle: MesocycleWeek[]
   /**
-   * Only these weeks are replaced; everything else is returned untouched.
-   * Omitted means the whole programme (a lasting injury). A time-bounded
-   * adaptation passes its window, so the rebuild is exactly as temporary as
-   * the adaptation is and the existing pre_image/revert machinery restores
-   * the original weeks unchanged when it expires.
+   * Only these plan rows are replaced; everything else is returned untouched.
+   * A time-bounded adaptation passes its window, so the rebuild is exactly as
+   * temporary as the adaptation is; a lasting injury passes every row from
+   * today to the end of the plan.
    */
-  weekNumbers?: number[]
+  targetDays: PlanDayRef[]
+  context: PlanEditContext
 }
 
 /**
@@ -243,12 +506,19 @@ export interface RebuildForInjuryParams {
  * test:injury-separation protects.
  */
 export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<MesocycleWeek[]> {
-  const { profile, injuryCode, exclusions, mesocycle, weekNumbers } = params
+  const { profile, injuryCode, exclusions, mesocycle, targetDays, context } = params
   const injuredProfile: UserProfile = {
     ...profile,
     injuries: profile.injuries.includes(injuryCode) ? profile.injuries : [...profile.injuries, injuryCode],
   }
-  return rebuildAgainstProfile(injuredProfile, exclusions, mesocycle, weekNumbers)
+  const wanted = new Set(targetDays.map(d => `${d.weekNumber}|${d.dayName}`))
+  const weekNumbers = [...new Set(targetDays.map(d => d.weekNumber))]
+  // A day outside the window is as untouchable to this rebuild as a trained one.
+  const windowed: PlanEditContext = {
+    ...context,
+    isProtected: (weekNumber, dayName) => context.isProtected(weekNumber, dayName) || !wanted.has(`${weekNumber}|${dayName}`),
+  }
+  return rebuildAgainstProfile(injuredProfile, exclusions, mesocycle, weekNumbers, windowed)
 }
 
 /**
@@ -270,12 +540,27 @@ export async function rebuildForInjury(params: RebuildForInjuryParams): Promise<
  * weight-basis rebuild must not touch weight_kg at all (it is formally the
  * immutable onboarding weight). The same separation
  * test:plan-adaptations-separation and test:injury-separation protect.
+ *
+ * THE SPLICE IS PER DAY, AND A TRAINED DAY IS NEVER SPLICED (9 Oct 2026).
+ * It used to replace whole weeks, so "rebuild from this week onwards" — every
+ * rebuild offer on Profile, the coach's own, the weight-basis and ceiling
+ * rebuilds — rewrote the days of the current week already trained. One guard
+ * here covers every caller, which is why `context` is not optional.
+ *
+ * AND IT KNOWS WHAT IS BEING EASED OFF. While a temporary injury change is
+ * running, the weeks it reaches are generated against the profile WITH that
+ * area flagged; weeks after it ends are generated against the profile alone.
+ * Whole weeks, because generation balances a week as a unit: the days of the
+ * adaptation's last week that fall after it ends stay cautious a few days
+ * longer than asked. That is the safe direction, and it is stated here rather
+ * than hidden.
  */
 export async function rebuildAgainstProfile(
   clone: UserProfile,
   exclusions: string[],
   mesocycle: MesocycleWeek[],
-  weekNumbers?: number[],
+  weekNumbers: number[] | undefined,
+  context: PlanEditContext,
   /**
    * Makes generation REPRODUCIBLE for callers that run it twice and must get
    * the same answer both times — see rebuildForWeightBasis, which previews a
@@ -297,31 +582,51 @@ export async function rebuildAgainstProfile(
   const { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } = await import('./exercise-plan')
   const { seededRngFromKey } = await import('./seeded-random')
 
-  // Both generate* calls are synchronous, so the seeded window never spans an
-  // await and cannot leak into unrelated generation happening elsewhere.
-  if (seedKey) setRandomSource(seededRngFromKey(seedKey))
-  let plan, rebuilt
-  try {
-    plan = generateExercisePlan(clone, exclusions)
-    rebuilt = generateMesocycle(clone, plan.plan)
-  } finally {
-    if (seedKey) resetRandomSource()
+  const generate = (against: UserProfile): MesocycleWeek[] => {
+    // Both generate* calls are synchronous, so the seeded window never spans an
+    // await and cannot leak into unrelated generation happening elsewhere.
+    if (seedKey) setRandomSource(seededRngFromKey(seedKey))
+    try {
+      const plan = generateExercisePlan(against, exclusions)
+      return generateMesocycle(against, plan.plan)
+    } finally {
+      if (seedKey) resetRandomSource()
+    }
   }
+
+  // Which weeks an active temporary injury change still reaches.
+  const cautiousProfile = constraintProfile(clone, { ...context.constraints, temporaryEquipment: null })
+  const cautiousWeeks = new Set<number>()
+  if (cautiousProfile !== clone && context.constrainedUntil) {
+    for (let date = context.calendar.today; date <= context.constrainedUntil; date = addDays(date, 1)) {
+      for (const w of planWeeksOnDate(context.calendar.planCreatedAt, date, mesocycle.length)) cautiousWeeks.add(w)
+    }
+  }
+  const wanted = (n: number) => !targetWeeks || targetWeeks.has(n)
+  const needsPlain = mesocycle.some(w => wanted(w.week_number) && !cautiousWeeks.has(w.week_number))
+  const needsCautious = mesocycle.some(w => wanted(w.week_number) && cautiousWeeks.has(w.week_number))
+  const plain = needsPlain ? generate(clone) : null
+  const cautious = needsCautious ? generate(cautiousProfile) : null
 
   // Keep the outgoing week identity (numbers, labels, block boundaries) so
   // anything holding a week reference — logged sets, an active session, the
-  // week strip — still resolves. Only the CONTENT is replaced.
+  // week strip — still resolves. Only the CONTENT is replaced, and only on
+  // days nobody has trained.
   return mesocycle.map((original, i) => {
-    if (targetWeeks && !targetWeeks.has(original.week_number)) return original
-    const week = rebuilt[i]
+    if (!wanted(original.week_number)) return original
+    const week = (cautiousWeeks.has(original.week_number) ? cautious : plain)?.[i]
     if (!week) return original
-    return {
+    const mayChange = (dayName: string) => !context.isProtected(original.week_number, dayName)
+    const dayNames = [...new Set([...original.days.map(d => d.day), ...week.days.map(d => d.day)])]
+    if (!dayNames.some(mayChange)) return original
+    const identity = {
       ...week,
       week_number: original.week_number,
       block_number: original.block_number,
       label: original.label,
       phase_label: original.phase_label,
     }
+    return keepDays(original, identity, mayChange)
   })
 }
 
@@ -342,6 +647,7 @@ export interface RebuildForWeightBasisParams {
    * turned out to be.
    */
   weekNumbers: number[]
+  context: PlanEditContext
 }
 
 /**
@@ -362,33 +668,40 @@ export interface RebuildForWeightBasisParams {
  * and the permanence of a decline. This function is only the "yes" branch.
  */
 export async function rebuildForWeightBasis(params: RebuildForWeightBasisParams): Promise<MesocycleWeek[]> {
-  const { profile, basisWeightKg, exclusions, mesocycle, weekNumbers } = params
+  const { profile, basisWeightKg, exclusions, mesocycle, weekNumbers, context } = params
   const reweighed: UserProfile = { ...profile, weight_kg: basisWeightKg }
   // Seeded on the two things that define this rebuild, so the preview the
   // trainee is shown and the rebuild they get on confirm are the same plan.
   // See rebuildAgainstProfile's seedKey doc comment.
   const seedKey = `weight-basis:${profile.id ?? 'anon'}:${basisWeightKg}`
-  return rebuildAgainstProfile(reweighed, exclusions, mesocycle, weekNumbers, seedKey)
+  return rebuildAgainstProfile(reweighed, exclusions, mesocycle, weekNumbers, context, seedKey)
 }
 
 export interface SubstituteForEquipmentParams {
   mesocycle: MesocycleWeek[]
   profile: UserProfile
   equipmentTier: EquipmentAccess
-  weekNumbers: number[]
+  /** The plan rows to change — from `planDaysInWindow`, never a week range. */
+  targetDays: PlanDayRef[]
   exclusions: string[]
+  context: PlanEditContext
 }
 
 /**
- * For each slot in the given weeks whose exercise isn't fully coverable by
+ * For each slot on the given days whose exercise isn't fully coverable by
  * equipmentTier's allowed set, finds a same-constraint-pool replacement that
  * is — candidate pool filtered against a local profile clone with
- * equipment_access set to the travel tier. Same drop-if-no-candidate
- * fallback as substituteForInjury.
+ * equipment_access set to the travel tier, ON TOP OF anything the person is
+ * temporarily easing off. Same drop-if-no-candidate fallback as
+ * substituteForInjury.
+ *
+ * Test log H17, 9 Oct 2026: this built its pool from the saved profile with
+ * only the kit changed, so a travel week proposed five minutes after "ease
+ * off my knees" put Box Squat straight back.
  */
 export async function substituteForEquipment(params: SubstituteForEquipmentParams): Promise<SubstitutionResult> {
-  const { mesocycle, profile, equipmentTier, weekNumbers, exclusions } = params
-  const candidateProfile: UserProfile = { ...profile, equipment_access: equipmentTier }
+  const { mesocycle, profile, equipmentTier, targetDays, exclusions, context } = params
+  const candidateProfile: UserProfile = { ...constraintProfile(profile, context.constraints), equipment_access: equipmentTier }
 
   const conflicts = (slot: Exercise): boolean => {
     const entry = getExerciseEntry(slot.name)
@@ -396,5 +709,5 @@ export async function substituteForEquipment(params: SubstituteForEquipmentParam
     return !isEquipmentAllowed(entry, equipmentTier)
   }
 
-  return substituteSlots(mesocycle, profile, weekNumbers, exclusions, conflicts, candidateProfile)
+  return substituteSlots(mesocycle, profile, targetDays, exclusions, conflicts, candidateProfile, context)
 }

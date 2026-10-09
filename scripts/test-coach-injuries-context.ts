@@ -67,7 +67,9 @@ console.log('\n1. The summary is correct on its own\n')
 console.log('\n2. It reaches the payload the coach is actually sent\n')
 {
   check('ChatAssistant imports the shared builder', /buildCoachInjuriesSummary/.test(chat))
-  check('...calls it (not just imports it)', /buildCoachInjuriesSummary\(profile\)/.test(chat))
+  // Re-anchored 9 Oct 2026: the line is now built with the temporary changes
+  // running too (it used to say "No injuries" during a 14-day knee adaptation).
+  check('...calls it (not just imports it), with what is temporarily being eased off', /buildCoachInjuriesSummary\(profile, activeAdaptations, getAppNow\(profile\.id\)\)/.test(chat))
   check('...and sends the result under injuries_summary', /injuries_summary:\s*injuriesSummary/.test(chat))
 }
 

@@ -38,6 +38,13 @@ import { applyReplacement, banExerciseFromMesocycle, swapExerciseInMesocycle, re
 import { substituteForInjury } from '../src/lib/plan-adaptations'
 import { rebuildDayAroundMainLift } from '../src/lib/session-rebuild'
 import type { Exercise, MesocycleWeek, UserProfile } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// These gates address whole plan weeks on a plan nobody has trained on: every
+// row of the named weeks, and no day protected. (A live plan addresses days by
+// date and loads the real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
+const rowsOfWeeks = (m: { week_number: number; days: { day: string }[] }[], weeks: number[]) =>
+  m.filter(w => weeks.includes(w.week_number)).flatMap(w => w.days.map(d => ({ weekNumber: w.week_number, dayName: d.day })))
 
 let failures = 0
 let ran = 0
@@ -239,7 +246,7 @@ async function main() {
 
   // (a) injury adaptation — the tester's knee card.
   const kneeProfile = sam()
-  const knee = await silencedAsync(() => substituteForInjury({ mesocycle: samPlan, profile: kneeProfile, injuryCode: 'knees', weekNumbers: [1, 2], exclusions: [] }))
+  const knee = await silencedAsync(() => substituteForInjury({ mesocycle: samPlan, profile: kneeProfile, injuryCode: 'knees', targetDays: rowsOfWeeks(samPlan, [1, 2]), exclusions: [], context: GATE_CONTEXT }))
   inspect('knee adaptation', samPlan, knee.mesocycle, kneeProfile, 8)
   const stepUp = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Thursday')!.exercises.find(e => e.name === 'Low Box Step-Up')
   check('the step-up that replaced a walking lunge reads 10-12, not the lunge\'s bought 11-13', stepUp?.reps === '10-12', stepUp?.reps)

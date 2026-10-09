@@ -50,6 +50,8 @@ import type { UserProfile, MacroTargets } from '@/lib/types'
 import { Dashboard } from '@/components/Dashboard'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
+import { getActiveAdaptations, endAdaptationEarly, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { ToolsTab } from '@/components/ToolsTab'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { ProfileMenu } from '@/components/ProfileMenu'
@@ -1246,6 +1248,25 @@ function Harness() {
   // owns this state and hands setMesocycle down (App.tsx:2547); so does this.
   const [editedMeso, setEditedMeso] = useState(mesocycle)
 
+  // TEMPORARY CHANGES TO THE PLAN, HELD AS App.tsx HOLDS THEM (9 Oct 2026, for
+  // verify:adaptation-line). The store, the edit context and the ending are
+  // the app's own; this is only App's few lines of state around them, because
+  // the harness mounts the tab without App.
+  const [activeAdaptations, setActiveAdaptations] = useState<PlanAdaptationRow[]>([])
+  const [endingAdaptationId, setEndingAdaptationId] = useState<string | null>(null)
+  const refreshAdaptations = () => { void getActiveAdaptations(PROFILE_ID).then(setActiveAdaptations) }
+  const handleEndAdaptation = async (adaptationId: string): Promise<string | null> => {
+    setEndingAdaptationId(adaptationId)
+    try {
+      const context = await loadPlanEditContext(profile, editedMeso, profile.created_at)
+      const result = await endAdaptationEarly(PROFILE_ID, adaptationId, { mesocycle: editedMeso, isProtected: context.isProtected, profile, exclusions: [] })
+      if (!result.mesocycle) return "That didn't end just now — try again in a moment."
+      setEditedMeso(result.mesocycle)
+      setActiveAdaptations(prev => prev.filter(a => a.id !== adaptationId))
+      return null
+    } finally { setEndingAdaptationId(null) }
+  }
+
   // THE LIVE SESSION'S TIERS, published for verify:exercise-add, 14 Sep 2026.
   //
   // WHY. Its check 4c said "it was not simply appended to the end", which is a
@@ -1319,6 +1340,10 @@ function Harness() {
         {activeTab === 'exercise' && (
           <ExerciseTab plan={exercisePlan} mesocycle={editedMeso} exclusions={[]}
             profile={profile} profileId={PROFILE_ID} planCreatedAt={profile.created_at}
+            activeAdaptations={activeAdaptations}
+            endingAdaptationId={endingAdaptationId}
+            onAdaptationsChanged={refreshAdaptations}
+            onEndAdaptation={handleEndAdaptation}
             onMesocycleUpdated={setEditedMeso}
             // THE APP'S OWN SWAP (screen-swap.ts), not a copy of it: App.tsx
             // calls this same function, so a driver that taps a swap here is

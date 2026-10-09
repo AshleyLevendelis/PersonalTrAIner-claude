@@ -195,7 +195,10 @@ console.log('\n6. An adaptation that fails to revert is not left closed\n')
   check('it still claims the row before writing (the concurrency guard)',
     body.indexOf(".eq('status', 'active')") < body.indexOf('saveMesocycleWeek'))
   check('...but reopens it if the restore throws', /status: 'active', ended_at: null/.test(body))
-  check('...and reports no reversion, so nothing announces one', /return null\s*\n\s*\}\s*\n\s*return row\.pre_image/.test(body))
+  // Re-anchored 9 Oct 2026: a successful ending now returns the plan as it
+  // stands after putting back only what the adaptation changed, not the stored
+  // weeks. The property held here is unchanged: a FAILED restore returns null.
+  check('...and reports no reversion, so nothing announces one', /return null\s*\n\s*\}\s*\n\s*return outcome\.mesocycle/.test(body))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

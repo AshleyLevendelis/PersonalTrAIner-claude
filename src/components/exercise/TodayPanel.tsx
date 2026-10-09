@@ -21,6 +21,7 @@ import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWor
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { executeSecondSportVolume } from '@/lib/pending-action-executor'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
@@ -96,6 +97,7 @@ export function TodayPanel({
   mesocycle,
   exclusions,
   profile,
+  storedProfile,
   profileId,
   planCreatedAt,
   logsVersion,
@@ -117,7 +119,10 @@ export function TodayPanel({
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
   exclusions: string[]
+  /** The profile a pool is built from: the saved one plus anything temporarily eased off. */
   profile?: UserProfile
+  /** The profile as saved — what a rebuild regenerates from. */
+  storedProfile?: UserProfile
   profileId?: string
   /** When this plan came into being — days before it were never prescribed. */
   planCreatedAt?: string
@@ -813,7 +818,11 @@ export function TodayPanel({
     setVolumeBusy(true)
     setVolumeError(null)
     try {
-      const result = await executeSecondSportVolume(profile, mesocycle, exclusions, { keepFullVolume: keepFull, fromWeek: liveWeek })
+      // The SAVED profile is what a rebuild regenerates from; the days already
+      // trained, and anything temporarily being eased off, come in the context.
+      const saved = storedProfile ?? profile
+      const context = await loadPlanEditContext(saved, mesocycle, planCreatedAt)
+      const result = await executeSecondSportVolume(saved, mesocycle, exclusions, { keepFullVolume: keepFull, fromWeek: liveWeek }, context)
       if (result.receipt.failed.length > 0) { setVolumeError(result.receipt.failed[0].error); return }
       onMesocycleUpdated(result.mesocycle)
       onProfileChanged(result.profilePatch)

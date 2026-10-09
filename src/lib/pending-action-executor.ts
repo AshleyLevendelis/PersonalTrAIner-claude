@@ -34,7 +34,8 @@ import type { MealAdditionPayload } from './meal-addition'
 import type { MealMovePayload } from './meal-move'
 import type { MealDayMovePayload, MealDayMoveLeg } from './meal-day-move'
 import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slots'
-import { substituteForInjury, substituteForEquipment, rebuildForInjury } from './plan-adaptations'
+import { substituteForInjury, substituteForEquipment, rebuildForInjury, dayChangesBetween, type AdaptationRecord, type PlanEditContext } from './plan-adaptations'
+import { planDaysInWindow, type PlanDayOnDate } from './plan-guard'
 import type { PendingActionReceipt } from './pending-actions-store'
 
 export interface ExerciseSwapPayload {
@@ -854,10 +855,13 @@ export async function undoMealDayMove(
 export interface InjuryAdaptationPayload {
   injuryCode: string
   durationDays: number
+  /** The weeks the window reaches — kept for the stored row; the DAYS are worked out from dates at confirm time. */
   weekNumbers: number[]
+  /** The day the card was made (YYYY-MM-DD). The window is these `durationDays` dates, whenever it is confirmed. */
+  startDate?: string
   exclusions: string[]
   reason?: string
-  /** See InjuryAdaptationMode. A time-bounded rebuild is exactly as temporary as the adaptation: pre_image restores the original weeks when it expires. */
+  /** See InjuryAdaptationMode. A time-bounded rebuild is exactly as temporary as the adaptation. */
   mode?: InjuryAdaptationMode
 }
 
@@ -865,6 +869,8 @@ export interface EquipmentAdaptationPayload {
   equipmentTier: EquipmentAccess
   durationDays: number
   weekNumbers: number[]
+  /** See InjuryAdaptationPayload.startDate. */
+  startDate?: string
   exclusions: string[]
   reason?: string
 }
@@ -875,6 +881,27 @@ export interface AdaptationResult {
   receipt: PendingActionReceipt
 }
 
+export interface PlanAdaptationResult extends AdaptationResult {
+  /** Each day and slot that changed — what `createPlanAdaptation` stores so ending it puts back only this. */
+  record: AdaptationRecord
+}
+
+/**
+ * The plan rows a time-bounded change covers: the `durationDays` dates from
+ * the day the card was made. ONE function for the injury and the kit
+ * executors, and the same `planDaysInWindow` the cards and the exercise row
+ * call, so what was shown and what is applied cannot be two calculations.
+ */
+function windowDays(mesocycle: MesocycleWeek[], context: PlanEditContext, durationDays: number, startDate?: string): PlanDayOnDate[] {
+  const calendar = startDate && startDate <= context.calendar.today ? { ...context.calendar, today: startDate } : context.calendar
+  return planDaysInWindow(mesocycle, calendar, durationDays)
+}
+
+/** The weeks whose content actually differs — the only ones worth a write. */
+function changedWeeks(before: MesocycleWeek[], after: MesocycleWeek[]): MesocycleWeek[] {
+  return after.filter(w => before.find(b => b.week_number === w.week_number) !== w)
+}
+
 /**
  * Re-runs substituteForInjury at confirm time (the diff shown pre-confirm
  * could be stale if the plan changed between propose and confirm — same
@@ -882,48 +909,53 @@ export interface AdaptationResult {
  * and persists every touched week via saveMesocycleWeek. Does NOT create
  * the plan_adaptations row itself — that's the caller's job (ChatAssistant),
  * since it needs the pending_actions row id this function has no access to.
+ *
+ * `context` is read at confirm time too: a session finished between the card
+ * and the tap is trained, and is not touched.
  */
 export async function executeInjuryAdaptation(
   profile: UserProfile,
   mesocycle: MesocycleWeek[],
   payload: InjuryAdaptationPayload,
-): Promise<AdaptationResult> {
+  context: PlanEditContext,
+): Promise<PlanAdaptationResult> {
   const preImage = mesocycle
+  const targetDays = windowDays(mesocycle, context, payload.durationDays, payload.startDate)
   // Same substitute-vs-rebuild choice as executeLastingInjury. A niggle in a
   // joint that rules out whole patterns still can't be adapted slot by slot,
   // and gutting the plan for two weeks is no better than gutting it forever.
   const rebuilding = payload.mode === 'rebuild'
   const substitution = rebuilding ? null : await substituteForInjury({
-    mesocycle, profile, injuryCode: payload.injuryCode, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
+    mesocycle, profile, injuryCode: payload.injuryCode, targetDays, exclusions: payload.exclusions, context,
   })
-  const result = {
-    mesocycle: rebuilding
-      ? await rebuildForInjury({
-          profile, injuryCode: payload.injuryCode, exclusions: payload.exclusions,
-          mesocycle, weekNumbers: payload.weekNumbers,
-        })
-      : substitution!.mesocycle,
-    touchedSlots: substitution?.touchedSlots ?? [],
+  const next = rebuilding
+    ? await rebuildForInjury({ profile, injuryCode: payload.injuryCode, exclusions: payload.exclusions, mesocycle, targetDays, context })
+    : substitution!.mesocycle
+  const record: AdaptationRecord = {
+    version: 2,
+    days: targetDays,
+    changes: substitution ? substitution.changes : dayChangesBetween(mesocycle, next),
   }
+  const result = { mesocycle: next, touchedSlots: substitution?.touchedSlots ?? [] }
 
   if (!profile.id) {
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+    return { mesocycle: result.mesocycle, preImage, record, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
   }
 
   try {
-    const touchedWeeks = result.mesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
-    await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
+    await Promise.all(changedWeeks(mesocycle, result.mesocycle).map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeInjuryAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
+    return { mesocycle: result.mesocycle, preImage, record, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
     mesocycle: result.mesocycle,
     preImage,
+    record,
     receipt: {
       landed: rebuilding
-        ? [`Rebuilt ${payload.weekNumbers.length} week${payload.weekNumbers.length === 1 ? '' : 's'} around your ${payload.injuryCode.replace('_', ' ')}`]
+        ? [`Rebuilt ${record.changes.length} session${record.changes.length === 1 ? '' : 's'} around your ${payload.injuryCode.replace('_', ' ')}`]
         : result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`),
       failed: [],
     },
@@ -970,49 +1002,55 @@ export async function executeLastingInjury(
   profile: UserProfile,
   mesocycle: MesocycleWeek[],
   payload: LastingInjuryPayload,
-): Promise<AdaptationResult> {
+  context: PlanEditContext,
+): Promise<PlanAdaptationResult> {
   const preImage = mesocycle
+  // From today to the end of the plan, by date — never the whole live week,
+  // which holds the days already trained.
+  const targetDays = planDaysInWindow(mesocycle, context.calendar)
 
   // Rebuild path — the injury removes whole movement patterns, so there is
   // nothing to substitute INTO and swapping slot by slot would just delete
-  // them. Regenerates the affected weeks around the injury instead. See
+  // them. Regenerates the affected days around the injury instead. See
   // assessAdaptation / rebuildForInjury.
   const rebuilding = payload.mode === 'rebuild'
   const substitution = rebuilding
     ? null
     : await substituteForInjury({
-        mesocycle, profile, injuryCode: payload.injuryCode, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
+        mesocycle, profile, injuryCode: payload.injuryCode, targetDays, exclusions: payload.exclusions, context,
       })
   const nextMesocycle = rebuilding
-    ? await rebuildForInjury({
-        profile, injuryCode: payload.injuryCode, exclusions: payload.exclusions,
-        mesocycle, weekNumbers: payload.weekNumbers,
-      })
+    ? await rebuildForInjury({ profile, injuryCode: payload.injuryCode, exclusions: payload.exclusions, mesocycle, targetDays, context })
     : substitution!.mesocycle
   const touchedSlots = substitution?.touchedSlots ?? []
+  const record: AdaptationRecord = {
+    version: 2, days: targetDays,
+    changes: substitution ? substitution.changes : dayChangesBetween(mesocycle, nextMesocycle),
+  }
 
   if (!profile.id) {
-    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+    return { mesocycle: nextMesocycle, preImage, record, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
   }
 
   try {
-    const touchedWeeks = nextMesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
-    await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
+    await Promise.all(changedWeeks(mesocycle, nextMesocycle).map(w => saveMesocycleWeek(profile.id!, w)))
     if (!profile.injuries.includes(payload.injuryCode)) {
       await updateProfileField(profile.id, { injuries: [...profile.injuries, payload.injuryCode] })
     }
   } catch (err) {
     console.error('executeLastingInjury: persisting failed', err)
-    return { mesocycle: nextMesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
+    return { mesocycle: nextMesocycle, preImage, record, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That') }] } }
   }
 
+  const rebuiltWeeks = new Set(record.changes.map(c => c.weekNumber)).size
   return {
     mesocycle: nextMesocycle,
     preImage,
+    record,
     receipt: {
       landed: [
         ...(rebuilding
-          ? [`Rebuilt ${payload.weekNumbers.length} week${payload.weekNumbers.length === 1 ? '' : 's'} around your ${payload.injuryCode.replace('_', ' ')}`]
+          ? [`Rebuilt ${rebuiltWeeks} week${rebuiltWeeks === 1 ? '' : 's'} around your ${payload.injuryCode.replace('_', ' ')}`]
           : touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`)),
         `Injuries: added ${payload.injuryCode.replace('_', ' ')}`,
       ],
@@ -1023,6 +1061,12 @@ export async function executeLastingInjury(
 
 export interface InjuryRecoveredPayload {
   injuryCode: string
+  /**
+   * Set when "it's cleared" is about a TEMPORARY change still running rather
+   * than an injury on the profile: confirming ends that adaptation early. No
+   * profile write happens on this branch — there is nothing on the profile.
+   */
+  endAdaptationId?: string
 }
 
 export interface InjuryRecoveredResult {
@@ -1059,27 +1103,30 @@ export async function executeEquipmentAdaptation(
   profile: UserProfile,
   mesocycle: MesocycleWeek[],
   payload: EquipmentAdaptationPayload,
-): Promise<AdaptationResult> {
+  context: PlanEditContext,
+): Promise<PlanAdaptationResult> {
   const preImage = mesocycle
+  const targetDays = windowDays(mesocycle, context, payload.durationDays, payload.startDate)
   const result = await substituteForEquipment({
-    mesocycle, profile, equipmentTier: payload.equipmentTier, weekNumbers: payload.weekNumbers, exclusions: payload.exclusions,
+    mesocycle, profile, equipmentTier: payload.equipmentTier, targetDays, exclusions: payload.exclusions, context,
   })
+  const record: AdaptationRecord = { version: 2, days: targetDays, changes: result.changes }
 
   if (!profile.id) {
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
+    return { mesocycle: result.mesocycle, preImage, record, receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] } }
   }
 
   try {
-    const touchedWeeks = result.mesocycle.filter(w => payload.weekNumbers.includes(w.week_number))
-    await Promise.all(touchedWeeks.map(w => saveMesocycleWeek(profile.id!, w)))
+    await Promise.all(changedWeeks(mesocycle, result.mesocycle).map(w => saveMesocycleWeek(profile.id!, w)))
   } catch (err) {
     console.error('executeEquipmentAdaptation: persisting failed', err)
-    return { mesocycle: result.mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
+    return { mesocycle: result.mesocycle, preImage, record, receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The adaptation') }] } }
   }
 
   return {
     mesocycle: result.mesocycle,
     preImage,
+    record,
     receipt: { landed: result.touchedSlots.map(s => `${s.dayName}: ${s.before} → ${s.after ?? '(removed)'}`), failed: [] },
   }
 }
@@ -1412,6 +1459,8 @@ export async function executeScheduleChange(
   mesocycle: MesocycleWeek[],
   exclusions: string[],
   payload: ScheduleChangePayload,
+  /** Which days are already trained — the rebuild leaves them alone. */
+  context: PlanEditContext,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
   const wanted = new Set(payload.trainingDays.map(d => d.toLowerCase()))
@@ -1420,7 +1469,7 @@ export async function executeScheduleChange(
     training_days: (profile.training_days ?? []).map(d => ({ ...d, available: wanted.has(d.day.toLowerCase()) })),
   }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -1479,11 +1528,13 @@ export async function executeStyleChange(
   mesocycle: MesocycleWeek[],
   exclusions: string[],
   payload: StyleChangePayload,
+  /** Which days are already trained — the rebuild leaves them alone. */
+  context: PlanEditContext,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
   const updated: UserProfile = { ...profile, training_style: payload.trainingStyle }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -1568,11 +1619,13 @@ export async function executeGoalChange(
   mesocycle: MesocycleWeek[],
   exclusions: string[],
   payload: GoalChangePayload,
+  /** Which days are already trained — the rebuild leaves them alone. */
+  context: PlanEditContext,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
   const updated: UserProfile = { ...profile, fitness_goal: payload.fitnessGoal }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -1624,11 +1677,13 @@ export async function executeSessionLength(
   mesocycle: MesocycleWeek[],
   exclusions: string[],
   payload: SessionLengthPayload,
+  /** Which days are already trained — the rebuild leaves them alone. */
+  context: PlanEditContext,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
   const updated: UserProfile = { ...profile, session_duration_preference: payload.sessionDuration }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -1940,6 +1995,8 @@ export async function executeConcurrentActivity(
   mesocycle: MesocycleWeek[],
   exclusions: string[],
   payload: ConcurrentActivityPayload,
+  /** Which days are already trained — the rebuild leaves them alone. */
+  context: PlanEditContext,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
   // Replace by name, otherwise append — telling the coach about Muay Thai a
@@ -1956,7 +2013,7 @@ export async function executeConcurrentActivity(
     preferred_time: payload.gymTimeOfDay ?? profile.preferred_time,
   }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -2027,6 +2084,8 @@ export async function executeSecondSportVolume(
   mesocycle: MesocycleWeek[],
   exclusions: string[],
   payload: SecondSportVolumePayload,
+  /** Which days are already trained — the rebuild leaves them alone. */
+  context: PlanEditContext,
 ): Promise<AdaptationResult & { profilePatch: Partial<UserProfile> }> {
   const preImage = mesocycle
   const activities: ConcurrentActivity[] = (profile.concurrent_activities ?? []).map(a => {
@@ -2038,7 +2097,7 @@ export async function executeSecondSportVolume(
   const names = [...new Set((profile.concurrent_activities ?? []).filter(activityCountsAsLoad).map(a => a.name))].join(' and ')
   const updated: UserProfile = { ...profile, concurrent_activities: activities }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle, preImage, profilePatch: {},

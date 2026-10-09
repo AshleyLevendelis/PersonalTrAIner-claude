@@ -13,7 +13,9 @@
 
 import { supabase } from './supabase'
 import { saveMesocycleWeek } from './mesocycle-persistence'
-import type { MesocycleWeek } from './types'
+import type { MesocycleWeek, UserProfile } from './types'
+import { revertAdaptationChanges, adaptationConflictTest, type AdaptationRecord } from './plan-adaptations'
+import type { DayGuard } from './plan-guard'
 
 export type PlanAdaptationKind = 'injury' | 'equipment'
 export type PlanAdaptationStatus = 'active' | 'ended_early' | 'expired'
@@ -28,7 +30,13 @@ export interface PlanAdaptationRow {
   severity: string | null
   reason: string | null
   affected_week_numbers: number[]
-  pre_image: MesocycleWeek[]
+  /**
+   * What ending this adaptation must put back. An `AdaptationRecord` (each
+   * changed day and slot) since 9 Oct 2026; whole weeks on older rows. A JSON
+   * column, so the new shape needed no migration. Read by
+   * `revertAdaptationChanges`, which understands both.
+   */
+  pre_image: AdaptationRecord | MesocycleWeek[]
   pending_action_id: string | null
   starts_at: string
   expires_at: string
@@ -43,8 +51,10 @@ export interface CreatePlanAdaptationInput {
   equipmentOverride?: string | null
   severity?: string | null
   reason?: string | null
+  /** The weeks touched — kept so older readers of the row still make sense of it. */
   affectedWeekNumbers: number[]
-  preImage: MesocycleWeek[]
+  /** Each day and slot this adaptation changed. See `AdaptationRecord`. */
+  record: AdaptationRecord
   pendingActionId?: string | null
   durationDays: number
 }
@@ -63,7 +73,7 @@ export async function createPlanAdaptation(input: CreatePlanAdaptationInput): Pr
       severity: input.severity ?? null,
       reason: input.reason ?? null,
       affected_week_numbers: input.affectedWeekNumbers,
-      pre_image: input.preImage,
+      pre_image: input.record,
       pending_action_id: input.pendingActionId ?? null,
       starts_at: startsAt.toISOString(),
       expires_at: expiresAt.toISOString(),
@@ -85,15 +95,31 @@ export async function getActiveAdaptations(profileId: string): Promise<PlanAdapt
 }
 
 /**
- * Restores an adaptation's pre_image weeks and marks it resolved. Shared by
- * both the automatic expiry sweep and an early "I'm good now" end. The
- * conditional update (`.eq('status', 'active')`) runs FIRST and its result
+ * The live plan an adaptation is being ended against: what it holds NOW, which
+ * days are already trained, and whose plan it is. Required, because ending is
+ * a change to the plan like any other and obeys the same day guard.
+ */
+export interface LivePlan {
+  mesocycle: MesocycleWeek[]
+  isProtected: DayGuard
+  profile: UserProfile
+  /** Everything the person has banned — never put back by an ending. */
+  exclusions: string[]
+}
+
+/**
+ * Ends an adaptation: puts back what IT changed, on days not yet trained, and
+ * keeps anything the person has done to those days since. Shared by the
+ * automatic expiry sweep and "End now". See `revertAdaptationChanges` for the
+ * rule; this is only the claim-then-write around it.
+ *
+ * The conditional update (`.eq('status', 'active')`) runs FIRST and its result
  * is checked before any mesocycle write happens — two concurrent callers
  * (e.g. React StrictMode's dev-only double-invoke, or two open tabs) can
  * both SELECT the same row while it's still 'active'; only the update that
  * actually flips the row wins, and the loser returns null and writes
- * nothing, rather than both racing to write pre_image and both surfacing a
- * duplicate reversion message.
+ * nothing, rather than both racing to write and both surfacing a duplicate
+ * reversion message.
  *
  * AND IT PUTS THE ROW BACK IF THE RESTORE FAILS. Claiming first is what makes
  * the race safe, but it also means the row is already closed while the weeks
@@ -104,7 +130,7 @@ export async function getActiveAdaptations(profileId: string): Promise<PlanAdapt
  * back. Reopening costs one write on a path that only runs when something has
  * already gone wrong, and turns permanent loss into "the next load retries".
  */
-async function revertAdaptation(profileId: string, row: PlanAdaptationRow, status: 'expired' | 'ended_early'): Promise<MesocycleWeek[] | null> {
+async function revertAdaptation(profileId: string, row: PlanAdaptationRow, status: 'expired' | 'ended_early', live: LivePlan): Promise<MesocycleWeek[] | null> {
   const { data: updated } = await supabase
     .from('plan_adaptations')
     .update({ status, ended_at: new Date().toISOString() })
@@ -113,10 +139,14 @@ async function revertAdaptation(profileId: string, row: PlanAdaptationRow, statu
     .select('id')
   if (!updated || updated.length === 0) return null
 
+  const outcome = revertAdaptationChanges(
+    live.mesocycle, row.pre_image, row.affected_week_numbers ?? [], live.isProtected, live.profile,
+    adaptationConflictTest(row.kind, row.injury_code, row.equipment_override), live.exclusions,
+  )
   try {
     await Promise.all(
-      row.pre_image
-        .filter(week => row.affected_week_numbers.includes(week.week_number))
+      outcome.mesocycle
+        .filter(week => outcome.changedWeeks.includes(week.week_number))
         .map(week => saveMesocycleWeek(profileId, week))
     )
   } catch (err) {
@@ -132,23 +162,24 @@ async function revertAdaptation(profileId: string, row: PlanAdaptationRow, statu
       .eq('status', status)
     return null
   }
-  return row.pre_image
+  return outcome.mesocycle
 }
 
 export interface RevertResult {
+  /** The whole plan after the ending(s), or null when nothing ended. */
   mesocycle: MesocycleWeek[] | null
   messages: string[]
 }
 
 /**
- * Check-on-load sweep — call once per mesocycle load (App.tsx). Restores
- * every adaptation whose expires_at has passed, returns the merged
- * pre-image weeks (last writer wins per week number if adaptations overlap,
- * which the UI never lets happen today) and a human message per reverted
- * adaptation for the caller to surface (never model prose — client-authored,
- * matching the existing receipt convention).
+ * Check-on-load sweep — call once per mesocycle load (App.tsx). Ends every
+ * adaptation whose expires_at has passed and returns the plan as it now
+ * stands, with a human message per ended adaptation for the caller to surface
+ * (never model prose — client-authored, matching the existing receipt
+ * convention). Adaptations are ended one after another against the running
+ * result, so two that overlap cannot overwrite each other's ending.
  */
-export async function checkAndRevertExpiredAdaptations(profileId: string): Promise<RevertResult> {
+export async function checkAndRevertExpiredAdaptations(profileId: string, live: LivePlan): Promise<RevertResult> {
   const { data, error } = await supabase
     .from('plan_adaptations')
     .select('*')
@@ -158,29 +189,28 @@ export async function checkAndRevertExpiredAdaptations(profileId: string): Promi
   if (error || !data || data.length === 0) return { mesocycle: null, messages: [] }
 
   const messages: string[] = []
-  let mergedWeeks: MesocycleWeek[] | null = null
+  let current: MesocycleWeek[] | null = null
   for (const row of data as PlanAdaptationRow[]) {
-    const restored = await revertAdaptation(profileId, row, 'expired')
+    const restored = await revertAdaptation(profileId, row, 'expired', { ...live, mesocycle: current ?? live.mesocycle })
     if (!restored) continue // another caller already won this row's revert
-    mergedWeeks = mergedWeeks ? mergeWeeks(mergedWeeks, restored) : restored
+    current = restored
     messages.push(describeReversion(row))
   }
-  return { mesocycle: mergedWeeks, messages }
+  return { mesocycle: current, messages }
 }
 
-export async function endAdaptationEarly(profileId: string, adaptationId: string): Promise<RevertResult> {
+/**
+ * "End now" — the coach has always said "tell me anytime to end it early",
+ * and until 9 Oct 2026 nothing called this. Profile's line, the Exercise tab's
+ * line and the coach's "recovered" card all do now.
+ */
+export async function endAdaptationEarly(profileId: string, adaptationId: string, live: LivePlan): Promise<RevertResult> {
   const { data } = await supabase.from('plan_adaptations').select('*').eq('id', adaptationId).eq('profile_id', profileId).maybeSingle()
   if (!data || data.status !== 'active') return { mesocycle: null, messages: [] }
   const row = data as PlanAdaptationRow
-  const restored = await revertAdaptation(profileId, row, 'ended_early')
+  const restored = await revertAdaptation(profileId, row, 'ended_early', live)
   if (!restored) return { mesocycle: null, messages: [] }
   return { mesocycle: restored, messages: [describeReversion(row)] }
-}
-
-function mergeWeeks(a: MesocycleWeek[], b: MesocycleWeek[]): MesocycleWeek[] {
-  const byWeek = new Map(a.map(w => [w.week_number, w]))
-  for (const w of b) byWeek.set(w.week_number, w)
-  return [...byWeek.values()].sort((x, y) => x.week_number - y.week_number)
 }
 
 function describeReversion(row: PlanAdaptationRow): string {

@@ -31,6 +31,8 @@ import { EQUIPMENT_OPTIONS } from './picker-options'
 import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from './plan-adaptations'
 import { executeInjuryAdaptation, executeLastingInjury, executeEquipmentAdaptation } from './pending-action-executor'
 import { createPlanAdaptation } from './plan-adaptations-store'
+import { loadPlanEditContext } from './plan-edit-context'
+import { planDaysInWindow } from './plan-guard'
 
 export interface RowAdaptationResult {
   /** The new plan, when one was written. Absent means nothing changed. */
@@ -48,7 +50,8 @@ export interface RowAdaptationResult {
 export async function applyInjuryFromRow(
   profile: UserProfile,
   mesocycle: MesocycleWeek[],
-  liveWeek: number,
+  /** When the plan was made — what turns "the next seven days" into plan rows. */
+  planCreatedAt: string | undefined,
   hurt: 'niggle' | 'lasting',
   area: string,
   /**
@@ -62,15 +65,17 @@ export async function applyInjuryFromRow(
   exclusions: string[],
 ): Promise<RowAdaptationResult> {
   const lasting = hurt === 'lasting'
-  const weekSpan = lasting ? Number.MAX_SAFE_INTEGER : Math.max(1, Math.ceil(NIGGLE_EASE_OFF_DAYS / 7))
-  const weekNumbers = mesocycle
-    .map(w => w.week_number)
-    .filter(n => n >= liveWeek && n < liveWeek + weekSpan)
-  if (weekNumbers.length === 0) return { message: "I can't see the rest of your plan just now." }
+  // WHICH DAYS, FROM DATES. A niggle eases off the next seven days; a lasting
+  // one runs from today to the end of the plan. Never "this plan week": that
+  // reached back over days already trained and stopped short of day seven.
+  const context = await loadPlanEditContext(profile, mesocycle, planCreatedAt)
+  const targetDays = planDaysInWindow(mesocycle, context.calendar, lasting ? undefined : NIGGLE_EASE_OFF_DAYS)
+  const weekNumbers = [...new Set(targetDays.map(d => d.weekNumber))]
+  if (targetDays.length === 0) return { message: "I can't see the rest of your plan just now." }
 
-  const trial = await substituteForInjury({ mesocycle, profile, injuryCode: area, weekNumbers, exclusions })
+  const trial = await substituteForInjury({ mesocycle, profile, injuryCode: area, targetDays, exclusions, context })
   if (trial.touchedSlots.length === 0) {
-    // NOT AN ERROR, AND NOT SILENCE. Nothing in these weeks loads that area,
+    // NOT AN ERROR, AND NOT SILENCE. Nothing in these days loads that area,
     // so there is nothing to ease off — saying so is more use than a spinner
     // that ends with the plan unchanged and no explanation. A lasting one
     // still goes on the profile, because next block might.
@@ -85,15 +90,15 @@ export async function applyInjuryFromRow(
 
   try {
     const result = lasting
-      ? await executeLastingInjury(profile, mesocycle, { injuryCode: area, weekNumbers, exclusions, mode })
+      ? await executeLastingInjury(profile, mesocycle, { injuryCode: area, weekNumbers, exclusions, mode }, context)
       : await executeInjuryAdaptation(profile, mesocycle, {
-          injuryCode: area, durationDays: NIGGLE_EASE_OFF_DAYS, weekNumbers, exclusions, mode,
-        })
+          injuryCode: area, durationDays: NIGGLE_EASE_OFF_DAYS, weekNumbers, startDate: context.calendar.today, exclusions, mode,
+        }, context)
     if (!lasting) {
       await createPlanAdaptation({
         profileId: profile.id!, kind: 'injury', injuryCode: area,
         durationDays: NIGGLE_EASE_OFF_DAYS, affectedWeekNumbers: weekNumbers,
-        preImage: result.preImage, reason: 'reported from the exercise row',
+        record: result.record, reason: 'reported from the exercise row',
       })
     }
     return { mesocycle: result.mesocycle, addInjuryCode: lasting ? area : undefined, message: null }
@@ -105,7 +110,7 @@ export async function applyInjuryFromRow(
 }
 
 /**
- * Rebuild this week around the kit they actually have today.
+ * Rebuild the next week around the kit they actually have today.
  *
  * TIME-BOUNDED, like the coach's equipment adaptation. "I haven't got the kit"
  * is nearly always a trip, and a permanent answer to a temporary problem is
@@ -115,16 +120,22 @@ export async function applyInjuryFromRow(
 export async function applyEquipmentFromRow(
   profile: UserProfile,
   mesocycle: MesocycleWeek[],
-  liveWeek: number,
+  /** When the plan was made — see applyInjuryFromRow. */
+  planCreatedAt: string | undefined,
   tier: string,
   /** The person's real exclusions — see applyInjuryFromRow. */
   exclusions: string[],
 ): Promise<RowAdaptationResult> {
-  const weekNumbers = mesocycle.map(w => w.week_number).filter(n => n === liveWeek)
-  if (weekNumbers.length === 0) return { message: "I can't see this week on your plan just now." }
+  const context = await loadPlanEditContext(profile, mesocycle, planCreatedAt)
+  // The seven days the change lasts, from today — the same seven the stored
+  // adaptation expires after. It used to be "this plan week", which on a
+  // Thursday meant three days forward and four days back.
+  const targetDays = planDaysInWindow(mesocycle, context.calendar, EQUIPMENT_SWITCH_DAYS)
+  const weekNumbers = [...new Set(targetDays.map(d => d.weekNumber))]
+  if (targetDays.length === 0) return { message: "I can't see this week on your plan just now." }
 
   const trial = await substituteForEquipment({
-    mesocycle, profile, equipmentTier: tier as never, weekNumbers, exclusions,
+    mesocycle, profile, equipmentTier: tier as never, targetDays, exclusions, context,
   })
   if (trial.touchedSlots.length === 0) {
     // INFORMATION, NOT A REFUSAL — see edit-reason.ts. The sheet draws it as
@@ -139,12 +150,12 @@ export async function applyEquipmentFromRow(
   }
   try {
     const result = await executeEquipmentAdaptation(profile, mesocycle, {
-      equipmentTier: tier as never, durationDays: EQUIPMENT_SWITCH_DAYS, weekNumbers, exclusions,
-    })
+      equipmentTier: tier as never, durationDays: EQUIPMENT_SWITCH_DAYS, weekNumbers, startDate: context.calendar.today, exclusions,
+    }, context)
     await createPlanAdaptation({
       profileId: profile.id!, kind: 'equipment', equipmentOverride: tier,
       durationDays: EQUIPMENT_SWITCH_DAYS, affectedWeekNumbers: weekNumbers,
-      preImage: result.preImage, reason: 'reported from the exercise row',
+      record: result.record, reason: 'reported from the exercise row',
     })
     return { mesocycle: result.mesocycle, message: null }
   } catch {
