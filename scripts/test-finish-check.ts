@@ -98,7 +98,9 @@ async function main() {
   const summary = derive.computeSessionSummary(friday, planned, T(0), T(80))
   check('"7/9": planned sets done over planned sets (it read 8/9 with the added set in the top half only)', summary.setsCompleted === 7 && summary.setsPrescribed === 9, { done: summary.setsCompleted, of: summary.setsPrescribed })
   check('the added set is counted, beside it', summary.extraSets === 1, summary.extraSets)
-  check('said as "7/9 planned · +1 extra"', voice.setsFraction(summary) === '7/9 planned · +1 extra', voice.setsFraction(summary))
+  // The card prints the fraction and, on its own line, "+1 extra" (SessionSummaryDialog). The joined
+  // phrase it once had a helper for was never rendered and was removed on 9 Oct.
+  check('the extra is said as "+1 extra", beside the 7/9', voice.extraSetsNote(summary.extraSets) === '+1 extra', voice.extraSetsNote(summary.extraSets))
   const overSummary = derive.computeSessionSummary(over, planned, T(0), T(80))
   check('an extra set on a planned exercise is an extra, not a tenth of nine', overSummary.setsCompleted === 9 && overSummary.setsPrescribed === 9 && overSummary.extraSets === 2, { done: overSummary.setsCompleted, extra: overSummary.extraSets })
   // A row with no exercise id is matched by NAME — and must then be counted
@@ -106,7 +108,7 @@ async function main() {
   const noIds = friday.slice(0, 7).map(l => { const { exercise_id: _drop, ...rest } = l as Record<string, unknown>; return rest as never })
   const byName = derive.computeSessionSummary(noIds, planned, T(0), T(80))
   check('a planned set matched by name is not also counted as an extra', byName.setsCompleted === 7 && byName.extraSets === 0, { done: byName.setsCompleted, extra: byName.extraSets })
-  check('with no extras there is nothing beside it', voice.setsFraction(derive.computeSessionSummary(friday.slice(0, 7), planned, T(0), T(80))) === '7/9 planned')
+  check('with no extras there is nothing beside it', voice.extraSetsNote(derive.computeSessionSummary(friday.slice(0, 7), planned, T(0), T(80)).extraSets) === '')
   check('the per-exercise rows still say what was done on each', summary.exercises.find(e => e.exerciseName === 'Hammer Curls')?.setsCompleted === 1 && summary.exercises.find(e => e.exerciseName === 'Hammer Curls')?.setsPrescribed === 0)
 
   // -------------------------------------------------------------------------

@@ -90,12 +90,16 @@ export interface ToolsTabProps {
   liveWeek?: number
   /** The kit tier, so the cardio quick picks on the "log this round" sheet are ones the person can do. */
   equipmentAccess?: EquipmentAccess
+  /** When the plan began, for the week reading below (the same answer Today gives). */
+  planCreatedAt?: string
+  /** App's logsVersion: bumped by a day write made elsewhere (the coach moving a session), so Tools re-reads today. */
+  logsVersion?: number
 }
 
 /** Stable identity, so a missing plan does not hand the week hook a fresh array each render. */
 const EMPTY_PLAN: WorkoutDay[] = []
 
-export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess }: ToolsTabProps) {
+export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess, planCreatedAt, logsVersion }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
@@ -106,7 +110,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // the plan's raw rows, so on a day a session had moved ONTO it offered no
   // conditioning timer, and on the day it had moved OFF it offered the timer
   // for a session being done elsewhere (H19's twentieth reader, 9 Oct 2026).
-  const trainingWeek = useTrainingWeek(profileId, todayDate, exercisePlan ?? EMPTY_PLAN)
+  // The LIVE week's days, the plan start and App's refresh signal, as every other reader passes: without
+  // the signal a session the coach moved never reached this card until a reload (test:home-week-strip).
+  const liveDays = mesocycle?.find(w => w.week_number === liveWeek)?.days ?? exercisePlan ?? EMPTY_PLAN
+  const trainingWeek = useTrainingWeek(profileId, todayDate, liveDays, planCreatedAt, logsVersion)
   const todayCell = trainingWeek.days.find(d => d.date === todayDate)
   const todaysConditioning = (todayCell?.movedTo ? null : todayCell?.session)?.recommendedCardio
 

@@ -351,7 +351,12 @@ async function main() {
     check('App builds the pool profile from the active adaptations', /const poolProfile = useMemo\(\s*\(\) => \(profile \? constraintProfile\(profile, effectiveConstraints\(profile, activeAdaptations, getAppNow\(profile\.id\)\)\) : null\)/.test(app))
     check('the Exercise tab (swap list, add, session rebuild, warm-up) is handed the pool profile', /<ExerciseTab[\s\S]{0,400}profile=\{poolProfile \?\? profile \?\? undefined\}/.test(app))
     check('...and the saved one separately, for anything that writes', /storedProfile=\{profile \?\? undefined\}/.test(app) && /const saved = storedProfile \?\? profile/.test(tab))
-    check('a ban\'s replacement is picked from the pool profile', /banExerciseFromMesocycle\(\{\s*mesocycle,\s*profile: poolProfile \?\? profile,/.test(app))
+    // TWO HOPS since the ban moved into screen-ban.ts: App hands the pool profile to banOnScreen, and
+    // banOnScreen hands ITS profile to the ban. Both halves, or the property is not held.
+    const screenBan = strip(readFileSync('src/lib/screen-ban.ts', 'utf8'))
+    check('a ban\'s replacement is picked from the pool profile',
+      /banOnScreen\(\{[\s\S]{0,200}profile: poolProfile \?\? profile,/.test(app)
+        && /banExerciseFromMesocycle\(\{\s*mesocycle, profile, bannedName/.test(screenBan))
     check('the coach is handed the pool profile and the adaptations', /<ChatAssistant[\s\S]{0,200}poolProfile=\{poolProfile \?\? profile\}\s*activeAdaptations=\{activeAdaptations\}/.test(app))
     check('the coach\'s add, session rebuild and ban use it', /resolveAdditionRequest\(item, poolProfile, exerciseExclusions\)/.test(chat) && /rebuildDayAroundMainLift\(\{\s*mesocycle, profile: poolProfile,/.test(chat) && /executeSessionRebuild\(poolProfile,/.test(chat) && /executeExerciseBan\(poolProfile,/.test(chat) && /executeExerciseAdd\(poolProfile,/.test(chat))
     check('the coach\'s context line is built with the adaptations', /buildCoachInjuriesSummary\(profile, activeAdaptations, getAppNow\(profile\.id\)\)/.test(chat))

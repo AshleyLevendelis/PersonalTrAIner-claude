@@ -79,7 +79,10 @@ for (const f of files) {
   const src = bare(readFileSync(join(DIR, f), 'utf-8'))
   const all = src.match(/Date\.now\(\)/g) ?? []
   if (all.length === 0) { continue }
-  const elapsed = src.match(/Date\.now\(\)\s*-|=\s*Date\.now\(\)\s*$|const \w+ = Date\.now\(\)/gm) ?? []
+  // A DEADLINE IS A STOPWATCH TOO: `Date.now() + 8000` is "eight seconds from now", measured on the clock
+  // that elapses, which is what an expiry the app checks against the real clock needs (moved-edit.mjs,
+  // 9 Oct 2026). It is never a calendar read: no date can come out of it that the run did not wait for.
+  const elapsed = src.match(/Date\.now\(\)\s*-|Date\.now\(\)\s*\+\s*\d|=\s*Date\.now\(\)\s*$|const \w+ = Date\.now\(\)/gm) ?? []
   check(`${f}: every Date.now() is elapsed-time (${elapsed.length} of ${all.length})`,
     elapsed.length >= all.length, { all: all.length, elapsed: elapsed.length })
 }
@@ -159,7 +162,9 @@ for (const f of drivers) {
   check(`${f}: does not write the dev-clock key itself`, !/fitplan_dev_clock_/.test(src),
     src.match(/.{0,60}fitplan_dev_clock_.{0,40}/)?.[0])
   // 5b. `?today=` is the seam, and its value is read off the page, never typed.
-  const pins = src.match(/today=\$?\{?[^&`'"\s]*/g) ?? []
+  // `today=` as its OWN query key, not the end of another one: `freetoday=1` is a week-shape flag and
+  // read as a literal date (9 Oct 2026).
+  const pins = src.match(/(?<![A-Za-z_])today=\$?\{?[^&`'"\s]*/g) ?? []
   for (const pin of pins) {
     check(`${f}: the day it stands on is interpolated, not a literal date — ${pin}`,
       pin.startsWith('today=$'), pin)

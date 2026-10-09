@@ -786,12 +786,6 @@ export function extraSetsNote(extraSets: number): string {
   return extraSets > 0 ? `+${extraSets} extra` : ''
 }
 
-/** "7/9 planned · +1 extra" — planned sets done over planned sets, and anything beyond the plan beside it. */
-export function setsFraction(s: { setsCompleted: number; setsPrescribed: number; extraSets: number }): string {
-  const extra = extraSetsNote(s.extraSets)
-  return `${s.setsCompleted}/${s.setsPrescribed} planned${extra ? ` · ${extra}` : ''}`
-}
-
 /**
  * Finish tapped with cardio logged and no set. The card said "Nothing logged"
  * over a walk it had just listed as saved. Decided unprompted, reversible
