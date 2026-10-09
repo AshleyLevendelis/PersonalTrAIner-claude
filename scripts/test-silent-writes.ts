@@ -86,14 +86,25 @@ console.log('\n2. Banning an exercise')
 {
   const body = handlerBody(app, 'const handleBanExercise')
   check('the handler exists', body.length > 0)
+  // RE-ANCHORED 9 Oct 2026 (M10). The ban's write moved out of App.tsx into
+  // src/lib/screen-ban.ts, for the same reason the swap's did: so the browser
+  // harness runs the function the app ships. It also stopped reporting through
+  // the page's one write-error slot — a ban is now confirmed in a sheet, and
+  // the sheet shows the result where the tap was. The three PROPERTIES these
+  // checks exist for are unchanged and are read where the code now lives.
+  const ban = stripComments(readFileSync(join(ROOT, 'src/lib/screen-ban.ts'), 'utf8'))
+  const sheet = stripComments(readFileSync(join(ROOT, 'src/components/exercise/BanExerciseSheet.tsx'), 'utf8'))
+  check('the handler is the shared function, and hands its outcome back', /return banOnScreen\(\{/.test(body))
   check('the memory write is guarded — offline it no longer silently does nothing',
-    /try \{[\s\S]*createFact\(/.test(body))
-  check('a failed memory write is reported', /setWriteError\(/.test(body))
+    /try \{[\s\S]*createFact\(/.test(ban) && /catch \(err\) \{[\s\S]{0,200}?return \{ error: /.test(ban))
+  check('a failed memory write is reported — in the sheet the tap was made in',
+    /if \(!result\.banned\) \{ setError\(result\.error/.test(sheet) && /\{error && <p[^>]*data-testid="ban-error"/.test(sheet))
   // Two different failures, two different truths: if the ban landed but the
   // plan rewrite didn't, telling them "that didn't save" would send them off
   // to re-tap something that already worked.
-  const messages = [...body.matchAll(/setWriteError\(`([^`]*)`\)/g)].map(m => m[1])
-  check('the two failure paths say different things', new Set(messages).size >= 2, messages)
+  const messages = [...ban.matchAll(/error: `([^`]*)`/g)].map(m => m[1])
+  check('the two failure paths say different things', new Set(messages).size >= 2 && messages.some(m => /hasn't been removed/.test(m)) && messages.some(m => /won't be picked again, but this plan couldn't be updated/.test(m)), messages)
+  check('...and the one where the ban DID land still shows the receipt', /setOutcome\(result\)\s*\n\s*setError\(result\.error\)/.test(sheet))
 }
 
 console.log('\n3. Steps and the water target')

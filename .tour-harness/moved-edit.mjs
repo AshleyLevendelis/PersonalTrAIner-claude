@@ -96,8 +96,12 @@ const openRowMenu = async name => {
 const savedRow = dayName => ev(`(() => {
   const rows = (window.__fakeDb && window.__fakeDb.mesocycle_weeks) || []
   const daysOf = r => { for (const v of Object.values(r)) { if (Array.isArray(v) && v[0] && typeof v[0] === 'object' && 'day' in v[0] && 'exercises' in v[0]) return v } return null }
+  // THE LIVE WEEK'S ROW, not whichever was written last. A 'today' edit saves
+  // one week, so the first save names it; a ban saves all sixteen, and the
+  // last of those is week 16's session, which is a different list.
+  if (window.__liveWeekNo == null && rows.length > 0) window.__liveWeekNo = rows[0].week_number
   let out = null
-  for (const r of rows) { const d = daysOf(r); const hit = d && d.find(x => x.day === ${JSON.stringify(dayName)}); if (hit) out = hit.exercises.map(e => e.name) }
+  for (const r of rows) { if (r.week_number !== window.__liveWeekNo) continue; const d = daysOf(r); const hit = d && d.find(x => x.day === ${JSON.stringify(dayName)}); if (hit) out = hit.exercises.map(e => e.name) }
   return out
 })()`)
 
@@ -106,7 +110,7 @@ const savedSets = dayName => ev(`(() => {
   const rows = (window.__fakeDb && window.__fakeDb.mesocycle_weeks) || []
   const daysOf = r => { for (const v of Object.values(r)) { if (Array.isArray(v) && v[0] && typeof v[0] === 'object' && 'day' in v[0] && 'exercises' in v[0]) return v } return null }
   let out = 0
-  for (const r of rows) { const d = daysOf(r); const hit = d && d.find(x => x.day === ${JSON.stringify(dayName)}); if (hit) out = hit.exercises.reduce((n, e) => n + (Number(e.sets) || 0), 0) }
+  for (const r of rows) { if (window.__liveWeekNo != null && r.week_number !== window.__liveWeekNo) continue; const d = daysOf(r); const hit = d && d.find(x => x.day === ${JSON.stringify(dayName)}); if (hit) out = hit.exercises.reduce((n, e) => n + (Number(e.sets) || 0), 0) }
   return out
 })()`)
 
@@ -217,6 +221,61 @@ check('5d. the refusal is on screen where the tap was (inside the viewport)', aw
 check('5e. ...and the session still holds three', ((await order()) || []).length === 3, await order())
 await shoot('moved-edit-5-floor')
 
+
+// ===========================================================================
+// SHEET MANNERS, on the same session (M26, M27, M10). Three exercises are
+// left, so "Drop it" is refused — which is exactly the state the tester was
+// in when the red line from one step followed him into the next.
+// ===========================================================================
+console.log('\n  sheet manners\n')
+const facts = () => ev(`((window.__fakeDb && window.__fakeDb.user_facts) || []).length`)
+const three = (await order()) || []
+const mannersVictim = three[three.length - 1] ?? 'NO-ROW'
+if (await has('[data-testid="remove-exercise-sheet"]')) await escape()
+
+// --- M26: the question uses the buttons' words; an error does not outlive its step
+check('5f. the take-out sheet reaches its scope step', (await openRowMenu(mannersVictim)) === 'open' && await tap('[data-testid="remove-exercise"]')
+  && !!(await until(() => has('[data-testid="remove-exercise-sheet"]'))) && await clickSel('[data-testid="reason-skip"]') && (await wait(450), await clickSel('[data-verb="drop"]')) && (await wait(450), await has('[data-testid="remove-scope"]')))
+const scopeQuestion = await ev(`document.querySelector('[data-testid="remove-scope-question"]')?.innerText || ''`)
+const scopeButtons = (await ev(`[...document.querySelectorAll('[data-testid="remove-scope"] [data-scope]')].map(b => b.textContent.trim())`)) || []
+check('5g. the question and its buttons use the same words: "Just today, or the rest of the block?" over "Today only" / "Rest of block"',
+  scopeQuestion === 'Just today, or the rest of the block?' && scopeButtons.join('|') === 'Today only|Rest of block', { scopeQuestion, scopeButtons })
+await clickSel('[data-scope="today"]'); await wait(1100)
+check('5h. the refusal shows on the step that produced it', /fewer than 3/.test(await ev(`document.querySelector('[data-testid="remove-error"]')?.innerText || ''`)))
+check('5i. "Back" takes the red line away with it', await clickSel('[data-testid="remove-scope-back"]') && (await wait(450), !(await has('[data-testid="remove-error"]'))) && await has('[data-verb="drop"]'),
+  await ev(`document.querySelector('[data-testid="remove-exercise-sheet"]')?.innerText || ''`))
+await escape()
+
+// --- M27: "I don't like it — and not again" bans, with a confirm ------------
+check('5j. the take-out sheet offers "I don\'t like it"', (await openRowMenu(mannersVictim)) === 'open' && await tap('[data-testid="remove-exercise"]')
+  && !!(await until(() => has('[data-testid="remove-exercise-sheet"] [data-reason="dislike"]'))))
+await clickSel('[data-testid="remove-exercise-sheet"] [data-reason="dislike"]'); await wait(900)
+check('5k. tapping it opens the for-good confirm, NOT "Today only / Rest of block"', !!(await until(() => has('[data-testid="ban-confirm"]'))) && !(await has('[data-testid="remove-scope"]')),
+  await ev(`document.body.innerText.slice(-300)`))
+check('5l. ...naming the exercise and how much of the plan it touches', await ev(`(() => { const t = document.querySelector('[data-testid="ban-exercise-sheet"]')?.innerText || ''; return t.includes(${JSON.stringify(mannersVictim)}) && /every week of your plan|isn.t on this plan anywhere/.test(t) })()`),
+  await ev(`(document.querySelector('[data-testid="ban-exercise-sheet"]')?.innerText || '').slice(0, 300)`))
+check('5m. NOTHING IS WRITTEN before the answer', (await facts()) === 0 && ((await order()) || []).includes(mannersVictim), { facts: await facts(), order: await order() })
+check('5n. "Keep it" closes it and changes nothing', await clickSel('[data-testid="ban-confirm-no"]') && await untilGone('[data-testid="ban-exercise-sheet"]') && (await facts()) === 0 && ((await order()) || []).includes(mannersVictim))
+
+// --- M10: "Ban exercise" asks, says what it did, and can be undone ---------
+const beforeBan = (await savedRow(FROM_NAME)) || []
+check('5o. "Ban exercise" on the ⋮ menu opens the same confirm', (await openRowMenu(mannersVictim)) === 'open' && await tap('[data-testid="ban-exercise"]') && !!(await until(() => has('[data-testid="ban-confirm"]'))))
+check('5p. ...and has written nothing yet', (await facts()) === 0 && ((await order()) || []).includes(mannersVictim) && JSON.stringify(await savedRow(FROM_NAME)) === JSON.stringify(beforeBan))
+await shoot('moved-edit-5-ban-confirm')
+await clickSel('[data-testid="ban-confirm-yes"]')
+check('5q. confirming shows a receipt, where the tap was', !!(await until(() => has('[data-testid="ban-receipt"]'))) && await ev(`(() => { const n = document.querySelector('[data-testid="ban-receipt"]'); if (!n) return false; const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight })()`),
+  await ev(`(document.querySelector('[data-testid="ban-exercise-sheet"]')?.innerText || '').slice(0, 300)`))
+check('5r. ...the preference is recorded and the exercise is off the card', (await facts()) === 1 && !((await order()) || []).includes(mannersVictim), { facts: await facts(), order: await order() })
+check('5s. ...and off the saved plan', !((await savedRow(FROM_NAME)) || [mannersVictim]).includes(mannersVictim), await savedRow(FROM_NAME))
+await shoot('moved-edit-5-ban-receipt')
+check('5t. the receipt offers Undo', await has('[data-testid="ban-undo"]'))
+await clickSel('[data-testid="ban-undo"]')
+check('5u. Undo says it is back', !!(await until(() => has('[data-testid="ban-undone"]'))), await ev(`(document.querySelector('[data-testid="ban-exercise-sheet"]')?.innerText || '').slice(0, 200)`))
+check('5v. ...BOTH halves are reversed: the preference is gone and the card and the saved plan hold the exercise again',
+  (await facts()) === 0 && ((await order()) || []).includes(mannersVictim) && JSON.stringify(await savedRow(FROM_NAME)) === JSON.stringify(beforeBan),
+  { facts: await facts(), order: await order(), saved: await savedRow(FROM_NAME), beforeBan })
+await escape()
+
 const errors = await ev(`(window.__pageErrors || []).length`)
 check('6. no uncaught error on the page', !errors, errors)
 
@@ -311,6 +370,27 @@ check('10b. the declined shorten reaches it marked CLOSED — declined', sentHis
 check('10c. ...and neither is sent bare, looking like an open question', !sentHistory.some(t => /^Want me to (swap|cut)/.test(t)), sentHistory.map(t => t.slice(0, 90)))
 const sentSummary = String(await ev(`(window.__lastBody && window.__lastBody.context && window.__lastBody.context.exercise_summary) || ''`))
 check(`10d. the coach's week says today holds ${FROM_NAME}'s session, moved here`, new RegExp(`^${TODAY_NAME} \\(TODAY\\): ${FROM_NAME}'s .*MOVED HERE`, 'm').test(sentSummary), sentSummary.slice(0, 300))
+
+// --- L33: a timed-out card looks timed out, without being tapped -----------
+// The card's window is ten minutes on the real clock. This one is MADE with
+// its expiry eight seconds away (the fake database's opt-in row patch — the
+// one input a driver chooses), so what is watched is the app's own timer
+// firing, not a status written by this driver.
+await ev(`window.__rowPatch = { pending_actions: () => ({ expires_at: new Date(Date.now() + 8000).toISOString() }) }`)
+const LATE_SAID = 'actually I only have 25 minutes now'
+const sentAt = Date.now()
+check('11a. another offer is asked for', await sayToCoach(LATE_SAID))
+const cardStatus = () => ev(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); if (!c) return null; return { status: c.getAttribute('data-card-status'), apply: [...c.querySelectorAll('button')].some(b => /^Apply/.test(b.textContent.trim())), note: c.querySelector('[data-testid="proposal-terminal-note"]')?.textContent || '', opacity: Number(getComputedStyle(c).opacity) } })()`)
+const live = await until(async () => { const c = await cardStatus(); return c && c.status === 'pending' && (await since(LATE_SAID)).length > 0 ? c : null }, 20)
+await ev(`window.__rowPatch = undefined`)
+check('11b. while it is live it has its Apply button and says nothing about a limit', !!live && live.apply === true && live.note === '' && live.opacity === 1 && !/minute|expire|timed/i.test((await since(LATE_SAID)).replace(/25 minutes|about \d+ minutes|~?\d+ min\b|\d+ minutes isn.t/g, '')), { live, text: (await since(LATE_SAID)).slice(0, 200) })
+await wait(Math.max(0, 9500 - (Date.now() - sentAt)))
+const dead = await cardStatus()
+check('11c. eight seconds on, UNTOUCHED, it reads as expired', dead?.status === 'expired', dead)
+check('11d. ...its Apply button is gone', dead?.apply === false, dead)
+check('11e. ...it says so in a short line', /timed out/.test(dead?.note || ''), dead)
+check('11f. ...and it is greyed', (dead?.opacity ?? 1) < 1, dead)
+await shoot('moved-edit-11-expired-card')
 
 console.log(`\n${ran} checks ran`)
 console.log(failures === 0 ? 'A moved session swaps, shortens and loses an exercise from its own screen.\n' : `\n${failures} FAILED\n`)

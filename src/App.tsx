@@ -37,8 +37,9 @@ import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
-import { banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
+import { type SwapScope } from '@/lib/mesocycle-edit'
 import { swapOnScreen } from '@/lib/screen-swap'
+import { banOnScreen, type BanOutcome } from '@/lib/screen-ban'
 import { sweepStaleForTarget } from '@/lib/pending-actions-store'
 import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { reconcileToStatedCeilings } from '@/lib/ceiling-reconcile'
@@ -1955,7 +1956,9 @@ function App() {
     // deleted rather than left unreachable: an unreachable second writer is
     // one restored code path away from being the same bug again.
     if (action.type === 'ban_exercise') {
-      handleBanExercise(action.exercise_name)
+      // No sheet on this path to show the result in, so a failure goes to
+      // the one write-error slot as it always did.
+      void handleBanExercise(action.exercise_name).then(r => setWriteError(r.error))
     }
   }
 
@@ -2421,70 +2424,24 @@ function App() {
     }
   }
 
-  const handleBanExercise = async (exerciseName: string) => {
-    if (!profile?.id) return
-    // Fix — food/exercise preferences have two competing stores: this used
-    // to read-modify-write `fitness_profiles.exercise_exclusions` (with a
-    // fresh-read-before-append dance specifically to avoid clobbering a
-    // concurrent chat-side write to the SAME column, per fix 4's original
-    // comment). Writing a user_facts row instead makes that whole race
-    // structurally impossible — each ban is an independent INSERT, not a
-    // read-modify-write of a shared array cell, so there's nothing left to
-    // clobber and nothing to read fresh before appending to.
-    if (compiledExerciseExclusions.includes(exerciseName)) return
-    // Audit §3.2 — this write had NO error handling at all. Offline it threw,
-    // the handler stopped here before changing anything, and the rejection
-    // went nowhere: no ban, no error, no visual change whatsoever. The user
-    // tapped "never show me this again" and the app simply ignored them,
-    // which is the worst of the three possible outcomes because it gives
-    // them nothing to react to.
-    try {
-      await createFact({
-        profileId: profile.id,
-        kind: 'exercise_preference',
-        source: 'manual',
-        rawPhrase: exerciseName,
-        displayText: `won't eat/do ${exerciseName}`,
-        polarity: 'dislike',
-        hardness: 'hard',
-        resolvedRefs: [exerciseName],
-      })
-      await reloadMemory(profile.id)
-    } catch (err) {
-      console.error('Recording the ban failed:', err)
-      setWriteError(`${couldNot('save that')} ${exerciseName} hasn't been removed — check your connection and try again.`)
-      return
-    }
-    setWriteError(null)
-    const updated = [...new Set([...compiledExerciseExclusions, exerciseName])]
-
-    // Single source of truth is the mesocycle — exercisePlan (the flat,
-    // non-periodized base plan) is display-only fallback for when no
-    // mesocycle exists yet and is never mutated by swap/ban directly.
-    if (mesocycle.length === 0) return
-    const updatedMesocycle = await banExerciseFromMesocycle({
-      mesocycle,
-      profile,
-      bannedName: exerciseName,
-      exclusions: updated,
+  /**
+   * The write behind a ban — recording the preference, rewriting the plan,
+   * and handing back an Undo that reverses both (screen-ban.ts, shared with
+   * the browser harness). Reached only AFTER the Exercise tab's confirm sheet
+   * (M10, 9 Oct 2026): until then this ran on one tap of a menu item, with no
+   * question before it and no word after it. The sheet shows the result, so
+   * a failure is said where the tap was rather than at the top of the page.
+   */
+  const handleBanExercise = async (exerciseName: string): Promise<BanOutcome> => {
+    if (!profile?.id) return { error: null, banned: false, undo: null }
+    const profileId = profile.id
+    return banOnScreen({
+      profile, mesocycle, exerciseName,
+      exclusions: compiledExerciseExclusions,
+      planCreatedAt: mesocycleCreatedAt,
+      show: setMesocycle,
+      reloadMemory: () => reloadMemory(profileId),
     })
-    setMesocycle(updatedMesocycle)
-    if (profile.id) {
-      try {
-        // Preserve the plan's original creation time — this is an EDIT of the
-        // live plan, not a new plan; without it the resave would rewind
-        // live-week detection to week 1.
-        await saveMesocycle(profile.id, updatedMesocycle, mesocycleCreatedAt ?? profile.created_at)
-      } catch (err) {
-        // The preference row above DID land, so the ban itself is real and
-        // survives — it is only this plan's rewrite that failed. Say exactly
-        // that rather than the generic "didn't save", which would send
-        // someone off to re-tap a button that already worked.
-        console.error('Persisting ban failed:', err)
-        setMesocycle(mesocycle)
-        setWriteError(`${exerciseName} won't be picked again, but this plan couldn't be updated — reopen the app to retry.`)
-      }
-    }
   }
 
   const handleSwapExercise = async (

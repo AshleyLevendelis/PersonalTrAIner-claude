@@ -151,8 +151,15 @@ check('today\'s conditioning is actually offered on the timer surface',
   /parseConditioningInterval\(todaysConditioning\?\.activity\)/.test(stripComments(read('src/components/ToolsTab.tsx')))
   && /protocolChoices\(todaysConfig,/.test(stripComments(read('src/components/ToolsTab.tsx')))
   && /label: 'Today', config: todaysConfig, fromToday: true/.test(stripComments(read('src/components/timers/ProtocolChips.tsx'))))
-check('...derived from the plan the tab is given',
-  /exercisePlan \?\? \[\]/.test(stripComments(read('src/components/ToolsTab.tsx'))))
+// RE-ANCHORED 9 Oct 2026 (H19). This pinned the literal `exercisePlan ?? []`
+// from the old lookup, `(exercisePlan ?? []).find(d => d.day === dayName)` —
+// the plan's raw weekday row, which is the wrong session on a day one has
+// been moved onto and a session being done elsewhere on the day it left. The
+// property is the same and now says more: the conditioning comes from the plan
+// the tab is given, AS IT RUNS TODAY (the week strip's own resolved cell).
+check('...derived from the plan the tab is given, as it runs today',
+  /useTrainingWeek\(profileId, todayDate, exercisePlan \?\? EMPTY_PLAN\)/.test(stripComments(read('src/components/ToolsTab.tsx')))
+  && /const todaysConditioning = \(todayCell\?\.movedTo \? null : todayCell\?\.session\)\?\.recommendedCardio/.test(stripComments(read('src/components/ToolsTab.tsx'))))
 
 console.log('\n4. No window.confirm anywhere — it is suppressible in a PWA\n')
 {

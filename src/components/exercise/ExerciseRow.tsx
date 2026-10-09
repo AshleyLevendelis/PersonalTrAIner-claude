@@ -422,7 +422,7 @@ export function ExerciseRow({
                     Take out of this session
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan}>
+                <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan} data-testid="ban-exercise">
                   <Ban className="size-3.5" />
                   {banBusy ? 'Banning…' : 'Ban exercise'}
                 </DropdownMenuItem>

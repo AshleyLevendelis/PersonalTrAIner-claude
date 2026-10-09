@@ -488,12 +488,20 @@ export function TodayPanel({
     const planDay = target.planDayName
     const day = week?.days.find(d => d.day === planDay)
     if (!week || !day) return "I can't see today's session just now."
+    // AN EMPTY DAY IS NOT A DAY AT ITS FLOOR (M26). adjustDayVolume changes
+    // nothing and blocks nothing on a day with no exercises, and that used to
+    // print "Every exercise is already at its minimum" about a rest day.
+    if (day.exercises.length === 0) return "There's no session here to make lighter."
     if (!isVolumeAdjustable(week)) return "This is a deload week — it's already lighter on purpose."
     const result = adjustDayVolume(day, 'lighter', profile)
     if (!result.changed) {
-      return result.blocked[0]
-        ? `Nothing left to take out — ${result.blocked[0].name} is ${result.blocked[0].reason}.`
-        : 'Every exercise is already at its minimum.'
+      // SAY WHAT THE MINIMUM IS, AND WHAT IS STILL POSSIBLE (M26). The bare
+      // "Every exercise is already at its minimum." answered "I'm wiped" with
+      // a dead end. The numbers are the session's own.
+      const sets = day.exercises.reduce((n, e) => n + (e.sets ?? 0), 0)
+      const floor = `${todayRef.sayDay}'s session is already as light as it goes: ${sets} sets across ${day.exercises.length} exercises, the fewest that still trains each one.`
+      const blocked = result.blocked[0] ? ` (${result.blocked[0].name} is ${result.blocked[0].reason}.)` : ''
+      return `${floor}${blocked} You can still swap an exercise for an easier one, shorten the session, or move it to another day from the day menu.`
     }
     const settled = settleWeek(
       { ...week, days: week.days.map(d => (d.day === planDay ? result.day : d)) },
@@ -954,6 +962,7 @@ export function TodayPanel({
         onSwapInstead={() => removeTarget && onOpenSwap(todayRef.planDayName, removeTarget.exIndex, removeTarget.exerciseName, todayRef.sayDay)}
         balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : { cost: null, balancing: null })}
         onReason={handleRemoveReason}
+        onDislike={() => removeTarget && void onBanExercise(removeTarget.exerciseName)}
       />
       </Suspense>
 

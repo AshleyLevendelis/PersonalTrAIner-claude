@@ -60,6 +60,7 @@ import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { cn } from '@/lib/utils'
 import { parseWorkoutEntries, resolveExerciseName, type ParsedSetGroup, type WorkoutEntryInput } from '@/lib/set-parse'
 import { resolveExerciseOnSession } from '@/lib/swap-target'
+import { banBlastRadius, banConfirmLines } from '@/lib/screen-ban'
 import { sessionRefForDayArg, sessionRefFromCell, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
@@ -2405,16 +2406,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
     }
 
     // Count across the WHOLE plan, not this week: that is what a ban means.
-    let sessions = 0
-    const weeksTouched = new Set<number>()
-    for (const w of mesocycle) {
-      for (const d of w.days) {
-        if (d.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())) {
-          sessions++
-          weeksTouched.add(w.week_number)
-        }
-      }
-    }
+    // ONE COUNT AND ONE SET OF SENTENCES for the coach's card and the screen's
+    // confirm sheet (screen-ban.ts) — the screen gained its confirm on 9 Oct
+    // 2026 and must not describe the same change in different words.
+    const radius = banBlastRadius(mesocycle, name)
+    const banLines = banConfirmLines(radius)
+    const sessions = radius.sessions
     if (sessions === 0) {
       // Still worth recording: it keeps the exercise out of FUTURE plans and
       // out of every swap suggestion, which is what they actually asked for.
@@ -2429,7 +2426,7 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
           rows: [{ field: 'On this plan', before: 'not scheduled', after: 'not scheduled' }],
           unchanged: ['Every session you already have'],
           implications: [
-            { severity: 'info', text: `It isn't on this plan anywhere, so nothing changes today — but it will never be chosen for you again, in this plan or the next one, and it won't be offered as a swap.` },
+            { severity: 'info', text: banLines.info },
           ],
           rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
           reversible: true,
@@ -2447,12 +2444,12 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
         lead: ask(`stop giving you **${name}** for good`),
         rows: [
           { field: 'Sessions it appears in', before: `${sessions}`, after: '0' },
-          { field: 'Weeks affected', before: `${weeksTouched.size} of ${mesocycle.length}`, after: 'all rebuilt' },
+          { field: 'Weeks affected', before: `${radius.weeks} of ${radius.totalWeeks}`, after: 'all rebuilt' },
         ],
         unchanged: ['Every other exercise, and the shape of each session'],
         implications: [
-          { severity: 'warn', text: `This is every week of your plan, not just today — ${sessions} session${sessions === 1 ? '' : 's'} get${sessions === 1 ? 's' : ''} rebuilt. Each one gets the closest alternative your kit and injuries allow.` },
-          { severity: 'info', text: `Where there's no good alternative, that slot comes out rather than being filled with something worse. It will never be chosen for you again, in this plan or the next.` },
+          { severity: 'warn', text: banLines.warn ?? '' },
+          { severity: 'info', text: banLines.info },
         ],
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
@@ -6566,7 +6563,13 @@ export function ChatAssistant({ profile, macros, exercisePlan, mesocycle, planCr
       // z-30: over the page's own content, under the tab bar (z-40) and the
       // dock (z-50). Inside a force-mounted tab whose inactive state is
       // display:none, so it only covers the page while the chat is open.
-      className="fixed inset-x-0 top-0 z-30 mx-auto flex max-w-6xl flex-col bg-background"
+      // THE BOTTOM EDGE SLIDES, IT DOES NOT SNAP (L22, 9 Oct 2026). When a
+      // session ends the dock reports 0 and this edge drops by the pill's
+      // height plus its gap — about 40px — in one frame, so the input jumped
+      // under a thumb that was on its way to it. Only while the keyboard is
+      // shut: with it open this edge follows the keyboard, and easing that
+      // would leave the composer trailing behind the keys.
+      className={`fixed inset-x-0 top-0 z-30 mx-auto flex max-w-6xl flex-col bg-background ${composerKeyboardOpen ? '' : 'transition-[bottom] duration-200 ease-out motion-reduce:transition-none'}`}
       style={{ bottom: chatScreenBottom }}
     >
       <header data-testid="chat-header" className="shrink-0 border-b border-[color:var(--hairline)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>

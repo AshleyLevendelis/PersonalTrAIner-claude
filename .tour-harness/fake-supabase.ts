@@ -113,7 +113,17 @@ export function makeFakeSupabase(db: Db) {
           // sorts on it, and the sort threw — so the list read back EMPTY
           // while the table held every row. Read off the harness's one clock,
           // not the machine's, so a run gives the same answer on a Tuesday.
-          else { const row = { id: crypto.randomUUID(), created_at: new Date(anchorNowMs()).toISOString(), ...raw }; rows0.push(row); stored.push(row) }
+          // A DRIVER MAY CHOOSE ONE INPUT OF A NEW ROW (9 Oct 2026):
+          // `window.__rowPatch = { pending_actions: () => ({ expires_at }) }`.
+          // An offer's window is ten real minutes and no driver can wait that
+          // long; this lets one be made eight seconds from its end, so the
+          // card's OWN timer is what is watched. Opt-in, applied to inserts
+          // only, and absent on every run that does not set it.
+          else {
+            const patch = (window as unknown as { __rowPatch?: Record<string, (row: Row) => Row> }).__rowPatch?.[name]
+            const row = { id: crypto.randomUUID(), created_at: new Date(anchorNowMs()).toISOString(), ...raw, ...(patch ? patch(raw) : {}) }
+            rows0.push(row); stored.push(row)
+          }
         }
         const out = stored.map(r => ({ ...r }))
         return { data: single ? (out[0] ?? null) : out, error: null }

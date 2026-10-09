@@ -35,6 +35,7 @@ export function RemoveExerciseSheet({
   onSwapInstead,
   balanceCost,
   onReason,
+  onDislike,
 }: {
   target: RemoveTarget | null
   onClose: () => void
@@ -54,6 +55,8 @@ export function RemoveExerciseSheet({
    * or null, the same channel `onDrop` uses.
    */
   onReason?: (answer: ReasonAnswer) => Promise<string | null>
+  /** "I don't like it" — opens the ban confirm for this exercise (M27). Absent, that answer falls through to the drop / swap choice as before. */
+  onDislike?: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,7 +78,13 @@ export function RemoveExerciseSheet({
 
   const answer = async (a: ReasonAnswer) => {
     // Drop and swap keep their own steps — the reason only says which.
-    if (a.type === 'reason' && a.reason === 'dislike') { setAsked(true); setChoosing(true); return }
+    // "I DON'T LIKE IT — AND NOT AGAIN" IS A BAN (M27, 9 Oct 2026). The words
+    // on the chip promise it and the design's route table says it; this went
+    // straight to "Today only / Rest of block", which is neither. It now
+    // hands over to the same confirm the ⋮ menu's ban opens — which says what
+    // takes its place and can be undone — and this sheet closes.
+    if (a.type === 'reason' && a.reason === 'dislike' && onDislike) { close(); onDislike(); return }
+    if (a.type === 'reason' && a.reason === 'dislike') { setError(null); setAsked(true); return }
     setBusy(true); setError(null)
     const refusal = await onReason?.(a) ?? null
     setBusy(false)
@@ -109,11 +118,15 @@ export function RemoveExerciseSheet({
             exerciseName={target?.exerciseName ?? 'it'}
             busy={busy}
             onAnswer={answer}
-            onSkip={() => setAsked(true)}
+            // AN ERROR BELONGS TO THE STEP THAT PRODUCED IT (M26). "I'm short on
+            // time" could refuse, and its red line then sat under "Drop it"
+            // and under the scope buttons, reading as if THEY had failed.
+            onSkip={() => { setError(null); setAsked(true) }}
+            onStepChange={() => setError(null)}
           />
         ) : !choosing ? (
           <div className="space-y-2">
-            <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setChoosing(true)} data-verb="drop">
+            <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => { setError(null); setChoosing(true) }} data-verb="drop">
               <Trash2 className="size-3.5" />
               Drop it — the session gets shorter
             </Button>
@@ -138,11 +151,14 @@ export function RemoveExerciseSheet({
                 app says so before the tap. */}
             {todayImpact?.cost && <p className="text-xs text-[color:var(--role-warn-text)]" data-testid="remove-balance-cost">{todayImpact.cost}</p>}
             {todayImpact?.balancing && <p className="text-xs text-muted-foreground" data-testid="remove-balancing">{todayImpact.balancing}</p>}
-            <p className="text-sm">Just this week, or the rest of the block?</p>
+            {/* THE QUESTION USES THE BUTTONS' WORDS (M26). It asked "just this
+                week" over a button reading "Today only"; the buttons are the
+                swap dialog's, to the letter, so the question follows them. */}
+            <p className="text-sm" data-testid="remove-scope-question">Just today, or the rest of the block?</p>
             <Button className="w-full" disabled={busy} onClick={() => drop('today')} data-scope="today">Today only</Button>
             <Button variant="outline" className="w-full" disabled={busy} onClick={() => drop('permanent')} data-scope="permanent">Rest of block</Button>
             {blockImpact?.cost && <p className="text-xs text-[color:var(--role-warn-text)]" data-testid="remove-block-cost">For the block: {blockImpact.cost}</p>}
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setChoosing(false)}>Back</Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => { setError(null); setChoosing(false) }} data-testid="remove-scope-back">Back</Button>
           </div>
         )}
 

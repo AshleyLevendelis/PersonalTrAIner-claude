@@ -29,6 +29,7 @@
 // ---------------------------------------------------------------------------
 
 import { swapOnScreen } from '@/lib/screen-swap'
+import { banOnScreen } from '@/lib/screen-ban'
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -1254,7 +1255,12 @@ function Harness() {
               const said = await swapOnScreen({ profile, mesocycle: editedMeso, weekNumber, dayName, exIndex, newExercise, scope, show: setEditedMeso })
               ;(window as unknown as { __swapSaid: string | null }).__swapSaid = said
             }}
-            onBanExercise={noop}
+            // THE APP'S OWN BAN (screen-ban.ts), reached through the Exercise
+            // tab's own confirm sheet — App.tsx calls this same function.
+            onBanExercise={name => banOnScreen({
+              profile, mesocycle: editedMeso, exerciseName: name, exclusions: [],
+              planCreatedAt: profile.created_at, show: setEditedMeso, reloadMemory: async () => {},
+            })}
             onDevOverrideWeekChange={noop} onDevOverrideDayChange={noop}
             onDevBypassLocksChange={noop} onLogsSeeded={noop} />
         )}

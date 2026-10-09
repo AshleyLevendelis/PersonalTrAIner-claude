@@ -14,6 +14,7 @@ import { TodayPanel } from './TodayPanel'
 import { lazy, Suspense } from 'react'
 import type { SwapTarget } from './SwapDialog'
 const SwapDialog = lazy(() => import('./SwapDialog').then(m => ({ default: m.SwapDialog })))
+const BanExerciseSheet = lazy(() => import('./BanExerciseSheet').then(m => ({ default: m.BanExerciseSheet })))
 import { ExerciseDetailDialog, type ExerciseDetailTab } from './ExerciseDetailDialog'
 import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
@@ -43,7 +44,8 @@ interface ExerciseTabProps {
   devOverrideDay?: string | null
   devBypassLocks?: boolean
   onSwapExercise: (weekNumber: number, dayName: string, exIndex: number, newExercise: ExerciseEntry, scope: SwapScope) => void | Promise<void>
-  onBanExercise: (exerciseName: string) => void | Promise<void>
+  /** The WRITE behind a ban. Called only from the confirm sheet this tab owns — never straight from a menu item (M10). */
+  onBanExercise: (exerciseName: string) => Promise<import('@/lib/screen-ban').BanOutcome | void> | void
   /** The second-sport volume toggle on the workout card rewrites the plan from the live week; these carry the result into App state. */
   onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
   onProfileChanged?: (patch: Partial<UserProfile>) => void
@@ -87,6 +89,15 @@ export function ExerciseTab({
   const isProgramView = route.kind === 'program'
 
   const [swapTarget, setSwapTarget] = useState<SwapTarget | null>(null)
+  // EVERY BAN ON THIS TAB GOES THROUGH ONE QUESTION (M10, 9 Oct 2026). Today's
+  // card, a peeked day and the programme view each called the write directly
+  // from a menu item; they now all hand a NAME to this, which opens the
+  // confirm sheet. The write is reachable from the sheet's own button only.
+  // "I don't like it" on the swap dialog and the take-out sheet lands here
+  // too (M27) — the design has always said that answer keeps the exercise out
+  // for good, and until now no screen did.
+  const [banTarget, setBanTarget] = useState<string | null>(null)
+  const requestBan = (exerciseName: string) => { setBanTarget(exerciseName) }
   const [plateCalcOpen, setPlateCalcOpen] = useState(false)
   const [plateCalcWeight, setPlateCalcWeight] = useState(0)
   // ONE TARGET, ONE DIALOG, THREE TABS. There were two dialogs about one
@@ -179,6 +190,18 @@ export function ExerciseTab({
     return null
   }, [applyInjury, applyEquipment])
 
+  // One sheet, rendered by whichever of the two views below is showing.
+  const banSheet = banTarget ? (
+    <Suspense fallback={null}>
+      <BanExerciseSheet
+        exerciseName={banTarget}
+        mesocycle={mesocycle ?? []}
+        onConfirm={onBanExercise}
+        onClose={() => setBanTarget(null)}
+      />
+    </Suspense>
+  ) : null
+
   if (isProgramView) {
     // DevTestPanel mounts here — program surface, dev-gated — never above
     // the today hero (LAYOUT-DESIGN.md §2.4).
@@ -209,7 +232,7 @@ export function ExerciseTab({
           // screen. Same prop, same signal, one more reader.
           refreshToken={logsVersion}
           onOpenSwap={setSwapTarget}
-          onBanExercise={onBanExercise}
+          onBanExercise={requestBan}
           onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
           onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
         />
@@ -222,7 +245,9 @@ export function ExerciseTab({
           onConfirm={handleConfirmSwap}
           impactFor={swapImpact}
             onReason={handleSwapReason}
+          onDislike={requestBan}
         /></Suspense>
+        {banSheet}
         <ExerciseDetailDialog
           open={!!detailTarget}
           onOpenChange={open => { if (!open) setDetailTarget(null) }}
@@ -254,7 +279,7 @@ export function ExerciseTab({
         onOpenSwap={(dayName, exIndex, exerciseName, sayDay) => setSwapTarget({ dayName, sayDay, exIndex, exerciseName })}
           onInjury={applyInjury}
           onEquipment={applyEquipment}
-        onBanExercise={onBanExercise}
+        onBanExercise={requestBan}
         onMesocycleUpdated={onMesocycleUpdated}
         onProfileChanged={onProfileChanged}
         onOpenPlateCalc={handleOpenPlateCalc}
@@ -272,7 +297,9 @@ export function ExerciseTab({
         onConfirm={handleConfirmSwap}
         impactFor={swapImpact}
             onReason={handleSwapReason}
+        onDislike={requestBan}
       /></Suspense>
+      {banSheet}
       <PlateCalculator
         open={plateCalcOpen}
         onOpenChange={setPlateCalcOpen}
