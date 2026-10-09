@@ -1,6 +1,6 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal, type PoolOption } from './meal-generation'
 import { normaliseSlot, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
-import { parseIngredientLines, withQuantity, computeScaleFactor, isScaleFactorAbsurd, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
+import { parseIngredientLines, withQuantity, kitchenRound, computeScaleFactor, isScaleFactorAbsurd, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
@@ -111,16 +111,11 @@ export function resizeMealTo(
     const q = parsed[i]?.quantity
     if (q == null) return line
     const unit = (parsed[i]?.unit ?? '').toLowerCase().trim()
-    // The same per-unit rounding scaleIngredients uses, applied to the line's
-    // own number so the text survives: whole grams and ml, one decimal for
-    // spoons, and never below one of a counted thing — half an egg scaled from
-    // a whole one is not a portion anybody serves.
-    const scaled = q * factor
-    const rounded = unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml'
-      ? Math.max(1, Math.round(scaled))
-      : unit === 'tbsp' || unit === 'tablespoon' || unit === 'tsp' || unit === 'teaspoon'
-        ? Math.max(0.1, Math.round(scaled * 10) / 10)
-        : Math.max(1, Math.round(scaled))
+    // The scaler's own rounding (kitchenRound: amounts somebody can measure),
+    // applied to the line's own number so the text survives. Never below one
+    // gram or one of a counted thing — half an egg scaled from a whole one is
+    // not a portion anybody serves.
+    const rounded = Math.max(unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml' ? 1 : 0, kitchenRound(q * factor, unit))
     return withQuantity(line, rounded) ?? line
   })
   return { ingredients, factor }

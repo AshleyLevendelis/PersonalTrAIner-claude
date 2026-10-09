@@ -690,6 +690,33 @@
   }
 }
 
+/* OPENING A DIALOG MUST NOT MOVE THE PAGE (9 Oct 2026, the test log's L25).
+ *
+ * Desktop only. Every dialog, menu and select locks page scroll while it is
+ * open. The lock hides the scrollbar, so the window gets about 15px wider, and
+ * the library pads the BODY by the same amount to hold the page still. But the
+ * tab bar, the gear and the session dock are `position: fixed`, which is
+ * measured from the window and not the body — so they slid 15px (7.5px for
+ * anything centred) every time something opened, and back when it closed.
+ *
+ * Two lines, and both are needed:
+ *   1. keep the scrollbar's room at all times, so the window never changes
+ *      width when the bar goes;
+ *   2. tell the library NOT to pad the body. With the room already kept, its
+ *      padding would move the page 7.5px the other way.
+ * The second has to out-rank a rule the library injects with !important: same
+ * importance, one more element in the selector. It is outside the layers above
+ * on purpose — the injected rule is unlayered too.
+ *
+ * Phones draw the scrollbar over the page and never had the problem; there
+ * both lines do nothing. verify:dialog-shift holds it on a desktop window. */
+html {
+  scrollbar-gutter: stable;
+}
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
 @layer utilities {
   /* One dot of the onboarding typing indicator. Reduced motion keeps the
    * dots visible and simply stops them moving — removing them entirely would

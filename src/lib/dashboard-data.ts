@@ -21,6 +21,7 @@ import { getActiveGoals } from './memory-store'
 import { computeStreak, buildStreakDays, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
 import { selectCoachTipWithKey, type CoachTipContext } from './coach-tips'
+import { expectedByNow, paceClock } from './pace'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
 import { getLocalDateString } from './dev-clock'
@@ -581,6 +582,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     })
     .filter((x): x is { name: string; deltaKg: number } => x !== null)
 
+  // ONE CLOCK FOR EVERY PACE LINE ON HOME, and it is the app's (`now` comes
+  // from getAppNow), not the machine's: the hour used to be `new Date()` read
+  // right here, so under the harness's fixed today the water tip still moved
+  // with the wall clock. "First day" is the account's or the plan's.
+  const clock = paceClock(now, [profile.created_at, planCreatedAt])
   const coachTipCtx: CoachTipContext = {
     today: todayStr,
     proteinAdherenceStreakDays: proteinStreak,
@@ -596,7 +602,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     // pure function by design.
     waterMl,
     waterTargetMl,
-    hourOfDay: new Date().getHours(),
+    hourOfDay: now.getHours(),
+    firstDay: clock.firstDay,
   }
   const selectedTip = selectCoachTipWithKey(coachTipCtx)
   const coachTip = selectedTip?.text ?? null
@@ -608,7 +615,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     const remaining = session.setsPlanned - session.setsLogged
     if (remaining > 0) gaps.push(`${remaining} set${remaining === 1 ? '' : 's'} left in today's session`)
   }
-  if (ledger.eaten.kcal === 0) gaps.push('no meals logged yet')
+  // "No meals logged yet" is only worth an amber line once a meal was DUE —
+  // it used to show at 07:01, before anybody has had breakfast, and on the
+  // evening somebody signed up. Every meals-per-day shape starts with
+  // breakfast, so that one slot is the whole question; pace.ts holds when.
+  const aMealWasDue = expectedByNow(1, clock, { kind: 'meals', meals: [{ slot: 'breakfast', amount: 1 }] }) > 0
+  if (ledger.eaten.kcal === 0 && aMealWasDue) gaps.push('no meals logged yet')
   const weighedInRecently = weighIns.filter(w => daysAgo(w.date, todayStr) <= 13).length >= 3
   const weighedInToday = weighIns.some(w => w.date === todayStr)
   if (weighedInRecently && !weighedInToday) gaps.push('no weigh-in yet today')

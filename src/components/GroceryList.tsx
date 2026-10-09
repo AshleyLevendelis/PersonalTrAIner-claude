@@ -26,6 +26,7 @@ import {
   DEFAULT_HORIZON_DAYS, type GroceryItemRow, type GroceryCategory,
 } from '@/lib/grocery-store'
 import {
+  GROCERY_AISLE_LABEL, trolleyToast, buildListLabel,
   MAX_GROCERY_QUANTITY, formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines,
   coverageSentence, readGroceryBuildMemo, writeGroceryBuildMemo, type GroceryBuildMemo,
 } from '@/lib/grocery-display'
@@ -59,18 +60,11 @@ interface GroceryListProps {
 }
 
 const CATEGORY_ORDER: GroceryCategory[] = ['produce', 'meat_fish', 'dairy', 'dry_goods', 'frozen', 'other']
-const CATEGORY_LABEL: Record<GroceryCategory, string> = {
-  produce: 'Produce',
-  meat_fish: 'Meat & Fish',
-  dairy: 'Dairy',
-  dry_goods: 'Dry Goods',
-  frozen: 'Frozen',
-  other: 'Other',
-}
+const CATEGORY_LABEL = GROCERY_AISLE_LABEL
 const DAY_PRESETS = [3, 7, 14]
 /** How long a ticked row stays in its aisle, struck through, before it leaves. */
 const LEAVE_AFTER_MS = 600
-/** How long "is in the trolley · Undo" stays up. */
+/** How long "— in the trolley · Undo" stays up. */
 const TOAST_MS = 5000
 /** Breathing room between the sticky chips and an aisle a chip has scrolled to. */
 const AISLE_GAP_PX = 12
@@ -391,7 +385,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                   {generating
                     ? <Loader2 className="size-[13px] animate-spin" aria-hidden />
                     : <RefreshCw className="size-[13px]" aria-hidden />}
-                  Rebuild
+                  {buildListLabel(items)}
                 </button>
               </div>
             </div>
@@ -435,7 +429,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
             <div className="flex flex-col items-center justify-center gap-2 py-10 text-center" data-testid="grocery-empty">
               <ShoppingCart className="size-7 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">Your list is empty.</p>
-              <p className="max-w-[26ch] text-xs text-muted-foreground/70">It fills from your meal plan — tap Rebuild above, or add an item by hand.</p>
+              <p className="max-w-[26ch] text-xs text-muted-foreground/70">It fills from your meal plan — tap {buildListLabel(items)} above, or add an item by hand.</p>
             </div>
           )}
 
@@ -590,7 +584,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           style={{ bottom: addBarH + 12 }}
         >
           <CheckCircle2 className="size-4 shrink-0 text-primary-text" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{toast.name} is in the trolley</span>
+          <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{trolleyToast(toast.name)}</span>
           <button
             type="button"
             data-testid="grocery-undo"

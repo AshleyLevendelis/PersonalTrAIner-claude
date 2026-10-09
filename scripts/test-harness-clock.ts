@@ -96,12 +96,21 @@ console.log('\n4. The pages pin the app clock, so no driver has to remember\n')
 // already guarantees no file can read a real calendar to get one.
 for (const page of ['real.tsx', 'chat.tsx', 'profile.tsx']) {
   const src = bare(readFileSync(join(DIR, page), 'utf-8'))
-  const call = src.match(/setDevClockOverride\(\s*PROFILE_ID\s*,\s*([A-Za-z_$][\w$]*)\s*\)/)
+  // THE DATE is the second argument. Since 9 Oct 2026 the override may carry a
+  // TIME OF DAY as a third (the pace lines depend on the hour), so the call is
+  // allowed one more argument — and that one is held just below: it must be a
+  // constant read from the page's own address, never from a clock.
+  const call = src.match(/setDevClockOverride\(\s*PROFILE_ID\s*,\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)/)
   const arg = call?.[1]
   const tracesToAnchor = arg === 'ANCHOR_ISO'
     || (!!arg && new RegExp(`const ${arg}\\b[^\n]*ANCHOR_ISO`).test(src))
   check(`${page} pins the dev clock to a date that comes from the anchor`, tracesToAnchor,
     { arg, call: src.match(/setDevClockOverride\([^)]*\)/)?.[0] })
+  const timeArg = call?.[2]
+  const timeDecl = timeArg ? src.match(new RegExp(`const ${timeArg}\\b[^\n]*`))?.[0] ?? '' : ''
+  check(`${page}: a time of day, if it sets one, comes from the page's address and nothing else`,
+    !timeArg || (/URLSearchParams\(location\.search\)\.get\(/.test(timeDecl) && !/Date|performance/.test(timeDecl)),
+    { timeArg, timeDecl })
 }
 
 console.log('\n5. One owner for "today", and a day is found rather than named\n')

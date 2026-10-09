@@ -25,6 +25,7 @@ import {
   macroShortfallLine, SHORTFALL_SPEAK_FRACTION, COVERING_MIN_FRACTION,
   type PlannedMeal,
 } from '../src/lib/macro-shortfall'
+import { paceClock } from '../src/lib/pace'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -80,13 +81,18 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
 {
   const T = { calories: 2400, protein: 180, carbs: 240, fat: 70 }
   const meal = (label: string, logged: boolean, protein: number): PlannedMeal =>
-    ({ label, logged, macros: { calories: 600, protein, carbs: 60, fat: 20 } })
+    ({ slot: label.toLowerCase() as PlannedMeal['slot'], label, logged, macros: { calories: 600, protein, carbs: 60, fat: 20 } })
+  // THE CLOCK, since 9 Oct 2026 (test:pace-clock holds what it does). These
+  // checks are about the thresholds and the covering meal, so they stand at
+  // 22:30 on an ordinary day — every meal's time has passed and the whole of
+  // each target was due — where the clock is not what decides the answer.
   const base = {
     targets: T,
     eaten: { protein: 0, carbs: 0, fat: 0 },
     waterTargetMl: 2000,
     waterMl: 2000,
     meals: [] as PlannedMeal[],
+    clock: paceClock(new Date('2026-03-11T22:30:00'), ['2026-02-01T09:00:00']),
   }
 
   check('nothing behind → silent',

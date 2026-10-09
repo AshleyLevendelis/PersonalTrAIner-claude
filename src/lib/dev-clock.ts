@@ -6,6 +6,14 @@ const BYPASS_PREFIX = 'fitplan_dev_bypass_'
 export interface DevClockOverride {
   date: string // ISO date string (YYYY-MM-DD)
   enabled: boolean
+  /**
+   * Time of day, "HH:MM", 24-hour. Optional: without it the overridden day is
+   * read at noon, as it always was. Added 9 Oct 2026 for the pace lines
+   * ("behind" depends on the hour), so a browser check can stand at 07:00 and
+   * at 20:00 on the harness's one fixed day instead of reading the machine's
+   * clock.
+   */
+  time?: string
 }
 
 export function getDevClockOverride(userId: string): DevClockOverride | null {
@@ -20,20 +28,24 @@ export function getDevClockOverride(userId: string): DevClockOverride | null {
   }
 }
 
-export function setDevClockOverride(userId: string, date: string | null): void {
+export function setDevClockOverride(userId: string, date: string | null, time?: string | null): void {
   const key = `${STORAGE_PREFIX}${userId}`
   if (!date) {
     localStorage.removeItem(key)
     return
   }
-  localStorage.setItem(key, JSON.stringify({ date, enabled: true }))
+  const timed = time && /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? { time } : {}
+  localStorage.setItem(key, JSON.stringify({ date, enabled: true, ...timed }))
 }
 
 export function getAppNow(userId: string | undefined): Date {
   if (!userId) return new Date()
   const override = getDevClockOverride(userId)
   if (!override) return new Date()
-  const d = new Date(override.date + 'T12:00:00')
+  // Noon unless a time was given: a day read at noon is the same calendar day
+  // in every timezone the app is used in.
+  const time = override.time && /^([01]\d|2[0-3]):[0-5]\d$/.test(override.time) ? override.time : '12:00'
+  const d = new Date(`${override.date}T${time}:00`)
   if (isNaN(d.getTime())) return new Date()
   return d
 }

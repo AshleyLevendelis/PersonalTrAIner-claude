@@ -1,4 +1,8 @@
 import type { MacroTargets } from '@/lib/types'
+import {
+  expectedByNow, isBehindPace, WAKING_DAY, PACE_WORTH_SAYING_FRACTION,
+  type PaceBasis, type PaceClock, type PaceSlot,
+} from '@/lib/pace'
 
 /**
  * The one sentence the Personal TrAIner says at the top of the Nutrition tab.
@@ -17,6 +21,8 @@ import type { MacroTargets } from '@/lib/types'
 
 /** One planned meal for today, in the order the meal list renders them. */
 export interface PlannedMeal {
+  /** Which meal of the day it is — what decides WHEN it is due (pace.ts). */
+  slot: PaceSlot
   /** As the meal list labels it — "Dinner", not "dinner" or "DINNER". */
   label: string
   logged: boolean
@@ -30,12 +36,22 @@ export interface ShortfallInput {
   waterTargetMl: number
   waterMl: number
   meals: PlannedMeal[]
+  /**
+   * The app's clock and whether today is the person's first day (pace.ts).
+   * REQUIRED, so no caller can leave the time out: until 9 Oct 2026 this rule
+   * had none, and said "Protein is behind — 162g to go" before breakfast.
+   */
+  clock: PaceClock
 }
 
 /**
  * Under this share of the target still outstanding, nothing is said. Being a
  * little under at 4pm is the normal shape of a day, and a line that fires on
  * it is wallpaper by Wednesday.
+ *
+ * NECESSARY, NOT SUFFICIENT, since 9 Oct 2026: a wide gap is only "behind"
+ * when the clock says that much was due by now (pace.ts). Before that this
+ * was the whole rule, and at 7am everything is 100% outstanding.
  */
 export const SHORTFALL_SPEAK_FRACTION = 0.34
 /**
@@ -46,36 +62,85 @@ export const COVERING_MIN_FRACTION = 0.2
 
 type MacroKey = 'protein' | 'carbs' | 'fat'
 
-export function macroShortfallLine(input: ShortfallInput): string | null {
-  const { targets, eaten, waterTargetMl, waterMl, meals } = input
-  const gaps: { label: string; key: MacroKey | 'water'; left: number; target: number; unit: string }[] = []
-  if (targets) {
-    gaps.push(
-      { label: 'Protein', key: 'protein', left: targets.protein - eaten.protein, target: targets.protein, unit: 'g' },
-      { label: 'Carbs', key: 'carbs', left: targets.carbs - eaten.carbs, target: targets.carbs, unit: 'g' },
-      { label: 'Fat', key: 'fat', left: targets.fat - eaten.fat, target: targets.fat, unit: 'g' },
-    )
-  }
-  gaps.push({ label: 'Water', key: 'water', left: waterTargetMl - waterMl, target: waterTargetMl, unit: 'ml' })
+/**
+ * With no meal plan for today there are no planned amounts to go by, so the
+ * day's food is read as three main meals of a third each. Stated here rather
+ * than left to fall out of an empty list: an empty list would mean "nothing is
+ * ever due", and somebody with targets and no plan would never hear a word.
+ */
+const NO_PLAN_SLOTS: PaceSlot[] = ['breakfast', 'lunch', 'dinner']
 
-  // A target of zero is not a gap of 100% — it is a number nobody set.
-  const behind = gaps.filter(g => g.target > 0 && g.left > 0)
-  if (behind.length === 0) return null
+const NOUN: Record<MacroKey | 'water', string> = { protein: 'protein', carbs: 'carbs', fat: 'fat', water: 'water' }
+
+export function macroShortfallLine(input: ShortfallInput): string | null {
+  const { targets, eaten, waterTargetMl, waterMl, meals, clock } = input
+  // THE FIRST DAY IS QUIET, and there is no line here that makes it so:
+  // `expectedByNow` is zero all day for somebody who joined today, and a gap
+  // nothing of which is due is never mentioned (below). A second stop here was
+  // tried and removed — breaking it changed no answer, so it held nothing.
+
+  const mealBasis = (key: MacroKey, target: number): PaceBasis => ({
+    kind: 'meals',
+    meals: meals.length > 0
+      ? meals.map(m => ({ slot: m.slot, amount: m.macros[key] }))
+      : NO_PLAN_SLOTS.map(slot => ({ slot, amount: target / NO_PLAN_SLOTS.length })),
+  })
+  const gaps: { label: string; key: MacroKey | 'water'; left: number; target: number; unit: string; actual: number; expected: number }[] = []
+  if (targets) {
+    for (const [label, key] of [['Protein', 'protein'], ['Carbs', 'carbs'], ['Fat', 'fat']] as const) {
+      gaps.push({
+        label, key, unit: 'g', target: targets[key], actual: eaten[key], left: targets[key] - eaten[key],
+        expected: expectedByNow(targets[key], clock, mealBasis(key, targets[key])),
+      })
+    }
+  }
+  gaps.push({
+    label: 'Water', key: 'water', unit: 'ml', target: waterTargetMl, actual: waterMl, left: waterTargetMl - waterMl,
+    expected: expectedByNow(waterTargetMl, clock, WAKING_DAY),
+  })
+
+  // A target of zero is not a gap of 100% — it is a number nobody set. And a
+  // gap nothing of which was DUE yet is the ordinary shape of a morning, not
+  // something to mention: before the time for it has passed, the line is quiet.
+  const open = gaps.filter(g => g.target > 0 && g.left > 0 && g.expected > 0)
+  if (open.length === 0) return null
   // ONLY THE WIDEST. Four "you're a bit under" lines is a list, and a list is
   // not a nudge.
-  const worst = behind.reduce((a, b) => (b.left / b.target > a.left / a.target ? b : a))
+  const widest = (list: typeof open) => list.reduce((a, b) => (b.left / b.target > a.left / a.target ? b : a))
+
+  const unlogged = meals.filter(m => !m.logged)
+  // BEHIND is the old threshold asked of what was DUE: the same third (and a
+  // bit) outstanding, but of the meals whose time has passed, not of the
+  // whole day. At the end of the day the two are the same rule.
+  const behind = open.filter(g => isBehindPace(g.actual, g.expected, g.target, 1 - SHORTFALL_SPEAK_FRACTION))
+  // NOT BEHIND, BUT THE PLAN DOES NOT COVER IT. The person is keeping up with
+  // the clock, a good share of the day is still open, and the meals left to
+  // log would not close it. Worth one neutral sentence — what is left, never
+  // "behind". Water is left out: the app plans food, not drinks, so every
+  // morning would qualify, and the ring already shows the figure.
+  const uncovered = open.filter(g => {
+    if (g.key === 'water' || behind.includes(g)) return false
+    const key = g.key
+    const planned = unlogged.reduce((sum, m) => sum + m.macros[key], 0)
+    return g.left - planned >= g.target * PACE_WORTH_SAYING_FRACTION
+  })
+  const isBehind = behind.length > 0
+  const pool = isBehind ? behind : uncovered
+  if (pool.length === 0) return null
+  const worst = widest(pool)
   if (worst.left / worst.target < SHORTFALL_SPEAK_FRACTION) return null
 
   const left = `${Math.round(worst.left)}${worst.unit}`
-  const bare = `${worst.label} is behind — ${left} to go.`
+  const bare = isBehind
+    ? `${worst.label} is behind — ${left} to go.`
+    : `${left} of ${NOUN[worst.key]} to come today.`
   // Water has no planned meal behind it (the app plans food, not drinks), so
   // that gap always gets the bare line rather than a meal that happens to
   // contain some liquid.
   if (worst.key === 'water') return bare
 
   const macroKey = worst.key
-  const covering = meals
-    .filter(m => !m.logged)
+  const covering = unlogged
     .map(m => ({ label: m.label, amount: m.macros[macroKey] }))
     .sort((a, b) => b.amount - a.amount)[0]
   if (!covering || covering.amount < worst.left * COVERING_MIN_FRACTION) return bare

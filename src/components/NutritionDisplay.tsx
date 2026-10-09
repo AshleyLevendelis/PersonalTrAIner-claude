@@ -16,6 +16,8 @@ import type { PoolOption } from '@/lib/meal-generation'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
 import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
 import { macroShortfallLine } from '@/lib/macro-shortfall'
+import { paceClock } from '@/lib/pace'
+import { getAppNow } from '@/lib/dev-clock'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MissingBodyMetricsNotice } from '@/components/MissingBodyMetricsNotice'
 import { InsightBanner } from '@/components/ui/insight-banner'
@@ -94,6 +96,8 @@ export interface NutritionDisplayProps {
   // unchanged from App.tsx (same values it passed to <MealPlan> before).
   profileId: string | undefined
   date: string
+  /** When the current plan was made. With the account's own date it decides "is this their first day?", when no pace line is said (pace.ts). */
+  planCreatedAt?: string
   pools: Partial<Record<MealSlotName, PoolOption[]>>
   chosen: Partial<Record<MealSlotName, PoolOption>>
   mealTotals: MacroTargets
@@ -167,7 +171,7 @@ export interface MealRefitOffer {
 
 export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onMacroSplitChange,
-  profileId, date, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
+  profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
@@ -326,10 +330,13 @@ export function NutritionDisplay({
     waterTargetMl: waterTarget,
     waterMl: todayWaterMl,
     meals: SLOT_ORDER.filter(slot => chosen[slot]).map(slot => ({
+      slot,
       label: SLOT_LABEL[slot],
       logged: loggedSlots.includes(slot),
       macros: chosen[slot]!.macros,
     })),
+    // The APP's clock, never `new Date()`: the harness has one fixed today.
+    clock: paceClock(getAppNow(profile.id), [profile.created_at, planCreatedAt]),
   })
 
   const ringValues: Record<string, { eaten: number; target: number }> = {

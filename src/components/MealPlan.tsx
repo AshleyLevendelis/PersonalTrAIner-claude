@@ -15,6 +15,7 @@ import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import { methodSafeToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
+import { formatKitchenQuantity } from '@/lib/portion-scaler'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
@@ -24,7 +25,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
-import { COOK_ONCE } from '@/lib/coach-voice'
+import { COOK_ONCE, didNotSave } from '@/lib/coach-voice'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
@@ -650,9 +651,20 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
   )
 }
 
+/**
+ * The line as DATA: the string handed to the edit and move builders, which
+ * read the amount back out of it. Decimal on purpose ("1.25 tsp olive oil").
+ * Two decimals since 9 Oct 2026, because spoons are now quarters and one
+ * decimal would turn 1.25 into 1.3 on the way to the builder.
+ */
 function formatIngredient(ing: { name: string; quantity: number; unit: string }): string {
-  const qty = Number.isInteger(ing.quantity) ? ing.quantity : Math.round(ing.quantity * 10) / 10
+  const qty = Number.isInteger(ing.quantity) ? ing.quantity : Math.round(ing.quantity * 100) / 100
   return `${qty}${ing.unit === 'g' || ing.unit === 'ml' ? ing.unit : ` ${ing.unit}`} ${ing.name}`
+}
+
+/** The line as she READS it: the same words, with spoons in quarters (1¼ tsp, ½ tbsp). */
+function displayIngredient(ing: { name: string; quantity: number; unit: string }): string {
+  return `${formatKitchenQuantity(ing.quantity, ing.unit)}${ing.unit === 'g' || ing.unit === 'ml' ? ing.unit : ` ${ing.unit}`} ${ing.name}`
 }
 
 function MealSlotRow({
@@ -724,6 +736,11 @@ function MealSlotRow({
 }) {
   const [busy, setBusy] = useState(false)
   const [favouriteBusy, setFavouriteBusy] = useState(false)
+  // THE HEART'S FAILURE IS SAID. Until 9 Oct 2026 a heart that did not save
+  // did nothing at all on screen and wrote "Couldn't save ..." to a console
+  // nobody reads (M21) — and it had never once saved. The heart still does
+  // not move on a failed write; now a line under the row says why not.
+  const [favouriteError, setFavouriteError] = useState<string | null>(null)
   const [swapOpen, setSwapOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -770,7 +787,9 @@ function MealSlotRow({
       // this card reports a failed write rather than showing the change
       // anyway, and a heart is the easiest thing in the app to flip
       // optimistically and quietly lose.
-      await onToggleFavourite(option, !isFavourite)
+      setFavouriteError(null)
+      const saved = await onToggleFavourite(option, !isFavourite)
+      if (saved === null) setFavouriteError(didNotSave(isFavourite ? 'Taking this off your favourites' : 'This favourite'))
     } finally {
       setFavouriteBusy(false)
     }
@@ -953,11 +972,11 @@ function MealSlotRow({
                           aria-expanded={editingLine === i}
                           onClick={() => { setEditNote(null); setEditingLine(prev => (prev === i ? null : i)) }}
                         >
-                          <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{line}</span>
+                          <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}</span>
                           <span className="shrink-0 text-[0.625rem] text-muted-foreground">Change</span>
                         </button>
                       ) : (
-                        <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{line}</span>
+                        <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}</span>
                       )}
                       {editingLine === i && (() => {
                         const ctx = editContextFor(option)
@@ -1166,6 +1185,9 @@ function MealSlotRow({
               </button>
             )}
           </div>
+          {favouriteError && (
+            <p role="status" className="text-[0.71875rem] text-[color:var(--role-warn-text)]" data-testid="meal-favourite-error">{favouriteError}</p>
+          )}
 
           {addOpen && onMealPickApplied && (() => {
             const ctx = editContextFor(option)

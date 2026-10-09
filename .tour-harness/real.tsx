@@ -111,7 +111,13 @@ const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001'
 // otherwise pinning a day would reshape the week and move the day you were
 // aiming at.
 const TODAY_ISO = new URLSearchParams(location.search).get('today') ?? ANCHOR_ISO
-setDevClockOverride(PROFILE_ID, TODAY_ISO)
+// ?clock=HH:MM — the time of day on the anchor, for the pace lines ("behind"
+// depends on the hour). Noon when absent, as every run before 9 Oct 2026 was.
+// Still the app's own seam (the dev clock), never the machine's.
+const CLOCK = new URLSearchParams(location.search).get('clock')
+setDevClockOverride(PROFILE_ID, TODAY_ISO, CLOCK)
+// ?joined=today — the account was made today (no pace line is said that day).
+const JOINED_TODAY = new URLSearchParams(location.search).get('joined') === 'today'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // TODAY MUST BE A TRAINING DAY or the tour legitimately drops its set stop
@@ -227,7 +233,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
+  created_at: new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
@@ -596,7 +602,11 @@ const priced = (slot: string, name: string, ingredients: { name: string; quantit
 const refitChosen = {
   breakfast: priced('breakfast', 'Porridge with milk', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 250, unit: 'ml' }]),
   lunch: priced('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 150, unit: 'g' }]),
-  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' }]),
+  // ?spoon=1 adds a spoon of oil to the dinner, so a resize has a spoon amount
+  // to round (verify:kitchen-amounts). Off by default: every other run of this
+  // fixture keeps the dinner, and therefore the targets, it always had.
+  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' },
+    ...(new URLSearchParams(location.search).get('spoon') === '1' ? [{ name: 'olive oil', quantity: 1, unit: 'tbsp' }] : [])]),
   snack: priced('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
 }
 const refitBase = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
@@ -1247,7 +1257,7 @@ function Harness() {
         )}
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
-            latestWeightKg={80} profileId={PROFILE_ID} date={today}
+            latestWeightKg={80} profileId={PROFILE_ID} date={today} planCreatedAt={profile.created_at}
             pools={servablePools as never} chosen={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
             avoidFoods={compileFoodDislikes(AVOID_FACTS)}
             isGeneratingMeals={false} mealRegenerateError={null}
