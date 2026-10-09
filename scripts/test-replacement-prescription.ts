@@ -347,9 +347,19 @@ async function main() {
   // The tempo is the WEEK's, not whatever the outgoing lift carried.
   check('the week\'s tempo is offered in a loading week (Adaptation: 2-0-1)', prog.tempo === '2-0-1', prog.tempo)
   check('...and none on a deload', twoSets.tempo === null, twoSets.tempo)
-  const thuStepUp = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Thursday')!.exercises.find(e => e.name === 'Low Box Step-Up')
-  const satStepUp = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Saturday')!.exercises.find(e => e.name === 'Low Box Step-Up')
-  check('the same step-up reads the same on both days — tempo whether it replaced a loaded lunge or a bodyweight squat', thuStepUp?.tempo === '2-0-1' && satStepUp?.tempo === '2-0-1', { thu: thuStepUp?.tempo, sat: satStepUp?.tempo })
+  // RE-ANCHORED 9 Oct 2026, deliberately. This compared the step-up on
+  // Thursday AND Saturday, because the tester's Saturday ("Shoulders & Abs")
+  // held three leg compounds and the knee adaptation put a step-up there too.
+  // That Saturday was the defect the day-purpose work fixed: it now holds one
+  // light leg accessory, and no step-up lands on it. The property is
+  // unchanged — the tempo is the WEEK's, not the outgoing lift's — and is held
+  // on every day the step-up appears: Thursday's replaced a LOADED lunge,
+  // which carries no tempo, so a tempo copied from the outgoing lift would
+  // read undefined here.
+  const stepUps = knee.mesocycle.find(w => w.week_number === 2)!.days
+    .flatMap(d => d.exercises.filter(e => e.name === 'Low Box Step-Up').map(e => ({ day: d.day, tempo: e.tempo })))
+  check('the step-up carries the week\'s tempo wherever the adaptation put it — it replaced a loaded lunge, which carries none',
+    stepUps.length >= 1 && stepUps.every(x => x.tempo === '2-0-1'), stepUps)
   const spanish = knee.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === 'Thursday')!.exercises.find(e => e.name === 'Spanish Squat')
   check('...and the Spanish Squat that came in beside it is a 35-50s hold with no tempo', spanish?.reps === '35-50s' && spanish?.tempo === undefined, spanish && { reps: spanish.reps, tempo: spanish.tempo })
   check('a hold swapped for a rep lift takes that lift\'s own range, not a fallback', replacementProgramming(holdSlot, ote, cleared, wkAA).reps === repRangeForIncomingExercise(ote, cleared, wkAA, 'RPE 6-7'), replacementProgramming(holdSlot, ote, cleared, wkAA))

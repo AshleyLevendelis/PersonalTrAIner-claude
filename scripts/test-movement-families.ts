@@ -174,6 +174,12 @@ function main() {
       isGenuineDuplicate(e('Plank'), e('Dead Bug')) === true &&
       isGenuineDuplicate(e('Air Squat'), e('Tempo Air Squat')) === true &&
       isGenuineDuplicate(e('Barbell Bench Press'), e('Incline Dumbbell Press')) === false &&
+      // Same implement, different plane: the pair that isolates the plane
+      // half of the rule (a mutation dropping it was MISSED without this).
+      e('Dumbbell Bench Press').equipment.includes('dumbbells') && e('Incline Dumbbell Press').equipment.includes('dumbbells') &&
+      isGenuineDuplicate(e('Dumbbell Bench Press'), e('Incline Dumbbell Press')) === false &&
+      // Same plane, no implement in common: the pair that isolates the other half.
+      isGenuineDuplicate(e('Lateral Raises'), e('Cable Lateral Raises')) === false &&
       isGenuineDuplicate(e('Plank'), e('Plank')) === false &&
       isGenuineDuplicate(e('Band Tricep Pushdown'), e('Band Tricep Kickback')) === false,
       [isGenuineDuplicate(e('Plank'), e('Dead Bug')), isGenuineDuplicate(e('Air Squat'), e('Tempo Air Squat')), isGenuineDuplicate(e('Barbell Bench Press'), e('Incline Dumbbell Press'))])

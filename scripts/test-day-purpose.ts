@@ -33,6 +33,7 @@ import {
 import { EXERCISE_DATABASE, getExerciseEntry, getMovementFamily, type ExerciseEntry } from '../src/lib/exercise-db'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { optionalFillerSeconds } from '../src/lib/session-duration'
+import { dayAnchorExercise } from '../src/lib/session-derive'
 import { scorePlan } from '../src/lib/quality-score'
 import { ALL_EQUIPMENT, ALL_DURATIONS, getInjuryCombinations } from '../src/lib/dev-constraint-audit'
 import { buildProfile, comboKey, type Combination } from './quality-grid'
@@ -288,8 +289,8 @@ function main() {
     : small ? [['beginner', 'fat_loss']]
     : [['intermediate', 'hypertrophy'], ['beginner', 'fat_loss']]
 
-  const offenders = { noDefining: [] as string[], legHeavy: [] as string[], onePress: [] as string[], thin: [] as string[], family: [] as string[], notABug: [] as string[], allLegs: [] as string[], legLeads: [] as string[] }
-  let plans = 0, bodyPartDays = 0, renamed = 0, chestDaysWithTwoInPool = 0, thinButExhausted = 0, onePressByBalance = 0, shouldersDaysWithLeg = 0
+  const offenders = { noDefining: [] as string[], legHeavy: [] as string[], onePress: [] as string[], thin: [] as string[], family: [] as string[], notABug: [] as string[], allLegs: [] as string[], legLeads: [] as string[], legIsMain: [] as string[], rowTaken: [] as string[] }
+  let plans = 0, bodyPartDays = 0, renamed = 0, chestDaysWithTwoInPool = 0, thinButExhausted = 0, onePressByBalance = 0, shouldersDaysWithLeg = 0, presslessShoulders = 0
   for (const equipment of ALL_EQUIPMENT) for (const injuries of getInjuryCombinations()) for (const duration of ALL_DURATIONS) for (const [experience, goal] of pairs) {
     const c = combo({ equipment, injuries, duration, experience, goal })
     const { week, profile } = gridWeek(c)
@@ -348,6 +349,18 @@ function main() {
         if (reachable.length > 0) offenders.thin.push(`${key} ${d.day} ${d.focus} sets=${workingSets(d)} could still take ${reachable.slice(0, 3).map(e => e.name).join(', ')}`)
         else thinButExhausted++
       }
+      // P11: a Shoulders day with no overhead press keeps its row. Where one
+      // press is all the pool holds, the week's exercise-count balance pass
+      // used to REMOVE pulls to match it — and the row on this day is the
+      // first it reaches, leaving "upper back" as shrugs and a curl.
+      if (d.focus === 'Shoulders & Abs' && !entries.some(e => e.movement_pattern === 'vertical_push')) {
+        presslessShoulders++
+        // By substitution group, not pattern: a rear-delt flye is filed as a
+        // horizontal pull too, and it is not the row this is about.
+        const poolHasRow = pool.some(e => e.substitution_group === 'row' && e.mechanics_tier !== 'primer')
+        if (poolHasRow && !entries.some(e => e.substitution_group === 'row'))
+          offenders.rowTaken.push(`${key} ${d.day}: ${w.map(x => x.name).join(' | ')}`)
+      }
       // P9: the leg accessory on a Shoulders day is last, and never its biggest dose.
       if (d.focus === 'Shoulders & Abs') {
         const legs = legCompounds(d)
@@ -357,6 +370,13 @@ function main() {
           const others = w.filter(x => !LEG_COMPOUND.has(x.entry.movement_pattern))
           if (w[w.length - 1].name !== legs[0].name || (legs[0].sets === mostSets && others.every(x => x.sets < mostSets)))
             offenders.legLeads.push(`${key} ${d.day}: ${w.map(x => `${x.name} ${x.sets}`).join(' | ')}`)
+          // P10: nor the movement the screen labels "Main lift". Where the day
+          // has no tier-1 of its own that label goes to the highest-ranked
+          // movement on it, so a leg accessory that outranks the day's own
+          // work would be drawn as the point of a Shoulders day. Asked of the
+          // function the screen itself uses.
+          if (dayAnchorExercise(d.exercises)?.name === legs[0].name)
+            offenders.legIsMain.push(`${key} ${d.day}: ${w.map(x => x.name).join(' | ')}`)
         }
       }
       for (const pair of sameMovementTwice(entries)) offenders.family.push(`${key} ${d.day}: ${pair}`)
@@ -381,6 +401,10 @@ function main() {
   check('P8: the fallback is real — some day on the slice took another name', renamed > 0, { renamed })
   check('P9: the leg accessory on a Shoulders day is written last and is never alone as the day\'s biggest dose',
     shouldersDaysWithLeg > 0 && offenders.legLeads.length === 0, { of: shouldersDaysWithLeg, count: offenders.legLeads.length, first: offenders.legLeads.slice(0, 3) })
+  check('P11: a Shoulders day with no overhead press keeps a row wherever the pool holds one — pulling is not removed to match one press',
+    presslessShoulders > 0 && offenders.rowTaken.length === 0, { of: presslessShoulders, count: offenders.rowTaken.length, first: offenders.rowTaken.slice(0, 3) })
+  check('P10: the leg accessory on a Shoulders day is never the movement the screen labels "Main lift"',
+    shouldersDaysWithLeg > 0 && offenders.legIsMain.length === 0, { of: shouldersDaysWithLeg, count: offenders.legIsMain.length, first: offenders.legIsMain.slice(0, 3) })
 
   // =========================================================================
   console.log('\n3. Each mechanism, handed its input directly')
@@ -497,6 +521,13 @@ function main() {
       sh.every(r => !!r && r.main.some(e => e.substitution_group === 'rear_delt') && r.main.filter(e => LEG_COMPOUND.has(e.movement_pattern)).length <= 1),
       sh.map(r => r?.main.map(e => e.name).join(' | ')))
     const uninjuredChest = ['a', 'b', 'c'].map(s => pick('Chest & Triceps', uninjured, `unit:${s}`))
+    // The triceps split must not turn a chest day into an arm day: the fill
+    // stops at the two triceps movements the slots are for. (Held by the
+    // muscle-balance gate's ratio too — which is how it was found — but a
+    // mutation removing the cap was MISSED here until this check existed.)
+    check('3w0. an uninjured 60-90 chest day holds exactly two triceps movements and at least four chest movements',
+      uninjuredChest.every(r => !!r && r.main.filter(e => e.movement_pattern === 'isolation_tricep').length === 2 && r.main.filter(e => e.movement_pattern === 'horizontal_push').length >= 4),
+      uninjuredChest.map(r => r?.main.map(e => `${e.name}:${e.movement_pattern}`).join(' | ')))
     check('3w. an uninjured chest day borrows nothing: no rear delts, no traps, no core',
       uninjuredChest.every(r => !!r && !r.main.some(e => e.substitution_group === 'rear_delt' || e.movement_pattern === 'isolation_trap' || e.movement_pattern === 'core')),
       uninjuredChest.map(r => r?.main.map(e => e.name).join(' | ')))
