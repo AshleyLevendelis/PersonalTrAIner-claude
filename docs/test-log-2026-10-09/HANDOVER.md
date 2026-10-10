@@ -233,6 +233,9 @@ Not yet in the test log. The tester was stopped after a few minutes.
 - The favourite heart DID save Beef Bolognese (59 P · 37 C · 25 F, whole numbers), which fits the
   inferred cause of M21.
 - A meal swap from the list applied at once and left the other meals alone (good).
+  **CORRECTED 10 Oct 2026 (Ashley, from runs 3-4, M34): not safe to assume.** A swap pins one
+  meal and the rest of the day is searched again, so another meal can become a different dish
+  with nothing said. See `runs-3-4-trace.md`.
 
 ## Deploys this branch will need, once merged (each needs her word)
 

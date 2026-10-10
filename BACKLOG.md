@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [ ] **RUNS 3 AND 4 OF THE LIVE-APP TEST (9-10 Oct 2026): 4 HIGH, 11 MEDIUM, 8 LOW, TRACED, NOT
+  BUILT.** Ashley's list, added to the hand-over's jobs. Report only, waiting on "build it".
+  Every item, its cause, and whether this branch already fixes it: `docs/test-log-2026-10-09/
+  runs-3-4-trace.md`. Fixed already: M41 (swap list sees an active adaptation), the first-log
+  record on a hold (part of M42), the add-food "re-fits" promise (part of H24), most of H6.
+  Worst open ones: H25 (a blank tick saves LAST SESSION's weight over today's plan), M40a (every
+  rebuild drops your bans from block 2 onward, checked by hand), M35 (a ban rewrites a day
+  already trained), H24 (header adds up the plan while rows show what was eaten).
+  **Four decisions are hers** (listed in the file); three are mine under the CSCS delegation and
+  are recorded there. HANDOVER.md's "a meal swap left the other meals alone" corrected (M34).
+
 - [x] **JOB 2 OF THE 9 OCT HAND-OVER: THE BRANCH VERIFIED ON A SETTLED TREE (9 Oct 2026).**
   Full sweep at `44d4b19b`, 362 gates. A container restart killed it at 310; the other 52 were
   run on the same commit and all passed. **Reds, read one by one:** `test:meal-quality`,
