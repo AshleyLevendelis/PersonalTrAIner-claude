@@ -25,7 +25,8 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
-import { COOK_ONCE, didNotSave } from '@/lib/coach-voice'
+import { COOK_ONCE, didNotSave, aroundEatenLine } from '@/lib/coach-voice'
+import { dayAsShown } from '@/lib/day-as-shown'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
@@ -246,6 +247,35 @@ export function MealPlan({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void reloadLogged() }, [profileId, date])
 
+  // TODAY AS THE SCREEN SHOWS IT (runs 3-4, H24): one calculation feeds the
+  // header and every row, so they cannot disagree, and the un-eaten meals fit
+  // around what was eaten within about 25% (Ashley's ruling A, 10 Oct 2026).
+  // Undo keeps today's plan as planned; it is remembered for this date only.
+  const keptKey = profileId && date ? `fitplan_around_eaten_kept_${profileId}_${date}` : null
+  const [keepAsPlanned, setKeepAsPlanned] = useState<boolean>(() => {
+    try { return !!keptKey && localStorage.getItem(keptKey) === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { setKeepAsPlanned(!!keptKey && localStorage.getItem(keptKey) === '1') } catch { setKeepAsPlanned(false) }
+  }, [keptKey])
+  const setKept = (next: boolean) => {
+    setKeepAsPlanned(next)
+    try { if (keptKey) { if (next) localStorage.setItem(keptKey, '1'); else localStorage.removeItem(keptKey) } } catch { /* the choice still holds for this visit */ }
+  }
+  const shown = dayAsShown({
+    slots: SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0),
+    chosen,
+    eatenBySlot: Object.fromEntries(Object.entries(loggedBySlot)
+      .filter(([, evs]) => (evs?.length ?? 0) > 0)
+      .map(([slot, evs]) => [slot, (evs ?? []).reduce(
+        (acc, e) => ({ kcal: acc.kcal + (e.macros?.kcal ?? 0), protein: acc.protein + (e.macros?.protein ?? 0), carbs: acc.carbs + (e.macros?.carbs ?? 0), fat: acc.fat + (e.macros?.fat ?? 0) }),
+        { kcal: 0, protein: 0, carbs: 0, fat: 0 })])),
+    targets: targets ?? null,
+    keepAsPlanned,
+  })
+  const shownOption = (slot: MealSlotName): PoolOption | null => shown.slots.find(r => r.slot === slot)?.option ?? chosen[slot] ?? null
+  const aroundLine = aroundEatenLine(shown.aroundEaten)
+
   // A MEAL ALREADY EATEN IS NOT A WARNING — roadmap item 9. The banner tells
   // you which of today's meals to swap or regenerate; a meal you have already
   // eaten cannot be either, so listing it there asks for something impossible
@@ -419,7 +449,18 @@ export function MealPlan({
         Ingredients are filtered, not verified. Check labels if you have an allergy.
       </p>
 
-      {targets && <TotalsHero totals={totals} targets={targets} />}
+      {targets && <TotalsHero totals={shown.totals} targets={targets} />}
+      {aroundLine && (
+        <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="around-eaten" data-kind={shown.aroundEaten.kind}>
+          <span>{aroundLine}</span>
+          {shown.aroundEaten.kind === 'resized' && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="around-eaten-undo" onClick={() => setKept(true)}>Undo</button>
+          )}
+          {shown.aroundEaten.kind === 'kept' && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="around-eaten-refit" onClick={() => setKept(false)}>Fit around what I ate</button>
+          )}
+        </p>
+      )}
 
       {upcoming && <AddDayToGrocery key={date} upcoming={upcoming} />}
 
@@ -452,7 +493,7 @@ export function MealPlan({
             onToggleFavourite={toggleFavourite}
             slot={slot}
             isFirst={idx === 0}
-            option={chosen[slot] ?? null}
+            option={shownOption(slot)}
             alternatives={pools[slot] ?? []}
             expanded={expandedSlot === slot}
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
@@ -660,7 +701,7 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
   return (
     <div>
       <div className="flex items-end gap-3">
-        <span className="tabular-mono ds-num-mega glow-mint-lg">{Math.round(totals.calories)}</span>
+        <span className="tabular-mono ds-num-mega glow-mint-lg" data-testid="day-kcal">{Math.round(totals.calories)}</span>
         <div className="flex flex-col gap-0.5 pb-1.5">
           <span className="text-sm text-foreground">kcal planned</span>
           <span className="ds-label-compact">target {targets.calories} · {deltaLabel}</span>
@@ -924,7 +965,7 @@ function MealSlotRow({
                       the new pick. Considered and kept: what the day is
                       carrying is the useful truth here, and unlogging and
                       logging again corrects it in two taps. */}
-                  <span className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
+                  <span data-testid="meal-row-kcal" data-slot={slot} className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
                     {Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal{isLogged ? ' ✓' : ''}
                     {duplicated ? ` ·×${loggedEvents.length}` : ''}
                   </span>
@@ -1024,7 +1065,7 @@ function MealSlotRow({
                   )
                 })}
               </div>
-              {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}. Your day has been re-fitted around it.</p>}
+              {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}.</p>}
             </div>
           )}
 

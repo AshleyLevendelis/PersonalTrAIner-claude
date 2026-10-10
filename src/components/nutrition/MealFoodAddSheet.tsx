@@ -142,7 +142,8 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
       setError(result.receipt.failed[0].error)
       return
     }
-    onDone(`${food} added to your ${ctx.slot}`)
+    // A sentence starts with a capital, whatever the food table calls it (runs 3-4, LOW).
+    onDone(`${(food ?? "").replace(/^./, c => c.toUpperCase())} added to your ${ctx.slot}`)
   }
 
   return (

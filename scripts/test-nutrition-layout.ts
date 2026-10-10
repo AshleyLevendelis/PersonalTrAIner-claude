@@ -162,7 +162,9 @@ for (const letter of ["label: 'P'", "label: 'C'", "label: 'F'", "label: 'H\\u208
   check(`the legend carries ${letter}`, nutrition.includes(letter))
 }
 check('calories stay the hero number, not a legend row', /ds-num-mega/.test(nutrition) && !/label: 'K'/.test(nutrition))
-check('the caption says what is left, not only what is eaten', /kcal · <span className="tabular-mono">/.test(nutrition))
+// Re-anchored 10 Oct 2026 (M33): the figure is the phrasebook's now, so past
+// the target it says "over" rather than "0 left".
+check('the caption says what is left, not only what is eaten', /kcal · <span className="tabular-mono" data-testid="kcal-left">\{kcalLeftOrOver\(/.test(nutrition))
 
 // ---------------------------------------------------------------------------
 console.log('\n4. The meal list points at the list it fills')

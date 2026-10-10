@@ -498,6 +498,37 @@ export type LoggedSetReading =
   | { kind: 'bodyweight'; reps: number }
   | { kind: 'added_load'; addedKg: number; reps: number }
 
+/** What is left of the day's calories, or how far over it is: never "0 left" past the target (M33). */
+export function kcalLeftOrOver(remainingKcal: number): string {
+  const n = Math.round(remainingKcal)
+  return n < 0 ? `${-n} over` : `${n} left`
+}
+
+/** "lunch", "lunch and dinner", "breakfast, lunch and snack". */
+function slotList(slots: string[]): string {
+  return slots.length <= 1 ? (slots[0] ?? '') : `${slots.slice(0, -1).join(', ')} and ${slots[slots.length - 1]}`
+}
+
+/**
+ * THE ONE LINE UNDER TODAY'S MEALS WHEN THE DAY FITS AROUND WHAT WAS EATEN
+ * (Ashley's ruling, 10 Oct 2026: "says so in one line with an undo"; beyond
+ * about 25% "leaves the meals alone and says plainly how far over or under").
+ * Null when there is nothing to say.
+ */
+export function aroundEatenLine(a:
+  | { kind: 'none' }
+  | { kind: 'kept'; deltaKcal: number }
+  | { kind: 'resized'; factor: number; slots: string[]; eatenVsPlanKcal: number; eatenSlots: string[] }
+  | { kind: 'too_far'; deltaKcal: number }): string | null {
+  const gap = (d: number) => `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
+  if (a.kind === 'none') return null
+  if (a.kind === 'kept') return `Your meals are as planned. Today is ${gap(a.deltaKcal)}.`
+  if (a.kind === 'too_far') return `Today is ${gap(a.deltaKcal)}: too far to fix by changing portions, so your meals are as planned.`
+  const more = a.eatenVsPlanKcal > 0
+  const pct = Math.round(Math.abs(a.factor - 1) * 100)
+  return `${slotList(a.eatenSlots).replace(/^./, c => c.toUpperCase())} came to ${Math.abs(a.eatenVsPlanKcal)} kcal ${more ? 'more' : 'less'} than planned, so ${slotList(a.slots)} ${a.slots.length === 1 ? 'is' : 'are'} ${pct}% ${a.factor < 1 ? 'smaller' : 'bigger'} today.`
+}
+
 /**
  * THE WEIGHT IN THE BOX IS THE SET JUST DONE (H25, 10 Oct 2026). Shown under a
  * working row only when the carried number differs from the plan's, so the

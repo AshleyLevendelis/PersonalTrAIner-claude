@@ -676,6 +676,7 @@ const driftedMacros: MacroTargets | null = REFIT
   : macros
 
 const today = isoOf(anchorDate())
+const ATE_OVER = new URLSearchParams(location.search).get('ateover') != null ? Number(new URLSearchParams(location.search).get('ateover')) : null
 // ?swappedpast=1 — A DAY EARLIER THIS WEEK, REPLACED BY FOOTBALL. For M14
 // (9 Oct 2026): "I did something else instead — football, 60 min, Hard" left a
 // ⇄ on the strip and a day card that still showed the planned session.
@@ -813,7 +814,15 @@ const db: Db = {
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
   daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }],
-  meal_events: new URLSearchParams(location.search).get('ate') === '1'
+  // ?ateover=N (with ?refit=1&drift=1, whose day sits exactly on its target):
+  // lunch eaten N kcal heavier than its planned dish — verify:day-as-shown,
+  // runs 3-4 H24 and Ashley's ruling A (10 Oct 2026).
+  meal_events: ATE_OVER != null
+    ? [{ id: 'me-over', profile_id: PROFILE_ID, date: today, slot: 'lunch', event_type: 'confirmed',
+        meal_name: refitChosen.lunch.name,
+        macros: { kcal: refitChosen.lunch.macros.calories + ATE_OVER, protein: refitChosen.lunch.macros.protein, carbs: refitChosen.lunch.macros.carbs + Math.round(ATE_OVER * 0.15), fat: refitChosen.lunch.macros.fat + Math.round(ATE_OVER * 0.045) },
+        source: 'manual', client_id: 'seed-over', created_at: anchorDate().toISOString() }]
+    : new URLSearchParams(location.search).get('ate') === '1'
     ? [
         // Eaten under the name the slot still shows — the quiet-note case.
         { id: 'me1', profile_id: PROFILE_ID, date: today, slot: 'breakfast', event_type: 'confirmed',

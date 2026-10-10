@@ -6,7 +6,7 @@ import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/compon
 import { MealDayStrip } from '@/components/nutrition/MealDayStrip'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
-import { mealsDrifted } from '@/lib/coach-voice'
+import { mealsDrifted, kcalLeftOrOver } from '@/lib/coach-voice'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
 import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
@@ -409,7 +409,9 @@ export function NutritionDisplay({
               <p className="ds-num-mega tabular-mono text-[color:var(--num-hero)] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
               <p className="mt-1 text-[0.65625rem] uppercase tracking-[.16em] text-muted-foreground">
                 {macros
-                  ? <>kcal · <span className="tabular-mono">{Math.max(0, Math.round(macros.calories - eaten.kcal))}</span> left</>
+                  // OVER IS SAID AS OVER (runs 3-4, M33): this clamped at zero
+                  // and read "0 left" at 112 over.
+                  ? <>kcal · <span className="tabular-mono" data-testid="kcal-left">{kcalLeftOrOver(macros.calories - eaten.kcal)}</span></>
                   : 'kcal · add your weight for a target'}
               </p>
             </div>
