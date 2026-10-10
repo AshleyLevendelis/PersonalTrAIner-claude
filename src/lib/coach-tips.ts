@@ -154,7 +154,10 @@ const RULES: Rule[] = [
     evaluate: ctx => {
       if (ctx.scheduledSoFarThisWeek === 0) return null
       if (ctx.loggedOfScheduledSoFarThisWeek === ctx.scheduledSoFarThisWeek && ctx.scheduledSoFarThisWeek >= 2) {
-        return `Every planned session this week, done — ${ctx.scheduledSoFarThisWeek} for ${ctx.scheduledSoFarThisWeek}.`
+        // SO FAR, because it counts only the sessions already due (runs 3-4,
+        // M39): "Every planned session this week, done — 2 for 2" sat beside
+        // "2 of 3 sessions done" with a session still to come.
+        return `Every session due so far this week, done — ${ctx.scheduledSoFarThisWeek} for ${ctx.scheduledSoFarThisWeek}.`
       }
       return null
     },

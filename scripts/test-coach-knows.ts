@@ -19,6 +19,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { buildCoachEatenSummary, eatenWindow } from '../src/lib/coach-eaten'
 import { describeEquipmentAccess } from '../src/lib/picker-options'
+import { selectCoachTipWithKey } from '../src/lib/coach-tips'
+import { swapKnockOnLine } from '../src/lib/coach-voice'
 import { buildCoachExerciseSummary, type CoachWeekRow } from '../src/lib/chat-plan-context'
 import type { WorkoutDay, ExerciseSetLog } from '../src/lib/types'
 
@@ -121,6 +123,32 @@ console.log('\n6. A session closed short is said as the fraction (M36)')
   check('with no logs handed over it falls back to the old wording, claiming no number', /\[CLOSED — work was logged that day\]/.test(noLogs))
   const week = read('src/hooks/useTrainingWeek.ts')
   check('the week hands each day its working sets', /workingLogs: dashboardDay\?\.workingLogs \?\? \[\],/.test(strip(week)))
+}
+
+console.log('\n7. The tip claims only the sessions already due (M39)')
+{
+  const ctx = {
+    today: '2026-10-08', proteinAdherenceStreakDays: 0, knownLiftProgress: [], sessionsThisWeekSoFar: 2,
+    sessionsLastWeekSameSpan: 2, scheduledSoFarThisWeek: 2, loggedOfScheduledSoFarThisWeek: 2,
+    weightTrend: null, recentPRs: [], waterMl: 2000, waterTargetMl: 2000, hourOfDay: 12, firstDay: false,
+  }
+  const tip = selectCoachTipWithKey(ctx as never)
+  check('two of two due sessions says "so far", not the whole week',
+    tip?.key === 'perfect_adherence' && tip.text === 'Every session due so far this week, done — 2 for 2.', tip)
+}
+
+console.log('\n8. A meal swap says what else it changed (M34)')
+{
+  check('a different dish is named, with what it replaced',
+    swapKnockOnLine({ slot: 'snack', kind: 'dish', from: 'Yoghurt and banana', to: 'Rice cakes and peanut butter', fromKcal: 230, toKcal: 260 }) === 'Snack changed too, so the day still fits: Yoghurt and banana is now Rice cakes and peanut butter.')
+  check('a resize is said as a size',
+    swapKnockOnLine({ slot: 'dinner', kind: 'size', from: 'Salmon and potatoes', to: 'Salmon and potatoes', fromKcal: 610, toKcal: 540 }) === 'Dinner changed size so the day still fits: Salmon and potatoes, 610 → 540 kcal.')
+  const mp = strip(read('src/components/MealPlan.tsx'))
+  const fn = mp.slice(mp.indexOf('const handleChoose = async'), mp.indexOf('const handleChoose = async') + 700)
+  check('the swap runs the same trial as add-food BEFORE it writes', fn.indexOf('dayMove.knockOn(date, slot, picked)') > -1 && fn.indexOf('dayMove.knockOn(date, slot, picked)') < fn.indexOf('await onSwap(slot, name)'))
+  check('...and names only the OTHER meals of THAT day', /trial\?\.changes\.filter\(c => c\.date === date && c\.slot !== slot\)/.test(fn))
+  check('...each changed meal becomes its line, and the line is drawn under the row',
+    /setSwapNote\(sameDay\.length > 0 \? sameDay\.map\(swapKnockOnLine\) : null\)/.test(fn) && /data-testid="swap-knock-on">\{swapNote\.join\(' '\)\}/.test(mp))
 }
 
 console.log(`\ncoach-knows: ${ran} checks ran`)

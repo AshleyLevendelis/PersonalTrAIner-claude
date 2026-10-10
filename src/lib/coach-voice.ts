@@ -530,6 +530,26 @@ export function aroundEatenLine(a:
 }
 
 /**
+ * WHAT A LOGGED SET SAYS UNDER ITS ROW, in its own unit (runs 3-4, M42): a
+ * 33-second plank read "33 reps" and one rep read "1 reps".
+ */
+export function setReading(set: { count: number; unit: 'reps' | 'seconds' | 'meters'; isBodyweight: boolean; weightKg: number }): string {
+  const n = set.count
+  const amount = set.unit === 'seconds' ? `${n} s` : set.unit === 'meters' ? `${n} m` : `${n} ${n === 1 ? 'rep' : 'reps'}`
+  return set.isBodyweight ? `${amount} · Bodyweight` : `${amount} @ ${set.weightKg}kg`
+}
+
+/**
+ * ONE OTHER MEAL A SWAP CHANGED, said after the tap (runs 3-4, M34). A
+ * different dish is named; a resize is said as a size.
+ */
+export function swapKnockOnLine(c: { slot: string; kind: 'dish' | 'size'; from: string | null; to: string; fromKcal: number | null; toKcal: number }): string {
+  const slot = c.slot.charAt(0).toUpperCase() + c.slot.slice(1)
+  if (c.kind === 'dish') return `${slot} changed too, so the day still fits: ${c.from ?? 'nothing'} is now ${c.to}.`
+  return `${slot} changed size so the day still fits: ${c.to}, ${c.fromKcal ?? '?'} → ${c.toKcal} kcal.`
+}
+
+/**
  * THE WEIGHT IN THE BOX IS THE SET JUST DONE (H25, 10 Oct 2026). Shown under a
  * working row only when the carried number differs from the plan's, so the
  * faint figure never reads as a prescription it is not.

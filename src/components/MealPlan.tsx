@@ -25,7 +25,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
-import { COOK_ONCE, didNotSave, aroundEatenLine } from '@/lib/coach-voice'
+import { COOK_ONCE, didNotSave, aroundEatenLine, swapKnockOnLine } from '@/lib/coach-voice'
 import { dayAsShown } from '@/lib/day-as-shown'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
@@ -839,11 +839,23 @@ function MealSlotRow({
     return true
   })
 
+  // WHAT ELSE A SWAP CHANGED, said after the tap (runs 3-4, M34: swapping
+  // lunch changed the snack recipe and nothing said so). The same trial the
+  // add-food sheet runs; only the changes on this day are named. Whether a
+  // swap should prefer re-sizing over re-picking is Ashley's decision, still
+  // open, so this changes nothing about what happens, only that it is said.
+  const [swapNote, setSwapNote] = useState<string[] | null>(null)
   const handleChoose = async (name: string) => {
     setBusy(true)
     try {
+      const picked = alternatives.find(o => o.name === name)
+      const trial = picked && dayMove?.knockOn && date
+        ? await dayMove.knockOn(date, slot, picked).catch(() => null)
+        : null
       await onSwap(slot, name)
       setSwapOpen(false)
+      const sameDay = trial?.changes.filter(c => c.date === date && c.slot !== slot) ?? []
+      setSwapNote(sameDay.length > 0 ? sameDay.map(swapKnockOnLine) : null)
     } finally {
       setBusy(false)
     }
@@ -1278,6 +1290,9 @@ function MealSlotRow({
             )
           })()}
           {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
+          {swapNote && (
+            <p className="text-[0.71875rem] text-muted-foreground" data-testid="swap-knock-on">{swapNote.join(' ')}</p>
+          )}
 
           {moveOpen && ((moveContext && onMealPickApplied) || dayMove) && (
             <Suspense fallback={null}>

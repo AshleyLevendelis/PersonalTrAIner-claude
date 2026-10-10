@@ -17,7 +17,7 @@ import {
 } from './periodization'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
-import { dayAnchorExercise, anchorScore } from './session-derive'
+import { dayAnchorExercise, anchorScore, canAnchor } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS, yieldFillerTo, optionalFillerSeconds } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
@@ -1681,6 +1681,7 @@ function stageTimeCap(
     for (let i = 0; i < dayExercises.length; i++) {
       const t = dayExercises[i].entry.mechanics_tier
       if (t === 'cardio' || t === 'primer') continue
+      if (!canAnchor(dayExercises[i].entry)) continue
       const r = anchorScore(t, dayExercises[i].entry.name)
       if (r > bestRank) { bestRank = r; best = i }
     }

@@ -458,6 +458,11 @@ export function anchorScore(mechanicsTier: string | undefined, name: string): nu
  * Cardio and finishers are excluded because they are not the session's work,
  * and primers because a warm-up movement is never the point of the day.
  */
+/** Whether a catalogue movement can be a day's main lift: counted in reps, never timed or carried. */
+export function canAnchor(entry: { prescription_type?: string }): boolean {
+  return (entry.prescription_type ?? 'reps') === 'reps'
+}
+
 export function dayAnchorExercise(exercises: Exercise[]): Exercise | undefined {
   // A day with a genuine tier-1 needs no promotion — say so by returning
   // undefined rather than handing back the tier-1 itself, so a caller can
@@ -472,6 +477,12 @@ export function dayAnchorExercise(exercises: Exercise[]): Exercise | undefined {
     const entry = getExerciseEntry(ex.name)
     if (!entry || entry.mechanics_tier === 'primer') continue
     if (ex.prescription_type === 'steady_state' || ex.tier === 'tier_4_finisher') continue
+    // NEVER A HOLD, A CARRY OR AN INTERVAL (runs 3-4, M38, decided as a CSCS
+    // coach): swapping a main lift away left a plank or a wall sit as the
+    // best-ranked thing on the day, labelled MAIN LIFT. The main lift is the
+    // movement progressed by load and reps; no main lift is better than a
+    // wrong one. The engine's rest floor uses canAnchor too.
+    if (!canAnchor(entry)) continue
     // Tier THEN difficulty. Before this carried the difficulty half, a day
     // holding both a Pistol Squat and an Air Squat picked whichever the
     // generator happened to list first — they are the same tier, and the

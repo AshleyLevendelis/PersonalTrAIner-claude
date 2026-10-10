@@ -21,7 +21,7 @@ import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, sameAsSet, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { lastTime, sameAsSet, setReading, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
@@ -323,6 +323,20 @@ export function SetGrid({
   )
 
   const [inputs, setInputs] = useState<Record<string, SetInputState>>({})
+  /**
+   * A HOLD TIMER ON A TIMED SET'S ROW (runs 3-4, M42): a plank had no timer,
+   * so the seconds were guessed and typed. Start, hold, Stop: the seconds go
+   * into the box, which the ✓ then saves like any typed number. One at a time.
+   */
+  const [holdTimer, setHoldTimer] = useState<{ ref: SetRef; startedAt: number; seconds: number } | null>(null)
+  useEffect(() => {
+    if (!holdTimer) return
+    const id = setInterval(() => {
+      // Date.now() as a stopwatch: elapsed time, never a date.
+      setHoldTimer(t => (t ? { ...t, seconds: Math.floor((Date.now() - t.startedAt) / 1000) } : t))
+    }, 250)
+    return () => clearInterval(id)
+  }, [holdTimer?.startedAt])
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
   /**
    * A weight past what the app believes this trainee can load, said out loud
@@ -708,7 +722,13 @@ export function SetGrid({
     // animation, and the DB-derived cache then quietly drops it on the next
     // refresh — a flicker, which is harder to notice and harder to report
     // than a wrong record that stays put.
-    const pr = warm || drop ? null : checkForPR(profileId, exerciseName, {
+    // NOT A LIFTING RECORD ON A TIMED, DISTANCE OR INTERVAL SET (runs 3-4,
+    // M42, decided as a CSCS coach): the record engine counts reps, so a
+    // 35-second plank after a 33 became "most reps 35". A hold is progressed
+    // by time and a carry by distance; neither is a lifting record, and a
+    // record in the wrong unit is worse than none.
+    const countedInReps = (prescriptionType ?? 'reps') === 'reps'
+    const pr = warm || drop || !countedInReps ? null : checkForPR(profileId, exerciseName, {
       weightKg: storedWeightKg,
       reps,
       isBodyweight: storedIsBodyweight,
@@ -725,7 +745,7 @@ export function SetGrid({
       ...existingLogs.filter(l => l.set_number !== setNumber),
       { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: storedWeightKg, reps_completed: reps, is_bodyweight: storedIsBodyweight, added_load_kg: addedLoadKg },
     ]
-    const topPR = warm || drop ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs), today)
+    const topPR = warm || drop || !countedInReps ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs), today)
     setPrBadgeSet(topPR ? { rowKey: rowKey({ kind: 'working', setNumber: topPR.setNumber }), result: topPR.result } : null)
 
     // THE REST TIMER AND THE SAME-SESSION TOAST BELONG TO WORKING SETS. A
@@ -853,7 +873,9 @@ export function SetGrid({
         // set, and only once that row is actually saved. Offering it under an
         // empty box would be asking for a continuation of a set that has not
         // happened.
-        const showAddDrop = rowIndex === lastRowIndexOfLastLoggedSet && isSaved
+        // AND ONLY ON A SET COUNTED IN REPS (M42): a drop is a lighter
+        // continuation of a lift, and a plank or a carry has none.
+        const showAddDrop = rowIndex === lastRowIndexOfLastLoggedSet && isSaved && (prescriptionType ?? 'reps') === 'reps'
         const padClass = railed
           ? (drop ? 'pl-5 pr-1' : 'pl-2 pr-1')
           : (drop ? 'pl-4 pr-1 rounded-l-[8px]' : 'px-1 rounded-l-[8px]')
@@ -1062,9 +1084,14 @@ export function SetGrid({
             // A set that has been waiting on a connection says so, and a set
             // the server refused says so and offers the one thing to do
             // about it. Neither ever just disappears.
-            const reading = logged.is_bodyweight
-              ? `${logged.reps_completed} reps · Bodyweight`
-              : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`
+            // IN ITS OWN UNIT (M42): "33 reps" was a 33-second plank, and
+            // "1 reps" was one rep.
+            const reading = setReading({
+              count: logged.reps_completed,
+              unit: logged.unit ?? prescriptionUnit(prescriptionType),
+              isBodyweight: !!logged.is_bodyweight,
+              weightKg: logged.weight_kg,
+            })
             const state = logged.syncStatus
             // THE FIRST TIME A LIFT IS LOGGED, where a PR badge used to be.
             // It was a trophy; a first log has nothing before it to beat
@@ -1207,13 +1234,38 @@ export function SetGrid({
               boxes. Only where a ghost is actually driving the placeholder,
               and never once the row is saved — then the boxes hold today's
               real numbers and the marker would be describing nothing. */}
+          {/* THE HOLD TIMER (M42): a line under a timed set's row, so the
+              row itself keeps its columns and its tap targets. */}
+          {prescriptionType === 'time' && !warm && !drop && !isSaved && (
+            holdTimer && rowKey(holdTimer.ref) === k ? (
+              <button
+                type="button"
+                data-testid="hold-timer-stop"
+                className="hit-slop-44 px-1 -mt-0.5 text-left text-[0.75rem] font-semibold text-primary-text tabular-mono"
+                onClick={() => { updateInput(ref, 'reps', String(Math.max(1, holdTimer.seconds))); setHoldTimer(null) }}
+              >
+                Stop · {holdTimer.seconds} s
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-testid="hold-timer-start"
+                className="hit-slop-44 px-1 -mt-0.5 text-left text-[0.75rem] font-semibold text-primary-text disabled:opacity-40"
+                disabled={!!holdTimer}
+                onClick={() => setHoldTimer({ ref, startedAt: Date.now(), seconds: 0 })}
+              >
+                Start hold timer
+              </button>
+            )
+          )}
           {/* AND WHEN THE WEIGHT IS THE SET JUST DONE (H25): said only where it
               differs from today's plan, the one case a reader could mistake
               the faint number for a prescription. */}
           {!isSaved && !warm && !drop && !isBW && (() => {
             const blank = workingBlankFor(ref)
             const plan = perSetLoadKg?.[ref.setNumber - 1] ?? suggestedLoadKg ?? null
-            if (blank.source !== 'carried' || blank.fromSet == null || String(plan) === blank.text) return null
+            // Not for a bodyweight carry: "0 · weight from set 1" says nothing.
+            if (blank.source !== 'carried' || blank.fromSet == null || String(plan) === blank.text || !(Number(blank.text) > 0)) return null
             return (
               <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="carried-weight">
                 {sameAsSet(blank.fromSet)}

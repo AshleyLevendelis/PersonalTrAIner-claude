@@ -15,7 +15,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { carriedWeightFor, blankWeightFor } from '../src/lib/set-row'
-import { sameAsSet } from '../src/lib/coach-voice'
+import { sameAsSet, setReading } from '../src/lib/coach-voice'
 
 const ROOT = join(import.meta.dirname, '..')
 let failures = 0
@@ -100,6 +100,7 @@ console.log('\n4. The grid asks the one decision everywhere')
     && (grid.match(/const ghost = drivingGhostFor\(ref\)/g) ?? []).length === 2)
   check('the "weight from set N" line is said only when the carry differs from the plan',
     /blank\.source !== 'carried'/.test(grid) && /String\(plan\) === blank\.text/.test(grid) && /sameAsSet\(blank\.fromSet\)/.test(grid))
+  check('...and never for a bodyweight carry, where it would say "0 · weight from set 1"', /!\(Number\(blank\.text\) > 0\)\) return null/.test(grid))
   check('...in words that name the set', sameAsSet(2) === 'weight from set 2')
 }
 
@@ -117,6 +118,19 @@ console.log('\n5. A box that says "type it" never saves a guess (Ashley\'s quest
     && /const catalogEntryIsLoaded = catalogEntry \? isExternallyLoaded\(catalogEntry\) : false/.test(grid))
   check('...so a blank tick there is refused with "Enter the weight you lifted"',
     /if \(weight === 0 && !isBodyweight\) \{\s*\n\s*setRowErrors\(prev => \(\{ \.\.\.prev, \[k\]: 'Enter the weight you lifted' \}\)\)/.test(grid))
+}
+
+console.log('\n6. A timed set is said in seconds and claims no lifting record (runs 3-4, M42)')
+{
+  check('a 33-second hold reads "33 s"', setReading({ count: 33, unit: 'seconds', isBodyweight: true, weightKg: 0 }) === '33 s · Bodyweight')
+  check('one rep reads "1 rep", never "1 reps"', setReading({ count: 1, unit: 'reps', isBodyweight: false, weightKg: 25 }) === '1 rep @ 25kg')
+  check('...and eight read "8 reps"', setReading({ count: 8, unit: 'reps', isBodyweight: false, weightKg: 25 }) === '8 reps @ 25kg')
+  check('a carry reads metres', setReading({ count: 40, unit: 'meters', isBodyweight: false, weightKg: 16 }) === '40 m @ 16kg')
+  const grid = stripComments(readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8'))
+  check('a set not counted in reps never reaches the record check',
+    /const countedInReps = \(prescriptionType \?\? 'reps'\) === 'reps'/.test(grid)
+    && /const pr = warm \|\| drop \|\| !countedInReps \? null : checkForPR\(/.test(grid)
+    && /const topPR = warm \|\| drop \|\| !countedInReps \? null : getTopPRSet\(/.test(grid))
 }
 
 console.log(`\nset-row: ${ran} checks ran`)

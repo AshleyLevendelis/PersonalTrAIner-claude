@@ -20,7 +20,9 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { beatTargetInBlock, offerText } from '../src/lib/beat-target-offer'
+import { beatTargetInBlock, offerText, carriedForRepRange, patchBlockFromLiftedKg } from '../src/lib/beat-target-offer'
+import { calculateE1RM } from '../src/lib/pr-engine'
+import type { MesocycleWeek, UserProfile } from '../src/lib/types'
 import { MIN_SESSIONS_TO_JUDGE } from '../src/lib/block-review'
 import type { ExerciseHistorySession } from '../src/lib/exercise-history'
 
@@ -185,6 +187,46 @@ console.log('\n5. The half that needs a database is wired to the half that does 
   check('the catch-up handler exists to be checked (sanity check on this check)', handler.length > 200, handler.length)
   check('...and only updates the plan when confirm actually patched something',
     /if \(patched\) \{/.test(handler))
+}
+
+console.log('\n6. Runs 3-4 (M43): the new block\'s reps, the kit limit, and a deload that is lighter')
+{
+  // The tester: Floor Press 18 kg x 11 in block 1, block 2 planned at 16 kg x 6-8.
+  const e1rm = calculateE1RM(18, 11)
+  const carry = carriedForRepRange(e1rm, '6-8')
+  // 18 x 11 is an Epley 1RM of 24.6; back down to 8 reps is 19.4, rounded down
+  // to the half kilo. The confirm then rounds to a dumbbell that exists.
+  check('18 kg x 11 is carried as 19 kg for 6-8 reps (above the 16 kg planned)', carry === 19, { e1rm, carry })
+  check('...aimed at the TOP of the range, so 6 reps leave some in reserve', carry !== null && carry < (carriedForRepRange(e1rm, '6') ?? 0))
+  check('a higher-rep block carries LOWER, and the offer only ever raises over the plan',
+    (carriedForRepRange(e1rm, '12-15') ?? 99) < 18 && beatTargetInBlock([session('2026-01-01', 18), session('2026-01-08', 18), session('2026-01-15', 18)], 16, carriedForRepRange(e1rm, '12-15') ?? 0) === false)
+  check('a range with no number carries nothing', carriedForRepRange(e1rm, 'AMRAP') === null)
+  check('the sentence says what the number is for', offerText('Dumbbell Floor Press', 16, 19, '6-8') === "Your Dumbbell Floor Press sets last block work out at about 19kg for this block's 6-8 reps, and it is planned from 16kg. Want me to start it from that?")
+
+  // The kit limit and the deload, through the real patch.
+  const profile = {
+    id: undefined, age: 34, gender: 'male', height_cm: 180, weight_kg: 82, activity_level: 'moderate', fitness_goal: 'hypertrophy',
+    equipment_access: 'minimalist', injuries: [], training_style: 'bodybuilding', training_experience: 'intermediate',
+    session_duration_preference: '45-60', max_dumbbell_kg: 24, dietary_preferences: [], concurrent_activities: [],
+    training_days: [], weekly_schedule: {}, recovery_capacity: 'moderate',
+  } as unknown as UserProfile
+  const week = (n: number, kg: number, deload = false): MesocycleWeek => ({
+    week_number: 4 + n, block_number: 2, week_in_block: n, is_deload: deload, label: '', phase_label: 'Hypertrophy',
+    days: [{ day: 'Monday', focus: 'Pull', exercises: [{ name: 'Dumbbell Rows', sets: 3, reps: '8-10', intensity: 'RPE 7', suggested_load_kg: kg, suggested_load: `${kg}kg` }] }],
+  } as unknown as MesocycleWeek)
+  const plan = [week(1, 20), week(2, 22), week(3, 24), week(4, 24, true)]
+  const { next } = patchBlockFromLiftedKg(plan, profile, { blockNumber: 2, dayName: 'Monday', exIndex: 0, exerciseName: 'Dumbbell Rows', liftedKg: 30 })
+  const kgOf = (m: MesocycleWeek[], n: number) => m.find(w => w.week_in_block === n)!.days[0].exercises[0].suggested_load_kg ?? 0
+  check('a lift carried past the stated 24 kg limit is written at the limit, never above', [1, 2, 3].every(n => kgOf(next, n) <= 24) && kgOf(next, 1) === 24, [1, 2, 3, 4].map(n => kgOf(next, n)))
+  check('the deload stored AT the limit comes DOWN to its fraction (it used to stay at 24)', kgOf(next, 4) < 24 && kgOf(next, 4) <= Math.ceil(24 * 0.7) + 2, kgOf(next, 4))
+  check('...and the loading weeks never come down', [1, 2, 3].every(n => kgOf(next, n) >= kgOf(plan, n)))
+}
+
+{
+  const src = readFileSync(join(ROOT, 'src/lib/beat-target-offer.ts'), 'utf8').replace(/\/\/.*$/gm, '')
+  check('the block-start offer judges and offers the carried number, not the raw last weight',
+    /const carryKg = recent \? \(carriedForRepRange\(recent\.topSetE1RM, ex\.reps\)/.test(src)
+    && /beatTargetInBlock\(sessionsInBlock, plannedKg, carryKg\)/.test(src) && /liftedKg: carryKg,/.test(src))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
