@@ -50,10 +50,17 @@ console.log('\n1. A finished session is not offered a start button\n')
   check('it is offered only from idle', /status === 'idle'/.test(cta), cta.slice(0, 200))
   check('...and never merely because a session is not running',
     !/status !== 'running'/.test(cta), cta.slice(0, 200))
-  // The spacer that reserves room for the fixed button has to agree with it,
-  // or a finished day carries 100px of empty space under the last exercise.
-  check('the spacer under the list follows the same condition',
-    /\{status === 'idle' && <div aria-hidden className="h-\[100px\]" \/>\}/.test(panel))
+  // The spacer that reserves room for a fixed bottom bar has to agree with the
+  // bars, or a day carries 100px of empty space under the last exercise, or a
+  // bar covers it. Re-anchored 10 Oct 2026: a finished day has a bar of its
+  // own now ("✓ Session finished", runs 3-4), so the spacer is there in
+  // exactly the two states that draw one, idle and finished, never running.
+  const spacerCond = /\{([^{}]*) && <div aria-hidden className="h-\[100px\]" \/>\}/.exec(panel)?.[1] ?? ''
+  const barStates = ['idle', 'finished'].filter(st =>
+    new RegExp(`status === '${st}' && \\(\\s*(\\{\\/\\*[\\s\\S]*?\\*\\/\\}\\s*)?<div\\s+className="fixed`).test(panel))
+  check('the spacer under the list follows the bars: one for each state that draws a fixed bar, and only those',
+    barStates.length === 2 && barStates.every(st => spacerCond.includes(`status === '${st}'`)) && !/running/.test(spacerCond),
+    { spacerCond, barStates })
   // Nothing anywhere in this screen may treat the three states as two.
   const looseTests = panel.match(/status !== 'running'/g) ?? []
   check('no "not running" test is left standing in for "not started"', looseTests.length === 0, looseTests)

@@ -2,8 +2,65 @@
 
 Newest first. One line each.
 
-- [ ] **RUNS 3 AND 4 OF THE LIVE-APP TEST (9-10 Oct 2026): 4 HIGH, 11 MEDIUM, 8 LOW, TRACED, NOT
-  BUILT.** Ashley's list, added to the hand-over's jobs. Report only, waiting on "build it".
+- [~] **RUNS 3 AND 4 OF THE LIVE-APP TEST: BUILT (10 Oct 2026), on `claude/test-log-fixes-oct9`.**
+  Her "Build it", and her answer to the first decision the same day: **A, with two conditions**
+  (when other meals are re-sized, one line says so with an Undo; only the same dishes, about 25%
+  either way, beyond which the meals are left alone and the line says how far over or under).
+  She also asked three checks first and ruled twice more: **reproduce the header case exactly**
+  (it did NOT reproduce on the test data, old build or new, so the cause on her day is unproven;
+  the header and rows now come from one calculation and cannot disagree); **what a blank tick
+  saves on a "type it" box** (nothing: it refuses); **toast counts as bread now**; and **carry
+  the heaviest set into the next block, under the stated kit limit, adjusted for the new reps**.
+  Status of every item: `docs/test-log-2026-10-09/runs-3-4-trace.md`. Seven commits, each with
+  its own checks and mutation counts in its message.
+  - **Fixed:** H24, H24b, H25, H26, H6, M33, M35, M36, M37, M38, M40a, M42, M43a, and all eight
+    LOW items.
+  - **Partly:** M34 (a swap now says which other meals changed; the visible line is proven by
+    logic only, because no harness fixture moved another meal in 18 swaps), M39 (the tip says
+    "due so far"; one week counter lands with the week work on the other branch), M43b (below).
+  - **Hers, to ask one at a time:** the M43b collision, M34 (re-size before re-pick?), M39 (is a
+    short session "Done"?), M40b (do rest-of-block swaps last?).
+  - **Open:** M40c (no bands means no band work), which is hand-over job 3, the kit list.
+  **M43b COLLIDES WITH TWO OF HER OLDER RULINGS, so it was built as an OFFER and is put to her.**
+  Carrying a logged weight into the next block automatically after one session would override
+  her 1 Sep "offer, never apply" (calibration alone applies, 10 Sep) and her three-session
+  evidence bar. The offer now carries last block's best set into the new block's reps (Epley
+  1RM back down to the top of the new range, floored to the half kilo: 18 kg x 11 is 19 kg for
+  6-8) and the confirm still clamps to the kit and stated limit. Per CLAUDE.md, a collision is
+  put to her with both rules named, not resolved by picking the newer.
+  **CSCS DECISIONS (mine under her delegation), with the basis:**
+  - H25: a blank weight box means "same as the set I just did", else today's plan, else last
+    session only when the plan carries no number. Basis: a working set's load is set by today's
+    prescription and today's performance; last session's number is history, and the tester's
+    30 kg against a 24 kg plan was a load nobody prescribed.
+  - M38: a hold, carry or interval is never the main lift (label and rest floor alike). Basis: a
+    main lift is the session's progression anchor, loaded and counted in reps; a timed or
+    distance effort cannot carry that, and no main lift beats a wrong one.
+  - M42: a timed, distance or interval set claims no lifting record. Basis: a record in the
+    wrong unit (seconds compared as reps) is worse than none.
+  - LOW, the evening food line: three or more meals past their time and unlogged is a LOGGING
+    gap, not an eating gap, and the line says so; otherwise protein is named first when it is
+    one of the gaps. Basis: a day is planned around protein, and fat's small target made it
+    "widest" for a few grams. Two unlogged keeps the ordinary line, which already names the
+    meal "still to log"; a meal whose time has not come never counts. **This is when the app
+    speaks, which is hers**; built because the report was a defect, and flagged in the report.
+    CSCS five for the prescription changes (H25, M38, M43): (1) the stimulus is today's
+    prescription, not yesterday's; (2) takes away nothing but a wrong number and a wrong label;
+    (3) progression is kept (the carry and the offer both move UP, under the limit); (4) no floor
+    or ceiling redefined — the rest floor follows the same anchor rule; (5) in scope.
+  **The last slice (LOW):** `test:runs34-low` (17 checks, 10/10 mutations), `test:nutrition-
+  layout` +5 and re-anchored (protein first is a deliberate change), `test:pace-clock` two
+  re-anchored, 6/6 mutations on the food line, `verify:finish-check` 2h-2j (4/4 browser
+  mutations). The "add exercise" sheet had the same "tier2 compound" and was fixed with the
+  swap sheet.
+  **Needs:** the `chat-gemini`, `onboarding-chat` and `generate-meals` deploys; the coach exam
+  is stale and must be re-run on her machine. No migration. Not on `main`.
+  One derived check went red on correct code and was re-anchored: `test:one-today` pinned the
+  space under the list to the Start bar alone; it now holds it to every state that draws a bottom
+  bar (3/3 mutations). 130 of 131 derived gates green first time.
+
+- [x] **RUNS 3 AND 4 OF THE LIVE-APP TEST (9-10 Oct 2026): 4 HIGH, 11 MEDIUM, 8 LOW, TRACED, NOT
+  BUILT.** (Built 10 Oct: see the entry above.) Ashley's list, added to the hand-over's jobs. Report only, waiting on "build it".
   Every item, its cause, and whether this branch already fixes it: `docs/test-log-2026-10-09/
   runs-3-4-trace.md`. Fixed already: M41 (swap list sees an active adaptation), the first-log
   record on a hold (part of M42), the add-food "re-fits" promise (part of H24), most of H6.

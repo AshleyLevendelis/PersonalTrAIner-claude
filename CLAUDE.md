@@ -1281,6 +1281,20 @@ menu" stays true when a copy is also left outside it.
   steps are checked against allergies and avoids. `MISSING`, all four; safety-adjacent, so each gets
   a plan before a build (`docs/plans/ingredient-lookup-truth.md` exists for (3))
 
+### Her rulings of 10 Oct 2026, from runs 3-4 of the live-app test (`docs/test-log-2026-10-09/runs-3-4-trace.md`)
+- **A logged meal stays as eaten; the rest of the day fits around it: "A, with two
+  conditions."** (1) When other meals are re-sized, ONE line says so, with an Undo; (2) only the
+  SAME dishes, by about 25% either way; beyond that the meals are left alone and the line says
+  plainly how far over or under the day is. Today's screen only: the stored meals and the
+  shopping list do not change. The header, its verdict and the rows come from one calculation,
+  so they cannot disagree. `day-as-shown`, `verify:day-as-shown`
+- **Toast counts as bread now.** French toast is its own food and keeps its egg and milk.
+  `meal-amounts`
+- **The heaviest logged set carries into the next block, under the stated kit limit, adjusted
+  for the new rep range.** BUILT AS AN OFFER, because applying it automatically would override
+  her 1 Sep "offer, never apply" and her three-session bar; that collision is put to her, not
+  resolved here. `beat-target` §6
+
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an
    exercise, a workout, a meal or the plan supports every operation listed
