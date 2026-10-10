@@ -60,7 +60,7 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   // --- starches ---
   'rice and grains': ['white rice cooked', 'brown rice cooked', 'basmati rice cooked', 'couscous cooked', 'quinoa cooked', 'bulgur wheat cooked', 'millet cooked', 'buckwheat cooked', 'barley', 'polenta cooked'],
   'pasta and noodles': ['pasta cooked', 'wholewheat pasta cooked', 'gluten free pasta', 'protein pasta', 'egg noodles cooked', 'rice noodles cooked', 'gnocchi'],
-  'bread': ['white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant'],
+  'bread': ['white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant', 'french toast'],
   'wraps and flatbreads': ['tortilla wrap', 'corn tortilla', 'pitta bread', 'naan bread', 'chapati', 'injera flatbread'],
   'starchy veg': ['potato boiled', 'potato baked', 'mashed potato', 'sweet potato baked', 'sweet potato raw', 'taro root', 'yellow yam', 'plantain', 'parsnip', 'butternut squash'],
   'breakfast cereal': ['oats', 'granola', 'muesli', 'cornflakes', 'weetabix'],

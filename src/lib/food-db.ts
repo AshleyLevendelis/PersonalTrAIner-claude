@@ -211,8 +211,16 @@ export const FOOD_DB: FoodEntry[] = [
   f('basmati rice cooked', ['basmati rice', 'cooked basmati'], { kcal: 121, protein: 2.9, carbs: 25, fat: 0.4 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('pasta cooked', ['pasta', 'penne', 'fusilli', 'spaghetti', 'cooked pasta'], { kcal: 158, protein: 5.8, carbs: 31, fat: 0.9 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('wholewheat pasta cooked', ['wholewheat pasta', 'whole wheat pasta', 'wholemeal pasta'], { kcal: 149, protein: 6.3, carbs: 30, fat: 1.1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
-  f('white bread', ['bread', 'white bread slice', 'sliced white bread'], { kcal: 265, protein: 9, carbs: 49, fat: 3.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { slice: 36 }),
-  f('wholemeal bread', ['whole wheat bread', 'brown bread'], { kcal: 247, protein: 13, carbs: 41, fat: 3.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { slice: 38 }),
+  // TOAST IS BREAD (Ashley, 10 Oct 2026: "make toast count as bread now rather
+  // than refusing it"). Toasting drives off a little water and changes nothing
+  // a slice is counted by. Held back on 9 Oct because "french toast" would have
+  // matched plain bread and lost its egg and milk; its own entry below wins on
+  // the longer name, so it keeps both allergen tags.
+  f('white bread', ['bread', 'white bread slice', 'sliced white bread', 'toast', 'white toast'], { kcal: 265, protein: 9, carbs: 49, fat: 3.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { slice: 36 }),
+  f('wholemeal bread', ['whole wheat bread', 'brown bread', 'wholemeal toast', 'whole wheat toast', 'brown toast', 'wholegrain toast'], { kcal: 247, protein: 13, carbs: 41, fat: 3.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { slice: 38 }),
+  // Bread soaked in egg and milk and fried (USDA, French toast prepared from
+  // recipe). Here so "french toast" never resolves to plain bread above.
+  f('french toast', ['eggy bread'], { kcal: 229, protein: 7.7, carbs: 25, fat: 10.8 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true, contains_egg: true, contains_dairy: true }, { slice: 65 }),
   f('bagel', ['plain bagel'], { kcal: 257, protein: 10, carbs: 50, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 95 }, { avgGrams: 95, label: 'bagel' }),
   f('tortilla wrap', ['flour tortilla', 'wrap', 'tortilla'], { kcal: 310, protein: 8.4, carbs: 50, fat: 8 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
   f('corn tortilla', [], { kcal: 218, protein: 5.7, carbs: 44, fat: 2.8 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 26 }),

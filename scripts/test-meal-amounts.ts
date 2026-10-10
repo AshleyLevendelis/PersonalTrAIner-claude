@@ -408,6 +408,24 @@ console.log('\n10. Every piece weight names a real food and carries its source\n
   check('no piece weighs nothing or more than half a kilo', absurd.length === 0, absurd)
 }
 
+console.log('\nTOAST IS BREAD (Ashley, 10 Oct 2026), and french toast keeps its egg and milk')
+for (const [label, db] of [['app', appDb], ['coach', coachDb]] as const) {
+  // Her runs-3/4 breakfast, word for word: 263 kcal and 10 g protein on the old build.
+  const m = db.computeMealMacros([
+    { name: 'large eggs', quantity: 2, unit: 'whole' },
+    { name: 'wholemeal toast', quantity: 2, unit: 'slice' },
+    { name: 'butter', quantity: 10, unit: 'g' },
+  ])
+  check(`${label}: "2 large eggs, 2 slices of wholemeal toast and 10g butter" is fully counted, about 440 kcal and 25 g protein`,
+    m.coverage === 1 && m.unmatched.length === 0 && Math.abs(m.kcal - 440) <= 15 && Math.abs(m.protein - 25) <= 2, { kcal: Math.round(m.kcal), protein: m.protein, unmatched: m.unmatched })
+  check(`${label}: "toast" is white bread and "wholemeal toast" is wholemeal bread`,
+    db.lookupIngredient('toast')?.name === 'white bread' && db.lookupIngredient('wholemeal toast')?.name === 'wholemeal bread')
+  const ft = db.lookupIngredient('french toast')
+  check(`${label}: "french toast" is NOT plain bread, and carries egg and dairy`,
+    ft?.name === 'french toast' && ft.tags.contains_egg === true && ft.tags.contains_dairy === true && ft.tags.contains_gluten === true, ft?.name)
+  check(`${label}: "toasted" is not "toast"`, db.lookupIngredient('toasted almonds')?.name === 'almonds')
+}
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`${failures} check(s) failed\n`); process.exit(1) }
 console.log('Counted foods weigh what they weigh, and an amount nobody could read is asked about.\n')
