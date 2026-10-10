@@ -35,6 +35,7 @@ import { patchBlockFromLiftedKg } from '../src/lib/beat-target-offer'
 import { getExerciseEntry, getExerciseId } from '../src/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, DELOAD_LOAD_FRACTION, nextSetRungsKg } from '../src/lib/load-prescription'
 import type { UserProfile, ExerciseSetLog } from '../src/lib/types'
+import { blankWeightFor } from '../src/lib/set-row'
 import { perSetChipsWorthShowing } from '../src/components/exercise/LoadChip'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -160,11 +161,19 @@ check('the sentence names the lift, the set and the week', !!msg && msg.includes
 console.log('\n2. The grid: sets 2+ have no default, the tick refuses, the chips climb off the last logged set')
 // ---------------------------------------------------------------------------
 const grid = strip(read('src/components/exercise/SetGrid.tsx'))
-const defaultFn = grid.slice(grid.indexOf('const defaultWeightFor = '), grid.indexOf('const weightPlaceholderFor'))
-const calibrationBranch = defaultFn.search(/if \(calibrationProbe && setNumber > 1\) return ''/)
-check('in a calibration week, sets after the first have NO default weight', calibrationBranch >= 0)
-check('...decided before the prescription is even looked up', calibrationBranch >= 0 && calibrationBranch < defaultFn.indexOf('perSetLoadKg?.[setNumber - 1]'))
-check('...and set 1 keeps its pre-fill — the probe is one tap when the guess is right', !/setNumber >= 1\) return ''/.test(defaultFn) && /setNumber > 1\) return ''/.test(defaultFn))
+// RE-ANCHORED 10 Oct 2026 (H25): a working set's blank box is now one decision,
+// blankWeightFor, so the property is ASKED of it rather than read off a line.
+// The grid's half is that it names a probe set the same way for all three
+// inputs (no carry, no plan number, no fallback).
+const blankFn = grid.slice(grid.indexOf('const workingBlankFor = '), grid.indexOf('const offersNoWeight'))
+const probeDecl = /const probeSet = calibrationProbe && setNumber > 1/.test(blankFn)
+check('in a calibration week, sets after the first have NO default weight',
+  probeDecl && /noCarry: probeSet/.test(blankFn) && /planKg: probeSet \? null/.test(blankFn) && /fallback: probeSet \|\|/.test(blankFn)
+  && blankWeightFor({ carry: { kg: 40, isBodyweight: false, fromSet: 1 }, noCarry: true, planKg: null, lastTimeKg: null, fallback: '' }).text === '')
+check('...not even the set just done: a probe set is never filled from set 1',
+  blankWeightFor({ carry: { kg: 40, isBodyweight: false, fromSet: 1 }, noCarry: true, planKg: null, lastTimeKg: null, fallback: '' }).source !== 'carried')
+check('...and set 1 keeps its pre-fill — the probe is one tap when the guess is right',
+  probeDecl && blankWeightFor({ carry: null, noCarry: false, planKg: 30, lastTimeKg: null, fallback: '' }).text === '30')
 
 const save = grid.slice(grid.indexOf('const handleSaveSet = '), grid.indexOf('const weight = input.isBodyweight'))
 // RE-ANCHORED 17 Sep 2026: the condition gained a term (`!warm`) when the

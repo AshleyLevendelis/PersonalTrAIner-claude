@@ -498,6 +498,15 @@ export type LoggedSetReading =
   | { kind: 'bodyweight'; reps: number }
   | { kind: 'added_load'; addedKg: number; reps: number }
 
+/**
+ * THE WEIGHT IN THE BOX IS THE SET JUST DONE (H25, 10 Oct 2026). Shown under a
+ * working row only when the carried number differs from the plan's, so the
+ * faint figure never reads as a prescription it is not.
+ */
+export function sameAsSet(setNumber: number): string {
+  return `weight from set ${setNumber}`
+}
+
 export function lastTime(reading: LoggedSetReading): string {
   // NEVER A BARE COUNT. "last time 9" beside a weight box reads as 9kg;
   // the kind travels with the number, same rule as personalBest.

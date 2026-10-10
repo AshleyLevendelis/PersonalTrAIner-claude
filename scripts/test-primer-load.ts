@@ -166,7 +166,8 @@ console.log('\n[4] The box stops inventing a zero')
 const grid = stripComments(readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8'))
 {
   check('4a. a movement that needs a weight gets an empty box, not 0',
-    /return catalogEntryIsLoaded \? '' : '0'/.test(grid), (grid.match(/.{0,50}: '0'.{0,20}/g) ?? []).slice(0, 3))
+    // Re-anchored 10 Oct 2026 (H25): the same rule, now the blank box's last resort.
+    /fallback: probeSet \|\| catalogEntryIsLoaded \? '' : '0'/.test(grid), (grid.match(/.{0,50}: '0'.{0,20}/g) ?? []).slice(0, 3))
   check('4b. ...and the old unconditional zero is gone',
     !/suggestedLoadKg != null \? String\(suggestedLoadKg\) : '0'/.test(grid))
 }

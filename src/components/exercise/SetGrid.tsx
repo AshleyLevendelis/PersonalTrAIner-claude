@@ -21,11 +21,12 @@ import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { lastTime, sameAsSet, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
+import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
 
 // REPLACED 8 Sep 2026 by set-plausibility.ts's MAX_LOGGABLE_SET_KG. The old
@@ -431,17 +432,30 @@ export function SetGrid({
     // week exists to replace it — so a default here is the guess writing
     // itself into the ledger three times. Set 1 keeps its default: the probe
     // IS the number, and one tap is right when the guess is right.
-    if (calibrationProbe && setNumber > 1) return ''
-    const perSet = perSetLoadKg?.[setNumber - 1]
-    if (perSet != null) return String(perSet)
-    if (suggestedLoadKg != null) return String(suggestedLoadKg)
-    // NEVER INVENT 0 FOR A MOVEMENT THAT NEEDS A WEIGHT. Ashley, 18 Sep 2026:
-    // her kettlebell swings offered a faint 0, and a blank tap would have
-    // logged 0kg against a bell she had actually loaded to 24. A default is a
-    // prescription, and `load-prescription.ts:12` forbids the app inventing
-    // one. Zero stays where it is the honest record — a movement carrying no
-    // external load, where 0kg x 12 is exactly what happened.
-    return catalogEntryIsLoaded ? '' : '0'
+    return workingBlankFor(ref).text
+  }
+  /**
+   * A WORKING SET'S BLANK BOX — see blankWeightFor for the order and why (H25,
+   * 10 Oct 2026: last session's 30 kg used to outrank today's plan of 24 and
+   * the 24 she had just typed on the set above).
+   */
+  const workingBlankFor = (ref: SetRef): BlankWeight => {
+    const setNumber = ref.setNumber
+    const probeSet = calibrationProbe && setNumber > 1
+    const ghost = ghostFor(ref)
+    return blankWeightFor({
+      carry: carriedWeightFor(setNumber, existingLogs, perSetLoadKg),
+      noCarry: probeSet,
+      planKg: probeSet ? null : (perSetLoadKg?.[setNumber - 1] ?? suggestedLoadKg ?? null),
+      lastTimeKg: ghost ? Number(ghost.weight_kg) : null,
+      // NEVER INVENT 0 FOR A MOVEMENT THAT NEEDS A WEIGHT. Ashley, 18 Sep 2026:
+      // her kettlebell swings offered a faint 0, and a blank tap would have
+      // logged 0kg against a bell she had actually loaded to 24. A default is a
+      // prescription, and `load-prescription.ts:12` forbids the app inventing
+      // one. Zero stays where it is the honest record — a movement carrying no
+      // external load, where 0kg x 12 is exactly what happened.
+      fallback: probeSet || catalogEntryIsLoaded ? '' : '0',
+    })
   }
   /** What the empty box SHOWS — the default where one exists, a prompt where it does not. */
   /**
@@ -456,7 +470,19 @@ export function SetGrid({
    * step before the set was logged. Ashley's ruling, 24 Sep 2026, from three
    * options: on these days the tour says to type the weight, then tap ✓.
    */
-  const offersNoWeight = (ref: SetRef): boolean => !ghostFor(ref) && defaultWeightFor(ref) === ''
+  /**
+   * LAST SESSION, ONLY WHERE IT IS WHAT THE BOXES HOLD (H25, decided as a CSCS
+   * coach, 10 Oct 2026). A row takes both of its faint numbers from ONE
+   * source: today's plan (its weight and the bottom of its rep range) or, when
+   * the plan carries no weight, last session's set, marked "last time" as
+   * Ashley ruled on 18 Sep. Mixing the two would print last week's 11 reps
+   * beside this week's 24 kg and mark half a row as history.
+   */
+  const drivingGhostFor = (ref: SetRef) => {
+    const g = ghostFor(ref)
+    return g && workingBlankFor(ref).source === 'last_time' ? g : undefined
+  }
+  const offersNoWeight = (ref: SetRef): boolean => defaultWeightFor(ref) === ''
 
   const weightPlaceholderFor = (ref: SetRef): string => {
     const d = defaultWeightFor(ref)
@@ -521,7 +547,7 @@ export function SetGrid({
     // site, because two of them take loose values and cannot see the row.
     const drop = isDrop(ref)
     const input = inputFor(ref)
-    const ghost = ghostFor(ref)
+    const ghost = drivingGhostFor(ref)
 
     // Reps: typed -> ghost (repeat-last-week's tap-the-check convenience) ->
     // the PRESCRIBED bottom of the range -> reject with a visible row error.
@@ -554,16 +580,17 @@ export function SetGrid({
       return
     }
 
-    // Weight: bodyweight is always 0. Otherwise typed -> ghost (repeat last
-    // week) -> this row's own prescribed default (the exact number already
-    // shown as the input's placeholder — leaving it blank must log what the
+    // Weight: bodyweight is always 0. Otherwise typed -> this row's blank
+    // value (workingBlankFor: the set just done, today's plan, then last
+    // session only when the plan has no number — H25), which is the exact
+    // number already shown as the input's placeholder — leaving it blank must log what the
     // placeholder promised, never silently 0). A blank weight with no ghost
     // used to fall through to weight_kg=0, which downstream code flags as
     // malformed and drops from every summary/history view without telling
     // the user their tap didn't actually count.
     const weight = input.isBodyweight
       ? 0
-      : parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : defaultWeightFor(ref))) || 0
+      : parseFloat(input.weight || defaultWeightFor(ref)) || 0
     // A 0kg save without the BW flag produces exactly the "malformed
     // zero-weight" row every summary/history reader silently filters out —
     // the tap would look successful (rest timer starts) but the set vanishes.
@@ -795,7 +822,7 @@ export function SetGrid({
         const input = inputFor(ref)
         const isBW = input.isBodyweight
         const isPRSet = prBadgeSet?.rowKey === k
-        const ghost = ghostFor(ref)
+        const ghost = drivingGhostFor(ref)
         // The caption sits above the FIRST row of each block rather than
         // wrapping them, so both blocks stay inside one grid and the weight
         // column runs unbroken down the card.
@@ -919,7 +946,7 @@ export function SetGrid({
               min="0"
               max={MAX_LOGGABLE_SET_KG}
               step="0.5"
-              placeholder={isBW ? 'BW' : (ghost ? String(ghost.weight_kg) : weightPlaceholderFor(ref))}
+              placeholder={isBW ? 'BW' : weightPlaceholderFor(ref)}
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(ref, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
@@ -941,7 +968,7 @@ export function SetGrid({
                 variant="ghost"
                 size="icon-xs"
                 className="size-7 text-muted-foreground hover:text-foreground"
-                onClick={() => onOpenPlateCalc(parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : '0')) || 0)}
+                onClick={() => onOpenPlateCalc(parseFloat(input.weight || defaultWeightFor(ref)) || 0)}
                 disabled={isBW}
                 aria-label="Plate calculator"
               >
@@ -1180,6 +1207,19 @@ export function SetGrid({
               boxes. Only where a ghost is actually driving the placeholder,
               and never once the row is saved — then the boxes hold today's
               real numbers and the marker would be describing nothing. */}
+          {/* AND WHEN THE WEIGHT IS THE SET JUST DONE (H25): said only where it
+              differs from today's plan, the one case a reader could mistake
+              the faint number for a prescription. */}
+          {!isSaved && !warm && !drop && !isBW && (() => {
+            const blank = workingBlankFor(ref)
+            const plan = perSetLoadKg?.[ref.setNumber - 1] ?? suggestedLoadKg ?? null
+            if (blank.source !== 'carried' || blank.fromSet == null || String(plan) === blank.text) return null
+            return (
+              <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="carried-weight">
+                {sameAsSet(blank.fromSet)}
+              </p>
+            )
+          })()}
           {ghost && !isSaved && (
             <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="last-time">
               {lastTime(loggedSetReading(ghost))}

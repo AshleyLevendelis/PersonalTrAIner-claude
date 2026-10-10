@@ -200,12 +200,17 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // because a build-up row and a working row can both be "2". The property is
   // the shape of the fallback, not what the parameter is called — so the
   // identifier is captured and the placeholder below must use the SAME one.
+  // RE-ANCHORED 10 Oct 2026 (H25): last session's weight no longer sits in
+  // front of the default in either place; ONE helper decides the blank box
+  // (set just done, then the plan, then last time), and both the save and the
+  // placeholder ask it.
   check('a blank weight still logs the prescribed number, as ruled',
-    /input\.weight \|\| \(ghost \? String\(ghost\.weight_kg\) : defaultWeightFor\((\w+)\)\)/.test(setGrid))
+    /input\.weight \|\| defaultWeightFor\((\w+)\)\) \|\| 0/.test(setGrid)
+    && !/ghost\.weight_kg\) : defaultWeightFor/.test(setGrid))
   // The placeholder shows the SAME default the tick would log, where one
   // exists — routed through one helper so the two cannot drift apart.
   check('...and the box shows that same number, so the tick keeps its promise',
-    /placeholder=\{isBW \? 'BW' : \(ghost \? String\(ghost\.weight_kg\) : weightPlaceholderFor\((\w+)\)\)\}/.test(setGrid)
+    /placeholder=\{isBW \? 'BW' : weightPlaceholderFor\((\w+)\)\}/.test(setGrid)
     && /const d = defaultWeightFor\((\w+)\)\s*\n\s*return d === '' \? '[^']+' : d/.test(setGrid))
 }
 

@@ -186,8 +186,8 @@ check('7. across the headline, the chips, the note and the boxes there is ONE we
 // an extra set can put it under the wrong one, and every source check still
 // passes. Reading the DOM in document order is the only way to see it.
 // ---------------------------------------------------------------------------
-const MARKERS = `(() => {
-  const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent.trim() === ${NAME})
+const markersFor = nameJson => `(() => {
+  const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent.trim() === ${nameJson})
   if (!leaf) return { found: false }
   let card = leaf
   for (let i = 0; i < 12 && card.parentElement; i++) {
@@ -212,6 +212,7 @@ const MARKERS = `(() => {
   }
   return { found: true, grid: true, rows }
 })()`
+const MARKERS = markersFor(NAME)
 
 const marked = await ev(MARKERS)
 check('8a. the set grid is readable row by row', marked.found === true && marked.grid === true && marked.rows.length > 0, marked)
@@ -221,7 +222,10 @@ if (marked.grid) {
   const warmups = marked.rows.filter(r => r.kind === 'warmup-row')
 
   // THE FIXTURE MUST BE UNDER PRESSURE. ?logged=1 seeds a real prior session
-  // on this lift, so every working row here IS history-driven. A run where
+  // on this lift at the weight today's card prescribes (double progression
+  // holds there), so every working row here IS history-driven. Since H25
+  // (10 Oct 2026) that is the only case where it is: at a weight that differs
+  // from the plan's, the plan's row stands (test:set-row). A run where
   // none of them carried a marker would otherwise read as a quiet pass.
   check('8b. every working row on a lift with a logged session says "last time"',
     working.length > 0 && working.every(r => r.marker && r.marker.startsWith('last time')),
@@ -303,6 +307,101 @@ if (marked.grid) {
   await wait(600)
   const shot8 = await send('Page.captureScreenshot', { format: 'png' })
   writeFileSync(new URL('./one-number-lasttime.png', import.meta.url).pathname, Buffer.from(shot8.result.data, 'base64'))
+}
+
+// 8j. THE SET JUST DONE CARRIES DOWN (runs 3-4, H25, 10 Oct 2026). The tester
+// typed 24 on set 1 and a blank tick on set 2 logged last session's 30. Here:
+// type a weight that is neither the plan's nor last session's on set 1, tick,
+// then tick set 2 with its box left BLANK. The grey number must be the typed
+// one, a line must say where it came from, and the STORED row must hold it.
+{
+  const CARD = `(() => {
+    const leaf = [...document.querySelectorAll('*')].find(x => x.children.length === 0 && x.textContent.trim() === ${NAME})
+    if (!leaf) return null
+    let card = leaf
+    for (let i = 0; i < 12 && card.parentElement; i++) {
+      card = card.parentElement
+      if (card.querySelector('input[id^="setgrid-weight-"]') && /kg/i.test(card.innerText)) break
+    }
+    return card
+  })()`
+  const typed = String(target.liftedKg - 2.5)
+  const typedOk = await ev(`(() => { const card = ${CARD}; const el = card && card.querySelector('input[id^="setgrid-weight-"][id$="-s1"]'); if (!el) return false
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(el, ${JSON.stringify(typed)}); el.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+  await wait(400)
+  const tap = n => ev(`(() => { const card = ${CARD}; const b = card && [...card.querySelectorAll('button')].find(x => x.getAttribute('aria-label') === 'Save set ${n}'); if (!b) return false; b.click(); return true })()`)
+  const t1 = await tap(1)
+  await wait(1500)
+  const set2 = await ev(`(() => { const card = ${CARD}; const el = card && card.querySelector('input[id^="setgrid-weight-"][id$="-s2"]')
+    const lines = card ? [...card.querySelectorAll('[data-testid="carried-weight"]')].map(x => x.textContent.trim()) : []
+    return el ? { value: el.value, placeholder: el.placeholder, lines } : null })()`)
+  check('8j. set 2\u2019s empty box shows the weight just typed on set 1, not the plan\u2019s or last session\u2019s',
+    typedOk && t1 && !!set2 && set2.value === '' && parseFloat(set2.placeholder) === parseFloat(typed), { typed, set2, typedOk, t1 })
+  check('8k. ...and says where it came from', !!set2 && set2.lines.includes('weight from set 1'), set2)
+  const t2 = await tap(2)
+  await wait(1500)
+  // TODAY'S row only: the fixture's earlier session has a set 2 of its own.
+  const stored = await ev(`(() => { const rows = (window.__fakeDb?.exercise_set_logs ?? []).filter(l => l.exercise_name === ${NAME} && l.set_number === 2 && !l.is_warmup)
+    const newest = rows.reduce((a, b) => (!a || String(b.completed_at) > String(a.completed_at) ? b : a), null)
+    return { count: rows.length, newestKg: newest ? Number(newest.weight_kg) : null } })()`)
+  check('8l. a blank tick on set 2 STORES that weight', t2 && stored?.count >= 2 && stored.newestKg === parseFloat(typed), { stored, typed })
+  await ev(`(() => { const c = ${CARD}; const l = c && c.querySelector('[data-testid="carried-weight"]'); (l || c)?.scrollIntoView({ block: 'center' }) })()`)
+  const shot8j = await send('Page.captureScreenshot', { format: 'png' })
+  writeFileSync(new URL('./one-number-carried.png', import.meta.url).pathname, Buffer.from(shot8j.result.data, 'base64'))
+}
+
+// 8g. WHERE "LAST TIME" STILL BELONGS (10 Oct 2026). With today's plan first,
+// last session fills a row only when the plan carries no weight: bodyweight
+// work. ?bwpr=1 seeds Pull-Ups sessions (set 1, rising to 14 reps) on a day
+// whose main lift is Pull-Ups, so set 1's boxes are history and must say so,
+// in figures that are in the boxes; the sets with no history behind them must
+// not.
+{
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1&load=8g#/tab/exercise` })
+  await wait(5000)
+  const PU = JSON.stringify('Pull-Ups')
+  // OPEN ITS OWN CARD FIRST, and wait for its own boxes: walking up from a
+  // collapsed card's name reaches the neighbour's grid, which is what the
+  // first run of this section read (2 rows of Prone Y-T Raises).
+  let open = false
+  for (let attempt = 0; attempt < 3 && !open; attempt++) {
+    await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${PU});
+     if(!n) return false; let p=n; for(let i=0;i<6&&p.parentElement;i++){p=p.parentElement; if(p.tagName==='BUTTON'||p.getAttribute('role')==='button'){p.click();return true}} return false})()`)
+    for (let i = 0; i < 10 && !open; i++) { await wait(400); open = !!(await ev(`!!document.querySelector('input[id^="setgrid-weight-pull-ups-s1"]')`)) }
+  }
+  check('8g0. the Pull-Ups card is open', open)
+  // Read the grid THROUGH its own box (the name also appears outside the card).
+  const bw = await ev(`(() => {
+    const box = document.querySelector('input[id^="setgrid-weight-pull-ups-s1"]')
+    const row = box && box.closest('[data-testid="working-row"]')
+    if (!row) return { found: false }
+    const kids = [...row.parentElement.children]
+    const isRow = el => { const t = el.getAttribute('data-testid'); return t === 'warmup-row' || t === 'working-row' }
+    const rows = []
+    for (let i = 0; i < kids.length; i++) {
+      if (!isRow(kids[i])) continue
+      let marker = null
+      for (let j = i + 1; j < kids.length && !isRow(kids[j]); j++) {
+        const m = kids[j].matches('[data-testid="last-time"]') ? kids[j] : kids[j].querySelector('[data-testid="last-time"]')
+        if (m) { marker = (m.textContent || '').trim(); break }
+      }
+      rows.push({ kind: kids[i].getAttribute('data-testid'), marker, boxes: [...kids[i].querySelectorAll('input')].map(inp => (inp.value || inp.placeholder || '').trim()) })
+    }
+    return { found: true, grid: true, rows }
+  })()`)
+  const rows = (bw?.rows ?? []).filter(r => r.kind === 'working-row')
+  const first = rows[0]
+  check('8g. a bodyweight lift with history still says "last time" on the set that has it',
+    !!first && typeof first.marker === 'string' && first.marker.startsWith('last time'), bw)
+  check('8h. ...naming only figures that are in that row\u2019s boxes',
+    !!first && !!first.marker && (first.marker.match(/[0-9]+(?:[.][0-9]+)?/g) || []).every(n => first.boxes.some(b => parseFloat(b) === parseFloat(n))), first)
+  check('8i. ...and a set with no history behind it says nothing',
+    rows.length > 1 && rows.slice(1).every(r => r.marker === null), rows)
+  await ev(`(() => { const row = document.querySelector('[data-testid="last-time"]'); if (row) row.scrollIntoView({ block: 'center' }) })()`)
+  await wait(600)
+  const shot8g = await send('Page.captureScreenshot', { format: 'png' })
+  writeFileSync(new URL('./one-number-lasttime-bodyweight.png', import.meta.url).pathname, Buffer.from(shot8g.result.data, 'base64'))
 }
 
 // ---------------------------------------------------------------------------
