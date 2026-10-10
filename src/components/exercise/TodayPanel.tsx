@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
@@ -249,6 +250,12 @@ export function TodayPanel({
   const handleFinish = async () => {
     const result = await finishSession()
     if (!result || !workout) return
+    // THE WEEK RE-READS WHEN A SESSION CLOSES (runs 3-4, M39, found by
+    // verify:finish-check): every other write on this panel refreshes it, and
+    // Finish did not, so today's cell stayed "due" and its count read 0 sets
+    // until the app reloaded.
+    weekTrain.refresh()
+    onLogsUpdated?.()
     setSummaryCloseFailed(!!result.serverCloseFailed)
     if (result.nothingLogged) {
       // No summary to compute — the point is to say the day did not close.
@@ -324,6 +331,8 @@ export function TodayPanel({
   // stays a straight plan lookup — a move is a fact about a date, and there
   // is no date being borrowed.
   const todayCell = borrowedDayName ? undefined : weekTrain.days.find(d => d.date === today)
+  // The same count the strips and the coach use (session-count.ts).
+  const finishedShort = shortOfPlan(sessionSetCount(todayCell?.session, todayCell?.workingLogs))
   // `session` is the moved-in session on the receiving end of a move, the
   // plan's own row on an ordinary day, and null on the ORIGIN of a move — and
   // on the origin it stays null. The first version let the plan lookup put the
@@ -1419,7 +1428,8 @@ export function TodayPanel({
             disabled={!summaryData}
             onClick={() => setSummaryOpen(true)}
           >
-            {summaryData ? '✓ Session finished · View summary' : '✓ Session finished'}
+            {/* DONE, WITH THE COUNT when it closed short (Ashley, 10 Oct 2026). */}
+            {`✓ ${finishedShort ? `Done · ${finishedShort}` : 'Session finished'}${summaryData ? ' · View summary' : ''}`}
           </Button>
         </div>
       )}

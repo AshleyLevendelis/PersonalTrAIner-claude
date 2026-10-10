@@ -28,6 +28,7 @@
  */
 import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
 import { filterLoggableSets, isDropRow } from './session-derive'
+import { sessionSetCount } from './session-count'
 import { buildCoachTechniqueSummary } from './exercise-technique'
 import { sessionForDate, dayNameOf, addDays, type SessionMove } from './session-move'
 import { describeExerciseTempo } from './periodization'
@@ -633,14 +634,13 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
   // WHAT HAPPENED TO THE DAY, in the row that names it. Empty for a day
   // nothing has happened to yet (due / rest / before the plan) and whenever
   // the caller sent no state.
-  // "9 of 24": today's own counter (summariseTodayWork + todayWorkTotals),
-  // run over that day's session and logs. Null when either is missing.
+  // "9 of 24": the same count the screen's "Done · 5 of 18 sets" uses
+  // (session-count.ts), run over that day's session and logs. Null when
+  // either is missing.
   const setCount = (r: CoachWeekRow): string | null => {
     if (!r.session || !r.workingLogs) return null
-    const work = summariseTodayWork({ session: r.session, logs: r.workingLogs })
-    if (!work) return null
-    const t = todayWorkTotals(work)
-    return t.planned > 0 ? `${t.logged} of ${t.planned}` : null
+    const t = sessionSetCount(r.session, r.workingLogs)
+    return t ? `${t.logged} of ${t.planned}` : null
   }
   const happened = (r: CoachWeekRow): string => {
     // TODAY'S ROW SAYS NOTHING HERE: the header and the exercise-by-exercise

@@ -590,7 +590,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 <span className="min-w-0 text-[1.5625rem] font-bold tracking-[-.02em] glow-text">{data.session.focus}</span>
                 {data.session.status !== 'not_started' && (
                   <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
-                    {data.session.status === 'in_progress' ? `${data.session.setsLogged} of ${data.session.setsPlanned} sets` : 'Done'}
+                    {/* DONE, WITH THE COUNT when it closed short (Ashley, 10 Oct 2026, runs 3-4 M39). */}
+                    {data.session.status === 'in_progress' ? `${data.session.setsLogged} of ${data.session.setsPlanned} sets`
+                      : data.session.setsPlanned > 0 && data.session.setsLogged < data.session.setsPlanned ? `Done · ${data.session.setsLogged} of ${data.session.setsPlanned} sets` : 'Done'}
                   </span>
                 )}
               </div>

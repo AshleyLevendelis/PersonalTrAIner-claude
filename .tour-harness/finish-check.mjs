@@ -96,7 +96,12 @@ await wait(400)
 // A FINISHED SESSION LOOKS FINISHED (runs 3-4, LOW): where Start sat, it says
 // so, and the summary opens again from there.
 const doneBar = await ev(`(() => { const b = ${q('[data-testid="session-finished"]')}; if (!b) return null; const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), onScreen: r.top >= 0 && r.bottom <= innerHeight, disabled: b.disabled } })()`)
-check('2h. THE CARD SAYS IT IS FINISHED: "✓ Session finished · View summary", on screen', doneBar?.text === '✓ Session finished · View summary' && doneBar.onScreen && !doneBar.disabled, doneBar)
+// Finished SHORT here (one lift of several), so it is Done WITH THE COUNT, the
+// same fraction the card shows (Ashley, 10 Oct 2026, M39).
+check(`2h. THE CARD SAYS IT IS DONE, WITH THE COUNT: "✓ Done · ${H.sets} of ${N} sets · View summary", on screen`, doneBar?.text === `✓ Done · ${H.sets} of ${N} sets · View summary` && doneBar.onScreen && !doneBar.disabled, doneBar)
+// THE WEEK KNOWS TOO: today's strip cell is done, and says the same count.
+const todayCellLabel = await ev(`(() => { const d = window.__fakeDb?.workout_sessions?.[0]?.date; if (!d) return null; const name = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' }); return [...document.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).find(t => t.startsWith(name + ': ')) ?? null })()`)
+check(`2h2. the strip's cell for today now says it is done, with the same count: "done, ${H.sets} of ${N} sets"`, typeof todayCellLabel === 'string' && todayCellLabel.endsWith(`: done, ${H.sets} of ${N} sets`), todayCellLabel)
 check('2i. ...and neither Start nor Finish is offered beside it', (await ev(`!!${byText('Start workout')}`)) === false && (await ev(`!!${byText('Finish session')}`)) === false)
 await shoot('finish-check-finished-bar')
 check('2j. tapping it opens the same summary again', (await tapExpr(q('[data-testid="session-finished"]'))) && !!(await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Session (complete|saved)$/.test(h.textContent))`, 4000)) && (await summary())?.sets === `${H.sets}/${N}`, (await summary())?.sets)
