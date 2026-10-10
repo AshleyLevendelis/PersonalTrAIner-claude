@@ -1303,6 +1303,9 @@ menu" stays true when a copy is also left outside it.
   three options: "Plan's own dishes only"** — a meal asked for by name, built from the fridge or
   edited still re-plans the rest of the day, so her 1 Sep "plan the rest of my meals" stands.
   `docs/plans/swap-keeps-the-other-meals.md`, `hold-around-pins`, `verify:swap-knock-on`
+- **A session finished short is "Done, with the count".** Still a tick, and the day says "5 of 18
+  sets" beside it, over a separate part-done mark and over keeping it as it was. One count for the
+  strips, Home, the Exercise bar and the coach. `session-count`, `verify:finish-check`
 
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an

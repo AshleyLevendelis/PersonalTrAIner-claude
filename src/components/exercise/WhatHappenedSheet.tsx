@@ -255,6 +255,21 @@ export function WhatHappenedSheet({
 
   const saveDidElsewhere = () => {
     if (!session) return
+    // A LOADED LIFT WITH NO WEIGHT IS ASKED FOR, NOT SAVED AT 0 KG (runs 3-4,
+    // found by verify:what-happened behind "Done, with the count"): its sets
+    // were written at 0 kg, which every count in the app reads as a broken
+    // row, so a full session logged here read "16 of 19". The live set grid
+    // already refuses a blank weight on a "type it" box; this is that rule.
+    const needWeight = session.exercises.filter((ex, i) => {
+      const r = rowFor(i, ex)
+      const entry = getExerciseEntry(ex.name)
+      const bodyweight = entry ? !isExternallyLoaded(entry) : r.weight.trim() === ''
+      return !bodyweight && Math.round(Number(r.sets) || 0) > 0 && !(Number(r.weight) > 0)
+    }).map(ex => ex.name)
+    if (needWeight.length > 0) {
+      setError(`Add the weight for ${needWeight.join(', ')}, or put its sets to 0.`)
+      return
+    }
     return run(async () => {
       const sets: Parameters<typeof writeHistoricalSession>[0]['sets'] = []
       session.exercises.forEach((ex, i) => {

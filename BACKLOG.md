@@ -21,7 +21,8 @@ Newest first. One line each.
   - **Hers, to ask one at a time:** ~~the M43b collision~~ (answered 10 Oct: **"Offer it"**, over
     applying automatically and over applying after three sessions; what is built stands), ~~M34~~ (answered 10 Oct: **"Resize, else leave"**, scope **"Plan's own dishes
     only"** after the collision with her 1 Sep fridge-meal rule was put to her; plan in
-    `docs/plans/swap-keeps-the-other-meals.md`; BUILT, see the M34 bullet below), M39 (is a
+    `docs/plans/swap-keeps-the-other-meals.md`; BUILT, see the M34 bullet below), ~~M39~~ (answered 10 Oct: **"Done, with the
+    count"**, over a part-done mark and over keeping it; BUILT, see the M39 bullet below; was: is a
     short session "Done"?), M40b (do rest-of-block swaps last?).
   - **Open:** M40c (no bands means no band work), which is hand-over job 3, the kit list.
   **M43b COLLIDES WITH TWO OF HER OLDER RULINGS, so it was built as an OFFER and is put to her.**
@@ -77,6 +78,20 @@ Newest first. One line each.
   derived gates and 14 meal drivers green first time; the two were those text checks.
   **Not measured:** how often a real plan's swap lands "too far" rather than re-sized; the
   harness fixtures cannot say, and her saved meals cannot be read from here.
+  **M39 BUILT (10 Oct), her "Done, with the count".** A session finished short is still a tick,
+  and says the count: Home "Done · 5 of 18 sets", Exercise's bar "✓ Done · 3 of 19 sets · View
+  summary", each strip cell's spoken label "done, 3 of 19 sets". One count (`session-count.ts`:
+  planned working sets, warm-ups and drops out, capped per lift) for the strips, the bar and the
+  coach's "CLOSED at N of M"; it agrees with today's own counter. **Two defects found behind it,
+  both by browser drivers, both fixed:** (1) Finish never refreshed the week, so today's cell
+  stayed "due" and its count read 0 until the app reloaded; it now re-reads the week like every
+  other write on that panel. (2) "I did it, not in the app" saved a loaded lift with an empty
+  weight box at 0 kg, a row every count in the app reads as broken, so a full session logged
+  there read "16 of 19" (Russian Twist's three sets). It now asks for the weight by name and
+  writes nothing, the live grid's own rule for a blank "type it" box. `test:session-count` (16
+  checks, 7/7), `verify:finish-check` 2h/2h2 (2/2), `verify:what-happened` 10e2/10e3/10g (2/2).
+  62 of 63 derived gates green first time; the one was `verify:what-happened` reading the new
+  count on the day that exposed defect (2).
   **Needs:** the `chat-gemini`, `onboarding-chat` and `generate-meals` deploys; the coach exam
   is stale and must be re-run on her machine. No migration. Not on `main`.
   One derived check went red on correct code and was re-anchored: `test:one-today` pinned the

@@ -193,8 +193,20 @@ const vPast = await verbs()
 check('10d. a past day offers "I did it, not in the app" as well as missed', vPast.includes('did_elsewhere') && vPast.includes('missed'), vPast)
 check('10e. ...with one row per exercise, pre-filled from the plan', await clickSel('[data-verb="did_elsewhere"]') && (await wait(300), (await ev(`document.querySelectorAll('input[aria-label$=" sets"]').length`)) >= 1))
 await shoot('what-happened-did-elsewhere')
-check('10f. logging it', await clickSel('[data-verb="save-did-elsewhere"]') && await untilClosed())
-check('10g. ...makes that day done — real sets, a completed session', new RegExp(`^${pastDay}: done$`).test(await untilCell(pastDay, /done/) || ''), await cell(pastDay))
+// A LOADED LIFT LEFT WITHOUT A WEIGHT IS ASKED FOR, never saved at 0 kg: a
+// 0 kg loaded set is a row no count in the app reads, so a full session
+// logged here used to read "16 of 19" (runs 3-4, found behind M39).
+const emptyKg = await ev(`[...document.querySelectorAll('[data-testid="what-happened-did-elsewhere"] input[aria-label$=" weight kg"]')].filter(i => i.value.trim() === '').map(i => i.getAttribute('aria-label').replace(/ weight kg$/, ''))`)
+const rowsBefore = await ev(`(window.__fakeDb?.exercise_set_logs ?? []).length`)
+await clickSel('[data-verb="save-did-elsewhere"]'); await wait(500)
+const askErr = await ev(`document.querySelector('[data-testid="what-happened-error"]')?.textContent ?? null`)
+check('10e2. the fixture has a loaded lift with no weight filled (sanity check on the next one)', (emptyKg?.length ?? 0) > 0, emptyKg)
+check('10e3. ...Log it asks for that weight by name, and writes nothing', !!askErr && (emptyKg ?? []).every(n => askErr.includes(n)) && /^Add the weight for .+, or put its sets to 0\.$/.test(askErr) && (await ev(`(window.__fakeDb?.exercise_set_logs ?? []).length`)) === rowsBefore && (await ev(`!!document.querySelector('[data-testid="what-happened-did-elsewhere"]')`)) === true, { askErr, emptyKg })
+await ev(`(() => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; for (const i of document.querySelectorAll('[data-testid="what-happened-did-elsewhere"] input[aria-label$=" weight kg"]')) { if (i.value.trim() === '') { set.call(i, '10'); i.dispatchEvent(new Event('input', { bubbles: true })) } } })()`)
+await wait(300)
+check('10f. logging it, the weight now given', await clickSel('[data-verb="save-did-elsewhere"]') && await untilClosed())
+// Every planned set was logged, so the day is plain "done", not "done, N of M".
+check('10g. ...makes that day done — every set counted, a completed session', new RegExp(`^${pastDay}: done$`).test(await untilCell(pastDay, /done/) || ''), await cell(pastDay))
 
 console.log(failures === 0 ? '\nThe five verbs work on the screen, and can be unsaid.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

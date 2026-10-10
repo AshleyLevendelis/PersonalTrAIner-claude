@@ -26,7 +26,7 @@ Status key: **fixed** on the branch / **partly** / **open** / **hers** (waits on
 | M36 "you hit your lifting sessions" at 9/24 and 5/18 | Past days reached the coach as "CLOSED" only | **fixed** ("CLOSED at 9 of 24 planned working sets"), needs `chat-gemini` deploy |
 | M37 coach says there's no data export | Listed as not existing, gates enforced it | **fixed**, needs `chat-gemini` + `onboarding-chat` deploys |
 | M38 swap makes a timed hold "MAIN LIFT" | Holds not excluded from promotion | **fixed** (CSCS, mine): a hold, carry or interval is never the main lift, label and rest floor alike |
-| M39 "2 of 3" became "done — 2 for 2"; 5 of 18 counts as Done | Two week counters; Finish = Done | **partly**: the tip now says "due so far". One counter lands with the week work on the other branch. Whether a short session is "Done" is **hers** |
+| M39 "2 of 3" became "done — 2 for 2"; 5 of 18 counts as Done | Two week counters; Finish = Done | **fixed**, her ruling "Done, with the count": "Done · 5 of 18 sets" on Home, the Exercise bar and the strips' spoken labels; Finish now refreshes the week; "I did it" no longer saves sets nothing counts. The tip says "due so far"; one week counter for screen and tip still lands with the week work on the other branch |
 | M40 swap/ban don't survive the block; bands back after "no bands" | (a) bans not passed to block rotation; (b) "rest of block" by design; (c) no kit list | (a) **fixed**; (b) **hers**; (c) **open**, hand-over job 3 (kit list) |
 | M41 swap list offers what a knee adaptation removed | | **fixed** earlier on the branch; not driven in a browser |
 | M42 timed holds | No hold timer, receipt said reps, records compared seconds as reps, "Add a drop" on anything | **fixed**: start/stop timer, said in seconds, no lifting record in the wrong unit, no drop on a hold |
@@ -61,8 +61,9 @@ Hers, settled 10 Oct 2026:
    for scope **"Plan's own dishes only"** (a by-name or fridge meal still re-plans the day, her
    1 Sep rule). Plan: `docs/plans/swap-keeps-the-other-meals.md`.
 
+6. M39: **"Done, with the count"**, over a part-done mark and over keeping it as it was.
+
 Still hers, one at a time:
-2. M39: is a session finished well short "Done", or its own "part done"?
 3. M40b: "swap for the rest of the block" — keep it to the block, or make it last?
 
 Mine under the CSCS delegation (basis in BACKLOG):
