@@ -1296,6 +1296,13 @@ menu" stays true when a copy is also left outside it.
   automatically, and over applying it only after three sessions). Block start says "last block
   you did 18 kg x 11, that's 19 kg for 6-8, use it?" and nothing changes until she taps yes.
   `beat-target` §6
+- **A swap keeps the day's other dishes: "Resize, else leave."** Swapping a meal (or moving one
+  between days) for one of the plan's own dishes leaves every other meal of that day on the dish
+  it showed; they re-size together, about 25% either way, with one line and an Undo, and beyond
+  that they are left alone and the line says how far over or under. **Scope, the same day, from
+  three options: "Plan's own dishes only"** — a meal asked for by name, built from the fridge or
+  edited still re-plans the rest of the day, so her 1 Sep "plan the rest of my meals" stands.
+  `docs/plans/swap-keeps-the-other-meals.md`
 
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an

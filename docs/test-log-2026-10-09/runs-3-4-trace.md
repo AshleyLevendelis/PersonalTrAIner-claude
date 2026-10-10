@@ -57,8 +57,11 @@ Hers, settled 10 Oct 2026:
    three-session bar): **offer it**, over applying automatically and over applying after three
    sessions.
 
+5. M34: **"Resize, else leave"** (over resize-else-re-pick and over keeping today's re-pick), and
+   for scope **"Plan's own dishes only"** (a by-name or fridge meal still re-plans the day, her
+   1 Sep rule). Plan: `docs/plans/swap-keeps-the-other-meals.md`.
+
 Still hers, one at a time:
-1. M34: should a swap re-size the other meals before it changes any dish?
 2. M39: is a session finished well short "Done", or its own "part done"?
 3. M40b: "swap for the rest of the block" — keep it to the block, or make it last?
 
