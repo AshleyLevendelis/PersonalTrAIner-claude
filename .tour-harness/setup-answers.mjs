@@ -31,6 +31,15 @@ const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => { const p = q.url.split('?')[0]; const f = join(DIST, p === '/' ? '/.tour-harness/profile.html' : p); if (!existsSync(f)) { r.writeHead(404); r.end('nf'); return } r.writeHead(200, { 'Content-Type': T[extname(f)] ?? 'application/octet-stream' }); r.end(readFileSync(f)) })
 await new Promise(r => server.listen(0, r)); const port = server.address().port
+// A BROWSER ALREADY ON THIS PORT IS NOT OURS. 10 Oct 2026: a Chromium left
+// over from an earlier run held 9443, this driver attached to its page, which
+// never had focus, so no field could lose focus and nothing saved; five checks
+// went red on code that passed the day before, and no edit to the app could
+// have told why. Refuse rather than talk to a stranger.
+if (await fetch('http://127.0.0.1:9443/json/version').then(() => true, () => false)) {
+  console.error('    ✗ 0. port 9443 is already taken by another browser, so this run would drive the wrong page. Close it (pkill -f "[c]hromium.*9443") and run again.')
+  server.close(); process.exit(1)
+}
 const chrome = spawn('/opt/pw-browsers/chromium', ['--headless=new', '--remote-debugging-port=9443', '--no-sandbox', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
 const wait = ms => new Promise(r => setTimeout(r, ms)); let t
 for (let i = 0; i < 80; i++) { try { const l = await fetch('http://127.0.0.1:9443/json/list').then(r => r.json()); const g = l.find(x => x.type === 'page'); if (g) { t = g.webSocketDebuggerUrl; break } } catch {} await wait(250) }

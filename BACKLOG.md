@@ -58,6 +58,17 @@ Newest first. One line each.
   One derived check went red on correct code and was re-anchored: `test:one-today` pinned the
   space under the list to the Start bar alone; it now holds it to every state that draws a bottom
   bar (3/3 mutations). 130 of 131 derived gates green first time.
+  **Full sweep at `1c06d57c`: 371 gates, 366 passed.** Red: the usual environmental three
+  (`test:meal-quality`, `test:schema-parity`, `verify:rls`, each read for its own "could not
+  reach it" sentence), `test:coach-exam-fresh` by design, and `verify:setup-answers`, which was
+  NOT the app. It failed identically on every commit back to the one that passed it on 9 Oct; a
+  probe showed the page never had focus, and four Chromium processes left over from earlier runs
+  held the driver's port 9443, so it drove a stranger's page. Killed, it passed. **I first blamed
+  the driver's typing helper (type and blur in one step) and "fixed" that; it changed nothing and
+  was reverted. The tell I skipped: a failure that is identical across commits is about the
+  machine, not the code.** The driver now refuses to run when its port is taken, with the fix in
+  the message (proven both ways: green on a clean port, refuses with one held). Other drivers
+  share the shape and were not changed; the 30 Sep note in CLAUDE.md names the class.
 
 - [x] **RUNS 3 AND 4 OF THE LIVE-APP TEST (9-10 Oct 2026): 4 HIGH, 11 MEDIUM, 8 LOW, TRACED, NOT
   BUILT.** (Built 10 Oct: see the entry above.) Ashley's list, added to the hand-over's jobs. Report only, waiting on "build it".
