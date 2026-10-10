@@ -1291,9 +1291,11 @@ menu" stays true when a copy is also left outside it.
 - **Toast counts as bread now.** French toast is its own food and keeps its egg and milk.
   `meal-amounts`
 - **The heaviest logged set carries into the next block, under the stated kit limit, adjusted
-  for the new rep range.** BUILT AS AN OFFER, because applying it automatically would override
-  her 1 Sep "offer, never apply" and her three-session bar; that collision is put to her, not
-  resolved here. `beat-target` §6
+  for the new rep range.** It collided with her 1 Sep "offer, never apply" and her three-session
+  bar, and was put to her the same day: **"Offer it"**, from three options (over applying it
+  automatically, and over applying it only after three sessions). Block start says "last block
+  you did 18 kg x 11, that's 19 kg for 6-8, use it?" and nothing changes until she taps yes.
+  `beat-target` §6
 
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an

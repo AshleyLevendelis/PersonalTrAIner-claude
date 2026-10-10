@@ -18,7 +18,8 @@ Newest first. One line each.
   - **Partly:** M34 (a swap now says which other meals changed; the visible line is proven by
     logic only, because no harness fixture moved another meal in 18 swaps), M39 (the tip says
     "due so far"; one week counter lands with the week work on the other branch), M43b (below).
-  - **Hers, to ask one at a time:** the M43b collision, M34 (re-size before re-pick?), M39 (is a
+  - **Hers, to ask one at a time:** ~~the M43b collision~~ (answered 10 Oct: **"Offer it"**, over
+    applying automatically and over applying after three sessions; what is built stands), M34 (re-size before re-pick?), M39 (is a
     short session "Done"?), M40b (do rest-of-block swaps last?).
   - **Open:** M40c (no bands means no band work), which is hand-over job 3, the kit list.
   **M43b COLLIDES WITH TWO OF HER OLDER RULINGS, so it was built as an OFFER and is put to her.**

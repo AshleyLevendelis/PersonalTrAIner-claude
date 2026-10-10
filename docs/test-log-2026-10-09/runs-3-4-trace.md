@@ -30,7 +30,7 @@ Status key: **fixed** on the branch / **partly** / **open** / **hers** (waits on
 | M40 swap/ban don't survive the block; bands back after "no bands" | (a) bans not passed to block rotation; (b) "rest of block" by design; (c) no kit list | (a) **fixed**; (b) **hers**; (c) **open**, hand-over job 3 (kit list) |
 | M41 swap list offers what a knee adaptation removed | | **fixed** earlier on the branch; not driven in a browser |
 | M42 timed holds | No hold timer, receipt said reps, records compared seconds as reps, "Add a drop" on anything | **fixed**: start/stop timer, said in seconds, no lifting record in the wrong unit, no drop on a hold |
-| M43 deload at the 24 kg limit; week 5 at 16 after 18×11 | (a) stored deload never lowered; (b) nothing carries a logged weight into the next block | (a) **fixed**; (b) **partly**: the block-start offer now carries last block's best set into the new reps, under the kit limit (her conditions). It stays an OFFER, which collides with "carry it": put to her |
+| M43 deload at the 24 kg limit; week 5 at 16 after 18×11 | (a) stored deload never lowered; (b) nothing carries a logged weight into the next block | (a) **fixed**; (b) **fixed**: the block-start offer carries last block's best set into the new reps, under the kit limit. She ruled it stays an OFFER (10 Oct) |
 
 ## LOW
 
@@ -53,9 +53,11 @@ Hers, settled 10 Oct 2026:
 2. H6: toast counts as bread now.
 3. M43b: carry it, under the stated kit limit, adjusted for the new rep range.
 
+4. M43b collision (carrying automatically would override her 1 Sep "offer, never apply" and her
+   three-session bar): **offer it**, over applying automatically and over applying after three
+   sessions.
+
 Still hers, one at a time:
-1. M43b collision: carrying automatically after one session overrides her 1 Sep "offer, never
-   apply" and her three-session evidence bar. Built as an offer; does she want it applied?
 2. M34: should a swap re-size the other meals before it changes any dish?
 3. M39: is a session finished well short "Done", or its own "part done"?
 4. M40b: "swap for the rest of the block" — keep it to the block, or make it last?
