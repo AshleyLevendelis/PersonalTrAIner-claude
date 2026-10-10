@@ -1,6 +1,6 @@
 import type { MacroTargets } from '@/lib/types'
 import {
-  expectedByNow, isBehindPace, WAKING_DAY, PACE_WORTH_SAYING_FRACTION,
+  expectedByNow, isBehindPace, WAKING_DAY, PACE_WORTH_SAYING_FRACTION, MEAL_DUE_HOUR,
   type PaceBasis, type PaceClock, type PaceSlot,
 } from '@/lib/pace'
 
@@ -72,6 +72,14 @@ const NO_PLAN_SLOTS: PaceSlot[] = ['breakfast', 'lunch', 'dinner']
 
 const NOUN: Record<MacroKey | 'water', string> = { protein: 'protein', carbs: 'carbs', fat: 'fat', water: 'water' }
 
+/** This many meals past their time and unlogged: the line says that, not a macro. */
+export const LOGGING_GAP_MEALS = 3
+
+/** Most of the day still to log: say that, not a macro. */
+export function loggingGapLine(n: number): string {
+  return `${n} of today's meals still to log, so these numbers are only what's logged so far.`
+}
+
 export function macroShortfallLine(input: ShortfallInput): string | null {
   const { targets, eaten, waterTargetMl, waterMl, meals, clock } = input
   // THE FIRST DAY IS QUIET, and there is no line here that makes it so:
@@ -125,9 +133,20 @@ export function macroShortfallLine(input: ShortfallInput): string | null {
     return g.left - planned >= g.target * PACE_WORTH_SAYING_FRACTION
   })
   const isBehind = behind.length > 0
+  // A LOGGING GAP IS NOT AN EATING GAP (runs 3-4, LOW, decided as a CSCS
+  // coach): at 9pm with three meals unlogged the line led with "Fat is
+  // behind". With three or more meals whose time has passed still unlogged,
+  // the numbers say what was logged, not what was eaten, so that is what is
+  // said. Two is left to the ordinary line, which already names the meal
+  // "still to log"; dinner at 1pm is not due and never counts.
+  const dueUnlogged = unlogged.filter(m => clock.hour >= MEAL_DUE_HOUR[m.slot])
+  const foodBehind = behind.filter(g => g.key !== 'water')
+  if (foodBehind.length > 0 && dueUnlogged.length >= LOGGING_GAP_MEALS) return loggingGapLine(dueUnlogged.length)
   const pool = isBehind ? behind : uncovered
   if (pool.length === 0) return null
-  const worst = widest(pool)
+  // PROTEIN FIRST when it is one of the gaps: it is the macro a day is
+  // planned around, and fat's small target made it "widest" for a few grams.
+  const worst = pool.find(g => g.key === 'protein') ?? widest(pool)
   if (worst.left / worst.target < SHORTFALL_SPEAK_FRACTION) return null
 
   const left = `${Math.round(worst.left)}${worst.unit}`

@@ -550,6 +550,21 @@ export function swapKnockOnLine(c: { slot: string; kind: 'dish' | 'size'; from: 
 }
 
 /**
+ * A CATALOGUE TIER IN PLAIN WORDS (runs 3-4, LOW): the swap sheet printed
+ * "tier2 compound". Never a raw code on screen.
+ */
+export function tierWords(tier: string | null | undefined): string {
+  switch (tier) {
+    case 'tier1_compound': return 'main compound'
+    case 'tier2_compound': return 'compound'
+    case 'tier3_isolation': return 'isolation'
+    case 'primer': return 'warm-up'
+    case 'cardio': return 'cardio'
+    default: return (tier ?? '').replace(/_/g, ' ').replace(/\btier\s*\d\b/g, '').trim() || 'exercise'
+  }
+}
+
+/**
  * THE WEIGHT IN THE BOX IS THE SET JUST DONE (H25, 10 Oct 2026). Shown under a
  * working row only when the carried number differs from the plan's, so the
  * faint figure never reads as a prescription it is not.

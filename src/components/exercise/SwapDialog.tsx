@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { isNothingToChangeMessage } from '@/lib/edit-reason'
+import { tierWords } from '@/lib/coach-voice'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
 import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
@@ -225,7 +226,7 @@ export function SwapDialog({
         {!pendingSwap && currentEntry && (
           <div className="flex flex-wrap gap-1.5 pb-2">
             <Badge variant="outline" className="text-xs">{currentEntry.movement_pattern.replace(/_/g, ' ')}</Badge>
-            <Badge variant="outline" className="text-xs">{currentEntry.mechanics_tier.replace(/_/g, ' ')}</Badge>
+            <Badge variant="outline" className="text-xs">{tierWords(currentEntry.mechanics_tier)}</Badge>
             <Badge variant={currentEntry.joint_stress === 'high' ? 'destructive' : 'secondary'} className="text-xs">
               <ShieldAlert className="size-3 mr-1" />
               {currentEntry.joint_stress} joint stress
@@ -238,7 +239,7 @@ export function SwapDialog({
         {!pendingSwap && (
           replacements.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No alternative exercises fit your equipment, injuries and skill level for this movement pattern. Search below to pick anything from the full catalog instead.
+              No alternative exercises fit your equipment, injuries and skill level for this movement pattern. Search below to pick from all exercises instead.
             </p>
           ) : (
             <>
@@ -268,7 +269,7 @@ export function SwapDialog({
             {replacements.length < INITIAL_SHOWN && (
               <p className="text-xs text-muted-foreground px-1 pb-1" data-testid="swap-short-list-reason">
                 {replacements.length === 1 ? "That's the only alternative" : `Only ${replacements.length} alternatives`} that fit your
-                equipment, injuries and skill level for this movement. Search below for anything else in the catalog.
+                equipment, injuries and skill level for this movement. Search below for any other exercise.
               </p>
             )}
             <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -283,7 +284,7 @@ export function SwapDialog({
                     <div className="space-y-1">
                       <p className="font-medium text-sm">{exercise.name}</p>
                       <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
+                        <Badge variant="secondary" className="text-xs">{tierWords(exercise.mechanics_tier)}</Badge>
                         {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
                           <Badge className="text-xs bg-primary/15 text-primary-text">
                             lower stress
@@ -353,7 +354,7 @@ export function SwapDialog({
                             <p className="font-medium text-sm">{exercise.name}</p>
                             <div className="flex flex-wrap gap-1">
                               <Badge variant="secondary" className="text-xs">{exercise.movement_pattern.replace(/_/g, ' ')}</Badge>
-                              <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
+                              <Badge variant="secondary" className="text-xs">{tierWords(exercise.mechanics_tier)}</Badge>
                             </div>
                             {/* THE NOTE THE RANKED LIST HAS AND THIS ONE DID NOT.
                                 Searching the catalogue told you strictly less

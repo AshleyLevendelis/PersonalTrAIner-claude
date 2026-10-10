@@ -129,7 +129,10 @@ console.log('\n2. The Nutrition line: the same day at 07:00, 12:00 and 20:00')
   check('nothing logged, 07:00: silent (this was "Protein is behind — 164g to go")', none0700 === null, none0700)
   check('nothing logged, 09:59: still silent', line(day([], '09:59')) === null, line(day([], '09:59')))
   check('nothing logged, 12:00: breakfast\'s time has passed, so it may say behind', /^Protein is behind — 164g to go\./.test(none1200 ?? ''), none1200)
-  check('nothing logged, 20:00: behind', /^Protein is behind — 164g to go\./.test(none2000 ?? ''), none2000)
+  // Re-anchored 10 Oct 2026 (runs 3-4, LOW): three meals past their time and
+  // none logged is a LOGGING gap, and the line says so instead of a macro.
+  check('nothing logged, 20:00: three meals past their time, so it says what is unlogged',
+    none2000 === "3 of today's meals still to log, so these numbers are only what's logged so far.", none2000)
 
   // (b) Breakfast logged at 07:00, then nothing else — the SAME inputs at three times.
   const b0700 = line(day(['breakfast'], '07:00'))
@@ -175,7 +178,7 @@ console.log('\n3. The day the account or the plan was made is silent, at every h
     hours.every(h => firstDay(h, [`${DAY}T06:30:00`]) === null), hours.map(h => firstDay(h, [`${DAY}T06:30:00`])))
   check('plan made today on an old account: the same', hours.every(h => firstDay(h, [JOINED_LONG_AGO, `${DAY}T06:30:00`]) === null))
   // The contrast: the identical day for somebody who joined in February is NOT silent.
-  check('...and the same day for somebody who is not new does speak at 20:00', /behind/.test(firstDay('20:00', [JOINED_LONG_AGO]) ?? ''), firstDay('20:00', [JOINED_LONG_AGO]))
+  check('...and the same day for somebody who is not new does speak at 20:00', /behind|still to log/.test(firstDay('20:00', [JOINED_LONG_AGO]) ?? ''), firstDay('20:00', [JOINED_LONG_AGO]))
 }
 
 // ---------------------------------------------------------------------------

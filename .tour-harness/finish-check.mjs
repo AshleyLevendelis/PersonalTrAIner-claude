@@ -92,6 +92,15 @@ check(`2f. VOLUME COUNTS BOTH HANDS: ${H.sets + 1} sets of 30 per hand for 8 is 
 check('2g. the time is labelled as training time', (c2?.tiles ?? []).some(t => /^\d+ ?m Training time$/i.test(t)), c2?.tiles)
 await shoot('finish-check-summary')
 await escape()
+await wait(400)
+// A FINISHED SESSION LOOKS FINISHED (runs 3-4, LOW): where Start sat, it says
+// so, and the summary opens again from there.
+const doneBar = await ev(`(() => { const b = ${q('[data-testid="session-finished"]')}; if (!b) return null; const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), onScreen: r.top >= 0 && r.bottom <= innerHeight, disabled: b.disabled } })()`)
+check('2h. THE CARD SAYS IT IS FINISHED: "✓ Session finished · View summary", on screen', doneBar?.text === '✓ Session finished · View summary' && doneBar.onScreen && !doneBar.disabled, doneBar)
+check('2i. ...and neither Start nor Finish is offered beside it', (await ev(`!!${byText('Start workout')}`)) === false && (await ev(`!!${byText('Finish session')}`)) === false)
+await shoot('finish-check-finished-bar')
+check('2j. tapping it opens the same summary again', (await tapExpr(q('[data-testid="session-finished"]'))) && !!(await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Session (complete|saved)$/.test(h.textContent))`, 4000)) && (await summary())?.sets === `${H.sets}/${N}`, (await summary())?.sets)
+await escape()
 
 // ---- 3. Everything done: no question -----------------------------------------
 console.log('\n  3. EVERY PLANNED SET DONE — nothing is asked, and the time is training time')

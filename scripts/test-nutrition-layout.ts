@@ -22,7 +22,7 @@ import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
-  macroShortfallLine, SHORTFALL_SPEAK_FRACTION, COVERING_MIN_FRACTION,
+  macroShortfallLine, SHORTFALL_SPEAK_FRACTION, COVERING_MIN_FRACTION, LOGGING_GAP_MEALS, loggingGapLine,
   type PlannedMeal,
 } from '../src/lib/macro-shortfall'
 import { paceClock } from '../src/lib/pace'
@@ -108,12 +108,34 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
   check('a wide gap → spoken',
     /Protein is behind/.test(macroShortfallLine({ ...base, eaten: { protein: T.protein - justOver, carbs: 240, fat: 70 } }) ?? ''))
 
-  // Only the WIDEST, so a bad day is one sentence and not four.
-  // Fat 65/70 behind (93%) beats protein 80/180 (44%) — the widest SHARE,
-  // not the biggest number, which is the whole point of the tie-break.
+  // ONE, so a bad day is one sentence and not four. Re-anchored 10 Oct 2026
+  // (runs 3-4, LOW): PROTEIN FIRST whenever it is one of the gaps — fat at
+  // 93% behind beat protein at 44% on share, and the tester read "Fat is
+  // behind" at 9pm on a day planned around protein.
   const twoBehind = macroShortfallLine({ ...base, eaten: { protein: 100, carbs: 240, fat: 5 } })
-  check('two macros behind → only the wider one is named',
-    /^Fat is behind/.test(twoBehind ?? '') && !/Protein/.test(twoBehind ?? ''), twoBehind)
+  check('protein and fat behind → protein is named, and only protein',
+    /^Protein is behind/.test(twoBehind ?? '') && !/Fat/.test(twoBehind ?? ''), twoBehind)
+  // Without protein in it, the widest SHARE still decides: carbs 200/240
+  // (83%) beats fat 40/70 (57%) though fat is not the bigger number.
+  const noProtein = macroShortfallLine({ ...base, eaten: { protein: 180, carbs: 40, fat: 30 } })
+  check('protein fine, carbs and fat behind → the wider share is named',
+    /^Carbs is behind/.test(noProtein ?? '') && !/Fat/.test(noProtein ?? ''), noProtein)
+
+  // A LOGGING GAP IS NOT AN EATING GAP (runs 3-4, LOW). 22:30, so every meal
+  // is past its time: three unlogged says what is unlogged, two does not.
+  const four = (logged: boolean[]) => (['breakfast', 'lunch', 'snack', 'dinner'] as const)
+    .map((slot, i) => ({ slot, label: slot[0].toUpperCase() + slot.slice(1), logged: logged[i], macros: { calories: 500, protein: 40, carbs: 60, fat: 18 } }))
+  const threeOpen = macroShortfallLine({ ...base, eaten: { protein: 40, carbs: 60, fat: 18 }, meals: four([true, false, false, false]) })
+  check(`${LOGGING_GAP_MEALS} meals past their time unlogged → the line is about logging, not a macro`,
+    threeOpen === loggingGapLine(3) && !/behind/.test(threeOpen ?? ''), threeOpen)
+  const twoOpen = macroShortfallLine({ ...base, eaten: { protein: 80, carbs: 120, fat: 36 }, meals: four([true, true, false, false]) })
+  check('...two unlogged keeps the ordinary line', /behind/.test(twoOpen ?? ''), twoOpen)
+  // Dinner is not due at 13:00, so it is not counted as unlogged.
+  const midday = macroShortfallLine({ ...base, clock: paceClock(new Date('2026-03-11T15:00:00'), ['2026-02-01T09:00:00']),
+    eaten: { protein: 0, carbs: 0, fat: 0 }, meals: four([false, false, false, false]) })
+  check('...and a meal whose time has not come is not counted (15:00, two due)', midday !== null && midday !== loggingGapLine(4) && midday !== loggingGapLine(2) && /behind/.test(midday), midday)
+  check('...and water alone never becomes a logging line',
+    macroShortfallLine({ ...base, eaten: { protein: 180, carbs: 240, fat: 70 }, waterMl: 0, meals: four([false, false, false, false]) }) === 'Water is behind — 2000ml to go.')
 
   // The covering meal.
   const withDinner = macroShortfallLine({

@@ -1108,7 +1108,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                     load_ceilings_declined is its own column. Reversible from
                     here, because "I'm not sure" stops the app asking and
                     somebody who later finds out needs a way back in. */}
-                {profile.load_ceilings_declined && (
+                {/* Only when nothing IS capped (runs 3-4, LOW): it showed under a
+                    filled-in 24 kg dumbbell. */}
+                {profile.load_ceilings_declined && profile.max_dumbbell_kg == null && profile.max_single_implement_kg == null && profile.max_improvised_kg == null && (
                   <p className="pt-1 text-xs text-muted-foreground" data-testid="ceilings-declined">
                     You said you weren't sure what these weigh, so nothing is capped. Fill any of them
                     in and I'll use it.

@@ -178,7 +178,8 @@ export async function saveStatedCeiling(
 ): Promise<CeilingWriteResult> {
   if (!isValidCeilingKg(kg)) return { saved: false, needsMigration: false }
   const { error } = await supabase.from('fitness_profiles')
-    .update({ [LOAD_CEILING_COLUMN[kind]]: kg })
+    // A stated number answers the question: "not sure" no longer stands (runs 3-4, LOW).
+    .update({ [LOAD_CEILING_COLUMN[kind]]: kg, load_ceilings_declined: false })
     .eq('id', profileId)
   if (error) return { saved: false, needsMigration: isMissingColumnError(error) }
   return { saved: true, needsMigration: false }

@@ -247,7 +247,9 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
       // this tab is mostly for, and it carries the tour stop, which used to
       // point at the round card that is no longer here at rest.
       label: 'Timers',
-      sub: roundLive ? 'A round is running' : 'Round timer, stopwatch, lap timer',
+      // A FINISHED ROUND IS NOT RUNNING (runs 3-4, LOW): it said "A round is
+      // running" until Log session or Reset.
+      sub: roundLive ? (timers.isRoundComplete ? 'Round finished — log it' : 'A round is running') : 'Round timer, stopwatch, lap timer',
       icon: TimerReset,
       tour: 'toolstimer',
       onClick: () => { setTimerPick(roundLive ? 'round' : null); setTimersOpen(true) },

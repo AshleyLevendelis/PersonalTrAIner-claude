@@ -1379,7 +1379,7 @@ export function TodayPanel({
           />
           {/* Clears the fixed CTA bar below, so the last row is never sitting
               underneath it. Matches the bar's own height plus its fade. */}
-          {status === 'idle' && <div aria-hidden className="h-[100px]" />}
+          {(status === 'idle' || status === 'finished') && <div aria-hidden className="h-[100px]" />}
         </div>
       )}
 
@@ -1400,6 +1400,29 @@ export function TodayPanel({
           A finished day gets no primary action: the work is done, and the
           summary it produced is the thing to look at. `idle` is the only
           state that means "not started". */}
+      {/* A FINISHED SESSION LOOKS FINISHED (runs 3-4, LOW): after Finish the
+          card was the plan with its bar gone and nothing saying so. The same
+          place Start sat says it is done, and opens the summary when there is
+          one to open. */}
+      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'finished' && (
+        <div
+          className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
+          style={{
+            bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`,
+            background: 'linear-gradient(to top, var(--background) 70%, transparent)',
+          }}
+        >
+          <Button
+            className="h-[52px] w-full text-[0.9375rem] font-semibold"
+            variant="outline"
+            data-testid="session-finished"
+            disabled={!summaryData}
+            onClick={() => setSummaryOpen(true)}
+          >
+            {summaryData ? '✓ Session finished · View summary' : '✓ Session finished'}
+          </Button>
+        </div>
+      )}
       {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && (
         <div
           className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
