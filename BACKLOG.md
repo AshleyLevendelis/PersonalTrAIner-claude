@@ -103,6 +103,12 @@ Newest first. One line each.
   the date formatter; the screen now formats the date and hands the phrasebook the words.
   **Not changed:** the add and remove sheets' own "Rest of block" choices (her question was the
   swap); they could take the same line.
+  **Full sweep at `79550ac9` (10 Oct, after every ruling was built): 374 gates, 370 passed.** The
+  four reds, each read for its own words: `test:meal-quality` ("VITE_SUPABASE_URL /
+  VITE_SUPABASE_ANON_KEY must be set"), `test:schema-parity` ("Failed to link to TEST"),
+  `verify:rls` ("No database to read") — no database from a cloud session — and
+  `test:coach-exam-fresh`, red by design until the exam is re-run against coach
+  `c1770715fa68b933` (28 cases, 52 turns).
   **Needs:** the `chat-gemini`, `onboarding-chat` and `generate-meals` deploys; the coach exam
   is stale and must be re-run on her machine. No migration. Not on `main`.
   One derived check went red on correct code and was re-anchored: `test:one-today` pinned the
