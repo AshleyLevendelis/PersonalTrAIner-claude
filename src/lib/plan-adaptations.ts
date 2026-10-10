@@ -588,7 +588,11 @@ export async function rebuildAgainstProfile(
     if (seedKey) setRandomSource(seededRngFromKey(seedKey))
     try {
       const plan = generateExercisePlan(against, exclusions)
-      return generateMesocycle(against, plan.plan)
+      // THE BANS GO TO THE WHOLE MESOCYCLE, not just the base week (runs 3-4,
+      // M40): block rotation and weekly accessory rotation pick from their own
+      // pool, which was built with no exclusions, so every rebuild let a banned
+      // exercise back in from block 2. First generation (App) already passed them.
+      return generateMesocycle(against, plan.plan, exclusions)
     } finally {
       if (seedKey) resetRandomSource()
     }

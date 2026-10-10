@@ -21,41 +21,58 @@
 // ---------------------------------------------------------------------------
 import type { MesocycleWeek, UserProfile } from './types'
 import { banExerciseFromMesocycle } from './mesocycle-edit'
+import { loadPlanEditContext } from './plan-edit-context'
+import type { DayGuard } from './plan-guard'
 import { saveMesocycle } from './mesocycle-persistence'
 import { createFact, deleteFactPermanently } from './memory-store'
 import { couldNot } from './coach-voice'
 
 export interface BanBlastRadius {
-  /** Sessions across the WHOLE plan that hold it — that is what a ban means. */
+  /** Sessions across the WHOLE plan that hold it and will change — that is what a ban means. */
   sessions: number
   weeks: number
   totalWeeks: number
+  /** Sessions already trained that hold it: they keep it, as the record (M35). */
+  kept: number
 }
 
-export function banBlastRadius(mesocycle: MesocycleWeek[], exerciseName: string): BanBlastRadius {
+/**
+ * What a ban will change, counted the way banExerciseFromMesocycle changes it:
+ * every session holding the exercise EXCEPT those already trained, which keep
+ * it (plan-guard's rule 1). Null guard: nothing has been trained.
+ */
+export function banBlastRadius(mesocycle: MesocycleWeek[], exerciseName: string, isProtected: DayGuard | null): BanBlastRadius {
   const wanted = exerciseName.toLowerCase()
   let sessions = 0
+  let kept = 0
   const weeks = new Set<number>()
   for (const w of mesocycle) {
     for (const d of w.days) {
-      if (d.exercises.some(e => e.name.toLowerCase() === wanted)) { sessions++; weeks.add(w.week_number) }
+      if (!d.exercises.some(e => e.name.toLowerCase() === wanted)) continue
+      if (isProtected?.(w.week_number, d.day)) { kept++; continue }
+      sessions++; weeks.add(w.week_number)
     }
   }
-  return { sessions, weeks: weeks.size, totalWeeks: mesocycle.length }
+  return { sessions, weeks: weeks.size, totalWeeks: mesocycle.length, kept }
 }
 
 /** What a ban will do, said before the tap. The coach's card and the screen's sheet both print these. */
 export function banConfirmLines(radius: BanBlastRadius): { warn: string | null; info: string } {
-  const { sessions } = radius
+  const { sessions, kept } = radius
+  const keptLine = kept > 0
+    ? ` ${kept === 1 ? 'The session' : `The ${kept} sessions`} you've already done keep${kept === 1 ? 's' : ''} it, as the record of what you did.`
+    : ''
   if (sessions === 0) {
     return {
       warn: null,
-      info: `It isn't on this plan anywhere, so nothing changes today — but it will never be chosen for you again, in this plan or the next one, and it won't be offered as a swap.`,
+      info: kept > 0
+        ? `It isn't in any session still to come, so nothing changes ahead of you — but it will never be chosen for you again, in this plan or the next one, and it won't be offered as a swap.${keptLine}`
+        : `It isn't on this plan anywhere, so nothing changes today — but it will never be chosen for you again, in this plan or the next one, and it won't be offered as a swap.`,
     }
   }
   return {
     warn: `This is every week of your plan, not just today — ${sessions} session${sessions === 1 ? '' : 's'} get${sessions === 1 ? 's' : ''} rebuilt. Each one gets the closest alternative your kit and injuries allow.`,
-    info: `Where there's no good alternative, that slot comes out rather than being filled with something worse. It will never be chosen for you again, in this plan or the next.`,
+    info: `Where there's no good alternative, that slot comes out rather than being filled with something worse. It will never be chosen for you again, in this plan or the next.${keptLine}`,
   }
 }
 
@@ -133,9 +150,11 @@ export async function banOnScreen(input: {
 
   if (mesocycle.length === 0) return { error: null, banned: true, undo: undoWith(false) }
 
+  const { isProtected } = await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
   const updated = await banExerciseFromMesocycle({
     mesocycle, profile, bannedName: exerciseName,
     exclusions: [...new Set([...exclusions, exerciseName])],
+    isProtected,
   })
   show(updated)
   try {

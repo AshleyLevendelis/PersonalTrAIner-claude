@@ -1104,6 +1104,8 @@ async function runMesocycleBehaviorChecks(): Promise<AuditTestCase[]> {
     if (anyExercise) {
       const afterBan = await banExerciseFromMesocycle({
         mesocycle, profile, bannedName: anyExercise.name, exclusions: [anyExercise.name],
+        // A plan generated here has never been trained on.
+        isProtected: null,
       })
       if (containsExerciseName(afterBan, anyExercise.name)) {
         failures.push({

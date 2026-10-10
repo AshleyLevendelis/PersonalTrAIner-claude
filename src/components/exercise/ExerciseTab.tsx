@@ -22,6 +22,7 @@ import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import type { ReasonAnswer } from './EditReasonStep'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { ActiveAdaptationLines } from './ActiveAdaptationLines'
 
@@ -221,6 +222,7 @@ export function ExerciseTab({
       <BanExerciseSheet
         exerciseName={banTarget}
         mesocycle={mesocycle ?? []}
+        loadGuard={() => loadPlanEditContext(profile ?? { id: profileId, injuries: [] }, mesocycle ?? [], planCreatedAt).then(c => c.isProtected)}
         onConfirm={onBanExercise}
         onClose={() => setBanTarget(null)}
       />

@@ -18,16 +18,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button'
 import { banBlastRadius, banConfirmLines, type BanOutcome } from '@/lib/screen-ban'
 import type { MesocycleWeek } from '@/lib/types'
+import type { DayGuard } from '@/lib/plan-guard'
 
 export function BanExerciseSheet({
   exerciseName,
   mesocycle,
+  loadGuard,
   onConfirm,
   onClose,
 }: {
   /** Null = closed. */
   exerciseName: string | null
   mesocycle: MesocycleWeek[]
+  /** Which sessions are already trained (they keep it). The ban itself loads the same guard. */
+  loadGuard: () => Promise<DayGuard>
   onConfirm: (exerciseName: string) => Promise<BanOutcome | void> | void
   onClose: () => void
 }) {
@@ -42,7 +46,14 @@ export function BanExerciseSheet({
   useEffect(() => {
     if (!exerciseName) return
     setBusy(false); setOutcome(null); setUndone(false); setError(null)
-    setLines(banConfirmLines(banBlastRadius(mesocycle, exerciseName)))
+    setLines(null)
+    let live = true
+    // Counted with the trained-day guard, so "N sessions get rebuilt" is the
+    // number the ban will change (M35). While it loads, Ban waits.
+    loadGuard()
+      .then(guard => { if (live) setLines(banConfirmLines(banBlastRadius(mesocycle, exerciseName, guard))) })
+      .catch(() => { if (live) setLines(banConfirmLines(banBlastRadius(mesocycle, exerciseName, null))) })
+    return () => { live = false }
     // Keyed on the exercise alone: the plan changing underneath an open sheet
     // (the ban itself) must not rewrite the sentence that was agreed to.
     // eslint-disable-next-line react-hooks/exhaustive-deps

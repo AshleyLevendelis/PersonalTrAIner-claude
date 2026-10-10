@@ -1,4 +1,5 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
+import type { DayGuard } from './plan-guard'
 import { getSmartReplacements, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, getExerciseEntry} from './exercise-db'
 import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded, DELOAD_LOAD_FRACTION } from './load-prescription'
@@ -703,6 +704,14 @@ export interface BanExerciseParams {
   bannedName: string
   /** Must already include bannedName — used to keep the replacement pick from re-suggesting anything else the trainee has banned. */
   exclusions: string[]
+  /**
+   * Plan rows already trained (plan-guard's rule 1), which the ban leaves as
+   * they are: the record of what was done. Runs 3-4, M35: banning an exercise
+   * after a session rewrote that finished day, and Home then named an
+   * exercise that was never in it. Null only where nobody has trained on the
+   * plan (gates, the dev audit); the app's callers load the real guard.
+   */
+  isProtected: DayGuard | null
 }
 
 /**
@@ -715,7 +724,7 @@ export interface BanExerciseParams {
  * than keeping the banned exercise around.
  */
 export async function banExerciseFromMesocycle(params: BanExerciseParams): Promise<MesocycleWeek[]> {
-  const { mesocycle, profile, bannedName, exclusions } = params
+  const { mesocycle, profile, bannedName, exclusions, isProtected } = params
   const lowerBanned = bannedName.toLowerCase()
 
   return Promise.all(mesocycle.map(async week => {
@@ -726,6 +735,7 @@ export async function banExerciseFromMesocycle(params: BanExerciseParams): Promi
     const days = await Promise.all(week.days.map(async day => {
       const idx = day.exercises.findIndex(e => e.name.toLowerCase() === lowerBanned)
       if (idx === -1) return day
+      if (isProtected?.(week.week_number, day.day)) return day
       touched.push(day.day)
 
       const oldSlot = day.exercises[idx]

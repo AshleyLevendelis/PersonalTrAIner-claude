@@ -2394,14 +2394,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * NO SCOPE, deliberately. Every other exercise tool offers today/permanent;
    * offering it here would imply a ban could be narrow, and it cannot be.
    */
-  const buildExerciseBanProposal = (rawArgs: Record<string, unknown>): {
+  const buildExerciseBanProposal = async (rawArgs: Record<string, unknown>): Promise<{
     ok: true
     scopeKey: string
     preconditions: Record<string, unknown>
     payload: ExerciseBanPayload
     preImage: MesocycleWeek[]
     diff: import('@/lib/pending-actions-store').ProposalDiff
-  } | { ok: false; reason: string } => {
+  } | { ok: false; reason: string }> => {
     const item = String(rawArgs.item ?? '').trim()
     if (!item) return { ok: false, reason: whichOne('exercise', 'stop getting') }
     if (mesocycle.length === 0) return { ok: false, reason: NOT_LOADED_YET }
@@ -2447,7 +2447,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // ONE COUNT AND ONE SET OF SENTENCES for the coach's card and the screen's
     // confirm sheet (screen-ban.ts) — the screen gained its confirm on 9 Oct
     // 2026 and must not describe the same change in different words.
-    const radius = banBlastRadius(mesocycle, name)
+    // Sessions already trained keep it (runs 3-4, M35): counted with the same
+    // guard the confirm writes through, so the card states what will happen.
+    const { isProtected } = await loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
+    const radius = banBlastRadius(mesocycle, name, isProtected)
     const banLines = banConfirmLines(radius)
     const sessions = radius.sessions
     if (sessions === 0) {
@@ -5191,7 +5194,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (ad.ok) { built = { scopeKey: ad.scopeKey, preconditions: ad.preconditions, payload: ad.payload as unknown as Record<string, unknown>, preImage: ad.preImage, diff: ad.diff }; advice = ad.advice }
         else refusal = ad.reason
       } else if (result.proposal.kind === 'propose_exercise_ban' && result.proposal.rawArgs) {
-        const bn = buildExerciseBanProposal(result.proposal.rawArgs)
+        const bn = await buildExerciseBanProposal(result.proposal.rawArgs)
         if (bn.ok) built = { scopeKey: bn.scopeKey, preconditions: bn.preconditions, payload: bn.payload as unknown as Record<string, unknown>, preImage: bn.preImage, diff: bn.diff }
         else refusal = bn.reason
       } else if (result.proposal.kind === 'propose_exercise_remove' && result.proposal.rawArgs) {
