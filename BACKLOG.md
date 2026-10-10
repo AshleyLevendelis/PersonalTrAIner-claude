@@ -21,7 +21,7 @@ Newest first. One line each.
   - **Hers, to ask one at a time:** ~~the M43b collision~~ (answered 10 Oct: **"Offer it"**, over
     applying automatically and over applying after three sessions; what is built stands), ~~M34~~ (answered 10 Oct: **"Resize, else leave"**, scope **"Plan's own dishes
     only"** after the collision with her 1 Sep fridge-meal rule was put to her; plan in
-    `docs/plans/swap-keeps-the-other-meals.md`, building), M39 (is a
+    `docs/plans/swap-keeps-the-other-meals.md`; BUILT, see the M34 bullet below), M39 (is a
     short session "Done"?), M40b (do rest-of-block swaps last?).
   - **Open:** M40c (no bands means no band work), which is hand-over job 3, the kit list.
   **M43b COLLIDES WITH TWO OF HER OLDER RULINGS, so it was built as an OFFER and is put to her.**
@@ -56,6 +56,27 @@ Newest first. One line each.
   re-anchored, 6/6 mutations on the food line, `verify:finish-check` 2h-2j (4/4 browser
   mutations). The "add exercise" sheet had the same "tier2 compound" and was fixed with the
   swap sheet.
+  **M34 BUILT (10 Oct), her "Resize, else leave", scope "Plan's own dishes only".** A swap or a
+  move between days to one of the plan's own dishes holds every other dish of that day; they
+  re-size together by ONE factor within 0.75-1.25, one line with Undo ("To fit around your swap,
+  your breakfast and dinner are 15% smaller. Same dishes."); beyond the band, or when a held dish
+  cannot be costed, they stay as planned and the gap is said. Undo is per date on the phone and
+  read by the screen, its trials and the shopping list. A leftover lunch stays last night's
+  dinner. Today's fit-around-what-was-eaten counts from the dish as planned, so the two re-sizes
+  stay inside 25% together. **Found while building:** sized on calories alone, a held day could
+  land its kcal and miss protein (a day-move fixture, 12 kcal under and off target), so the
+  factor is chosen for the whole day: a straight-line model ranks the factors, the real re-size
+  proves each, because a 2% factor can round to no change. And the hold first dropped last
+  night's leftover when the PLANNED day had given it up; it now takes the leftover from the day
+  with her pin. `test:hold-around-pins` (50 checks, 25 mutations, all caught after four cases
+  were added for the ones that first got through), `verify:swap-knock-on` rewritten (9 checks,
+  4/4; walks 16 swaps over six days; the harness week's lunches were all within a few kcal, so
+  18 of 18 swaps needed nothing, and one bigger real-food lunch is added behind `?bigswap=1`,
+  input only). Re-anchored to the new rule, each read first: meal-variety §7, meal-day-move (a
+  re-fit swap now keeps every dish), meal-knock-on, coach-knows, session-continuity. 101 of 103
+  derived gates and 14 meal drivers green first time; the two were those text checks.
+  **Not measured:** how often a real plan's swap lands "too far" rather than re-sized; the
+  harness fixtures cannot say, and her saved meals cannot be read from here.
   **Needs:** the `chat-gemini`, `onboarding-chat` and `generate-meals` deploys; the coach exam
   is stale and must be re-run on her machine. No migration. Not on `main`.
   One derived check went red on correct code and was re-anchored: `test:one-today` pinned the

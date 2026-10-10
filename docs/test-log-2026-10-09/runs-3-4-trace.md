@@ -21,7 +21,7 @@ Status key: **fixed** on the branch / **partly** / **open** / **hers** (waits on
 | # | Cause | Status |
 |---|---|---|
 | M33 "0 LEFT" when 112 over | Clamp at zero | **fixed**: "112 over" |
-| M34 lunch swap changed the snack | The day is re-searched after a swap pin | **partly**: a swap now says, under the row, which other meals changed. Whether a swap should re-size before it re-picks is **hers**. The visible line is proven by logic only (no harness fixture moved another meal in 18 swaps) |
+| M34 lunch swap changed the snack | The day is re-searched after a swap pin | **fixed** (her ruling "Resize, else leave", scope "Plan's own dishes only"): the other meals keep their dishes and re-size within about 25%, one line with Undo; beyond that the gap is said. A by-name or fridge meal still re-plans the day. Driven in a browser |
 | M35 ban after a finished session rewrote that day | No trained-day guard on ban | **fixed**, screen and coach |
 | M36 "you hit your lifting sessions" at 9/24 and 5/18 | Past days reached the coach as "CLOSED" only | **fixed** ("CLOSED at 9 of 24 planned working sets"), needs `chat-gemini` deploy |
 | M37 coach says there's no data export | Listed as not existing, gates enforced it | **fixed**, needs `chat-gemini` + `onboarding-chat` deploys |

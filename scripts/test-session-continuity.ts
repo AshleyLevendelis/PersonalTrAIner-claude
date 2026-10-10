@@ -182,7 +182,9 @@ console.log('\n5. The shopping list buys what you actually chose')
   // tab's tomorrow DOES follow today's actual dinner now, and the list's with
   // it, by the same call). test:meal-days §3b holds the list after a gap.
   check('the list builds every day with the tab\'s own day function, so its tomorrow is the tab\'s tomorrow',
-    /serveDates\(\{ dates: run, pools, targets, softLikedFoods, shape, pinsByDate \}\)/.test(grocery))
+    // Re-anchored 10 Oct 2026 (M34): with the dates where Undo kept a swap's
+    // planned sizes, so the list buys what the screen shows.
+    /serveDates\(\{ dates: run, pools, targets, softLikedFoods, shape, pinsByDate, keepHeldSizes \}\)/.test(grocery))
 
   const app = stripComments(readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'))
   check('App passes the same chosenMeals the Nutrition tab renders',

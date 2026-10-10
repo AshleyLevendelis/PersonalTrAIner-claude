@@ -146,7 +146,9 @@ console.log('\n8. A meal swap says what else it changed (M34)')
   const mp = strip(read('src/components/MealPlan.tsx'))
   const fn = mp.slice(mp.indexOf('const handleChoose = async'), mp.indexOf('const handleChoose = async') + 700)
   check('the swap runs the same trial as add-food BEFORE it writes', fn.indexOf('dayMove.knockOn(date, slot, picked)') > -1 && fn.indexOf('dayMove.knockOn(date, slot, picked)') < fn.indexOf('await onSwap(slot, name)'))
-  check('...and names only the OTHER meals of THAT day', /trial\?\.changes\.filter\(c => c\.date === date && c\.slot !== slot\)/.test(fn))
+  // Re-anchored 10 Oct 2026 (M34, her "Resize, else leave"): a re-size now has
+  // its own line on the day, so this note names only a DIFFERENT dish.
+  check('...and names only the OTHER meals of THAT day, and only a different dish', /trial\?\.changes\.filter\(c => c\.date === date && c\.slot !== slot && c\.kind === 'dish'\)/.test(fn))
   check('...each changed meal becomes its line, and the line is drawn under the row',
     /setSwapNote\(sameDay\.length > 0 \? sameDay\.map\(swapKnockOnLine\) : null\)/.test(fn) && /data-testid="swap-knock-on">\{swapNote\.join\(' '\)\}/.test(mp))
 }
