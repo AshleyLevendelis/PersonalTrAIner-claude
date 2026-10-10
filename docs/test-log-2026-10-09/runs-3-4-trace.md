@@ -58,9 +58,9 @@ Hers, settled 10 Oct 2026:
    sessions.
 
 Still hers, one at a time:
-2. M34: should a swap re-size the other meals before it changes any dish?
-3. M39: is a session finished well short "Done", or its own "part done"?
-4. M40b: "swap for the rest of the block" — keep it to the block, or make it last?
+1. M34: should a swap re-size the other meals before it changes any dish?
+2. M39: is a session finished well short "Done", or its own "part done"?
+3. M40b: "swap for the rest of the block" — keep it to the block, or make it last?
 
 Mine under the CSCS delegation (basis in BACKLOG):
 - H25: a blank box means the set just done, else today's plan; last session only when the plan
