@@ -1306,6 +1306,11 @@ menu" stays true when a copy is also left outside it.
 - **A session finished short is "Done, with the count".** Still a tick, and the day says "5 of 18
   sets" beside it, over a separate part-done mark and over keeping it as it was. One count for the
   strips, Home, the Exercise bar and the coach. `session-count`, `verify:finish-check`
+- **"Rest of block" means the block, and says so: "Keep to the block, say it."** The swap names
+  the day the next block starts ("Swaps it until Mon 5 Oct, when your next block starts and your
+  plan changes exercises.") and offers "Never give me this one again" beside it for good. Rejected:
+  carrying a swap into later blocks, and a third "from now on" choice. `block-swap-until`,
+  `verify:moved-edit`
 
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an

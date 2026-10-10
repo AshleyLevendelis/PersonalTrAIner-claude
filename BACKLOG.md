@@ -23,7 +23,7 @@ Newest first. One line each.
     only"** after the collision with her 1 Sep fridge-meal rule was put to her; plan in
     `docs/plans/swap-keeps-the-other-meals.md`; BUILT, see the M34 bullet below), ~~M39~~ (answered 10 Oct: **"Done, with the
     count"**, over a part-done mark and over keeping it; BUILT, see the M39 bullet below; was: is a
-    short session "Done"?), M40b (do rest-of-block swaps last?).
+    short session "Done"?), ~~M40b~~ (answered 10 Oct: **"Keep to the block, say it"**; BUILT).
   - **Open:** M40c (no bands means no band work), which is hand-over job 3, the kit list.
   **M43b COLLIDES WITH TWO OF HER OLDER RULINGS, so it was built as an OFFER and is put to her.**
   Carrying a logged weight into the next block automatically after one session would override
@@ -92,6 +92,17 @@ Newest first. One line each.
   checks, 7/7), `verify:finish-check` 2h/2h2 (2/2), `verify:what-happened` 10e2/10e3/10g (2/2).
   62 of 63 derived gates green first time; the one was `verify:what-happened` reading the new
   count on the day that exposed defect (2).
+  **M40b BUILT (10 Oct), her "Keep to the block, say it"** (over carrying a swap into later
+  blocks and over a third "from now on" choice). The swap's "Rest of block" now reads "Swaps it
+  until Mon 5 Oct, when your next block starts and your plan changes exercises." ("for the rest
+  of your plan" on the last block), with "Never give me <exercise> again" beside it, the ban that
+  lasts. The date is the next block's first day from the plan's own block numbers, counted the
+  way the live week is. `test:block-swap-until` (12 checks, 10 mutations: 9 caught, 1 exposed a
+  redundant guard, deleted), `verify:moved-edit` 2d2/2d3 (2/2). One derived gate went red:
+  `test:coach-voice` holds that the phrasebook imports nothing, and the new line had pulled in
+  the date formatter; the screen now formats the date and hands the phrasebook the words.
+  **Not changed:** the add and remove sheets' own "Rest of block" choices (her question was the
+  swap); they could take the same line.
   **Needs:** the `chat-gemini`, `onboarding-chat` and `generate-meals` deploys; the coach exam
   is stale and must be re-run on her machine. No migration. Not on `main`.
   One derived check went red on correct code and was re-anchored: `test:one-today` pinned the

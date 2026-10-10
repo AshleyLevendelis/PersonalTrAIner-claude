@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { shortDate } from '@/lib/day-labels'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -423,7 +424,7 @@ export function SwapDialog({
             >
               <p className="font-medium text-sm">Rest of block</p>
               <p className="text-xs text-muted-foreground mt-0.5" data-testid="swap-block-until">
-                {blockEndsOn !== undefined ? blockSwapLine(blockEndsOn, today) : 'Swaps it for the rest of this training block; later blocks re-plan from your base program.'}
+                {blockEndsOn !== undefined ? blockSwapLine(blockEndsOn ? shortDate(blockEndsOn, today) : null) : 'Swaps it for the rest of this training block; later blocks re-plan from your base program.'}
                 {currentEntry?.mechanics_tier === 'tier1_compound'
                   ? ' Main lift — this resets to a conservative starting weight so you can find it fresh, rather than inheriting a number that belonged to a different movement.'
                   : ' Loads recompute for the new movement right away.'}

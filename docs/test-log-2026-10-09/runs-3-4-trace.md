@@ -27,7 +27,7 @@ Status key: **fixed** on the branch / **partly** / **open** / **hers** (waits on
 | M37 coach says there's no data export | Listed as not existing, gates enforced it | **fixed**, needs `chat-gemini` + `onboarding-chat` deploys |
 | M38 swap makes a timed hold "MAIN LIFT" | Holds not excluded from promotion | **fixed** (CSCS, mine): a hold, carry or interval is never the main lift, label and rest floor alike |
 | M39 "2 of 3" became "done — 2 for 2"; 5 of 18 counts as Done | Two week counters; Finish = Done | **fixed**, her ruling "Done, with the count": "Done · 5 of 18 sets" on Home, the Exercise bar and the strips' spoken labels; Finish now refreshes the week; "I did it" no longer saves sets nothing counts. The tip says "due so far"; one week counter for screen and tip still lands with the week work on the other branch |
-| M40 swap/ban don't survive the block; bands back after "no bands" | (a) bans not passed to block rotation; (b) "rest of block" by design; (c) no kit list | (a) **fixed**; (b) **hers**; (c) **open**, hand-over job 3 (kit list) |
+| M40 swap/ban don't survive the block; bands back after "no bands" | (a) bans not passed to block rotation; (b) "rest of block" by design; (c) no kit list | (a) **fixed**; (b) **fixed**, her ruling "Keep to the block, say it": the swap says the day the block ends and offers "never give me this one" beside it; (c) **open**, hand-over job 3 (kit list) |
 | M41 swap list offers what a knee adaptation removed | | **fixed** earlier on the branch; not driven in a browser |
 | M42 timed holds | No hold timer, receipt said reps, records compared seconds as reps, "Add a drop" on anything | **fixed**: start/stop timer, said in seconds, no lifting record in the wrong unit, no drop on a hold |
 | M43 deload at the 24 kg limit; week 5 at 16 after 18×11 | (a) stored deload never lowered; (b) nothing carries a logged weight into the next block | (a) **fixed**; (b) **fixed**: the block-start offer carries last block's best set into the new reps, under the kit limit. She ruled it stays an OFFER (10 Oct) |
@@ -63,8 +63,10 @@ Hers, settled 10 Oct 2026:
 
 6. M39: **"Done, with the count"**, over a part-done mark and over keeping it as it was.
 
-Still hers, one at a time:
-3. M40b: "swap for the rest of the block" — keep it to the block, or make it last?
+7. M40b: **"Keep to the block, say it"**, over carrying swaps into later blocks and over a third
+   "from now on" choice.
+
+None still open from runs 3-4.
 
 Mine under the CSCS delegation (basis in BACKLOG):
 - H25: a blank box means the set just done, else today's plan; last session only when the plan

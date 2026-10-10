@@ -10,6 +10,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { blockSwapEndsOn } from '../src/lib/block-swap-until'
 import { blockSwapLine } from '../src/lib/coach-voice'
+import { shortDate } from '../src/lib/day-labels'
 import type { MesocycleWeek } from '../src/lib/types'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -39,14 +40,14 @@ console.log('\n1. The day the next block starts')
 
 console.log('\n2. What the swap says')
 {
-  check('with a date: the day it ends, and why', blockSwapLine('2026-10-05', '2026-09-20') === 'Swaps it until Mon 5 Oct, when your next block starts and your plan changes exercises.', blockSwapLine('2026-10-05', '2026-09-20'))
+  check('with a date: the day it ends, and why', blockSwapLine(shortDate('2026-10-05', '2026-09-20')) === 'Swaps it until Mon 5 Oct, when your next block starts and your plan changes exercises.', blockSwapLine(shortDate('2026-10-05', '2026-09-20')))
   check('on the last block: for the rest of the plan', blockSwapLine(null) === 'Swaps it for the rest of your plan.')
 }
 
 console.log('\n3. The wiring')
 {
   const dlg = code('src/components/exercise/SwapDialog.tsx')
-  check('the "Rest of block" choice says it through blockSwapLine(', /data-testid="swap-block-until"[\s\S]{0,120}blockSwapLine\(blockEndsOn, today\)/.test(dlg))
+  check('the "Rest of block" choice says it through blockSwapLine(', /data-testid="swap-block-until"[\s\S]{0,120}blockSwapLine\(blockEndsOn \? shortDate\(blockEndsOn, today\) : null\)/.test(dlg))
   check('...and "never give me this one" sits beside it, opening the ban for THIS exercise', /data-testid="swap-never-again"[\s\S]{0,200}onDislike\(name\)/.test(dlg) && /const name = target\.exerciseName; handleClose\(\); onDislike\(name\)/.test(dlg))
   const tab = code('src/components/exercise/ExerciseTab.tsx')
   check('the Exercise tab works the date out from the plan, for the week being swapped', /blockSwapEndsOn\(mesocycle \?\? \[\], swapTarget\?\.weekNumber \?\? liveWeek, planCreatedAt\)/.test(tab))
