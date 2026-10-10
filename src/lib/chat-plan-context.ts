@@ -553,6 +553,12 @@ export interface CoachWeekRow {
   swappedForActivity?: string | null
   /** They SAID it was missed — as opposed to the strip inferring it from an empty past day. */
   markedMissed?: boolean
+  /**
+   * The working sets logged that day. With the row's session it gives the
+   * same "N of M planned working sets" today's block uses, so a session closed
+   * at 9 of 24 is never read to them as one they "hit" (runs 3-4, M36).
+   */
+  workingLogs?: ExerciseSetLog[]
 }
 
 export interface CoachWeekBrief {
@@ -627,6 +633,15 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
   // WHAT HAPPENED TO THE DAY, in the row that names it. Empty for a day
   // nothing has happened to yet (due / rest / before the plan) and whenever
   // the caller sent no state.
+  // "9 of 24": today's own counter (summariseTodayWork + todayWorkTotals),
+  // run over that day's session and logs. Null when either is missing.
+  const setCount = (r: CoachWeekRow): string | null => {
+    if (!r.session || !r.workingLogs) return null
+    const work = summariseTodayWork({ session: r.session, logs: r.workingLogs })
+    if (!work) return null
+    const t = todayWorkTotals(work)
+    return t.planned > 0 ? `${t.logged} of ${t.planned}` : null
+  }
   const happened = (r: CoachWeekRow): string => {
     // TODAY'S ROW SAYS NOTHING HERE: the header and the exercise-by-exercise
     // block above carry today exactly, and the strip's 'done' means "closed
@@ -636,8 +651,8 @@ export function buildCoachExerciseSummary({ days, coachNote, pendingLoadSuggesti
     switch (r.state) {
       // CLOSED, not "done": the strip's state says the session was finished
       // with work in it, not that every set was. The log lines say which.
-      case 'done': return ' [CLOSED — work was logged that day]'
-      case 'partial': return ' [PART-DONE — some sets logged, session not closed]'
+      case 'done': return setCount(r) ? ` [CLOSED at ${setCount(r)} planned working sets — say the fraction, never "you hit it", unless they are equal]` : ' [CLOSED — work was logged that day]'
+      case 'partial': return setCount(r) ? ` [PART-DONE — ${setCount(r)} planned working sets logged, session not closed]` : ' [PART-DONE — some sets logged, session not closed]'
       case 'swapped': return ` [NOT DONE AS PLANNED — they did ${r.swappedLine || r.swappedForActivity || 'something else'} instead, and said so; what the plan had is listed for reference]`
       case 'rest_chosen': return ' [RESTED ON PURPOSE — they said so; not missed; what the plan had is listed for reference]'
       case 'missed': return r.markedMissed

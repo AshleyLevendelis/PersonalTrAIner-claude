@@ -13,7 +13,7 @@ import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } f
 import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { swappedActivityLine } from '@/lib/cardio-lines'
-import type { WorkoutDay } from '@/lib/types'
+import type { ExerciseSetLog, WorkoutDay } from '@/lib/types'
 
 export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen' | 'moved'
 
@@ -56,6 +56,8 @@ export interface TrainingWeekDay {
    * happened to, and there are now four ways that can be false.
    */
   session?: WorkoutDay | null
+  /** The working sets logged on this date (warm-ups out). The coach reads them to say "closed at 9 of 24" (runs 3-4, M36). */
+  workingLogs?: ExerciseSetLog[]
 }
 
 export interface TrainingWeekResult {
@@ -301,6 +303,7 @@ export function useTrainingWeek(
       movedTo: resolved.movedTo,
       movedFrom: resolved.movedFrom,
       session: resolved.day,
+      workingLogs: dashboardDay?.workingLogs ?? [],
     }
   })
 

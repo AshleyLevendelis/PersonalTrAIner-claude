@@ -15,7 +15,8 @@ import { supabase } from '@/lib/supabase'
 import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
-import { swapPoolMeal, setMealPick, recordMealEvent, type MealSlotName } from '@/lib/meal-store'
+import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, type MealSlotName } from '@/lib/meal-store'
+import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
@@ -48,7 +49,7 @@ import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE } from '@/lib/coach-voice'
 import { isHedged } from '@/lib/definite-mention'
 import { prescriptionLine } from '@/lib/activity-day'
-import { EQUIPMENT_OPTIONS } from '@/lib/picker-options'
+import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
@@ -1525,7 +1526,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   }
 
   // Fix #4: System prompt context assembled once per call, separate from conversation window
-  const buildContext = () => {
+  // eatenByDay: read fresh by callGemini for this turn (H26); null = the log could not be read.
+  const buildContext = (eatenByDay: string | null = null) => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     // Split out from `.days` (not just `?.days || exercisePlan` inline) so
     // the week's own coach_note is still reachable below — that's where a
@@ -1702,6 +1704,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // never sent, so a swap-preference rule referencing it would have
         // been dead prompt text. See EQUIPMENT-QUALITY AWARENESS below.
         equipment_access: profile.equipment_access,
+        equipment_access_described: describeEquipmentAccess(profile.equipment_access),
         // Also never sent — same shape as equipment_access above. Absent on
         // an activity-only profile (the starting-out walking plan has no
         // lifting-experience tier), so the prompt says so rather than
@@ -1758,6 +1761,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         : buildFeelBrief(null, feelRun([])),
       meal_summary: mealSummary,
       upcoming_meal_summary: buildCoachUpcomingSummary(upcomingMeals ?? []),
+      // WHAT THEY LOGGED AS EATEN, today and the seven days before (H26). The
+      // flag says it was read, so the coach can tell "nothing logged" from
+      // "could not see".
+      eaten_by_day: eatenByDay,
+      eaten_by_day_read: eatenByDay != null,
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
       cardio_log_history: cardioLogHistory,
@@ -1979,6 +1987,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // read as an open one. The outcome goes on first, the time around it.
       .map(m => ({ role: m.role, content: stampTurnTime(m.role === 'assistant' ? stampTurnOutcome(m.content, turnOutcomeOf(m)) : m.content, m.created_at, historyNow) }))
 
+    // THIS TURN'S EATEN LOG, read now rather than from a copy loaded earlier, so
+    // a meal logged on Nutrition a moment ago is in it (H26).
+    const eatenToday = getLocalDateString(getAppNow(profile.id))
+    const eatenByDay = profile.id
+      ? buildCoachEatenSummary(await getEatenByDate(profile.id, eatenWindow(eatenToday)).catch(() => null), eatenToday)
+      : null
+
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 45000)
@@ -1991,7 +2006,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       body: JSON.stringify({
         message: userMessage,
         history,
-        context: buildContext(),
+        context: buildContext(eatenByDay),
       }),
       signal: controller.signal,
     })

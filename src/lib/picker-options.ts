@@ -24,6 +24,17 @@ export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: s
   { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'Bodyweight, a pull-up bar and a weighted bag' },
 ]
 
+/**
+ * THE KIT IN WORDS, for the coach (runs 3-4, LOW, 10 Oct 2026): it was sent
+ * the raw word "minimalist" and told a Minimalist user about their "full home
+ * gym setup". The picker's own label and description, so the coach and the
+ * setup screen say the same thing.
+ */
+export function describeEquipmentAccess(value: string | null | undefined): string {
+  const o = EQUIPMENT_OPTIONS.find(e => e.value === value)
+  return o ? `${o.label} — ${o.description}` : 'not recorded'
+}
+
 export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = [
   { value: 'lower_back', icon: '🧍', label: 'Lower back' },
   { value: 'knees', icon: '🦵', label: 'Knees' },

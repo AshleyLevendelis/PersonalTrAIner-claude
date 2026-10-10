@@ -182,9 +182,18 @@ async function main() {
   const doesNotExistMatch = appRealityBlock.match(/These do NOT exist[^]*?(?=\n\nIf asked)/)
   check('a "does NOT exist" list is present', doesNotExistMatch !== null)
   const doesNotExistBlock = doesNotExistMatch?.[0] ?? ''
-  for (const phrase of ['subscription', 'data export', 'progress-photo', 'community']) {
+  for (const phrase of ['subscription', 'progress-photo', 'community']) {
     check(`"does NOT exist" list still names "${phrase}"`, doesNotExistBlock.toLowerCase().includes(phrase))
   }
+  // DATA EXPORT IS REAL (runs 3-4, M37, 10 Oct 2026): this list named it as
+  // fabricated, and this gate enforced that, while Profile > App carried
+  // "Download my data". Derived from the screen: if Profile renders the
+  // control, the prompt must name it and must not deny it.
+  const profileSrc = readFileSync(join(ROOT, 'src/components/ProfileScreen.tsx'), 'utf8')
+  const profileHasDownload = /Download my data/.test(profileSrc)
+  check('Profile really has "Download my data" (the fact the next two read)', profileHasDownload)
+  check('...so the "does NOT exist" list does not deny exporting data', !/data export|export/i.test(doesNotExistBlock))
+  check('...and the app map names it, by its own label', appRealityBlock.includes('Download my data'))
 
   if (failures > 0) {
     console.error(`\n${failures} chat-app-reality check(s) FAILED.`)

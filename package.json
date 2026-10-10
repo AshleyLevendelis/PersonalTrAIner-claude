@@ -366,6 +366,7 @@
     "test:coach-clock": "tsx scripts/test-coach-clock.ts",
     "test:last-time": "tsx scripts/test-last-time.ts",
     "test:set-row": "tsx scripts/test-set-row.ts",
+    "test:coach-knows": "tsx scripts/test-coach-knows.ts",
     "test:day-as-shown": "tsx scripts/test-day-as-shown.ts",
     "test:ban-scope": "tsx scripts/test-ban-scope.ts",
     "test:drop-sets": "tsx scripts/test-drop-sets.ts",
