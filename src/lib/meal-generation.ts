@@ -165,6 +165,13 @@ export interface PoolOption {
    * `leftoverFrom` is.
    */
   reusedTomorrow?: boolean
+  /**
+   * SET WHEN A SWAP HELD THIS DISH AND RE-SIZED IT (runs 3-4, M34): the factor
+   * applied to the planned dish. Derived, never persisted. Read by today's
+   * fit-around-what-was-eaten so the two re-sizes together stay inside her
+   * "about 25% either way" of the dish as planned.
+   */
+  heldBy?: number
 }
 
 export interface RawProposal {
@@ -1251,7 +1258,24 @@ export interface AssembledDay {
    * meal" state with a retry, not a plausible-looking day quietly missing a
    * meal's worth of food. */
   missingSlots: MealSlotName[]
+  /**
+   * Set only on a day where a swap to one of the plan's own dishes held the
+   * day's other dishes (runs 3-4, M34; see hold-around-pins.ts). Absent when
+   * no such swap was made, or the day re-planned around a meal of her own.
+   */
+  heldAround?: HeldAround
 }
+
+/** What a swap did to the day's other meals (Ashley, 10 Oct 2026: "Resize, else leave"). */
+export type HeldAround =
+  /** Held as planned and already on target: nothing to say. */
+  | { kind: 'none'; slots: MealSlotName[] }
+  /** Held and re-sized together by `factor`; `deltaKcal` is how far the day was before. */
+  | { kind: 'resized'; factor: number; slots: MealSlotName[]; deltaKcal: number }
+  /** Re-sizing would need more than about 25%: held as planned, the day is `deltaKcal` off. */
+  | { kind: 'too_far'; slots: MealSlotName[]; deltaKcal: number }
+  /** Undo was tapped for this date: held as planned, the day is `deltaKcal` off. */
+  | { kind: 'kept'; slots: MealSlotName[]; deltaKcal: number }
 
 function sumOptionMacros(options: PoolOption[]): MacroTargets {
   return options.reduce(

@@ -1,4 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
+import type { HeldAround } from '@/lib/meal-generation'
 import { Button } from '@/components/ui/button'
 import {
   UtensilsCrossed,
@@ -25,7 +26,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
-import { COOK_ONCE, didNotSave, aroundEatenLine, swapKnockOnLine } from '@/lib/coach-voice'
+import { COOK_ONCE, didNotSave, aroundEatenLine, heldAroundLine, swapKnockOnLine } from '@/lib/coach-voice'
 import { dayAsShown } from '@/lib/day-as-shown'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
@@ -130,6 +131,12 @@ interface MealPlanProps {
    */
   dayMove?: MealDayMoveController
   /**
+   * What a swap did to this day's other meals (runs 3-4, M34; her "Resize,
+   * else leave"), and the Undo that keeps them at their planned sizes.
+   */
+  heldAround?: HeldAround
+  onKeepHeldSizes?: (date: string, keep: boolean) => void
+  /**
    * "Regenerate all" is running (useMealPlanActions). It takes about twenty
    * seconds, and until 9 Oct 2026 the only sign was a 12px spinner inside the
    * link while the old meals sat there, tappable. While this is true the list
@@ -155,6 +162,7 @@ export function MealPlan({
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
   onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
+  heldAround, onKeepHeldSizes,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -275,6 +283,7 @@ export function MealPlan({
   })
   const shownOption = (slot: MealSlotName): PoolOption | null => shown.slots.find(r => r.slot === slot)?.option ?? chosen[slot] ?? null
   const aroundLine = aroundEatenLine(shown.aroundEaten)
+  const heldLine = heldAround ? heldAroundLine(heldAround) : null
 
   // A MEAL ALREADY EATEN IS NOT A WARNING — roadmap item 9. The banner tells
   // you which of today's meals to swap or regenerate; a meal you have already
@@ -458,6 +467,18 @@ export function MealPlan({
           )}
           {shown.aroundEaten.kind === 'kept' && (
             <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="around-eaten-refit" onClick={() => setKept(false)}>Fit around what I ate</button>
+          )}
+        </p>
+      )}
+
+      {heldLine && heldAround && (
+        <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="held-around" data-kind={heldAround.kind}>
+          <span>{heldLine}</span>
+          {heldAround.kind === 'resized' && onKeepHeldSizes && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="held-around-undo" onClick={() => onKeepHeldSizes(date, true)}>Undo</button>
+          )}
+          {heldAround.kind === 'kept' && onKeepHeldSizes && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="held-around-refit" onClick={() => onKeepHeldSizes(date, false)}>Fit around my swap</button>
           )}
         </p>
       )}
@@ -841,9 +862,11 @@ function MealSlotRow({
 
   // WHAT ELSE A SWAP CHANGED, said after the tap (runs 3-4, M34: swapping
   // lunch changed the snack recipe and nothing said so). The same trial the
-  // add-food sheet runs; only the changes on this day are named. Whether a
-  // swap should prefer re-sizing over re-picking is Ashley's decision, still
-  // open, so this changes nothing about what happens, only that it is said.
+  // add-food sheet runs; only the changes on this day are named. Since her
+  // 10 Oct ruling ("Resize, else leave") a swap to one of the plan's own
+  // dishes keeps the other dishes and the day's own line says the resize, so
+  // only a DIFFERENT dish is named here: the rare day the hold could not keep
+  // (one dish would be on the plate twice) and the plan's search stood.
   const [swapNote, setSwapNote] = useState<string[] | null>(null)
   const handleChoose = async (name: string) => {
     setBusy(true)
@@ -854,7 +877,7 @@ function MealSlotRow({
         : null
       await onSwap(slot, name)
       setSwapOpen(false)
-      const sameDay = trial?.changes.filter(c => c.date === date && c.slot !== slot) ?? []
+      const sameDay = trial?.changes.filter(c => c.date === date && c.slot !== slot && c.kind === 'dish') ?? []
       setSwapNote(sameDay.length > 0 ? sameDay.map(swapKnockOnLine) : null)
     } finally {
       setBusy(false)

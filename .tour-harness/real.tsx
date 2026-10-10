@@ -1045,7 +1045,13 @@ const leftoverPools = (() => {
     // gives the leftover back rather than serve one dish twice, so a thin pool
     // starves the very feature this run exists to show.
     breakfast: [dish('breakfast', 'Oats and yoghurt', 118, 440, 20), dish('breakfast', 'Eggs on toast', 124, 430, 21), dish('breakfast', 'Rice pudding bowl', 112, 450, 19)],
-    lunch: [dish('lunch', 'Chicken salad bowl', 158, 587, 26), dish('lunch', 'Rice and greens', 165, 575, 27), dish('lunch', 'Warm grain salad', 152, 600, 25)],
+    lunch: [dish('lunch', 'Chicken salad bowl', 158, 587, 26), dish('lunch', 'Rice and greens', 165, 575, 27), dish('lunch', 'Warm grain salad', 152, 600, 25),
+      // ?bigswap=1: ONE lunch about a quarter bigger than the rest, so a swap
+      // to it needs the day's other meals re-sized (verify:swap-knock-on, M34).
+      // Every other option here is within a few kcal of its neighbours, and on
+      // those no swap ever moves the day: measured, 18 of 18 held "nothing to
+      // say". The input is chosen here; what the app serves is the app's.
+      ...(new URLSearchParams(location.search).get('bigswap') === '1' ? [dish('lunch', 'Big rice bowl', 190, 760, 32)] : [])],
     dinner: [dish('dinner', 'Roast chicken tray bake', 118, 440, 20), dish('dinner', 'Chicken and rice pot', 124, 430, 21), dish('dinner', 'Baked chicken and rice', 112, 450, 19),
       ...(KEPT ? [(() => {
         const ingredients = [
@@ -1419,7 +1425,9 @@ function Harness() {
             onMealTopUp={() => { void handleTopUp() }}
             onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}
             onDismissMealTopUpNote={() => setTopUpNote(null)}
-            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove} />
+            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove}
+            // The app's own held state and its Undo (runs 3-4, M34), as App passes them.
+            heldAround={TOPUP || DAYMOVE ? mealDays.today?.day.heldAround : undefined} onKeepHeldSizes={mealDays.keepHeldSizes} />
         )}
         {activeTab === 'exercise' && (
           <ExerciseTab plan={exercisePlan} mesocycle={editedMeso} exclusions={[]}

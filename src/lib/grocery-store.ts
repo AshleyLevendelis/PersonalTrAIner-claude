@@ -19,6 +19,7 @@
 // partial-unique-client_id convention every other table uses.
 // ---------------------------------------------------------------------------
 
+import { readKeptHeldSizes } from './held-sizes-kept'
 import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
 import type { PoolOption } from './meal-generation'
@@ -732,6 +733,8 @@ function assembleDates(
    * the list.
    */
   runFrom: string,
+  /** Dates where Undo kept the planned sizes around a swap: the list shops what the screen shows. */
+  keepHeldSizes: string[] = [],
 ): { date: string; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
   if (dates.length === 0) return []
   const first = dates.reduce((a, b) => (b < a ? b : a), runFrom)
@@ -742,7 +745,7 @@ function assembleDates(
   // ingredients are stored at LUNCH size, so summing dinner and lunch
   // separately is already right and needs no special case here.
   const wanted = new Set(dates)
-  return serveDates({ dates: run, pools, targets, softLikedFoods, shape, pinsByDate })
+  return serveDates({ dates: run, pools, targets, softLikedFoods, shape, pinsByDate, keepHeldSizes })
     .filter(s => wanted.has(s.date))
     .map(s => ({ date: s.date, chosen: s.day.chosen }))
 }
@@ -816,7 +819,7 @@ export interface GenerateGroceryListResult {
 export async function generateGroceryList(input: GenerateGroceryListInput): Promise<GenerateGroceryListResult> {
   const days = Math.max(1, Math.min(MAX_HORIZON_DAYS, input.days ?? DEFAULT_HORIZON_DAYS))
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.startDate]: { ...(input.pinsByDate?.[input.startDate] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, datesFrom(input.startDate, days), input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.startDate)
+  const planned = assembleDates(input.mealPools, input.targets, datesFrom(input.startDate, days), input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.startDate, readKeptHeldSizes(input.profileId))
   return reconcileGenerated(input.profileId, planned, input.startDate)
 }
 
@@ -1015,7 +1018,7 @@ export async function addGroceryDays(input: AddGroceryDaysInput): Promise<AddGro
   }
   const covered = [...new Set([...before, ...wanted])].sort()
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today)
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today, readKeptHeldSizes(input.profileId))
   const result = await reconcileGenerated(input.profileId, planned, input.today)
   return { ...result, alreadyCovered: false, covered }
 }
@@ -1034,7 +1037,7 @@ export async function removeGroceryDays(input: AddGroceryDaysInput): Promise<Add
   }
   const covered = before.filter(d => !input.dates.includes(d))
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today)
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today, readKeptHeldSizes(input.profileId))
   const result = await reconcileGenerated(input.profileId, planned, input.today)
   return { ...result, alreadyCovered: false, covered }
 }

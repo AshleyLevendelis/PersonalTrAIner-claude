@@ -309,12 +309,16 @@ async function main() {
       truth.some(t => t.nowLeftover) && said.some(x => x.includes('the leftovers of the dinner the night before')), said)
     check('a lunch that stopped being leftovers says it is cooked fresh',
       truth.some(t => t.wasLeftover && !t.nowLeftover) && said.some(x => /cooked fresh instead of leftovers/.test(x)), said)
-    // ...and a different dish chosen only to re-fit the day says that.
+    // RE-ANCHORED 10 Oct 2026 (runs 3-4, M34, her "Resize, else leave"): a
+    // swap of the plan's own dishes no longer brings in a DIFFERENT dish to
+    // re-fit a day. Before, this case changed a dish and the card named it;
+    // now every other meal keeps its dish, and only sizes or leftovers move.
     const refit = okOf(build(on, { meal_slot: 'breakfast', from_date: dates[4], to_date: dates[6] }))
     const refitTruth = diffOf(refit?.after, [dates[4], dates[6]], 'breakfast')
     const refitSaid = (refit?.diff.implications ?? []).map(i => i.text)
-    check('a different dish chosen only to re-fit the day says so',
-      refitTruth.some(t => !t.resized && !t.nowLeftover && !t.wasLeftover) && refitSaid.some(x => /becomes .*, so the day still fits\./.test(x)), { refitTruth, refitSaid })
+    check('the re-fit swap is proposed (sanity check on the next one)', !!refit, refitSaid)
+    check('a swap that needs the day re-fitted keeps every other dish: no meal becomes a different dish to fit',
+      !!refit && refitTruth.every(t => t.resized || t.nowLeftover || t.wasLeftover) && !refitSaid.some(x => /becomes .*, so the day still fits\./.test(x)), { refitTruth, refitSaid })
 
     // MORE THAN FOUR CHANGES: the first four are listed and the rest folded
     // into one counted line, so a card never becomes a wall of text and never
@@ -526,7 +530,9 @@ async function main() {
   {
     const hook = read('src/hooks/useMealDays.ts')
     check('the hook plans over ITS OWN week: today\'s pins, the other days\' pins, the pools, the rotation',
-      /buildMealDayMoveProposal\(\{[\s\S]*?serving: \{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation \}/.test(hook))
+      /buildMealDayMoveProposal\(\{[\s\S]*?serving: \{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}/.test(hook)
+      // ...and the screen's own week is served the same, Undo dates included (M34).
+      && /serveMealWeek\(\{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}\)/.test(hook))
     check('...reading the ledger, and the shopping list STRICTLY, before it plans',
       /getTodayLedger\(profileId, today, targets\)/.test(hook) && /readGroceryCoverage\([\s\S]*?\{ strict: true \}\)/.test(hook))
     check('...and an unreadable one is passed on as unreadable, never as empty',

@@ -3058,6 +3058,8 @@ function App() {
               mealStrip={mealDays.strip}
               upcomingDay={mealDays.openDay}
               dayMove={mealDays.dayMove}
+              heldAround={mealDays.today?.day.heldAround}
+              onKeepHeldSizes={mealDays.keepHeldSizes}
             />
             )}
           </TabsContent>

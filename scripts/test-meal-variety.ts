@@ -48,6 +48,7 @@ import {
 import { computeMealMacros, lookupIngredient, type MealIngredientLine } from '../src/lib/food-db'
 import { dishKeysFor, dishKeyOf, sameDish } from '../src/lib/meal-dish-identity'
 import { mulberry32, makeDish } from './meal-fixture'
+import { holdAroundPins } from '../src/lib/hold-around-pins'
 import {
   buildRotation,
   assembleRotationDay,
@@ -632,12 +633,22 @@ console.log('\n7. The day already worked out is the day a fresh calculation give
    * its leftover pinned, and the leftover yielding when the dinner is the
    * same dish (the "not twice today" rule, kept for every day since 28 Sep).
    */
-  const freshDay = (rot: ReturnType<typeof buildRotation>, i: number, p: Partial<Record<MealSlotName, PoolOption[]>>, t: MacroTargets, l: string[], pin: Partial<Record<MealSlotName, PoolOption>>) => {
+  const searchDay = (rot: ReturnType<typeof buildRotation>, i: number, p: Partial<Record<MealSlotName, PoolOption[]>>, t: MacroTargets, l: string[], pin: Partial<Record<MealSlotName, PoolOption>>) => {
     const leftover = rot.leftoverFor(i)
     const day = assembleDay(p, t, rot.historyFor(i), l, { ...leftover, ...pin })
     return leftover.lunch && !pin.lunch && day.chosen.dinner?.name === leftover.lunch.name
       ? assembleDay(p, t, rot.historyFor(i), l, { ...pin })
       : day
+  }
+  // RE-ANCHORED 10 Oct 2026 (runs 3-4, M34, her "Resize, else leave"): a pin
+  // of one of the plan's own dishes now HOLDS the day's other dishes, so the
+  // fresh calculation for a pinned day is the unpinned day held around the
+  // pin (hold-around-pins.ts), the leftover kept as the pinned search left it.
+  const freshDay = (rot: ReturnType<typeof buildRotation>, i: number, p: Partial<Record<MealSlotName, PoolOption[]>>, t: MacroTargets, l: string[], pin: Partial<Record<MealSlotName, PoolOption>>) => {
+    const searched = searchDay(rot, i, p, t, l, pin)
+    if (Object.keys(pin).length === 0) return searched
+    const fixed = { ...pin, ...(!pin.lunch && searched.chosen.lunch?.leftoverFrom === 'dinner' ? { lunch: searched.chosen.lunch } : {}) }
+    return holdAroundPins({ planned: searchDay(rot, i, p, t, l, {}), fixed, targets: t }) ?? searched
   }
   let compared = 0
   let reused = 0

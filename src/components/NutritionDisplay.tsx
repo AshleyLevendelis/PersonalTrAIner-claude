@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { HeldAround } from '@/lib/meal-generation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calculator, Layers } from 'lucide-react'
@@ -135,6 +136,9 @@ export interface NutritionDisplayProps {
    * Absent, the Move control offers only the meal slots, as it did.
    */
   dayMove?: MealDayMoveController
+  /** What a swap did to today's other meals (runs 3-4, M34), and its Undo. */
+  heldAround?: HeldAround
+  onKeepHeldSizes?: (date: string, keep: boolean) => void
   /**
    * The day open on the strip, when it is not today: that date's meals, its
    * swap, and putting it on the shopping list. Null means today is open.
@@ -143,6 +147,7 @@ export interface NutritionDisplayProps {
     date: string
     chosen: Partial<Record<MealSlotName, PoolOption>>
     totals: MacroTargets
+    heldAround?: HeldAround
     onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
   } & UpcomingMealDay | null
   mealRefitBusy?: boolean
@@ -178,7 +183,7 @@ export function NutritionDisplay({
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
   mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote,
-  mealStrip, upcomingDay = null, dayMove,
+  mealStrip, upcomingDay = null, dayMove, heldAround, onKeepHeldSizes,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
@@ -558,6 +563,8 @@ export function NutritionDisplay({
           onRegenerateAll={onRegenerateAllMeals}
           upcoming={upcomingDay}
           dayMove={dayMove}
+          heldAround={upcomingDay.heldAround}
+          onKeepHeldSizes={onKeepHeldSizes}
           regeneratingAll={mealsRegeneratingAll}
         />
       ) : (
@@ -584,6 +591,8 @@ export function NutritionDisplay({
         onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}
         dayMove={dayMove}
+        heldAround={heldAround}
+        onKeepHeldSizes={onKeepHeldSizes}
         regeneratingAll={mealsRegeneratingAll}
       />
       )}

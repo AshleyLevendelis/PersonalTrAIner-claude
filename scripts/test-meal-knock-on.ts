@@ -290,7 +290,9 @@ async function main() {
   console.log('\n[7] One function, from the hook to the sheet and to the coach')
   {
     const hook = read('src/hooks/useMealDays.ts')
-    const servingLiteral = /serving: \{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation \}/g
+    // Re-anchored 10 Oct 2026: the week also carries the dates where Undo kept
+    // a swap's planned sizes (M34), and the trial must be served the same.
+    const servingLiteral = /serving: \{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}/g
     check('the hook runs the trial over the SAME week it hands the day swap', (hook.match(servingLiteral) ?? []).length === 2 && /knockOnOfPin\(\{\s*serving: \{ today, dates/.test(hook), (hook.match(servingLiteral) ?? []).length)
     check('...with the shopping list read strictly (unreadable is null, not empty)', /const knockOn = async[\s\S]{0,500}readGroceryCoverage\([\s\S]{0,120}?strict: true/.test(hook))
     check('...and hands it out on the one controller both surfaces already receive', /plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn,/.test(hook))

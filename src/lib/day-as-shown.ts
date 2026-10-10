@@ -68,8 +68,12 @@ const add = (a: MacroTargets, b: MacroTargets): MacroTargets => ({
 })
 const fromEaten = (e: EatenMacros): MacroTargets => ({ calories: e.kcal, protein: e.protein, carbs: e.carbs, fat: e.fat })
 
-/** One dish scaled by `factor`, costed again from its own scaled ingredients; null when it cannot be honestly. */
-function resized(option: PoolOption, factor: number): PoolOption | null {
+/**
+ * One dish scaled by `factor`, costed again from its own scaled ingredients;
+ * null when it cannot be honestly. Shared with a swap's hold (hold-around-pins.ts),
+ * so both re-sizes are the same arithmetic.
+ */
+export function resizeDish(option: PoolOption, factor: number): PoolOption | null {
   const m = option.macros
   const result = scaleToTarget(
     option.ingredients,
@@ -120,12 +124,15 @@ export function dayAsShown(input: {
   const eatenKcal = logged.reduce((s, r) => s + r.macros.calories, 0)
   const openKcal = open.reduce((s, r) => s + r.macros.calories, 0)
   const factor = openKcal > 0 ? Math.max(0, targets.calories - eatenKcal) / openKcal : 1
-  if (!(factor >= AROUND_EATEN_MIN && factor <= AROUND_EATEN_MAX)) {
+  // A dish a swap already re-sized counts from the dish AS PLANNED, so the two
+  // re-sizes together stay inside "about 25% either way" (her one rule).
+  const combined = (r: ShownSlot) => factor * (r.option?.heldBy ?? 1)
+  if (!(factor > 0) || open.some(r => !(combined(r) >= AROUND_EATEN_MIN - 1e-9 && combined(r) <= AROUND_EATEN_MAX + 1e-9))) {
     return { slots: base, totals: baseTotals, aroundEaten: { kind: 'too_far', deltaKcal } }
   }
   const rows = base.map(r => {
     if (r.eaten || !r.option) return r
-    const next = resized(r.option, factor)
+    const next = resizeDish(r.option, factor)
     return next ? { ...r, option: next, macros: next.macros, resizedBy: factor } : r
   })
   // Every open dish or none: a half-resized day would describe a fit it did not make.

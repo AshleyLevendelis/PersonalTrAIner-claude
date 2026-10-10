@@ -530,6 +530,26 @@ export function aroundEatenLine(a:
 }
 
 /**
+ * THE ONE LINE WHEN A SWAP HELD THE DAY'S OTHER DISHES (runs 3-4, M34;
+ * Ashley 10 Oct 2026, "Resize, else leave"): the same promise as the logged-
+ * meal line above, one line, an Undo beside a resize, and the gap said
+ * plainly when the dishes could not fit. Null when there is nothing to say.
+ */
+export function heldAroundLine(h:
+  | { kind: 'none'; slots: string[] }
+  | { kind: 'resized'; factor: number; slots: string[]; deltaKcal: number }
+  | { kind: 'too_far'; slots: string[]; deltaKcal: number }
+  | { kind: 'kept'; slots: string[]; deltaKcal: number }): string | null {
+  const gap = (d: number) => `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
+  const yours = `your ${slotList(h.slots)}`
+  if (h.kind === 'none') return null
+  if (h.kind === 'kept') return `Kept ${yours} as planned after your swap. The day is ${gap(h.deltaKcal)}.`
+  if (h.kind === 'too_far') return `Kept ${yours} as planned: fitting ${h.slots.length === 1 ? 'it' : 'them'} around your swap would take more than a 25% change. The day is ${gap(h.deltaKcal)}.`
+  const pct = Math.round(Math.abs(h.factor - 1) * 100)
+  return `To fit around your swap, ${yours} ${h.slots.length === 1 ? 'is' : 'are'} ${pct}% ${h.factor < 1 ? 'smaller' : 'bigger'}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
+}
+
+/**
  * WHAT A LOGGED SET SAYS UNDER ITS ROW, in its own unit (runs 3-4, M42): a
  * 33-second plank read "33 reps" and one rep read "1 reps".
  */
