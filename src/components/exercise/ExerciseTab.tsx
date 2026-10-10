@@ -1,4 +1,6 @@
 import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
+import { blockSwapEndsOn } from '@/lib/block-swap-until'
+import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useCallback, useState } from 'react'
 import { useAppRoute, programHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -110,6 +112,10 @@ export function ExerciseTab({
   const isProgramView = route.kind === 'program'
 
   const [swapTarget, setSwapTarget] = useState<SwapTarget | null>(null)
+  // WHEN "REST OF BLOCK" ENDS, said on the swap (runs 3-4, M40b; her 10 Oct
+  // ruling "Keep to the block, say it").
+  const todayStr = getLocalDateString(getAppNow(profile?.id))
+  const swapBlockEndsOn = blockSwapEndsOn(mesocycle ?? [], swapTarget?.weekNumber ?? liveWeek, planCreatedAt)
   // EVERY BAN ON THIS TAB GOES THROUGH ONE QUESTION (M10, 9 Oct 2026). Today's
   // card, a peeked day and the programme view each called the write directly
   // from a menu item; they now all hand a NAME to this, which opens the
@@ -274,6 +280,8 @@ export function ExerciseTab({
           impactFor={swapImpact}
             onReason={handleSwapReason}
           onDislike={requestBan}
+          blockEndsOn={swapBlockEndsOn}
+          today={todayStr}
         /></Suspense>
         {banSheet}
         <ExerciseDetailDialog
@@ -336,6 +344,8 @@ export function ExerciseTab({
         impactFor={swapImpact}
             onReason={handleSwapReason}
         onDislike={requestBan}
+        blockEndsOn={swapBlockEndsOn}
+        today={todayStr}
       /></Suspense>
       {banSheet}
       <PlateCalculator

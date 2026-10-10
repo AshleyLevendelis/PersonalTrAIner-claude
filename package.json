@@ -58,6 +58,7 @@
     "test:runs34-low": "tsx scripts/test-runs34-low.ts",
     "test:hold-around-pins": "tsx scripts/test-hold-around-pins.ts",
     "test:session-count": "tsx scripts/test-session-count.ts",
+    "test:block-swap-until": "tsx scripts/test-block-swap-until.ts",
     "verify:finish-check": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/finish-check.mjs",
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",

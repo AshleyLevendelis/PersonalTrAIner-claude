@@ -146,6 +146,13 @@ if (await has('[data-testid="swap-dialog"] [data-testid="reason-skip"]')) { awai
 const swapTo = await ev(`document.querySelector('[data-testid="swap-dialog"] [data-testid="swap-option"]')?.innerText?.split('\\n')[0]?.trim() || null`)
 check('2d. it offers a replacement', typeof swapTo === 'string' && swapTo.length > 0, swapTo)
 await clickSel('[data-testid="swap-dialog"] [data-testid="swap-option"]'); await wait(900)
+// "REST OF BLOCK" SAYS WHEN IT ENDS, and "never" is offered beside it (runs
+// 3-4, M40b; her 10 Oct ruling "Keep to the block, say it").
+const blockUntil = await ev(`document.querySelector('[data-testid="swap-dialog"] [data-testid="swap-block-until"]')?.textContent?.trim() ?? null`)
+check('2d2. "Rest of block" says the day it ends and why', !!blockUntil && /^Swaps it until (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)( \d{4})?, when your next block starts and your plan changes exercises\.( |$)/.test(blockUntil), blockUntil)
+const never = await ev(`document.querySelector('[data-testid="swap-dialog"] [data-testid="swap-never-again"]')?.textContent?.trim() ?? null`)
+check('2d3. ...with "never give me this one" beside it, naming the exercise', never === `Never give me ${swapVictim} again`, never)
+await shoot('moved-edit-2-scope')
 check('2e. "Today only" is offered and tapped', await clickText('[data-testid="swap-dialog"]', '/^Today only/'))
 await untilGone('[data-testid="swap-dialog"]'); await wait(900)
 const afterSwap = (await until(async () => { const o = await order(); return o && !o.includes(swapVictim) ? o : null })) || (await order()) || []

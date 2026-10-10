@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { isNothingToChangeMessage } from '@/lib/edit-reason'
-import { tierWords } from '@/lib/coach-voice'
+import { tierWords, blockSwapLine } from '@/lib/coach-voice'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
 import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
@@ -54,6 +54,8 @@ export function SwapDialog({
   impactFor,
   onReason,
   onDislike,
+  blockEndsOn,
+  today,
 }: {
   target: SwapTarget | null
   onClose: () => void
@@ -82,6 +84,13 @@ export function SwapDialog({
   onReason?: (answer: ReasonAnswer) => Promise<string | null>
   /** "I don't like it" — opens the ban confirm for this exercise. Absent, that answer is an ordinary swap. */
   onDislike?: (exerciseName: string) => void
+  /**
+   * The first day of the next block, when "Rest of block" ends (runs 3-4,
+   * M40b; Ashley 10 Oct 2026, "Keep to the block, say it"). Null on the last
+   * block; absent when the caller cannot know.
+   */
+  blockEndsOn?: string | null
+  today?: string
 }) {
   const [asked, setAsked] = useState(false)
   const [reasonBusy, setReasonBusy] = useState(false)
@@ -413,13 +422,26 @@ export function SwapDialog({
               onClick={() => applyScope('permanent')}
             >
               <p className="font-medium text-sm">Rest of block</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Swaps it for the rest of this training block; later blocks re-plan from your base program.
+              <p className="text-xs text-muted-foreground mt-0.5" data-testid="swap-block-until">
+                {blockEndsOn !== undefined ? blockSwapLine(blockEndsOn, today) : 'Swaps it for the rest of this training block; later blocks re-plan from your base program.'}
                 {currentEntry?.mechanics_tier === 'tier1_compound'
                   ? ' Main lift — this resets to a conservative starting weight so you can find it fresh, rather than inheriting a number that belonged to a different movement.'
                   : ' Loads recompute for the new movement right away.'}
               </p>
             </button>
+            {/* FOR GOOD IS A DIFFERENT THING, offered beside it (her 10 Oct ruling):
+                a block swap ends when the plan changes exercises; a ban does not. */}
+            {onDislike && target && (
+              <button
+                type="button"
+                className="hit-slop-44 w-full text-center text-xs font-semibold text-primary-text"
+                data-testid="swap-never-again"
+                disabled={busy}
+                onClick={() => { const name = target.exerciseName; handleClose(); onDislike(name) }}
+              >
+                Never give me {target.exerciseName} again
+              </button>
+            )}
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPendingSwap(null)}>
               {busy ? (
                 <span className="inline-flex items-center gap-2">

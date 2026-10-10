@@ -51,6 +51,7 @@
 //   - `coach-tips.ts` — dashboard tiles, a different medium from a chat bubble.
 // ---------------------------------------------------------------------------
 
+import { shortDate } from './day-labels'
 import type { FitnessGoal, MacroTargets } from './types'
 
 // ---------------------------------------------------------------------------
@@ -567,6 +568,17 @@ export function swapKnockOnLine(c: { slot: string; kind: 'dish' | 'size'; from: 
   const slot = c.slot.charAt(0).toUpperCase() + c.slot.slice(1)
   if (c.kind === 'dish') return `${slot} changed too, so the day still fits: ${c.from ?? 'nothing'} is now ${c.to}.`
   return `${slot} changed size so the day still fits: ${c.to}, ${c.fromKcal ?? '?'} → ${c.toKcal} kcal.`
+}
+
+/**
+ * WHAT "REST OF BLOCK" MEANS, said on the swap (Ashley, 10 Oct 2026, "Keep to
+ * the block, say it"): the date it ends and that the plan then changes
+ * exercises. `until` is the next block's first day; null on the last block.
+ */
+export function blockSwapLine(until: string | null, today?: string): string {
+  return until
+    ? `Swaps it until ${shortDate(until, today)}, when your next block starts and your plan changes exercises.`
+    : 'Swaps it for the rest of your plan.'
 }
 
 /**
