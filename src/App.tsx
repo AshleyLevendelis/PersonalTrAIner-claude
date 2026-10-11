@@ -2483,27 +2483,6 @@ function App() {
     }
   }
 
-  // THE OFFER SAYS WHAT THE REBUILD WILL DO, read off a trial of it (run 5, H28, 11 Oct 2026): the same rebuild,
-  // seeded, so the plan the tap applies is the plan the dialog described.
-  const [rebuildPreview, setRebuildPreview] = useState<{ lines: string[]; seedKey: string } | null>(null)
-  useEffect(() => {
-    setRebuildPreview(null)
-    if (!planInvalidation || !profile?.id || mesocycle.length === 0) return
-    let cancelled = false
-    const seedKey = `profile-rebuild:${profile.id}:${planInvalidation.title}:${getLocalDateString(getAppNow(profile.id))}`
-    const createdAt = mesocycleCreatedAt ?? profile.created_at
-    const currentWeek = getActiveMesocycleWeek(createdAt, undefined, mesocycle.length || 4)
-    void (async () => {
-      const context = await loadPlanEditContext(profile, mesocycle, createdAt)
-      const trial = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context, { seedKey })
-      if (cancelled || !trial.ok || !trial.mesocycle) return
-      const today = context.calendar.today
-      setRebuildPreview({ seedKey, lines: describeRebuild(mesocycle, trial.mesocycle, { start: { fromWeek: currentWeek, fromDate: today, said: 'from today' }, planCreatedAt: createdAt }) })
-    })().catch(console.error)
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planInvalidation])
-
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
     setRebuilding(true)
@@ -2560,6 +2539,27 @@ function App() {
       setPlanInvalidation(null)
     }
   }
+
+  // THE OFFER SAYS WHAT THE REBUILD WILL DO, read off a trial of it (run 5, H28, 11 Oct 2026): the same rebuild,
+  // seeded, so the plan the tap applies is the plan the dialog described.
+  const [rebuildPreview, setRebuildPreview] = useState<{ lines: string[]; seedKey: string } | null>(null)
+  useEffect(() => {
+    setRebuildPreview(null)
+    if (!planInvalidation || !profile?.id || mesocycle.length === 0) return
+    let cancelled = false
+    const seedKey = `profile-rebuild:${profile.id}:${planInvalidation.title}:${getLocalDateString(getAppNow(profile.id))}`
+    const createdAt = mesocycleCreatedAt ?? profile.created_at
+    const currentWeek = getActiveMesocycleWeek(createdAt, undefined, mesocycle.length || 4)
+    void (async () => {
+      const context = await loadPlanEditContext(profile, mesocycle, createdAt)
+      const trial = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context, { seedKey })
+      if (cancelled || !trial.ok || !trial.mesocycle) return
+      const today = context.calendar.today
+      setRebuildPreview({ seedKey, lines: describeRebuild(mesocycle, trial.mesocycle, { start: { fromWeek: currentWeek, fromDate: today, said: 'from today' }, planCreatedAt: createdAt }) })
+    })().catch(console.error)
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planInvalidation])
 
   // THE TRAINER'S LINE ON HOME — design_handoff_app_polish. The adaptation
   // messages used to render as a stack of InsightBanner tone="ai" above every

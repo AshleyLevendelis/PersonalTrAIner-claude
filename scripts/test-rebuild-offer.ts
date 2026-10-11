@@ -351,7 +351,7 @@ console.log('\n4. Nothing rebuilds without somebody saying yes')
   // ...and, since 9 Oct 2026, it is handed which DAYS of that week are already
   // trained: "from this week onwards" used to rewrite those too.
   check('...and is handed the days already trained, read at the tap',
-    /const context = await loadPlanEditContext\(profile, mesocycle, mesocycleCreatedAt \?\? profile\.created_at\)\s*const result = await rebuildFromCurrentWeek\(profile, effectiveExclusions, mesocycle, currentWeek, context\)/.test(app))
+    /const context = await loadPlanEditContext\(profile, mesocycle, mesocycleCreatedAt \?\? profile\.created_at\)\s*const result = await rebuildFromCurrentWeek\(profile, effectiveExclusions, mesocycle, currentWeek, context(?:, \{[^}]*\})?\)/.test(app))
 
   // THE WORDS HAVE TO REACH A SCREEN. Everything above proves the offer is
   // RAISED and that saying yes or no does the right thing; none of it proves

@@ -142,7 +142,8 @@ check('the REPLACEMENT is resolved just as tolerantly',
 check('every failure carries a reason instead of a bare null',
   /\{ ok: false; reason: string \}/.test(chat) && /else refusal = swap\.reason/.test(chat))
 check('...and the generic sentence is only the last resort it always was',
-  /refusal \?\? "I couldn't find that on your current plan/.test(chat))
+  // Since 11 Oct 2026 (run 5, H27) the sentence is a named constant kept for a proposal the client does not know.
+  /refusal \?\? UNKNOWN_PROPOSAL_REFUSAL/.test(chat) && /const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan/.test(chat))
 
 console.log(failures === 0 ? '\nAll swap-target checks pass.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

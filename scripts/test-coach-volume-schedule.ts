@@ -284,7 +284,9 @@ console.log('\n8. The client can actually execute what the server proposes')
   check('the volume executor never touches a week outside the payload',
     /payload\.weekNumbers\.includes\(week\.week_number\)/.test(exec))
   check('the schedule executor rebuilds from a week, not from week 1',
-    /rebuildFromCurrentWeek\(updated, exclusions, mesocycle, payload\.fromWeek, context\)/.test(exec))
+    // Read inside the SCHEDULE executor: five siblings make the same call, so a file-wide match proved nothing
+    // about this one (a mutation to week 1 here came back MISSED, 11 Oct 2026).
+    /rebuildFromCurrentWeek\(updated, exclusions, mesocycle, payload\.fromWeek, context(?:, \{[^}]*\})?\)/.test(exec.slice(exec.indexOf('export async function executeScheduleChange'), exec.indexOf('export async function', exec.indexOf('export async function executeScheduleChange') + 10))))
   check('...and only saves from that week forward',
     /week\.week_number < payload\.fromWeek/.test(exec))
   check('undo is forward-only too', /week\.week_number < fromWeek/.test(exec))
