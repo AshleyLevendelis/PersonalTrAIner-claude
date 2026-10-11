@@ -51,6 +51,11 @@ import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, iso as isoOf } from './anchor.mjs'
+import { makeKitController } from '@/lib/kit-change'
+import { planDaysInWindow } from '@/lib/plan-guard'
+import { profileWithKit } from '@/lib/kit-list'
+import { compileKitStatements, kitFactsIn } from '@/lib/fact-compiler'
+import type { UserFactRow } from '@/lib/memory-store'
 import '@/index.css'
 
 window.addEventListener('error', e => { (window as never as Record<string, unknown>).__err = String(e.message) })
@@ -585,9 +590,36 @@ function StartATimer() {
   return null
 }
 
+// ?kit=1 — THE KIT LIST (Ashley, 9 Oct 2026). The coach is handed the app's
+// own controller (kit-change.ts makeKitController) over this page's plan and
+// fake database, and the profile is derived from the remembered facts with
+// the app's own functions — App's two lines, reproduced, nothing else.
+const KIT = new URLSearchParams(location.search).get('kit') === '1'
+
 function Harness() {
   const [, setTick] = useState(0)
   const [chatAttention, setChatAttention] = useState(false)
+  const readKitFacts = () => ((db.user_facts ?? []) as unknown as UserFactRow[]).filter(f => f.status === 'active')
+  const [kitFacts, setKitFacts] = useState<UserFactRow[]>(readKitFacts)
+  const [kitMeso, setKitMeso] = useState(mesocycle)
+  const kitProfile = KIT ? profileWithKit(profile, compileKitStatements(kitFacts)) : profile
+  const kitController = KIT ? makeKitController({
+    profile: kitProfile, mesocycle: kitMeso, planCreatedAt: profile.created_at, exclusions: [],
+    onFile: kitFactsIn(kitFacts).map(k => ({ id: k.fact.id, statement: k.statement })),
+    onSaved: result => { setKitMeso(result.mesocycle); setKitFacts(readKitFacts()) },
+  }) : null
+  useEffect(() => {
+    if (!KIT) return
+    const w = window as unknown as Record<string, unknown>
+    // What the coach's confirm WROTE, and what the plan now holds from today:
+    // the measurement, read off the app's catalogue and calendar.
+    w.__kitRows = () => ((db.user_facts ?? []) as Record<string, unknown>[]).filter(f => f.kind === 'hard_constraint' && f.constraint_kind === 'equipment').map(f => ({ status: f.status, polarity: f.polarity, refs: f.resolved_refs, source: f.source }))
+    const ahead = new Set(planDaysInWindow(kitMeso, { planCreatedAt: profile.created_at, today: isoOf(anchorDate()), moves: [] }).map(r => `${r.weekNumber}|${r.dayName}`))
+    w.__needsFromToday = (eqs: string[]) => [...new Set(kitMeso.flatMap(wk => wk.days.filter(d => ahead.has(`${wk.week_number}|${d.day}`)).flatMap(d => d.exercises
+      .filter(e => { const x = EXERCISE_DATABASE.find(c => c.name === e.name); return !!x && (x.equipment_alternatives ? x.equipment.every(q => eqs.includes(q)) : x.equipment.some(q => eqs.includes(q))) })
+      .map(e => e.name))))]
+    w.__kitSaid = kitProfile.kit_statements ?? []
+  })
   // App.tsx holds [] for both of these until its plan read resolves. In every
   // mode but ?seed=opener the harness skips that window entirely, which is
   // why the opener has never been driven here.
@@ -658,10 +690,11 @@ function Harness() {
           <div className="space-y-6">
             <Suspense fallback={<div>Loading the coach…</div>}>
             <ChatAssistant
-              profile={profile}
+              profile={kitProfile}
+              kitController={kitController}
               macros={macros}
               exercisePlan={livePlan}
-              mesocycle={liveMeso}
+              mesocycle={KIT ? kitMeso : liveMeso}
               planCreatedAt={profile.created_at}
               mealPlan={mealPlan}
               exerciseExclusions={[]}

@@ -48,7 +48,7 @@ import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoo
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE } from '@/lib/coach-voice'
 import { isHedged } from '@/lib/definite-mention'
-import { KIT_ITEMS, isKitItem, kitStatementInUserWords, describeKitStatement, kitItemsFor, kitOf, kitLine, type KitStatement } from '@/lib/kit-list'
+import { KIT_ITEMS, KIT_ITEM_LABELS, isKitItem, kitStatementInUserWords, describeKitStatement, kitItemsFor, kitOf, kitLine, kitInWords, type KitStatement } from '@/lib/kit-list'
 import type { KitController } from '@/lib/kit-change'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
@@ -2926,7 +2926,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const mode = String(rawArgs.mode ?? '')
     const items = (Array.isArray(rawArgs.items) ? rawArgs.items : []).filter(isKitItem)
     if (!['has', 'hasnt', 'only'].includes(mode) || items.length === 0) {
-      return { refusal: `Which of these do you mean: ${KIT_ITEMS.map(i => i.replace(/_/g, ' ')).join(', ')}?` }
+      return { refusal: `Which of these do you mean: ${KIT_ITEMS.map(i => KIT_ITEM_LABELS[i].toLowerCase()).join(', ')}?` }
     }
     const statement: KitStatement = { mode: mode as KitStatement['mode'], items }
     if (!kitStatementInUserWords(statement, userSaid)) {
@@ -2936,7 +2936,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const plan = await kitController.plan([statement])
     if (plan.refusal) return { refusal: plan.refusal }
     const rows = [
-      { field: 'Your kit', before: plan.kitBefore.length ? plan.kitBefore.map(i => i.replace(/_/g, ' ')).join(', ') : 'bodyweight only', after: plan.kitAfter.length ? plan.kitAfter.map(i => i.replace(/_/g, ' ')).join(', ') : 'bodyweight only' },
+      { field: 'Your kit', before: plan.kitBefore.length ? kitInWords(plan.kitBefore) : 'bodyweight only', after: plan.kitAfter.length ? kitInWords(plan.kitAfter) : 'bodyweight only' },
       ...plan.changedDays.slice(0, 6).map(d => ({
         field: d.date ? shortDate(d.date) : `${d.dayName} (Week ${d.weekNumber})`,
         before: d.before.filter(n => !d.after.includes(n)).join(', ') || '—',

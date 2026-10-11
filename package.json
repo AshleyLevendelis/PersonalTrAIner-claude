@@ -320,6 +320,7 @@
     "verify:exercise-add": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/exercise-add.mjs",
     "verify:setup-answers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/setup-answers.mjs",
     "verify:kit-ticks": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kit-ticks.mjs",
+    "verify:chat-kit": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-kit.mjs",
     "verify:tightness": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tightness.mjs",
     "verify:session-rebuild": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-rebuild.mjs",
     "verify:shorten-today": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/shorten-today.mjs",
