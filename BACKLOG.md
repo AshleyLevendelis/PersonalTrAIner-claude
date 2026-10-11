@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [~] **RUN 5 OF THE LIVE-APP TEST, AND THE MERGE OF MAIN INTO THE WORKING BRANCH (11 Oct 2026).**
+  Her message of 11 Oct: "fix the newest bugs, then put the app live", with conditions (every check
+  green, the long checks once on the finished tree, browser checks with screenshots read, no `wip/*`
+  branch merged as it is, this file and CLAUDE.md updated).
+  - **The merge.** `main` (the test-log fixes and the layout pass) merged into
+    `claude/coach-empty-text-fix-2c4bzv` (the unit fix, week boundaries, layoff, circuit log, 8 Oct
+    fixes). 27 files conflicted. Two decisions worth keeping: **one amount reader** (main's table of
+    piece weights and "unknown is unknown", plus this branch's line reader that marks a line it
+    cannot read); a chicken breast is one figure, 120 g, the same in both. And the week strip on
+    Home and Exercise is main's circles with this branch's block-boundary mark beside them.
+  - **H28, a rebuild that started today when she asked for next week.** The rule she set: a rebuild
+    honours the date asked for, never touches a day already trained or a session in progress,
+    carries bans, swaps, active temporary changes and logged weights through, and its card lists
+    everything else it will change; every rebuild path. Built through the one place every rebuild
+    goes (`rebuildAgainstProfile`): a start date; a running session counts as today trained; a day
+    is judged by its DATE, so a moved session's original day is not "free"; swaps are replayed
+    (only onto a lift that is still a valid replacement) and earned weights carried (same lift, same
+    reps, never into a deload, never past a stated limit). **The card is read off a trial of the very
+    rebuild confirm runs, with the same seed**, so it can say "Starts from Mon 12 Oct, when your next
+    training week starts", each changed day of the first week, what comes in and leaves, any weight
+    that restarts from an estimate, and the swaps it keeps. Same on the Profile rebuild dialog.
+    Undo now retitles the card "Put back" and says what was taken back.
+  - **H27, ending a temporary injury change early.** The coach's "I'm better" card now ends a
+    running change as well as a listed injury, and when there is nothing to end it says why in words
+    ("Nothing is easing off your knees right now and it isn't on your injuries list, so there's
+    nothing to end."). The generic "I couldn't find that on your current plan" is no longer used for
+    a request the app understands. The screen's End-now button already existed.
+  - **"2 eggs on 2 slices of toast" typed as one line** was read as one food. A line naming two
+    amounts is now split before it is costed, on both the coach and the add-a-meal path: 346 kcal
+    for medium eggs and ordinary slices (371 for large), never the 155 it was.
+    **Her 350 figure is just above that**: 346 is right for those sizes, so the live check reads
+    "above 300 and both foods costed" rather than "above 350".
+  - **Already fixed in the tree when traced:** M45's backwards label, M48's chips, the PR badge
+    following each heavier first-session set, "no meals logged yet" just after midnight.
+  - **CSCS review (H28 changes what is prescribed after a rebuild):** 1. training effect: a rebuild
+    no longer throws away earned loads or a variant she chose, so the progression thread survives a
+    schedule change. 2. takes away: a carried weight is skipped when the reps changed (it would be
+    a different stimulus), so those restart from an estimate, and the card says so. 3.
+    fundamentals: the week is re-settled after the replay (pattern balance, one weight, warm-up), so
+    a carried swap cannot leave a pattern uncovered. 4. no floor or ceiling redefined; a carried
+    load still goes through the stated-limit clamp, and never lands in a deload week. 5. in scope.
+  - **Checked:** `test:rebuild-honours` (54 checks, 23 mutations, all caught, four only after a
+    check was added: the date-judged guard, a mid-week plan, a plan with no start date, a Wednesday
+    start); `verify:rebuild-card` (16 checks, 5 mutations, screenshots read; it found a lone full
+    stop left on the card and "your your knees" in two refusals); `test:meal-amounts` +4 checks
+    for the split (4 mutations). `test:coach-volume-schedule` was re-anchored: its check matched
+    any sibling handler and proved nothing.
+  - **Needs:** the `chat-gemini` deploy (new `starts` argument, the injury card, the split).
+  - **Not explained:** a coach message stamped 12:00 AM (L-c). No code path found; needs the row.
+
 - [x] **LAYOUT PASS, SIX SCREENS (10-11 Oct 2026): MERGED to `main` 11 Oct 2026 on her word ("Merge").**
   That merge also brings in `claude/test-log-fixes-oct9`, which the layout branch was cut from.
   `claude/coach-empty-text-fix-2c4bzv` is NOT in it and is still to merge.
