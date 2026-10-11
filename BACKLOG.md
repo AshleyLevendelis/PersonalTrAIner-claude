@@ -2,6 +2,43 @@
 
 Newest first. One line each.
 
+- [~] **LAYOUT PASS, SIX SCREENS (10-11 Oct 2026): BUILT, on `claude/layout-revamp-oct10`, not merged.**
+  Her design zip (2a Home, 2b Nutrition, 2c Exercise, 2d Profile, 2e setup, 4c round timer), sent with
+  no message. Her rulings: **"Build all six, then show me"** (from four options) and **keep "Personal
+  TrAIner"** over the brief's "Coach" (from three). Every decision, with its reason, is in
+  `docs/plans/layout-revamp-oct10.md`.
+  - **Built:** Home (greeting and streak, one rotating coach note that holds on touch and stays still
+    under reduced motion, the session hero with its week circles, a Done panel with the day's summary,
+    Today 2x2, the weight panel with the latest PR and the week's sets against last week's same days);
+    Nutrition (day header with a Grocery pill, four rings, kcal left, Up next / Later / Eaten);
+    Exercise (week label, seven-column strip, the length and its shortfall reason on the hero, numbered
+    rows with set dots and a load chip, and a running "Log set 3 · Bench 80 kg × 6" button that presses
+    the tick it describes); Profile (a page of rows, each opening the editors it always had); setup (one
+    question per screen, Skip where a question could already be declined, a mic where speech works);
+    the round-timer sheet.
+  - **Deviations to show her:** one tap still answers a single-choice setup question (the brief draws
+    select-then-Next); "Reply speed" instead of the brief's "Tone" (that is the only control there);
+    only the "Accessory" section label is dropped on Exercise (Main lift, Primer, Finisher, Superset say
+    something); Exercises to avoid is its own Profile row in Training.
+  - **Found and fixed on the way, by the browser drivers:** the Done panel had dropped the lift line
+    (L9); the coach note's three page dots, 5px apart with 44px tap areas, took each other's taps; a
+    peeked day had lost its length when the length moved to the hero; a question card she had not
+    answered vanished when she typed something else in setup. And a bug found by reading: the coach's
+    "Ask ↗" prefill was read once at mount, so a prefill set later never arrived.
+  - **Checked:** new gates `test:round-setup`, `test:exercise-layout`, `test:layout-revamp` (61 mutations
+    in all, every one caught, five only after a check was tightened or a case added); `test:profile-groups`
+    and `test:onboarding-style` rewritten for the new screens; 23 browser drivers re-anchored and green;
+    screenshots read in four themes; `test:bundle` measured both ends (2,229 kB before, 2,257 after).
+  - **Needs:** the `chat-gemini` deploy (the coach's description of Home changed). Frontend on merge.
+  - **Not done:** the coach exam was not re-run (the coach's prompt changed, so its scores are stale
+    until it is); the Home harness has no fixture with a rest timer running, so the Log-set button
+    riding above the rest dock is proven by construction only.
+  - **CSCS review** (the Exercise screen is the only one that touches what is prescribed, and it changes
+    nothing prescribed): 1. training effect: none, it is presentation; the Log-set button saves exactly
+    what the tick saves, including refusing a calibration set 2 with a blank box. 2. takes away: nothing;
+    every control moved, none removed. 3. fundamentals: the main lift stays labelled. 4. no floor or
+    ceiling touched. 5. in scope.
+
 - [~] **RUNS 3 AND 4 OF THE LIVE-APP TEST: BUILT (10 Oct 2026), on `claude/test-log-fixes-oct9`.**
   Her "Build it", and her answer to the first decision the same day: **A, with two conditions**
   (when other meals are re-sized, one line says so with an Undo; only the same dishes, about 25%

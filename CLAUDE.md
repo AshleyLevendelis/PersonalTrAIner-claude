@@ -710,8 +710,9 @@ menu" stays true when a copy is also left outside it.
     be CHANGED or REMOVED from the screen. What the screen cannot do is ADD one
     — and the group is hidden entirely when there are none, so a first dislike
     has no screen route at all. **CLOSED the same day**: "Exercises to avoid"
-    now sits beside "Foods to avoid" on Profile, so it is **both** on every
-    operation. The typed word is RESOLVED against the catalogue before it is
+    sat beside "Foods to avoid" on Profile, so it is **both** on every
+    operation (since the 10 Oct 2026 layout pass it is its own Profile row,
+    in Training). The typed word is RESOLVED against the catalogue before it is
     stored, because the exclusion filter matches a full exercise name — "squats"
     stored as typed bans nothing while looking on screen exactly like a ban that
     worked — and an ambiguous word asks which rather than guessing, the rule the
@@ -1311,6 +1312,23 @@ menu" stays true when a copy is also left outside it.
   plan changes exercises.") and offers "Never give me this one again" beside it for good. Rejected:
   carrying a swap into later blocks, and a third "from now on" choice. `block-swap-until`,
   `verify:moved-edit`
+
+### Her layout pass of 10 Oct 2026 (`docs/plans/layout-revamp-oct10.md`), on `claude/layout-revamp-oct10`
+- **"Build all six, then show me"**, and **"Personal TrAIner" stays** over the brief's "Coach".
+  Home, Nutrition, Exercise, Profile, setup and the round-timer sheet, layout only: every control
+  moved, none removed. `test:layout-revamp`, `test:exercise-layout`, `test:round-setup`,
+  `test:profile-groups`, `test:onboarding-style`, and the browser drivers re-anchored to the new
+  screens. NOT merged, NOT shown to her yet.
+- **The Exercise tab's running button presses the tick it describes**: "Log set 3 · Bench 80 kg ×
+  6" is read off the set row's own tick, so it can never promise one weight and save another; with
+  no weight to take it opens the box instead. `test:exercise-layout`
+- **Setup is one question per screen**, and a card she has not answered holds the screen open.
+  Skip is the old "Prefer not to say", moved to the header, never on a multi-select. One tap still
+  answers a single-choice question (a deviation from the brief, put to her). `test:onboarding-style`
+- **Profile is a page of rows**; every editor it had is in exactly one row's sheet, and a deep link
+  opens the sheet holding its section. `test:profile-groups`
+- **Home's coach note rotates, and stops**: held while touched or focused, never moving under
+  reduced motion; an adaptation question is never rotated away. `test:layout-revamp`
 
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an

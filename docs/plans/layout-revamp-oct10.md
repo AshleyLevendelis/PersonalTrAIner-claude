@@ -60,9 +60,16 @@ scratchpad, `mockshot/2a.png … 4c.png`.
 - Day strip states: done/partial → accent dot (partial hollow), missed → warn dot, rest kinds → no
   dot + dim name, swapped/moved/rest_chosen → dim hollow dot; aria-label stays `dayLabel(d)`.
 - Hero sets count is `sessionSetCount` (capped, the same count Home and the finished bar use).
-- **The fixed CTA during a session logs the next set through the row's own tick**, label and save
-  read from the same set-row functions; while resting the dock owns the bottom. Finish session stays
-  in the hero. (Reverses the pinned "bar only before the session starts", because her design draws it.)
+- **The fixed CTA during a session logs the next set through the row's own tick** ("Log set 3 ·
+  Bench 80 kg × 6"). BUILT AS: the tick carries what it would save (`data-next-*`, the save path's own
+  fallbacks), `next-set-label.ts` words it, `NextSetButton` presses that tick; with no weight to take
+  (or a calibration set 2+ with a blank box, one shared predicate `probeNeedsWeight`) it opens the box
+  instead of pressing a tick that would refuse. It rides above the dock when a rest timer is up. Gone
+  when no open row has a set left. Finish session stays in the hero. (Reverses the pinned "bar only
+  before the session starts", because her design draws it.)
+- **Section labels: only "Accessory" is dropped.** The brief draws a plain numbered list; Main lift
+  (the lift a shortened or rebuilt day protects), Primer, Finisher and Superset each tell the lifter
+  something, so they stay. CSCS reading: the main lift being marked matters to how the session is run.
 - Warm-up "done": no source exists; no check is drawn (an invented "done" would claim something the
   app does not know).
 - Collapsed rows: index, name, set dots, prescription, load chip (progressing = `didProgress`, from
@@ -72,7 +79,16 @@ scratchpad, `mockshot/2a.png … 4c.png`.
 - Becomes a full-screen page with four groups of rows; each row opens its existing editors in a
   sheet. Deep links (dietary, goals, facts, context) open the matching sheet.
 - "‹ {tab}" names the tab it returns to (it closes back to whatever was behind).
-- "Tone" row opens the existing reply-speed control (the only "Tone" there is; no persona editor exists).
+- The brief's "Tone" row is labelled **"Reply speed"**: it opens the existing reveal-speed control,
+  the only thing there; calling it Tone would claim a persona setting the app does not have.
+- **Rows as built**: Body & goals (Height & weight, Goal, Injuries), Training (Schedule, Equipment,
+  Known lifts only where they were asked, Exercises to avoid, Style & recovery), Food (Diet, Foods you
+  like, Foods to avoid, Meals & shopping), Personal TrAIner & app (Reply speed, Remembers, Appearance,
+  Reminders). Your data and Start a new plan stay in the footer. Every editor the old groups held is in
+  exactly one sheet (`test:profile-groups`).
+- **Exercises to avoid is its own row in Training.** It sat beside Foods to avoid when Profile was one
+  long list; on a page of rows the row's name is how it is found.
+- **Foods you like sits directly above Foods to avoid** — her 27 Sep placement, kept as adjacent rows.
 - Stat strip needs the live calorie target: new prop from App's `macros`.
 
 ### Setup (2e)
@@ -83,8 +99,22 @@ scratchpad, `mockshot/2a.png … 4c.png`.
 - No new questions (the mock's "days a week" is an example; the real question is which days).
 - "{Section} · n of N" and six ticks: sections derived from the slot order (Training, Body, Food).
   This reverses the v2 "no visible count" choice, because her brief draws one.
-- Select then Next for single-choice; free text still goes through the existing parser; the mic
-  appears only where speech is supported. The review step stays as the last screen.
+- **DEVIATION, to show her: one tap still answers a single-choice question.** The brief draws
+  select-then-Next. Every tested answer path (and the coach's flow) is tap-to-answer, it is one tap
+  fewer on about ten questions, and the tap is the answer. "Next →" (full width, 54px) is the footer
+  of a multi-choice question. Offered to her as a one-line change either way.
+- Free text still goes through the existing parser; the mic appears only where speech input is
+  supported (it fills the box, so it goes through the same parser). The review step stays last.
+- **Skip moved, not copied**: it is the old "Prefer not to say", from the cards to the header, on
+  single-choice and number questions the plan does not need. Never on a multi-select (injuries and
+  diet record "none" through their own Next, and a skip there would assemble into the same empty
+  list while meaning "not given").
+- **A card still waiting for an answer holds the screen open**: if she asks something of her own
+  mid-setup, the unanswered card stays, with what was said since drawn under it.
+- **The question is the last sentence that asks** (`splitQuestion`), set large; any lead-in is small
+  above it. Nothing the coach said is dropped.
+- Her answer bubble uses the AI-role violet as a token (`--role-ai-accent` at 22%), not the brief's
+  pasted rgba, so it follows the theme.
 
 ### Round timer (4c)
 - Beep, buzz, countdown and full-screen-on-start live in their own small stored record, not the
@@ -97,3 +127,15 @@ scratchpad, `mockshot/2a.png … 4c.png`.
 ## Known collisions with other branches
 - `claude/coach-empty-text-fix-2c4bzv` (week boundaries, layoff, circuit log, user-test fixes)
   touches Dashboard, the timers and Home tips. Whichever merges second resolves conflicts.
+
+## How it was checked
+- New gates: `test:round-setup` (46 checks, 21/21 mutations), `test:exercise-layout` (33, 26/26 after
+  two checks were tightened), `test:layout-revamp` (33, 14/14 after three cases were added),
+  `test:profile-groups` rewritten (8/8), `test:onboarding-style` rewritten for 2e.
+- Every browser driver run against a frozen copy of the Home/Nutrition/Exercise commit: 73 of 96
+  passed first time; all 23 failures were read, fixed (3 in the app, 20 drivers re-anchored to the
+  new screens) and re-run green. The app fixes the drivers found: Home's Done panel had dropped the
+  lift line (L9); the coach note's page dots took each other's taps; a peeked day had lost its length.
+- Screenshots read at 390x844 in Nightshift, Daylight, Linen and Graphite.
+- `test:bundle` measured both ends: 2,229 kB before the pass, 2,257 after; budgets moved with the
+  measured figures written beside them.
