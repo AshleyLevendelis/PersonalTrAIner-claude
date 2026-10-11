@@ -211,7 +211,7 @@ async function main() {
     check('the recovered builder never returns a bare null (every way out says why)', body.length > 500 && !/return null/.test(body))
     check('...with one temporary change running and no area named, it ends that one', /runningInjuries\.length === 1\)[\s\S]{0,80}injuryCode = runningInjuries\[0\]\.injury_code/.test(body))
     check('...and an area on the list AND being eased off ends both', /alsoEndAdaptationId: running\.id/.test(body) && /payload\.alsoEndAdaptationId[\s\S]{0,200}onEndAdaptation\(payload\.alsoEndAdaptationId\)/.test(chat))
-    check('the temporary and lasting injury branches give their own reason', /else refusal = injuryAdaptationRefusal\(/.test(chat) && /is already on your injuries list, so every plan already works around it/.test(chat))
+    check('the temporary and lasting injury branches give their own reason', /else refusal = injuryAdaptationRefusal\(/.test(chat) && /That's already on your injuries list, so every plan already works around/.test(chat))
     check('the generic line is kept only for a proposal the client does not know', (chat.match(/I couldn't find that on your current plan/g) ?? []).length === 1 && /return \{ text: refusal \?\? UNKNOWN_PROPOSAL_REFUSAL/.test(chat))
     const app = code('src/App.tsx')
     const end = app.slice(app.indexOf('const handleEndAdaptation'), app.indexOf('const handleEndAdaptation') + 600)

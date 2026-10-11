@@ -294,6 +294,7 @@
     "verify:meal-counter": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-counter.mjs",
     "verify:modal-close": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/modal-close.mjs",
     "verify:activity-swap": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/activity-swap.mjs",
+    "verify:rebuild-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/rebuild-card.mjs",
     "verify:no-tool-claim": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/no-tool-claim.mjs",
     "verify:correction-loop": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/correction-loop.mjs",
     "verify:chat-cardio": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-cardio.mjs",

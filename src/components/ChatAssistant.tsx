@@ -2735,7 +2735,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // The old "Rebuilds N weeks from week X on" line goes; anything else it said (a second sport's reason) stays.
     const kept = (built.diff.implications ?? [])
       .map(i => i.text.startsWith('Rebuilds ') ? { ...i, text: i.text.replace(/^Rebuilds \d+ weeks? from week \d+ on( so )?/, (_m, so) => (so ? 'So ' : '')).replace(SCOPE.historyKept, '').trim() } : i)
-      .filter(i => i.text.length > 0)
+      .filter(i => /[a-z]/i.test(i.text))
     return {
       built: {
         ...built,
@@ -2767,8 +2767,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const days = Number(rawArgs.duration_days)
     if (!area || !days || days <= 0) return 'Tell me which area and roughly how many days, and I\'ll ease those days off.'
     const running = activeAdaptations.find(a => a.kind === 'injury' && a.injury_code === area && isAdaptationActive(a, getAppNow(profile.id)))
-    if (running) return `I'm already easing off your ${areaInWords(area)} until ${endsOn(running.expires_at)}. Want me to end it early, or keep it going?`
-    return `Nothing in your plan over those days loads your ${areaInWords(area)}, so there's nothing to change. If it's still bothering you next week, tell me and I'll look again.`
+    if (running) return `I'm already easing off ${areaInWords(area)} until ${endsOn(running.expires_at)}. Want me to end it early, or keep it going?`
+    return `Nothing in your plan over those days loads ${areaInWords(area)}, so there's nothing to change. If it's still bothering you next week, tell me and I'll look again.`
   }
 
   const buildInjuryAdaptationProposal = async (rawArgs: Record<string, unknown>): Promise<{
@@ -2970,7 +2970,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     }
     if (!profile.injuries.includes(injuryCode)) {
-      return { refusal: `Your ${areaInWords(injuryCode)} isn't on your injuries list and nothing is easing it off right now, so there's nothing to end.` }
+      return { refusal: `Nothing is easing off ${areaInWords(injuryCode)} right now and it isn't on your injuries list, so there's nothing to end.` }
     }
 
     // On the list AND being eased off: both go on one card, and confirm ends the temporary change too (it was left
@@ -5270,8 +5270,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           refusal = !area
             ? 'Which area is it? Tell me and I can make it a lasting part of your plan.'
             : profile.injuries.includes(area)
-              ? `Your ${areaInWords(area)} is already on your injuries list, so every plan already works around it.`
-              : `Nothing in your plan from today loads your ${areaInWords(area)}, so there's nothing to change — it's noted for any plan I build next.`
+              ? `That's already on your injuries list, so every plan already works around ${areaInWords(area)}.`
+              : `Nothing in your plan from today loads ${areaInWords(area)}, so there's nothing to change.`
         }
       } else if (result.proposal.kind === 'propose_injury_recovered' && result.proposal.rawArgs) {
         const recovered = buildInjuryRecoveredProposal(result.proposal.rawArgs)
