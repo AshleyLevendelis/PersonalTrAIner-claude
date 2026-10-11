@@ -1918,13 +1918,16 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
               {messages[prevUserIdx].content}
             </div>
           )}
-          {messages.map((msg, i) => i < turnStart ? null :
-            msg.isReceipt ? (
-              <div key={i} data-testid="onboarding-tick" className="flex items-center gap-1.5 pl-1">
-                <Check className="size-3 shrink-0 text-primary-text" />
-                <p className="text-xs text-muted-foreground">{msg.content.slice(RECEIPT_PREFIX.length)}</p>
-              </div>
-            ) : (
+          {/* WHAT WAS JUST SAVED, beside what she said — never under the
+              options of the next question, where a tick reads as an answer
+              to it. */}
+          {messages.map((msg, i) => i >= turnStart && msg.isReceipt ? (
+            <div key={`r${i}`} data-testid="onboarding-tick" className="-mt-2 flex items-center justify-end gap-1.5 pr-1">
+              <Check className="size-3 shrink-0 text-primary-text" />
+              <p className="text-xs text-muted-foreground">{msg.content.slice(RECEIPT_PREFIX.length)}</p>
+            </div>
+          ) : null)}
+          {messages.map((msg, i) => i < turnStart || msg.isReceipt ? null : (
               <div key={i}>
                 {msg.role === 'user' ? (
                   <div className="ob-message-in ob-user-bubble ml-auto w-fit max-w-[78%]">{msg.content}</div>

@@ -73,7 +73,10 @@ console.log('\n2. One question per screen (design handoff 2e, 10 Oct 2026)')
   check('...stepping down to 20px for a long one rather than filling the screen', /\.length > 120 \? 'text-\[1\.25rem\]\/\[1\.3\]'/.test(q))
   check('...and still no surface: the coach is not in a bubble', !/\bbg-|\bborder|\brounded/.test(q))
   check('the question is the LAST SENTENCE THAT ASKS, from one shared splitter', /splitQuestion\(msg\.content\)/.test(ui))
-  check('earlier turns are not drawn', /messages\.map\(\(msg, i\) => i < turnStart \? null :/.test(ui))
+  check('earlier turns are not drawn', /messages\.map\(\(msg, i\) => i < turnStart \|\| msg\.isReceipt \? null :/.test(ui))
+  check('...and the turn\'s receipts sit beside her answer, above the question, not under its options',
+    /messages\.map\(\(msg, i\) => i >= turnStart && msg\.isReceipt \? \(/.test(ui)
+    && ui.indexOf('i >= turnStart && msg.isReceipt') < ui.indexOf('i < turnStart || msg.isReceipt'))
   check('...but an open card holds the screen open', /const turnStart = oldestLiveCard >= 0 && oldestLiveCard <= lastUserIdx \? oldestLiveCard : lastUserIdx \+ 1/.test(ui))
 
   // Her reply: on the right, small and quiet, in the AI-role violet (a token,
