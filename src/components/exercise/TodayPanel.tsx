@@ -14,6 +14,7 @@ import { reconnectingLine } from '@/lib/coach-voice'
 import { readCardioLogsForDate } from '@/lib/cardio-log-store'
 import { cardioLine, splitActivity } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
+import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions } from '@/lib/borrowed-day'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
 import { layoffStatus, easesWeights, easeWeightKg, easeAddedKg, layoffWeightFrom, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
@@ -35,7 +36,7 @@ import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
 import { LoadCeilingPrompt } from './LoadCeilingPrompt'
 import { WeekContextRow } from './WeekContextRow'
-import { PeekPanel } from './PeekPanel'
+import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
 import { NextSetButton } from './NextSetButton'
@@ -49,7 +50,7 @@ import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
 import { FinishSection } from './FinisherRow'
-import { isScheduledDay, dayDetail } from '@/lib/activity-day'
+import { isScheduledDay, dayDetail, prescriptionLine } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
 import { RestDayCard, ActiveRecoveryCard, MovedDayCard } from './RestDayCard'
@@ -202,7 +203,14 @@ export function TodayPanel({
   const [whatHappened, setWhatHappened] = useState<WhatHappenedTarget | null>(null)
   // Taking one exercise out — the drop-or-swap sheet (her ruling, 11 Sep 2026).
   const [removeTarget, setRemoveTarget] = useState<RemoveTarget | null>(null)
-  const [borrowedDayName, setBorrowedDayName] = useState<string | null>(null)
+  // REMEMBERED FOR TODAY'S DATE (run 5, M45): the Exercise tab is not kept
+  // mounted, so a borrow held only in state was gone the moment she looked
+  // at Home, and the sets she had logged on it with it.
+  const [borrowedDayName, setBorrowedDayState] = useState<string | null>(() => readBorrowedDay(profileId, today))
+  const setBorrowedDayName = (dayName: string | null) => {
+    writeBorrowedDay(profileId, today, dayName)
+    setBorrowedDayState(dayName)
+  }
   const [expandedWarmup, setExpandedWarmup] = useState(false)
   const [tightOpen, setTightOpen] = useState(false)
 
@@ -328,10 +336,12 @@ export function TodayPanel({
 
   // Reset the warm-up collapse and any borrowed prescription whenever the
   // live day itself changes (a real day boundary, not a re-render).
+  // The borrow is per DATE: a new day reads its own (none, unless she
+  // borrowed on it), so yesterday's never carries over.
   useEffect(() => {
     setExpandedWarmup(false)
-    setBorrowedDayName(null)
-  }, [todayName])
+    setBorrowedDayState(readBorrowedDay(profileId, today))
+  }, [todayName, today, profileId])
 
   const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt, logsVersion, mesocycle)
 
@@ -842,9 +852,14 @@ export function TodayPanel({
   // day's PRESCRIPTION to do today, and an activity day has no exercises to
   // borrow — offering one here would open a session with nothing in it, which
   // is the defect this whole change exists to remove.
-  const trainAnywayOptions = liveWeekPlan
-    .filter(d => d.exercises.length > 0 && d.day !== todayName)
-    .map(d => d.day)
+  // Each with its session's name, and never a session already trained this
+  // week (run 5, M45) — the strip's own day states decide that.
+  const trainAnyway = trainAnywayOptions({
+    plan: liveWeekPlan,
+    todayName,
+    week: weekTrain.days,
+    borrowedOn: date => readBorrowedDay(profileId, date),
+  })
 
   // THE SECOND-SPORT VOLUME NOTICE — Ashley's ruling, 6 Sep 2026: when a sport
   // counts as training load the plan comes down one recovery notch, the card
@@ -950,6 +965,9 @@ export function TodayPanel({
   // row the session LIVES in (Monday's, for a session moved to Friday), and
   // a day swapped for football or rested on purpose opens none.
   const peekRef: SessionRef | null = peekCell ? sessionRefFromCell(peekCell, liveWeek) : null
+  // The working sets logged on the peeked day (the week hook already holds
+  // them) — "What you did" leads when there are any (run 5, M47).
+  const peekDidLogs = peekCell?.workingLogs ?? []
 
   // Turn 5: session-progress 2px line — total sets logged today across every
   // exercise on the live day, over total sets planned. Only meaningful (and
@@ -1037,7 +1055,7 @@ export function TodayPanel({
         ? (mainLift.block_hold_note ?? progressionNotes[mainLift.name]?.note ?? null)
         : null,
       calibrationCue: cueIsOnMainLift
-        ? calibrationCueText(mainLift!.suggested_load_kg != null)
+        ? calibrationCueText(mainLift!.suggested_load_kg != null, mainLift!.load_hold === 'stated_limit')
         : null,
       coachNote: currentMesoWeekObj?.coach_note ?? null,
     })
@@ -1120,14 +1138,24 @@ export function TodayPanel({
             <button className="block mx-auto mt-2 text-xs underline text-muted-foreground" onClick={() => setPeekDay(null)}>Back to today</button>
           </div>
         ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
-          <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground">
-            {/* A peeked day with a prescribed activity is NOT a rest day, and
-                saying so was the same defect as the empty card — it just said
-                it in one sentence instead of a blank form. */}
-            {peekWorkout?.plannedActivity
-              ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
-              : `${peekDay} is a rest or recovery day.`}
-            <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
+          <div className="space-y-3">
+            {peekDidLogs.length > 0 && <PeekWhatYouDid logs={peekDidLogs} />}
+            <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm text-muted-foreground" data-testid="peek-rest-day">
+              {/* A peeked day with a prescribed activity is NOT a rest day, and
+                  saying so was the same defect as the empty card — it just said
+                  it in one sentence instead of a blank form. The recovery day's
+                  suggested walk or ride is said too (run 5, M47): "a rest or
+                  recovery day" over a day the plan gave a 20-minute walk told
+                  her less than the plan knew. */}
+              {peekWorkout?.plannedActivity
+                ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
+                : peekWorkout?.recommendedCardio
+                ? `${peekDay} is a recovery day: ${prescriptionLine(peekWorkout.recommendedCardio)}.`
+                : peekWorkout?.conditioning_note
+                ? `${peekDay} is a recovery day. ${peekWorkout.conditioning_note}`
+                : `${peekDay} is a rest or recovery day.`}
+              <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
+            </div>
           </div>
         ) : (
           <>
@@ -1145,7 +1173,11 @@ export function TodayPanel({
                 </span>
               </InsightBanner>
             )}
-            <div className={peekCell?.state === 'swapped' ? 'opacity-60' : undefined}>
+            {peekDidLogs.length > 0 && <PeekWhatYouDid logs={peekDidLogs} />}
+            {peekDidLogs.length > 0 && (
+              <p className="px-1 text-[0.65625rem] uppercase tracking-[.2em] text-muted-foreground" data-testid="peek-planned-label">Planned</p>
+            )}
+            <div className={peekCell?.state === 'swapped' || peekDidLogs.length > 0 ? 'opacity-60' : undefined} data-testid="peek-plan">
               <PeekPanel
                 workout={peekWorkout}
                 dayLabel={peekDay}
@@ -1175,7 +1207,7 @@ export function TodayPanel({
           weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned, left: weekTrain.sessionsLeft }}
           tomorrow={tomorrowPreview}
           onPeek={d => setPeekDay(d)}
-          trainAnywayOptions={trainAnywayOptions}
+          trainAnywayOptions={trainAnyway}
           onTrainAnyway={setBorrowedDayName}
           onAddCardio={handleAddCardio}
         />

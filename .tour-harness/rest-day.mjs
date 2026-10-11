@@ -331,8 +331,10 @@ const picker = await ev(`(() => {
   if (!box) return { buttons: [] }
   return { buttons: [...box.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean) }
 })()`)
-check('6a. "Train anyway" opens the day picker in place',
-  (picker.buttons || []).some(b => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/.test(b)), picker.buttons)
+// Each chip names the day AND its session since run 5 (11 Oct 2026, M45):
+// "Wednesday · Upper Pull & Core", not a bare "Wednesday".
+check('6a. "Train anyway" opens the day picker in place, each chip naming its session',
+  (picker.buttons || []).some(b => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) · \S/.test(b)), picker.buttons)
 
 await send('Page.navigate', { url: `${BASE}&today=${restDay?.date ?? ''}#/tab/exercise` })
 await wait(3500)
@@ -403,7 +405,7 @@ await send('Page.navigate', { url: `${BASE}&today=${restDay?.date ?? ''}&n=borro
 await wait(4000)
 await tap('[data-testid="train-anyway"]')
 await wait(500)
-const borrowedFrom = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/.test((x.textContent || '').trim())); if (!b) return null; const d = b.textContent.trim(); b.click(); return d })()`)
+const borrowedFrom = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) · /.test((x.textContent || '').trim())); if (!b) return null; const d = b.textContent.trim().split(' · ')[0]; b.click(); return d })()`)
 await wait(1500)
 const todayName = new Date(`${restDay?.date ?? '2026-09-17'}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
 const heading = await ev(`(() => { const s = [...document.querySelectorAll('span')].find(x => /^Today · /.test((x.textContent || '').trim())); return s ? s.textContent.trim() : null })()`)

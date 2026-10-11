@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { addDays, type SessionMove } from './session-move'
 import { readCardioLogs } from './cardio-log-store'
 import type { DailyMetric, DailyNutritionTarget, WorkoutSession, WorkoutExerciseRow, ExerciseSetLog, CardioLog } from './types'
-import { setLabelLong, type SetRef } from './session-derive'
+import { setLabelLong, honestSessionMinutes, type SetRef } from './session-derive'
 import { isMalformedZeroWeight } from './set-log-store'
 
 export async function upsertDailyMetric(metric: Omit<DailyMetric, 'id' | 'created_at' | 'updated_at'>) {
@@ -78,12 +78,6 @@ export async function markSessionCompleted(
    */
   durationMinutes?: number,
 ) {
-  const { data: session } = await supabase
-    .from('workout_sessions')
-    .select('started_at')
-    .eq('id', sessionId)
-    .maybeSingle()
-
   const update: Record<string, unknown> = {
     is_completed: true,
     finished_at: finishedAt.toISOString(),
@@ -91,9 +85,19 @@ export async function markSessionCompleted(
   }
   if (durationMinutes != null && durationMinutes > 0 && durationMinutes < 24 * 60) {
     update.duration_minutes = durationMinutes
-  } else if (session?.started_at) {
-    const elapsedMin = Math.round((finishedAt.getTime() - new Date(session.started_at).getTime()) / 60000)
-    if (elapsedMin > 0 && elapsedMin < 24 * 60) update.duration_minutes = elapsedMin
+  } else {
+    // NO MINUTES GIVEN (the "I did it" sheet, a retried close): the training
+    // time from this session's own sets, by the rule the finish card uses —
+    // or nothing, when the sets carry no span to measure (a past day typed in
+    // afterwards). It used to be the wall clock from the row's start, which
+    // for a past day logged today was negative and left the 45 placeholder
+    // standing as if measured (run 5, M46). select('*'): a named column is a
+    // parse-time dependency.
+    const { data: session } = await supabase.from('workout_sessions').select('*').eq('id', sessionId).maybeSingle()
+    const { data: sets } = await supabase.from('exercise_set_logs').select('*').eq('session_id', sessionId)
+    const working = ((sets ?? []) as { is_warmup?: boolean; completed_at?: string | null }[]).filter(s => !s.is_warmup)
+    const minutes = honestSessionMinutes(null, (session as { started_at?: string | null } | null)?.started_at ?? null, finishedAt.toISOString(), working.map(s => s.completed_at))
+    if (minutes != null && minutes > 0 && minutes < 24 * 60) update.duration_minutes = minutes
   }
 
   const { error } = await supabase

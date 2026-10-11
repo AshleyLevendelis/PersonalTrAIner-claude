@@ -273,7 +273,8 @@ export function RestDayCard({
   weekTally: { done: number; planned: number; left?: number }
   tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
-  trainAnywayOptions: string[]
+  /** Each a session she could borrow: its weekday and "Tuesday · Pull & Hinge". */
+  trainAnywayOptions: { day: string; label: string }[]
   onTrainAnyway: (sourceDayName: string) => void
   /** Returns null on success, or a sentence to show. Absent means no plan loaded yet. */
   onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
@@ -321,9 +322,9 @@ export function RestDayCard({
             )}
             {pickerOpen && (
               <div className="flex flex-wrap gap-1.5 py-1.5 px-0.5">
-                {trainAnywayOptions.map(d => (
-                  <Button key={d} variant="outline" size="sm" className="h-8 text-xs" onClick={() => onTrainAnyway(d)}>
-                    {d}
+                {trainAnywayOptions.map(o => (
+                  <Button key={o.day} variant="outline" size="sm" className="h-8 text-xs" data-testid="train-anyway-option" onClick={() => onTrainAnyway(o.day)}>
+                    {o.label}
                   </Button>
                 ))}
               </div>

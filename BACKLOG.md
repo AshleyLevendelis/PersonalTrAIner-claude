@@ -2,6 +2,73 @@
 
 Newest first. One line each.
 
+- [x] **RUN 5 OF THE LIVE-APP TEST (11 Oct 2026): M44-M48, L-a, L-b BUILT** on her "Build it" (the
+  bugs were already traced). Frontend only: no edge function, no migration.
+  - **M44, the shopping card on Home** said "for the week ahead" over a list built days earlier (dates
+    gone, swapped meals missing, Tuesday's onions still counted). The words are now read off the list
+    (`shop-card.ts`, through the Grocery screen's own `coveredDates` and `coverageSentence`): "for the week
+    ahead" only when every day from today to a week out is on it; otherwise "out of date", what it still
+    covers, "Meals have changed since it was built." when a meal picked for a covered day is not the one
+    the rows were built from, and a "Rebuild the list" button to the Grocery screen (whose Rebuild keeps
+    ticked and edited rows). The count leaves out a row whose every meal has passed; rows she typed
+    count. On shop day an out-of-date list raises the card even with nothing left to buy.
+    Named limit: "meals changed" sees PICKS (swaps, pins), not a day the rotation re-derived after the
+    targets moved.
+  - **M45, "Train anyway"**: each option is "Tuesday · Pull & Hinge", and a session already trained this
+    week (on its day, on the day it was moved to, or borrowed onto an earlier rest day) is not offered.
+    The borrow is remembered on the phone for TODAY'S DATE (`borrowed-day.ts`), so leaving the Exercise tab
+    no longer drops it and the sets logged on it. **CSCS review:** 1. offering a done session again is
+    the same work twice in a week on the same patterns, which a coach would not program on a rest day;
+    a missed one is still offered, which is the catch-up a coach would want. 2. takes away only the repeat;
+    extra work can still be logged. 3. coverage improves (the owed session is what is offered). 4. no floor
+    or ceiling touched. 5. in scope.
+  - **M46, a rest day she trained on**: Home showed "Rest day · N of M done" under her session. Working
+    sets on a day the plan left empty now make it a session on Home: in progress, or done once finished,
+    named for the borrowed session or, with none, from what she did ("Barbell Rows + 1 more"). An empty
+    recovery row with sets logged now reads done/partial on the strip (it returned "recovery" first).
+    **The 45 minutes**: the column is created at 45 and three closes wrote nothing over it. A close passed
+    no minutes now writes the training time from its own sets (the finish card's rule); sets typed in
+    afterwards for a past day have no span, so nothing is invented. Readers (Home, history) treat 45 as a
+    placeholder: the sets decide, or history says **"time not recorded"** (wording hers to change). The
+    old wall-clock fallback (start of row to close) is gone. Times before 11 Oct are not comparable.
+  - **M47, a past day from the strip** now leads with **"What you did"** (exercise, weight × reps per set,
+    working sets only) and dims the plan under **"Planned"**. A recovery day says its suggested cardio in
+    the plan's phrase ("Tuesday is a recovery day: … · 28 min · Easy.") or its conditioning note.
+  - **M48, the set-1 cue at the stated dumbbell limit** said "Go up 5-10%". It now says: **"This is the
+    heaviest you've told me you have. If set 1 is easy, add reps rather than weight, and stop each set with
+    3-4 reps in reserve."** The exact words are Ashley's to change. **CSCS review:** 1. at a fixed maximum
+    load the stimulus is progressed by reps, then sets and tempo (double progression), which is what the
+    plan already does there ("The reps go up instead", load-prescription's stated-limit basis); the cue no
+    longer asks for a weight she does not own. 2. takes away nothing: below the limit the probe cue is
+    unchanged. 3. overload survives, through reps. 4. no floor or ceiling moved (the chips were already
+    capped). 5. in scope.
+  - **L-a**: a typed item with no readable amount ("toilet roll") was stored as 1 g and shown "~0g". It is
+    stored as one, a count, and reads "1"; no amount under one rounding step ever prints as 0. The coach's
+    add path already stored a count ("whole") and was not changed. Still showing, unchanged: such a row
+    carries "Rough estimate · tap to set the amount" (the item is not in the food list).
+  - **L-b**: 00:00-04:59 greets **"Hi, Sam"**, not "Morning" (wording hers to change).
+  - **Wording for her to check, all new:** "out of date", "Meals have changed since it was built.",
+    "Rebuild it to match this week — anything ticked or edited stays.", "Rebuild the list", "What you did",
+    "Planned", "time not recorded", "Hi", and the M48 cue.
+  - **Checked:** new `test:live-run-5` (85 checks; 35 mutations, all caught, one only after a fixture was
+    added: a 45 never re-closed, which only the history reader can correct). New `verify:live-run-5`
+    (27 checks at 390x844; 12 mutations, all caught, one only after E4 was tightened to the plan's own
+    phrase) and `verify:grocery` §13 (2 checks; 2 of 2 caught). Re-anchored to the new behaviour, each
+    mutation-tested: `verify:rest-day` 6a/10 (chips now carry the session), `test:cardio-reader` (the 45
+    was the assertion; now "the cardio minutes are not in it"), `test:one-day-one-look` (load_hold allowed
+    on today's row: it picks the calibration cue's words, and no read-only surface has a cue). The shop
+    card is now its own chunk (lazy), which kept first paint at +1 kB.
+    Screenshots read: the stale and changed shop cards, Train anyway's options, Home on the trained rest
+    day, the done-day and recovery-day peeks, the 00:13 greeting, the typed toilet roll.
+  - **Not browser-driven:** M48 (no harness fixture reaches a calibration week at a stated limit; held by
+    the logic gate and the two call sites), and "time not recorded" in Session history (logic gate only).
+  - **Red before this work, on a clean copy of 45264e98, and the same after:** `test:bundle` (app chunk
+    1092 of 1090 kB and everything 2317 of 2275 before; 1093 and 2324 after, with first paint 473 of 474
+    and a deploy's re-download 317 of 318 gzipped, 1 kB each left), `test:week-boundaries` (one
+    weigh-in window check, time-of-day dependent), `verify:home-weight`, `verify:planned-activity` (H3)
+    and `verify:layoff` (22), each failing identically on the clean copy. `test:coach-exam-fresh` is
+    stale from the coach changes already on the branch. The bundle budgets need a decision before merge.
+
 - [x] **LAYOUT PASS, SIX SCREENS (10-11 Oct 2026): MERGED to `main` 11 Oct 2026 on her word ("Merge").**
   That merge also brings in `claude/test-log-fixes-oct9`, which the layout branch was cut from.
   `claude/coach-empty-text-fix-2c4bzv` is NOT in it and is still to merge.

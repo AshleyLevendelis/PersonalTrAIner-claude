@@ -18,7 +18,7 @@ import { isMalformedZeroWeight, getSetsForSession } from './set-log-store'
 import { readCardioLogs } from './cardio-log-store'
 import { cardioLine } from './cardio-lines'
 import { dayNameOf } from './session-move'
-import { setVolumeKg } from './session-derive'
+import { setVolumeKg, honestSessionMinutes } from './session-derive'
 import { prMetricFor, calculateE1RM, type PRMetric } from './pr-engine'
 
 export interface ExerciseHistorySetRow {
@@ -378,13 +378,13 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
   }
 
   const allRows: SessionHistoryEntry[] = await Promise.all(
-    rows.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean }) => {
+    rows.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean; started_at?: string | null; finished_at?: string | null }) => {
       const base = {
         sessionId: row.id,
         date: row.date,
         splitType: row.split_type,
         day: row.day,
-        durationMinutes: row.duration_minutes,
+        durationMinutes: honestSessionMinutes(row.duration_minutes, row.started_at, row.finished_at, []),
         isCompleted: row.is_completed,
         cardio: cardioByDate.get(row.date) ?? [],
       }
@@ -394,6 +394,10 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
       // getSetsForSession, which now throws instead of swallowing the error).
       try {
         const sets = await getSetsForSession(row.id)
+        // THE TIME AS FAR AS ANYONE KNOWS (run 5, M46): the column's 45 is a
+        // placeholder until a finish measures it; the sets say otherwise, or
+        // nobody knows and the row says so.
+        base.durationMinutes = honestSessionMinutes(row.duration_minutes, row.started_at, row.finished_at, sets.filter(x => !x.is_warmup).map(x => x.completed_at))
         // Volume as the finish card counts it (session-derive's setVolumeKg:
         // a pair of dumbbells counts both hands), so one session does not
         // show two different totals on two screens.

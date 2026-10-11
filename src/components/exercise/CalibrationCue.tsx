@@ -64,7 +64,20 @@ import { CornerDownRight } from 'lucide-react'
  * longer has to beg for the number. The last sentence is the whole "enter
  * your real weights" feature: the box was always editable.
  */
-export function calibrationCueText(hasLoad: boolean): string {
+/**
+ * AT THE HEAVIEST WEIGHT SHE HAS SAID SHE OWNS, "go up 5-10%" is an
+ * instruction nobody can follow (run 5 of the live test, 11 Oct 2026: her
+ * dumbbells stop at the number on the card, and the chips beside it were
+ * already capped there). The plan's own answer at that limit is that the reps
+ * go up instead (load-prescription's stated-limit basis), so the cue says the
+ * same. CSCS basis: at a fixed maximum load, progression comes from reps, then
+ * sets and tempo (double progression); the probe still finds the effort, it
+ * just cannot climb in weight. The exact words are Ashley's to change.
+ */
+export function calibrationCueText(hasLoad: boolean, atStatedLimit = false): string {
+  if (hasLoad && atStatedLimit) {
+    return 'This is the heaviest you\'ve told me you have. If set 1 is easy, add reps rather than weight, and stop each set with 3-4 reps in reserve.'
+  }
   return hasLoad
     ? 'Set 1 is a probe. Too easy — 5 or more reps left? Go up 5-10% for set 2, and again if it\'s still easy. Your heaviest set at 3-4 reps in reserve becomes next week\'s weight. Know your weight already? Start there.'
     : 'Calibration: leave 3-4 reps in reserve. Log what you actually do.'
@@ -79,11 +92,11 @@ export function calibrationCueText(hasLoad: boolean): string {
  * unrelated jobs on one screen. The ramp took violet; this took the quiet
  * grey every other explanatory line on the card uses.
  */
-export function CalibrationCue({ hasLoad }: { hasLoad: boolean }) {
+export function CalibrationCue({ hasLoad, atStatedLimit = false }: { hasLoad: boolean; atStatedLimit?: boolean }) {
   return (
-    <p className="flex items-start gap-1 text-[0.625rem] text-muted-foreground mt-0.5">
+    <p className="flex items-start gap-1 text-[0.625rem] text-muted-foreground mt-0.5" data-testid="calibration-cue">
       <CornerDownRight className="size-2.5 mt-0.5 shrink-0" />
-      <span>{calibrationCueText(hasLoad)}</span>
+      <span>{calibrationCueText(hasLoad, atStatedLimit)}</span>
     </p>
   )
 }

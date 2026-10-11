@@ -196,7 +196,11 @@ async function main() {
   check('...and the unplanned rope (H7)', thuCardio.includes('skipping rope · 12 min · Steady'), thu)
   check('...WITHOUT folding the minutes into the lifting figures: still 2 sets, 320 kg',
     thu?.totalSets === 2 && thu?.totalVolumeKg === 320, { sets: thu?.totalSets, kg: thu?.totalVolumeKg })
-  check('...or into its duration', thu?.durationMinutes === 45, thu?.durationMinutes)
+  // The row's 45 is a placeholder since 11 Oct 2026 (run 5, M46): the time
+  // comes from the session's own sets. What this holds is unchanged — the 42
+  // cardio minutes are not in it.
+  check('...or into its duration (the sets\' own time, not the 42 cardio minutes on top)',
+    thu?.durationMinutes != null && (thu.durationMinutes as number) < 12, thu?.durationMinutes)
   const sun = entries.find(e => e.date === SUN)
   check('a day with cardio and no lifting is in the history too', !!sun && ((sun.cardio ?? []) as string[]).includes('Walk · 45 min · Easy'), sun)
   check('...marked as cardio only, so a count of lifting sessions can leave it out', sun?.cardioOnly === true, sun)

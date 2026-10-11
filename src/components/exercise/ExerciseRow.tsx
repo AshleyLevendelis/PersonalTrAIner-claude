@@ -313,7 +313,7 @@ export function ExerciseRow({
                   />
                 )}
               </div>
-              {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
+              {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} atStatedLimit={ex.load_hold === 'stated_limit'} />}
               {/* ONE TEXT NODE, deliberately — verify:one-number finds this line
                   as a leaf. The second half is only a number when the phone
                   has something to count from (H20; see loggedCountLabel). */}

@@ -349,7 +349,7 @@ const screens: Screen[] = [
         dayName="Saturday"
         weekTally={{ done: 2, planned: 4 }}
         tomorrow={{ dayName: 'Sunday', focus: 'Upper Body Strength', detail: '6 exercises' }}
-        trainAnywayOptions={['Monday', 'Tuesday']}
+        trainAnywayOptions={[{ day: 'Monday', label: 'Monday · Upper Body' }, { day: 'Tuesday', label: 'Tuesday · Lower Body' }]}
         onTrainAnyway={noop}
       />
     ),

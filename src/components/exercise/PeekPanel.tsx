@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import { ReadOnlyDayList } from './ReadOnlyDayList'
-import type { WorkoutDay } from '@/lib/types'
+import { whatYouDid } from '@/lib/session-derive'
+import type { ExerciseSetLog, WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §2.2 — one other day's content, in place, one tap, one
@@ -31,6 +32,30 @@ import type { WorkoutDay } from '@/lib/types'
 // differs — no set grid, no logged-set state, no calibration cue, no plate
 // calculator.
 // ---------------------------------------------------------------------------
+
+/**
+ * WHAT YOU DID, FIRST — a past day opened from the strip (run 5, M47). It
+ * showed only the plan, even on a day with sets logged: the one thing she
+ * opened it to see was the one thing it did not say. Read off that day's own
+ * working sets, never the plan.
+ */
+export function PeekWhatYouDid({ logs }: { logs: ExerciseSetLog[] }) {
+  const rows = whatYouDid(logs)
+  if (rows.length === 0) return null
+  return (
+    <div className="rounded-xl bg-card px-4 py-3" data-testid="peek-what-you-did">
+      <p className="text-[0.65625rem] uppercase tracking-[.2em] text-primary-text">What you did</p>
+      <ul className="mt-2 space-y-1.5">
+        {rows.map(r => (
+          <li key={r.name} className="text-sm" data-testid="peek-did-row">
+            <span className="font-medium">{r.name}</span>
+            <span className="tabular-mono text-muted-foreground"> · {r.line}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 export function PeekPanel({
   workout,

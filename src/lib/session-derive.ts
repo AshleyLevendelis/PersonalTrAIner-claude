@@ -11,7 +11,7 @@
 
 import { getExerciseEntry } from './exercise-db'
 import { anchorDifficultyBump } from './movement-difficulty'
-import { isMalformedZeroWeight } from './set-log-store'
+import { isMalformedZeroWeight, SESSION_ROW_DEFAULT_MINUTES } from './set-log-store'
 import { loadingMode, roundToPlate, getEquipmentFloorKg, isUnverifiedLoadSource, labelModeForEntry } from './load-prescription'
 import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
 import type { WarmupItem } from './warmup'
@@ -645,6 +645,25 @@ export function formatCompletedSummary(
   return groups.map(g => `${g.weight}kg × ${g.reps.join(', ')}`).join(' · ')
 }
 
+/**
+ * WHAT WAS DONE ON A DAY, exercise by exercise, in the order it was done —
+ * for a past day opened from the week strip (run 5, M47), which showed only
+ * what the plan had. Working sets only: build-ups and drops are not "what you
+ * did" in the sense the plan's sets are, and every count in the app leaves
+ * them out the same way.
+ */
+export function whatYouDid(logs: ExerciseSetLog[]): { name: string; line: string }[] {
+  const byName = new Map<string, ExerciseSetLog[]>()
+  const ordered = [...logs]
+    .filter(l => !l.is_warmup && !((l.drop_index ?? 0) > 0))
+    .sort((a, b) => String(a.completed_at ?? '').localeCompare(String(b.completed_at ?? '')))
+  for (const l of ordered) {
+    if (!byName.has(l.exercise_name)) byName.set(l.exercise_name, [])
+    byName.get(l.exercise_name)!.push(l)
+  }
+  return [...byName.entries()].map(([name, sets]) => ({ name, line: formatCompletedSummary(sets) }))
+}
+
 // ---------------------------------------------------------------------------
 // Session summary (Part 1: explicit start/finish) — duration/volume/
 // sets-vs-prescribed for one finished session. Pure: takes the day's planned
@@ -732,6 +751,39 @@ export function trainingMinutes(startedAtIso: string, setTimesIso: (string | nul
     previous = Math.max(previous, t)
   }
   return Math.max(1, Math.round(total / 60000))
+}
+
+/**
+ * HOW LONG A COMPLETED SESSION RAN, AS FAR AS ANYONE KNOWS — run 5 of the live
+ * test, 11 Oct 2026 (M46). History said "45m" for a session that had never
+ * been timed: the column is created at 45 and three finish paths (the "I did
+ * it" sheet, a retried close, an older close) wrote nothing over it.
+ *
+ * A stored figure that is not the placeholder is what a finish measured, and
+ * stands. Otherwise the time comes from the sets, by the same training-time
+ * rule the finish card uses (trainingMinutes) — but only when there is a span
+ * to measure: two distinct moments among the start and the set times. Sets
+ * typed in afterwards for a past day all carry one stamp, and their length is
+ * unknown, which is null here and "time not recorded" on screen, never a
+ * number the app made up.
+ */
+export function honestSessionMinutes(
+  stored: number | null | undefined,
+  startedAtIso: string | null | undefined,
+  finishedAtIso: string | null | undefined,
+  setTimesIso: (string | null | undefined)[],
+): number | null {
+  if (typeof stored === 'number' && stored > 0 && stored !== SESSION_ROW_DEFAULT_MINUTES) return stored
+  const times = setTimesIso.map(t => (t ? new Date(t).getTime() : NaN)).filter(t => !isNaN(t)).sort((a, b) => a - b)
+  if (times.length === 0) return null
+  const start = startedAtIso ? new Date(startedAtIso).getTime() : NaN
+  // A start AFTER the first set is a row made later (a past day logged now) and says nothing.
+  const usableStart = !isNaN(start) && start <= times[0] ? start : null
+  const moments = new Set([...(usableStart != null ? [usableStart] : []), ...times])
+  if (moments.size < 2) return null
+  const startIso = new Date(usableStart ?? times[0]).toISOString()
+  const endIso = finishedAtIso ?? new Date(times[times.length - 1]).toISOString()
+  return trainingMinutes(startIso, times.map(t => new Date(t).toISOString()), endIso)
 }
 
 /**

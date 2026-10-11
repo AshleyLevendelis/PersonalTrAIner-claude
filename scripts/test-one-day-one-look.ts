@@ -150,6 +150,7 @@ console.log('\n4. The two rows say the same things about an exercise')
     per_set_load: 'feeds SetGrid\'s per-set weights; a read-only surface has no set grid',
     prescription_type: 'labels SetGrid\'s log column (Hold/Distance/Work); same reason',
     load_source: 'today\'s row takes it as a prop from TodayPanel instead of off the exercise',
+    load_hold: 'chooses the calibration cue\'s words at a stated limit (run 5, M48); a read-only surface has no calibration cue',
   }
   const fieldsIn = (...srcs: string[]) =>
     new Set(srcs.flatMap(s => [...s.matchAll(/\bex\.([a-z_]+)\b/g)].map(m => m[1])))

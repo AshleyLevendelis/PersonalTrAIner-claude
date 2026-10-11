@@ -100,8 +100,14 @@ export function isGroceryDueToday(input: {
   plan: WorkoutDay[] | undefined
   uncheckedCount: number
   nowMs: number
+  /**
+   * The list no longer matches the week (shop-card.ts). Shop day is the day
+   * that matters, so the card comes up to say so even with nothing left on it
+   * to buy (run 5, 11 Oct 2026).
+   */
+  listOutOfDate?: boolean
 }): boolean {
-  if (input.uncheckedCount < 1) return false
+  if (input.uncheckedCount < 1 && !input.listOutOfDate) return false
   if (getShopDay(input.plan) !== input.todayName) return false
   return !isSnoozed(input.nowMs)
 }

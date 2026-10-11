@@ -153,6 +153,10 @@ export function classifyDay(
   // missed and a logged one never showed as done. It is done once an activity is logged that day,
   // and otherwise falls through to the same date judgement a lifting day gets.
   if (workout.exercises.length === 0) {
+    // AN EMPTY RECOVERY ROW SHE TRAINED ON IS A SESSION TOO (run 5, M46) — the
+    // same rule as a day with no row at all, two lines up. It returned
+    // 'recovery' before the logged work below was ever asked.
+    if (!workout.plannedActivity && dashboardDay && dashboardDay.workingLogs.length > 0) return dashboardDay.session?.is_completed ? 'done' : 'partial'
     if (!workout.plannedActivity) return 'recovery'
     if ((dashboardDay?.cardioLogs?.length ?? 0) > 0) return 'done'
   }
