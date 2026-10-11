@@ -23,6 +23,8 @@
  *      a line read through the reader is never allowed where the food alone is
  *      refused.
  */
+// @ts-expect-error a plain .mjs module
+import { renderSharedCopy } from './sync-shared-code.mjs'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -86,7 +88,7 @@ const TABLE: [string, number, string][] = [
   // counts: a piece, a size, a half
   ['2 large egg', 116, ''], ['3 egg', 150, 'the case that was 3 g'], ['3 eggs', 150, ''], ['1 medium banana', 118, ''], ['a banana', 118, 'was 1 g'], ['1 large banana', 136, 'was 1 g'],
   ['half an avocado', 75, ''], ['1 half avocado', 75, 'was 150 g: the add-food sheet writes this'], ['1 avocado', 150, ''],
-  ['2 carrots', 122, 'was 2 g'], ['1 onion', 110, ''], ['1 chicken breast', 140, ''], ['4 chicken thighs', 440, ''], ['2 tomatoes', 246, ''], ['a lemon', 58, ''],
+  ['2 carrots', 122, 'was 2 g'], ['1 onion', 110, ''], ['1 chicken breast', 120, 'BNF cooked breast, one figure with the piece table'], ['4 chicken thighs', 440, ''], ['2 tomatoes', 246, ''], ['a lemon', 58, ''],
   ['2 slices wholemeal bread', 76, ''], ['1 slice white bread', 36, ''], ['3 cloves garlic', 9, ''], ['1 bunch spring onion', 90, ''], ['1 stick celery', 40, ''],
   ['1 head broccoli', 300, ''], ['2 heads cauliflower', 1200, ''], ['1 medium onion, finely diced', 110, 'a prep note after the name'], ['6 cherry tomatoes', 102, ''], ['1 scoop whey protein powder', 30, ''],
   // the amount written LAST: still one exact answer (the meal-tradeoff driver's fixture wrote its meals this way and every line cost 1 g)
@@ -122,12 +124,13 @@ async function main() {
   for (const [line] of UNREAD.filter(([l]) => l.trim().length > 0)) {
     const p = parseIngredientLine(line)
     const m = computeMealMacros([p])
-    const expected = p.source ?? `${p.quantity} ${p.unit} ${p.name}`
+    // A bare count is said as a count ("3 white rice cooked", as written), never the parsed "3 whole ..." (merge of 11 Oct 2026).
+    const expected = p.source ?? (p.unit === 'whole' ? `${p.quantity} ${p.name}` : `${p.quantity} ${p.unit} ${p.name}`)
     if (m.unreadAmounts.length !== 1 || m.unreadAmounts[0] !== expected) whyBad.push(`${line} -> ${JSON.stringify(m.unreadAmounts)}, want ["${expected}"]`)
     if (p.unread !== undefined && (p.source !== line.trim() || p.unread.length < 5)) whyBad.push(`${line} -> reason "${p.unread}", source "${p.source}"`)
   }
   const juice = readIngredientText('juice of 1 lemon')
-  check('an unread line is reported as itself (the line as written, or "amount unit name"), and a reader refusal carries a real reason and its source', whyBad.length === 0 && /juice/.test(juice.unread ?? '') && juice.source === 'juice of 1 lemon' && /taste/.test(readIngredientText('salt and pepper to taste').unread ?? '') && /zero/.test(readIngredientText('0 g rice').unread ?? ''), whyBad.slice(0, 4))
+  check('an unread line is reported as itself (the line as written, or "amount unit name", a bare count without "whole"), and a reader refusal carries a real reason and its source', whyBad.length === 0 && /juice/.test(juice.unread ?? '') && juice.source === 'juice of 1 lemon' && /taste/.test(readIngredientText('salt and pepper to taste').unread ?? '') && /zero/.test(readIngredientText('0 g rice').unread ?? ''), whyBad.slice(0, 4))
 
   console.log('\n2. Properties that need no table')
   const UNIT_WORDS = ['oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'kg', 'g', 'gram', 'ml', 'l', 'litre', 'cup', 'cups', 'tbsp', 'tsp', 'can', 'cans', 'tin', 'tins', 'pinch', 'handful', 'dash', 'splash', 'bunch', 'head', 'stick']
@@ -180,7 +183,7 @@ async function main() {
   const log: string[] = []
   check('the control: the readable meal is accepted', !!verifyProposal(good, 'dinner', budget, [], []))
   const refused = verifyProposal(withBad, 'dinner', budget, [], log)
-  check('a meal whose amount cannot be read is refused, even though every food was found (coverage alone cannot see it)', refused === null && computeMealMacros(withBad.ingredients.map(parseIngredientLine)).coverage >= 0.8, { refused, log })
+  check('a meal whose amount cannot be read is refused, even though every food was found (every food was found; only the amount is missing)', refused === null && (() => { const c = computeMealMacros(withBad.ingredients.map(parseIngredientLine)); return c.unmatched.every(n => c.amountUnknown.includes(n)) })(), { refused, log })
   check('...and the refusal quotes the line as it was written', log.some(l => l.includes('1 knob butter')), log)
   const logOwn: string[] = []
   const ownRefused = verifyProposal(withBad, 'dinner', budget, [], logOwn, [], undefined, true)
@@ -196,8 +199,9 @@ async function main() {
 
   console.log('\n4. The coach reads the same way: one file, one answer')
   const strip = (s: string) => s.replace(/^\/\/ SYNCED COPY[\s\S]*?\n(?=[^/])/m, '')
-  check('ingredient-units.ts in the app and in the edge function are the same file, byte for byte', text('src/lib/ingredient-units.ts') === text('supabase/functions/_shared/ingredient-units.ts'))
-  check('food-db.ts in the app and in the edge function are the same file, byte for byte (they had drifted: nine foods, piece weights and the whole-count rule were missing from the coach\'s copy)', text('src/lib/food-db.ts') === text('supabase/functions/_shared/food-db.ts'))
+  // Since 11 Oct 2026 the coach's copies are written by scripts/sync-shared-code.mjs: the app's file under a GENERATED header.
+  check('ingredient-units.ts in the app and in the edge function are the same file, byte for byte under the sync header', renderSharedCopy('src/lib/ingredient-units.ts', text('src/lib/ingredient-units.ts')) === text('supabase/functions/_shared/ingredient-units.ts'))
+  check('food-db.ts in the app and in the edge function are the same file, byte for byte under the sync header (they had drifted: nine foods, piece weights and the whole-count rule were missing from the coach\'s copy)', renderSharedCopy('src/lib/food-db.ts', text('src/lib/food-db.ts')) === text('supabase/functions/_shared/food-db.ts'))
   void strip
   const every = [...TABLE.map(t => t[0]), ...UNREAD.map(u => u[0])]
   const disagree = every.filter(l => {

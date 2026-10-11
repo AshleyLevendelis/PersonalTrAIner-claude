@@ -539,9 +539,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     .lte('date', addDays(todayStr, 35))
   if (noteError) console.error('The streak could not read moved and swapped days; counting from this week\'s moves only:', noteError)
   const notes = (noteRows ?? []) as { date: string; moved_to_date?: string | null; swapped_for_activity?: string | null }[]
-  const windowMoves: SessionMove[] = noteError
-    ? moves
+  // The window's moves read here, plus the ones this screen was handed (the same rows, read for this week by the
+  // week hook): a move the hook already knows is never lost to a read that has not caught up.
+  const readMoves: SessionMove[] = noteError
+    ? []
     : notes.filter(r => !!r.moved_to_date).map(r => ({ fromDate: r.date, toDate: r.moved_to_date as string }))
+  const windowMoves: SessionMove[] = [...readMoves, ...moves.filter(m => !readMoves.some(r => r.fromDate === m.fromDate))]
   const planStartForStreak = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null
   const streakDays: StreakDayInput[] = buildStreakDays({
     todayStr,

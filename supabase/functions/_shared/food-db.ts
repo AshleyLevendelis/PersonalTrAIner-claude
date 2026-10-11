@@ -618,7 +618,8 @@ const HOUSEHOLD_UNITS: Record<string, Record<string, number>> = {
   'pineapple': { cup: 165, can: 230 }, 'watermelon': { cup: 152 }, 'cherries': { cup: 138 }, 'raisins': { cup: 145, handful: 30 },
   'dried apricots': { whole: 8, cup: 130 }, 'coconut flesh': { cup: 80 },
   // protein foods: a piece (cooked weight, as the entry's figures are), pulses by the cup and the tin
-  'chicken breast': { whole: 140 }, 'chicken thigh': { whole: 110 }, 'chicken drumstick': { whole: 80 },
+  // chicken breast: one figure with the piece table's BNF breast (merge of 11 Oct 2026: this said 140).
+  'chicken breast': { whole: 120 }, 'chicken thigh': { whole: 110 }, 'chicken drumstick': { whole: 80 },
   'pork sausage': { whole: 60 }, 'bacon': { whole: 12, slice: 12 }, 'ham': { slice: 25 }, 'chorizo': { slice: 6 },
   'salmon': { whole: 150 }, 'cod': { whole: 150 }, 'haddock': { whole: 150 }, 'sea bass': { whole: 130 }, 'tilapia': { whole: 120 },
   'trout': { whole: 150 }, 'mackerel': { whole: 130 }, 'beef steak sirloin': { whole: 225 }, 'beef rump steak': { whole: 225 },
@@ -833,9 +834,10 @@ for (const entry of FOOD_DB) {
  * water density unless the entry gives its own. A pinch is a sixteenth of a
  * teaspoon by kitchen convention (about 0.3 g of salt or spice) and a dash an
  * eighth (about 0.6 g): trace amounts, weighed as such rather than refused.
- * A splash is a teaspoon, a drop a twentieth of a millilitre.
+ * A splash is a teaspoon, a drop a twentieth of a millilitre. A CUP IS NOT HERE (1 Oct 2026): a cup of rice, of
+ * spinach and of milk weigh 160, 30 and 245 g, so only a food that names its own cup weight has one.
  */
-const MEASURE_GRAMS: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000, oz: 28.35, lb: 453.6, tbsp: 15, tsp: 5, cup: 240, pinch: 0.3, dash: 0.6, splash: 5, drop: 0.05 }
+const MEASURE_GRAMS: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000, oz: 28.35, lb: 453.6, tbsp: 15, tsp: 5, pinch: 0.3, dash: 0.6, splash: 5, drop: 0.05 }
 
 /** Other spellings of a unit -> the one word it is looked up under. Plurals are folded before this is read. */
 const UNIT_SPELLINGS: Record<string, string> = {
@@ -1085,6 +1087,17 @@ export function unitToGrams(entry: FoodEntry | null, unit: string, quantity: num
   return resolveAmount(entry, unit, quantity, name).grams
 }
 
+/**
+ * Grams for a quantity of a food, and whether that was UNDERSTOOD (1 Oct 2026). When it was not, `grams` is only
+ * the legacy guess the old readers used (a cup as water, anything else as grams), for a reader that must have a
+ * number; every new meal goes through computeMealMacros, where an amount not understood is never costed.
+ */
+export function resolveGrams(entry: FoodEntry | null, unit: string, quantity: number, name = ''): { grams: number; understood: boolean } {
+  const grams = resolveAmount(entry, unit, quantity, name).grams
+  if (grams != null) return { grams, understood: true }
+  return { grams: normaliseUnit(unit) === 'cup' ? 240 * quantity : quantity, understood: false }
+}
+
 /** The food a line names. A tin or a jar can name a canned food by its shorter name ("1 tin tuna"): tried as written first, then as "canned ..." (trying "canned" first sent "1 can chopped tomatoes" to a fresh tomato). */
 function lookupForLine(line: MealIngredientLine): FoodEntry | null {
   const found = lookupIngredient(line.name)
@@ -1115,7 +1128,9 @@ export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMe
     // The reader's own verdict first ("to taste", no amount). Then, for a food that RESOLVED, whether this
     // file can weigh its unit. A food that did not resolve is unmatched either way, so its unit is not asked about.
     const understood = !line.unread && (entry ? grams != null : true)
-    if (!understood) unreadAmounts.push(line.source ?? `${line.quantity} ${line.unit} ${line.name}`)
+    // Quoted back to her: the line as she wrote it when the reader kept it, else rebuilt from its parts, with a bare
+    // count said as a count ("2 hummus", never the parsed "2 whole hummus" she did not write).
+    if (!understood) unreadAmounts.push(line.source ?? (normaliseUnit(line.unit) === 'whole' ? `${line.quantity} ${line.name}` : `${line.quantity} ${line.unit} ${line.name}`))
     if (grams == null || line.unread) {
       unmatched.push(line.name)
       if (entry) amountUnknown.push(line.name)

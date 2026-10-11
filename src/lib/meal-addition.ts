@@ -127,8 +127,11 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
     const quoted = [...(line.split('—').slice(1).join('—')).matchAll(/"([^"]+)"/g)].map(m => `"${m[1]}"`)
     // "My dinner" is the default name of a meal she typed in; mid-sentence it reads as a title, so say it as hers.
     const dish = /^My /.test(dishName) ? `your ${dishName.slice(3)}` : dishName
-    if (quoted.length <= 1) return `I couldn't read how much ${quoted[0] ?? 'one of the ingredients'} is, so I haven't added ${dish}. How many grams is it?`
-    return `I couldn't read how much of these is: ${quoted.slice(0, 3).join(', ')}. So I haven't added ${dish}. How many grams is each?`
+    // One sentence for both readers of "how much" (the amount reader, 1 Oct, and the piece-weight table, 9 Oct):
+    // what could not be weighed, as she wrote it, that nothing was saved, and the one question that fixes it.
+    const names = quoted.map(q => q.replace(/^"|"$/g, ''))
+    const list = names.length === 0 ? 'one of the ingredients' : names.slice(0, 3).join(', ').replace(/, ([^,]*)$/, ' and $1')
+    return `I couldn't put a weight on ${list}, so I haven't added ${dish}. Roughly how many grams is ${names.length > 1 ? 'each' : 'it'}?`
   }
   if (/unrecognised dietary restriction/i.test(line)) {
     return `Something's wrong with the dietary restrictions saved on your profile, so I can't safely check ${dishName} against them. Worth fixing those in Profile first — I'd rather stop than guess.`

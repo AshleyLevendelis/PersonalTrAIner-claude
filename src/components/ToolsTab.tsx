@@ -106,7 +106,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
   // be a second answer to a question this app deliberately has one owner for.
-  const { date: today, logs: setLogs } = useActiveSession()
+  const { date: todayDate, logs: setLogs } = useActiveSession()
   // TODAY'S SESSION IS THE ONE RUN TODAY, moves taken into account — the same
   // seven cells the week strip is drawn from. This looked the weekday up in
   // the plan's raw rows, so on a day a session had moved ONTO it offered no
@@ -115,10 +115,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // The same hook also answers the circuit offer under a logged block (her ruling A, 8 Oct 2026), so the two
   // places cannot disagree about whether the session is still due.
   const liveDays = mesocycle?.find(w => w.week_number === liveWeek)?.days ?? exercisePlan ?? EMPTY_PLAN
-  const week = useTrainingWeek(profileId, today, liveDays, planCreatedAt, logsVersion, mesocycle)
-  const todayCell = week.days.find(d => d.date === today)
+  const week = useTrainingWeek(profileId, todayDate, liveDays, planCreatedAt, logsVersion, mesocycle)
+  const todayCell = week.days.find(d => d.date === todayDate)
   const todaysSession = (todayCell?.movedTo ? null : todayCell?.session) ?? undefined
-  const todaysConditioning = todaysSession?.recommendedCardio
+  const todaysConditioning = (todayCell?.movedTo ? null : todayCell?.session)?.recommendedCardio
 
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
   const [groceryCount, setGroceryCount] = useState<{ total: number; checked: number } | null>(null)
@@ -304,8 +304,8 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
       {loggedNote && (
         <CircuitOffer
           profileId={profileId}
-          date={today}
-          day={week.days.find(d => d.date === today)}
+          date={todayDate}
+          day={week.days.find(d => d.date === todayDate)}
           session={todaysSession}
           workingSetsToday={setLogs.filter(l => !l.is_warmup && (l.drop_index ?? 0) === 0).length}
           onChanged={() => { week.refresh(); onLogsUpdated?.() }}

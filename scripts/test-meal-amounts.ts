@@ -386,7 +386,7 @@ console.log('\n9. A typed line: an amount said in words, and the "of" a unit lea
   const base = { profileId: 'p', targets: { calories: 1700, protein: 164, carbs: 150, fat: 50 }, mealsPerDay: 3, includeSnacks: true, dietaryPreferences: [], dislikedFoods: [], todayDate: '2026-10-09' }
   const refused = buildCustomMealProposal({ ...base, rawArgs: { meal_slot: 'breakfast', food_lines: ['2 hummus', '100g oats'] } })
   check('a custom meal with an unreadable amount is refused, not costed at 2 g', refused.ok === false, refused)
-  check('...saying it could not put a weight on the hummus', !refused.ok && /couldn't put a weight on hummus/.test(refused.reason) && /rough weight in grams/.test(refused.reason), refused)
+  check('...saying it could not put a weight on the hummus', !refused.ok && /couldn't put a weight on 2 hummus/.test(refused.reason) && /how many grams/i.test(refused.reason), refused)
   check('...and NOT that hummus is missing from the food data', !refused.ok && !/don't have hummus/.test(refused.reason), refused)
   const unknownFood = buildCustomMealProposal({ ...base, rawArgs: { meal_slot: 'breakfast', food_lines: ['50g flargle root', '30g oats'] } })
   check('a food the app does not know still gets the "not in my food data" sentence', !unknownFood.ok && /don't have flargle root in my food data/.test(unknownFood.reason), unknownFood)

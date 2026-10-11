@@ -472,7 +472,7 @@ console.log('\n9. A lift held at the person\'s own limit says so')
 
   // The card keeps this label once a set is logged (the estimate labels go).
   const chipSrc = readFileSync(new URL('../src/components/exercise/LoadChip.tsx', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  check('the card does not drop "held at your…" when a set has been logged', /source === 'logged' && ex\.load_hold !== 'stated_limit' \? null : ceilingLabel\(ex\)/.test(chipSrc))
+  check('the card does not drop "held at your…" when a set has been logged', /\(?source === 'logged'(?: \|\| source === 'eased'\))? && ex\.load_hold !== 'stated_limit' \? null : ceilingLabel\(ex\)/.test(chipSrc))
 
   // --- and it reaches a real plan ---
   const p = man({ max_dumbbell_kg: 12, equipment_access: 'minimalist', training_style: 'bodybuilding',

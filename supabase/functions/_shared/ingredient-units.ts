@@ -1,3 +1,16 @@
+// ===========================================================================
+// GENERATED FILE — DO NOT EDIT.
+//
+// This is src/lib/ingredient-units.ts, copied here by scripts/sync-shared-code.mjs so the edge
+// functions (Deno, which cannot import from src/) run the SAME code the app
+// does. Change the source, then run:
+//
+//     npm run sync:shared
+//
+// A hand edit here is overwritten by the next sync, and test:food-db-parity
+// fails for as long as this file differs from what the script would write.
+// ===========================================================================
+
 // ---------------------------------------------------------------------------
 // READING AN INGREDIENT AMOUNT (1 Oct 2026; docs/plans/ingredient-units.md).
 //
@@ -199,6 +212,8 @@ export function readIngredientText(text: string): ReadLine {
 
   // WORD AMOUNTS: "a banana", "an egg", "one onion", "half an avocado", "a pinch of salt".
   const word = t.match(/^(a half(?:\s+an?)?|half(?:\s+an?)?|an|a|one)\s+(.+)$/i)
+  // "a little olive oil", "a bit of cheese", "a few olives": the "a" is not a count, and the line has no amount.
+  if (word && /^(?:little|bit|few|touch|dab|smidge|sprinkle|drizzle|knob|glug|squeeze|couple|some)\b/i.test(word[2])) return unread(source, 'it has no amount')
   if (word && !/^\d/.test(t)) {
     const lead = word[1].toLowerCase()
     qty = lead.startsWith('half') || lead.startsWith('a half') ? 0.5 : 1

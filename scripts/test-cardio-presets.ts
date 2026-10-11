@@ -83,7 +83,7 @@ check('...and is the same for every tier that is not a full gym',
 
 console.log('\n[4] The sheet asks, and the screens that open it tell it the tier')
 const sheet = code('src/components/exercise/AddUnplannedWork.tsx')
-check('the sheet takes its options from the kit tier', /picks=\{cardioPresetsFor\(equipmentAccess\)\}/.test(sheet))
+check('the sheet takes its options from the kit tier', /picks=\{(?:prefill \? timerBlockPicks\([^)]*\) : )?cardioPresetsFor\(equipmentAccess\)\}/.test(sheet))
 check('...and holds no list of its own any more', !/Incline Treadmill Walk|Heavy Bag|Assault Bike|CONDITIONING_PRESETS/.test(sheet))
 // The element's own text, from its opening tag to its "/>" — a `[^>]*` would
 // stop at the first arrow function inside a prop.

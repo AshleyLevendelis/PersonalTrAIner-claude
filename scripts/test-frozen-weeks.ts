@@ -709,7 +709,7 @@ console.log('\n8. A week that repeats itself SAYS so — Ashley\'s ruling, 5 Sep
   // the weight) but not "held at your 24kg dumbbells" — the heaviest dumbbell
   // somebody owns is still the heaviest they own after they log a set.
   check('a real logged number silences the estimate labels — and only those',
-    /source === 'logged' && ex\.load_hold !== 'stated_limit' \? null : ceilingLabel\(ex\)/.test(chip))
+    /\(?source === 'logged'(?: \|\| source === 'eased'\))? && ex\.load_hold !== 'stated_limit' \? null : ceilingLabel\(ex\)/.test(chip))
 
   // --- AND THE COACH GETS THE SAME FACT. Two surfaces describing one week
   // differently is the disagreement this repo keeps producing.
