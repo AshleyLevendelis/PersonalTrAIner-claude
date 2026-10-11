@@ -426,6 +426,20 @@ for (const [label, db] of [['app', appDb], ['coach', coachDb]] as const) {
   check(`${label}: "toasted" is not "toast"`, db.lookupIngredient('toasted almonds')?.name === 'almonds')
 }
 
+// RUN 5, 11 Oct 2026: "2 eggs on 2 slices of toast" as ONE line was 155 kcal — the toast vanished into the eggs'
+// name, coverage 100%. Her bar: costed properly or asked about, never a card under 300.
+{
+  const { splitCompoundFoodLine } = await import('../src/lib/ingredient-units')
+  const { normaliseIngredients } = await import('../src/lib/meal-addition')
+  check('a line that is two foods with two amounts is two lines', JSON.stringify(splitCompoundFoodLine('2 eggs on 2 slices of toast')) === '["2 eggs","2 slices of toast"]')
+  check('...but a dish name stays whole: salt and pepper, fish and chips, toast with butter',
+    ['salt and pepper', 'fish and chips', '2 slices toast with butter'].every(t => splitCompoundFoodLine(t).length === 1))
+  const typed = appDb.computeMealMacros(normaliseIngredients(['2 eggs on 2 slices of toast']).map(parseIngredientLine))
+  check('"2 eggs on 2 slices of toast" typed as one line is costed with the toast, over 300 kcal', typed.kcal > 300 && typed.coverage === 1, typed.kcal)
+  const coach = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../supabase/functions/chat-gemini/index.ts'), 'utf8')
+  check('...and the coach\'s log_meal splits the same way before it costs', /\.flatMap\(\(i\): MealIngredientLine\[\] => splitCompoundFoodLine\(/.test(coach))
+}
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`${failures} check(s) failed\n`); process.exit(1) }
 console.log('Counted foods weigh what they weigh, and an amount nobody could read is asked about.\n')

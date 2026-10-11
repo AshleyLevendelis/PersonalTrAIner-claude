@@ -287,3 +287,16 @@ export function readIngredientText(text: string): ReadLine {
   if (stated.size) return { name: rest, quantity: tidy(qty * stated.size.amount), unit: stated.size.unit }
   return { name: rest, quantity: qty, unit: 'whole' }
 }
+
+/**
+ * ONE LINE THAT IS TWO FOODS, each with its own amount: "2 eggs on 2 slices of toast", "chicken 150g with 100g rice".
+ * Read as one, the second food vanished into the first one's name and the meal was costed without it (run 5, 11 Oct
+ * 2026: 155 kcal for two eggs on two slices of toast, coverage 100%). Split only where a joining word is followed by a
+ * fresh amount, so "salt and pepper", "fish and chips" and "mac and cheese" stay whole.
+ */
+export function splitCompoundFoodLine(text: string): string[] {
+  const parts = text.split(/\s*(?:,|;|\+|&|\b(?:on|with|and|plus|alongside)\b)\s+(?=(?:\d|a |an |half |one |two |three |four |five |six )[^,;]*\S)/i)
+    .map(p => p.trim())
+    .filter(Boolean)
+  return parts.length > 1 ? parts : [text.trim()]
+}

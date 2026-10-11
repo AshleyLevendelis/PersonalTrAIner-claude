@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
-import { readIngredientText } from "../_shared/ingredient-units.ts";
+import { readIngredientText, splitCompoundFoodLine } from "../_shared/ingredient-units.ts";
 import { weighInQuestion } from "../_shared/weigh-in-check.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
@@ -3796,7 +3796,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
           // straight to the food database, so "8 oz" was 8 g, "3 whole eggs" was 3 g (5 kcal, and this reply printed it as
           // the meal's total) and a cup was 240 g of everything. Rebuilt as a line and read, oz and lb are converted
           // exactly and an amount that cannot be understood is flagged, not guessed.
-          .map((i): MealIngredientLine => readIngredientText(`${Number(i.quantity)} ${i.unit} ${i.name}`.replace(/\s+/g, " ").trim()));
+          // ...and a name that is really two foods with their own amounts ("eggs on 2 slices of toast") is read as two.
+          .flatMap((i): MealIngredientLine[] => splitCompoundFoodLine(`${Number(i.quantity)} ${i.unit} ${i.name}`.replace(/\s+/g, " ").trim()).map(readIngredientText));
 
         if (ingredients.length === 0) {
           // INTENT IS READ HERE, NOT FIFTY LINES DOWN. Ashley, 8 Sep 2026:

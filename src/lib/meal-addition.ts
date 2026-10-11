@@ -1,3 +1,4 @@
+import { splitCompoundFoodLine } from './ingredient-units'
 // ---------------------------------------------------------------------------
 // "Add this meal to my plan" (docs/PLAN-add-a-meal.md)
 //
@@ -72,7 +73,8 @@ export function normaliseIngredients(value: unknown): string[] {
   const lines = Array.isArray(value)
     ? value.map(v => String(v ?? ''))
     : String(value ?? '').split('\n')
-  return lines.map(l => l.trim()).filter(Boolean)
+  // A line that is two foods with two amounts is two lines (splitCompoundFoodLine).
+  return lines.flatMap(l => splitCompoundFoodLine(l.trim())).filter(Boolean)
 }
 
 /** YYYY-MM-DD or nothing. A malformed date silently becoming today would put the meal on the wrong day, so it is checked rather than coerced. */
