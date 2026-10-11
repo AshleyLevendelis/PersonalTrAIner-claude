@@ -148,7 +148,9 @@ console.log('\n6. The screen asks this calculation')
   check('every row is fed the shown dish', /option=\{shownOption\(slot\)\}/.test(mp) && !/option=\{chosen\[slot\] \?\? null\}/.test(mp))
   check('...from the slots on screen, with what was eaten', /slots: SLOT_ORDER\.filter\(s => \(pools\[s\]\?\.length \?\? 0\) > 0\)/.test(mp) && /eatenBySlot: Object\.fromEntries\(Object\.entries\(loggedBySlot\)/.test(mp))
   check('the line and its Undo are drawn', /\{aroundLine\}/.test(mp) && /data-testid="around-eaten-undo" onClick=\{\(\) => setKept\(true\)\}/.test(mp))
-  check('the ring says "over" past the target', /\{kcalLeftOrOver\(macros\.calories - eaten\.kcal\)\}/.test(nd) && !/Math\.max\(0, Math\.round\(macros\.calories - eaten\.kcal\)\)/.test(nd))
+  // RE-ANCHORED 10 Oct 2026 (2b): the phrase is split into the hero number
+  // and its word, still read off the one phrasebook function.
+  check('the ring says "over" past the target', /= kcalLeftOrOver\(macros\.calories - eaten\.kcal\)\.split\(' '\)/.test(nd) && /kcal \{word\}/.test(nd) && !/Math\.max\(0, Math\.round\(macros\.calories - eaten\.kcal\)\)/.test(nd))
   check('no line promises a re-fit nothing checks', !/re-fitted around it/.test(mp))
 }
 

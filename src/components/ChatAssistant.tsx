@@ -109,7 +109,7 @@ import { ClarificationCard, answerPlaceholderFor } from '@/components/chat/Clari
 import type { ChatMessage, UserProfile, MacroTargets, WorkoutDay, MealPlanDay, MesocycleWeek, PlanAction, ChatPendingActionView, ChatReceiptView, ChatClarificationView, TrainingStyle } from '@/lib/types'
 import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
-import { takeChatPrefill } from '@/lib/chat-prefill-store'
+import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
@@ -625,6 +625,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // cleared by the store, so it fills the box but never re-appears later.
   // Filled, NOT sent: the user sees it before it becomes a message.
   const [input, setInput] = useState(() => takeChatPrefill())
+  // ...AND ON EVERY LATER HAND-OVER, because this component never unmounts:
+  // the mount read alone missed every question asked after the app opened.
+  useEffect(() => {
+    const take = () => { const t = takeChatPrefill(); if (t) setInput(t) }
+    window.addEventListener(CHAT_PREFILL_EVENT, take)
+    return () => window.removeEventListener(CHAT_PREFILL_EVENT, take)
+  }, [])
   // Voice input — captures the input text at the moment listening starts so
   // a live transcript appends after whatever the user already typed, rather
   // than each recognition event (which reports the FULL transcript so far,

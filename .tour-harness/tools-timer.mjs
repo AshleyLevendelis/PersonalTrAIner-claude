@@ -128,6 +128,11 @@ const cardBoxes = await ev(`[...document.querySelectorAll('[data-protocol]')].ma
 check('1k. every card is 98x76 and nothing in it spills', cardBoxes.every(c => c.w === 98 && c.h === 76 && !c.spill), cardBoxes)
 check('1k2. ...and the row scrolls inside itself, the page does not scroll sideways',
   await ev('document.documentElement.scrollWidth <= window.innerWidth'), await ev('[document.documentElement.scrollWidth, window.innerWidth]'))
+// AND THE SHEET ITSELF IS PHONE-WIDE. The dialog clips what overflows, so the
+// page never scrolls sideways even when the sheet is 780px wide with its right
+// half cut off — which is what it was before min-w-0 (found on a screenshot).
+check('1k3. the sheet is no wider than the phone', await ev('Math.round(document.querySelector("[data-round-sheet]")?.getBoundingClientRect().width ?? 9999) <= window.innerWidth'),
+  await ev('Math.round(document.querySelector("[data-round-sheet]")?.getBoundingClientRect().width ?? -1)'))
 const preview = () => ev(`document.querySelector('[data-round-preview]')?.innerText?.replace(/\\s+/g, ' ')?.trim() || ''`)
 const idle = await preview()
 check('1l. the preview holds a total and what it is made of',

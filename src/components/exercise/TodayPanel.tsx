@@ -33,6 +33,7 @@ import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
+import { NextSetButton } from './NextSetButton'
 // DEFERRED, the same trade the two nutrition sheets took on 14 Sep: a sheet
 // nobody has opened yet has no business in the chunk that has to arrive before
 // the first pixel. It costs one extra chunk header in the total and takes its
@@ -77,6 +78,7 @@ const AddExerciseSheet = lazy(() => import('./AddExerciseSheet').then(m => ({ de
 const FinishCheckSheet = lazy(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
+import { readSessionSummary, saveSessionSummary } from '@/lib/session-summary-store'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { describeDayGap } from '@/lib/day-gap-note'
@@ -171,6 +173,8 @@ export function TodayPanel({
   // How tall BottomDock currently is, so the fixed CTA bar below rides above
   // it instead of under it — the same published height the chat composer uses.
   const { dockHeightPx } = useBottomDockHeight()
+  // The list the running button reads its next set from (NextSetButton).
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null)
   // The week's phase-focus / note disclosure. Lifted out of WeekContextRow
   // because the clamped nudge below it opens the same thing — a "Do…" that
   // ends in an ellipsis has to lead somewhere, and chat is not where the rest
@@ -219,6 +223,9 @@ export function TodayPanel({
   const [addOpen, setAddOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
+  // THE CARD SURVIVES LEAVING THE TAB (2a): read back for the day, so "View
+  // summary" works after a trip to Home or a reload, and a new day starts clean.
+  useEffect(() => { setSummaryData(readSessionSummary(profileId, today)) }, [profileId, today])
   const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
   const [summaryCloseFailed, setSummaryCloseFailed] = useState(false)
   const [summarySavedCardio, setSummarySavedCardio] = useState<string[]>([])
@@ -299,7 +306,9 @@ export function TodayPanel({
     // (H21) — the finisher, anything unplanned, and anything still waiting on
     // this phone. It never rejects, so a dead connection cannot stop the card.
     const cardio = (await readCardioLogsForDate(profileId!, today)).rows.map(cardioLine)
-    setSummaryData({ summary, prs, progressions, cardio })
+    const card = { summary, prs, progressions, cardio }
+    setSummaryData(card)
+    if (profileId) saveSessionSummary(profileId, today, card)
     setSummaryOpen(true)
   }
 
@@ -877,6 +886,7 @@ export function TodayPanel({
   // only rendered) for the live-session branch below; rest/recovery/peek
   // don't have a "sets" concept.
   const totalSetsPlanned = workout && !isRestDay && !isActiveRecovery ? workout.exercises.reduce((s, ex) => s + ex.sets, 0) : 0
+  const heroCount = workout && !isRestDay && !isActiveRecovery ? sessionSetCount(workout, logs) : null
   const totalSetsLogged = workout && !isRestDay && !isActiveRecovery
     ? workout.exercises.reduce((s, ex) => s + setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length, 0)
     : 0
@@ -968,6 +978,7 @@ export function TodayPanel({
       <WeekContextRow
         days={weekTrain.days}
         todayName={todayName}
+        selectedDay={peekDay ?? todayName}
         onSelectDay={d => setPeekDay(d)}
         weekNumber={liveWeek}
         totalWeeks={totalWeeks}
@@ -977,8 +988,6 @@ export function TodayPanel({
         isCalibrationWeek={currentMesoWeekObj?.isCalibrationWeek}
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
-        sessionLength={sessionEstimate.length}
-        shortfallNote={sessionEstimate.note}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
         onOpenWhatHappened={profileId ? openWhatHappened : undefined}
@@ -1171,10 +1180,26 @@ export function TodayPanel({
               )}
             </div>
             <p className="mt-1.5 text-[2.25rem] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
-            <div className="mt-3 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
+            {/* THE META LINE (2c): what is in it and how long, then the sets —
+                the SHARED capped count (her M39 "one count"), so this, Home
+                and the finished bar cannot say different fractions. */}
+            <div className="mt-2 flex items-baseline justify-between gap-3 text-[0.75rem] text-muted-foreground">
+              <span data-testid="hero-meta">
+                {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}
+              </span>
+              {heroCount && <span className="tabular-mono" data-testid="hero-sets">{heroCount.logged}/{heroCount.planned} sets</span>}
+            </div>
+            {/* THE REASON BESIDE THE NUMBER (audit §6.5). The length moved
+                from the week row to this line in 2c, so the "why is it shorter
+                than I asked for" line moved with it: always visible, never
+                behind an expander. */}
+            {sessionEstimate.note && (
+              <p className="mt-1 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{sessionEstimate.note}</p>
+            )}
+            <div className="mt-2 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
               <div
                 className="h-[2px] rounded-full bg-primary glow-mint-box"
-                style={{ width: `${totalSetsPlanned > 0 ? Math.min(100, (totalSetsLogged / totalSetsPlanned) * 100) : 0}%` }}
+                style={{ width: `${heroCount && heroCount.planned > 0 ? Math.min(100, (heroCount.logged / heroCount.planned) * 100) : 0}%` }}
               />
             </div>
             {/* START MOVED OUT OF THE HERO on 6 Sep 2026 — it is the fixed
@@ -1220,8 +1245,8 @@ export function TodayPanel({
             todayNudge.source === 'week-note'
               // Clamped, so its chevron must open the REST OF THIS SENTENCE
               // (the week disclosure above), never the chat tab.
-              ? <TrainerNudge text={todayNudge.text} clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
-              : <TrainerNudge text={todayNudge.text} openChat />
+              ? <TrainerNudge text={todayNudge.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
+              : <TrainerNudge text={todayNudge.text} tag="Training" openChat askPrefill={`Tell me more about this: "${todayNudge.text}"`} />
           )}
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} />
           {finishCheck && (
@@ -1310,6 +1335,7 @@ export function TodayPanel({
             </Suspense>
           )}
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
+          <div ref={setListEl} data-today-exercises>
           <ExerciseList
             workout={workout!}
             dayName={todayRef.planDayName}
@@ -1335,6 +1361,7 @@ export function TodayPanel({
               }
             }}
           />
+          </div>
           {/* "Finish" for what ends the session; "Also today" for a session the
               plan set apart from it. FinishSection decides which is which. */}
           <FinishSection cardio={workout!.recommendedCardio} mobilityFiller={workout!.mobilityFiller} />
@@ -1388,7 +1415,7 @@ export function TodayPanel({
           />
           {/* Clears the fixed CTA bar below, so the last row is never sitting
               underneath it. Matches the bar's own height plus its fade. */}
-          {(status === 'idle' || status === 'finished') && <div aria-hidden className="h-[100px]" />}
+          {(status === 'idle' || status === 'running' || status === 'finished') && <div aria-hidden className="h-[100px]" />}
         </div>
       )}
 
@@ -1452,6 +1479,17 @@ export function TodayPanel({
             {swappedToday ? 'Train it anyway' : 'Start workout'}
           </Button>
         </div>
+      )}
+
+      {/* DURING THE SESSION, THE NEXT SET (design handoff 2c, 10 Oct 2026):
+          "Log set 3 · Bench 80 kg × 6", read off the tick that would save it
+          and pressing that tick — see next-set-label.ts. Gone when no open
+          row has a set left to log, rather than guessing at one. */}
+      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'running' && (
+        <NextSetButton
+          root={listEl}
+          bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`}
+        />
       )}
 
       {/* STEPS MOVED TO HOME, 6 Sep 2026 — design_handoff_app_polish's
@@ -1588,6 +1626,8 @@ function ExerciseList({
       onSetCompleted,
       expanded,
       onToggleExpanded: () => setExpandOverrides(prev => ({ ...prev, [exIndex]: !expanded })),
+      // "01", "02" in the order the session is done, supersets included.
+      index: flatExIndexes.indexOf(exIndex) + 1,
     }
   }
 

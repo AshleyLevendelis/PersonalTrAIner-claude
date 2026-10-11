@@ -229,7 +229,7 @@ check('...and TodayPanel tells it, from the source that actually won',
 check('...so the note is never only behind the chevron',
   /\{!expanded && coachNote && !coachNoteShownBelow && \(/.test(contextRow))
 check('a long week note is capped rather than pushing the session off screen',
-  /<TrainerNudge text=\{todayNudge\.text\} clamp=\{!weekNotesOpen\}/.test(today) && /clamp && 'line-clamp-3'/.test(nudgeComponent))
+  /<TrainerNudge text=\{todayNudge\.text\}[^>]*clamp=\{!weekNotesOpen\}/.test(today) && /clamp && 'line-clamp-3'/.test(nudgeComponent))
 // ...and uncapped once it is opened, in place, rather than reprinted above.
 check('...and expanding unclamps it rather than printing it twice',
   /clamp=\{!weekNotesOpen\}/.test(today)
@@ -243,8 +243,12 @@ check('...and its chevron opens the rest of that sentence, not chat',
 check('...which is the SAME state the week row\'s own chevron toggles',
   /expanded=\{weekNotesOpen\}/.test(today) && /onToggleExpanded=\{setWeekNotesOpen\}/.test(today))
 check('...so the row keeps no private copy of it', !/useState\(false\)/.test(contextRowCode))
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): the chat chevron became "Ask ↗"
+// and the clamp chevron stayed a chevron — still one control, one destination:
+// Ask is drawn only with openChat and goes to chat; the chevron only without it.
 check('the chevron only ever has one destination',
-  /onClick=\{openChat \? \(\) => \{ window\.location\.hash = tabHash\('chat'\) \} : onOpen\}/.test(nudgeComponent))
+  /\{openChat && \(/.test(nudgeComponent) && /\{!openChat && onOpen && \(/.test(nudgeComponent)
+  && /const ask = \(\) => \{[\s\S]{0,120}window\.location\.hash = tabHash\('chat'\)/.test(nudgeComponent))
 
 check('"Add unplanned work" is a visible control again', /＋ Add unplanned work/.test(today))
 check('...on a 44px target', /hit-slop-44[\s\S]{0,200}＋ Add unplanned work/.test(today))
@@ -255,11 +259,14 @@ check('...while session history stays in it', /Session history/.test(contextRow)
 // ---------------------------------------------------------------------------
 console.log('\n4. The week context is context — no card, tertiary, strip under it')
 // ---------------------------------------------------------------------------
-check('the --surface-raised box is gone', !/var\(--surface-raised\)/.test(contextRowCode))
+// DESIGN HANDOFF 2c (10 Oct 2026): the raised fill is back, but ONLY on the
+// selected day of the strip — never as a panel around the row.
+check('the --surface-raised box is gone — the fill is only the selected day\'s',
+  (contextRowCode.match(/var\(--surface-raised\)/g) ?? []).length === 1 && /isSelected \? \{ background: 'var\(--surface-raised\)'/.test(contextRowCode))
 check('...and so is the rounded panel it sat in', !/rounded-2xl/.test(contextRowCode))
-check('the context line is tertiary, not foreground', /text-\[0\.78125rem\] text-text-tertiary/.test(contextRow))
+check('the context line is a quiet label, not foreground (2c: .ds-label)', /className="ds-label min-w-0 flex-1 truncate text-left"/.test(contextRow))
 check('the tour anchor survived the restyle', /data-tour="extoday"/.test(contextRow))
-check('the strip sits 12px under the line', /className="mt-3 flex items-start justify-between"/.test(contextRow))
+check('the strip sits 12px under the line, seven equal columns (2c)', /className="mt-3 grid grid-cols-7 gap-1" data-exercise-strip/.test(contextRow))
 // The assistant has one name in UI text.
 check('nothing on this screen calls it "Coach"',
   !/Coach:/.test(contextRowCode) && !/Coach:/.test(todayCode), 'Coach: found')

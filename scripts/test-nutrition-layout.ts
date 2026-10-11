@@ -179,31 +179,41 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
 // ---------------------------------------------------------------------------
 console.log('\n3. The legend is four rows in two columns, beside the rings')
 // ---------------------------------------------------------------------------
-check('a 2-column grid holds it', /grid-cols-2 gap-x-3 gap-y-1/.test(nutrition))
-for (const letter of ["label: 'P'", "label: 'C'", "label: 'F'", "label: 'H\\u2082O'"]) {
-  check(`the legend carries ${letter}`, nutrition.includes(letter))
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): the legend became the RING
+// KEY — four rows in a 2x2 grid, named in full, in the order the rings sit —
+// and fat, which lost its ring, is a muted line under it so its number stays.
+check('a 2-column grid holds it', /grid grid-cols-2 gap-x-\[22px\] gap-y-2\.5" data-ring-key/.test(nutrition))
+for (const label of ["label: 'Calories'", "label: 'Protein'", "label: 'Carbs'", "label: 'Water'"]) {
+  check(`the key carries ${label}`, nutrition.includes(label))
 }
-check('calories stay the hero number, not a legend row', /ds-num-mega/.test(nutrition) && !/label: 'K'/.test(nutrition))
-// Re-anchored 10 Oct 2026 (M33): the figure is the phrasebook's now, so past
-// the target it says "over" rather than "0 left".
-check('the caption says what is left, not only what is eaten', /kcal · <span className="tabular-mono" data-testid="kcal-left">\{kcalLeftOrOver\(/.test(nutrition))
+check('the rings are those four, in that order, outermost first',
+  /key: 'calories', r: 58[\s\S]{0,120}key: 'protein', r: 46[\s\S]{0,120}key: 'carbs', r: 34[\s\S]{0,120}key: 'water', r: 22/.test(nutrition))
+check('fat is still on the screen, as a line', /data-ring-key-fat>\s*Fat/.test(nutrition) && /ringValues\.fat\.eaten/.test(nutrition))
+check('the hero is what is LEFT (2b), the eaten figure under it', /data-testid="kcal-left-number"/.test(nutrition) && /data-testid="kcal-eaten"/.test(nutrition) && /ds-num-mega/.test(nutrition))
+check('the caption says left or over, from the phrasebook', /kcalLeftOrOver\(macros\.calories - eaten\.kcal\)/.test(nutrition) && /data-testid="kcal-left">kcal \{word\}/.test(nutrition))
 
 // ---------------------------------------------------------------------------
 console.log('\n4. The meal list points at the list it fills')
 // ---------------------------------------------------------------------------
-check('the header links to the grocery list', /Grocery list ›/.test(meals))
+// RE-ANCHORED 10 Oct 2026 (2b): the link is the "Grocery" pill in the
+// Nutrition header now, there even before any meals are; the day-added row's
+// "Open list ›" in MealPlan still goes to the same route.
+check('the header links to the grocery list', /data-grocery-pill/.test(nutrition) && /<ShoppingBasket[^>]*\/> Grocery/.test(nutrition))
 // THE LIST MOVED OFF TOOLS, 12 Sep 2026 (design handoff 2b ›). It has a
 // screen of its own under Nutrition — where it is built from — so the link
 // goes there and the sanity check follows it. The property is unchanged: the
 // header must point at somewhere the list actually is.
 check('...at the real grocery route, not a hand-written hash',
-  /window\.location\.hash = groceryHash\(\)/.test(meals) && !/'#\/nutrition\/grocery'/.test(meals))
+  /window\.location\.hash = groceryHash\(\)/.test(nutrition) && !/'#\/nutrition\/grocery'/.test(nutrition) && !/'#\/nutrition\/grocery'/.test(meals))
 check('...and that route really is where the list lives (sanity check on this check)',
   /groceryHash\(\)/.test(read('src/App.tsx')) && /<GroceryList/.test(read('src/components/GroceryScreen.tsx')))
 check('regenerating all the meals is still reachable', /onClick=\{onRegenerateAll\}/.test(meals))
 check('a collapsed row ends in a chevron', /<ChevronRight className="size-3\.5/.test(meals))
-check('...with the logged tick after the number, not before',
-  /\{Math\.round\(isLogged \? loggedKcal : option\.macros\.calories\)\} kcal\{isLogged \? ' ✓' : ''\}/.test(meals))
+// 2b: a logged meal sits under "Eaten" with a tick circle before it, and its
+// number is what was LOGGED (the meal actually eaten), not the plan's dish.
+check('...and a logged meal shows what was logged, with its tick',
+  /const kcalShown = Math\.round\(isLogged \? loggedKcal : \(option\?\.macros\.calories \?\? 0\)\)/.test(meals)
+  && /variant === 'eaten' && \([\s\S]{0,400}<Check /.test(meals))
 
 // ---------------------------------------------------------------------------
 console.log('\n5. Every file this gate speaks for is actually mounted')

@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   Plus,
   Heart,
+  Repeat, ChefHat,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
@@ -392,128 +393,15 @@ export function MealPlan({
     )
   }
 
-  return (
-    <div data-tour="meals" className="space-y-4">
-      {unrecognisedBanner || errorBanner}
-      {unlogError && (
-        <InsightBanner tone="warning" className="items-start justify-between">
-          <span>{unlogError}</span>
-          <button type="button" onClick={() => setUnlogError(null)} className="shrink-0 text-xs font-semibold underline">
-            Dismiss
-          </button>
-        </InsightBanner>
-      )}
-      {blockedSlots.length > 0 && (
-        <InsightBanner tone="warning" className="items-start justify-between">
-          <span>
-            {blockedSlots.length === 1
-              ? `Your ${SLOT_LABEL[blockedSlots[0]].toLowerCase()} no longer fits your restrictions.`
-              : `${blockedSlots.length} of ${upcoming ? `${upcoming.dayName}'s` : "today's"} meals no longer fit your restrictions.`}
-            {' '}They were built before you changed them.
-          </span>
-          <button
-            type="button"
-            onClick={onRegenerateAll}
-            disabled={isGenerating}
-            className="shrink-0 text-xs font-semibold underline disabled:opacity-50"
-          >
-            {isGenerating ? 'Redoing…' : 'Redo them'}
-          </button>
-        </InsightBanner>
-      )}
-      <div className="flex items-center justify-between gap-3">
-        <span className="ds-label" data-testid="meal-day-heading">{upcoming ? `${upcoming.dayName}'s meals` : "Today's meals"}</span>
-        {/* TWO CONTROLS, not one. The handoff specifies "Grocery list ›" on
-            this row and shows nothing else; Regenerate all is kept beside it
-            because this header is its ONLY call site — dropping it to match
-            the frame would delete the one way to redo a day's meals, which
-            is a capability change, not a presentation one. Flagged in the
-            commit rather than silently resolved either way. */}
-        <span className="flex shrink-0 items-center gap-3">
-          {!upcoming && (
-            <button
-              type="button"
-              onClick={onRegenerateAll}
-              disabled={isGenerating}
-              className="hit-slop-44 flex items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground disabled:opacity-50"
-            >
-              {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-              Regenerate all
-            </button>
-          )}
-          <button
-            type="button"
-            // THE LIST LEFT TOOLS on 12 Sep 2026 and this link did not follow
-            // it — it went on pointing at a tab that no longer has a grocery
-            // section on it. Found by test:nutrition-layout's sanity check,
-            // which asks whether the destination really holds the list.
-            onClick={() => { window.location.hash = groceryHash() }}
-            className="hit-slop-44 text-[0.6875rem] font-semibold text-primary-text"
-          >
-            Grocery list ›
-          </button>
-        </span>
-      </div>
-      <p className="text-xs text-muted-foreground/70">
-        Ingredients are filtered, not verified. Check labels if you have an allergy.
-      </p>
-
-      {targets && <TotalsHero totals={shown.totals} targets={targets} />}
-      {aroundLine && (
-        <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="around-eaten" data-kind={shown.aroundEaten.kind}>
-          <span>{aroundLine}</span>
-          {shown.aroundEaten.kind === 'resized' && (
-            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="around-eaten-undo" onClick={() => setKept(true)}>Undo</button>
-          )}
-          {shown.aroundEaten.kind === 'kept' && (
-            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="around-eaten-refit" onClick={() => setKept(false)}>Fit around what I ate</button>
-          )}
-        </p>
-      )}
-
-      {heldLine && heldAround && (
-        <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="held-around" data-kind={heldAround.kind}>
-          <span>{heldLine}</span>
-          {heldAround.kind === 'resized' && onKeepHeldSizes && (
-            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="held-around-undo" onClick={() => onKeepHeldSizes(date, true)}>Undo</button>
-          )}
-          {heldAround.kind === 'kept' && onKeepHeldSizes && (
-            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="held-around-refit" onClick={() => onKeepHeldSizes(date, false)}>Fit around my swap</button>
-          )}
-        </p>
-      )}
-
-      {upcoming && <AddDayToGrocery key={date} upcoming={upcoming} />}
-
-      {/* THE WORKING STATE FOR "REGENERATE ALL" (test log M22). The same two
-          sentences the first build shows, because it is the same job; and a
-          third that says what the dimmed meals underneath are. */}
-      {regeneratingAll && (
-        <div role="status" aria-live="polite" data-testid="meals-regenerating" className="flex items-start gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-3">
-          <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-primary-text" aria-hidden />
-          <div className="space-y-0.5">
-            <p className="text-sm font-medium text-foreground">Building your meals…</p>
-            <p className="text-xs text-muted-foreground">They arrive one meal at a time — this takes up to a minute. The meals below are the ones you had, until the new ones are ready.</p>
-          </div>
-        </div>
-      )}
-
-      <div
-        data-testid="meal-list"
-        aria-busy={regeneratingAll || undefined}
-        // `inert` takes the old meals out of reach of a thumb, the keyboard
-        // and a screen reader while they are being replaced.
-        inert={regeneratingAll}
-        className={regeneratingAll ? 'pointer-events-none opacity-45 transition-opacity' : 'transition-opacity'}
-      >
-        {activeSlots.map((slot, idx) => (
-          <MealSlotRow
+  const rowFor = (slot: MealSlotName, variant: 'upnext' | 'later' | 'eaten') => (
+    <MealSlotRow
             key={slot}
+            variant={variant}
             profileId={profileId}
             isFavourite={favouriteNames.has((chosen[slot] ?? { name: '' }).name)}
             onToggleFavourite={toggleFavourite}
             slot={slot}
-            isFirst={idx === 0}
+            isFirst={false}
             option={shownOption(slot)}
             alternatives={pools[slot] ?? []}
             expanded={expandedSlot === slot}
@@ -580,7 +468,113 @@ export function MealPlan({
               setUnlogError(removed ? null : "That meal is still logged — we couldn't reach the server. Try again in a moment.")
             }}
           />
-        ))}
+  )
+  // Which meal is up next: the first of today, in slot order, not yet logged
+  // and with a dish to serve. Logged meals are "Eaten"; the rest are "Later".
+  const eatenSlots = upcoming ? [] : activeSlots.filter(sl => (loggedBySlot[sl] ?? []).length > 0)
+  const upNextSlot = upcoming ? null : activeSlots.find(sl => !eatenSlots.includes(sl) && !!shownOption(sl)) ?? null
+  const laterSlots = upcoming ? activeSlots : activeSlots.filter(sl => !eatenSlots.includes(sl) && sl !== upNextSlot)
+
+  return (
+    <div data-tour="meals" className="space-y-4">
+      {unrecognisedBanner || errorBanner}
+      {unlogError && (
+        <InsightBanner tone="warning" className="items-start justify-between">
+          <span>{unlogError}</span>
+          <button type="button" onClick={() => setUnlogError(null)} className="shrink-0 text-xs font-semibold underline">
+            Dismiss
+          </button>
+        </InsightBanner>
+      )}
+      {blockedSlots.length > 0 && (
+        <InsightBanner tone="warning" className="items-start justify-between">
+          <span>
+            {blockedSlots.length === 1
+              ? `Your ${SLOT_LABEL[blockedSlots[0]].toLowerCase()} no longer fits your restrictions.`
+              : `${blockedSlots.length} of ${upcoming ? `${upcoming.dayName}'s` : "today's"} meals no longer fit your restrictions.`}
+            {' '}They were built before you changed them.
+          </span>
+          <button
+            type="button"
+            onClick={onRegenerateAll}
+            disabled={isGenerating}
+            className="shrink-0 text-xs font-semibold underline disabled:opacity-50"
+          >
+            {isGenerating ? 'Redoing…' : 'Redo them'}
+          </button>
+        </InsightBanner>
+      )}
+      {targets && <TotalsHero totals={shown.totals} targets={targets} />}
+      {aroundLine && (
+        <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="around-eaten" data-kind={shown.aroundEaten.kind}>
+          <span>{aroundLine}</span>
+          {shown.aroundEaten.kind === 'resized' && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="around-eaten-undo" onClick={() => setKept(true)}>Undo</button>
+          )}
+          {shown.aroundEaten.kind === 'kept' && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="around-eaten-refit" onClick={() => setKept(false)}>Fit around what I ate</button>
+          )}
+        </p>
+      )}
+
+      {heldLine && heldAround && (
+        <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="held-around" data-kind={heldAround.kind}>
+          <span>{heldLine}</span>
+          {heldAround.kind === 'resized' && onKeepHeldSizes && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="held-around-undo" onClick={() => onKeepHeldSizes(date, true)}>Undo</button>
+          )}
+          {heldAround.kind === 'kept' && onKeepHeldSizes && (
+            <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="held-around-refit" onClick={() => onKeepHeldSizes(date, false)}>Fit around my swap</button>
+          )}
+        </p>
+      )}
+
+      {upcoming && <AddDayToGrocery key={date} upcoming={upcoming} />}
+
+      {/* THE WORKING STATE FOR "REGENERATE ALL" (test log M22). The same two
+          sentences the first build shows, because it is the same job; and a
+          third that says what the dimmed meals underneath are. */}
+      {regeneratingAll && (
+        <div role="status" aria-live="polite" data-testid="meals-regenerating" className="flex items-start gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-3">
+          <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-primary-text" aria-hidden />
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-foreground">Building your meals…</p>
+            <p className="text-xs text-muted-foreground">They arrive one meal at a time — this takes up to a minute. The meals below are the ones you had, until the new ones are ready.</p>
+          </div>
+        </div>
+      )}
+
+      <div
+        data-testid="meal-list"
+        aria-busy={regeneratingAll || undefined}
+        // `inert` takes the old meals out of reach of a thumb, the keyboard
+        // and a screen reader while they are being replaced.
+        inert={regeneratingAll}
+        className={regeneratingAll ? 'pointer-events-none opacity-45 transition-opacity' : 'transition-opacity'}
+      >
+        {/* DESIGN HANDOFF 2b: Up next (the first meal of today not yet
+            logged, as a card), then the rest still to eat, then what was
+            eaten. Nothing the old list showed is gone: every row opens to
+            the same full meal with every control it had. An upcoming day is
+            one plain list. */}
+        {!upcoming && upNextSlot && (
+          <section className="mb-[18px]" data-meal-section="upnext">
+            <p className="ds-label mb-2">Up next</p>
+            {rowFor(upNextSlot, 'upnext')}
+          </section>
+        )}
+        {laterSlots.length > 0 && (
+          <section className="mb-[18px]" data-meal-section="later">
+            {!upcoming && <p className="ds-label">{upNextSlot ? 'Later' : 'Still to eat'}</p>}
+            {laterSlots.map(slot => rowFor(slot, 'later'))}
+          </section>
+        )}
+        {!upcoming && eatenSlots.length > 0 && (
+          <section className="mb-[18px]" data-meal-section="eaten">
+            <p className="ds-label flex items-baseline justify-between">Eaten <span className="tabular-mono">{eatenSlots.length}</span></p>
+            {eatenSlots.map(slot => rowFor(slot, 'eaten'))}
+          </section>
+        )}
         {/* Surfacing round — a per-slot Retry is a dead end while a
             restriction is unrecognised (every retry fails identically), and
             showing four of them would restate the false promise the top
@@ -589,6 +583,27 @@ export function MealPlan({
         {!unrecognisedBanner && emptySlots.map(slot => (
           <EmptySlotRow key={slot} slot={slot} isGenerating={isGenerating} onRegenerate={onRegenerateSlot} />
         ))}
+      </div>
+
+      {/* UNDER THE LIST: the allergy line (it qualifies every meal above, so
+          it reads after them) and Regenerate all — kept because this is its
+          ONLY call site, and dropping it to match the frame would delete the
+          one way to redo a day's meals. */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs text-muted-foreground/70">
+          Ingredients are filtered, not verified. Check labels if you have an allergy.
+        </p>
+        {!upcoming && (
+          <button
+            type="button"
+            onClick={onRegenerateAll}
+            disabled={isGenerating}
+            className="hit-slop-44 flex shrink-0 items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground disabled:opacity-50"
+          >
+            {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+            Regenerate all
+          </button>
+        )}
       </div>
     </div>
   )
@@ -719,19 +734,21 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
   // third rule ("at or above target" lit it at 30% over too).
   const proteinAchieved = targets.protein > 0 && macroOnTarget('protein', totals.protein, targets.protein)
 
+  // COMPACT SINCE 2b (10 Oct 2026): the kcal LEFT is the hero now, so the
+  // planned day is one quiet panel under it — still the engine's own verdict
+  // (her 10 Oct "one calculation" ruling), never a second big number.
   return (
-    <div>
-      <div className="flex items-end gap-3">
-        <span className="tabular-mono ds-num-mega glow-mint-lg" data-testid="day-kcal">{Math.round(totals.calories)}</span>
-        <div className="flex flex-col gap-0.5 pb-1.5">
-          <span className="text-sm text-foreground">kcal planned</span>
-          <span className="ds-label-compact">target {targets.calories} · {deltaLabel}</span>
-        </div>
+    <div className="rounded-[14px] px-3.5 py-3" style={{ background: 'var(--surface-raised)' }} data-planned-day>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[0.75rem] text-text-tertiary">
+          Planned <span className="tabular-mono font-semibold text-foreground" data-testid="day-kcal">{Math.round(totals.calories)}</span> kcal
+        </span>
+        <span className="ds-label-compact">target {targets.calories} · {deltaLabel}</span>
       </div>
-      <div className="mt-3 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
-        <div className="h-[2px] rounded-full bg-primary glow-mint-box" style={{ width: `${calPct}%` }} />
+      <div className="mt-2 h-[2px] rounded-full" style={{ background: 'var(--surface-sunken)' }}>
+        <div className="h-[2px] rounded-full bg-primary" style={{ width: `${calPct}%` }} />
       </div>
-      <div className="mt-3 flex items-baseline gap-4 tabular-mono text-xs">
+      <div className="mt-2 flex items-baseline gap-4 tabular-mono text-[0.6875rem]">
         <span className={proteinAchieved ? 'text-primary-text glow-mint' : 'text-muted-foreground'}>
           {Math.round(totals.protein)} / {targets.protein} P
         </span>
@@ -782,7 +799,16 @@ function MealSlotRow({
   upcoming,
   date,
   dayMove,
+  variant = 'later',
 }: {
+  /**
+   * DESIGN HANDOFF 2b, 10 Oct 2026. 'upnext': the first meal of today not
+   * yet logged, as a card with Log it / Swap / method. 'later': a plain row
+   * (today's other unlogged meals, and every meal of an upcoming day).
+   * 'eaten': a logged meal, with its tick. Whichever look, tapping it opens
+   * the same full row underneath, with every control it always had.
+   */
+  variant?: 'upnext' | 'later' | 'eaten'
   profileId: string | undefined
   /** An upcoming day's row: no logging, no regenerate — see UpcomingMealDay. */
   upcoming: boolean
@@ -833,6 +859,7 @@ function MealSlotRow({
   // not move on a failed write; now a line under the row says why not.
   const [favouriteError, setFavouriteError] = useState<string | null>(null)
   const [swapOpen, setSwapOpen] = useState(false)
+  const [methodOpen, setMethodOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [addNote, setAddNote] = useState<string | null>(null)
@@ -955,71 +982,111 @@ function MealSlotRow({
     }
   }
 
+  const hasMethod = !!option && methodSafeToShow(option.prep).length > 0
+  const canSwap = otherOptions.length > 0 || !!onFindMore
+  const kcalShown = Math.round(isLogged ? loggedKcal : (option?.macros.calories ?? 0))
+  const kcalText = (
+    <span data-testid="meal-row-kcal" data-slot={slot} className={`tabular-mono text-[0.78125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : 'text-text-tertiary'}`}>
+      {kcalShown}{variant === 'upnext' ? ` kcal · ${Math.round(option?.macros.protein ?? 0)}g P` : ' kcal'}
+      {duplicated ? ` ·×${loggedEvents.length}` : ''}
+    </span>
+  )
+
   return (
-    <div className="py-4" style={!isFirst ? { borderTop: '1px solid var(--hairline)' } : undefined}>
-      <button type="button" onClick={onToggle} disabled={!option} className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default">
-        <span className={expanded ? 'ds-label-compact text-primary-text glow-mint' : 'ds-label-compact'}>
-          {SLOT_LABEL[slot]}{expanded ? ' · open' : ''}
-        </span>
-        <div className="flex items-baseline justify-between gap-3">
+    <div
+      data-meal-row={slot}
+      data-variant={variant}
+      className={variant === 'upnext' ? 'rounded-[18px] p-4' : 'py-1'}
+      style={variant === 'upnext'
+        ? { background: 'var(--surface-raised)', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .35)' }
+        : { borderBottom: '1px solid var(--hairline)' }}
+    >
+      {variant === 'upnext' ? (
+        <button type="button" onClick={onToggle} disabled={!option} className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default">
+          <span className="flex items-baseline justify-between gap-3">
+            <span className="glow-mint text-[0.65625rem] font-semibold uppercase tracking-[.2em] text-primary-text">{SLOT_LABEL[slot]}{expanded ? ' · open' : ''}</span>
+            {option && kcalText}
+          </span>
           {option ? (
-            <>
-              {/* NOT `truncate` — reported by Ashley, 3 Sep 2026: "Steak with
-                  New Potatoes and Asparagus" showed as a clipped single line
-                  with no way to read the rest. `truncate` was on BOTH states,
-                  so expanding the card did not reveal it either.
-                  Expanded: wrap in full, since the card is already the thing
-                  the user opened to read. Collapsed: two lines via
-                  line-clamp-2 rather than one hard cut, which fits every meal
-                  name in the pool while keeping the row compact. `min-w-0`
-                  stays either way — without it the flex row refuses to shrink
-                  and the macros beside it get pushed off. */}
-              {/* data-meal-name: the one stable way to read which meal is in
-                  which slot. verify:meal-move used to scrape the rendered text
-                  under each slot heading, which broke the moment the Move
-                  sheet put the words "Lunch" and "Dinner" inside an expanded
-                  row — the driver then read a destination BUTTON as the slot's
-                  meal. A test hook beats a text scrape that any layout change
-                  can quietly redefine. */}
-              <span
-                data-meal-name={slot}
-                className={expanded ? 'min-w-0 text-[1.1875rem] font-semibold tracking-[-.02em]' : 'min-w-0 line-clamp-2 text-[1rem] font-medium'}
-              >
-                {displayName}
-              </span>
-              {!expanded && (
-                <span className="flex shrink-0 items-center gap-1">
-                  {/* THE NUMBER THAT IS ACTUALLY COUNTING. A duplicated slot
-                      showed the meal's own calories with a tick beside it
-                      while contributing twice that to the totals above — the
-                      one place a user could have caught the discrepancy, and
-                      it agreed with the wrong figure.
-                      The events carry the macros as they were AT LOG TIME, so
-                      swapping the slot after logging leaves this number on the
-                      meal that was actually eaten while the name above shows
-                      the new pick. Considered and kept: what the day is
-                      carrying is the useful truth here, and unlogging and
-                      logging again corrects it in two taps. */}
-                  <span data-testid="meal-row-kcal" data-slot={slot} className={`tabular-mono text-[0.8125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : isLogged ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
-                    {Math.round(isLogged ? loggedKcal : option.macros.calories)} kcal{isLogged ? ' ✓' : ''}
-                    {duplicated ? ` ·×${loggedEvents.length}` : ''}
-                  </span>
-                  <ChevronRight className="size-3.5 text-muted-foreground" />
-                </span>
-              )}
-            </>
+            <span data-meal-name={slot} className="min-w-0 text-[1.1875rem] font-bold tracking-[-.02em]">{displayName}</span>
           ) : (
-            // Options WERE made; every one clashes with what she avoids, so
-            // none is served (Ashley's ruling, 27 Sep 2026). "No option
-            // generated" would be untrue.
             <span className="text-sm text-muted-foreground" data-testid="meal-slot-all-clash-note">
-              {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction)
-                ? 'Nothing saved fits what you avoid'
-                : 'No option generated'}
+              {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction) ? 'Nothing saved fits what you avoid' : 'No option generated'}
             </span>
           )}
+        </button>
+      ) : (
+        <button type="button" onClick={onToggle} disabled={!option} className="flex min-h-[52px] w-full items-center gap-3 text-left disabled:cursor-default">
+          {variant === 'eaten' && (
+            <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }} aria-hidden>
+              <Check className="size-3.5" strokeWidth={3} />
+            </span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className={`block text-[0.625rem] uppercase tracking-[.12em] ${expanded ? 'text-primary-text' : 'text-muted-foreground'}`}>
+              {SLOT_LABEL[slot]}{expanded ? ' · open' : ''}
+            </span>
+            {option ? (
+              /* NOT a hard one-line cut: Ashley, 3 Sep 2026, could not read a
+                 long meal name. Two lines collapsed, all of it when open. */
+              <span data-meal-name={slot} className={expanded ? 'block text-[1.0625rem] font-semibold tracking-[-.01em]' : 'block line-clamp-2 text-[0.875rem]'}>
+                {displayName}
+              </span>
+            ) : (
+              <span className="block text-sm text-muted-foreground" data-testid="meal-slot-all-clash-note">
+                {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction) ? 'Nothing saved fits what you avoid' : 'No option generated'}
+              </span>
+            )}
+          </span>
+          {option && !expanded && <span className="flex shrink-0 items-center gap-1">{kcalText}<ChevronRight className="size-3.5 text-muted-foreground" /></span>}
+        </button>
+      )}
+
+      {/* THE CARD'S OWN THREE (2b): Log it, Swap, and the method. Each is the
+          row's own handler, so the card and the full row cannot disagree. */}
+      {variant === 'upnext' && option && !expanded && (
+        <div className="mt-3 flex items-center gap-2" data-upnext-actions>
+          <button
+            type="button"
+            onClick={() => void handleLogToggle()}
+            disabled={busy || blocked}
+            className="glow-mint-box flex h-11 flex-1 items-center justify-center rounded-xl text-[0.875rem] font-bold disabled:opacity-50"
+            style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white) 0%, var(--primary) 55%, var(--primary-2) 100%)', color: 'var(--primary-foreground)' }}
+            data-upnext-log
+          >
+            Log it
+          </button>
+          {canSwap && (
+            <button
+              type="button"
+              onClick={() => { if (!expanded) onToggle(); setSwapOpen(true) }}
+              className="flex h-11 items-center gap-1.5 rounded-xl px-3.5 text-[0.8125rem] font-medium"
+              style={{ background: 'color-mix(in srgb, var(--surface-raised) 60%, var(--text-dim))' }}
+              data-upnext-swap
+            >
+              <Repeat className="size-4" aria-hidden /> Swap
+            </button>
+          )}
+          {hasMethod && (
+            <button
+              type="button"
+              onClick={() => setMethodOpen(o => !o)}
+              aria-expanded={methodOpen}
+              aria-label="How to cook it"
+              className="flex size-11 items-center justify-center rounded-xl"
+              style={{ background: 'color-mix(in srgb, var(--surface-raised) 60%, var(--text-dim))' }}
+              data-upnext-method
+            >
+              <ChefHat className="size-[18px]" aria-hidden />
+            </button>
+          )}
         </div>
-      </button>
+      )}
+      {variant === 'upnext' && option && !expanded && methodOpen && hasMethod && (
+        <p className="mt-3 whitespace-pre-line text-xs leading-relaxed text-[color:var(--text-tertiary)]" data-meal-method={option.name}>
+          {methodSafeToShow(option.prep)}
+        </p>
+      )}
 
       {eatenNote && (
         /* QUIET, AND NOT AN INSTRUCTION — Ashley's ruling, 9 Sep 2026. Muted

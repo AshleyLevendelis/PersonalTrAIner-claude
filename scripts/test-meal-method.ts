@@ -247,8 +247,14 @@ console.log('\n5. It reaches the screen, and only when there is one')
   // ingredients heading made it -1 and the comparison passed for free — an
   // ordering check that silently stopped ordering anything. A mutation
   // removing the ingredients anchor now fails it rather than satisfying it.
+  // TWO PLACES SINCE 2b (10 Oct 2026): the open row (below its ingredients,
+  // the LAST occurrence) and the Up next card's chef-hat panel, which is only
+  // drawn while the row is closed — no ingredients on screen to be below.
   const iIngredients = card.indexOf('option.ingredients.length > 0 && (')
-  const iMethod = card.indexOf('data-meal-method=')
+  const iMethod = card.lastIndexOf('data-meal-method=')
+  check('the card\'s method shows only with the row closed, and only when there is one',
+    /variant === 'upnext' && option && !expanded && methodOpen && hasMethod && \(/.test(card)
+    && /const hasMethod = !!option && methodSafeToShow\(option\.prep\)\.length > 0/.test(card))
   check('...and below the ingredients, which are where the amounts live',
     iIngredients >= 0 && iMethod >= 0 && iIngredients < iMethod, { iIngredients, iMethod })
   check('the legacy chat shape stops hardcoding an empty method',

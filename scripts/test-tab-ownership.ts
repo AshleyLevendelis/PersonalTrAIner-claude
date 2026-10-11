@@ -95,7 +95,10 @@ check('Exercise imports it too', /from '@\/lib\/week-glyphs'/.test(exStrip) && !
 check("Home's strip is not interactive — no handler", !/onClick/.test(homeStrip))
 check('...and not a button', !/<button/.test(homeStrip))
 check("Exercise's strip IS interactive", /onClick/.test(exStrip) && /<button/.test(exStrip))
-check('Home cells are 26px, Exercise is not', /h-\[26px\]/.test(homeStrip) && !/h-\[26px\]/.test(exStrip))
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's cells are 26px CIRCLES
+// now (size-[26px]); the point is unchanged — the record is small, the
+// navigator is not.
+check('Home cells are 26px, Exercise is not', /size-\[26px\]/.test(homeStrip) && !/(size|h)-\[26px\]/.test(exStrip))
 // RE-ANCHORED 9 Oct 2026 (M14). This asserted that Exercise's strip contains
 // the text `STATE_LABEL[d.state]` — the mechanism. Both strips now take their
 // sentence from one function in the shared vocabulary (dayLabel), which is what

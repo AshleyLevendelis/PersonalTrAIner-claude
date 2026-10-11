@@ -230,7 +230,7 @@ async function main() {
   check('a lift with no short name reads as the catalogue writes it, never lower-cased', other === 'Bulgarian Split Squats from ~12kg per hand', other)
   check('a bar is a plain weight', leadLiftPhrase({ name: 'Barbell Squats', kg: 60, labelMode: 'total', loggedKg: null }, 'not_started') === 'Squat from ~60kg')
   const home = strip(read('src/components/Dashboard.tsx'))
-  check('Home builds the line with that one function', (home.match(/leadLiftPhrase\(/g) ?? []).length === 2 && !/\.kg\} kg/.test(home) && !/toLowerCase\(\)/.test(/glanceParts[\s\S]{0,1400}/.exec(home)?.[0] ?? ''))
+  check('Home builds the line with that one function', (home.match(/leadLiftPhrase\(/g) ?? []).length >= 1 && !/\bkg\} ?kg|from \$\{[^}]*kg/.test(home) && !/\.kg\} kg/.test(home) && !/toLowerCase\(\)/.test(/glanceParts[\s\S]{0,1400}/.exec(home)?.[0] ?? ''))
 
   console.log(`\n${ran} checks ran. ${failures === 0 ? 'All passed.' : `${failures} FAILED.`}`)
   if (failures > 0) process.exit(1)

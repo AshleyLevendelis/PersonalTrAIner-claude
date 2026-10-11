@@ -1,72 +1,79 @@
 // ---------------------------------------------------------------------------
-// Home's week strip — THE RECORD, not the navigator.
+// Home's week row — THE RECORD, not the navigator.
 //
-// The same seven marks Exercise shows, at 26px instead of 38px and with no
-// affordance at all: no handler, no cursor, no focus ring, not a button. That
-// is the whole distinction. Exercise's strip is how you move around the week;
-// this one is how the week looks, and offering a tap here would promise a
-// peek that Home has nowhere to put.
+// Design handoff 2a (10 Oct 2026): seven 26px circles with the day's letter
+// inside, under the session hero. No affordance at all: no handler, no cursor,
+// not a button. Exercise's strip is how you move around the week; this one is
+// how the week looks, and offering a tap here would promise a peek Home has
+// nowhere to put.
 //
-// Glyphs come from the shared vocabulary so the two strips cannot drift into
-// meaning different things by the same mark.
+// FOUR LOOKS FOR TEN STATES, and the full state is still spoken. The brief
+// draws done, rest, missed and today; the week has ten states. Each maps to
+// the nearest look (below), and every cell keeps its aria-label from
+// dayLabel(d) — the one sentence the Exercise strip and the coach also use —
+// so nothing the old glyphs said is lost to a screen reader.
 // ---------------------------------------------------------------------------
+import type { CSSProperties } from 'react'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
-import { GLYPH, dayLabel, SHORT_DAY } from '@/lib/week-glyphs'
+import { dayLabel, SHORT_DAY } from '@/lib/week-glyphs'
 
-export function HomeWeekStrip({ days, todayName }: { days: TrainingWeekDay[]; todayName: string }) {
-  return (
-    <div className="grid grid-cols-7 gap-1">
-      {days.map(d => {
-        const isToday = d.dayName === todayName
-        const isDone = d.state === 'done'
-        return (
-          <div
-            key={d.date}
-            // A LIST, not a row of controls. role="img" with a spoken label
-            // keeps it legible to a screen reader without announcing seven
-            // buttons that do nothing.
-            role="img"
-            aria-label={dayLabel(d)}
-            className="flex h-[26px] flex-col items-center justify-center rounded-lg"
-            style={{
-              background: isToday
-                ? 'rgba(var(--glow-rgb), .10)'
-                : isDone ? 'rgba(var(--glow-rgb), .16)' : 'transparent',
-              border: isToday ? '1px solid rgba(var(--glow-rgb), .45)' : '1px solid transparent',
-            }}
-          >
-            {/* TODAY'S CELL SAYS WHAT HAPPENED. This drew a plain dot for
-                today whatever its state, so a day swapped, moved or finished
-                TODAY could never show ⇄, → or ✓ here — Ashley, 8 Sep 2026:
-                "still not moving markers". The dot now means exactly what it
-                means on the Exercise strip (WeekContextRow): due, and only
-                due. Same rule, same glyph file, so the two cannot drift. */}
-            {isToday && d.state === 'due' ? (
-              <span aria-hidden className="size-[6px] rounded-full bg-primary" />
-            ) : (
-              <span
-                aria-hidden
-                className={`leading-none ${isDone ? 'text-[0.75rem]' : 'text-[0.6875rem]'} ${isDone || isToday ? 'text-primary-text' : 'text-muted-foreground'}`}
-              >
-                {GLYPH[d.state]}
-              </span>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
+export type WeekCircleLook = 'done' | 'partial' | 'missed' | 'today' | 'due' | 'rest' | 'away'
+
+/**
+ * Which look a day wears. Exported so the gate asks the function rather than
+ * reading a ternary.
+ *  - done, and a day swapped for something she did → filled
+ *  - partly done → accent ring
+ *  - missed → warn ring
+ *  - today, still due → accent ring with glow
+ *  - a training day still ahead → plain raised circle
+ *  - rest, recovery, before the plan, rest chosen → sunken and dim
+ *  - moved away → sunken and dim (the session is on the day it moved to)
+ */
+export function weekCircleLook(d: Pick<TrainingWeekDay, 'state'>, isToday: boolean): WeekCircleLook {
+  switch (d.state) {
+    case 'done': case 'swapped': return 'done'
+    case 'partial': return 'partial'
+    case 'missed': return 'missed'
+    case 'due': return isToday ? 'today' : 'due'
+    case 'moved': return 'away'
+    default: return 'rest'
+  }
 }
 
-/** Mon–Sun, under the strip. Separate so the strip itself stays 26px exactly. */
-export function HomeWeekStripLabels({ days }: { days: TrainingWeekDay[] }) {
+const LOOK: Record<WeekCircleLook, CSSProperties> = {
+  done: { background: 'var(--primary)', color: 'var(--primary-foreground)' },
+  partial: { background: 'rgba(var(--glow-rgb), .14)', boxShadow: 'inset 0 0 0 1.5px var(--primary)', color: 'var(--primary-text)' },
+  missed: { background: 'transparent', boxShadow: 'inset 0 0 0 1.5px color-mix(in srgb, var(--role-warn) 60%, transparent)', color: 'var(--role-warn-text)' },
+  today: { background: 'transparent', boxShadow: 'inset 0 0 0 1.5px var(--primary)', color: 'var(--primary-text)' },
+  due: { background: 'var(--surface-raised)', color: 'var(--text-tertiary)' },
+  rest: { background: 'var(--surface-sunken)', color: 'var(--text-dim)' },
+  away: { background: 'var(--surface-sunken)', color: 'var(--text-dim)' },
+}
+
+export function HomeWeekStrip({ days, todayName, done, planned }: { days: TrainingWeekDay[]; todayName: string; done: number; planned: number }) {
   return (
-    <div className="mt-1 grid grid-cols-7 gap-1" aria-hidden>
-      {days.map(d => (
-        <span key={d.date} className="text-center text-[0.625rem] text-muted-foreground">
-          {(SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 3)).slice(0, 1)}
-        </span>
-      ))}
+    <div className="flex items-center gap-1.5" data-home-week>
+      {days.map(d => {
+        const isToday = d.dayName === todayName
+        const look = weekCircleLook(d, isToday)
+        return (
+          <span
+            key={d.date}
+            // A LIST, not a row of controls: role="img" with a spoken label.
+            role="img"
+            aria-label={dayLabel(d)}
+            data-look={look}
+            className={`flex size-[26px] shrink-0 items-center justify-center rounded-full text-[0.65625rem] font-semibold ${look === 'done' || look === 'today' ? 'glow-mint-box' : ''}`}
+            style={look === 'done' || look === 'today' ? { ...LOOK[look], '--glow-strength': 'calc(var(--glow-strength, 1) * .45)' } as CSSProperties : LOOK[look]}
+          >
+            <span aria-hidden>{(SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 3)).slice(0, 1)}</span>
+          </span>
+        )
+      })}
+      <span className="ml-auto tabular-mono text-[0.75rem] text-text-tertiary" data-home-week-count aria-label={`${done} of ${planned} sessions done this week`}>
+        {done}/{planned}
+      </span>
     </div>
   )
 }

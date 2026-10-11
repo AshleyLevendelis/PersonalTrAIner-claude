@@ -79,36 +79,22 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1#/t
 await wait(5000)
 
 const home = await ev('document.body.innerText')
-check('1a. the PR section is on screen at all', /Recent PRs/i.test(home), home.slice(0, 200))
-
-// THE FIXTURE MUST BE THE ONE THIS IS ABOUT. Without this the six checks
-// below could all pass against a page that never had a bodyweight record.
-check('1b. the bodyweight exercise reached the list', /Pull-Ups/i.test(home), home.slice(0, 400))
-
-// The section, isolated — so "12 reps" appearing somewhere else on Home
-// cannot satisfy a check about the PR list.
-const prBlock = await ev(`(() => {
-  const label = [...document.querySelectorAll('*')].find(n => n.children.length === 0 && /^Recent PRs$/i.test(n.textContent.trim()))
-  return label ? (label.parentElement?.innerText ?? '') : ''
-})()`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's "Recent PRs" list became
+// ONE cell in the weight panel — the latest PR. In this fixture the latest is
+// the bodyweight one (Pull-Ups, 2 days back), which is the record this driver
+// exists for. The belt record (Dips, 3 days back) is no longer on Home; its
+// "+12kg" rendering is held by test:bodyweight-progress through personalBest.
+check('1a. the PR cell is on screen at all', await ev(`!!document.querySelector('[data-home-latest-pr]')`), home.slice(0, 200))
+const prBlock = await ev(`document.querySelector('[data-home-latest-pr]')?.innerText ?? ''`)
+check('1b. the bodyweight exercise reached it', /Pull-Ups/i.test(prBlock), prBlock)
 check('1c. the PR block was found, so the checks below are not vacuous', prBlock.length > 0, prBlock)
 check('1d. the bodyweight best reads in REPS', /Pull-Ups[\s\S]*?\b14 reps\b/.test(prBlock), prBlock)
-// THE DEFECT THIS EXISTS FOR. Before today the renderer printed `${value} kg`
-// with no branch: a bodyweight record showed "0 kg", and a reps record would
-// have shown "14 kg" — a number in the wrong unit, which reads as correct.
-check('1e. ...and NOT as kilograms', !/Pull-Ups[\s\S]*?\b14 ?kg\b/.test(prBlock), prBlock)
-check('1f. ...and not as the "0 kg" it used to show', !/Pull-Ups[\s\S]*?\b0 ?kg\b/.test(prBlock), prBlock)
-check('1g. the belt record reads as ADDED weight, with its plus', /Dips[\s\S]*?\+12kg/.test(prBlock), prBlock)
-check('1h. ...and the belt is not reported as reps', !/Dips[\s\S]*?\b12 reps\b/.test(prBlock), prBlock)
+// THE DEFECT THIS EXISTS FOR: `${value} kg` with no branch printed "0 kg"
+// for a bodyweight record and would have printed "14 kg" for a reps one.
+check('1e. ...and NOT as kilograms', !/\b14 ?kg\b/.test(prBlock), prBlock)
+check('1f. ...and not as the "0 kg" it used to show', !/\b0 ?kg\b/.test(prBlock), prBlock)
 
-// SCROLL TO IT BEFORE SHOOTING. The section sits below the fold on a 390x844
-// phone, and innerText reads it whether it is visible or not — so a
-// screenshot taken at the top proves the checks ran, not that anyone could
-// read the result. The picture is the point.
-await ev(`(() => {
-  const label = [...document.querySelectorAll('*')].find(n => n.children.length === 0 && /^Recent PRs$/i.test(n.textContent.trim()))
-  label?.scrollIntoView({ block: 'center' })
-})()`)
+await ev(`document.querySelector('[data-home-latest-pr]')?.scrollIntoView({ block: 'center' })`)
 await wait(600)
 await shoot('bodyweight-progress-home')
 

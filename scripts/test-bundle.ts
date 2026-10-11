@@ -143,8 +143,15 @@ console.log('\n1. The libraries are cached separately from the app')
   // Measured on the test-log fixes branch: 297. The growth is 58 commits of fixes, spread thin over core
   // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
   // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
-  headroom('a deploy re-downloads', appGzip, 305, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 305, appGzip)
+  // MOVED 10 Oct 2026 for her six-screen layout pass (design handoff 2a-2e, 4c), on her 15 Sep ruling
+  // ("raise it with room to grow"). MEASURED through this gate, the base on a clean worktree of fc516ab4:
+  //     before Home   deploy 303 gz   paint 458 gz   app 1048 raw
+  //     after Home    deploy 305 gz   paint 461 gz   app 1055 raw
+  // Home is the default tab, so its new panels and the rotating note are first-paint code by nature.
+  // Room is left for Nutrition and Exercise, the other two first-paint screens in the same pass; each
+  // re-measures this as it lands.
+  headroom('a deploy re-downloads', appGzip, 318, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 318, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -221,9 +228,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // Measured on the test-log fixes branch: 453. The growth is 58 commits of fixes, spread thin over core
   // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
   // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
-  headroom('first paint fetches', firstLoadGzip, 461, 'kB gzipped')
+  // MOVED 10 Oct 2026: 461 -> 474, the layout pass — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 474, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 461, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 474, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -325,7 +333,8 @@ console.log('\n3. Nothing has crept back up')
   // Measured on the test-log fixes branch: 1,032. The growth is 58 commits of fixes, spread thin over core
   // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
   // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
-  const APP_CHUNK_BUDGET_KB = 1052
+  // MOVED 10 Oct 2026: 1,052 -> 1,090 raw, the layout pass — see the deploy figure above for both ends.
+  const APP_CHUNK_BUDGET_KB = 1090
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

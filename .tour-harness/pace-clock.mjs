@@ -92,11 +92,30 @@ const settled = tab => ev(tab === 'nutrition'
   : `!!document.querySelector('main') && !/Loading/.test(document.querySelector('main').innerText) && /\\d/.test(document.querySelector('main').innerText)`)
 
 let loads = 0
+// HOME'S NOTE ROTATES (design handoff 2a, 10 Oct 2026), so one reading shows
+// ONE tip. Every tip is read by tapping its dot — the way a person reaches it
+// — and the page text checked below is the page plus every tip it holds.
+const homeTips = async () => {
+  const n = await ev(`document.querySelectorAll('main [data-nudge-dots] button').length`)
+  if (!n) return [(await nudge()).text]
+  const out = []
+  for (let i = 0; i < n; i++) {
+    await ev(`document.querySelectorAll('main [data-nudge-dots] button')[${i}]?.click()`)
+    await wait(450)
+    out.push((await nudge()).text)
+  }
+  return out
+}
 const open = async (tab, query) => {
   // Its own address every time: the same URL twice is a jump to a #fragment, not a load.
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=${++loads}${query}#/tab/${tab}` })
   await until(() => settled(tab), v => v === true)
   await wait(900)
+  if (tab === 'dashboard') {
+    const tips = await homeTips()
+    const first = await nudge()
+    return { nudge: { ...first, text: tips.join(' | ') }, text: `${await pageText()} ${tips.join(' ')}` }
+  }
   return { nudge: await nudge(), text: await pageText() }
 }
 
@@ -132,8 +151,8 @@ await shoot('pace-clock-home-1200')
 const h2153 = await open('dashboard', '&clock=21:53')
 const hFirst = await open('dashboard', '&joined=today&clock=21:53')
 await shoot('pace-clock-home-first-day')
-const NO_MEALS = /no meals logged yet/
-const WATER = /behind on water/
+const NO_MEALS = /no meals logged yet/i
+const WATER = /behind on water/i
 check('3a. 07:01: Home does not say "no meals logged yet"', !NO_MEALS.test(h0701.text), h0701.nudge)
 check('3b. ...or anything about being behind on water', !WATER.test(h0701.text), h0701.nudge)
 check('3c. 12:00: it does', NO_MEALS.test(h1200.text) && NO_MEALS.test(h1200.nudge.text), h1200.nudge)

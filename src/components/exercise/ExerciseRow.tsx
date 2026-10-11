@@ -60,6 +60,8 @@ export interface ExerciseRowProps {
   canMoveDown?: boolean
   /** Passed straight through to SetGrid, which needs it to judge a typed weight — see set-plausibility.ts. */
   profile?: SetGridProps['profile']
+  /** Its place in today's session, printed "01" on the collapsed line (design handoff 2c). */
+  index?: number
 }
 
 export function ExerciseRow({
@@ -84,6 +86,7 @@ export function ExerciseRow({
   canMoveUp,
   canMoveDown,
   profile,
+  index,
 }: ExerciseRowProps) {
   const { logs, setsFor, requestedSetFocus, clearSetFocusRequest, setsKnown, loadState } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
@@ -189,6 +192,11 @@ export function ExerciseRow({
         onToggleExpanded={onToggleExpanded}
         allSetsLogged={allSetsLogged}
         loggedSummary={formatCompletedSummary(loggedSets)}
+        index={index}
+        // WORKING sets, the same count as the track's "Working n/N": a ramp
+        // set logged is not a set of the exercise done.
+        setsDone={rampProgress.workingDone}
+        progressing={progressionNote?.didProgress}
       />
       {/* ONE CONTINUOUS TRACK, RAMP THEN WORKING — the handoff's progress row.
           It replaces a bare "2/3 sets" that counted working sets only, so a

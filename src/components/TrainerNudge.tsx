@@ -1,7 +1,8 @@
 import type * as React from 'react'
-import { ChevronRight, MessageCircle } from 'lucide-react'
+import { ArrowUpRight, ChevronRight, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tabHash } from '@/lib/app-route'
+import { setChatPrefill } from '@/lib/chat-prefill-store'
 
 // ---------------------------------------------------------------------------
 // The Personal TrAIner's one line outside chat — design_handoff_app_polish
@@ -58,62 +59,112 @@ export interface TrainerNudgeProps {
   clamp?: boolean
   className?: string
   'data-testid'?: string
+  /**
+   * What the line is about, after "TRAINER ·" in the label — "TRAINING",
+   * "NUTRITION". Absent: the label says TRAINER alone. (Design handoff 2a,
+   * 10 Oct 2026; the brief's "COACH" became TRAINER on her ruling that the
+   * assistant is called Personal TrAIner everywhere on screen.)
+   */
+  tag?: string
+  /** "Ask ↗" opens chat with this already typed for her. Without it, Ask opens chat empty. */
+  askPrefill?: string
+  /** Home's rotation: one dot per tip, the active one long. Tapping a dot jumps to it. */
+  pager?: { count: number; index: number; onSelect: (i: number) => void }
+  /** Tapping the line itself (Home: the next tip). */
+  onTextTap?: () => void
+  /** Fading between two lines (Home's rotation). */
+  fading?: boolean
 }
 
-const AVATAR_GRADIENT = 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))'
-
-export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, className, ...rest }: TrainerNudgeProps) {
-  const avatar = compact ? 20 : 22
+/**
+ * THE 2a NOTE (design handoff, 10 Oct 2026): a sparkle, "TRAINER · TAG",
+ * "Ask ↗" and the dots on one row, the line under it at 13.5px. One
+ * component for Home, Nutrition and Exercise, so the three cannot drift.
+ */
+export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, className, tag, askPrefill, pager, onTextTap, fading, ...rest }: TrainerNudgeProps) {
+  const ask = () => {
+    if (askPrefill) setChatPrefill(askPrefill)
+    window.location.hash = tabHash('chat')
+  }
   return (
     <div
       role="note"
       aria-label="Personal TrAIner says"
       data-testid={rest['data-testid'] ?? 'trainer-nudge'}
-      className={cn('glow-bloom-once flex items-start', compact ? 'gap-2 rounded-xl' : 'gap-2.5 rounded-[14px]', className)}
+      className={cn('glow-bloom-once flex flex-col', compact ? 'gap-1 rounded-xl' : 'glow-violet-soft gap-1.5 rounded-[14px]', className)}
       style={{
-        padding: compact ? '10px 12px' : '12px 14px',
+        padding: compact ? '9px 12px' : '10px 14px',
         background: 'var(--role-ai-bg)',
         border: compact ? 'none' : '1px solid var(--role-ai-border)',
       }}
     >
-      <span
-        aria-hidden
-        className="flex shrink-0 items-center justify-center rounded-full"
-        style={{ width: avatar, height: avatar, background: AVATAR_GRADIENT, color: 'var(--primary-foreground)', marginTop: compact ? 1 : 2 }}
-      >
-        <MessageCircle size={12} strokeWidth={2.6} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className={cn('m-0', clamp && 'line-clamp-3')} style={{ fontSize: compact ? '0.78125rem' : '0.8125rem', lineHeight: 1.5, color: 'var(--role-ai-text)' }}>
-          {text}
-        </div>
-        {actions && actions.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-            {actions.map(a => (
+      <div className="flex items-center gap-2">
+        <Sparkles aria-hidden className="glow-violet size-[14px] shrink-0" style={{ color: 'var(--role-ai-accent)' }} />
+        <span className="min-w-0 flex-1 truncate text-[0.65625rem] font-semibold uppercase tracking-[.16em]" style={{ color: 'var(--role-ai-label)' }} data-nudge-tag>
+          {tag ? `Trainer · ${tag}` : 'Trainer'}
+        </span>
+        {openChat && (
+          <button
+            type="button"
+            onClick={ask}
+            aria-label="Ask the Personal TrAIner about this"
+            className="hit-slop-44 flex shrink-0 items-center gap-0.5 bg-transparent p-0 text-[0.71875rem] font-semibold"
+            style={{ color: 'var(--role-ai-text)' }}
+            data-nudge-ask
+          >
+            Ask <ArrowUpRight className="size-3" aria-hidden />
+          </button>
+        )}
+        {!openChat && onOpen && (
+          <button
+            type="button"
+            aria-label="Read the rest of this"
+            onClick={onOpen}
+            className="hit-slop-44 -mr-1 flex shrink-0 items-center justify-center bg-transparent p-0"
+            style={{ color: 'var(--muted-foreground)', width: 20, height: 20 }}
+          >
+            <ChevronRight size={14} />
+          </button>
+        )}
+        {pager && pager.count > 1 && (
+          <span className="flex shrink-0 items-center gap-1" data-nudge-dots>
+            {Array.from({ length: pager.count }, (_, i) => (
               <button
-                key={a.label}
+                key={i}
                 type="button"
-                disabled={a.disabled}
-                onClick={() => { void a.onClick() }}
-                className="hit-slop-44 bg-transparent p-0 text-[0.78125rem] font-semibold disabled:opacity-50"
-                style={{ color: a.secondary ? 'var(--muted-foreground)' : 'var(--primary)' }}
-              >
-                {a.label}
-              </button>
+                aria-label={`Tip ${i + 1} of ${pager.count}`}
+                aria-current={i === pager.index ? 'true' : undefined}
+                onClick={() => pager.onSelect(i)}
+                className="hit-slop-44 h-[5px] rounded-full p-0 transition-[width] duration-300"
+                style={{ width: i === pager.index ? 14 : 5, background: i === pager.index ? 'var(--role-ai-accent)' : 'color-mix(in srgb, var(--role-ai-accent) 30%, transparent)' }}
+              />
             ))}
-          </div>
+          </span>
         )}
       </div>
-      {(openChat || onOpen) && (
-        <button
-          type="button"
-          aria-label={openChat ? 'Open the Personal TrAIner chat' : 'Read the rest of this'}
-          onClick={openChat ? () => { window.location.hash = tabHash('chat') } : onOpen}
-          className="hit-slop-44 -mr-1 flex shrink-0 items-center justify-center bg-transparent p-0"
-          style={{ color: 'var(--muted-foreground)', width: 20, height: 20, marginTop: compact ? 0 : 1 }}
-        >
-          <ChevronRight size={14} />
-        </button>
+      <div
+        className={cn('m-0 transition-opacity duration-[250ms]', clamp && 'line-clamp-3', onTextTap && 'cursor-pointer')}
+        style={{ fontSize: compact ? '0.78125rem' : '0.84375rem', lineHeight: 1.45, color: 'var(--role-ai-text)', opacity: fading ? 0 : 1 }}
+        onClick={onTextTap}
+        data-nudge-text
+      >
+        {text}
+      </div>
+      {actions && actions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {actions.map(a => (
+            <button
+              key={a.label}
+              type="button"
+              disabled={a.disabled}
+              onClick={() => { void a.onClick() }}
+              className="hit-slop-44 bg-transparent p-0 text-[0.78125rem] font-semibold disabled:opacity-50"
+              style={{ color: a.secondary ? 'var(--muted-foreground)' : 'var(--primary)' }}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   )

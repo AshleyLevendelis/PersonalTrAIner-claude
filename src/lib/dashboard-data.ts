@@ -20,7 +20,7 @@ import { getExerciseEntry } from './exercise-db'
 import { getActiveGoals } from './memory-store'
 import { computeStreak, buildStreakDays, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
-import { selectCoachTipWithKey, type CoachTipContext } from './coach-tips'
+import { selectCoachTipWithKey, eligibleCoachTips, type CoachTipContext, type SelectedCoachTip } from './coach-tips'
 import { expectedByNow, paceClock } from './pace'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
@@ -201,6 +201,24 @@ export interface DashboardData {
   session: TodaySession
   /** Null while the plan has not arrived — the row is dropped rather than guessed at. */
   tomorrowLabel: string | null
+  /**
+   * Tomorrow, structured, for the session hero's glance line (design handoff
+   * 2a moved "Tomorrow" from its own row into that line). Null while the plan
+   * is unknown, for the same reason tomorrowLabel is.
+   */
+  tomorrow: { rest: true } | { rest: false; focus: string } | null
+  /** Every coach tip true today, the day's pick first — the Home note rotates through them (2a). */
+  coachTips: SelectedCoachTip[]
+  /** Records beaten TODAY, ranked like recentPRs — the "Done" panel's PR row and count (2a). */
+  prsToday: RecentPR[]
+  /** Training minutes of today's session, only once it was finished (the column defaults to 45 before that). */
+  sessionMinutes: number | null
+  /**
+   * Working sets logged this calendar week so far, and last week over the SAME
+   * days (Mon..same weekday) — never a part week against a whole one (2a's
+   * "Volume this week"). Warm-ups and drops are not volume (getRecentLogs).
+   */
+  volume: { thisWeek: number; lastWeekSoFar: number }
   coachTip: string | null
   /** Which rule produced coachTip — drives the bubble's reply chips. */
   coachTipKey: string | null
@@ -337,9 +355,15 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const isRestDay = planKnown && (!todayWorkoutDay || todayWorkoutDay.exercises.length === 0)
 
   let explicitlyCompleted = false
+  let sessionMinutes: number | null = null
   if (!isRestDay) {
-    const { data } = await supabase.from('workout_sessions').select('is_completed').eq('profile_id', profileId).eq('date', todayStr).maybeSingle()
-    explicitlyCompleted = !!data?.is_completed
+    // select('*') and read defensively: a named column is a parse-time
+    // dependency (CLAUDE.md), and this row now also gives the Done panel its time.
+    const { data } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).eq('date', todayStr).maybeSingle()
+    const row = data as { is_completed?: boolean; finished_at?: string | null; duration_minutes?: number | null } | null
+    explicitlyCompleted = !!row?.is_completed
+    // ONLY A FINISHED SESSION HAS A REAL DURATION: the column defaults to 45.
+    if (row?.is_completed && row.finished_at && typeof row.duration_minutes === 'number' && row.duration_minutes > 0) sessionMinutes = row.duration_minutes
   }
 
   // The glance line's three facts, derived here rather than in the component:
@@ -453,7 +477,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // one of the session: the likeliest to be the best. Found by a driver that
   // beat a record on its final set and saw no "Recent PRs" on Home.
   await refreshPRCacheFromDB(profileId).catch(() => {})
-  const recentPRs = pickRecentPRs(getRecordsBeaten(profileId), todayStr)
+  const beatenAll = getRecordsBeaten(profileId)
+  const recentPRs = pickRecentPRs(beatenAll, todayStr)
+  const prsToday = pickRecentPRs(beatenAll.filter(r => r.date === todayStr), todayStr)
   const prCache = getPRCache(profileId)
 
   // ---- Streak + session-pace + protein-adherence window (shared reads) ---
@@ -619,6 +645,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     firstDay: clock.firstDay,
   }
   const selectedTip = selectCoachTipWithKey(coachTipCtx)
+  const coachTips = eligibleCoachTips(coachTipCtx)
   const coachTip = selectedTip?.text ?? null
   const coachTipKey = selectedTip?.key ?? null
 
@@ -640,6 +667,17 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const whatsLeftLine = gaps.length > 0 ? gaps.join(' · ') : null
 
   // ---- Phase context --------------------------------------------------------
+  // THIS WEEK'S VOLUME against last week's SAME days. Calendar weeks, Monday
+  // first, the same week the Home strip draws.
+  const mondayOf = (d: string) => addDays(d, -((new Date(`${d}T12:00:00`).getDay() + 6) % 7))
+  const thisMonday = mondayOf(todayStr)
+  const lastMonday = addDays(thisMonday, -7)
+  const lastSameDay = addDays(todayStr, -7)
+  const volume = {
+    thisWeek: workingLogs.filter(l => l.date >= thisMonday && l.date <= todayStr).length,
+    lastWeekSoFar: workingLogs.filter(l => l.date >= lastMonday && l.date <= lastSameDay).length,
+  }
+
   const phase: PhaseContext | null = liveWeekData
     ? {
         weekNumber: liveWeekData.week_number,
@@ -656,6 +694,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     dayName,
     session,
     tomorrowLabel,
+    tomorrow: !planKnown ? null
+      : tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0 ? { rest: false, focus: tomorrowWorkoutDay.focus } : { rest: true },
+    coachTips,
+    prsToday,
+    sessionMinutes,
+    volume,
     coachTip,
     coachTipKey,
     consistency,

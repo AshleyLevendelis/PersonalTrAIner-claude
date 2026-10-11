@@ -421,6 +421,7 @@
     "test:chat-page": "tsx scripts/test-chat-page.ts",
     "test:meal-library": "tsx scripts/test-meal-library.ts",
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
+    "test:exercise-layout": "tsx scripts/test-exercise-layout.ts",
     "test:round-setup": "tsx scripts/test-round-setup.ts"
   },
   "dependencies": {

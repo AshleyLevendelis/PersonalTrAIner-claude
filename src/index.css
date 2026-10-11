@@ -170,6 +170,16 @@
    * animations below inherit the same multiplier, which is why glow "Off"
    * also visually stills them (they animate between two invisible states). */
   --glow-strength: 1;
+
+  /* A well INSIDE a raised panel — bar tracks, a rest day's dot (design
+   * handoff 2a, 10 Oct 2026). Derived from the canvas rather than set per
+   * theme, so all nine themes get one that reads as "below the panel". */
+  --surface-sunken: color-mix(in srgb, var(--background) 58%, transparent);
+
+  /* The trainer note's sparkle and its "TRAINER · TAG" label (2a). The violet
+   * of the AI role on a dark canvas; darker on paper, below. */
+  --role-ai-accent: #9C8DFF;
+  --role-ai-label: #B8AEFF;
 }
 
 [data-glow="off"] { --glow-strength: 0; }
@@ -586,6 +596,8 @@
  * a designer's call about hue, not mine. */
 [data-canvas="light"] {
   --role-warn-text: #9A3F0B;
+  --role-ai-accent: #6A58E8;
+  --role-ai-label: #5644C9;
 }
 
 [data-canvas="light"] .glow-text,
@@ -600,6 +612,9 @@
  * button on paper looks like a printing fault. */
 [data-canvas="light"] .glow-mint-box {
   box-shadow: 0 6px 16px rgba(var(--glow-rgb), .25);
+}
+[data-canvas="light"] .glow-violet-soft {
+  box-shadow: none;
 }
 /* .glow-bloom-once is `both`-filled, so its END state is what the CTA wears
  * at rest — overriding the class alone would not reach it. Its own keyframe
@@ -847,6 +862,11 @@ html body[data-scroll-locked] {
   }
   .glow-violet-box {
     box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(156, 141, 255, calc(.45 * var(--glow-strength)));
+  }
+  /* The trainer's note (design handoff 2a, 10 Oct 2026): the same violet,
+   * softer — a note sitting on the page, not a control asking to be pressed. */
+  .glow-violet-soft {
+    box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(156, 141, 255, calc(.22 * var(--glow-strength)));
   }
   .glow-icon {
     filter: drop-shadow(0 0 calc(8px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.90 * var(--glow-strength))));

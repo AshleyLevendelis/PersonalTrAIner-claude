@@ -547,6 +547,19 @@ export function SetGrid({
     return /\d+/.exec(prescribedReps ?? '')?.[0] ?? ''
   }
 
+  /**
+   * A calibration week's set 2 onwards with nothing typed: the save below
+   * refuses it ("set 1 was the probe"), so the tick must not be offered as a
+   * one-tap log either. One predicate, read by the save and by the tick's
+   * data-next-weight, so the Exercise tab's button cannot promise a log the
+   * save would refuse.
+   */
+  const probeNeedsWeight = (ref: SetRef): boolean => {
+    const input = inputFor(ref)
+    return !!calibrationProbe && !isWarm(ref) && !isDrop(ref) && ref.setNumber > 1
+      && !input.isBodyweight && !input.weight.trim() && !drivingGhostFor(ref)
+  }
+
   const handleSaveSet = (ref: SetRef) => {
     if (!profileId) return
     const setNumber = ref.setNumber
@@ -589,7 +602,7 @@ export function SetGrid({
     // lift an empty weight would otherwise resolve to "bodyweight" and be
     // logged as a set she never did. The message names the probe so the
     // refusal reads as the design, not a fault.
-    if (calibrationProbe && !warm && !drop && setNumber > 1 && !input.isBodyweight && !input.weight.trim() && !ghost) {
+    if (probeNeedsWeight(ref)) {
       setRowErrors(prev => ({ ...prev, [k]: 'Type the weight you lifted — set 1 was the probe' }))
       return
     }
@@ -1049,6 +1062,19 @@ export function SetGrid({
                   color: warm ? 'var(--ramp-on)' : 'var(--primary-foreground)',
                 }}
                 onClick={() => handleSaveSet(ref)}
+                // WHAT THIS TICK WOULD SAVE, said on the tick itself, for the
+                // Exercise tab's "Log set 3 · Bench 80 kg × 6" button (design
+                // handoff 2c, 10 Oct 2026). The same expressions the two boxes
+                // show, so the button can only ever describe what this tick
+                // saves — and it presses this tick. Drop rows are left out:
+                // a drop is offered from its parent, never as "next".
+                data-next-set={!isSaved && !drop ? setLabelLong(ref) : undefined}
+                // EMPTY when there is no weight to take: the button then
+                // opens the box instead of pressing a tick that would refuse.
+                data-next-weight={!isSaved && !drop ? (isBW ? 'BW' : probeNeedsWeight(ref) ? '' : (input.weight || defaultWeightFor(ref))) : undefined}
+                data-next-unit={!isSaved && !drop ? (loadUnitLabel ?? 'kg') : undefined}
+                data-next-weight-box={!isSaved && !drop ? `setgrid-weight-${exerciseId}-${rowKey(ref)}` : undefined}
+                data-next-reps={!isSaved && !drop ? (input.reps || (ghost ? String(ghost.reps_completed) : defaultRepsFor(ref))) : undefined}
                 // THE KIND IS IN THE SPOKEN LABEL TOO. Warm-up 2 and working
                 // set 2 both read "Save set 2" until 17 Sep 2026, so a screen
                 // reader — and every driver — could not tell the two tick

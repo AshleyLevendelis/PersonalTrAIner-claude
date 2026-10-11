@@ -451,6 +451,35 @@ const loggedTarget = (() => {
 })()
 ;(window as unknown as { __loggedTarget: unknown }).__loggedTarget = loggedTarget
 
+// ?done=1 — TODAY'S SESSION FINISHED, every planned set logged, with one
+// personal best beaten on the heaviest lift (design handoff 2a's Done panel,
+// 10 Oct 2026). INPUT ONLY: the sets as the database holds them, the session
+// row as finishing writes it, and one earlier, lighter set for the record to
+// beat. What the panel says — time, count, PR — the app works out.
+const DONE_TODAY = new URLSearchParams(location.search).get('done') === '1'
+const doneSeed = (() => {
+  if (!DONE_TODAY) return null
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
+  if (!day) return null
+  const heaviest = [...day.exercises].filter(e => (e.suggested_load_kg ?? 0) > 0)
+    .sort((a, b) => (b.suggested_load_kg ?? 0) - (a.suggested_load_kg ?? 0))[0]
+  const sets = day.exercises.flatMap(ex => Array.from({ length: ex.sets }, (_, i) => ({
+    id: `dn-${ex.id}-${i}`, user_id: PROFILE_ID, session_id: 'sess-done',
+    exercise_id: getExerciseId(ex.name) ?? ex.id, exercise_name: ex.name, set_number: i + 1,
+    weight_kg: ex.suggested_load_kg ?? 0, reps_completed: 8, is_bodyweight: !(ex.suggested_load_kg ?? 0), is_warmup: false,
+    completed_at: anchorDate().toISOString(), date: isoOf(anchorDate()),
+  })))
+  const before = heaviest ? [{
+    id: 'dn-before', user_id: PROFILE_ID, session_id: 'sess-before',
+    exercise_id: getExerciseId(heaviest.name) ?? heaviest.id, exercise_name: heaviest.name, set_number: 1,
+    weight_kg: Math.max(2.5, (heaviest.suggested_load_kg ?? 0) - 5), reps_completed: 8, is_bodyweight: false, is_warmup: false,
+    completed_at: new Date(anchorNowMs() - 6 * 86400000).toISOString(), date: isoOf(new Date(anchorNowMs() - 6 * 86400000)),
+  }] : []
+  return { sets: [...before, ...sets], prLift: heaviest?.name ?? null, planned: day.exercises.reduce((n, e) => n + e.sets, 0) }
+})()
+;(window as unknown as { __doneSeed: unknown }).__doneSeed = doneSeed && { prLift: doneSeed.prLift, planned: doneSeed.planned }
+
 // A CARD WITH NO EXTERNAL LOAD ON TODAY'S SESSION — published for
 // verify:bodyweight-progress §3, 23 Sep 2026. That section asked "today's first
 // card" and its comment named Band Pull-Aparts; when new catalogue entries
@@ -770,6 +799,7 @@ const db: Db = {
           },
         ]
       : []),
+    ...(doneSeed?.sets ?? []),
     ...(loggedTarget
       ? Array.from({ length: Math.min(3, loggedTarget.sets) }, (_, i) => ({
           id: `lg${i}`, user_id: PROFILE_ID, session_id: 'sess-logged',
@@ -793,7 +823,10 @@ const db: Db = {
   // check cannot show. Today IS a training day in this fixture and tomorrow
   // is not (availableIdx), so this is the ordinary case — the session moves
   // to the next free day, which is the one she asked for.
-  workout_sessions: new URLSearchParams(location.search).get('swapped') === '1'
+  workout_sessions: doneSeed
+    ? [{ id: 'sess-done', profile_id: PROFILE_ID, date: today, is_completed: true, duration_minutes: 46,
+        started_at: anchorDate().toISOString(), finished_at: anchorDate().toISOString() }]
+    : new URLSearchParams(location.search).get('swapped') === '1'
     ? [{ id: 'ws-swap', profile_id: PROFILE_ID, date: today, is_completed: false, swapped_for_activity: 'Muay Thai' }]
     : new URLSearchParams(location.search).get('moved') === '1'
     ? [{

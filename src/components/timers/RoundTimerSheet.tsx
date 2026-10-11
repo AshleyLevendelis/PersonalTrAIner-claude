@@ -91,7 +91,7 @@ export function RoundTimerSheet({ todaysConfig, live, selected, todaysSessionNam
       <span
         data-step-value={field}
         className="tabular-mono min-w-[74px] text-center text-[1.5rem] font-bold"
-        style={isNone ? { color: 'color-mix(in oklab, var(--chart-2) 62%, white)' } : undefined}
+        style={isNone ? { color: 'var(--role-ai-label)' } : undefined}
       >
         {value}
       </span>
@@ -254,7 +254,7 @@ export function RoundTimerSheet({ todaysConfig, live, selected, todaysSessionNam
           >
             <span
               className="relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors"
-              style={{ background: prefs.openFullScreenOnStart ? 'var(--primary)' : 'rgba(69,60,142,.5)' }}
+              style={{ background: prefs.openFullScreenOnStart ? 'var(--primary)' : 'color-mix(in srgb, var(--text-dim) 70%, transparent)' }}
             >
               <span
                 className="absolute top-[2px] size-[14px] rounded-full bg-white transition-[left]"

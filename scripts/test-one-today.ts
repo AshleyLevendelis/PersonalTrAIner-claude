@@ -56,10 +56,13 @@ console.log('\n1. A finished session is not offered a start button\n')
   // own now ("✓ Session finished", runs 3-4), so the spacer is there in
   // exactly the two states that draw one, idle and finished, never running.
   const spacerCond = /\{([^{}]*) && <div aria-hidden className="h-\[100px\]" \/>\}/.exec(panel)?.[1] ?? ''
-  const barStates = ['idle', 'finished'].filter(st =>
-    new RegExp(`status === '${st}' && \\(\\s*(\\{\\/\\*[\\s\\S]*?\\*\\/\\}\\s*)?<div\\s+className="fixed`).test(panel))
+  // 10 Oct 2026, design handoff 2c: a RUNNING session has a fixed bar now
+  // too ("Log set 3 · Bench 80 kg × 6", NextSetButton), so the spacer is
+  // there in all three states — each because its own bar is drawn.
+  const barStates = ['idle', 'finished', 'running'].filter(st =>
+    new RegExp(`status === '${st}' && \\(\\s*(\\{\\/\\*[\\s\\S]*?\\*\\/\\}\\s*)?<(div\\s+className="fixed|NextSetButton)`).test(panel))
   check('the spacer under the list follows the bars: one for each state that draws a fixed bar, and only those',
-    barStates.length === 2 && barStates.every(st => spacerCond.includes(`status === '${st}'`)) && !/running/.test(spacerCond),
+    barStates.length === 3 && barStates.every(st => spacerCond.includes(`status === '${st}'`)),
     { spacerCond, barStates })
   // Nothing anywhere in this screen may treat the three states as two.
   const looseTests = panel.match(/status !== 'running'/g) ?? []

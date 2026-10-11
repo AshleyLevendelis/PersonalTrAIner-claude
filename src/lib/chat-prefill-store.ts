@@ -14,8 +14,17 @@
 // ---------------------------------------------------------------------------
 const KEY = 'fitplan_chat_prefill_v1'
 
+/**
+ * THE CHAT IS ALWAYS MOUNTED (App forceMounts it), so "read once on mount"
+ * read once per app open: a question handed over later sat in storage and
+ * the box stayed empty. Found tracing Home's "Ask ↗" (design handoff 2a,
+ * 10 Oct 2026). Setting one now also says so, and the chat takes it then.
+ */
+export const CHAT_PREFILL_EVENT = 'fitplan-chat-prefill'
+
 export function setChatPrefill(text: string): void {
   try { sessionStorage.setItem(KEY, text) } catch { /* private mode — the tab change still happens */ }
+  try { window.dispatchEvent(new Event(CHAT_PREFILL_EVENT)) } catch { /* no window (tests) */ }
 }
 
 /** Reads and CLEARS. Returns '' when nothing is waiting. */

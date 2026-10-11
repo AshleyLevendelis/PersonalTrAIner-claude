@@ -68,8 +68,12 @@ console.log('\n2. Said only when short')
 console.log('\n3. Every place that says "Done" says the count')
 {
   const home = code('src/components/Dashboard.tsx')
-  check('Home: "Done · N of M sets" when short, "Done" when not',
-    /data\.session\.setsPlanned > 0 && data\.session\.setsLogged < data\.session\.setsPlanned \? `Done · \$\{data\.session\.setsLogged\} of \$\{data\.session\.setsPlanned\} sets` : 'Done'/.test(home))
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's Done panel prints
+  // "{logged}/{planned} sets", and both now come from the SHARED count off the
+  // week's own cell — the M39 "one count" rule, tighter than before.
+  check('Home: the Done panel shows the shared count, "N/M" sets',
+    /const shared = sessionSetCount\(todayCell\?\.session, todayCell\?\.workingLogs\)/.test(home)
+    && /\{setsLogged\}\/\{setsPlanned\}/.test(home))
   const panel = code('src/components/exercise/TodayPanel.tsx')
   check('Exercise\'s finished bar uses the shared count for today', /const finishedShort = shortOfPlan\(sessionSetCount\(todayCell\?\.session, todayCell\?\.workingLogs\)\)/.test(panel) && /finishedShort \? `Done · \$\{finishedShort\}`/.test(panel))
   for (const f of ['src/components/HomeWeekStrip.tsx', 'src/components/exercise/WeekContextRow.tsx']) {

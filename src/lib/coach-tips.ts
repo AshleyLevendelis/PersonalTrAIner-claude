@@ -203,6 +203,20 @@ export function selectCoachTipWithKey(ctx: CoachTipContext): SelectedCoachTip | 
   return eligible[Math.floor(rng() * eligible.length)]
 }
 
+/**
+ * EVERY TIP THAT IS TRUE TODAY, the day's seeded pick first — Home's coach
+ * note rotates through them (design handoff 2a, 10 Oct 2026). Same rules,
+ * same order otherwise, so the tip that opens the note is the one that used
+ * to be the only one.
+ */
+export function eligibleCoachTips(ctx: CoachTipContext): SelectedCoachTip[] {
+  const eligible = RULES
+    .map(r => ({ key: r.key, text: r.evaluate(ctx) }))
+    .filter((e): e is SelectedCoachTip => e.text !== null)
+  const first = selectCoachTipWithKey(ctx)
+  return first ? [first, ...eligible.filter(e => e.key !== first.key)] : eligible
+}
+
 export function selectCoachTip(ctx: CoachTipContext): string | null {
   return selectCoachTipWithKey(ctx)?.text ?? null
 }

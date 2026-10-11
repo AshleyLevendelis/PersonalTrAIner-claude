@@ -175,7 +175,7 @@ console.log('\n5. HOME — last known numbers, not a grey line, on a tab switch\
   check('coming back paints straight away, with no "Loading your day"',
     !/Loading your day/.test(onReturn), onReturn.slice(0, 200))
   check('...and what it paints is the real screen, not an empty card',
-    /Today so far|kcal|Tomorrow/i.test(onReturn), onReturn.slice(0, 200))
+    /Today so far|kcal|Calories|Tomorrow/i.test(onReturn), onReturn.slice(0, 200))
   await shoot('six-home-on-return')
 
   // And it is still not stale: the re-read runs and swaps in.

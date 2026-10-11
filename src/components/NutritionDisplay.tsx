@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calculator, Layers } from 'lucide-react'
+import { Calculator, Layers, ShoppingBasket } from 'lucide-react'
+import { groceryHash } from '@/lib/app-route'
 import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/components/MealPlan'
 import { MealDayStrip } from '@/components/nutrition/MealDayStrip'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
@@ -32,19 +33,24 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 // three rings + water get a legend row each — four rows, not five, matching
 // the design reference's own rendered screen (its prose says "five legend
 // rows" but the reference screen itself shows four: water/protein/carbs/fat).
+// DESIGN HANDOFF 2b, 10 Oct 2026: four concentric rings at 132px, stroke 8,
+// calories outermost, then protein, carbs and water. Fat left the rings (the
+// brief's open question); it is a muted line under the key instead, so its
+// number is still on the screen.
 const NUTRITION_RINGS = [
-  { key: 'water', r: 50, strokeWidth: 3, color: 'var(--chart-3)' },
-  { key: 'calories', r: 40, strokeWidth: 8, color: 'var(--primary)' },
-  { key: 'protein', r: 30, strokeWidth: 5, color: 'var(--role-ai)' },
-  { key: 'carbs', r: 22, strokeWidth: 5, color: 'var(--role-warn)' },
-  { key: 'fat', r: 14, strokeWidth: 5, color: 'var(--text-tertiary)' },
+  { key: 'calories', r: 58, strokeWidth: 8, color: 'var(--primary)' },
+  { key: 'protein', r: 46, strokeWidth: 8, color: 'var(--chart-2)' },
+  { key: 'carbs', r: 34, strokeWidth: 8, color: 'var(--chart-4)' },
+  { key: 'water', r: 22, strokeWidth: 8, color: 'var(--chart-3)' },
 ] as const
+const RING_BOX = 132
+const RING_C = RING_BOX / 2
 const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION_RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
 
 // ---------------------------------------------------------------------------
 // Water-target sparkle
 // ---------------------------------------------------------------------------
-// Three stars placed ON the water ring's own arc (r=50, centre 56,56) rather
+// Three stars placed ON the water ring's own arc (r=22, centre 66,66 since 2b) rather
 // than scattered around the meter, so the effect reads as "this ring
 // completed" and not "something happened near the rings". Angles are measured
 // the same way the ring fills — from 12 o'clock, clockwise — and spread across
@@ -53,7 +59,7 @@ const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION
 // The stagger is deliberately long (~1.45s between plays, ~4s total): three
 // quick pops in succession reads as a loading state, three slow ones read as
 // a small celebration and then stop.
-const WATER_RING_R = 50
+const WATER_RING_R = 22
 const SPARKLES = [
   { angleDeg: 312, size: 9, delayMs: 0 },
   { angleDeg: 28, size: 6.5, delayMs: 1450 },
@@ -355,7 +361,22 @@ export function NutritionDisplay({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[18px]">
+      {/* HEADER (2b): which day, and the shopping list one tap away — a pill
+          here rather than a link inside the meal list, so it is there even
+          before the meals are. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="ds-label" data-testid="meal-day-heading">Nutrition · {upcomingDay?.dayName ?? dayName}</p>
+        <button
+          type="button"
+          onClick={() => { window.location.hash = groceryHash() }}
+          className="hit-slop-44 inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[0.75rem] font-medium"
+          style={{ background: 'var(--surface-raised)' }}
+          data-grocery-pill
+        >
+          <ShoppingBasket className="size-[13px]" aria-hidden /> Grocery
+        </button>
+      </div>
       {mealStrip && (
         <MealDayStrip dates={mealStrip.dates} today={mealStrip.today} selected={mealStrip.selected} onSelect={mealStrip.onSelect} />
       )}
@@ -368,12 +389,10 @@ export function NutritionDisplay({
           unit — its copy names both, and water is the only quick-add the tour
           promises ("+250 / +500 log water in one tap"). */}
       <div data-tour="rings">
-        <p className="ds-label">Nutrition · {dayName}</p>
-
-        <div className="mt-3.5 flex items-center gap-[18px]">
-          <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
+        <div className="mt-3.5 flex items-center gap-5">
+          <svg width={RING_BOX} height={RING_BOX} viewBox={`0 0 ${RING_BOX} ${RING_BOX}`} className="shrink-0" aria-hidden>
             {NUTRITION_RINGS.map(r => (
-              <circle key={`track-${r.key}`} cx="56" cy="56" r={r.r} fill="none" stroke="var(--surface-raised)" strokeWidth={r.strokeWidth} />
+              <circle key={`track-${r.key}`} cx={RING_C} cy={RING_C} r={r.r} fill="none" stroke="var(--surface-raised)" strokeWidth={r.strokeWidth} />
             ))}
             {NUTRITION_RINGS.map(r => {
               const { eaten: e, target: t } = ringValues[r.key]
@@ -382,10 +401,10 @@ export function NutritionDisplay({
               return (
                 <circle
                   key={`fill-${r.key}`}
-                  cx="56" cy="56" r={r.r} fill="none" strokeWidth={r.strokeWidth} strokeLinecap="round"
+                  cx={RING_C} cy={RING_C} r={r.r} fill="none" strokeWidth={r.strokeWidth} strokeLinecap="round"
                   stroke={r.color}
                   strokeDasharray={`${circ * frac} ${circ}`}
-                  transform="rotate(-90 56 56)"
+                  transform={`rotate(-90 ${RING_C} ${RING_C})`}
                   className={r.key === 'calories' ? 'glow-icon' : undefined}
                   style={{ transition: 'stroke-dasharray 400ms ease' }}
                 />
@@ -399,7 +418,7 @@ export function NutritionDisplay({
                 <path
                   key={`sparkle-${s.angleDeg}`}
                   className="ds-sparkle"
-                  d={starPath(56 + WATER_RING_R * Math.cos(rad), 56 + WATER_RING_R * Math.sin(rad), s.size)}
+                  d={starPath(RING_C + WATER_RING_R * Math.cos(rad), RING_C + WATER_RING_R * Math.sin(rad), s.size)}
                   fill="var(--chart-3)"
                   style={{
                     animationDelay: `${s.delayMs}ms`,
@@ -409,44 +428,62 @@ export function NutritionDisplay({
               )
             })}
           </svg>
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <div>
-              <p className="ds-num-mega tabular-mono text-[color:var(--num-hero)] glow-mint-lg">{macros ? Math.round(eaten.kcal) : '—'}</p>
-              <p className="mt-1 text-[0.65625rem] uppercase tracking-[.16em] text-muted-foreground">
-                {macros
-                  // OVER IS SAID AS OVER (runs 3-4, M33): this clamped at zero
-                  // and read "0 left" at 112 over.
-                  ? <>kcal · <span className="tabular-mono" data-testid="kcal-left">{kcalLeftOrOver(macros.calories - eaten.kcal)}</span></>
-                  : 'kcal · add your weight for a target'}
-              </p>
-            </div>
-            {/* 2x2, not four stacked rows: the four values fit beside a
-                112px meter without wrapping, and stacked they pushed the
-                block taller than the rings it labels. Letters rather than
-                words for the same reason — the swatch carries the identity
-                and the colour is the same one the ring is drawn in. */}
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              {([
-                { key: 'protein', label: 'P', unit: 'g' },
-                { key: 'carbs', label: 'C', unit: 'g' },
-                { key: 'fat', label: 'F', unit: 'g' },
-                { key: 'water', label: 'H\u2082O', unit: 'ml' },
-              ] as const).map(row => {
-                const ring = NUTRITION_RINGS.find(r => r.key === row.key)!
-                const { eaten: e, target: t } = ringValues[row.key]
-                return (
-                  <div key={row.key} className="flex items-baseline gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: ring.color }} />
-                    <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{row.label}</span>
-                    <span className="tabular-mono text-[0.6875rem]">
-                      {Math.round(e)}<span className="text-muted-foreground">/{Math.round(t)}{row.unit}</span>
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+          {/* THE HERO IS WHAT IS LEFT (2b), with what was eaten under it.
+              OVER IS SAID AS OVER (runs 3-4, M33): never "0 left" at 112 over. */}
+          <div className="min-w-0 flex-1" data-nutrition-hero>
+            {macros ? (() => {
+              // THE PHRASEBOOK DECIDES left or over (and the rounding), so the
+              // hero and every other "left" in the app say it one way.
+              const [amount, word] = kcalLeftOrOver(macros.calories - eaten.kcal).split(' ')
+              return (
+                <>
+                  <p className="ds-num-mega tabular-mono glow-mint-lg text-[2.875rem] leading-[0.92] tracking-[-.04em]" style={{ color: 'var(--num-hero)' }} data-testid="kcal-left-number">
+                    {Number(amount).toLocaleString()}
+                  </p>
+                  <p className="mt-1.5 text-[0.65625rem] uppercase tracking-[.16em] text-muted-foreground">
+                    <span data-testid="kcal-left">kcal {word}</span>
+                  </p>
+                  <p className="mt-1 text-[0.75rem] text-text-tertiary">
+                    <span className="tabular-mono" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> of <span className="tabular-mono">{Math.round(macros.calories).toLocaleString()}</span> eaten
+                  </p>
+                </>
+              )
+            })() : (
+              <>
+                <p className="ds-num-mega tabular-mono text-[2.875rem] leading-[0.92]" style={{ color: 'var(--num-hero)' }}>—</p>
+                <p className="mt-1.5 text-[0.75rem] text-text-tertiary">
+                  <span className="tabular-mono" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> kcal eaten · add your weight for a target
+                </p>
+              </>
+            )}
           </div>
         </div>
+
+        {/* THE RING KEY (2b) — four rows in the order the rings sit, each with
+            its swatch, name, and eaten/target. Then fat, which has no ring. */}
+        <div className="mt-4 grid grid-cols-2 gap-x-[22px] gap-y-2.5" data-ring-key>
+          {([
+            { key: 'calories', label: 'Calories', fmt: (n: number) => Math.round(n).toLocaleString(), unit: '' },
+            { key: 'protein', label: 'Protein', fmt: (n: number) => String(Math.round(n)), unit: 'g' },
+            { key: 'carbs', label: 'Carbs', fmt: (n: number) => String(Math.round(n)), unit: 'g' },
+            { key: 'water', label: 'Water', fmt: (n: number) => (n / 1000).toFixed(1), unit: 'L' },
+          ] as const).map(row => {
+            const ring = NUTRITION_RINGS.find(r => r.key === row.key)!
+            const { eaten: e, target: t } = ringValues[row.key]
+            return (
+              <div key={row.key} className="flex items-center gap-2" data-ring-key-row={row.key}>
+                <span className={`size-2.5 shrink-0 rounded-[3px] ${row.key === 'calories' ? 'glow-mint-box' : ''}`} style={{ background: ring.color }} />
+                <span className="flex-1 text-[0.75rem] text-muted-foreground">{row.label}</span>
+                <span className="tabular-mono text-[0.78125rem]">
+                  {row.fmt(e)}<span className="text-muted-foreground">/{t > 0 ? row.fmt(t) : '—'}{row.unit}</span>
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-[0.71875rem] text-muted-foreground" data-ring-key-fat>
+          Fat <span className="tabular-mono">{Math.round(ringValues.fat.eaten)}/{ringValues.fat.target > 0 ? Math.round(ringValues.fat.target) : '—'}g</span>
+        </p>
 
         {/* THE WATER ROW LEFT THIS SCROLL, 6 Sep 2026. Water is the H2O ring
             and its legend entry here; the quick-adds are on Home's "Today so
@@ -470,7 +507,7 @@ export function NutritionDisplay({
       {/* THE TRAINER'S LINE. One sentence about the macro furthest behind,
           and only when something is. Derived here from the same eaten/target
           pairs the rings are drawn from — no second source, no new call. */}
-      {macroNudge && <TrainerNudge text={macroNudge} openChat />}
+      {macroNudge && <TrainerNudge text={macroNudge} tag="Nutrition" openChat askPrefill={`Tell me more about this: "${macroNudge}"`} />}
 
       {/* THE DRIFT OFFER. Ashley's ruling, 17 Sep 2026: tell her, and offer to
           refit. It sits ABOVE the meal list because it is about that list, and

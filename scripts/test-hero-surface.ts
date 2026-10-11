@@ -65,7 +65,7 @@ console.log('\n1. A glow is never clipped by its own box')
   // wraps instead of being cut. §1's generic scan above is what now protects
   // it: glow + clip on one element still fails.
   check('the session name glows and does NOT clip it',
-    /glow-text">\{data\.session\.focus\}/.test(dash) && !/truncate[^"]*">\{data\.session\.focus\}/.test(dash))
+    /glow-text[^"]*">\{data\.session\.focus\}/.test(dash) && !/truncate[^"]*">\{data\.session\.focus\}/.test(dash))
 }
 
 console.log('\n2. The ambient surface is gone with the cards')
@@ -80,7 +80,13 @@ console.log('\n2. The ambient surface is gone with the cards')
   // re-deciding the direction fails here with a sentence.
   const dash = readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf8')
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
-  check('the hero wash is gone', !/--hero-wash/.test(dash))
+  // RE-DECIDED 10 Oct 2026 by design handoff 2a, as this note asked: the
+  // hero is a PANEL again, and its wash is the panel's own background — a
+  // radial over --surface-raised, clipped by the panel's corners — never a
+  // layer pulled past the gutter (the next two checks still hold that).
+  check('the hero wash is back, as the hero panel\'s own background only',
+    (dash.match(/var\(--hero-wash\)/g) ?? []).length === 1
+    && /radial-gradient\(120% 90% at 100% 0%, var\(--hero-wash\), transparent 60%\), var\(--surface-raised\)/.test(dash))
   check('...and so is the grain', !/grain-overlay/.test(dash))
   check('...and nothing replaced them with a full-bleed layer', !/pointer-events-none absolute inset-x-0/.test(dash))
   check('the page gutter is still px-4', /max-w-6xl mx-auto px-4/.test(app))
