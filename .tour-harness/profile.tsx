@@ -38,6 +38,12 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exe
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { ProfileScreen } from '@/components/ProfileScreen'
+import { makeKitController, clearKitStatements } from '@/lib/kit-change'
+import { profileWithKit } from '@/lib/kit-list'
+import { compileKitStatements, kitFactsIn } from '@/lib/fact-compiler'
+import type { UserFactRow } from '@/lib/memory-store'
+import { getExerciseEntry } from '@/lib/exercise-db'
+import { planDaysInWindow } from '@/lib/plan-guard'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 import type { UserProfile, MesocycleWeek } from '@/lib/types'
 import { setDevClockOverride } from '@/lib/dev-clock'
@@ -76,6 +82,13 @@ const LIKES = new URLSearchParams(location.search).get('likes') === '1'
 // regenerate, with mushrooms in it: the food this seed already avoids. The
 // Profile list must keep it and mark it (Ashley's ruling, 27 Sep 2026).
 const KEPT_CLASH = LIKES && new URLSearchParams(location.search).get('keptclash') === '1'
+// ?kit=1 — THE KIT LIST (Ashley, 9 Oct 2026: "Remember what they say"). A
+// Minimalist profile with nothing said yet, so the ticks start from the
+// choice's own assumption. The controller is the app's own builder
+// (kit-change.ts makeKitController) over a real generated plan and the fake
+// database; what this page reproduces is only App's "take the new plan and
+// re-read the facts" — which is all `onSaved` is.
+const KIT = new URLSearchParams(location.search).get('kit') === '1'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
 
@@ -90,7 +103,7 @@ const baseProfile: UserProfile = {
   // moment a Goal row existed it would have drawn an empty box. A fixture
   // value outside its own union is invisible until something reads it.
   fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
-  equipment_access: FULL_GYM ? 'full_gym' : 'home_gym',
+  equipment_access: FULL_GYM ? 'full_gym' : KIT ? 'minimalist' : 'home_gym',
   injuries: [], training_style: (STYLE ?? 'bodybuilding') as UserProfile['training_style'],
   training_experience: 'intermediate', session_duration_preference: '60-90',
   workout_split_preference: 'upper_lower',
@@ -173,6 +186,18 @@ function Harness() {
   // (nothing rebuilds without a confirm, raised from exactly one place).
   const [invalidation, setInvalidation] = useState<{ title: string; detail: string } | null>(null)
   const [open, setOpen] = useState(true)
+  // THE KIT LIST (?kit=1). App's two lines, reproduced: the remembered facts
+  // as read from the database, and the profile derived from them with the
+  // app's own functions. Everything the ticks do goes through the app's
+  // controller builder.
+  const readFacts = () => (db.user_facts as unknown as UserFactRow[]).filter(f => f.status === 'active')
+  const [facts, setFacts] = useState<UserFactRow[]>(readFacts)
+  const shown = KIT ? profileWithKit(profile, compileKitStatements(facts)) : profile
+  const kitOnFile = kitFactsIn(facts).map(k => ({ id: k.fact.id, statement: k.statement }))
+  const kit = KIT ? makeKitController({
+    profile: shown, mesocycle, planCreatedAt: shown.created_at, exclusions: [], onFile: kitOnFile,
+    onSaved: result => { setMesocycle(result.mesocycle); setFacts(readFacts()) },
+  }) : null
 
   // App's handler, reproduced — see the header. The two functions it calls are
   // the real ones.
@@ -210,14 +235,31 @@ function Harness() {
             .filter(e => e.suggested_load_kg != null)
             .map(e => ({ w: w.week_number, d: d.day, n: e.name, kg: e.suggested_load_kg })))),
         )}</div>
+        {/* THE PLAN'S EXERCISE NAMES (?kit=1), so the driver checks a saved
+            kit change against what the plan now holds, not against the
+            sentence that announced it. */}
+        {KIT && (() => {
+          // Read off the app's own catalogue and the warm-up's own drill name:
+          // the measurement, not the answer. Split at TODAY (the plan's own
+          // date window), because days already behind her are never rewritten.
+          const fromToday = new Set(planDaysInWindow(mesocycle, { planCreatedAt: shown.created_at, today: ANCHOR_ISO, moves: [] }).map(r => `${r.weekNumber}|${r.dayName}`))
+          const bandsOn = (d: MesocycleWeek['days'][number]) => [
+            ...d.exercises.filter(e => { const x = getExerciseEntry(e.name); return !!x && !x.equipment_alternatives && x.equipment.includes('resistance band') }).map(e => e.name),
+            ...(d.warmup?.mobility ?? []).filter(m => m.name === 'Band Pull-Aparts').map(m => m.name),
+          ]
+          const split = (ahead: boolean) => [...new Set(mesocycle.flatMap(w => w.days.filter(d => fromToday.has(`${w.week_number}|${d.day}`) === ahead).flatMap(bandsOn)))]
+          return <div hidden data-testid="plan-needs-bands">{JSON.stringify({ fromToday: split(true), before: split(false), daysAhead: fromToday.size })}</div>
+        })()}
         <ProfileScreen
           exercisePlan={mesocycle[0].days}
           open={open}
           onOpenChange={setOpen}
-          profile={profile}
+          profile={shown}
           latestWeightKg={80}
           onProfileChanged={patch => setProfile(prev => ({ ...prev, ...patch }))}
           onCeilingsCorrected={onCeilingsCorrected}
+          kit={kit}
+          onEquipmentChoiceChanged={KIT ? async () => { await clearKitStatements(kitOnFile); setFacts(readFacts()) } : undefined}
           onPlanInvalidated={setInvalidation}
           onMemoryChanged={() => {}}
           revealSpeed="normal"

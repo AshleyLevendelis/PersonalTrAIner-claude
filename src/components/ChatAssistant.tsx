@@ -48,13 +48,15 @@ import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoo
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
 import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE } from '@/lib/coach-voice'
 import { isHedged } from '@/lib/definite-mention'
+import { KIT_ITEMS, isKitItem, kitStatementInUserWords, describeKitStatement, kitItemsFor, kitOf, kitLine, type KitStatement } from '@/lib/kit-list'
+import type { KitController } from '@/lib/kit-change'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
-import { planDaysInWindow, describeDateSpan, dayAndMonth, type PlanDayOnDate } from '@/lib/plan-guard'
+import { planDaysInWindow, describeDateSpan, dayAndMonth, shortDate, type PlanDayOnDate } from '@/lib/plan-guard'
 import { areaInWords, endsOn, isAdaptationActive } from '@/lib/effective-constraints'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { updateProfileField } from '@/lib/profile-store'
@@ -262,6 +264,13 @@ interface ChatAssistantProps {
   onEndAdaptation?: (id: string) => Promise<string | null>
   /** The rebuild offer — App asks, and only a yes rebuilds. Same road as Profile's. */
   onPlanInvalidated?: (invalidation: PlanInvalidation) => void
+  /**
+   * The kit list's one controller (kit-change.ts) — the SAME object Profile's
+   * ticks are handed, so a "no bands" said here and one ticked there are
+   * priced and saved by one function against one plan. Absent: the card says
+   * it cannot change the kit from here.
+   */
+  kitController?: KitController | null
   /** Living targets from computeTargets (M0) — the SAME numbers the Nutrition tab shows, respecting the user's selected macro mode. Null when a body metric is missing; already guarded internally (line ~355) before any use. */
   macros: MacroTargets | null
   exercisePlan: WorkoutDay[]
@@ -427,7 +436,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1712,6 +1721,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // been dead prompt text. See EQUIPMENT-QUALITY AWARENESS below.
         equipment_access: profile.equipment_access,
         equipment_access_described: describeEquipmentAccess(profile.equipment_access),
+        // WHAT THEY HAVE SAID ABOUT THEIR KIT (the kit list), so the coach
+        // describes the kit the plan is actually built from. Null when they
+        // have said nothing: the choice above is then the whole story.
+        kit_said: (profile.kit_statements ?? []).length > 0
+          ? `${kitLine(kitItemsFor(profile))}${kitOf(profile)?.exhaustive ? ' That is their whole kit: nothing else is planned for.' : ''}`
+          : null,
         // Also never sent — same shape as equipment_access above. Absent on
         // an activity-only profile (the starting-out walking plan has no
         // lifting-experience tier), so the prompt says so rather than
@@ -2889,6 +2904,63 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   }
 
   /** Mirrors buildInjuryAdaptationProposal exactly, for the equipment/travel adaptation (§3b). */
+  /**
+   * "I don't own bands" / "I've got a bench too" / "all I have is dumbbells
+   * and a bench" — the kit list (Ashley, 9 Oct 2026: "Remember what they
+   * say"). The trial is the controller App hands Profile's ticks too, so the
+   * card prices the change exactly as the screen would. Nothing is written
+   * until Confirm, and the confirm re-runs the trial against the live plan.
+   *
+   * THE ITEMS MUST BE IN HER OWN WORDS (kit-list.ts
+   * `kitStatementInUserWords`): a model that adds a kettlebell nobody
+   * mentioned, or hears "no bench" as a bench, is refused here, before any
+   * card. `userSaid`, not the tool's quote, for the reason the cardio card
+   * gives: the quote is the model's choice of words.
+   */
+  const buildKitChangeProposal = async (rawArgs: Record<string, unknown>, userSaid: string): Promise<{
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: Record<string, unknown>
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { refusal: string }> => {
+    const mode = String(rawArgs.mode ?? '')
+    const items = (Array.isArray(rawArgs.items) ? rawArgs.items : []).filter(isKitItem)
+    if (!['has', 'hasnt', 'only'].includes(mode) || items.length === 0) {
+      return { refusal: `Which of these do you mean: ${KIT_ITEMS.map(i => i.replace(/_/g, ' ')).join(', ')}?` }
+    }
+    const statement: KitStatement = { mode: mode as KitStatement['mode'], items }
+    if (!kitStatementInUserWords(statement, userSaid)) {
+      return { refusal: "Tell me in your own words which kit you have, or don't, and I'll update it." }
+    }
+    if (!kitController) return { refusal: "I can't change your kit from here just now — Profile → Equipment has the same ticks." }
+    const plan = await kitController.plan([statement])
+    if (plan.refusal) return { refusal: plan.refusal }
+    const rows = [
+      { field: 'Your kit', before: plan.kitBefore.length ? plan.kitBefore.map(i => i.replace(/_/g, ' ')).join(', ') : 'bodyweight only', after: plan.kitAfter.length ? plan.kitAfter.map(i => i.replace(/_/g, ' ')).join(', ') : 'bodyweight only' },
+      ...plan.changedDays.slice(0, 6).map(d => ({
+        field: d.date ? shortDate(d.date) : `${d.dayName} (Week ${d.weekNumber})`,
+        before: d.before.filter(n => !d.after.includes(n)).join(', ') || '—',
+        after: d.after.filter(n => !d.before.includes(n)).join(', ') || '— left out',
+      })),
+    ]
+    const implications: { severity: 'info' | 'warn'; text: string }[] = [
+      ...plan.summary.slice(1).map(text => ({ severity: 'info' as const, text })),
+      ...(plan.changedDays.length > 6 ? [{ severity: 'info' as const, text: `…and ${plan.changedDays.length - 6} more day${plan.changedDays.length - 6 === 1 ? '' : 's'}.` }] : []),
+      { severity: 'info', text: 'Every plan from now on is built from this kit. Profile → Equipment shows it as ticks, and you can change it there.' },
+    ]
+    return {
+      scopeKey: `${profile.id}:propose_kit_change:${mode}:${items.join(',')}`,
+      preconditions: { statement },
+      payload: { statements: [statement], rawPhrase: userSaid.slice(0, 500) },
+      diff: {
+        lead: ask(`remember that — ${describeKitStatement(statement).replace(/^Kit: /, '')}`),
+        rows,
+        implications,
+        reversible: false,
+      },
+    }
+  }
+
   const buildEquipmentAdaptationProposal = async (rawArgs: Record<string, unknown>): Promise<{
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -5077,6 +5149,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       } else if (result.proposal.kind === 'propose_injury_recovered' && result.proposal.rawArgs) {
         const recovered = buildInjuryRecoveredProposal(result.proposal.rawArgs)
         if (recovered) built = { scopeKey: recovered.scopeKey, preconditions: recovered.preconditions, payload: recovered.payload as unknown as Record<string, unknown>, diff: recovered.diff }
+      } else if (result.proposal.kind === 'propose_kit_change' && result.proposal.rawArgs) {
+        // userSaid, not the tool's quote: see buildKitChangeProposal.
+        const kitCard = await buildKitChangeProposal(result.proposal.rawArgs, userSaid)
+        if ('refusal' in kitCard) refusal = kitCard.refusal
+        else built = { scopeKey: kitCard.scopeKey, preconditions: kitCard.preconditions, payload: kitCard.payload, diff: kitCard.diff }
       } else if (result.proposal.kind === 'propose_equipment_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildEquipmentAdaptationProposal(result.proposal.rawArgs)
         if (adaptation && 'refusal' in adaptation) refusal = adaptation.refusal
@@ -6086,6 +6163,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_injury_recovered'].done : RECEIPTS['propose_injury_recovered'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+    } else if (row.kind === 'propose_kit_change') {
+      // THE SAME FUNCTION PROFILE'S TICKS SAVE THROUGH, re-run against the
+      // live plan (kit-change.ts `recordKitStatement`); App takes the new plan
+      // and re-reads memory, so every tab gets the kit at once.
+      const payload = row.payload as unknown as { statements: KitStatement[]; rawPhrase?: string }
+      const result = kitController
+        ? await kitController.apply(payload.statements ?? [], { source: 'chat', rawPhrase: payload.rawPhrase ?? '' })
+        : null
+      receipt = result?.saved
+        ? { landed: [`Your kit: ${(result.summary[0] ?? '').replace(/^Your kit: /, '')}`, `Your plan: ${result.summary[1] ?? ''}`], failed: [] }
+        : { landed: [], failed: [{ op: 'propose_kit_change', error: result?.message ?? "I can't change your kit from here just now." }] }
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_kit_change'].done : RECEIPTS['propose_kit_change'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
     } else if (row.kind === 'propose_equipment_adaptation') {
       const payload = row.payload as unknown as EquipmentAdaptationPayload
       const result = await executeEquipmentAdaptation(profile, mesocycle, payload, await loadEditContext())

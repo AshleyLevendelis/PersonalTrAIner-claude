@@ -57,6 +57,8 @@ import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 import { dietTargetCaveat } from '@/lib/coach-voice'
+import { KitTicks } from '@/components/KitTicks'
+import type { KitController } from '@/lib/kit-change'
 import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_LABEL, type WeighInCheck } from '@/lib/weigh-in-check'
 
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
@@ -142,6 +144,17 @@ interface ProfileScreenProps {
   onRevealSpeedChange: (speed: RevealSpeed) => void
   /** Opens App.tsx's existing New Plan confirm dialog — the footer's only job. */
   onNewPlan: () => void
+  /**
+   * The kit list's one controller (kit-change.ts) — the same object the
+   * coach's card is handed. Absent before there is a profile to save to.
+   */
+  kit?: KitController | null
+  /**
+   * A new equipment choice starts the kit list again. Awaited BEFORE the
+   * rebuild is offered, so a yes rebuilds around the new choice and not the
+   * old choice's list.
+   */
+  onEquipmentChoiceChanged?: () => Promise<void>
 }
 
 // ---- Shared small field-row components (scoped to this screen) -----------
@@ -443,7 +456,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, backLabel = 'Back', calorieTarget }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, backLabel = 'Back', calorieTarget, kit, onEquipmentChoiceChanged }: ProfileScreenProps) {
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
@@ -899,8 +912,11 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     // A CORRECTED CEILING IS A DIFFERENT KIND OF WRONG. Compared here, before
     // the merge, for the same reason the invalidation is.
     const ceilingsMoved = CEILING_FIELDS.some(k => k in patch && patch[k] !== profile[k])
+    // A NEW EQUIPMENT CHOICE STARTS THE KIT LIST AGAIN (kit-change.ts).
+    const equipmentChoiceMoved = 'equipment_access' in patch && patch.equipment_access !== profile.equipment_access
     onProfileChanged(patch)
-    updateProfileField(profileId, patch).then(() => {
+    updateProfileField(profileId, patch).then(async () => {
+      if (equipmentChoiceMoved) await onEquipmentChoiceChanged?.().catch(err => console.error('Clearing the kit list for a new equipment choice failed:', err))
       // Only once the write actually lands. Offering to rebuild around an
       // injury whose save then failed would rebuild the plan around something
       // the database does not know about.
@@ -1250,6 +1266,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       case 'equipment': return (
         <div className="text-sm">
             <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
+            {/* THE KIT AS TICKS (Ashley, 9 Oct 2026: "Remember what they say").
+                Right under the choice it refines, because the choice is what
+                the ticks start from. Every change is shown before it is saved. */}
+            {kit && profile.equipment_access && <KitTicks profile={profile} kit={kit} />}
             {/* WHAT YOU CAN LIFT — added 13 Sep 2026, beside Equipment
                 because that is the field that decides whether these apply at
                 all, and because they are the same kind of fact: what this

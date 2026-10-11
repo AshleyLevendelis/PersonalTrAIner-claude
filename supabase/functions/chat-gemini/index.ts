@@ -985,6 +985,34 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_kit_change",
+    description:
+      "PROPOSES remembering, FOR GOOD, what kit the user OWNS — their own kit list, the ticks under Equipment on their Profile. This does NOT apply anything: the app works out what it changes on their plan, shows a card, and the user taps Confirm. Use it whenever they say something lasting about their own kit: \"I don't own bands\" (mode hasnt, items [bands]); \"I've got a bench too\" (mode has, items [bench]); \"all I have is dumbbells and a flat bench\" / \"I've got dumbbells and a bench, that's it\" (mode only, items [dumbbells, bench]) — only when they give the list as their WHOLE kit. Name ONLY the items they named, from the nine below; never add one they did not say (\"dumbbells at home\" is not kettlebells and bands too). Use it instead of record_fact for kit, and instead of propose_equipment_adaptation, which is for a trip or a week somewhere else and reverts on its own. Never ban exercises one by one to get rid of a piece of kit: this removes every exercise that needs it.",
+    parameters: {
+      type: "object",
+      properties: {
+        mode: {
+          type: "string",
+          enum: ["has", "hasnt", "only"],
+          description: "has = they have these (as well as what they have); hasnt = they do not have these; only = these are ALL they have.",
+        },
+        items: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["dumbbells", "bench", "incline_bench", "barbell", "squat_rack", "kettlebell", "bands", "pull_up_bar", "weighted_bag"],
+          },
+          description: "The kit they named, from these nine only. bench = a flat bench; incline_bench = an adjustable or incline bench; barbell = a barbell and plates (and an EZ or trap bar); weighted_bag = a backpack or sandbag they load.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message that says it. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["mode", "items", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_volume_change",
     description:
       "PROPOSES moving a day's set count up or down — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. DIRECTION ONLY: you say lighter or heavier, the app decides by how much. It will not go below the floor that keeps an exercise worth doing, will not let an accessory outgrow the main lift it supports, will not push the session past the length the user asked for, and never touches a deload week. If a bound stops it, the card says so rather than silently doing less than it claimed. SCOPE MATTERS AND IS OFTEN THE WHOLE POINT: 'today' changes only this week's session and it is back to normal next week — that is what someone means by 'I'm knackered today', 'go easy on me this morning', 'I slept badly'. 'ongoing' changes it from this week to the end of the plan, which is what 'Tuesdays are always too much' or 'this is more than I can keep up with' means. When it is genuinely ambiguous, ask which they meant rather than guessing — an ongoing change made from one bad night is the wrong answer in a way that is easy to make and hard to notice.",
@@ -1590,7 +1618,7 @@ const toolDeclarations = [
         timing_relation: { type: "string", enum: ["before", "after"] },
         timing_anchor: { type: "string", enum: ["training", "slot"] },
         timing_slot: { type: "string", enum: ["breakfast", "lunch", "dinner", "snack"], description: "Required when timing_anchor=slot." },
-        constraint_kind: { type: "string", enum: ["availability", "equipment"], description: "Required for kind=hard_constraint." },
+        constraint_kind: { type: "string", enum: ["availability", "equipment"], description: "Required for kind=hard_constraint. NOT for kit they own or do not own (\"no bands\", \"I have a bench\") — that is propose_kit_change, which the plan actually reads." },
         weekday: { type: "string", enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], description: "Required when constraint_kind=availability." },
         description: { type: "string", description: "Plain description for equipment gaps or anything not weekday-shaped." },
       },
@@ -2198,6 +2226,11 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 - Once you know both, call propose_equipment_adaptation with equipment_tier + duration_days. Map to the nearest existing tier honestly, and know what each one actually assumes: minimalist assumes dumbbells, kettlebells, bands, a pull-up bar and a weighted bag; bodyweight still assumes a pull-up bar and a weighted bag. So "dumbbells only" maps to minimalist as the CLOSEST fit, not an exact one — say so if it comes up, don't pretend it's exact.
 - It reverts automatically once the period ends — mention this once, not every turn.
 
+=== 3b2. THEIR OWN KIT, FOR GOOD (propose_kit_change) ===
+- "I don't own bands", "I've got a bench as well", "no pull-up bar", "all I've got is dumbbells and a bench" are about the kit they OWN, not a trip. Call propose_kit_change: hasnt for what they don't have, has for something extra, only when they give the list as their whole kit. Name only what they named. The card shows what changes on their plan before anything does.
+- A trip or another gym for a while is still §3b. If you can't tell which they mean, ask ("Is that just this week, or your kit at home?").
+- Their kit, as they've told it, is in the profile below ("Kit they've told you about"). Describe it in those words.
+
 === 3d2. NOT ENOUGH TIME TODAY (propose_session_shorten) ===
 - "I've only got 25 minutes", "I can do half an hour before work", "I need to be out by 7" — call propose_session_shorten with the number of minutes they said. If they say they are short of time but no number, ASK how long they have; do not guess one.
 - "My sessions need to be 45 minutes from now on", "I can only do half an hour these days", "make them shorter permanently", "I've got more time now" — call propose_session_length. THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER: both tools take a figure in minutes, and the same "45 minutes" means one day in the first list and every session from here in this one. Words that decide it: "today", "this morning", "before work" mean ONE day; "from now on", "these days", "permanently", "always", "in future" mean LASTING. If NEITHER kind of word is there — a bare "my sessions should be 45 minutes" — ASK which they mean. Do not guess: one of them rebuilds the rest of their block and the other does not touch tomorrow.
@@ -2552,6 +2585,7 @@ USER PROFILE:
 - Activity Level: ${context.profile.activity_level}
 - Fitness Goal: ${context.profile.fitness_goal}
 - Equipment Access: ${context.profile.equipment_access_described || context.profile.equipment_access || 'not recorded'} — describe their kit only in these words; never call it a home gym or a full gym unless it says so
+- Kit they've told you about: ${context.profile.kit_said || 'nothing beyond the choice above'}
 - Training Experience: ${context.profile.training_experience || 'not recorded (activity-only profile, or not asked)'}
 - Training Style: ${context.profile.training_style || 'not recorded (activity-only profile, or not asked)'}
 - Training Days: Originally ${context.training_days_count} days/week (user can add or remove days at any time via chat — this is NOT a ceiling)
@@ -4315,6 +4349,23 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_injury_recovered",
               rawArgs: { affected_area: args.affected_area },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_kit_change") {
+        // The kit list (Ashley, 9 Oct 2026: "Remember what they say"). Same
+        // I1 contract as every propose_*: the server writes nothing. The
+        // client checks the items are in the user's own words, prices the
+        // change with the same function Profile's ticks use, and shows a card.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_kit_change",
+              rawArgs: { mode: args.mode, items: args.items, origin_verbatim_quote: args.origin_verbatim_quote },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

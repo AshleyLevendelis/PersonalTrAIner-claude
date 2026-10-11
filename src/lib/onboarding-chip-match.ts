@@ -88,6 +88,8 @@ const ASKS: Record<SlotKey, Asks> = {
   maxDumbbellKg: /heaviest dumbbell|dumbbells? go (up )?to/i,
   maxSingleImplementKg: /heaviest kettlebell/i,
   maxImprovisedKg: /bag\b.{0,20}\bhold/i,
+  // Never asked (no new setup question, 9 Oct 2026), so no message asks it.
+  kitList: /(?!)/,
 }
 
 /**

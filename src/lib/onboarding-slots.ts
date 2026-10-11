@@ -128,6 +128,7 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
  * claim, and must name things the tier genuinely lacks.
  */
 import { EQUIPMENT_OPTIONS, INJURY_OPTIONS } from './picker-options'
+import { parseKitSlot, describeKitStatement } from './kit-list'
 export { EQUIPMENT_OPTIONS, INJURY_OPTIONS }
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
@@ -461,6 +462,11 @@ export interface OnboardingSlotValues {
   maxDumbbellKg: string
   maxSingleImplementKg: string
   maxImprovisedKg: string
+  /**
+   * What kit they said they have, IF they said — one statement as text,
+   * "only: dumbbells, bench" (kit-list.ts parseKitSlot). Never asked.
+   */
+  kitList: string
 }
 
 /**
@@ -502,6 +508,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     maxDumbbellKg: '',
     maxSingleImplementKg: '',
     maxImprovisedKg: '',
+    kitList: '',
   }
 }
 
@@ -927,6 +934,18 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'maxImprovisedKg', question: 'How much can your bag actually hold?',
     inputHint: 'kg, roughly…', shortLabel: 'Loaded bag', control: 'numeric', required: false,
     min: 1, max: 100, unit: 'kg', requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+  // THE KIT LIST — Ashley, 9 Oct 2026: "Remember what they say". Keep the four
+  // equipment choices AND remember the specifics people say ("I've got
+  // dumbbells and a bench", "I don't own bands"). NO NEW SETUP QUESTION: in
+  // NEVER_BLOCKING_SLOTS and never presented, only recorded when volunteered.
+  // The value is ONE statement as text, the mode first and then the items
+  // from the closed list of nine: "only: dumbbells, bench" when they list
+  // their whole kit, "hasnt: bands" for something they lack, "has: bench" for
+  // something extra. The client records it only when every item is in their
+  // own words, the right way round (kit-list.ts kitStatementInUserWords).
+  { key: 'kitList', question: 'What kit do you actually have?',
+    inputHint: 'only: dumbbells, bench', shortLabel: 'Your kit', control: 'text', required: false,
+    destination: 'user_facts', validate: v => v === '' || parseKitSlot(v) !== null },
 ]
 
 export function getSlotDef(key: string): SlotDef | undefined {
@@ -951,6 +970,7 @@ export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): st
     const opt = def.options.find(o => String(o.value) === String(v))
     if (opt) return opt.label
   }
+  if (def.key === 'kitList') { const s = parseKitSlot(v); if (s) return describeKitStatement(s).replace(/^Kit: /, '') }
   return def.unit ? `${v} ${def.unit}` : String(v)
 }
 
@@ -1048,6 +1068,9 @@ export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
   // an answer she gives unprompted is not thrown away, never so one is asked
   // for. See their slot defs above.
   'maxDumbbellKg', 'maxSingleImplementKg', 'maxImprovisedKg',
+  // The kit list: never asked (Ashley, 9 Oct 2026: no new setup question),
+  // only recorded when volunteered. See its slot def.
+  'kitList',
 ]
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */
@@ -1217,6 +1240,10 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     recovery_capacity: data.recoveryCapacity!,
     injuries: data.injuries,
     display_name: data.displayName.trim(),
+    // WHAT THEY SAID ABOUT THEIR KIT, if they volunteered it (the kitList
+    // slot). Attached the one way a kit reaches a profile, so the FIRST plan
+    // is built from it; App then records it as a kit row after the insert.
+    ...(parseKitSlot(data.kitList) ? { kit_statements: [parseKitSlot(data.kitList)!] } : {}),
     ...PROFILE_CONSTANTS,
   }
 }

@@ -21,6 +21,7 @@ import { dayAnchorExercise, anchorScore, canAnchor } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS, yieldFillerTo, optionalFillerSeconds } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
+import { kitOf, equipmentTierFor, kitAllowsEquipment, kitInWords, type ResolvedKit } from './kit-list'
 
 // ---------------------------------------------------------------------------
 // Track definitions (unchanged — used for day-level focus selection)
@@ -906,12 +907,51 @@ export function getFlaggedJoints(injuries: string[]): Set<string> {
  * need only ONE listed item present; every other entry needs all of them,
  * the historical behaviour.
  */
-export function isEquipmentAllowed(entry: ExerciseEntry, tier: EquipmentAccess): boolean {
-  const allowed = EQUIPMENT_SETS[tier]
+export function isEquipmentAllowed(entry: ExerciseEntry, who: EquipmentAccess | EquipmentReader): boolean {
+  const allowed = typeof who === 'string' ? EQUIPMENT_SETS[who] : allowedEquipmentFor(who)
   if (!allowed) return true
   return entry.equipment_alternatives
     ? entry.equipment.some(eq => allowed.has(eq))
     : entry.equipment.every(eq => allowed.has(eq))
+}
+
+/** The two fields that decide what kit somebody has: the tier they picked and what they have said since. */
+export type EquipmentReader = Pick<UserProfile, 'equipment_access' | 'kit_statements'>
+
+/** What `allowedEquipmentFor` answers: may this person be given something that needs `eq`? `null` = everything (a full gym). */
+export interface EquipmentAllowance { has(eq: string): boolean }
+
+// One allowance object per resolved kit, so the per-exercise test stays a lookup.
+const kitAllowances = new WeakMap<ResolvedKit, EquipmentAllowance>()
+
+/**
+ * THE ONE ANSWER TO "WHAT KIT MAY THIS PERSON BE GIVEN WORK FOR".
+ * docs/plans/kit-list.md; Ashley's ruling of 9 Oct 2026 ("remember what they
+ * say").
+ *
+ * With no kit list it is the tier's own set, the very object it always was —
+ * `null` for a full gym — so a person who has said nothing gets byte-identical
+ * plans (`test:kit-list` §2, and the quality grid). With one, each equipment
+ * string is answered by the list (kit-list.ts `kitAllowsEquipment`): one of
+ * the nine things a person can say they have is owned or not; anything else is
+ * as their tier has it, unless they gave a list as their whole kit.
+ *
+ * Read by `isEquipmentAllowed` and the equipment stage of the pool filter, and
+ * therefore by everything that goes through the pool: generation, the swap
+ * shortlist, add-an-exercise, injury substitution and rebuild, session
+ * rebuild, block rotation, the quality scorer. The warm-up's separate
+ * tier→kit map reads the same list (warmup.ts).
+ */
+export function allowedEquipmentFor(profile: EquipmentReader): EquipmentAllowance | null {
+  const kit = kitOf(profile)
+  if (!kit) return EQUIPMENT_SETS[profile.equipment_access || 'full_gym']
+  let allowance = kitAllowances.get(kit)
+  if (!allowance) {
+    const tierSet = EQUIPMENT_SETS[kit.baseTier]
+    allowance = { has: eq => kitAllowsEquipment(kit, eq, tierSet ? tierSet.has(eq) : true) }
+    kitAllowances.set(kit, allowance)
+  }
+  return allowance
 }
 
 // ---------------------------------------------------------------------------
@@ -950,24 +990,26 @@ function shuffle<T>(arr: T[]): T[] {
 
 function stageEquipmentFilter(
   pool: ExerciseEntry[],
-  equipmentAccess: EquipmentAccess,
+  who: EquipmentReader,
   trace: ConstraintTrace
 ): ExerciseEntry[] {
-  const allowed = EQUIPMENT_SETS[equipmentAccess]
+  const allowed = allowedEquipmentFor(who)
   if (!allowed) {
     trace.pool_size_after_each_stage.equipment = pool.length
     return pool
   }
+  const kit = kitOf(who)
+  const has = kit ? `said they have ${kitInWords(kit.items) || 'no kit'}` : `has ${who.equipment_access || 'full_gym'} equipment`
   const result: ExerciseEntry[] = []
   for (const ex of pool) {
-    const hasAll = isEquipmentAllowed(ex, equipmentAccess)
+    const hasAll = isEquipmentAllowed(ex, who)
     if (hasAll) {
       result.push(ex)
     } else {
       trace.equipment_filtered.push({
         exercise: ex.name,
         stage: 'equipment',
-        reason: `user has ${equipmentAccess} equipment; exercise requires [${ex.equipment.join(', ')}]`,
+        reason: `user ${has}; exercise requires [${ex.equipment.join(', ')}]`,
       })
     }
   }
@@ -3582,9 +3624,9 @@ export function selectDayExercises(
   }
   const { primer, rehab, main } = selectExercisesForTrack(
     track, pool, counts, new Set<string>(), styleConfig, trace, getGoalPolicy(profile.fitness_goal || 'hypertrophy'),
-    getFeaibleRequiredPatterns(styleConfig, profile.equipment_access || 'full_gym', profile.injuries || []),
+    getFeaibleRequiredPatterns(styleConfig, (equipmentTierFor(profile) || 'full_gym'), profile.injuries || []),
     new Map<string, number>(), profile.training_experience || 'novice', duration,
-    getFlaggedJoints(profile.injuries ?? []), profile.equipment_access || 'full_gym', trainingStyle,
+    getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle,
     opts.weekTrainsLegsElsewhere ?? false,
   )
   return { primer, rehab, main }
@@ -5471,10 +5513,10 @@ export function getConstrainedPool(
   let pool = EXERCISE_DATABASE.filter(
     e => !e.retired && !exclusions.some(ex => ex.toLowerCase() === e.name.toLowerCase())
   )
-  pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', throwaway)
+  pool = stageEquipmentFilter(pool, profile, throwaway)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
   if (!opts.skipStyle) {
-    pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+    pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
   }
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
   return pool
@@ -5508,13 +5550,20 @@ export function getExerciseCompatibilityWarnings(
   // filter this function's own doc comment claims to reuse. Found 9 Sep 2026
   // while auditing the equipment labels (roadmap item 11).
   const tier = profile.equipment_access || 'full_gym'
-  const allowedEquipment = EQUIPMENT_SETS[tier]
-  if (allowedEquipment && !isEquipmentAllowed(exercise, tier)) {
+  const allowedEquipment = allowedEquipmentFor(profile)
+  if (allowedEquipment && !isEquipmentAllowed(exercise, profile)) {
     const missing = exercise.equipment.filter(eq => !allowedEquipment.has(eq))
     // An alternatives entry only reaches here with NOTHING present, so listing
     // the misses with "or" is accurate: any one of them would do.
     const joiner = exercise.equipment_alternatives ? ' or ' : ', '
-    warnings.push(`Needs ${missing.join(joiner)} — outside your ${tier.replace(/_/g, ' ')} equipment.`)
+    // WITH A KIT LIST THE REASON IS WHAT THEY SAID, not a tier. "Outside your
+    // minimalist equipment" was printed on a dumbbell bench press for a man who
+    // owns dumbbells and a bench (test log H1); once somebody has told the app
+    // what they have, the tier's name is no longer why. With no list, the
+    // sentence is exactly what it was.
+    warnings.push(kitOf(profile)
+      ? `Needs ${missing.join(joiner)} — not in the kit you've told me you have.`
+      : `Needs ${missing.join(joiner)} — outside your ${tier.replace(/_/g, ' ')} equipment.`)
   }
 
   const flaggedJoints = new Set<string>()
@@ -5582,7 +5631,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // Compute feasible required patterns based on equipment & injury constraints
   const feasiblePatterns = getFeaibleRequiredPatterns(
     styleConfig,
-    profile.equipment_access || 'full_gym',
+    (equipmentTierFor(profile) || 'full_gym'),
     profile.injuries || []
   )
 
@@ -5601,13 +5650,13 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   })
 
   // STAGE 1: Equipment
-  pool = stageEquipmentFilter(pool, profile.equipment_access || 'full_gym', trace)
+  pool = stageEquipmentFilter(pool, profile, trace)
 
   // STAGE 2: Injury (replacements sourced from equipment-filtered pool only)
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
 
   // STAGE 3: Style
-  pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), profile.equipment_access || 'full_gym')
+  pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
 
   // STAGE 4: Skill / experience
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', trace)
@@ -5661,7 +5710,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const track = TRACKS[trackFocus]
     const legDaysElsewhere = resolvedTracks.filter((focus, i) => i !== index && isLegTrack(focus)).length
 
-    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), profile.equipment_access || 'full_gym', trainingStyle, legDaysElsewhere >= 2)
+    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -5771,7 +5820,8 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const warmup = buildWarmup({
       patterns: sessionEntries.map(e => e.movement_pattern),
       compounds,
-      equipment: profile.equipment_access || 'full_gym',
+      equipment: (equipmentTierFor(profile) || 'full_gym'),
+      kit: kitOf(profile),
       injuries: profile.injuries || [],
       experience: profile.training_experience || 'novice',
       budgetSeconds: warmupReserve,
@@ -7277,10 +7327,10 @@ export function generateMesocycle(
   // this function exists to solve). Bodyweight metabolic/conditioning
   // circuits are a legitimate, common variation regardless of the
   // trainee's primary goal.
-  const effectiveAllowedPhases = profile.equipment_access === 'bodyweight'
+  const effectiveAllowedPhases = equipmentTierFor(profile) === 'bodyweight'
     ? BODYWEIGHT_ALLOWED_PHASES
     : policy.allowedPhases
-  if (profile.equipment_access === 'bodyweight') {
+  if (equipmentTierFor(profile) === 'bodyweight') {
     sequence = restrictPhaseSequence(sequence, BODYWEIGHT_ALLOWED_PHASES)
   }
   // Any of the restrictions above (experience, goal, equipment) can each
@@ -7501,7 +7551,7 @@ export function generateMesocycle(
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
         )
-        const rotated = rotateVariation(ex.name, blockIndex, poolForRotation(pool, profile.equipment_access), experience, profile, usedNamesThisDay, avoidFamilies)
+        const rotated = rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
         usedNamesThisDay.add(rotated)
         if (rotated === ex.name) return { ...ex, name: rotated }
         // A rotation can land on an exercise with a different prescription
@@ -7730,7 +7780,7 @@ export function generateMesocycle(
               .map(e => getMovementFamily(e))
           )
           const weeklyName = rotatesWeekly
-            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), poolForRotation(pool, profile.equipment_access), experience, profile, usedWeeklyNames, weeklyFamilies)
+            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedWeeklyNames, weeklyFamilies)
             : ex.name
           if (rotatesWeekly) usedWeeklyNames.add(weeklyName)
 

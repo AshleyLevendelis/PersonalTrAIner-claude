@@ -114,6 +114,19 @@ export interface UserProfile {
    * stays required.
    */
   equipment_access?: EquipmentAccess
+  /**
+   * What the person has SAID about their kit ("I've got dumbbells and a
+   * bench", "I don't own bands"), in the order they said it — applied on top
+   * of the tier above. See kit-list.ts; Ashley's ruling of 9 Oct 2026.
+   *
+   * NOT A COLUMN, and never written to the profile row. It is compiled from
+   * `user_facts` and attached by `profileWithKit` in App, so everything the
+   * app hands a profile to sees the same kit. Absent for anyone who has said
+   * nothing, and then the tier decides exactly as it always has. Engine code
+   * reads the tier through `equipmentTierFor`, not `equipment_access`, so the
+   * list is never ignored.
+   */
+  kit_statements?: import('./kit-list').KitStatement[]
   training_style?: TrainingStyle
   training_experience?: TrainingExperience
   coaching_persona: CoachingPersona
@@ -673,7 +686,7 @@ export interface ChatPendingActionView {
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_add' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_session_shorten' | 'propose_session_length' | 'propose_schedule_change' | 'propose_style_change' | 'propose_goal_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'propose_session_activity_swap' | 'propose_weigh_in' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'grocery_day_added' | 'water_logged' | 'steps_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_add' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_kit_change' | 'propose_volume_change' | 'propose_session_shorten' | 'propose_session_length' | 'propose_schedule_change' | 'propose_style_change' | 'propose_goal_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'propose_session_activity_swap' | 'propose_weigh_in' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'grocery_day_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string

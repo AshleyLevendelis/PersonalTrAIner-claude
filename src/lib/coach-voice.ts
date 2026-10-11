@@ -1041,6 +1041,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_injury_as_lasting: { done: 'Saved', failed: "I couldn't save that" },
   propose_injury_recovered: { done: 'Cleared', failed: "I couldn't clear that" },
   propose_equipment_adaptation: { done: 'Adapted', failed: "I couldn't adapt it" },
+  propose_kit_change: { done: 'Kit saved', failed: "I couldn't save your kit" },
   propose_concurrent_activity: { done: 'Added', failed: "I couldn't add that" },
   propose_meal_swap: { done: 'Swapped', failed: "I couldn't swap that meal" },
   propose_meal_move: { done: 'Moved', failed: "I couldn't move that meal" },

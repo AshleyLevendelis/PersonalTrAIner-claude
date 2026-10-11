@@ -67,6 +67,7 @@ import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, EQUIPMENT
 import { isExternallyLoaded } from './load-prescription'
 import { EXERCISE_DATABASE, getExerciseEntry, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
 import type { WorkoutDay, UserProfile, MesocycleMovementPattern, EquipmentAccess } from './types'
+import { equipmentTierFor } from './kit-list'
 
 export interface AdditionCandidate {
   exercise: ExerciseEntry
@@ -187,7 +188,7 @@ export function getAdditionCandidates(
   const somethingIsThinner = leastInDay < Math.max(...openSets)
   const present = new Set(day.exercises.map(e => e.name.toLowerCase()))
   const pool = getConstrainedPool(profile, exclusions)
-  const equipment = profile.equipment_access
+  const equipment = equipmentTierFor(profile)
   // Does this day's name make a claim at all? Asked with nothing in hand: a
   // track with no defining work answers yes to anything, and then purpose is
   // not a way to tell two candidates apart.

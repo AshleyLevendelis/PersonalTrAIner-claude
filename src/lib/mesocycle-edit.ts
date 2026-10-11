@@ -106,7 +106,7 @@ export function getReplacementCandidates(
   // their gym), scoped to this shortlist everywhere else — a trainee whose
   // kit really is a backpack never has the only thing they own demoted for
   // want of a peer that isn't even a real option.
-  const equipment = profile.equipment_access
+  const equipment = equipmentTierFor(profile)
   const demoted = new Set<string>()
   if (equipment && EQUIPMENT_QUALITY_TIERS.has(equipment)) {
     const peerPool = POOL_WIDE_IMPLEMENT_TIERS.has(equipment) ? pool : ranked.map(c => c.exercise)
@@ -631,6 +631,7 @@ export function applyReplacement(
 // which would otherwise be an import cycle between the two.
 export { clearOrphanedSupersetLabels } from './settle-week'
 import { clearOrphanedSupersetLabels, settleWeek } from './settle-week'
+import { equipmentTierFor } from './kit-list'
 
 export function isMainLiftSlot(ex: Exercise | undefined): boolean {
   return ex?.tier === 'tier_1_primary'
