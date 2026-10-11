@@ -369,6 +369,12 @@ export interface Exercise {
    */
   load_hold?: 'ceiling' | 'implement' | 'stated_limit' | 'floor' | 'matched' | 'unaffordable_step'
   /**
+   * THE EXERCISE THIS ONE REPLACED, by her choice (a swap), so a later rebuild can put her choice back where the
+   * fresh plan brings the old one (run 5, H28, 11 Oct 2026: a rebuild dropped a Dumbbell Rows swap and handed back
+   * the lift she had swapped out). Only a swap writes it; generation never does.
+   */
+  swapped_for?: string
+  /**
    * What the frozen-load rep bump did this week, when it ran at all (the
    * weight did not move from last week and the lift is eligible):
    *   'bought'       a rep was added on top of the phase's range

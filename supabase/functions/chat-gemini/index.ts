@@ -955,7 +955,7 @@ const toolDeclarations = [
   {
     name: "propose_injury_recovered",
     description:
-      "PROPOSES removing a previously-added LASTING injury (see propose_injury_as_lasting) from the trainee's injuries, once they say it's resolved. Does NOT undo any exercise already swapped out for it — only stops FUTURE plans from avoiding that area. This does NOT apply anything — the app shows a card and the user taps Confirm. If the area isn't actually in their injuries, the app will say so rather than you needing to check first.",
+      "PROPOSES ending what the plan is doing around an area once they say it has cleared or want it ended: a TEMPORARY easing-off still running ('my knee feels fine now, can we go back to normal leg training?', 'end the two-week knee adjustment early') is ENDED TODAY and the sessions from today go back to what they were; a LASTING injury is taken off their injuries list and a rebuild is offered next. Both at once when both apply. Pass affected_area; if they don't name one and exactly one temporary change is running, the app ends that one. This does NOT apply anything — the app shows a card and the user taps Confirm, and if nothing is running or listed for that area the app says so in its own words. Days already trained are never changed.",
     parameters: {
       type: "object",
       properties: {
@@ -1065,10 +1065,14 @@ const toolDeclarations = [
   {
     name: "propose_session_length",
     description:
-      "PROPOSES changing how long their sessions are FROM NOW ON, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it when the time they have has CHANGED for good: 'my sessions need to be 45 minutes from now on', 'I can only do half an hour these days', 'I've got more time now, make them longer'. WHAT IT DOES, so you can say it plainly: the remaining weeks are rebuilt to FIT the new length — fewer or more exercises, sets and rest to match — rather than the same sessions with the end cut off. Weeks already underway or finished are never rewritten and anything logged stays exactly as it is. THE DIFFERENCE FROM propose_session_shorten IS THE TIME SCOPE, NEVER THE NUMBER: both carry a figure in minutes. 'I only have 45 minutes today' is one day and is propose_session_shorten; 'my sessions need to be 45 minutes' is every session from here and is this one. If you cannot tell which they mean, ASK — do not guess, because one of them rebuilds the rest of their block.",
+      "PROPOSES changing how long their sessions are FROM NOW ON, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it when the time they have has CHANGED for good: 'my sessions need to be 45 minutes from now on', 'I can only do half an hour these days', 'I've got more time now, make them longer'. WHAT IT DOES, so you can say it plainly: the remaining weeks are rebuilt to FIT the new length — fewer or more exercises, sets and rest to match — rather than the same sessions with the end cut off. Days already trained, and a session in progress, are never rewritten, and it starts on the date they ask for (see `starts`). THE DIFFERENCE FROM propose_session_shorten IS THE TIME SCOPE, NEVER THE NUMBER: both carry a figure in minutes. 'I only have 45 minutes today' is one day and is propose_session_shorten; 'my sessions need to be 45 minutes' is every session from here and is this one. If you cannot tell which they mean, ASK — do not guess, because one of them rebuilds the rest of their block.",
     parameters: {
       type: "object",
       properties: {
+        starts: {
+          type: "string",
+          description: "WHEN the change starts, from what they said: \"next_week\" for 'from next week' / 'starting next week', a date YYYY-MM-DD for a day they named, or \"today\" when they gave no start. Never assume next week when they did not say it, and never assume today when they did. The card states the start date in words before they confirm.",
+        },
         minutes: {
           type: "string",
           enum: ["30-45", "45-60", "60-90", "90+"],
@@ -1169,10 +1173,14 @@ const toolDeclarations = [
   {
     name: "propose_schedule_change",
     description:
-      "PROPOSES changing WHICH DAYS the user trains on, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Send the COMPLETE set of days they want to train, not a patch: if they train Mon/Tue/Thu/Sat and want Thursday off, send Monday, Tuesday, Saturday. Weeks already underway or finished are never rewritten — anything they have logged stays exactly as it is. ONLY for a LASTING change to which WEEKDAYS they train. Never for a question about today, and never for a statement that they want to train: 'I want to work out today', 'what should I do today?', 'what are the exercises I should be doing today?' ask nothing about which weekdays they train — answer those from this week's schedule, in text, with no tool call. Wanting to train today is not a schedule change; calling this for one rebuilt sixteen weeks of a real user's plan.",
+      "PROPOSES changing WHICH DAYS the user trains on, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Send the COMPLETE set of days they want to train, not a patch: if they train Mon/Tue/Thu/Sat and want Thursday off, send Monday, Tuesday, Saturday. Days already trained, and a session in progress, are never rewritten, and it starts on the date they ask for (see `starts`); the card lists every day it changes, what comes into and leaves the plan, and any weight that restarts. ONLY for a LASTING change to which WEEKDAYS they train. Never for a question about today, and never for a statement that they want to train: 'I want to work out today', 'what should I do today?', 'what are the exercises I should be doing today?' ask nothing about which weekdays they train — answer those from this week's schedule, in text, with no tool call. Wanting to train today is not a schedule change; calling this for one rebuilt sixteen weeks of a real user's plan.",
     parameters: {
       type: "object",
       properties: {
+        starts: {
+          type: "string",
+          description: "WHEN the change starts, from what they said: \"next_week\" for 'from next week' / 'starting next week', a date YYYY-MM-DD for a day they named, or \"today\" when they gave no start. Never assume next week when they did not say it, and never assume today when they did. The card states the start date in words before they confirm.",
+        },
         training_days: {
           type: "array",
           description: "The COMPLETE list of days the user will train from now on, replacing whatever is there today. Full day names: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.",
@@ -1197,6 +1205,10 @@ const toolDeclarations = [
     parameters: {
       type: "object",
       properties: {
+        starts: {
+          type: "string",
+          description: "WHEN the change starts, from what they said: \"next_week\" for 'from next week' / 'starting next week', a date YYYY-MM-DD for a day they named, or \"today\" when they gave no start. Never assume next week when they did not say it, and never assume today when they did. The card states the start date in words before they confirm.",
+        },
         name: { type: "string", description: "The activity in the user's own words, e.g. 'Muay Thai', 'five-a-side', 'club run'." },
         days: {
           type: "array",
@@ -1225,10 +1237,14 @@ const toolDeclarations = [
   {
     name: "propose_style_change",
     description:
-      "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
+      "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Days already trained, and a session in progress, are never rewritten, and it starts on the date they ask for (see `starts`). The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
     parameters: {
       type: "object",
       properties: {
+        starts: {
+          type: "string",
+          description: "WHEN the change starts, from what they said: \"next_week\" for 'from next week' / 'starting next week', a date YYYY-MM-DD for a day they named, or \"today\" when they gave no start. Never assume next week when they did not say it, and never assume today when they did. The card states the start date in words before they confirm.",
+        },
         training_style: {
           type: "string",
           enum: ["functional", "bodybuilding", "hybrid"],
@@ -1249,10 +1265,14 @@ const toolDeclarations = [
   {
     name: "propose_goal_change",
     description:
-      "PROPOSES changing WHAT the user is training for — their goal (fat loss / muscle growth / functional strength / conditioning) — then rebuilding the plan from the live week forward AND rebuilding their meals around the new calorie and macro targets. This does NOT apply anything: the app shows a card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. THIS IS THE BIGGEST CHANGE ANY TOOL MAKES — say plainly what it does: the volume, the phases, the rep ranges and the conditioning all change, and so does what they eat, because the goal is what sets the deficit or surplus. THE DIFFERENCE FROM propose_style_change IS WHAT versus HOW: the goal is the outcome they are training for, the style is the manner they train in. Somebody can chase muscle growth in a combat style. 'I want to train more like a bodybuilder' is a STYLE change; 'I want to build muscle instead of losing fat' is this one. ASK BEFORE CALLING IT UNLESS THEY WERE DEFINITE. A goal is something people think aloud about — 'I've been wondering about bulking', 'maybe I should focus on strength', 'part of me wants to lean out first' are all musing, and musing must NOT produce a card. Wait for an actual decision ('I want to switch to building muscle', 'change my goal to fat loss'), or ask them which of the four they mean and let them answer. When in doubt, ask: the cost of asking is one turn, and the cost of guessing is rewriting their whole block and their food.",
+      "PROPOSES changing WHAT the user is training for — their goal (fat loss / muscle growth / functional strength / conditioning) — then rebuilding the plan from the live week forward AND rebuilding their meals around the new calorie and macro targets. This does NOT apply anything: the app shows a card and the user taps Confirm. Days already trained, and a session in progress, are never rewritten, and it starts on the date they ask for (see `starts`). THIS IS THE BIGGEST CHANGE ANY TOOL MAKES — say plainly what it does: the volume, the phases, the rep ranges and the conditioning all change, and so does what they eat, because the goal is what sets the deficit or surplus. THE DIFFERENCE FROM propose_style_change IS WHAT versus HOW: the goal is the outcome they are training for, the style is the manner they train in. Somebody can chase muscle growth in a combat style. 'I want to train more like a bodybuilder' is a STYLE change; 'I want to build muscle instead of losing fat' is this one. ASK BEFORE CALLING IT UNLESS THEY WERE DEFINITE. A goal is something people think aloud about — 'I've been wondering about bulking', 'maybe I should focus on strength', 'part of me wants to lean out first' are all musing, and musing must NOT produce a card. Wait for an actual decision ('I want to switch to building muscle', 'change my goal to fat loss'), or ask them which of the four they mean and let them answer. When in doubt, ask: the cost of asking is one turn, and the cost of guessing is rewriting their whole block and their food.",
     parameters: {
       type: "object",
       properties: {
+        starts: {
+          type: "string",
+          description: "WHEN the change starts, from what they said: \"next_week\" for 'from next week' / 'starting next week', a date YYYY-MM-DD for a day they named, or \"today\" when they gave no start. Never assume next week when they did not say it, and never assume today when they did. The card states the start date in words before they confirm.",
+        },
         goal: {
           type: "string",
           enum: ["fat_loss", "hypertrophy", "functional", "conditioning"],
@@ -2237,7 +2257,7 @@ When the user says something hurts ("my shoulder's been aching since Tuesday", "
 - affected_area accepts lower_back/knees/shoulders/neck/wrists/hips/ankles/elbows on EITHER tool — these eight are the areas with joint-conflict data to filter against. (This list said five for a while after hips, ankles and elbows were wired up, so the coach refused three injuries the app could already handle. If you are ever unsure whether an area is supported, the enum on the tool is the truth.) If the user describes pain somewhere else, say plainly you can't auto-adjust the plan for that area yet, and offer a manual swap (propose_exercise_swap) for the specific exercise bothering them instead.
 
 === 3c. INJURY RECOVERY (propose_injury_recovered) ===
-When the user says a lasting injury has resolved ("my shoulder's fine now", "knee's back to normal", "I don't need to work around my back anymore"), call propose_injury_recovered with the affected_area. Say plainly what this does and doesn't do: it stops FUTURE plans from avoiding that area — it does NOT undo any exercise already swapped out for it, those stay as they are unless they ask for a manual swap back. If there's nothing currently listed for that area, the app will tell you rather than you having to check first.
+When the user says an area has cleared or asks to end what you're doing around it ("my shoulder's fine now", "knee's back to normal", "can we go back to normal leg training?", "end the knee adjustment early"), call propose_injury_recovered with the affected_area. It covers BOTH cases: a temporary easing-off that is still running is ended today and the sessions from today go back to what they were (days already trained stay as they are); a lasting injury comes off their injuries list and the app then asks whether to rebuild so the work comes back. Never answer "I couldn't find that" for this: if nothing is running or listed for that area, the app says so itself.
 
 === 3b. EQUIPMENT / TRAVEL ADAPTATION (propose_equipment_adaptation) ===
 When the user says they're away or at a different gym for a period ("hotel gym for a week", "only dumbbells until Friday", "I'm away from my gym"):
@@ -2271,7 +2291,7 @@ When the user wants a day's session to be more or less work ("Tuesdays are too m
 === 3e. WHICH DAYS THEY TRAIN (propose_schedule_change) ===
 When the user wants to train on different days ("I can't do Thursdays anymore", "can we move to three days a week", "add Saturday"):
 - Call propose_schedule_change with training_days: the COMPLETE list of days they'll train from now on, not a patch. Work it out from the schedule shown below plus what they just said, and if you can't tell what the new full week looks like, ask before calling.
-- This rebuilds the plan from the live week forward. Weeks they've already logged are untouched — say so, it's the reassurance people want before tapping Confirm.
+- WHEN IT STARTS IS THEIRS. "From next week" is starts: "next_week"; a day they name is that date; nothing said is today. The same goes for every change that rebuilds the plan (session length, style, goal, a second sport). The card works out and lists what it will change — the start date, each day of the first week it touches, what comes into and leaves the plan, any weight that restarts — so do not promise more than that in your own words. Days already trained, and a session they have started, are never touched.
 - Changing how MANY days they train changes the split, not just the calendar: four days of work does not fit into three days unchanged. Say that honestly rather than implying the same plan just moves.
 - THIS TOOL IS FOR A LASTING CHANGE TO WHICH WEEKDAYS THEY TRAIN, AND NOTHING ELSE. "I want to work out today", "I'm training today", "can I train today?", "what should I do today?", "what are the exercises I should be doing today?" are NOT schedule changes — not one of them asks for different training days. MEASURED LIVE, 1 Sep 2026: "I want to work out today" rebuilt SIXTEEN WEEKS of a real user's plan, and her follow-up "not the schedule, the workout, what's the exercises I should be doing today" was answered — twice, word for word — with "Those are already the days you're training — nothing to change." Wanting to train is the normal state of a person using a training app. It is never, by itself, a reason to touch the plan.
 - WHAT TO DO INSTEAD, when they ask what to do today or say they want to train: read the day off THIS WEEK'S SCHEDULE below and tell them, in plain text, with NO tool call. That schedule lists every day, including the ones with no gym session — a walk with its minutes, a rest day, a conditioning note — so "there is nothing there to tell them" is never true. If today is a rest day and they want to train anyway, say what today is and let them decide; do not rewrite the week to accommodate a single day.
@@ -2280,7 +2300,7 @@ When the user wants to train on different days ("I can't do Thursdays anymore", 
 === 3f. HOW THEY TRAIN (propose_style_change) ===
 When the user wants a LASTING change to how they train ("switch me to bodybuilding", "I want to train more like an athlete from now on", "can we make my whole programme hybrid"):
 - Call propose_style_change with training_style: one of functional, bodybuilding, hybrid. Map what they said to the nearest one and say which you picked; if it genuinely isn't clear which of the three they mean, ask before calling. (Combat is not offered as a style to move TO any more. Someone already on it keeps it, and their plan, until they choose to change.)
-- This rebuilds the plan from the live week forward. Weeks they've already logged are untouched — say so, it's the reassurance people want before tapping Confirm.
+- It starts when they say (starts: "next_week", a date, or today when they said nothing), and the card lists what it changes. Days already trained, and a session they have started, are never touched.
 - A style change changes the EXERCISES and the REP RANGES, not just the name on the plan: combat runs heavy main lifts at 3-5, bodybuilding runs 6-8 and up. Say that honestly rather than implying the same sessions just get relabelled.
 - THIS TOOL IS FOR A LASTING CHANGE TO HOW THEY TRAIN, AND NOTHING ELSE. "Make today harder", "give me a bodybuilding-style session today", "I fancy something different this session", "I want a different workout" are NOT style changes — not one of them asks to retrain for the rest of the plan. The same lesson §3e learned live: a single day's wish is never a reason to rewrite sixteen weeks.
 - WHAT TO DO INSTEAD for a one-off: answer in text, or use propose_exercise_swap with scope "today" for the specific exercise they want different. If they say the current style isn't working for them at all, that is the moment to ask whether they want to change it for good.
@@ -2949,7 +2969,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_schedule_change",
-              rawArgs: { training_days: args.training_days, reason: args.reason },
+              rawArgs: { training_days: args.training_days, reason: args.reason, starts: args.starts },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -2973,7 +2993,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
               rawArgs: {
                 name: args.name, days: args.days, time_of_day: args.time_of_day, intensity: args.intensity,
                 movement_demands: args.movement_demands, training_days: args.training_days,
-                gym_time_of_day: args.gym_time_of_day, reason: args.reason,
+                gym_time_of_day: args.gym_time_of_day, reason: args.reason, starts: args.starts,
               },
             },
           }),
@@ -2993,7 +3013,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_style_change",
-              rawArgs: { training_style: args.training_style, reason: args.reason },
+              rawArgs: { training_style: args.training_style, reason: args.reason, starts: args.starts },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -3021,7 +3041,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_goal_change",
-              rawArgs: { goal: args.goal, reason: args.reason },
+              rawArgs: { goal: args.goal, reason: args.reason, starts: args.starts },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -4222,7 +4242,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
             reply: "",
             proposal: {
               kind: "propose_session_length",
-              rawArgs: { minutes: args.minutes, reason: args.reason },
+              rawArgs: { minutes: args.minutes, reason: args.reason, starts: args.starts },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

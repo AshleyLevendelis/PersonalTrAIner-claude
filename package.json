@@ -432,7 +432,8 @@
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
     "test:layout-revamp": "tsx scripts/test-layout-revamp.ts",
     "test:exercise-layout": "tsx scripts/test-exercise-layout.ts",
-    "test:round-setup": "tsx scripts/test-round-setup.ts"
+    "test:round-setup": "tsx scripts/test-round-setup.ts",
+    "test:rebuild-honours": "tsx scripts/test-rebuild-honours.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

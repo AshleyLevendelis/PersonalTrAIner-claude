@@ -17,7 +17,7 @@ import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
-import { isDevAccount, getSessionDateContext, getAppNow } from '@/lib/dev-clock'
+import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
@@ -36,6 +36,7 @@ import { useMealPlanActions } from '@/hooks/useMealPlanActions'
 import { watchFavouriteNames } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
+import { describeRebuild } from '@/lib/rebuild-card'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { buildRestartedPlan } from '@/lib/plan-restart'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
@@ -2457,7 +2458,9 @@ function App() {
    * caller says so instead of the line quietly staying put.
    */
   const handleEndAdaptation = async (adaptationId: string): Promise<string | null> => {
-    if (!profile?.id || endingAdaptationId) return null
+    // NOT A SILENT SUCCESS (run 5, H27): null means "ended", so a tap that could not run must say why.
+    if (!profile?.id) return "That can't be ended until your profile has loaded."
+    if (endingAdaptationId) return 'One change is already being ended — give it a moment, then try again.'
     setEndingAdaptationId(adaptationId)
     try {
       const context = await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at)
@@ -2480,6 +2483,27 @@ function App() {
     }
   }
 
+  // THE OFFER SAYS WHAT THE REBUILD WILL DO, read off a trial of it (run 5, H28, 11 Oct 2026): the same rebuild,
+  // seeded, so the plan the tap applies is the plan the dialog described.
+  const [rebuildPreview, setRebuildPreview] = useState<{ lines: string[]; seedKey: string } | null>(null)
+  useEffect(() => {
+    setRebuildPreview(null)
+    if (!planInvalidation || !profile?.id || mesocycle.length === 0) return
+    let cancelled = false
+    const seedKey = `profile-rebuild:${profile.id}:${planInvalidation.title}:${getLocalDateString(getAppNow(profile.id))}`
+    const createdAt = mesocycleCreatedAt ?? profile.created_at
+    const currentWeek = getActiveMesocycleWeek(createdAt, undefined, mesocycle.length || 4)
+    void (async () => {
+      const context = await loadPlanEditContext(profile, mesocycle, createdAt)
+      const trial = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context, { seedKey })
+      if (cancelled || !trial.ok || !trial.mesocycle) return
+      const today = context.calendar.today
+      setRebuildPreview({ seedKey, lines: describeRebuild(mesocycle, trial.mesocycle, { start: { fromWeek: currentWeek, fromDate: today, said: 'from today' }, planCreatedAt: createdAt }) })
+    })().catch(console.error)
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planInvalidation])
+
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
     setRebuilding(true)
@@ -2490,7 +2514,7 @@ function App() {
       // Which days are already trained, read at the moment of the tap: the
       // rebuild leaves every one of them exactly as it is.
       const context = await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at)
-      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context)
+      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context, { seedKey: rebuildPreview?.seedKey })
       if (!result.ok || !result.mesocycle) {
         setWriteError(result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`)
         return
@@ -3251,6 +3275,11 @@ function App() {
             <DialogTitle>{planInvalidation?.title}</DialogTitle>
             <DialogDescription>{planInvalidation?.detail}</DialogDescription>
           </DialogHeader>
+          {rebuildPreview && rebuildPreview.lines.length > 0 && (
+            <ul className="space-y-1.5 text-[0.8125rem] leading-snug text-muted-foreground" data-testid="rebuild-preview">
+              {rebuildPreview.lines.map(line => <li key={line}>{line}</li>)}
+            </ul>
+          )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPlanInvalidation(null)} disabled={rebuilding}>
               Leave it as it is

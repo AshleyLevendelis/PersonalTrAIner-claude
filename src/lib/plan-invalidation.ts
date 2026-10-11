@@ -332,6 +332,11 @@ export async function rebuildFromCurrentWeek(
    * including the days of it already done. See rebuildAgainstProfile.
    */
   context: PlanEditContext,
+  /**
+   * `fromDate`: the first date she asked the change to start (run 5, H28: "from next week" rebuilt this week).
+   * `seedKey`: the same plan on the card and on confirm — the card is read off a trial run of this very function.
+   */
+  opts: { fromDate?: string; seedKey?: string } = {},
 ): Promise<RebuildResult> {
   const forward = mesocycle.filter(w => w.week_number >= currentWeek).map(w => w.week_number)
   if (forward.length === 0) {
@@ -342,7 +347,7 @@ export async function rebuildFromCurrentWeek(
   }
 
   try {
-    const rebuilt = await rebuildAgainstProfile(profile, exclusions, mesocycle, forward, context)
+    const rebuilt = await rebuildAgainstProfile(profile, exclusions, mesocycle, forward, opts.fromDate ? { ...context, fromDate: opts.fromDate } : context, opts.seedKey)
     return { ok: true, mesocycle: rebuilt, weeksRebuilt: forward.length }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }

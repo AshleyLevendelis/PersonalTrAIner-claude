@@ -242,14 +242,15 @@ console.log('\n"Today" for the weight window and the target snapshot is the pers
   const row = (date: string, kg: number) => ({ date, weight_kg: kg })
 
   // Auckland, 09:00 on 7 Oct: the person's date is 7 Oct, UTC's is still 6 Oct. Today's weigh-in is
-  // 90kg and the six before it 80kg, so a window that includes today averages 81.43 and one that
-  // does not averages 80.
+  // 81kg and the six before it 80kg, so a window that includes today averages 80.14 and one that
+  // does not averages 80. (81, not 90: since her 9 Oct ruling a jump of more than about 3% is held out
+  // of the average until a second day agrees, so a 90 here would measure that rule, not the window.)
   process.env.TZ = 'Pacific/Auckland'
-  weighIns = [row('2026-10-07', 90), ...['01', '02', '03', '04', '05', '06'].map(d => row(`2026-10-${d}`, 80))]
+  weighIns = [row('2026-10-07', 81), ...['01', '02', '03', '04', '05', '06'].map(d => row(`2026-10-${d}`, 80))]
   freezeAt('2026-10-06T20:00:00Z')
   const morning = await getEffectiveTargetWeightKg('p1', 70)
   thaw()
-  check('east of UTC in the morning, today\'s weigh-in is inside the seven-day window', near(morning.weightKg, (90 + 6 * 80) / 7), morning)
+  check('east of UTC in the morning, today\'s weigh-in is inside the seven-day window', near(morning.weightKg, (81 + 6 * 80) / 7), morning)
 
   // New York, 22:00 on 6 Oct: the person's date is 6 Oct, UTC's is already 7 Oct. The 30 Sep weigh-in
   // is the seventh day back for the person (100kg) and the eighth for UTC.

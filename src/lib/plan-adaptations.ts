@@ -17,10 +17,11 @@ import {
   buildReplacementSlot,
   clearOrphanedSupersetLabels,
   isMainLiftSlot,
+  getReplacementCandidates,
 } from './mesocycle-edit'
 import { settleWeek } from './settle-week'
 import {
-  comparePlanDays, planWeeksOnDate, weekdayIndex, NOTHING_TRAINED,
+  comparePlanDays, planWeeksOnDate, weekdayIndex, NOTHING_TRAINED, planDayDate,
   type DayGuard, type PlanCalendar, type PlanDayOnDate, type PlanDayRef,
 } from './plan-guard'
 import { addDays } from './session-move'
@@ -45,8 +46,13 @@ export interface PlanEditContext {
   constraints: EffectiveConstraints
   /** Today on the app's clock, the plan's start, and any moved sessions. */
   calendar: PlanCalendar
-  /** The day the last active temporary injury change ends (YYYY-MM-DD), or null. */
+  /** The day the last active temporary change (injury or kit) ends (YYYY-MM-DD), or null. */
   constrainedUntil: string | null
+  /**
+   * The first date a rebuild may change (YYYY-MM-DD) — "from next week" (run 5, H28, 11 Oct 2026). Every row
+   * before it is left as it is, trained or not. Absent: from today.
+   */
+  fromDate?: string
 }
 
 /**
@@ -598,8 +604,9 @@ export async function rebuildAgainstProfile(
     }
   }
 
-  // Which weeks an active temporary injury change still reaches.
-  const cautiousProfile = constraintProfile(clone, { ...context.constraints, temporaryEquipment: null })
+  // Which weeks an active temporary change still reaches — injury AND kit (run 5, H28: the kit one was dropped
+  // here, so "rebuild" quietly ended a temporary equipment change she had asked for).
+  const cautiousProfile = constraintProfile(clone, context.constraints)
   const cautiousWeeks = new Set<number>()
   if (cautiousProfile !== clone && context.constrainedUntil) {
     for (let date = context.calendar.today; date <= context.constrainedUntil; date = addDays(date, 1)) {
@@ -616,11 +623,18 @@ export async function rebuildAgainstProfile(
   // anything holding a week reference — logged sets, an active session, the
   // week strip — still resolves. Only the CONTENT is replaced, and only on
   // days nobody has trained.
-  return mesocycle.map((original, i) => {
+  // THE DATE SHE ASKED FOR (run 5, H28): a row before it is left as it is, trained or not.
+  const beforeStart = (weekNumber: number, dayName: string): boolean => {
+    if (!context.fromDate) return false
+    const date = planDayDate(context.calendar.planCreatedAt, weekNumber, dayName)
+    return date != null && date < context.fromDate
+  }
+  return Promise.all(mesocycle.map(async (original, i) => {
     if (!wanted(original.week_number)) return original
-    const week = (cautiousWeeks.has(original.week_number) ? cautious : plain)?.[i]
+    const cautiousWeek = cautiousWeeks.has(original.week_number)
+    const week = (cautiousWeek ? cautious : plain)?.[i]
     if (!week) return original
-    const mayChange = (dayName: string) => !context.isProtected(original.week_number, dayName)
+    const mayChange = (dayName: string) => !context.isProtected(original.week_number, dayName) && !beforeStart(original.week_number, dayName)
     const dayNames = [...new Set([...original.days.map(d => d.day), ...week.days.map(d => d.day)])]
     if (!dayNames.some(mayChange)) return original
     const identity = {
@@ -630,8 +644,78 @@ export async function rebuildAgainstProfile(
       label: original.label,
       phase_label: original.phase_label,
     }
-    return keepDays(original, identity, mayChange)
-  })
+    const spliced = keepDays(original, identity, mayChange)
+    return carryHerChoices(original, spliced, cautiousWeek ? cautiousProfile : clone, exclusions, mayChange)
+  }))
+}
+
+/**
+ * WHAT A REBUILD MUST NOT FORGET (run 5, H28, 11 Oct 2026). A rebuild regenerates from the profile, and the
+ * profile does not hold two things she chose after the plan was made, so they were lost on every rebuild:
+ *
+ *   1. A SWAP. A slot the fresh plan fills with the lift she swapped away from gets her choice back, when it is
+ *      still one she can do (the swap list's own candidates for the slot: kit, injuries, bans).
+ *   2. A WEIGHT THE PLAN HAD ALREADY MOVED UP TO — a calibration anchor, an accepted "beat the target" offer. Kept
+ *      when the same lift sits in the same week at the same reps; never downward, never into a deload (a deload is
+ *      defined by being lighter); a lift at different reps starts from its estimate, as a new prescription should.
+ *
+ * Only days the rebuild changed are touched, and each touched day goes through the same tail as any edit.
+ * Basis (CSCS): progression is built on the loads already earned; resetting them is a regression nobody asked
+ * for, and a substitution the trainee chose (usually for comfort, kit or a niggle) is the one they will do.
+ */
+async function carryHerChoices(
+  original: MesocycleWeek,
+  next: MesocycleWeek,
+  profile: UserProfile,
+  exclusions: string[],
+  mayChange: (dayName: string) => boolean,
+): Promise<MesocycleWeek> {
+  const { patchBlockFromLiftedKg } = await import('./beat-target-offer')
+  const lower = (n: string) => n.toLowerCase()
+  const swaps = new Map<string, string>()
+  const earned = new Map<string, { kg: number; reps: string }>()
+  for (const day of original.days) {
+    for (const e of day.exercises) {
+      if (e.swapped_for) swaps.set(lower(e.swapped_for), e.name)
+      if (e.suggested_load_kg != null) {
+        const was = earned.get(lower(e.name))
+        if (!was || e.suggested_load_kg > was.kg) earned.set(lower(e.name), { kg: e.suggested_load_kg, reps: e.reps })
+      }
+    }
+  }
+  if (swaps.size === 0 && earned.size === 0) return next
+  const banned = new Set(exclusions.map(lower))
+  let week = next
+  const touched = new Set<string>()
+  for (const day of next.days) {
+    if (!mayChange(day.day) || day === original.days.find(d => d.day === day.day)) continue
+    for (let exIndex = 0; exIndex < day.exercises.length; exIndex++) {
+      const current = week.days.find(d => d.day === day.day)!
+      const slot = current.exercises[exIndex]
+      const herChoice = swaps.get(lower(slot.name))
+      if (herChoice && !banned.has(lower(herChoice)) && !current.exercises.some(e => lower(e.name) === lower(herChoice))) {
+        const allowed = getReplacementCandidates(slot.name, profile, exclusions).find(c => lower(c.exercise.name) === lower(herChoice))
+        if (allowed) {
+          const replaced: Exercise = { ...(await buildReplacementSlot(slot, allowed.exercise, profile, week, isMainLiftSlot(slot))), swapped_for: slot.name }
+          week = { ...week, days: week.days.map(d => (d.day === day.day
+            ? { ...d, exercises: clearOrphanedSupersetLabels(d.exercises.map((e, i) => (i === exIndex ? replaced : e))) }
+            : d)) }
+          touched.add(day.day)
+          continue
+        }
+      }
+      const was = earned.get(lower(slot.name))
+      if (was && !week.is_deload && was.reps === slot.reps && slot.suggested_load_kg != null && was.kg > slot.suggested_load_kg) {
+        const r = patchBlockFromLiftedKg([week], profile, {
+          blockNumber: week.block_number ?? 1, dayName: day.day, exIndex, exerciseName: slot.name,
+          liftedKg: was.kg, fromWeekInBlock: week.week_in_block ?? 1,
+        })
+        if (r.patched) { week = r.next[0]; touched.add(day.day) }
+      }
+    }
+  }
+  for (const dayName of touched) week = settleWeek(week, dayName, profile).week
+  return week
 }
 
 export interface RebuildForWeightBasisParams {

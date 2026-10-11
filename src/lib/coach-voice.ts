@@ -1013,6 +1013,16 @@ export interface ReceiptTitles {
   failed: string
 }
 
+/**
+ * A card whose change was taken back with Undo. Its title had stayed "Rescheduled" with only the button gone
+ * (run 5, 11 Oct 2026). "Put back" is the word the meal day-swap's Undo already uses.
+ */
+export const RECEIPTS_UNDONE = {
+  title: 'Put back',
+  label: 'Undone',
+  detail: (was: string) => `${was.replace(/[.!]+$/, '')} was taken back. Everything is as it was before.`,
+} as const
+
 export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_exercise_swap: { done: 'Swapped', failed: "I couldn't swap that" },
   propose_exercise_add: { done: 'Added', failed: "I couldn't add that" },

@@ -120,6 +120,21 @@ export function planDaysInWindow(mesocycle: MesocycleWeek[], calendar: PlanCalen
   return out
 }
 
+/**
+ * The date a plan row WOULD be trained on when no date reaches it today: a day a rebuild is about to add, or a row
+ * whose session moved outside the plan. Its own weekday inside its own plan week, counted from the day the plan was
+ * made (weeks run from that day, not from Monday). Null when the plan has no start date to count from.
+ */
+export function planDayDate(planCreatedAt: string | undefined, weekNumber: number, dayName: string): string | null {
+  if (!planCreatedAt) return null
+  const weekStart = addDays(localDateOf(planCreatedAt), (weekNumber - 1) * 7)
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(weekStart, i)
+    if (dayNameOf(date) === dayName) return date
+  }
+  return null
+}
+
 export interface DayGuardInput extends PlanCalendar {
   /** Dates with at least one logged set. */
   loggedDates: Iterable<string>
@@ -132,7 +147,8 @@ export interface DayGuardInput extends PlanCalendar {
  *
  * A plan row is protected when any date it is trained on is before today, has
  * logged sets, or was closed by the person (finished, missed, rested, swapped
- * for something else). Today is open until something is logged on it. A
+ * for something else). Today is open until something is logged on it, or a
+ * session is running on it (the caller passes today as logged then). A
  * session moved to another day is judged on the day it moved TO.
  *
  * Basis (CSCS): the training record is the evidence progression is built
@@ -160,13 +176,20 @@ export function buildDayGuard(mesocycle: MesocycleWeek[], input: DayGuardInput):
     const k = key(weekNumber, dayName)
     if (protectedRows.has(k)) return true
     if (served.has(k)) return false
-    // A row no date reaches (its session was moved outside the plan, or the
-    // plan has no start date to count from). Judge it on its own weekday in
-    // its own week: everything in a week before the live one is history.
+    // A row no date reaches: a day a rebuild is ADDING (the plan had no session on it), or a session moved outside
+    // the plan. JUDGED ON ITS DATE, by the same rule as every other row (run 5, H28, 11 Oct 2026). This compared
+    // weekdays Monday-first with a strict "before today", so a rebuild that put a session on TODAY — a rest day she
+    // had already trained on with "Train anyway" — wrote over the session in progress, and in a plan begun midweek
+    // a Monday later in the live week read as past.
+    const date = planDayDate(input.planCreatedAt, weekNumber, dayName)
+    if (date) return date < input.today || logged.has(date) || closed.has(date)
+    // No start date to count from: everything before the live week is history, and so is today once trained.
     const liveWeeks = planWeeksOnDate(input.planCreatedAt, input.today, mesocycle.length)
     const live = liveWeeks.length > 0 ? Math.min(...liveWeeks) : 1
     if (weekNumber !== live) return weekNumber < live
-    return weekdayIndex(dayName) < weekdayIndex(dayNameOf(input.today))
+    const todayIndex = weekdayIndex(dayNameOf(input.today))
+    const dayIndex = weekdayIndex(dayName)
+    return dayIndex < todayIndex || (dayIndex === todayIndex && (logged.has(input.today) || closed.has(input.today)))
   }
 }
 

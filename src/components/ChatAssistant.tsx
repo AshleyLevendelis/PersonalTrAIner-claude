@@ -45,11 +45,11 @@ import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import { DEFAULT_POOL_SIZE } from '@/lib/meal-generation'
-import { executeMealMove } from '@/lib/pending-action-executor'
+import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, SCOPE, MORE_MEALS, DAY_MOVE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, SCOPE, MORE_MEALS, DAY_MOVE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -62,7 +62,8 @@ import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptat
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { planDaysInWindow, describeDateSpan, dayAndMonth, type PlanDayOnDate } from '@/lib/plan-guard'
 import { areaInWords, endsOn, isAdaptationActive } from '@/lib/effective-constraints'
-import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
+import { detectPlanInvalidation, rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
+import { resolveRebuildStart, describeRebuild } from '@/lib/rebuild-card'
 import { updateProfileField } from '@/lib/profile-store'
 import { substituteForInjury, substituteForEquipment, assessAdaptation, countSlots } from '@/lib/plan-adaptations'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -437,6 +438,16 @@ const SESSION_PASSED_CUTOFF: Record<string, number> = {
 function sessionCutoffHour(preferredTime: string | undefined): number {
   return SESSION_PASSED_CUTOFF[preferredTime || 'morning'] || 22
 }
+
+/** The coach tools that rebuild the rest of the plan; each card is finished by finishRebuildCard. */
+const REBUILD_CARD_KINDS = new Set(['propose_schedule_change', 'propose_session_length', 'propose_style_change', 'propose_goal_change', 'propose_concurrent_activity'])
+
+/**
+ * ONLY for a proposal this client does not know at all. Every tool it knows says what it could not do in its own
+ * words (run 5, H27, 11 Oct 2026: "end the knee adjustment early" got this line from a builder that had no reason
+ * to give, as if the plan had changed under her).
+ */
+const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — it may have changed since you last looked."
 
 export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
@@ -2691,6 +2702,51 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    */
   const loadEditContext = () => loadPlanEditContext(profile, mesocycle, planCreatedAt ?? profile.created_at)
 
+  /**
+   * EVERY REBUILD CARD IS READ OFF A TRIAL OF ITSELF (run 5, H28, 11 Oct 2026). The card used to say "Rebuilds 16
+   * weeks from week 1 on. Anything you've already logged stays exactly as it is." before anything was worked out,
+   * and the rebuild then started today, replaced the session in progress and handed back a swapped-out lift, none
+   * of it on the card. Now: the start is the date she asked for ("next week", a date, else today); the rebuild runs
+   * once here with a seed, the card lists what that run changed, and confirm runs the same seed, so the plan she
+   * gets is the plan the card described. Applies to every coach rebuild: days, length, style, goal, second sport.
+   */
+  const finishRebuildCard = async (
+    kind: string,
+    built: { scopeKey: string; preconditions: Record<string, unknown>; payload: Record<string, unknown>; preImage?: MesocycleWeek[]; diff: import('@/lib/pending-actions-store').ProposalDiff },
+    rawArgs: Record<string, unknown>,
+  ): Promise<{ built: typeof built } | { refusal: string }> => {
+    const p = built.payload
+    const after: UserProfile | null =
+      kind === 'propose_schedule_change' ? { ...profile, training_days: (profile.training_days ?? []).map(d => ({ ...d, available: (p.trainingDays as string[]).some(w => w.toLowerCase() === d.day.toLowerCase()) })) }
+      : kind === 'propose_session_length' ? { ...profile, session_duration_preference: p.sessionDuration as UserProfile['session_duration_preference'] }
+      : kind === 'propose_style_change' ? { ...profile, training_style: p.trainingStyle as UserProfile['training_style'] }
+      : kind === 'propose_goal_change' ? { ...profile, fitness_goal: p.fitnessGoal as UserProfile['fitness_goal'] }
+      : kind === 'propose_concurrent_activity' ? profileAfterConcurrentActivity(profile, p as unknown as Parameters<typeof profileAfterConcurrentActivity>[1])
+      : null
+    if (!after) return { built }
+    const start = resolveRebuildStart(rawArgs.starts, { liveWeek: activeSession.liveWeek, today: activeSession.date, planCreatedAt: planCreatedAt ?? profile.created_at, totalWeeks: mesocycle.length })
+    if ('refusal' in start) return { refusal: start.refusal }
+    const seedKey = `${built.scopeKey}:${start.fromDate}`
+    const context = await loadEditContext()
+    const trial = await rebuildFromCurrentWeek(after, exerciseExclusions, mesocycle, start.fromWeek, context, { fromDate: start.fromDate, seedKey })
+    if (!trial.ok || !trial.mesocycle) return { refusal: `I couldn't work that out on your plan just now (${trial.error ?? 'the rebuild failed'}), so nothing has changed. Try again in a moment.` }
+    const lines = describeRebuild(mesocycle, trial.mesocycle, { start, planCreatedAt: planCreatedAt ?? profile.created_at })
+    if (lines.length === 0) return { refusal: `That wouldn't change anything in your plan ${start.said} — the days it would touch are already trained or already like that.` }
+    // The old "Rebuilds N weeks from week X on" line goes; anything else it said (a second sport's reason) stays.
+    const kept = (built.diff.implications ?? [])
+      .map(i => i.text.startsWith('Rebuilds ') ? { ...i, text: i.text.replace(/^Rebuilds \d+ weeks? from week \d+ on( so )?/, (_m, so) => (so ? 'So ' : '')).replace(SCOPE.historyKept, '').trim() } : i)
+      .filter(i => i.text.length > 0)
+    return {
+      built: {
+        ...built,
+        scopeKey: `${built.scopeKey}:${start.fromDate}`,
+        preconditions: { ...built.preconditions, startWeek: start.fromWeek, fromDate: start.fromDate },
+        payload: { ...p, fromWeek: start.fromWeek, fromDate: start.fromDate, seedKey },
+        diff: { ...built.diff, implications: [...lines.map(text => ({ severity: 'info' as const, text })), ...kept] },
+      },
+    }
+  }
+
   /** "Thursday 15 Oct" — a card row is named by the day it is trained, so the rows read in date order. */
   const adaptationRowLabel = (slot: { weekNumber: number; dayName: string }, days: PlanDayOnDate[]): string => {
     const on = days.find(d => d.weekNumber === slot.weekNumber && d.dayName === slot.dayName)
@@ -2705,6 +2761,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * side to build the real diff — same I1 reasoning as the swap proposal:
    * the server never touches the plan.
    */
+  /** Why a temporary injury change made no card, said in its own words (run 5, H27) rather than "couldn't find that". */
+  const injuryAdaptationRefusal = (rawArgs: Record<string, unknown>): string => {
+    const area = String(rawArgs.affected_area ?? '')
+    const days = Number(rawArgs.duration_days)
+    if (!area || !days || days <= 0) return 'Tell me which area and roughly how many days, and I\'ll ease those days off.'
+    const running = activeAdaptations.find(a => a.kind === 'injury' && a.injury_code === area && isAdaptationActive(a, getAppNow(profile.id)))
+    if (running) return `I'm already easing off your ${areaInWords(area)} until ${endsOn(running.expires_at)}. Want me to end it early, or keep it going?`
+    return `Nothing in your plan over those days loads your ${areaInWords(area)}, so there's nothing to change. If it's still bothering you next week, tell me and I'll look again.`
+  }
+
   const buildInjuryAdaptationProposal = async (rawArgs: Record<string, unknown>): Promise<{
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -2867,15 +2933,27 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     preconditions: Record<string, unknown>
     payload: InjuryRecoveredPayload
     diff: import('@/lib/pending-actions-store').ProposalDiff
-  } | null => {
-    const injuryCode = String(rawArgs.affected_area ?? '')
-    if (!injuryCode) return null
+  } | { refusal: string } => {
+    const now = getAppNow(profile.id)
+    const runningAll = activeAdaptations.filter(a => isAdaptationActive(a, now))
+    let injuryCode = String(rawArgs.affected_area ?? '')
+    // "END THE TWO-WEEK KNEE ADJUSTMENT EARLY" names no recovery and sometimes no area the tool knows (run 5, H27,
+    // 11 Oct 2026). With one temporary change running, that change is the one she means.
+    const runningInjuries = runningAll.filter(a => a.kind === 'injury' && a.injury_code)
+    if ((!injuryCode || !runningInjuries.some(a => a.injury_code === injuryCode)) && !profile.injuries.includes(injuryCode) && runningInjuries.length === 1) {
+      injuryCode = runningInjuries[0].injury_code as string
+    }
+    if (!injuryCode) {
+      return { refusal: runningInjuries.length > 1
+        ? `You've got ${runningInjuries.length} temporary changes running (${runningInjuries.map(a => areaInWords(a.injury_code as string)).join(' and ')}). Which one should I end?`
+        : "Nothing is being eased off right now and there's no injury on your list to take off, so there's nothing to end." }
+    }
 
     // "TELL ME ANYTIME TO END IT EARLY" — the coach's own words when it sets a
     // temporary change up, and until 9 Oct 2026 nothing could (test log M24).
     // Saying an area has cleared while a temporary change for it is running
     // ends that change, through this same card.
-    const running = activeAdaptations.find(a => a.kind === 'injury' && a.injury_code === injuryCode && isAdaptationActive(a, getAppNow(profile.id)))
+    const running = runningInjuries.find(a => a.injury_code === injuryCode)
     if (running && !profile.injuries.includes(injuryCode)) {
       return {
         scopeKey: `${profile.id}:propose_injury_recovered:${injuryCode}`,
@@ -2891,12 +2969,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         },
       }
     }
-    if (!profile.injuries.includes(injuryCode)) return null
+    if (!profile.injuries.includes(injuryCode)) {
+      return { refusal: `Your ${areaInWords(injuryCode)} isn't on your injuries list and nothing is easing it off right now, so there's nothing to end.` }
+    }
 
+    // On the list AND being eased off: both go on one card, and confirm ends the temporary change too (it was left
+    // running here, so "it's cleared" took the area off the list and kept the plan avoiding it).
     return {
       scopeKey: `${profile.id}:propose_injury_recovered:${injuryCode}`,
-      preconditions: { injuryCode },
-      payload: { injuryCode },
+      preconditions: { injuryCode, ...(running ? { adaptationId: running.id } : {}) },
+      payload: { injuryCode, ...(running ? { alsoEndAdaptationId: running.id } : {}) },
       diff: {
         lead: ask(`take your ${injuryCode.replace('_', ' ')} off your injuries list`),
         rows: [{ field: 'Injuries', before: injuryCode.replace('_', ' '), after: 'removed' }],
@@ -5179,12 +5261,22 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
+        else refusal = injuryAdaptationRefusal(result.proposal.rawArgs)
       } else if (result.proposal.kind === 'propose_injury_as_lasting' && result.proposal.rawArgs) {
         const lasting = await buildLastingInjuryProposal(result.proposal.rawArgs)
         if (lasting) built = { scopeKey: lasting.scopeKey, preconditions: lasting.preconditions, payload: lasting.payload as unknown as Record<string, unknown>, preImage: lasting.preImage, diff: lasting.diff }
+        else {
+          const area = String(result.proposal.rawArgs.affected_area ?? '')
+          refusal = !area
+            ? 'Which area is it? Tell me and I can make it a lasting part of your plan.'
+            : profile.injuries.includes(area)
+              ? `Your ${areaInWords(area)} is already on your injuries list, so every plan already works around it.`
+              : `Nothing in your plan from today loads your ${areaInWords(area)}, so there's nothing to change — it's noted for any plan I build next.`
+        }
       } else if (result.proposal.kind === 'propose_injury_recovered' && result.proposal.rawArgs) {
         const recovered = buildInjuryRecoveredProposal(result.proposal.rawArgs)
-        if (recovered) built = { scopeKey: recovered.scopeKey, preconditions: recovered.preconditions, payload: recovered.payload as unknown as Record<string, unknown>, diff: recovered.diff }
+        if ('refusal' in recovered) refusal = recovered.refusal
+        else built = { scopeKey: recovered.scopeKey, preconditions: recovered.preconditions, payload: recovered.payload as unknown as Record<string, unknown>, diff: recovered.diff }
       } else if (result.proposal.kind === 'propose_equipment_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildEquipmentAdaptationProposal(result.proposal.rawArgs)
         if (adaptation && 'refusal' in adaptation) refusal = adaptation.refusal
@@ -5361,8 +5453,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         built = { scopeKey: result.proposal.scopeKey, preconditions: result.proposal.preconditions ?? {}, payload: result.proposal.payload, preImage: result.proposal.preImage, diff: result.proposal.diff }
       }
 
+      // EVERY COACH REBUILD: the start she asked for, and a card read off a trial of the rebuild (run 5, H28).
+      if (built && REBUILD_CARD_KINDS.has(result.proposal.kind)) {
+        const finished = await finishRebuildCard(result.proposal.kind, built as Parameters<typeof finishRebuildCard>[1], result.proposal.rawArgs ?? {})
+        if ('refusal' in finished) { built = null; refusal = finished.refusal } else built = finished.built
+      }
+
       if (!built) {
-        return { text: refusal ?? "I couldn't find that on your current plan — it may have changed since you last looked.", outcome: 'refused' }
+        return { text: refusal ?? UNKNOWN_PROPOSAL_REFUSAL, outcome: 'refused' }
       }
 
       // ---------------------------------------------------------------
@@ -6210,6 +6308,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const result = await executeInjuryRecovered(profile, payload)
         const nextInjuries = profile.injuries.filter(i => i !== payload.injuryCode)
         receipt = result.receipt
+        if (receipt.failed.length === 0 && payload.alsoEndAdaptationId) {
+          const problem = onEndAdaptation ? await onEndAdaptation(payload.alsoEndAdaptationId) : "I can't end that from here just now."
+          receipt = problem
+            ? { landed: receipt.landed, failed: [{ op: 'propose_injury_recovered', error: problem }] }
+            : { landed: [...receipt.landed, `Easing off ${areaInWords(payload.injuryCode)}: ended today`], failed: [] }
+        }
         if (receipt.failed.length === 0) {
           // THE SAME OFFER, FROM THE SAME FUNCTION, AS THE PROFILE TICK (H5).
           // Asked, never silent: App shows the dialog, and only a yes rebuilds.
@@ -6817,7 +6921,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     }
 
-    setMessages(prev => prev.map((m, i) => (i === msgIndex && m.receipt ? { ...m, receipt: { ...m.receipt, undoToken: undefined } } : m)))
+    // AN UNDONE CARD SAYS SO (run 5, 11 Oct 2026: after Undo the card still read "Rescheduled", with only the button
+    // gone, so nothing on screen said the change had been taken back).
+    setMessages(prev => prev.map((m, i) => (i === msgIndex && m.receipt
+      ? { ...m, receipt: { ...m.receipt, title: RECEIPTS_UNDONE.title, rows: [{ label: RECEIPTS_UNDONE.label, detail: RECEIPTS_UNDONE.detail(m.receipt.title) }], undoToken: undefined } }
+      : m)))
   }
 
   const isInterrupted = (msg: ChatMessage) =>

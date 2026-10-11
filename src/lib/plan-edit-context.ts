@@ -16,6 +16,7 @@ import { supabase } from './supabase'
 import { getSessionMovesInRange } from './daily-tracking'
 import { getAppNow, getLocalDateString } from './dev-clock'
 import { getLocalSetsForDate } from './set-log-store'
+import { getActiveSessionRecord } from './active-session-store'
 import { getActiveAdaptations, type PlanAdaptationRow } from './plan-adaptations-store'
 import { buildDayGuard } from './plan-guard'
 import { addDays, type SessionMove } from './session-move'
@@ -53,6 +54,9 @@ export async function loadPlanEditContext(
     // answers: a set logged ten seconds ago is a set logged.
     try {
       if (getLocalSetsForDate(profile.id, today).rows.length > 0) logged.add(today)
+      // A SESSION RUNNING TODAY IS TODAY BEING TRAINED, sets or not (run 5, H28, 11 Oct 2026): a rebuild applied
+      // mid-session replaced the session on screen with a different one.
+      if (getActiveSessionRecord(profile.id, today)?.status === 'running') logged.add(today)
     } catch { /* no local store outside the browser */ }
 
     try {
@@ -92,7 +96,8 @@ export async function loadPlanEditContext(
 
   const calendar = { planCreatedAt, today, moves }
   const live = adaptations.filter(a => isAdaptationActive(a, now))
-  const injuryEnds = live.filter(a => a.kind === 'injury').map(a => getLocalDateString(new Date(a.expires_at))).sort()
+  // Every running temporary change, injury AND kit: a rebuild carries both through until they end (run 5, H28).
+  const injuryEnds = live.map(a => getLocalDateString(new Date(a.expires_at))).sort()
   return {
     isProtected: buildDayGuard(mesocycle, { ...calendar, loggedDates: logged, closedDates: closed }),
     constraints: effectiveConstraints(profile, live, now),

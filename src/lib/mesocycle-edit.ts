@@ -684,7 +684,9 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
     const slot = day?.exercises[exIndex]
     if (!day || !slot) return week
 
-    const replaced = await buildReplacementSlot(slot, newExercise, profile, week, isMainLift)
+    // HER CHOICE IS RECORDED ON THE ROW (swapped_for), so a rebuild of these weeks can carry it through. A swap of
+    // a swap keeps the name of the lift she first moved away from.
+    const replaced: Exercise = { ...(await buildReplacementSlot(slot, newExercise, profile, week, isMainLift)), swapped_for: slot.swapped_for ?? slot.name }
     const exercises = clearOrphanedSupersetLabels(
       day.exercises.map((e, i) => (i === exIndex ? replaced : e))
     )

@@ -1070,6 +1070,8 @@ export interface InjuryRecoveredPayload {
    * profile write happens on this branch — there is nothing on the profile.
    */
   endAdaptationId?: string
+  /** On the injuries list AND being eased off: confirm takes it off the list and ends the temporary change too. */
+  alsoEndAdaptationId?: string
 }
 
 export interface InjuryRecoveredResult {
@@ -1446,6 +1448,10 @@ export interface ScheduleChangePayload {
   /** The days the user will train, replacing whatever was there. */
   trainingDays: string[]
   fromWeek: number
+  /** The first date the change may touch (her "from next week"); absent means from today. Run 5, H28. */
+  fromDate?: string
+  /** Makes the confirmed rebuild the same plan the card was read off. */
+  seedKey?: string
   reason?: string
 }
 
@@ -1472,7 +1478,7 @@ export async function executeScheduleChange(
     training_days: (profile.training_days ?? []).map(d => ({ ...d, available: wanted.has(d.day.toLowerCase()) })),
   }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context, { fromDate: payload.fromDate, seedKey: payload.seedKey })
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -1523,6 +1529,10 @@ export interface StyleChangePayload {
   /** The style they will train in from now on, replacing whatever was there. */
   trainingStyle: TrainingStyle
   fromWeek: number
+  /** The first date the change may touch (her "from next week"); absent means from today. Run 5, H28. */
+  fromDate?: string
+  /** Makes the confirmed rebuild the same plan the card was read off. */
+  seedKey?: string
   reason?: string
 }
 
@@ -1537,7 +1547,7 @@ export async function executeStyleChange(
   const preImage = mesocycle
   const updated: UserProfile = { ...profile, training_style: payload.trainingStyle }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context, { fromDate: payload.fromDate, seedKey: payload.seedKey })
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -1614,6 +1624,10 @@ export interface GoalChangePayload {
   /** What they are training for from now on, replacing whatever was there. */
   fitnessGoal: FitnessGoal
   fromWeek: number
+  /** The first date the change may touch (her "from next week"); absent means from today. Run 5, H28. */
+  fromDate?: string
+  /** Makes the confirmed rebuild the same plan the card was read off. */
+  seedKey?: string
   reason?: string
 }
 
@@ -1628,7 +1642,7 @@ export async function executeGoalChange(
   const preImage = mesocycle
   const updated: UserProfile = { ...profile, fitness_goal: payload.fitnessGoal }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context, { fromDate: payload.fromDate, seedKey: payload.seedKey })
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -1672,6 +1686,10 @@ export interface SessionLengthPayload {
   /** The band their sessions run to from now on, replacing whatever was set. */
   sessionDuration: SessionDuration
   fromWeek: number
+  /** The first date the change may touch (her "from next week"); absent means from today. Run 5, H28. */
+  fromDate?: string
+  /** Makes the confirmed rebuild the same plan the card was read off. */
+  seedKey?: string
   reason?: string
 }
 
@@ -1686,7 +1704,7 @@ export async function executeSessionLength(
   const preImage = mesocycle
   const updated: UserProfile = { ...profile, session_duration_preference: payload.sessionDuration }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context, { fromDate: payload.fromDate, seedKey: payload.seedKey })
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -2056,7 +2074,30 @@ export interface ConcurrentActivityPayload {
   trainingDays?: string[]
   gymTimeOfDay?: 'morning' | 'evening'
   fromWeek: number
+  /** The first date the change may touch (her "from next week"); absent means from today. Run 5, H28. */
+  fromDate?: string
+  /** Makes the confirmed rebuild the same plan the card was read off. */
+  seedKey?: string
   reason?: string
+}
+
+/**
+ * The profile a second-sport change rebuilds against — one function, so the card's trial (ChatAssistant) and the
+ * confirm run the same plan. Replace by name, otherwise append: telling the coach about Muay Thai a second time
+ * with different days corrects it rather than duplicating it.
+ */
+export function profileAfterConcurrentActivity(profile: UserProfile, payload: Pick<ConcurrentActivityPayload, 'activity' | 'trainingDays' | 'gymTimeOfDay'>): UserProfile {
+  const others = (profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== payload.activity.name.toLowerCase())
+  const activities: ConcurrentActivity[] = [...others, payload.activity]
+  const wanted = payload.trainingDays ? new Set(payload.trainingDays.map(d => d.toLowerCase())) : null
+  return {
+    ...profile,
+    concurrent_activities: activities,
+    training_days: wanted
+      ? (profile.training_days ?? []).map(d => ({ ...d, available: wanted.has(d.day.toLowerCase()) }))
+      : profile.training_days,
+    preferred_time: payload.gymTimeOfDay ?? profile.preferred_time,
+  }
 }
 
 export async function executeConcurrentActivity(
@@ -2068,21 +2109,11 @@ export async function executeConcurrentActivity(
   context: PlanEditContext,
 ): Promise<AdaptationResult> {
   const preImage = mesocycle
-  // Replace by name, otherwise append — telling the coach about Muay Thai a
-  // second time with different days corrects it rather than duplicating it.
-  const others = (profile.concurrent_activities ?? []).filter(a => a.name.toLowerCase() !== payload.activity.name.toLowerCase())
-  const activities: ConcurrentActivity[] = [...others, payload.activity]
+  const updated = profileAfterConcurrentActivity(profile, payload)
+  const activities = updated.concurrent_activities ?? []
   const wanted = payload.trainingDays ? new Set(payload.trainingDays.map(d => d.toLowerCase())) : null
-  const updated: UserProfile = {
-    ...profile,
-    concurrent_activities: activities,
-    training_days: wanted
-      ? (profile.training_days ?? []).map(d => ({ ...d, available: wanted.has(d.day.toLowerCase()) }))
-      : profile.training_days,
-    preferred_time: payload.gymTimeOfDay ?? profile.preferred_time,
-  }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context, { fromDate: payload.fromDate, seedKey: payload.seedKey })
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle,
@@ -2137,6 +2168,10 @@ export interface SecondSportVolumePayload {
   /** true = keep full lifting volume despite the sport(s); false = put the notch back. */
   keepFullVolume: boolean
   fromWeek: number
+  /** The first date the change may touch; absent means from today. Run 5, H28. */
+  fromDate?: string
+  /** Makes the confirmed rebuild the same plan the card was read off. */
+  seedKey?: string
 }
 
 /**
@@ -2166,7 +2201,7 @@ export async function executeSecondSportVolume(
   const names = [...new Set((profile.concurrent_activities ?? []).filter(activityCountsAsLoad).map(a => a.name))].join(' and ')
   const updated: UserProfile = { ...profile, concurrent_activities: activities }
 
-  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context)
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context, { fromDate: payload.fromDate, seedKey: payload.seedKey })
   if (!rebuild.ok || !rebuild.mesocycle) {
     return {
       mesocycle, preImage, profilePatch: {},
