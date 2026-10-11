@@ -223,6 +223,8 @@ function Harness() {
           revealSpeed="normal"
           onRevealSpeedChange={() => {}}
           onNewPlan={() => {}}
+          backLabel="Home"
+          calorieTarget={2350}
         />
       </div>
     </AppearanceProvider>

@@ -1079,6 +1079,7 @@ export function TodayPanel({
                 workout={peekWorkout}
                 dayLabel={peekDay}
                 movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
+                sessionLength={sessionEstimate.length}
                 onExit={() => setPeekDay(null)}
                 onSwap={(exIndex, name) => peekRef && editTarget(peekRef).ok && onOpenSwap(peekRef.planDayName, exIndex, name, peekRef.sayDay)}
                 onBan={handleBan}

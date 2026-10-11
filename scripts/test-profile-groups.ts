@@ -39,62 +39,88 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n1. Four groups, and every editor still inside one of them')
+console.log('\n1. Four groups of rows, and every editor still behind one of them')
 // ---------------------------------------------------------------------------
-const GROUPS = ['You', 'Nutrition', 'Personal TrAIner', 'App']
+// DESIGN HANDOFF 2d (10 Oct 2026): the four collapsible groups became four
+// titled lists of rows, each row opening the editors it names on a page of
+// their own. The disappearance this gate exists for is the same one.
+const GROUPS = ['Body & goals', 'Training', 'Food', 'Personal TrAIner & app']
 for (const g of GROUPS) {
-  check(`a "${g}" group exists`, new RegExp(`<Group label="${g}"`).test(profileCode))
+  check(`a "${g}" group exists`, profileCode.includes(`<ProfileGroup label="${g}"`))
 }
 check('...and exactly four of them, not four plus a stray',
-  (profileCode.match(/<Group label=/g) ?? []).length === GROUPS.length,
-  (profileCode.match(/<Group label="[^"]+"/g) ?? []))
-check('...each one openable', /aria-expanded=\{isOpen\}/.test(profileCode))
-check('...and closed content is hidden, not display-none guessed at',
-  /hidden=\{!isOpen\}/.test(profileCode))
+  (profileCode.match(/<ProfileGroup label=/g) ?? []).length === GROUPS.length,
+  (profileCode.match(/<ProfileGroup label="[^"]+"/g) ?? []))
 
-// EVERY EDITOR, by the thing that proves it is really there. A heading is not
-// evidence: the point of this gate is the restructure that moved them.
-const EDITORS: [string, RegExp][] = [
-  ['name', /display_name: v/],
-  ['age / height / onboarding weight', /savePatch\(\{ height_cm: n \}\)/],
-  ['training days', /<TrainingDaysEditor/],
-  ['equipment', /savePatch\(\{ equipment_access/],
-  ['other training (a second sport)', /concurrent_activities:/],
-  ['daily step target', /savePatch\(\{ daily_step_target: n \}\)/],
-  ['injuries', /savePatch\(\{ injuries:/],
-  ['dietary restrictions', /ref=\{dietaryRef\}/],
-  ['goals', /ref=\{goalsRef\}/],
-  ['remembered facts', /ref=\{factsRef\}/],
-  ['context notes', /ref=\{contextRef\}/],
-  ['reply speed', /onRevealSpeedChange\(level\)/],
-  ['appearance', /<AppearanceSection/],
-  ['download my data', /handleDownloadData/],
-  ['delete everything', /handleDeleteEverything/],
+// The sheets: every key the screen names has a title, a body, and a row that
+// opens it. A sheet with no row is an editor nobody can reach.
+const keys = [...(/type ProfileSheet =([\s\S]*?)\n\n/.exec(profileCode)?.[1] ?? '').matchAll(/'([a-z]+)'/g)].map(m => m[1])
+check('the sheet list is readable', keys.length >= 12, keys)
+const bodyAt = profileCode.indexOf('const sheetBody = ')
+const renderAt = profileCode.indexOf('<Dialog open={open}', bodyAt)
+const bodies = bodyAt > 0 && renderAt > bodyAt ? profileCode.slice(bodyAt, renderAt) : ''
+const page = renderAt > 0 ? profileCode.slice(renderAt) : ''
+const noRow = keys.filter(k => !page.includes(`onOpen={() => setSheet('${k}')}`))
+const noBody = keys.filter(k => !bodies.includes(`case '${k}': return (`))
+check('...every sheet has a row that opens it', noRow.length === 0, noRow)
+check('...and a body', noBody.length === 0, noBody)
+check('...and a title', keys.every(k => new RegExp(`\\b${k}: '`).test(profileCode)), keys)
+check('a sheet replaces the page of rows, and the back button leaves the sheet before Profile',
+  /\{sheet \? \(/.test(page) && /onClick=\{\(\) => sheet \? setSheet\(null\) : onOpenChange\(false\)\}/.test(page))
+
+// EVERY EDITOR, by the thing that proves it is really there — and INSIDE a
+// sheet body, except the footer's two, which the brief keeps as they are.
+const EDITORS: [string, RegExp, 'sheet' | 'footer'][] = [
+  ['name', /display_name: v/, 'sheet'],
+  ['age / height / onboarding weight', /savePatch\(\{ height_cm: n \}\)/, 'sheet'],
+  ['goal', /savePatch\(\{ fitness_goal:/, 'sheet'],
+  ['training days', /<TrainingDaysEditor/, 'sheet'],
+  ['equipment', /savePatch\(\{ equipment_access/, 'sheet'],
+  ['weight caps', /max_dumbbell_kg: n/, 'sheet'],
+  ['known lifts', /known_bench_kg: n/, 'sheet'],
+  ['other training (a second sport)', /concurrent_activities:/, 'sheet'],
+  ['session length', /session_duration_preference: v/, 'sheet'],
+  ['style', /training_style: v/, 'sheet'],
+  ['daily step target', /savePatch\(\{ daily_step_target: n \}\)/, 'sheet'],
+  ['injuries', /savePatch\(\{ injuries:/, 'sheet'],
+  ['dietary restrictions', /ref=\{dietaryRef\}/, 'sheet'],
+  ['foods liked', /saveLikedFoods/, 'sheet'],
+  ['foods to avoid', /saveDislikedFoods/, 'sheet'],
+  ['exercises to avoid', /saveDislikedExercises/, 'sheet'],
+  ['shopping day', /setShopDay\(/, 'sheet'],
+  ['goals', /ref=\{goalsRef\}/, 'sheet'],
+  ['remembered facts', /ref=\{factsRef\}/, 'sheet'],
+  ['context notes', /ref=\{contextRef\}/, 'sheet'],
+  ['reply speed', /onRevealSpeedChange\(level\)/, 'sheet'],
+  ['appearance', /<AppearanceSection/, 'sheet'],
+  ['reminders', /<RemindersSection/, 'sheet'],
+  ['download my data', /handleDownloadData/, 'footer'],
+  ['delete everything', /handleDeleteEverything/, 'footer'],
 ]
-for (const [what, re] of EDITORS) check(`${what} survived the regrouping`, re.test(profileCode))
+for (const [what, re, where] of EDITORS) {
+  check(`${what} survived the regrouping, in ${where === 'sheet' ? 'a sheet' : 'the footer'}`, re.test(where === 'sheet' ? bodies : page))
+}
 
 // ---------------------------------------------------------------------------
-console.log('\n2. A deep link opens the group it points into')
+console.log('\n2. A deep link opens the sheet it points into')
 // ---------------------------------------------------------------------------
-// initialSection is a scroll-to-ref, not a route. Scrolling to a ref inside a
-// collapsed group scrolls to nothing — and the one caller that matters sends
-// people here BECAUSE something of theirs cannot be enforced.
-check('the dietary deep link opens Nutrition',
-  /<Group label="Nutrition" forceOpen=\{initialSection === 'dietary'\}>/.test(profileCode))
-check('...and the memory deep links open Personal TrAIner',
-  /<Group label="Personal TrAIner" forceOpen=\{initialSection === 'goals' \|\| initialSection === 'facts' \|\| initialSection === 'context'\}>/.test(profileCode))
-// The refs must actually be in those groups, or the check above is decoration.
+// initialSection is a scroll-to-ref, not a route. A ref inside a sheet that is
+// not open scrolls to nothing — and the one caller that matters sends people
+// here BECAUSE something of theirs cannot be enforced.
 {
-  const groupOf = (ref: string) => {
-    const at = profileCode.indexOf(`ref={${ref}}`)
+  const caseOf = (ref: string) => {
+    const at = bodies.indexOf(`ref={${ref}}`)
     if (at === -1) return null
-    const opens = [...profileCode.slice(0, at).matchAll(/<Group label="([^"]+)"/g)]
+    const opens = [...bodies.slice(0, at).matchAll(/case '([a-z]+)': return \(/g)]
     return opens.length ? opens[opens.length - 1][1] : null
   }
-  check('dietaryRef really sits in Nutrition', groupOf('dietaryRef') === 'Nutrition', groupOf('dietaryRef'))
-  for (const r of ['goalsRef', 'factsRef', 'contextRef']) {
-    check(`${r} really sits in Personal TrAIner`, groupOf(r) === 'Personal TrAIner', groupOf(r))
+  const map = /const SHEET_FOR_SECTION[^=]*= \{([^}]*)\}/.exec(profileCode)?.[1] ?? ''
+  const target = (section: string) => new RegExp(`${section}: '([a-z]+)'`).exec(map)?.[1] ?? null
+  check('the dietary deep link opens the sheet holding dietaryRef', target('dietary') != null && caseOf('dietaryRef') === target('dietary'), [target('dietary'), caseOf('dietaryRef')])
+  for (const [section, ref] of [['goals', 'goalsRef'], ['facts', 'factsRef'], ['context', 'contextRef']] as const) {
+    check(`the ${section} deep link opens the sheet holding ${ref}`, target(section) != null && caseOf(ref) === target(section), [target(section), caseOf(ref)])
   }
+  check('...the link is read when Profile opens', /setSheet\(initialSection \? SHEET_FOR_SECTION\[initialSection\] : null\)/.test(profileCode))
   check('...and something still routes people here', /setProfileInfoSection\('dietary'\)/.test(app))
 }
 

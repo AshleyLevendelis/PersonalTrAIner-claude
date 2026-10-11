@@ -127,19 +127,27 @@ export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, 
           </button>
         )}
         {pager && pager.count > 1 && (
-          <span className="flex shrink-0 items-center gap-1" data-nudge-dots>
+          // ONE BUTTON, NOT ONE PER DOT. Three 5px dots five pixels apart, each
+          // with a 44px tap area, took each other's taps (verify:tap-targets
+          // found two stolen). The dots say where you are; the one control
+          // moves to the next tip, wrapping at the end.
+          <button
+            type="button"
+            className="hit-slop-44 flex shrink-0 items-center gap-1 p-0"
+            aria-label={`Tip ${pager.index + 1} of ${pager.count} — next tip`}
+            onClick={() => pager.onSelect((pager.index + 1) % pager.count)}
+            data-nudge-dots
+          >
             {Array.from({ length: pager.count }, (_, i) => (
-              <button
+              <span
                 key={i}
-                type="button"
-                aria-label={`Tip ${i + 1} of ${pager.count}`}
-                aria-current={i === pager.index ? 'true' : undefined}
-                onClick={() => pager.onSelect(i)}
-                className="hit-slop-44 h-[5px] rounded-full p-0 transition-[width] duration-300"
+                aria-hidden
+                data-nudge-dot={i === pager.index ? 'current' : undefined}
+                className="h-[5px] rounded-full transition-[width] duration-300"
                 style={{ width: i === pager.index ? 14 : 5, background: i === pager.index ? 'var(--role-ai-accent)' : 'color-mix(in srgb, var(--role-ai-accent) 30%, transparent)' }}
               />
             ))}
-          </span>
+          </button>
         )}
       </div>
       <div

@@ -132,7 +132,7 @@ console.log('\n1. Home measures the change from where she started\n')
   check('1c. ...and "since week 1" is gone', !/since week 1/.test(t))
   // Measured from the first of the rows on the chart it would read -0.6
   // (80 today against 80.6 in August). From the 80 kg she started at, 0.0.
-  check('1d. the figure is from the starting weight: 0.0 kg, where the old sum gave -0.6', /(^|\s)0\.0 kg since you started/.test(t) && !/-0\.6 kg/.test(t), (t.match(/[-+]?\d+\.\d kg since[^\n]*/) ?? [])[0])
+  check('1d. the figure is from the starting weight: 0.0 kg, where the old sum gave -0.6', /(^|\s)0\.0\s+kg since you started/.test(t) && !/-0\.6\s+kg/.test(t), (t.match(/[-+]?\d+\.\d\s+kg since[^\n]*/) ?? [])[0])
   await shoot('weigh-in-home')
 }
 
@@ -153,8 +153,8 @@ console.log('\n3. A believable weigh-in, then one that is not\n')
   const c1 = await until(card, v => !!v && /79\.4/.test(v.line))
   check('3b. it is saved over today\'s row', (await metrics()).some(m => m.endsWith(':79.4')) && (await metrics()).length === 2, await metrics())
   check('3c. the check was asked and found it fine', c1?.check === 'ok' && c1?.difference === null, c1)
-  const home1 = await until(bodyText, t => /-0\.6 kg since you started/.test(t))
-  check('3c2. Home now reads 0.6 kg down since she started (80 -> 79.4)', /-0\.6 kg since you started/.test(home1), (home1.match(/[-+]?\d+\.\d kg since[^\n]*/) ?? [])[0])
+  const home1 = await until(bodyText, t => /-0\.6\s+kg since you started/.test(t))
+  check('3c2. Home now reads 0.6 kg down since she started (80 -> 79.4)', /-0\.6\s+kg since you started/.test(home1), (home1.match(/[-+]?\d+\.\d\s+kg since[^\n]*/) ?? [])[0])
 
   const targetBefore = await homeTarget()
   check('3c3. Home shows a calorie target to watch', Number.isInteger(targetBefore) && targetBefore > 1000, targetBefore)
@@ -202,9 +202,10 @@ console.log('\n4. The Profile weight field asks the same check\n')
   await until(() => ev(`!!document.querySelector('[data-testid="open-profile"]')`), v => v === true)
   await ev(`document.querySelector('[data-testid="open-profile"]').click()`)
   await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`), v => v === true)
-  // The "You" group is collapsed by default; its rows are not in the DOM until it is opened.
-  const openedYou = await ev(`(() => { const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^You$/i.test((x.textContent || '').trim())); if (!b) return false; if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true })()`)
-  check('4a. the You group opens', openedYou === true)
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2d): Profile is a page of rows now,
+  // and the weight field is behind "Height & weight", on a sheet of its own.
+  const openedYou = await ev(`(() => { const b = document.querySelector('[data-profile-row="Height & weight"]'); if (!b) return false; b.click(); return true })()`)
+  check('4a. the Height & weight sheet opens', openedYou === true)
   const field = '[data-testid="profile-weight-field"]'
   const present = await until(() => ev(`!!document.querySelector('${field} input')`), v => v === true)
   check('4b. the weight field is there, holding the 80 kg she started at', present === true && (await ev(`document.querySelector('${field} input')?.value`)) === '80', await ev(`document.querySelector('${field} input')?.value`))

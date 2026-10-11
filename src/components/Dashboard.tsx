@@ -514,6 +514,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 </button>
               )}
             </div>
+            {/* THE LIFT LINE SURVIVES THE FINISH (L9, 9 Oct 2026): "Romanian
+                deadlifts 30kg per hand today" is what she lifted, and a done
+                day is exactly when that is worth reading. The same glance
+                line as before the session, now saying what was done. */}
+            {sessionGlance && <p className="-mt-1.5 text-[0.78125rem] text-muted-foreground" data-testid="home-session-glance">{sessionGlance}</p>}
             {prCount > 0 && topPr && (
               <div className="flex items-center gap-3" data-home-pr>
                 <span className="glow-mint-box flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(var(--glow-rgb), .16)', color: 'var(--primary-text)', '--glow-strength': 'calc(var(--glow-strength, 1) * .5)' } as CSSProperties}>

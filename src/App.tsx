@@ -3205,6 +3205,8 @@ function App() {
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
+        backLabel={activeTab === 'chat' ? 'Chat' : activeTab[0].toUpperCase() + activeTab.slice(1)}
+        calorieTarget={macros?.calories ?? null}
         onNewPlan={() => {
           setActiveAdaptationsForReset([])
           if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)

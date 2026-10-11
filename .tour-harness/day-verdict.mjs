@@ -79,11 +79,15 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 const header = () => ev(`(() => {
   const line = [...document.querySelectorAll('span')].find(e => /^target \\d/.test((e.textContent || '').trim()) && e.children.length === 0)
   if (!line) return null
-  const hero = line.closest('div')?.parentElement?.parentElement
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the planned day is a compact
+  // panel now ("Planned 1633 kcal"), found by its own marker rather than by
+  // counting parents, and its figure by its testid rather than the big-number
+  // class it no longer wears.
+  const hero = line.closest('[data-planned-day]')
   if (!hero) return null
   const text = (line.textContent || '').trim()
   const m = /^target (\\d+) · (.+)$/.exec(text)
-  const planned = Number((hero.querySelector('.ds-num-mega')?.textContent || '').replace(/[^\\d]/g, ''))
+  const planned = Number((hero.querySelector('[data-testid="day-kcal"]')?.textContent || '').replace(/[^\\d]/g, ''))
   const macros = {}
   for (const span of hero.querySelectorAll('span')) {
     const mm = /^(\\d+) \\/ (\\d+) ([PCF])$/.exec((span.textContent || '').trim())

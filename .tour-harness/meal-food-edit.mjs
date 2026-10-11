@@ -72,7 +72,9 @@ const check = (name, ok, detail) => {
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 
-const hero = () => ev(`(() => { const el = document.querySelector('.ds-num-mega'); return el ? el.textContent.trim() : null })()`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): the big number on Nutrition is
+// kcal LEFT now; what was eaten is the "N of M eaten" line beside it.
+const hero = () => ev(`(() => { const el = document.querySelector('[data-testid="kcal-eaten"]'); return el ? el.textContent.trim() : null })()`)
 /** Polls until `read()` returns `want`, and reports how long that took — the measurement this whole run exists to make. */
 const timeUntil = async (read, want, budgetMs) => {
   const started = Date.now()
@@ -123,7 +125,8 @@ const tapApply = () => ev(`(() => { const b = document.querySelector('[data-edit
 // calories share a class, and which is first is a layout detail this run has
 // no business depending on — so it reads them all and asserts that the one
 // that moves, moves by what the card promised.
-const bigNumbers = () => ev(`[...document.querySelectorAll('.ds-num-mega')].map(el => el.textContent.trim())`)
+// The tab's big figures: kcal left, and the planned day's total (2b moved it off .ds-num-mega).
+const bigNumbers = () => ev(`[...document.querySelectorAll('.ds-num-mega, [data-testid="day-kcal"]')].map(el => el.textContent.trim().replace(/,/g, ''))`)
 const mealCalories = () => ev(`(() => { const el = document.querySelector('.ds-num-lg'); return el ? el.textContent.trim() : null })()`)
 
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/nutrition` })

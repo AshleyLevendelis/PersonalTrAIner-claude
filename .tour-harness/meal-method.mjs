@@ -66,7 +66,9 @@ const check = (name, ok, detail) => {
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 
-const hero = () => ev(`(() => { const el = document.querySelector('.ds-num-mega'); return el ? el.textContent.trim() : null })()`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): the big number on Nutrition is
+// kcal LEFT now; what was eaten is the "N of M eaten" line beside it.
+const hero = () => ev(`(() => { const el = document.querySelector('[data-testid="kcal-eaten"]'); return el ? el.textContent.trim() : null })()`)
 const timeUntil = async (read, want, budgetMs) => {
   const started = Date.now()
   while (Date.now() - started < budgetMs) {

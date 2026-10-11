@@ -95,12 +95,14 @@ let loads = 0
 // HOME'S NOTE ROTATES (design handoff 2a, 10 Oct 2026), so one reading shows
 // ONE tip. Every tip is read by tapping its dot — the way a person reaches it
 // — and the page text checked below is the page plus every tip it holds.
+// The dots are ONE button since 10 Oct 2026 (two tap areas overlapped): each
+// tap moves to the next tip, so n taps visit all n.
 const homeTips = async () => {
-  const n = await ev(`document.querySelectorAll('main [data-nudge-dots] button').length`)
+  const n = await ev(`document.querySelectorAll('main [data-nudge-dots] > span').length`)
   if (!n) return [(await nudge()).text]
-  const out = []
-  for (let i = 0; i < n; i++) {
-    await ev(`document.querySelectorAll('main [data-nudge-dots] button')[${i}]?.click()`)
+  const out = [(await nudge()).text]
+  for (let i = 1; i < n; i++) {
+    await ev(`document.querySelector('main [data-nudge-dots]')?.click()`)
     await wait(450)
     out.push((await nudge()).text)
   }

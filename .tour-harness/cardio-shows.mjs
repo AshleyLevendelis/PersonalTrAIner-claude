@@ -269,8 +269,11 @@ if (!swapped) finish()
 const FOOTBALL = 'Football · 60 min · Hard'
 const cellSel = `button[aria-label^="${swapped.dayName}:"]`
 await until(`${q(cellSel)}?.getAttribute('aria-label')?.includes('Football')`, 10000)
-const cell = await ev(`(() => { const b = ${q(cellSel)}; return b ? { label: b.getAttribute('aria-label'), glyph: b.querySelector('span:last-child')?.textContent ?? null } : null })()`)
-check('8b. the strip still marks it ⇄', cell?.glyph === '⇄', cell)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2c): the strip is a day name over
+// a dot now, and a day swapped for something done wears the DONE dot — it was
+// trained. The sentence still names what it was swapped for.
+const cell = await ev(`(() => { const b = ${q(cellSel)}; return b ? { label: b.getAttribute('aria-label'), dot: b.getAttribute('data-dot') } : null })()`)
+check('8b. the strip still marks it trained (the done dot), and says what it was swapped for', cell?.dot === 'done' && /swapped for Football/.test(cell?.label ?? ''), cell)
 check(`8c. ...and now SAYS what for: "${swapped.dayName}: swapped for ${FOOTBALL}"`, cell?.label === `${swapped.dayName}: swapped for ${FOOTBALL}`, cell?.label)
 await tapExpr(q(cellSel)); await wait(900)
 const peek = await ev(`(() => { const b = ${q('[data-testid="peek-swapped"]')}; if (!b) return null; const list = b.nextElementSibling; return { text: b.innerText.replace(/\\s+/g, ' ').trim(), plannedRows: list ? list.querySelectorAll('[data-exercise-name], li, [role="button"]').length : 0, dimmed: list ? getComputedStyle(list).opacity : null, right: Math.round(b.getBoundingClientRect().right), vw: innerWidth } })()`)

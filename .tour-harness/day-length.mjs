@@ -150,7 +150,7 @@ await go(`sam=1&today=${walkDay.date}`, '#/tab/exercise', 4200)
 const shown = await targets()
 const walkShown = (shown?.days ?? []).find(d => d.day === walkDay.day) ?? null
 const otherShown = (shown?.days ?? []).find(d => d.day === otherDay.day) ?? null
-const header = await text('[data-testid="week-context-header"]')
+const header = await text('[data-testid="hero-meta"]')
 const headerLen = parseLength(header)
 check('2a. the header\'s two parts add up to the day on screen, and the walk is not in them',
   !!headerLen && !!walkShown && walkShown.cardio?.timing === 'independent_session' &&
@@ -195,7 +195,7 @@ console.log('\n  3. The header shows the day that is OPEN (L17)')
 // ===========================================================================
 check('3a. another day is tapped on the week strip', await tap(`[data-strip-day="${otherDay.day}"]`) === true)
 await wait(900)
-const peekHeader = parseLength(await text('[data-testid="week-context-header"]'))
+const peekHeader = parseLength(await text('[data-testid="hero-meta"]'))
 check('3b. the header now carries THAT day\'s length, not today\'s',
   !!peekHeader && !!otherShown && peekHeader.work + peekHeader.optional === Math.round(otherShown.totalSeconds / 60) && peekHeader.work + peekHeader.optional !== (headerLen?.work ?? 0) + (headerLen?.optional ?? 0),
   { peek: peekHeader, today: headerLen, wantMinutes: otherShown ? Math.round(otherShown.totalSeconds / 60) : null })
@@ -230,7 +230,7 @@ await go(`mobility=1&today=${optDay?.date ?? ''}`, '#/tab/exercise', 4200)
 const mobShown = await targets()
 const optShown = (mobShown?.days ?? []).find(d => d.day === optDay?.day) ?? null
 if (optShown) { want.total = Math.round(optShown.totalSeconds / 60); want.optional = Math.round(optShown.optionalSeconds / 60) }
-const optHeader = parseLength(await text('[data-testid="week-context-header"]'))
+const optHeader = parseLength(await text('[data-testid="hero-meta"]'))
 check('5b. the header says the work and the optional part apart, and they add up to the day',
   !!optHeader && optHeader.optional === want.optional && optHeader.work + optHeader.optional === want.total && / · \+ \d+ optional$/.test(optHeader.worded), { optHeader, want })
 const optRows = await ev(`[...document.querySelectorAll('[data-testid^="finisher-row"]')].map(r => (r.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 60))`)

@@ -38,9 +38,13 @@ console.log('\nWHAT A PERSONAL BEST IS\n')
 // ---- 0. Which lifts ---------------------------------------------------------
 await load('', { tab: 'home' })
 const before = await homeGlance()
-// "5 exercises · ~48 min · <Lift> from ~16kg per hand" — the lead lift is the
-// part after the last dot, up to " from".
-const leadShown = (before ?? '').split(' · ').pop() ?? ''
+// "5 exercises · <Lift> from ~16kg per hand · rest tomorrow" — the lead lift is
+// the part that names a weight. RE-ANCHORED 10 Oct 2026 (design handoff 2a):
+// tomorrow joined the end of the line, so "the last part" stopped being the
+// lift, the driver picked a different exercise, and every later check
+// measured the wrong lift.
+const liftPart = s => (s ?? '').split(' · ').find(p => /\d+(\.\d+)?kg/.test(p)) ?? ''
+const leadShown = liftPart(before)
 check('0a. before training, Home names the session\'s heaviest lift with its unit', /^[A-Z].* from ~\d+(\.\d+)?kg( per (hand|leg))?$/.test(leadShown), before)
 await goto('exercise')
 await until(`document.querySelectorAll('[data-exercise-name]').length > 0`, 12000)
@@ -78,11 +82,15 @@ check('1g. THE CARD LISTS NO "NEW PRs" (the tester\'s listed five)', Array.isArr
 await shoot('what-a-pr-is-first-finish')
 await escape()
 const home1 = await homeGlance()
-check('1h. Home has no "Recent PRs"', (await ev(`!${q('[data-testid="home-recent-prs"]')}`)) === true)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's "Recent PRs" list became
+// the Done panel's PR row and the weight panel's "latest PR" cell.
+const homePrs = () => ev(`({ row: document.querySelector('[data-home-pr]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null, latest: document.querySelector('[data-home-latest-pr]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null })`)
+const prs0 = await homePrs()
+check('1h. Home shows no PR: no row on the Done panel, and the latest-PR cell says none', prs0?.row === null && /none this week/.test(prs0?.latest ?? ''), prs0)
 check('1i. ...and no "New PR this week" tip', (await ev(`!/New PR this week/.test(document.body.innerText) && !/\\bat 0kg/.test(document.body.innerText)`)) === true)
-if (leadIsX) check('1j. HOME\'S LIFT LINE SAYS WHAT WAS LIFTED: 22.5, not the plan\'s figure', new RegExp(`${X.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')} 22\\.5kg( per (hand|leg))? today$`).test(home1 ?? ''), home1)
-else check('1j. Home\'s lift line still carries a unit and a proper name', /[A-Z][^·]*\d+(\.\d+)?kg/.test((home1 ?? '').split(' · ').pop() ?? ''), home1)
-check('1k. ...never lower-cased, never a bare " kg"', !/ \d+(\.\d+)? kg/.test(home1 ?? '') && !/^[a-z]/.test((home1 ?? '').split(' · ').pop() ?? 'x'), home1)
+if (leadIsX) check('1j. HOME\'S LIFT LINE SAYS WHAT WAS LIFTED: 22.5, not the plan\'s figure', new RegExp(`^${X.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')} 22\\.5kg( per (hand|leg))? today$`).test(liftPart(home1)), home1)
+else check('1j. Home\'s lift line still carries a unit and a proper name', /[A-Z][^·]*\d+(\.\d+)?kg/.test(liftPart(home1)), home1)
+check('1k. ...never lower-cased, never a bare " kg"', !/ \d+(\.\d+)? kg/.test(home1 ?? '') && !/^[a-z]/.test(liftPart(home1) || 'x'), home1)
 await shoot('what-a-pr-is-home-first')
 const tools1 = await toolsCount()
 check('1l. Tools counts 1 session and 0 PRs (it counted every exercise logged)', tools1 === '1 session · 0 PRs', tools1)
@@ -113,11 +121,12 @@ check('2g. THE CARD LISTS ONE NEW PR: the lift, at 25kg', Array.isArray(prs2) &&
 await shoot('what-a-pr-is-finish')
 await escape()
 await goto('home')
-await until(`!!${q('[data-testid="home-recent-prs"]')}`, 8000)
-const recent = await ev(`[...(${q('[data-testid="home-recent-prs"]')}?.querySelectorAll('.flex') ?? [])].map(r => r.innerText.replace(/\\s+/g, ' ').trim())`)
-check('2h. Home\'s "Recent PRs" lists that lift and its weight', (recent ?? []).length === 1 && recent[0].startsWith(X) && /25kg$/.test(recent[0]), recent)
-check('2i. ...and not the warm-up move', !(recent ?? []).some(r => r.includes(P)), recent)
-await ev(`${q('[data-testid="home-recent-prs"]')}?.scrollIntoView({ block: 'center' })`); await wait(300)
+await until(`!!document.querySelector('[data-home-pr]')`, 8000)
+const recent = await homePrs()
+check('2h. Home shows that lift and its weight — on the Done panel and as the latest PR',
+  (recent?.row ?? '').includes(X) && /25kg/.test(recent?.row ?? '') && (recent?.latest ?? '').startsWith(`${X} PR`) && /25kg/.test(recent?.latest ?? ''), recent)
+check('2i. ...and not the warm-up move', !(recent?.row ?? '').includes(P) && !(recent?.latest ?? '').includes(P), recent)
+await ev(`document.querySelector('[data-home-pr]')?.scrollIntoView({ block: 'center' })`); await wait(300)
 await shoot('what-a-pr-is-home')
 const tools2 = await toolsCount()
 check('2j. Tools counts 1 PR', /· 1 PR$/.test(tools2 ?? ''), tools2)
