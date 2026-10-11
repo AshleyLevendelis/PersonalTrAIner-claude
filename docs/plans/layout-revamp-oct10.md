@@ -99,10 +99,11 @@ scratchpad, `mockshot/2a.png … 4c.png`.
 - No new questions (the mock's "days a week" is an example; the real question is which days).
 - "{Section} · n of N" and six ticks: sections derived from the slot order (Training, Body, Food).
   This reverses the v2 "no visible count" choice, because her brief draws one.
-- **DEVIATION, to show her: one tap still answers a single-choice question.** The brief draws
+- **One tap answers a single-choice question: her ruling 11 Oct 2026, "Move straight on"** (from
+  two options, over waiting for Next). It was built that way as a deviation and put to her. The brief draws
   select-then-Next. Every tested answer path (and the coach's flow) is tap-to-answer, it is one tap
   fewer on about ten questions, and the tap is the answer. "Next →" (full width, 54px) is the footer
-  of a multi-choice question. Offered to her as a one-line change either way.
+  of a multi-choice question.
 - Free text still goes through the existing parser; the mic appears only where speech input is
   supported (it fills the box, so it goes through the same parser). The review step stays last.
 - **Skip moved, not copied**: it is the old "Prefer not to say", from the cards to the header, on

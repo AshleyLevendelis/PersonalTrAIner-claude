@@ -1313,18 +1313,19 @@ menu" stays true when a copy is also left outside it.
   carrying a swap into later blocks, and a third "from now on" choice. `block-swap-until`,
   `verify:moved-edit`
 
-### Her layout pass of 10 Oct 2026 (`docs/plans/layout-revamp-oct10.md`), on `claude/layout-revamp-oct10`
+### Her layout pass of 10 Oct 2026 (`docs/plans/layout-revamp-oct10.md`), merged to `main` 11 Oct 2026
 - **"Build all six, then show me"**, and **"Personal TrAIner" stays** over the brief's "Coach".
   Home, Nutrition, Exercise, Profile, setup and the round-timer sheet, layout only: every control
   moved, none removed. `test:layout-revamp`, `test:exercise-layout`, `test:round-setup`,
   `test:profile-groups`, `test:onboarding-style`, and the browser drivers re-anchored to the new
-  screens. NOT merged, NOT shown to her yet.
+  screens. Shown to her as screenshots; merged on her "Merge", 11 Oct 2026.
 - **The Exercise tab's running button presses the tick it describes**: "Log set 3 · Bench 80 kg ×
   6" is read off the set row's own tick, so it can never promise one weight and save another; with
   no weight to take it opens the box instead. `test:exercise-layout`
 - **Setup is one question per screen**, and a card she has not answered holds the screen open.
-  Skip is the old "Prefer not to say", moved to the header, never on a multi-select. One tap still
-  answers a single-choice question (a deviation from the brief, put to her). `test:onboarding-style`
+  Skip is the old "Prefer not to say", moved to the header, never on a multi-select. One tap
+  answers a single-choice question: her ruling 11 Oct 2026, **"Move straight on"**, over the
+  brief's select-then-Next. `test:onboarding-style`
 - **Profile is a page of rows**; every editor it had is in exactly one row's sheet, and a deep link
   opens the sheet holding its section. `test:profile-groups`
 - **Home's coach note rotates, and stops**: held while touched or focused, never moving under

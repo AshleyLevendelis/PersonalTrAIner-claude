@@ -2,7 +2,9 @@
 
 Newest first. One line each.
 
-- [~] **LAYOUT PASS, SIX SCREENS (10-11 Oct 2026): BUILT, on `claude/layout-revamp-oct10`, not merged.**
+- [x] **LAYOUT PASS, SIX SCREENS (10-11 Oct 2026): MERGED to `main` 11 Oct 2026 on her word ("Merge").**
+  That merge also brings in `claude/test-log-fixes-oct9`, which the layout branch was cut from.
+  `claude/coach-empty-text-fix-2c4bzv` is NOT in it and is still to merge.
   Her design zip (2a Home, 2b Nutrition, 2c Exercise, 2d Profile, 2e setup, 4c round timer), sent with
   no message. Her rulings: **"Build all six, then show me"** (from four options) and **keep "Personal
   TrAIner"** over the brief's "Coach" (from three). Every decision, with its reason, is in
@@ -16,8 +18,9 @@ Newest first. One line each.
     the tick it describes); Profile (a page of rows, each opening the editors it always had); setup (one
     question per screen, Skip where a question could already be declined, a mic where speech works);
     the round-timer sheet.
-  - **Deviations to show her:** one tap still answers a single-choice setup question (the brief draws
-    select-then-Next); "Reply speed" instead of the brief's "Tone" (that is the only control there);
+  - **Her ruling, 11 Oct 2026, "Move straight on"** (from two: move straight on, or wait for Next):
+    one tap answers a single-choice setup question, over the brief's select-then-Next. Nothing changed.
+  - **Other deviations, shown to her with the screenshots:** "Reply speed" instead of the brief's "Tone" (that is the only control there);
     only the "Accessory" section label is dropped on Exercise (Main lift, Primer, Finisher, Superset say
     something); Exercises to avoid is its own Profile row in Training.
   - **Found and fixed on the way, by the browser drivers:** the Done panel had dropped the lift line
@@ -34,7 +37,7 @@ Newest first. One line each.
     `test:meal-quality`, `test:schema-parity` and `verify:rls` (no database reachable from a cloud
     session, each saying so), and `test:coach-exam-fresh` (the coach's prompt changed; the exam must be
     re-run). The one later app change (setup receipts) re-ran its gate and the four setup drivers: green.
-  - **Not done:** the coach exam was not re-run (the coach's prompt changed, so its scores are stale
+  - **Not done:** the coach exam was not re-run (she said "Run exam" on 11 Oct; it needs her machine) (the coach's prompt changed, so its scores are stale
     until it is); the Home harness has no fixture with a rest timer running, so the Log-set button
     riding above the rest dock is proven by construction only.
   - **CSCS review** (the Exercise screen is the only one that touches what is prescribed, and it changes
