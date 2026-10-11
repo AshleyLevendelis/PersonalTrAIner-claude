@@ -49,6 +49,10 @@ import {
   saveTimerRecord,
   clearTimerRecord,
   defaultTimerRecord,
+  getTimerPrefs,
+  saveTimerPrefs,
+  DEFAULT_TIMER_PREFS,
+  type TimerPrefs,
   type TimerRecord,
   type TimerMode,
   type LapEntry,
@@ -123,9 +127,17 @@ export interface TimersValue {
    */
   roundFullScreen: boolean
   setRoundFullScreen: (on: boolean) => void
+  /** Countdown, beeps, buzz, full screen on Start — her settings, kept apart from any one run (4c). */
+  timerPrefs: TimerPrefs
+  setTimerPrefs: (patch: Partial<TimerPrefs>) => void
 }
 
 const TimersContext = createContext<TimersValue | null>(null)
+
+/** Her Beeps and Buzz switches, as the cue module's options. Round timer only. */
+function roundCueOpts(p: TimerPrefs): { sound: boolean; vibrate: boolean } {
+  return { sound: p.beepsOn, vibrate: p.buzzOn }
+}
 
 /** Render seam — lets the screenshot harness mount timer views in a chosen state without a provider or a clock. Not used by the app. */
 export const TimersContextForTests = TimersContext
@@ -138,6 +150,22 @@ export function useTimers(): TimersValue {
 
 export function TimersProvider({ profileId, children }: { profileId: string | undefined; children: React.ReactNode }) {
   const [record, setRecord] = useState<TimerRecord>(() => defaultTimerRecord('stopwatch'))
+  const [timerPrefs, setPrefsState] = useState<TimerPrefs>(DEFAULT_TIMER_PREFS)
+  // The cue effect below closes over one render; a ref lets it read the
+  // switches as they are now, so turning beeps off mid-round silences the
+  // very next transition.
+  const prefsRef = useRef<TimerPrefs>(DEFAULT_TIMER_PREFS)
+  prefsRef.current = timerPrefs
+  useEffect(() => {
+    if (profileId) setPrefsState(getTimerPrefs(profileId))
+  }, [profileId])
+  const setTimerPrefs = useCallback((patch: Partial<TimerPrefs>) => {
+    setPrefsState(prev => {
+      const next = { ...prev, ...patch }
+      if (profileId) saveTimerPrefs(profileId, next)
+      return next
+    })
+  }, [profileId])
 
   // Hydrate from the persisted record when identity resolves — mirrors the
   // rest facade's own hydration effect. A round-mode record persisted by the
@@ -425,7 +453,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     // first observation after a reload (prev === null), where no cue plays.
     const isFirstObservation = !prev || prev.anchor !== record.startedAtIso
     if (roundState.isComplete) {
-      if (!isFirstObservation && index - prev!.index === 1 && !document.hidden) playTimerCue('round-complete')
+      if (!isFirstObservation && index - prev!.index === 1 && !document.hidden) playTimerCue('round-complete', roundCueOpts(prefsRef.current))
       // accumulatedMs is what keeps the finished state alive: once running
       // goes false the anchor is no longer consulted, so without this the
       // completed round would vanish rather than hold the screen.
@@ -435,7 +463,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     if (isFirstObservation) return
     const delta = index - prev!.index
     if (delta === 1 && !document.hidden) {
-      playTimerCue(roundState.currentPhase === 'rest' ? 'work-to-rest' : 'rest-to-work')
+      playTimerCue(roundState.currentPhase === 'rest' ? 'work-to-rest' : 'rest-to-work', roundCueOpts(prefsRef.current))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundState])
@@ -470,6 +498,8 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     clearScreenOpenRequest,
     roundFullScreen,
     setRoundFullScreen,
+    timerPrefs,
+    setTimerPrefs,
     setMode,
     start,
     stop,

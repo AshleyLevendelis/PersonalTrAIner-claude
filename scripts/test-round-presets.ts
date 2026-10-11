@@ -18,8 +18,9 @@
 // when they disagree in either direction. It is deliberately not a list of
 // banned words: a blocklist only ever catches the mistake you already made.
 // ---------------------------------------------------------------------------
+import { stepConfig, withRest, REST_STEPS } from '../src/lib/round-setup'
 import { readFileSync } from 'fs'
-import { ROUND_PRESETS, describeRoundPreset, totalRoundSeconds, computeRoundState, leadInMsOf, roundStyleOf, intervalNoun, roundHeadline, roundDoneLabel, roundSubline } from '../src/lib/timer-engine'
+import { ROUND_PRESETS, describeRoundPreset, totalRoundSeconds, computeRoundState, leadInMsOf, roundStyleOf, intervalNoun, roundHeadline, roundDoneLabel, roundSubline, type RoundConfig } from '../src/lib/timer-engine'
 
 let failures = 0
 const check = (label: string, ok: boolean, extra?: unknown) => {
@@ -172,17 +173,20 @@ console.log('\n5. The chip row actually renders them, and a tap does not start o
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('the chip row maps the preset table rather than hardcoding buttons',
     /of ROUND_PRESETS\)/.test(chips), null)
-  check('...each showing its own numbers', /chipNumbers\(choice\.config[,)]/.test(chips), null)
+  // RE-ANCHORED 10 Oct 2026 (4c): the chips became cards and Custom shows a
+  // draft's numbers, so the card reads `shown` (choice.config, or the draft /
+  // saved numbers on Custom). Still read from a config, never typed.
+  check('...each showing its own numbers', /chipNumbers\((choice\.config|shown)[,)]/.test(chips), null)
   // CHOOSES, DOES NOT START. A preset that started the timer on tap would run
   // four minutes of work from a single mis-tap, with the numbers never shown.
   // Under 4a the card above shows the total the moment a chip is chosen, and
   // Start is a second, separate press.
   check('...and tapping one chooses it instead of starting the timer',
-    /timers\.selectRoundConfig\(choice\.config\)/.test(chips) && !/startRound/.test(chips), null)
+    /timers\.selectRoundConfig\((choice\.)?config\)/.test(chips) && !/startRound/.test(chips), null)
   // AND MID-ROUND IT QUEUES. The round in progress is the one thing a person
   // cannot get back, so a tap must never reach into it.
   check('...and while a round runs it queues for the next boundary instead',
-    /if \(live\) timers\.queueRoundConfig\(choice\.config\)/.test(chips), null)
+    /if \(live\) timers\.queueRoundConfig\((choice\.)?config\)/.test(chips), null)
 }
 
 // ---------------------------------------------------------------------------
@@ -266,27 +270,23 @@ console.log('\n6. EMOM is a real clock, not a relabelled round')
 console.log('\n7. Zero rest survives the setup form, which is what blocked it')
 {
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  const panel = strip(readFileSync('src/components/timers/TimersPanel.tsx', 'utf8'))
-  // THE ACTUAL BLOCKER, pinned. `Math.max(1, ...)` on rest made an EMOM
-  // untypeable no matter what the engine could do.
-  //
-  // RE-ANCHORED 12 Sep 2026 (design handoff 2a): the three number boxes became
-  // chips, so the clamp, the two-vs-three layout and the separate `style`
-  // state are all gone. The PROPERTY is unchanged and is what is checked —
-  // zero rest reaches startRound, and an EMOM is marked as one — but it now
-  // has to survive a different form, which is exactly why the check is
-  // rewritten rather than deleted.
-  check('an EMOM start sends rest 0 rather than clamping it up to 1',
-    /restSeconds: Math\.max\(0, [a-zA-Z.]*restSeconds\)/.test(panel), null)
-  check('...and nothing clamps the rest up to one on the way', !/Math\.max\(1, parseInt\(restSeconds/.test(panel), null)
-  check('...and marks the style, so the words follow', /style: 'emom' as const/.test(panel), null)
-  // ONE FACT, NOT TWO. "Is this an EMOM" used to be a `style` state kept in
-  // step with a rest of zero; it is now derived from that zero, so the two
-  // cannot disagree.
+  // RE-ANCHORED AGAIN 10 Oct 2026 (design handoff 4c): the chips became
+  // steppers, and the arithmetic moved into round-setup.ts, so the property is
+  // now checked by RUNNING it rather than reading a form. Same property: zero
+  // rest reaches the config, nothing clamps it up, an EMOM is marked as one
+  // and derived from that zero, and None is the bottom of the rest list.
+  const tabata: RoundConfig = { rounds: 8, workSeconds: 20, restSeconds: 10 }
+  let walked: RoundConfig = tabata
+  for (let i = 0; i < 6; i++) walked = stepConfig(walked, 'rest', -1)
+  check('an EMOM start sends rest 0 rather than clamping it up to 1', walked.restSeconds === 0, walked)
+  check('...and nothing clamps the rest up to one on the way', REST_STEPS[0] === 0 && !REST_STEPS.includes(1), REST_STEPS)
+  check('...and marks the style, so the words follow', walked.style === 'emom', walked)
+  const back = stepConfig(walked, 'rest', 1)
   check('an EMOM is derived from its rest, not stored beside it',
-    /const isEmom = restSeconds === 0/.test(panel), null)
+    back.restSeconds > 0 && back.style === undefined && withRest(tabata, 0).style === 'emom', back)
+  const sheet = strip(readFileSync('src/components/timers/RoundTimerSheet.tsx', 'utf8'))
   check('None is on the rest row, and it is what sets zero',
-    /const REST_CHOICES = \[0,/.test(panel) && /sec === 0 \? 'None'/.test(panel), null)
+    /config\.restSeconds === 0 \? 'None'/.test(sheet), null)
 
   const dock = strip(readFileSync('src/components/BottomDock.tsx', 'utf8'))
   check('the dock chip uses the same noun as the full-screen field',

@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, readdirSync } from 'fs'
+import { startLabel, nextCountdown } from '../src/lib/round-setup'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
@@ -195,9 +196,22 @@ console.log('\n7. The ten-second countdown before round 1')
   const componentDir = join(ROOT, 'src/components')
   const starters = walkTsx(componentDir).filter(f => /timers\.startRound\(/.test(readFileSync(f, 'utf8')))
   check('something on screen can start a round (sanity check on this check)', starters.length > 0, starters.length)
-  const silent = starters.filter(f => !/\{ROUND_LEAD_IN_SECONDS\}s countdown/.test(readFileSync(f, 'utf8')))
+  // RE-ANCHORED 10 Oct 2026 (design handoff 4c): the countdown is HERS now —
+  // Off, 5, 10 or 15 — so a starter may instead label itself with
+  // startLabel(X) and start the round with leadInSeconds: X, the SAME X, so
+  // the words and the wait cannot come apart.
+  const saysIt = (src: string) => {
+    if (/\{ROUND_LEAD_IN_SECONDS\}s countdown/.test(src)) return true
+    const label = src.match(/startLabel\(([\w.]+)\)/)
+    return !!label && new RegExp(`leadInSeconds: ${label[1].replace(/\./g, '\\.')}[ ,}]`).test(src)
+  }
+  const silent = starters.filter(f => !saysIt(readFileSync(f, 'utf8')))
   check('...and the app says so before you press it, wherever it can be pressed',
     silent.length === 0, silent.map(f => f.replace(ROOT, '')))
+
+  check('the label says the countdown it will run', startLabel(10) === 'Start · 10s countdown' && startLabel(5) === 'Start · 5s countdown', startLabel(10))
+  check('...and says "now" when there is none, rather than a 0s countdown', startLabel(0) === 'Start now', startLabel(0))
+  check('the countdown chip walks Off → 5 → 10 → 15 → Off', [0, 5, 10, 15].map(nextCountdown).join() === '5,10,15,0')
 }
 
 console.log('\n6. Audio and haptics exist, and are not a second copy')

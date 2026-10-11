@@ -147,9 +147,12 @@ for (const file of ['src/components/exercise/SetGrid.tsx', 'src/components/exerc
 // property is the same one and slightly stronger: what the plan prescribes
 // today has to arrive at the timer surface, parsed, rather than being
 // something the person has to retype from memory.
+// RE-ANCHORED 10 Oct 2026 (4c): the list of cards is built inside the lazy
+// sheet now, from the todaysConfig the tab parses and hands it.
 check('today\'s conditioning is actually offered on the timer surface',
   /parseConditioningInterval\(todaysConditioning\?\.activity\)/.test(stripComments(read('src/components/ToolsTab.tsx')))
-  && /protocolChoices\(todaysConfig,/.test(stripComments(read('src/components/ToolsTab.tsx')))
+  && /todaysConfig=\{todaysConfig\}/.test(stripComments(read('src/components/ToolsTab.tsx')))
+  && /protocolChoices\(todaysConfig,/.test(stripComments(read('src/components/timers/RoundTimerSheet.tsx')))
   && /label: 'Today', config: todaysConfig, fromToday: true/.test(stripComments(read('src/components/timers/ProtocolChips.tsx'))))
 // RE-ANCHORED 9 Oct 2026 (H19). This pinned the literal `exercisePlan ?? []`
 // from the old lookup, `(exercisePlan ?? []).find(d => d.day === dayName)` —

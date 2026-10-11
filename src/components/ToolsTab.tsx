@@ -4,7 +4,7 @@ import { Disc, History, BookOpen, Timer, ChevronRight, List, TimerReset, ArrowLe
 // loads: the round setup unfolds only under the Custom chip and the stopwatch
 // opens from a row. Eagerly imported they pushed the app chunk 1 kB past its
 // budget (test:bundle, 13 Sep 2026) for two panels most sessions never open.
-const RoundSetupPanel = lazy(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.RoundSetupPanel })))
+const RoundTimerSheet = lazy(() => import('@/components/timers/RoundTimerSheet').then(m => ({ default: m.RoundTimerSheet })))
 const StopwatchPanel = lazy(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog'
@@ -15,7 +15,6 @@ import { getAllItems, subscribeGroceryStore } from '@/lib/grocery-store'
 import { programHash, groceryHash } from '@/lib/app-route'
 import { RoundField } from '@/components/timers/RoundField'
 import { RoundCard } from '@/components/timers/RoundCard'
-import { ProtocolChips, protocolChoices } from '@/components/timers/ProtocolChips'
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
@@ -121,7 +120,6 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   const [groceryCount, setGroceryCount] = useState<{ total: number; checked: number } | null>(null)
   const [plateOpen, setPlateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [customOpen, setCustomOpen] = useState(false)
   // THE TIMERS SHEET, and which of the three is open inside it. `null` is the
   // three-way chooser; the rest are the panels. One piece of state, so the
   // sheet cannot be open on a timer it is not showing.
@@ -199,7 +197,6 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // above a chip row with nothing lit.
   const todaysConfig = parseConditioningInterval(todaysConditioning?.activity)
   const idleConfig = timers.selectedRoundConfig ?? todaysConfig ?? ROUND_PRESETS[0].config
-  const choices = protocolChoices(todaysConfig, timers.customRoundConfig)
 
   // THE SHEET WHERE THE FINISHED ROUND IS WRITTEN DOWN. Rendered once, beside
   // both branches, because the full-screen branch returns early and a sheet
@@ -342,7 +339,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
           Choosing a mode CLEARS the timer record, so the chooser refuses to
           walk away from a live round rather than wiping it silently; that was
           already true of the old stopwatch row and is stated on the row. */}
-      <Dialog open={timersOpen} onOpenChange={o => { setTimersOpen(o); if (!o) setCustomOpen(false) }}>
+      <Dialog open={timersOpen} onOpenChange={setTimersOpen}>
         {/* NO max-w OVERRIDE. The stopwatch dialog this replaces carried
             `max-w-[22rem]` (352px), which is NARROWER than DialogContent's own
             `max-w-[calc(100%-2rem)]` (358px on a 390px phone) — so the round
@@ -350,7 +347,17 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
             "Full screen" wrapped onto two lines. Read off a screenshot, not
             reasoned about. The default matches the tab, so the card renders
             the same in both places. */}
-        <DialogContent className="[&_[data-slot=dialog-body]]:px-3">
+        {/* THE ROUND TIMER IS A FULL-SCREEN SHEET — 4c. Its own top bar
+            ("‹ Timers", the title, the sound toggle) and a docked Start, so
+            the dialog's padding, header and ✕ step aside for it. The list and
+            the stopwatch keep the ordinary dialog. */}
+        <DialogContent
+          showCloseButton={timerPick !== 'round'}
+          className={timerPick === 'round'
+            ? 'inset-0 top-0 left-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 pt-[env(safe-area-inset-top,0px)] sm:max-w-none [&_[data-slot=dialog-body]]:p-0 [&_[data-slot=dialog-body]]:gap-0'
+            : '[&_[data-slot=dialog-body]]:px-3'}
+        >
+          {timerPick !== 'round' && (
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {timerPick && (
@@ -363,9 +370,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
                   <ArrowLeft className="size-4" aria-hidden />
                 </button>
               )}
-              {timerPick === 'round' ? 'Round timer' : timerPick === 'lap' ? 'Lap timer' : timerPick === 'stopwatch' ? 'Stopwatch' : 'Timers'}
+              {timerPick === 'lap' ? 'Lap timer' : timerPick === 'stopwatch' ? 'Stopwatch' : 'Timers'}
             </DialogTitle>
           </DialogHeader>
+          )}
 
           {timerPick === null && (
             <div data-testid="timer-choices">
@@ -397,24 +405,16 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
           )}
 
           {timerPick === 'round' && (
-            <div className="flex flex-col gap-3">
-              <RoundCard live={roundLive} idleConfig={idleConfig} onLogSession={setRoundToLog} />
-              <ProtocolChips
-                choices={choices}
+            <Suspense fallback={null}>
+              <RoundTimerSheet
+                todaysConfig={todaysConfig}
                 live={roundLive}
-                selected={roundLive ? timers.roundConfig : idleConfig}
-                customOpen={customOpen}
-                onOpenCustom={setCustomOpen}
+                selected={idleConfig}
+                todaysSessionName={todaysConfig ? (todayCell?.session?.focus ?? null) : null}
+                onBack={() => setTimerPick(null)}
+                onLogSession={setRoundToLog}
               />
-              {customOpen && (
-                <Suspense fallback={null}>
-                  <RoundSetupPanel onDone={() => setCustomOpen(false)} />
-                </Suspense>
-              )}
-              <p className="text-[0.71875rem] leading-[1.45] text-muted-foreground">
-                Rest between sets runs itself in the session dock — this is for conditioning.
-              </p>
-            </div>
+            </Suspense>
           )}
 
           {(timerPick === 'stopwatch' || timerPick === 'lap') && (

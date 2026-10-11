@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------------------
-// Standalone timers surface — the round setup, and the stopwatch.
+// Standalone timers surface — the stopwatch. (The round setup moved to its own
+// sheet, RoundTimerSheet, with design handoff 4c on 10 Oct 2026.)
 //
 // TURN 12 ("one owner per fact") moved this out of an Exercise-tab dialog into
 // the Tools tab. 2a made the round setup chips instead of three number inputs.
@@ -11,19 +12,14 @@
 // "Round" beside all that was the surface competing with itself. Stopwatch and
 // Lap were never two things either: a stopwatch with laps is one timer, and
 // splitting it across two tabs meant starting on the wrong one and losing the
-// clock to switch. So there are two exports now, each mounted where it is
-// used: the round setup unfolds under the Custom chip, and the stopwatch opens
-// on its own from "Also here".
+// clock to switch. The stopwatch opens on its own from the Timers list.
 //
 // All state lives in useTimers (deadline-anchored, persisted, ticked by the
 // same useDeadlineTick hook the rest timer uses) — this file is presentation.
 // ---------------------------------------------------------------------------
 
-import { useState, type CSSProperties, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useTimers } from '@/hooks/useTimers'
-import { secondsPhrase, type RoundConfig } from '@/lib/timer-engine'
 
 function formatMs(ms: number, withTenths = false): string {
   const totalMs = Math.max(0, ms)
@@ -97,160 +93,3 @@ export function StopwatchPanel() {
 // is already showing the total these chips are changing. Leaving either here
 // would be two controls doing one job, six inches apart.
 // ---------------------------------------------------------------------------
-
-/** Selected and unselected chip, in tokens. */
-function chipStyle(on: boolean): CSSProperties {
-  return on
-    ? { background: 'rgba(var(--glow-rgb), .14)', border: '1px solid rgba(var(--glow-rgb), .45)', color: 'var(--primary-text)' }
-    : { background: 'var(--surface-raised)', border: '1px solid transparent', color: 'var(--text-tertiary)' }
-}
-
-function Chip({ on, onClick, children, ...rest }: {
-  on: boolean
-  onClick: () => void
-  children: ReactNode
-} & Record<string, unknown>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className="min-h-[44px] rounded-xl px-3 text-[0.875rem] font-medium"
-      style={chipStyle(on)}
-      {...rest}
-    >
-      {children}
-    </button>
-  )
-}
-
-/** The seconds a work interval can be, as people say them. */
-const WORK_CHOICES = [20, 30, 45, 60, 120, 180, 300]
-/** And the rest, with None first because it is a protocol, not an absence. */
-const REST_CHOICES = [0, 10, 15, 20, 30, 60]
-
-const secondsLabel = (s: number) => s < 60 ? `${s}s` : s === 60 ? '1 min' : `${s / 60} min`
-
-export function RoundSetupPanel({ onDone }: { onDone: () => void }) {
-  const timers = useTimers()
-  const seed = timers.customRoundConfig ?? timers.selectedRoundConfig
-  const [rounds, setRounds] = useState(seed?.rounds ?? 6)
-  const [workSeconds, setWorkSeconds] = useState(seed?.workSeconds ?? 60)
-  const [restSeconds, setRestSeconds] = useState(seed?.restSeconds ?? 30)
-  // CUSTOM IS REACHABLE, both sides. The handoff names it for Work; Rest gets
-  // one for the same reason — a 45-second rest is an ordinary prescription
-  // and a chip row that cannot express it would send someone back to a screen
-  // that no longer exists.
-  const [customWork, setCustomWork] = useState(!WORK_CHOICES.includes(seed?.workSeconds ?? 60))
-  const [customRest, setCustomRest] = useState(!REST_CHOICES.includes(seed?.restSeconds ?? 30))
-
-  // AN EMOM IS REST = NONE, and nothing else. One fact, derived, rather than a
-  // `style` flag kept in step with a number that already says the same thing.
-  const isEmom = restSeconds === 0
-
-  /**
-   * EVERY TAP WRITES. 4a: "Changing any chip re-reads the card's total live,
-   * so the number you're about to commit to is always the one on the card."
-   * A Save button would let the card and these chips disagree for as long as
-   * it went untapped, which is the whole thing this layout is for.
-   */
-  const commit = (next: Partial<Pick<RoundConfig, 'rounds' | 'workSeconds' | 'restSeconds'>>) => {
-    const merged = { rounds, workSeconds, restSeconds, ...next }
-    if (merged.rounds !== rounds) setRounds(merged.rounds)
-    if (merged.workSeconds !== workSeconds) setWorkSeconds(merged.workSeconds)
-    if (merged.restSeconds !== restSeconds) setRestSeconds(merged.restSeconds)
-    timers.setCustomRoundConfig({
-      rounds: Math.max(1, merged.rounds),
-      workSeconds: Math.max(1, merged.workSeconds),
-      restSeconds: Math.max(0, merged.restSeconds),
-      ...(merged.restSeconds === 0 ? { style: 'emom' as const } : {}),
-    })
-  }
-
-  return (
-    <div
-      data-round-setup
-      className="flex flex-col gap-3.5 pb-0.5 pt-3.5"
-      style={{ borderTop: '1px solid var(--hairline)' }}
-    >
-      <div>
-        <p className="ds-label">Work</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {WORK_CHOICES.map(sec => (
-            <Chip key={sec} data-work={sec} on={!customWork && workSeconds === sec} onClick={() => { setCustomWork(false); commit({ workSeconds: sec }) }}>
-              {secondsLabel(sec)}
-            </Chip>
-          ))}
-          <Chip data-work="custom" on={customWork} onClick={() => setCustomWork(true)}>Custom</Chip>
-        </div>
-        {customWork && (
-          <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            Seconds
-            <Input type="number" min="1" className="w-24" value={String(workSeconds)} onChange={e => commit({ workSeconds: parseInt(e.target.value, 10) || 0 })} />
-          </label>
-        )}
-      </div>
-
-      <div>
-        <p className="ds-label">Rest</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {REST_CHOICES.map(sec => (
-            <Chip key={sec} data-rest={sec} on={!customRest && restSeconds === sec} onClick={() => { setCustomRest(false); commit({ restSeconds: sec }) }}>
-              {sec === 0 ? 'None' : secondsLabel(sec)}
-            </Chip>
-          ))}
-          <Chip data-rest="custom" on={customRest} onClick={() => setCustomRest(true)}>Custom</Chip>
-        </div>
-        {customRest && (
-          <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            Seconds
-            <Input type="number" min="0" className="w-24" value={String(restSeconds)} onChange={e => commit({ restSeconds: parseInt(e.target.value, 10) || 0 })} />
-          </label>
-        )}
-        {isEmom && <p className="mt-1.5 text-[0.6875rem] text-muted-foreground">No rest makes it an EMOM.</p>}
-      </div>
-
-      <div>
-        <p className="ds-label">{isEmom ? (workSeconds === 60 ? 'Minutes' : 'Intervals') : 'Rounds'}</p>
-        <div className="mt-2 flex items-center gap-3">
-          <button
-            type="button"
-            data-rounds-down
-            aria-label="One fewer round"
-            onClick={() => commit({ rounds: Math.max(1, rounds - 1) })}
-            className="rounded-xl text-xl"
-            style={{ width: 52, height: 52, ...chipStyle(false) }}
-          >
-            −
-          </button>
-          <span className="tabular-mono" style={{ fontSize: '2.125rem', fontWeight: 700, minWidth: '2.5ch', textAlign: 'center' }}>{rounds}</span>
-          <button
-            type="button"
-            data-rounds-up
-            aria-label="One more round"
-            onClick={() => commit({ rounds: rounds + 1 })}
-            className="rounded-xl text-xl"
-            style={{ width: 52, height: 52, ...chipStyle(false) }}
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
-        <span data-round-summary className="text-[0.75rem] text-muted-foreground">
-          Saved as your Custom chip · {secondsPhrase({ rounds, workSeconds, restSeconds, ...(isEmom ? { style: 'emom' as const } : {}) })}
-        </span>
-        <button
-          type="button"
-          data-round-setup-done
-          onClick={onDone}
-          className="shrink-0 text-[0.78125rem] font-semibold"
-          style={{ color: 'var(--primary-text)' }}
-        >
-          Done
-        </button>
-      </div>
-    </div>
-  )
-}

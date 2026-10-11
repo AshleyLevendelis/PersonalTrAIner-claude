@@ -17,9 +17,13 @@ const CUE_TONES: Record<TimerCue, { frequency: number; durationMs: number; vibra
   'round-complete': { frequency: 1200, durationMs: 700, vibration: [200, 100, 200, 100, 200] },
 }
 
-export function playTimerCue(cue: TimerCue): void {
+/**
+ * `sound` / `vibrate` default on. Only the round timer passes them (her Beeps
+ * and Buzz switches, 4c); the rest timer's chime is not those switches' business.
+ */
+export function playTimerCue(cue: TimerCue, opts: { sound?: boolean; vibrate?: boolean } = {}): void {
   const tone = CUE_TONES[cue]
-  try {
+  if (opts.sound !== false) try {
     const ctx = new AudioContext()
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
@@ -36,5 +40,5 @@ export function playTimerCue(cue: TimerCue): void {
     // Silent fallback — see module doc comment.
   }
   // Android only — a permanent no-op on iOS Safari at every version.
-  if (navigator.vibrate) navigator.vibrate(tone.vibration)
+  if (opts.vibrate !== false && navigator.vibrate) navigator.vibrate(tone.vibration)
 }

@@ -525,7 +525,13 @@ console.log('\n3. Nothing has crept back up')
   // Measured on the test-log fixes branch: 2,201. The growth is 58 commits of fixes, spread thin over core
   // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
   // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
-  const TOTAL_BUDGET_KB = 2221
+  // MOVED 10 Oct 2026: 2,221 -> 2,245, the round-timer setup sheet (design handoff 4c, the first
+  // screen of her six-screen layout pass). MEASURED both ends through this gate, the base on a clean
+  // worktree of the plan commit: before total 2219 app 1049; after total 2229 app 1048. The sheet is
+  // its own lazy chunk (8 kB) and the card row moved inside it, so the app chunk went DOWN by 1; the
+  // three figures a person waits for did not move. 2,245 is 16 above the 2,229 measured, on her 15 Sep
+  // ruling ("raise it with room to grow"); the other five screens re-measure it as they land.
+  const TOTAL_BUDGET_KB = 2245
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

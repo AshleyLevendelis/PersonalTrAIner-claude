@@ -93,3 +93,48 @@ export function saveTimerRecord(profileId: string, record: TimerRecord): void {
 export function clearTimerRecord(profileId: string): void {
   localStorage.removeItem(storageKey(profileId))
 }
+
+// ---------------------------------------------------------------------------
+// HOW SHE LIKES HER ROUND TIMER — design handoff 4c, 10 Oct 2026: countdown
+// length, beeps, buzz, and whether Start opens full screen.
+//
+// ITS OWN RECORD, not four more fields on TimerRecord. The timer record is
+// rebuilt from defaultTimerRecord at four sites (mode change, reset, start,
+// the queued switch) that copy forward only what they know about, so a
+// setting stored there would quietly reset itself the first time she pressed
+// Reset. Settings are not part of a run, so they do not live in one.
+// ---------------------------------------------------------------------------
+const PREFS_PREFIX = 'fitplan_timer_prefs_v1:'
+
+export interface TimerPrefs {
+  /** Get-ready seconds before round 1: 0 (off), 5, 10 or 15. */
+  countdownSeconds: number
+  beepsOn: boolean
+  buzzOn: boolean
+  openFullScreenOnStart: boolean
+}
+
+/** Ten seconds, sound and buzz on, full screen off — exactly what the timer did before 4c. */
+export const DEFAULT_TIMER_PREFS: TimerPrefs = { countdownSeconds: 10, beepsOn: true, buzzOn: true, openFullScreenOnStart: false }
+
+export function getTimerPrefs(profileId: string): TimerPrefs {
+  try {
+    const raw = localStorage.getItem(`${PREFS_PREFIX}${profileId}`)
+    if (!raw) return DEFAULT_TIMER_PREFS
+    const p = JSON.parse(raw)
+    // Field by field, so a record from an older build (or a hand-edited one)
+    // falls back per setting rather than all at once.
+    return {
+      countdownSeconds: [0, 5, 10, 15].includes(p?.countdownSeconds) ? p.countdownSeconds : DEFAULT_TIMER_PREFS.countdownSeconds,
+      beepsOn: typeof p?.beepsOn === 'boolean' ? p.beepsOn : DEFAULT_TIMER_PREFS.beepsOn,
+      buzzOn: typeof p?.buzzOn === 'boolean' ? p.buzzOn : DEFAULT_TIMER_PREFS.buzzOn,
+      openFullScreenOnStart: typeof p?.openFullScreenOnStart === 'boolean' ? p.openFullScreenOnStart : DEFAULT_TIMER_PREFS.openFullScreenOnStart,
+    }
+  } catch {
+    return DEFAULT_TIMER_PREFS
+  }
+}
+
+export function saveTimerPrefs(profileId: string, prefs: TimerPrefs): void {
+  try { localStorage.setItem(`${PREFS_PREFIX}${profileId}`, JSON.stringify(prefs)) } catch { /* a full or blocked store keeps the in-memory value */ }
+}

@@ -420,7 +420,8 @@
     "test:grocery-screen": "tsx scripts/test-grocery-screen.ts",
     "test:chat-page": "tsx scripts/test-chat-page.ts",
     "test:meal-library": "tsx scripts/test-meal-library.ts",
-    "measure:meal-library": "tsx scripts/measure-meal-library.ts"
+    "measure:meal-library": "tsx scripts/measure-meal-library.ts",
+    "test:round-setup": "tsx scripts/test-round-setup.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

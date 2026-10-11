@@ -95,11 +95,15 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // REACHABLE FROM TOOLS WITHOUT LEAVING IT — that was always the property,
   // and it survives 4b: the sheet opens over Tools rather than routing away.
   // What changed is that the chips are inside it rather than on the surface.
+  // RE-ANCHORED 10 Oct 2026 (design handoff 4c): the chips became the sheet's
+  // preset cards. Same property — reachable from Tools without routing away —
+  // read off the sheet the tab mounts and the cards the sheet draws.
+  const sheetSrc = read('src/components/timers/RoundTimerSheet.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('the protocols are still reachable without leaving Tools',
-    /<ProtocolChips/.test(bare) && !/data-change-intervals/.test(bare)
-    && !/window\.location\.hash = .*timer/i.test(bare), bare.match(/.{0,24}<ProtocolChips/)?.[0])
+    /<RoundTimerSheet/.test(bare) && /<PresetCards/.test(sheetSrc) && !/data-change-intervals/.test(bare)
+    && !/window\.location\.hash = .*timer/i.test(bare), bare.match(/.{0,24}<RoundTimerSheet/)?.[0])
   check('...built from the preset table rather than a second list here',
-    /protocolChoices\(/.test(tools) && !/'Tabata'|'EMOM'|'40\/20'/.test(bare))
+    /protocolChoices\(/.test(sheetSrc) && !/'Tabata'|'EMOM'|'40\/20'/.test(bare) && !/'Tabata'|'EMOM'|'40\/20'/.test(sheetSrc))
   // MOUNTED IN PLACE, not routed to. Written to allow the Suspense wrapper the
   // code-split needs — the property is that the setup appears INSIDE this tab
   // when the chip is on, not that one particular JSX shape does it.
@@ -109,16 +113,22 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // still worth pinning is that Custom appears BENEATH the chips it belongs
   // to, rather than being a further screen away — the chips and the panel in
   // the same block, in that order.
-  check('...and Custom unfolds under the chips, not a screen further in',
-    /<ProtocolChips[\s\S]{0,400}?\{customOpen && \(?[\s\S]{0,120}?<RoundSetupPanel/.test(tools),
-    bare.match(/<ProtocolChips[\s\S]{0,60}/)?.[0])
-  check('the rest timer is explained, not faked', /runs itself in the session dock/.test(tools))
+  // 4c: there is no Custom panel to unfold any more — the steppers ARE the
+  // sheet, under the cards, and any change lights Custom by itself. So the
+  // property becomes: the numbers are editable on the same sheet as the cards,
+  // below them, never a screen further in.
+  const cardsAt = sheetSrc.indexOf('<PresetCards'), stepAt = sheetSrc.indexOf("stepRow('rounds'")
+  check('...and her own numbers are set right under the cards, not a screen further in',
+    cardsAt >= 0 && stepAt > cardsAt, { cardsAt, stepAt })
+  check('the rest timer is explained, not faked', /runs itself in the session dock/.test(sheetSrc))
   // THE SETUP PANEL IS NOT LEFT STANDING UNDER A RUNNING ROUND. It used to
   // stay mounted for as long as anything was running — which under the old
   // design was how you reached the round at all — and put a tab strip beneath
   // the card. Caught by reading the screenshot, not by any assertion here.
-  check('...and the setup is mounted only when asked for', /\{customOpen && [(<]/.test(tools))
-  check('...not merely because something is running', !/customOpen \|\| timers\.running/.test(tools))
+  // 4c: under a running round the preview gives way to the running card and
+  // the steppers lock, so nothing she can change is left standing under it.
+  check('...and a running round shows the running card, not the setup preview', /\{live \? \([\s\S]{0,120}<RoundCard live/.test(sheetSrc))
+  check('...with the steppers locked while it runs', (sheetSrc.match(/disabled=\{live\}/g) ?? []).length === 2)
   // THE TAB STRIP IS GONE WITH IT (4a). Round is this tab's own content, so a
   // tab labelled "Round" beside it was the surface competing with itself.
   const panelSrc = read('src/components/timers/TimersPanel.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -206,7 +216,7 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // typed beside the name — a chip cannot come to describe a protocol it does
   // not run.
   const chips = read('src/components/timers/ProtocolChips.tsx')
-  check('each protocol chip states its own numbers', /chipNumbers\(choice\.config[,)]/.test(chips))
+  check('each protocol chip states its own numbers', /chipNumbers\((choice\.config|shown)[,)]/.test(chips))
 }
 
 console.log('\n2. The counts are read, not written\n')
