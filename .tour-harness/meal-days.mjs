@@ -78,7 +78,8 @@ const heading = () => ev(`document.querySelector('[data-testid="meal-day-heading
 const has = sel => ev(`!!document.querySelector(${JSON.stringify(sel)})`)
 const tapDay = async date => { await ev(`document.querySelector('[data-meal-day="${date}"]').click()`); await wait(500) }
 const openSlot = async slot => { await ev(`document.querySelector('[data-meal-name="${slot}"]').closest('button').click()`); await wait(400) }
-const buttonTexts = () => ev(`[...document.querySelectorAll('[data-meal-name]')].flatMap(e => [...e.closest('.py-4').querySelectorAll('button')].map(b => b.textContent.trim()))`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): a meal row is found by its own data-meal-row, not by the .py-4 spacing it no longer has.
+const buttonTexts = () => ev(`[...document.querySelectorAll('[data-meal-name]')].flatMap(e => [...e.closest('[data-meal-row]').querySelectorAll('button')].map(b => b.textContent.trim()))`)
 
 console.log('\n[1] Today, with the strip across the top')
 const days = await strip()
@@ -86,7 +87,10 @@ check('seven days, today first', days.length === 7 && days[0].text.startsWith('T
 check('...today is the one open', days[0].selected && days.slice(1).every(d => !d.selected), days.map(d => d.selected))
 check('...and every day is a thumb-sized target', days.every(d => d.h >= 44 && d.w >= 44), days.map(d => [d.w, d.h]))
 check('...consecutive calendar dates', days.every((d, i) => i === 0 || new Date(d.date + 'T00:00:00Z') - new Date(days[i - 1].date + 'T00:00:00Z') === 86_400_000), days.map(d => d.date))
-check('the heading is today\'s', (await heading()) === "Today's meals", await heading())
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): the heading is "Nutrition · {day}"
+// now, the strip below it saying which of them is today.
+const todayName = new Date(days[0].date + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
+check('the heading is today\'s', (await heading()) === `Nutrition · ${todayName}`, await heading())
 check('today\'s rings are there', await has('[data-tour="rings"]'))
 const todayMeals = await meals()
 check('today has its three meals', Object.keys(todayMeals).length === 3, todayMeals)
@@ -110,7 +114,7 @@ const after = await strip()
 check('the tapped day is the open one', after.find(d => d.date === d2)?.selected === true && !after[0].selected, after.map(d => d.selected))
 check('...and "Today" is still named, so the way back is not a guess', after[0].text.startsWith('Today'), after[0].text)
 const dayName = new Date(d2 + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
-check('the heading names the day', (await heading()) === `${dayName}'s meals`, { heading: await heading(), dayName })
+check('the heading names the day', (await heading()) === `Nutrition · ${dayName}`, { heading: await heading(), dayName })
 check('today\'s rings step aside', !(await has('[data-tour="rings"]')))
 check('the day has an add-to-list button, in its own words',
   (await ev(`document.querySelector('[data-testid="meal-day-add-grocery"]')?.textContent.trim()`)) === `Add ${dayName} to the shopping list`,
@@ -136,8 +140,8 @@ console.log('\n[3] Swapping a meal on that day')
 const before = await meals()
 await ev(`[...document.querySelectorAll('button')].find(b => /^Swap/.test(b.textContent.trim())).click()`)
 await wait(300)
-const choice = await ev(`(() => { const row = document.querySelector('[data-meal-name="dinner"]').closest('.py-4'); const b = [...row.querySelectorAll('button')].find(x => x.querySelector('p.line-clamp-2') && !x.disabled); return b ? b.querySelector('p').textContent.trim() : null })()`)
-await ev(`(() => { const row = document.querySelector('[data-meal-name="dinner"]').closest('.py-4'); [...row.querySelectorAll('button')].find(x => x.querySelector('p.line-clamp-2') && !x.disabled).click() })()`)
+const choice = await ev(`(() => { const row = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]'); const b = [...row.querySelectorAll('button')].find(x => x.querySelector('p.line-clamp-2') && !x.disabled); return b ? b.querySelector('p').textContent.trim() : null })()`)
+await ev(`(() => { const row = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]'); [...row.querySelectorAll('button')].find(x => x.querySelector('p.line-clamp-2') && !x.disabled).click() })()`)
 await wait(900)
 const swapped = await meals()
 check('the swap offered a different dinner', !!choice && choice !== before.dinner, { before: before.dinner, choice })
@@ -204,7 +208,7 @@ check('a day already on the list when it opens offers no Undo — this visit did
 
 console.log('\n[5] Back to today')
 await tapDay(days[0].date)
-check('the heading is today\'s again', (await heading()) === "Today's meals")
+check('the heading is today\'s again', (await heading()) === `Nutrition · ${todayName}`, await heading())
 check('...the rings are back', await has('[data-tour="rings"]'))
 await openSlot('breakfast')
 check('...and today\'s meals can be logged, as before', (await buttonTexts()).some(t => /Log this meal/.test(t)))

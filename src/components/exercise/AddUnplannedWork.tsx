@@ -7,6 +7,8 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { UnplannedCardioEntry, type CardioPick } from './CardioSetRow'
 import type { CardioLogView } from '@/lib/cardio-log-store'
 import { BLOCK_NAMES, blockChipLabel } from '@/lib/circuit'
+import { cardioPresetsFor } from '@/lib/cardio-presets'
+import type { EquipmentAccess } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // One entry point for off-plan lifts AND ad-hoc cardio (LAYOUT-DESIGN.md
@@ -21,15 +23,11 @@ import { BLOCK_NAMES, blockChipLabel } from '@/lib/circuit'
 // CardioSetRow). The presets were buttons that filled two text boxes and a
 // 5-10 number strip; they are the row's activity chips now, each carrying its
 // minutes and its effort, and the effort is Easy / Steady / Hard like every
-// other cardio log. The activity strings are unchanged — they are what the
-// log has always recorded — and so are the RPEs, which a preset logged as-is
-// still stores exactly (see rpeToStore): the HIIT bike is still an 8.
-const CONDITIONING_PRESETS: readonly CardioPick[] = [
-  { label: 'Incline walk', activity: 'Incline Treadmill Walk', minutes: 15, rpe: 4 },
-  { label: 'Heavy bag', activity: 'Heavy Bag / Functional Circuit', minutes: 15, rpe: 7 },
-  { label: 'HIIT bike', activity: 'HIIT / Assault Bike', minutes: 10, rpe: 8 },
-  { label: 'Zone 2', activity: 'Zone 2 Cardio', minutes: 15, rpe: 5 },
-]
+// other cardio log.
+//
+// WHICH FOUR depends on the kit since 9 Oct 2026 — see cardio-presets.ts. This
+// file used to hold one list for everybody, and a tester training at home was
+// offered a treadmill, a heavy bag and an assault bike.
 
 /** The timer's chips: what a block usually is, at the minutes the timer counted, effort left to her. */
 function timerBlockPicks(minutes: number): CardioPick[] {
@@ -44,9 +42,15 @@ export function AddUnplannedWork({
   hideTrigger,
   prefill,
   overlay,
+  equipmentAccess,
 }: {
   onLiftAdded?: () => void
   onCardioLogged?: (view: CardioLogView) => void
+  /**
+   * The person's kit tier, so the quick-pick cardio options are ones they can
+   * do. Left out, the options are the ones that need no kit at all.
+   */
+  equipmentAccess?: EquipmentAccess | null
   /** Turn 5: unplanned work moved behind the day-level "⋮" menu (see
    * WeekContextRow) — controlled-open mode for that call site. Omit both
    * `open`/`hideTrigger` for the previous always-visible-button behavior. */
@@ -184,7 +188,8 @@ export function AddUnplannedWork({
           // A TIMER BLOCK IS NAMED, NOT "INTERVALS" (Ashley's ruling A, 8 Oct
           // 2026): the chips are what a block usually is, each carrying the
           // timer's own minutes and no effort, and Other keeps the minutes too.
-          picks={prefill ? timerBlockPicks(prefill.durationMinutes) : CONDITIONING_PRESETS}
+          // Otherwise the quick picks fit the kit (cardio-presets.ts, 9 Oct 2026).
+          picks={prefill ? timerBlockPicks(prefill.durationMinutes) : cardioPresetsFor(equipmentAccess)}
           defaultMinutes={prefill?.durationMinutes}
           // "5 × 3 min" — what the timer actually ran, so the log says more
           // than a name and a minute count when she reads it back.

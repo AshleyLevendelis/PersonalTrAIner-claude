@@ -27,6 +27,7 @@ import { createRoot } from 'react-dom/client'
 import { setSupabaseClient } from '@/lib/supabase'
 import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
+import { EXERCISE_DATABASE } from '@/lib/exercise-db'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { removeExerciseFromSession } from '@/lib/session-edit'
@@ -188,6 +189,15 @@ const swapTarget = (() => {
 })()
 ;(window as unknown as { __swapTarget: unknown }).__swapTarget = swapTarget
 
+// THE SESSION THAT WAS MOVED ONTO TODAY, by name — for verify:moved-edit
+// (9 Oct 2026). Under ?movedin=1 today's own row is empty and __swapTarget is
+// null, which is exactly the situation: the exercises a person would ask the
+// coach about live on YESTERDAY's row. Facts about the fixture's plan only;
+// what the coach does with them is the app's own code.
+;(window as unknown as { __movedInExercises: unknown }).__movedInExercises = MOVED_IN
+  ? (mesocycle[0].days.find(d => d.day === DAYS[(todayIdx + 6) % 7])?.exercises ?? []).map(e => e.name)
+  : null
+
 // A REPLACEMENT FROM A DIFFERENT DAY'S FOCUS — for verify:swap-request's cost
 // section, added 14 Sep 2026 when the coach's swap card started stating what a
 // swap costs the week.
@@ -204,11 +214,17 @@ const crossPatternSwap = (() => {
   const week = mesocycle[0]
   const today = week.days.find(d => d.day === todayName)
   if (!today || today.exercises.length === 0) return null
-  const otherDay = week.days.find(d => d.day !== todayName && d.focus !== today.focus && d.exercises.length > 0)
-  if (!otherDay) return null
+  // A TRAINING LIFT, not the movement-prep drill that now opens most days
+  // (9 Oct 2026): Band Face Pulls -> Wall Slides is two primers, moves no
+  // pushing or pulling set, and the card was right to stay quiet about it.
+  const isPrimer = (name: string) => EXERCISE_DATABASE.find(e => e.name === name)?.mechanics_tier === 'primer'
+  const firstLift = (d: { exercises: { name: string }[] }) => d.exercises.find(e => !isPrimer(e.name))
+  const from = firstLift(today)
+  const otherDay = week.days.find(d => d.day !== todayName && d.focus !== today.focus && !!firstLift(d))
+  if (!from || !otherDay) return null
   return {
-    from: today.exercises[0].name,
-    to: otherDay.exercises[0].name,
+    from: from.name,
+    to: firstLift(otherDay)!.name,
     fromFocus: today.focus,
     toFocus: otherDay.focus,
   }
@@ -664,6 +680,7 @@ function Harness() {
               onMealDayMovePlan={DAYMOVE ? mealDays.dayMove.plan : undefined}
               onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
               onMealDayMoveUndo={DAYMOVE ? mealDays.dayMove.undo : undefined}
+              onMealKnockOn={mealDays.dayMove.knockOn}
               mealTopUp={TOPUP && macros ? { ...topUpPlan(pools as never, topUpSlots as never, macros), building: false } : null}
               onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}
               onMealTopUpConfirm={TOPUP && macros ? async () => {

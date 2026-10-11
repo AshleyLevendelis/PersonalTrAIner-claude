@@ -1,3 +1,5 @@
+import { loadParkedQuestions } from './parked-questions'
+
 /**
  * The first four messages a brand-new user ever sees in the coach chat, and
  * the starter chips under them.
@@ -214,6 +216,17 @@ export function buildFirstRunIntro(
   greeting: string,
   session: FirstRunSessionBrief | null,
   shape: FirstRunPlanShape | null = null,
+  /**
+   * Questions the onboarding coach PARKED ("good question — I'll answer that
+   * properly once you're set up"). This is where that promise is kept: each
+   * comes back as something to tap, in the person's own words, in the first
+   * thing the coach says after setup. See parked-questions.ts for the ruling.
+   *
+   * Defaults to what this device is holding, so the one call site in
+   * ChatAssistant keeps its promise without having to know about it. Anything
+   * that needs a fixed answer (a gate, a rendered screen) passes the list.
+   */
+  parked: readonly string[] = loadParkedQuestions(),
 ): FirstRunMessage[] {
   // ---- 1. Welcome, and what they now have. ------------------------------
   //
@@ -302,11 +315,21 @@ export function buildFirstRunIntro(
   // by accident while the intro was a single message; with three it is a real
   // constraint again, which is why test:coach-promises pins it.
   const dayOneIsToday = session?.when === 'today' || session?.when === 'whenever'
+  const starters = shape?.activityOnly
+    ? (dayOneIsToday ? FIRST_RUN_QUICK_REPLIES_ACTIVITY : FIRST_RUN_QUICK_REPLIES_ACTIVITY_AHEAD)
+    : (dayOneIsToday ? FIRST_RUN_QUICK_REPLIES : FIRST_RUN_QUICK_REPLIES_AHEAD)
+  // WHAT WAS PROMISED DURING SETUP COMES FIRST. At most two were ever parked
+  // (the cap is the owner's condition for parking at all), and the row stays
+  // three chips long — the parked questions take the place of the last
+  // starters rather than making a menu of five.
+  const owed = parked.slice(0, 2)
+  const owedLine = owed.length === 0 ? ''
+    : owed.length === 1
+      ? " You asked me something while we were setting up — it's right below. Tap it and I'll answer it properly."
+      : " You asked me a couple of things while we were setting up — they're right below. Tap one and I'll answer it properly."
   const last = {
-    content: `${dayOne} ${openDoor}`,
-    quickReplies: shape?.activityOnly
-      ? (dayOneIsToday ? FIRST_RUN_QUICK_REPLIES_ACTIVITY : FIRST_RUN_QUICK_REPLIES_ACTIVITY_AHEAD)
-      : (dayOneIsToday ? FIRST_RUN_QUICK_REPLIES : FIRST_RUN_QUICK_REPLIES_AHEAD),
+    content: `${dayOne} ${openDoor}${owedLine}`,
+    quickReplies: owed.length === 0 ? starters : [...owed, ...starters.slice(0, 3 - owed.length)],
   }
   return hasStructure
     ? [{ content: welcome }, { content: structure }, last]

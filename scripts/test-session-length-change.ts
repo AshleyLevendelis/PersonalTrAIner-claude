@@ -34,6 +34,10 @@ import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSo
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getSessionMaximumSeconds, estimateDaySeconds } from '../src/lib/session-duration'
 import type { UserProfile, SessionDuration } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// A plan nobody has trained on: no day is protected. (A live plan loads the
+// real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failures = 0
@@ -121,7 +125,7 @@ console.log('\n3. Confirming a lasting change REACHES the plan')
   // are already guarded by `if (profile.id)` for exactly this reason.
   const result = await executeSessionLength(
     { ...profile, id: undefined } as unknown as UserProfile,
-    meso, [], { sessionDuration: WANTED, fromWeek: CURRENT },
+    meso, [], { sessionDuration: WANTED, fromWeek: CURRENT }, GATE_CONTEXT,
   )
   check('the rebuild succeeded', result.receipt.failed.length === 0, result.receipt.failed)
   check('...and returned a plan', result.mesocycle.length === meso.length, result.mesocycle.length)

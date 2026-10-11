@@ -41,6 +41,7 @@ export function PeekPanel({
   banBusyName,
   dayLabel,
   movedFromDayName,
+  sessionLength,
 }: {
   workout: WorkoutDay
   onExit: () => void
@@ -58,6 +59,12 @@ export function PeekPanel({
   dayLabel?: string
   /** Where a moved-in session came from, so the header can say so. */
   movedFromDayName?: string | null
+  /**
+   * THIS day's length, already worded by formatDayLength. The length left the
+   * week row for the hero's meta line in 2c (10 Oct 2026), so the peek carries
+   * its own — the L17 rule: the length shown is the day that is OPEN.
+   */
+  sessionLength?: string
 }) {
   return (
     <div className="rounded-xl bg-card">
@@ -90,6 +97,9 @@ export function PeekPanel({
             {movedFromDayName && <span className="normal-case tracking-normal"> · moved from {movedFromDayName}</span>}
           </span>
           <p className="mt-1.5 text-[1.875rem] font-bold leading-[1.05] tracking-[-.03em]">{workout.focus}</p>
+          <p className="mt-1.5 text-[0.75rem] text-muted-foreground" data-testid="hero-meta">
+            {workout.exercises.length} exercise{workout.exercises.length === 1 ? '' : 's'}{sessionLength ? ` · ${sessionLength}` : ''}
+          </p>
         </div>
         <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={onExit} aria-label="Close">
           <X className="size-3.5" />

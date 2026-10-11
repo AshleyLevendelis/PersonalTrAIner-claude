@@ -114,7 +114,7 @@ async function main() {
   const plain = day0.exercises.filter(e => !e.superset_label)
   const sameTier = plain.filter(e => e.tier === tier)
   const template = (sameTier.length > 0 ? sameTier : plain)[Math.max(0, (sameTier.length > 0 ? sameTier : plain).length - 1)]
-  const expected = applyReplacement(template, PICK, LOAD, PROFILE.session_duration_preference)
+  const expected = applyReplacement(template, PICK, LOAD, PROFILE)
   check('the priced sets are the peer\'s sets', peer.sets === template.sets, { priced: peer.sets, peer: template.sets })
   check('reps agree with what applyReplacement would build', slot.reps === expected.reps, { slot: slot.reps, expected: expected.reps })
 
@@ -488,7 +488,7 @@ async function main() {
     resolveAdditionRequest(limitedCands[0].exercise.name.toLowerCase(), limited, [])?.name === limitedCands[0].exercise.name)
   check('an empty name resolves to nothing rather than to the first thing in the pool',
     resolveAdditionRequest('   ', limited, []) === null)
-  check('...and the client calls that executor on confirm', /executeExerciseAdd\(profile, mesocycle/.test(client))
+  check('...and the client calls that executor on confirm', /executeExerciseAdd\(poolProfile, mesocycle/.test(client))
   check('...and can be undone from the pre-image',
     /propose_exercise_add/.test(store) && /undoSessionEdit/.test(client))
 

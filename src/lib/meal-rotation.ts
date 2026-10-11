@@ -35,7 +35,8 @@ import { assembleDay, computeSlotBudgets, VARIETY_MEMORY_DAYS, type AssembledDay
 import { newFromDate } from './meal-new-from'
 import { computeMealMacros, type Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
-import type { MealSlotName } from './meal-store'
+import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
+import { holdAroundPins } from './hold-around-pins'
 import type { MacroTargets } from './types'
 import { sameDish } from './meal-dish-identity'
 
@@ -371,6 +372,8 @@ export function assembleRotationDay(
      * undefined when it does not (today, whose yesterday is not worked out).
      */
     previousDinner?: PoolOption | null
+    /** Undo was tapped on this date's "resized to fit around your swap": hold at the planned sizes. */
+    keepHeldSizes?: boolean
   } = {},
 ): AssembledDay {
   const index = rotationIndexFor(date)
@@ -398,26 +401,50 @@ export function assembleRotationDay(
   // already decided on rather than re-deriving a different answer. A meal the
   // USER pinned still wins — their choice outranks the plan's, which is the
   // rule everywhere else in the app.
-  const withLeftover = { ...leftover, ...pinned }
-  // THE SAME CALCULATION, NOT A SECOND PATH (28 Sep 2026). With no pin of the
-  // caller's own and the very inputs the rotation was built from, assembleDay
-  // would be handed exactly what buildRotation handed it for this index, and
-  // it is pure, so its answer is the day the rotation already holds. The note
-  // that stood here called the repeat "cheap"; at seven options a slot it was
-  // most of a week's cost on a phone. Identity, not value, is the test: any
-  // doubt about an input and the day is worked out afresh.
-  const b = rotation.builtFrom
-  const sameInputs = !replanned && Object.keys(pinned).length === 0 && b.pools === pools && b.targets === targets && b.softLikedFoods === softLikedFoods
-  let day = sameInputs && rotation.days[index]
-    ? rotation.days[index]
-    : assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, withLeftover)
-  // COOK ONCE, EAT TWICE — NOT TWICE TODAY, the rule buildRotation keeps for
-  // its own leftovers, now kept for every day: the leftover yields rather than
-  // sit beside the same dish at dinner. Reached by a re-made leftover, and by
-  // a dinner she swapped to the very dish her lunch is — which served it
-  // twice in one day before 28 Sep 2026.
-  if (leftover.lunch && !pinned.lunch && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.lunch.name)) {
-    day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, { ...pinned })
+  const dayFor = (pinned: Partial<Record<MealSlotName, PoolOption>>): AssembledDay => {
+    const withLeftover = { ...leftover, ...pinned }
+    // THE SAME CALCULATION, NOT A SECOND PATH (28 Sep 2026). With no pin of the
+    // caller's own and the very inputs the rotation was built from, assembleDay
+    // would be handed exactly what buildRotation handed it for this index, and
+    // it is pure, so its answer is the day the rotation already holds. The note
+    // that stood here called the repeat "cheap"; at seven options a slot it was
+    // most of a week's cost on a phone. Identity, not value, is the test: any
+    // doubt about an input and the day is worked out afresh.
+    const b = rotation.builtFrom
+    const sameInputs = !replanned && Object.keys(pinned).length === 0 && b.pools === pools && b.targets === targets && b.softLikedFoods === softLikedFoods
+    let day = sameInputs && rotation.days[index]
+      ? rotation.days[index]
+      : assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, withLeftover)
+    // COOK ONCE, EAT TWICE — NOT TWICE TODAY, the rule buildRotation keeps for
+    // its own leftovers, now kept for every day: the leftover yields rather than
+    // sit beside the same dish at dinner. Reached by a re-made leftover, and by
+    // a dinner she swapped to the very dish her lunch is — which served it
+    // twice in one day before 28 Sep 2026.
+    if (leftover.lunch && !pinned.lunch && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.lunch.name)) {
+      day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, { ...pinned })
+    }
+    return day
+  }
+  let day = dayFor(pinned)
+
+  // A SWAP KEEPS THE DAY'S OTHER DISHES (runs 3-4, M34; Ashley 10 Oct 2026,
+  // "Resize, else leave", scope "Plan's own dishes only"). When every pin on
+  // this date is one of the plan's own dishes, the other meals hold the dishes
+  // the day served with no pins, re-sized together within about 25%, else
+  // left as planned with the gap said (hold-around-pins.ts). A pin of her own
+  // (by name, fridge, edited) re-plans the day as before: her 1 Sep "plan the
+  // rest of my meals". A pin set aside for a restriction is not a pin.
+  const live = (Object.entries(pinned) as [MealSlotName, PoolOption | undefined][])
+    .filter((e): e is [MealSlotName, PoolOption] => e[1] != null && !e[1].breaksRestriction)
+  if (live.length > 0 && !live.some(([, o]) => o.tags?.includes(USER_REQUESTED_TAG))) {
+    const plannedDay = dayFor({})
+    const fixed: Partial<Record<MealSlotName, PoolOption>> = Object.fromEntries(live)
+    // A leftover lunch is last night's dinner, already portioned: it stays as
+    // it is. Taken from the day WITH her pin, which already knows whether the
+    // leftover yields to a dinner of the same dish (cook once, not twice today).
+    if (!fixed.lunch && day.chosen.lunch?.leftoverFrom === 'dinner') fixed.lunch = day.chosen.lunch
+    const held = holdAroundPins({ planned: plannedDay, fixed, targets, keepSizes: opts.keepHeldSizes })
+    if (held) day = held
   }
 
   // PROMISE TOMORROW'S LUNCH ONLY WHEN IT IS ACTUALLY PROMISED. The rotation
@@ -465,8 +492,11 @@ export function serveDates(input: {
   rotation?: Rotation | null
   /** The dinner served the night before the first date, when known. */
   previousDinner?: PoolOption | null
+  /** Dates where Undo kept the planned sizes around a swap (held-sizes-kept.ts). */
+  keepHeldSizes?: string[]
 }): ServedDay[] {
   const { dates, pools, targets, softLikedFoods = [], shape = {}, pinsByDate = {} } = input
+  const kept = new Set(input.keepHeldSizes ?? [])
   const rotations = new Map<Partial<Record<MealSlotName, PoolOption[]>>, Rotation>()
   // Reused only when it was built from these very inputs; anything else and
   // the whole pool builds its own, exactly as a held-back pool does.
@@ -497,7 +527,7 @@ export function serveDates(input: {
       rotation = buildRotation(dayPools, targets, softLikedFoods, shape)
       rotations.set(dayPools, rotation)
     }
-    const day = assembleRotationDay(rotation, date, dayPools, targets, softLikedFoods, pinsByDate[date] ?? {}, { previousDinner })
+    const day = assembleRotationDay(rotation, date, dayPools, targets, softLikedFoods, pinsByDate[date] ?? {}, { previousDinner, keepHeldSizes: kept.has(date) })
     served.push({ date, day, pools: dayPools, rotation })
     previousDinner = day.chosen.dinner ?? null
   })
@@ -536,11 +566,13 @@ export function serveMealWeek(input: {
   softLikedFoods: string[]
   shape: MealShape
   rotation: Rotation | null
+  /** Dates where Undo kept the planned sizes around a swap. */
+  keepHeldSizes?: string[]
 }): ServedDay[] {
   if (!input.targets) return []
   return serveDates({
     dates: input.dates, pools: input.pools, targets: input.targets, softLikedFoods: input.softLikedFoods,
-    shape: input.shape, rotation: input.rotation,
+    shape: input.shape, rotation: input.rotation, keepHeldSizes: input.keepHeldSizes,
     pinsByDate: { ...input.pinsByDate, [input.today]: input.todaysPins },
   })
 }

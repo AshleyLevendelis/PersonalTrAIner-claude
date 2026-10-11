@@ -11,6 +11,7 @@
 // the other's meaning, and so a new mark cannot be added to one strip alone.
 // ---------------------------------------------------------------------------
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
+import { sessionSetCount, shortOfPlan } from './session-count'
 
 export const GLYPH: Record<TrainingWeekDay['state'], string> = {
   done: '✓',
@@ -54,6 +55,22 @@ export const STATE_LABEL: Record<TrainingWeekDay['state'], string> = {
   swapped: 'swapped for another activity',
   rest_chosen: 'rest day you chose',
   moved: 'moved to another day',
+}
+
+/**
+ * WHAT A STRIP CELL SAYS OUT LOUD. One function for both strips, so Home and
+ * Exercise cannot describe the same day differently.
+ *
+ * A swapped day names what it was swapped FOR (M14, 9 Oct 2026). The mark is
+ * still ⇄ — there is no room in a 26px cell for "Football · 60 min · Hard" —
+ * but "swapped for another activity" was all a screen reader ever got, about a
+ * day the app knew the whole story of.
+ */
+export function dayLabel(d: Pick<TrainingWeekDay, 'dayName' | 'state' | 'swappedLine'> & Partial<Pick<TrainingWeekDay, 'session' | 'workingLogs'>>): string {
+  if (d.state === 'swapped' && d.swappedLine) return `${d.dayName}: swapped for ${d.swappedLine}`
+  // DONE, WITH THE COUNT when it closed short (Ashley, 10 Oct 2026).
+  const short = d.state === 'done' ? shortOfPlan(sessionSetCount(d.session, d.workingLogs)) : null
+  return short ? `${d.dayName}: done, ${short}` : `${d.dayName}: ${STATE_LABEL[d.state]}`
 }
 
 export const SHORT_DAY: Record<string, string> = {

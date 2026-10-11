@@ -22,9 +22,10 @@ import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
-  macroShortfallLine, SHORTFALL_SPEAK_FRACTION, COVERING_MIN_FRACTION,
+  macroShortfallLine, SHORTFALL_SPEAK_FRACTION, COVERING_MIN_FRACTION, LOGGING_GAP_MEALS, loggingGapLine,
   type PlannedMeal,
 } from '../src/lib/macro-shortfall'
+import { paceClock } from '../src/lib/pace'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -80,13 +81,18 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
 {
   const T = { calories: 2400, protein: 180, carbs: 240, fat: 70 }
   const meal = (label: string, logged: boolean, protein: number): PlannedMeal =>
-    ({ label, logged, macros: { calories: 600, protein, carbs: 60, fat: 20 } })
+    ({ slot: label.toLowerCase() as PlannedMeal['slot'], label, logged, macros: { calories: 600, protein, carbs: 60, fat: 20 } })
+  // THE CLOCK, since 9 Oct 2026 (test:pace-clock holds what it does). These
+  // checks are about the thresholds and the covering meal, so they stand at
+  // 22:30 on an ordinary day — every meal's time has passed and the whole of
+  // each target was due — where the clock is not what decides the answer.
   const base = {
     targets: T,
     eaten: { protein: 0, carbs: 0, fat: 0 },
     waterTargetMl: 2000,
     waterMl: 2000,
     meals: [] as PlannedMeal[],
+    clock: paceClock(new Date('2026-03-11T22:30:00'), ['2026-02-01T09:00:00']),
   }
 
   check('nothing behind → silent',
@@ -102,12 +108,34 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
   check('a wide gap → spoken',
     /Protein is behind/.test(macroShortfallLine({ ...base, eaten: { protein: T.protein - justOver, carbs: 240, fat: 70 } }) ?? ''))
 
-  // Only the WIDEST, so a bad day is one sentence and not four.
-  // Fat 65/70 behind (93%) beats protein 80/180 (44%) — the widest SHARE,
-  // not the biggest number, which is the whole point of the tie-break.
+  // ONE, so a bad day is one sentence and not four. Re-anchored 10 Oct 2026
+  // (runs 3-4, LOW): PROTEIN FIRST whenever it is one of the gaps — fat at
+  // 93% behind beat protein at 44% on share, and the tester read "Fat is
+  // behind" at 9pm on a day planned around protein.
   const twoBehind = macroShortfallLine({ ...base, eaten: { protein: 100, carbs: 240, fat: 5 } })
-  check('two macros behind → only the wider one is named',
-    /^Fat is behind/.test(twoBehind ?? '') && !/Protein/.test(twoBehind ?? ''), twoBehind)
+  check('protein and fat behind → protein is named, and only protein',
+    /^Protein is behind/.test(twoBehind ?? '') && !/Fat/.test(twoBehind ?? ''), twoBehind)
+  // Without protein in it, the widest SHARE still decides: carbs 200/240
+  // (83%) beats fat 40/70 (57%) though fat is not the bigger number.
+  const noProtein = macroShortfallLine({ ...base, eaten: { protein: 180, carbs: 40, fat: 30 } })
+  check('protein fine, carbs and fat behind → the wider share is named',
+    /^Carbs is behind/.test(noProtein ?? '') && !/Fat/.test(noProtein ?? ''), noProtein)
+
+  // A LOGGING GAP IS NOT AN EATING GAP (runs 3-4, LOW). 22:30, so every meal
+  // is past its time: three unlogged says what is unlogged, two does not.
+  const four = (logged: boolean[]) => (['breakfast', 'lunch', 'snack', 'dinner'] as const)
+    .map((slot, i) => ({ slot, label: slot[0].toUpperCase() + slot.slice(1), logged: logged[i], macros: { calories: 500, protein: 40, carbs: 60, fat: 18 } }))
+  const threeOpen = macroShortfallLine({ ...base, eaten: { protein: 40, carbs: 60, fat: 18 }, meals: four([true, false, false, false]) })
+  check(`${LOGGING_GAP_MEALS} meals past their time unlogged → the line is about logging, not a macro`,
+    threeOpen === loggingGapLine(3) && !/behind/.test(threeOpen ?? ''), threeOpen)
+  const twoOpen = macroShortfallLine({ ...base, eaten: { protein: 80, carbs: 120, fat: 36 }, meals: four([true, true, false, false]) })
+  check('...two unlogged keeps the ordinary line', /behind/.test(twoOpen ?? ''), twoOpen)
+  // Dinner is not due at 13:00, so it is not counted as unlogged.
+  const midday = macroShortfallLine({ ...base, clock: paceClock(new Date('2026-03-11T15:00:00'), ['2026-02-01T09:00:00']),
+    eaten: { protein: 0, carbs: 0, fat: 0 }, meals: four([false, false, false, false]) })
+  check('...and a meal whose time has not come is not counted (15:00, two due)', midday !== null && midday !== loggingGapLine(4) && midday !== loggingGapLine(2) && /behind/.test(midday), midday)
+  check('...and water alone never becomes a logging line',
+    macroShortfallLine({ ...base, eaten: { protein: 180, carbs: 240, fat: 70 }, waterMl: 0, meals: four([false, false, false, false]) }) === 'Water is behind — 2000ml to go.')
 
   // The covering meal.
   const withDinner = macroShortfallLine({
@@ -151,29 +179,41 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
 // ---------------------------------------------------------------------------
 console.log('\n3. The legend is four rows in two columns, beside the rings')
 // ---------------------------------------------------------------------------
-check('a 2-column grid holds it', /grid-cols-2 gap-x-3 gap-y-1/.test(nutrition))
-for (const letter of ["label: 'P'", "label: 'C'", "label: 'F'", "label: 'H\\u2082O'"]) {
-  check(`the legend carries ${letter}`, nutrition.includes(letter))
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): the legend became the RING
+// KEY — four rows in a 2x2 grid, named in full, in the order the rings sit —
+// and fat, which lost its ring, is a muted line under it so its number stays.
+check('a 2-column grid holds it', /grid grid-cols-2 gap-x-\[22px\] gap-y-2\.5" data-ring-key/.test(nutrition))
+for (const label of ["label: 'Calories'", "label: 'Protein'", "label: 'Carbs'", "label: 'Water'"]) {
+  check(`the key carries ${label}`, nutrition.includes(label))
 }
-check('calories stay the hero number, not a legend row', /ds-num-mega/.test(nutrition) && !/label: 'K'/.test(nutrition))
-check('the caption says what is left, not only what is eaten', /kcal · <span className="tabular-mono">/.test(nutrition))
+check('the rings are those four, in that order, outermost first',
+  /key: 'calories', r: 58[\s\S]{0,120}key: 'protein', r: 46[\s\S]{0,120}key: 'carbs', r: 34[\s\S]{0,120}key: 'water', r: 22/.test(nutrition))
+check('fat is still on the screen, as a line', /data-ring-key-fat>\s*Fat/.test(nutrition) && /ringValues\.fat\.eaten/.test(nutrition))
+check('the hero is what is LEFT (2b), the eaten figure under it', /data-testid="kcal-left-number"/.test(nutrition) && /data-testid="kcal-eaten"/.test(nutrition) && /ds-num-mega/.test(nutrition))
+check('the caption says left or over, from the phrasebook', /kcalLeftOrOver\(macros\.calories - eaten\.kcal\)/.test(nutrition) && /data-testid="kcal-left">kcal \{word\}/.test(nutrition))
 
 // ---------------------------------------------------------------------------
 console.log('\n4. The meal list points at the list it fills')
 // ---------------------------------------------------------------------------
-check('the header links to the grocery list', /Grocery list ›/.test(meals))
+// RE-ANCHORED 10 Oct 2026 (2b): the link is the "Grocery" pill in the
+// Nutrition header now, there even before any meals are; the day-added row's
+// "Open list ›" in MealPlan still goes to the same route.
+check('the header links to the grocery list', /data-grocery-pill/.test(nutrition) && /<ShoppingBasket[^>]*\/> Grocery/.test(nutrition))
 // THE LIST MOVED OFF TOOLS, 12 Sep 2026 (design handoff 2b ›). It has a
 // screen of its own under Nutrition — where it is built from — so the link
 // goes there and the sanity check follows it. The property is unchanged: the
 // header must point at somewhere the list actually is.
 check('...at the real grocery route, not a hand-written hash',
-  /window\.location\.hash = groceryHash\(\)/.test(meals) && !/'#\/nutrition\/grocery'/.test(meals))
+  /window\.location\.hash = groceryHash\(\)/.test(nutrition) && !/'#\/nutrition\/grocery'/.test(nutrition) && !/'#\/nutrition\/grocery'/.test(meals))
 check('...and that route really is where the list lives (sanity check on this check)',
   /groceryHash\(\)/.test(read('src/App.tsx')) && /<GroceryList/.test(read('src/components/GroceryScreen.tsx')))
 check('regenerating all the meals is still reachable', /onClick=\{onRegenerateAll\}/.test(meals))
 check('a collapsed row ends in a chevron', /<ChevronRight className="size-3\.5/.test(meals))
-check('...with the logged tick after the number, not before',
-  /\{Math\.round\(isLogged \? loggedKcal : option\.macros\.calories\)\} kcal\{isLogged \? ' ✓' : ''\}/.test(meals))
+// 2b: a logged meal sits under "Eaten" with a tick circle before it, and its
+// number is what was LOGGED (the meal actually eaten), not the plan's dish.
+check('...and a logged meal shows what was logged, with its tick',
+  /const kcalShown = Math\.round\(isLogged \? loggedKcal : \(option\?\.macros\.calories \?\? 0\)\)/.test(meals)
+  && /variant === 'eaten' && \([\s\S]{0,400}<Check /.test(meals))
 
 // ---------------------------------------------------------------------------
 console.log('\n5. Every file this gate speaks for is actually mounted')

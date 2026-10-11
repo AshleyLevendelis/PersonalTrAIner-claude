@@ -23,6 +23,7 @@ import { fileURLToPath } from 'url'
 import { classifyDay, countsTowardWeekTally } from '../src/hooks/useTrainingWeek'
 import { missedYesterdayFrom, pickOpener, type OpenerInput } from '../src/lib/coach-opener'
 import type { WorkoutDay } from '../src/lib/types'
+import { dayVerbs, type DayVerbInput } from '../src/lib/day-verbs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -119,12 +120,31 @@ check('...and never invent a row to record a negative',
 // ---------------------------------------------------------------------------
 console.log('\n4. The sheet offers the verbs that apply, and each writes what it says')
 // ---------------------------------------------------------------------------
-const verbs = sheet.slice(sheet.indexOf('const verbs: Verb[] = useMemo'), sheet.indexOf('const moveCandidates'))
-check('a logged day, a day with no session, or a day moved away gets no verbs', /if \(!target \|\| isDone \|\| !hasSession \|\| movedAway\) return \[\]/.test(verbs))
-check('"did it, not in the app" is a PAST-day verb only', /if \(isPast\) out\.push\('did_elsewhere'\)/.test(verbs))
-check('"I missed it" needs a day that has happened, and not already declared', /\(isPast \|\| isToday\) && !declared\.missed\) out\.push\('missed'\)/.test(verbs))
-check('"something else instead" likewise', /\(isPast \|\| isToday\) && !declared\.swapped\) out\.push\('something_else'\)/.test(verbs))
-check('move and rest apply to any day with a session', /out\.push\('move'\)/.test(verbs) && /if \(!declared\.rest\) out\.push\('rest'\)/.test(verbs))
+// RE-ANCHORED 9 Oct 2026, deliberately. These seven read the TEXT of the rule
+// where it sat inside the sheet's useMemo. The rule moved to dayVerbs
+// (src/lib/day-verbs.ts) so that "nothing is offered before the plan began"
+// could be asked of it, and all seven went red on correct code. They now CALL
+// the rule and assert the same seven properties of what it returns — a
+// stronger claim than a regex — plus one check that the sheet draws from it.
+const V: DayVerbInput = {
+  isDone: false, hasSession: true, movedAway: false, beforePlan: false, isPast: false, isToday: false,
+  declared: { missed: false, rest: false, swapped: false }, canShorten: true, canLighter: true, canRebuild: true,
+}
+const has = (input: Partial<DayVerbInput>, verb: string) => (dayVerbs({ ...V, ...input }) as string[]).includes(verb)
+check('the sheet draws exactly what the rule returns', /dayVerbs\(\{/.test(sheet) && !/out\.push\(/.test(sheet))
+check('a logged day, a day with no session, or a day moved away gets no verbs',
+  [{ isDone: true }, { hasSession: false }, { movedAway: true }].every(x => dayVerbs({ ...V, isPast: true, ...x }).length === 0))
+check('"did it, not in the app" is a PAST-day verb only',
+  has({ isPast: true }, 'did_elsewhere') && !has({ isToday: true }, 'did_elsewhere') && !has({}, 'did_elsewhere'))
+check('"I missed it" needs a day that has happened, and not already declared',
+  has({ isPast: true }, 'missed') && has({ isToday: true }, 'missed') && !has({}, 'missed')
+  && !has({ isPast: true, declared: { missed: true, rest: false, swapped: false } }, 'missed'))
+check('"something else instead" likewise',
+  has({ isPast: true }, 'something_else') && has({ isToday: true }, 'something_else') && !has({}, 'something_else')
+  && !has({ isPast: true, declared: { missed: false, rest: false, swapped: true } }, 'something_else'))
+check('move and rest apply to any day with a session',
+  [{ isPast: true }, { isToday: true }, {}].every(x => has(x, 'move') && has(x, 'rest'))
+  && !has({ declared: { missed: false, rest: true, swapped: false } }, 'rest'))
 // "I'VE ONLY GOT 25 MINUTES TODAY", 13 Sep 2026. Two verbs unlike the other
 // five: the rest declare what already happened to a day, these two CHANGE THE
 // PLAN. So they are gated twice — on the day still being a session you are
@@ -133,9 +153,11 @@ check('move and rest apply to any day with a session', /out\.push\('move'\)/.tes
 // a plan edit here would have to reach the database, so it does not happen
 // here at all.
 check('shortening and lightening are TODAY only, and only while the day is still ahead of you',
-  /if \(isToday && !declared\.rest && !declared\.missed && !declared\.swapped\)/.test(verbs))
+  has({ isToday: true }, 'shorten') && has({ isToday: true }, 'lighter') && !has({ isPast: true }, 'shorten') && !has({}, 'lighter')
+  && (['missed', 'rest', 'swapped'] as const).every(k => !has({ isToday: true, declared: { missed: false, rest: false, swapped: false, [k]: true } }, 'shorten')))
 check('...and neither is offered on a surface that cannot edit the plan',
-  /if \(onShorten\) out\.push\('shorten'\)/.test(verbs) && /if \(onLighter\) out\.push\('lighter'\)/.test(verbs))
+  !has({ isToday: true, canShorten: false }, 'shorten') && !has({ isToday: true, canLighter: false }, 'lighter')
+  && /canShorten: !!onShorten, canLighter: !!onLighter/.test(sheet))
 check('...so the sheet itself still writes no plan edit — both hand back to the caller',
   /onShorten!\(minutes\)/.test(sheet) && /onLighter!\(\)/.test(sheet) && !/saveScopedEdit|saveMesocycle/.test(sheet))
 check('a refusal from either is shown in its own words, not flattened to "couldn\'t save that"',

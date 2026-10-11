@@ -38,6 +38,10 @@ import { GOAL_OPTIONS } from '../src/lib/onboarding-slots'
 import { RECEIPTS } from '../src/lib/coach-voice'
 import { GOAL_POLICIES } from '../src/lib/goal-policies'
 import type { UserProfile, FitnessGoal } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// A plan nobody has trained on: no day is protected. (A live plan loads the
+// real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failures = 0
@@ -205,7 +209,7 @@ console.log('\n5. Confirming REACHES the plan, from the current week on')
   // are already guarded by `if (profile.id)` for exactly this reason.
   const result = await executeGoalChange(
     { ...profile, id: undefined } as unknown as UserProfile,
-    meso, [], { fitnessGoal: WANTED, fromWeek: CURRENT },
+    meso, [], { fitnessGoal: WANTED, fromWeek: CURRENT }, GATE_CONTEXT,
   )
   check('the rebuild succeeded', result.receipt.failed.length === 0, result.receipt.failed)
   check('...and returned a plan', result.mesocycle.length === meso.length, result.mesocycle.length)
@@ -242,7 +246,7 @@ console.log('\n6. Rebuild first, write second — proven by failing the rebuild'
   const profile = base()
   const result = await executeGoalChange(
     { ...profile, id: undefined } as unknown as UserProfile,
-    [], [], { fitnessGoal: 'hypertrophy', fromWeek: 1 },
+    [], [], { fitnessGoal: 'hypertrophy', fromWeek: 1 }, GATE_CONTEXT,
   )
   check('a rebuild with nothing to rebuild fails rather than claiming success',
     result.receipt.failed.length > 0, result.receipt)

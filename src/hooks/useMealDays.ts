@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { datesFrom, pinsFromPicks, serveMealWeek, ROTATION_DAYS, type MealShape, type Rotation, type ServedDay } from '@/lib/meal-rotation'
-import { computeSlotBudgets } from '@/lib/meal-generation'
+import { computeSlotBudgets, type HeldAround } from '@/lib/meal-generation'
 import { getMealPicksForDates, setMealPick, swapPoolMeal, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { addGroceryDays, removeGroceryDays, readGroceryCoverage, type AddGroceryDaysResult } from '@/lib/grocery-store'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
@@ -8,8 +8,10 @@ import { weekdayLong } from '@/lib/day-labels'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MealDayMoveArgs, MealDayMoveController, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import type { PendingActionReceipt } from '@/lib/pending-actions-store'
-import { DAY_MOVE } from '@/lib/coach-voice'
+import { DAY_MOVE, KNOCK_ON } from '@/lib/coach-voice'
+import type { MealKnockOn } from '@/lib/meal-knock-on'
 import type { MacroTargets } from '@/lib/types'
+import { readKeptHeldSizes, writeKeptHeldSize } from '@/lib/held-sizes-kept'
 
 // ---------------------------------------------------------------------------
 // THE NUTRITION STRIP'S DAYS — Ashley, 27 Sep 2026: "I can only see today's
@@ -70,6 +72,8 @@ export interface OpenMealDay {
   dayName: string
   chosen: Partial<Record<MealSlotName, PoolOption>>
   totals: MacroTargets
+  /** What a swap did to this day's other meals (M34), when one was made. */
+  heldAround?: HeldAround
   onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
   onAddToGrocery: () => Promise<AddGroceryDaysResult | null>
   onRemoveFromGrocery: () => Promise<AddGroceryDaysResult | null>
@@ -110,6 +114,15 @@ export function useMealDays(input: MealDaysInput) {
   // A day opened yesterday that is today now, or gone, falls back to today.
   const openDate = viewDate && viewDate > today && dates.includes(viewDate) ? viewDate : null
 
+  // UNDO ON "RESIZED TO FIT AROUND YOUR SWAP" (runs 3-4, M34), by date. On
+  // the phone, read by the shopping list too, so the two serve one week.
+  const [keptHeldSizes, setKeptHeldSizes] = useState<string[]>(() => readKeptHeldSizes(profileId))
+  useEffect(() => { setKeptHeldSizes(readKeptHeldSizes(profileId)) }, [profileId])
+  const keepHeldSizes = (date: string, keep: boolean) => {
+    if (!profileId) return
+    setKeptHeldSizes(writeKeptHeldSize(profileId, date, keep))
+  }
+
   const pinsByDate = useMemo(() => {
     const out: Record<string, Partial<Record<MealSlotName, PoolOption>>> = {}
     for (const [date, picks] of Object.entries(futurePicks)) {
@@ -124,8 +137,8 @@ export function useMealDays(input: MealDaysInput) {
    * a Monday the screen would not serve.
    */
   const week: ServedDay[] = useMemo(
-    () => serveMealWeek({ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation }),
-    [dates, pools, targets, softLikedFoods, mealShape, rotation, pinsByDate, today, todaysPins],
+    () => serveMealWeek({ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes }),
+    [dates, pools, targets, softLikedFoods, mealShape, rotation, pinsByDate, today, todaysPins, keptHeldSizes],
   )
   const todaysChosen = useMemo(() => week[0]?.day.chosen ?? {}, [week])
 
@@ -226,12 +239,38 @@ export function useMealDays(input: MealDaysInput) {
     return buildMealDayMoveProposal({
       profileId: profileId ?? '',
       rawArgs,
-      serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation },
+      serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes },
       loggedTodaySlots,
       listDates,
       dietaryPreferences,
       dislikedFoods: dislikedFoods?.(),
     })
+  }
+
+  /**
+   * WHAT ELSE CHANGES when a new option becomes a date's meal (9 Oct 2026, the
+   * test log's H9): the trial behind the add-a-food card and the custom-meal
+   * card, run over THIS hook's week — the one the screen serves — with the
+   * same shopping-list read the day swap makes. Never throws: a trial that
+   * cannot run comes back as the line saying it could not be checked.
+   */
+  const knockOn = async (date: string, slot: MealSlotName, option: PoolOption): Promise<MealKnockOn> => {
+    const { knockOnOfPin } = await import('@/lib/meal-knock-on')
+    let listDates: string[] | null = null
+    if (profileId && targets) {
+      try {
+        listDates = await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate, { strict: true })
+      } catch { /* stays null: the card says the list could not be checked */ }
+    }
+    try {
+      return knockOnOfPin({
+        serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes },
+        date, slot, option, listDates,
+      })
+    } catch (err) {
+      console.error('useMealDays: the knock-on trial failed', err)
+      return { changes: [], lines: [{ severity: 'info', text: KNOCK_ON.unknown }] }
+    }
   }
 
   /**
@@ -297,6 +336,7 @@ export function useMealDays(input: MealDaysInput) {
     dayName: weekdayLong(openDate),
     chosen: openAssembled.chosen,
     totals: sumChosenMacros(openAssembled.chosen),
+    heldAround: openAssembled.heldAround,
     onSwap: (slot, name) => swap(openDate, slot, name, openAssembled.chosen[slot]?.name),
     onAddToGrocery: () => addToGrocery(openDate),
     onRemoveFromGrocery: () => removeFromGrocery(openDate),
@@ -315,6 +355,8 @@ export function useMealDays(input: MealDaysInput) {
     },
     /** The open upcoming day, or null when today is open. */
     openDay,
+    /** Undo (keep) or redo (false) the re-size around a swap on one date: the screen and the list follow. */
+    keepHeldSizes,
     /** Every upcoming day's pins, for the shopping list's Rebuild. */
     pinsByDate,
     /** Raw picks by date — App hands a new today's across when the date moves on. */
@@ -333,7 +375,7 @@ export function useMealDays(input: MealDaysInput) {
     dayMove: {
       dates, today,
       slots: targets ? (Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]) : [],
-      plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove,
+      plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn,
     } satisfies MealDayMoveController,
   }
 }

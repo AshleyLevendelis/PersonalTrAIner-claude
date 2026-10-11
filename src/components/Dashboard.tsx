@@ -5,42 +5,34 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
-import { daysBetween } from '@/lib/session-move'
-import { useEffect, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
-import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
+import { loadDashboardData, leadLiftPhrase, LIFT_SHORT_NAME, type DashboardData } from '@/lib/dashboard-data'
+import { changeSinceStart } from '@/lib/weight-trend'
 import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
 import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { logWater, undoLog, type WaterLogRow } from '@/lib/water-store'
 import { getLedgerSnapshot, subscribeMealStore } from '@/lib/meal-store'
-import { Flame, Droplets, Footprints, Scale, ChevronRight } from 'lucide-react'
+import { Flame, Droplets, Footprints, Beef, Trophy } from 'lucide-react'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { HomeWeekStrip, HomeWeekStripLabels } from '@/components/HomeWeekStrip'
-import { setChatPrefill } from '@/lib/chat-prefill-store'
+import { HomeWeekStrip, HomeWeekBoundaryNote } from '@/components/HomeWeekStrip'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
+import { sessionSetCount } from '@/lib/session-count'
+import { readSessionSummary } from '@/lib/session-summary-store'
+import { readingFor } from '@/lib/pr-engine'
+import { dayNameOf } from '@/lib/session-move'
+const SessionSummaryDialog = lazy(() => import('@/components/exercise/SessionSummaryDialog').then(m => ({ default: m.SessionSummaryDialog })))
 import { ShopDayCard } from '@/components/ShopDayCard'
-
-/**
- * When the last weigh-in was, in words that fit the tile on one line: "yesterday", the weekday
- * within the past week ("Mon"), otherwise "16 Sep". Never the stored 2026-09-16 (user test #22).
- * Spelt out here rather than through toLocaleDateString, which writes "Wed, 16 Sept" in some
- * browsers and wraps the tile.
- */
-function weighInDayLabel(date: string, today: string): string {
-  const days = daysBetween(date, today)
-  if (days === 1) return 'yesterday'
-  const d = new Date(`${date}T12:00:00`)
-  if (days > 1 && days < 7) return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]
-  return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]}`
-}
-import { personalBest, bestReadingOf } from '@/lib/coach-voice'
+import { personalBest, bestReadingOf, streakLabel } from '@/lib/coach-voice'
+import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
+import { cardioLine } from '@/lib/cardio-lines'
 
 interface DashboardProps {
   profile: UserProfile
@@ -84,10 +76,11 @@ interface DashboardProps {
  * a Fat Loss user who just set a goal 8kg below today's weigh-in should see
  * both on the same chart, not a goal line clipped off the top/bottom. */
 function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: number }[]; goalKg?: number | null }) {
+  // 40px tall since design handoff 2a (was 60): the line inside a 6-32 band.
   const width = 320
-  const height = 60
-  const topY = 8
-  const bottomY = 48
+  const height = 40
+  const topY = 6
+  const bottomY = 32
   const kgs = series.map(p => p.kg)
   const rangeValues = goalKg != null ? [...kgs, goalKg] : kgs
   const min = Math.min(...rangeValues)
@@ -108,7 +101,7 @@ function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: num
       {goalY != null && (
         <>
           <line x1={0} y1={goalY} x2={width} y2={goalY} stroke="var(--role-warn, #FFB454)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.7" />
-          <text x={width} y={goalY - 3} textAnchor="end" fontSize="8" fill="var(--role-warn, #FFB454)" opacity="0.85">goal</text>
+          <text x={width} y={Math.max(7, goalY - 3)} textAnchor="end" fontSize="7" fill="var(--role-warn, #FFB454)" opacity="0.85">goal</text>
         </>
       )}
       <polyline
@@ -127,56 +120,6 @@ function WeighInTrendChart({ series, goalKg }: { series: { date: string; kg: num
 }
 
 
-/**
- * "Barbell Bench Press" -> "bench". The glance line has one line of a phone's
- * width to carry three facts; the catalogue's full names are written for a
- * plan screen where there is room for them.
- *
- * Falls back to the full name rather than a truncation, so an unrecognised
- * lift reads as itself instead of as "Kettlebell...".
- */
-const LIFT_SHORT_NAME: Record<string, string> = {
-  'Barbell Bench Press': 'bench',
-  'Barbell Squats': 'squat',
-  'Deadlifts': 'deadlift',
-  'Trap Bar Deadlift': 'trap bar',
-  'Overhead Press': 'overhead press',
-  'Romanian Deadlift': 'RDL',
-  'Front Squat': 'front squat',
-  'Incline Barbell Press': 'incline bench',
-}
-function shortLiftName(name: string): string {
-  return LIFT_SHORT_NAME[name] ?? name.toLowerCase()
-}
-
-/**
- * The two reply chips under a coach tip, keyed to the rule that produced it.
- *
- * Keyed rather than generic because "What changed?" under a protein-streak
- * line asks something different from the same words under a stalled-lift
- * line, and a chip that opens a conversation the coach cannot continue is
- * worse than no chip. A rule with no sensible follow-up returns none, which
- * is the expected outcome for most of them.
- */
-const TIP_CHIPS: Record<string, { label: string; prefill: string }[]> = {
-  lift_progress: [
-    { label: 'What changed?', prefill: 'What changed to move that lift?' },
-    { label: 'Adjust today', prefill: "Can we adjust today's session?" },
-  ],
-  protein_streak: [
-    { label: 'What changed?', prefill: 'What have I been doing differently with protein?' },
-  ],
-  weight_trend: [
-    { label: 'What changed?', prefill: 'What is driving my weight trend right now?' },
-    { label: 'Adjust today', prefill: 'Should we adjust anything based on my weight trend?' },
-  ],
-  missed_sessions: [
-    { label: 'Adjust today', prefill: "I have missed some sessions - can we adjust the plan?" },
-  ],
-}
-function chipsForTip(key: string | null): { label: string; prefill: string }[] {
-  return key ? (TIP_CHIPS[key] ?? []) : []
-}
 
 /**
  * The day's macro figures re-derived from the meal store's own snapshot.
@@ -233,6 +176,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // looked up in the plan week its own date falls in (a plan begun on a Thursday changes week on a Thursday).
   const liveWeekDays = mesocycle?.find(w => w.week_number === activeSession.liveWeek)?.days ?? exercisePlan ?? []
   const week = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt, logsVersion, mesocycle)
+  const cardioToday = useCardioLogsToday()
 
   // Bumped after a weigh-in save (from WeighInCard here, or a goal-weight
   // set) so the effect below re-fetches — nothing else that changes when a
@@ -352,6 +296,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [stepsOpen, setStepsOpen] = useState(false)
   const [stepsError, setStepsError] = useState<string | null>(null)
   const [weighInOpen, setWeighInOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
 
   const handleAddWater = (amountMl: number) => {
     if (!profile.id || !activeSession.date) return
@@ -439,53 +384,17 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     )
   }
 
-  // Steps are LOGGED on the Exercise tab now (Ashley's ruling, 5 Sep 2026 —
-  // they were on Nutrition before that, and on Home before that). Home still
-  // reads the figure for its third tile: the read stays because the tile is a
-  // pointer, and a pointer with no number on it points at nothing.
-  // PROPOSAL 3, assembled here rather than inline so the three states read as
-  // one decision. Each part is dropped when its value is genuinely unknown
-  // rather than filled with a placeholder — an estimate we do not have is not
-  // "~0 min".
-  const glanceParts: string[] = []
-  if (data.session.activity) {
-    // An activity session reads like one: "20 min · Easy", not "0 exercises".
-    glanceParts.push(`${data.session.activity.minutes} min`)
-    if (data.session.activity.effort) glanceParts.push(data.session.activity.effort)
-  } else if (data.session.status === 'in_progress') {
-    if (data.session.minutesLeft != null) glanceParts.push(`~${data.session.minutesLeft} min left`)
-    // DELIBERATE DEVIATION FROM THE HANDOFF. It specifies "bench 92.5 kg
-    // next"; the app knows the session's heaviest lift but NOT the running
-    // order, so "next" would be a claim it cannot support — the same class of
-    // invention as a fabricated weight. The number is shown without the word.
-    if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} ${data.session.leadLift.kg} kg`)
-  } else {
-    glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
-    if (data.session.estimatedMinutes != null) glanceParts.push(`~${data.session.estimatedMinutes} min`)
-    if (data.session.leadLift) glanceParts.push(`${shortLiftName(data.session.leadLift.name)} from ${data.session.leadLift.kg} kg`)
-  }
-  const sessionGlance = glanceParts.join(' · ')
-
-  const replyChips = chipsForTip(data.coachTipKey)
-
-  // The nudge's line, in the handoff's stated order: an adaptation message
-  // that wants an answer, else the coach tip, else nothing. Never filler.
-  const homeNudge: TrainerNudgeProps | null = trainerNudge
-    ?? ((data.coachTip || data.whatsLeftLine)
-      ? {
-          openChat: true,
-          text: (
-            <>
-              {data.coachTip}
-              {data.whatsLeftLine && (
-                <span className={`block text-[0.78125rem] text-[color:var(--role-warn-text)] ${data.coachTip ? 'mt-1' : ''}`}>
-                  {data.whatsLeftLine}
-                </span>
-              )}
-            </>
-          ),
-        }
-      : null)
+  // THE TRAINER'S NOTE — design handoff 2a. An adaptation message wants an
+  // answer, so it is shown ALONE and never rotates away mid-read. Otherwise
+  // every tip true today, the day's pick first, then what is still left today.
+  // THE BRIEF'S ORDER: the day's tip, then what is still left today, then the
+  // other tips that are true.
+  const allTips = (data.coachTips ?? (data.coachTip && data.coachTipKey ? [{ key: data.coachTipKey, text: data.coachTip }] : []))
+    .map(t => ({ key: t.key, text: t.text, tag: tipTag(t.key), prefill: tipPrefill(t.key, t.text) }))
+  const whatsLeftTip: HomeTip[] = data.whatsLeftLine
+    ? [{ key: 'whats_left', text: capitalise(data.whatsLeftLine), tag: 'Today', prefill: 'What should I focus on for the rest of today?' }]
+    : []
+  const plainTips: HomeTip[] = [...allTips.slice(0, 1), ...whatsLeftTip, ...allTips.slice(1)]
 
   // The greeting's period comes from the app's own clock (dev-clock), the
   // same one every date on this screen already uses, so a shifted dev day
@@ -501,74 +410,98 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const stepsToday = steps?.steps ?? 0
   const waterShown = waterMl ?? data.waterMl
   const lastWeighIn = data.weightSeries.length > 0 ? data.weightSeries[data.weightSeries.length - 1] : null
-  // Counted from the first weigh-in since the plan began, never one before it (user test #23).
-  const weightDeltaKg = data.weightSinceWeekOneKg
-  // Hairline cell geometry, written once: the grid opens with a border-top,
-  // the left column carries the vertical rule, the top row the horizontal one.
-  const cellStyle = (col: 0 | 1, row: 0 | 1): CSSProperties => ({
-    padding: '14px 0',
-    paddingLeft: col === 1 ? 14 : 0,
-    paddingRight: col === 0 ? 14 : 0,
-    borderRight: col === 0 ? '1px solid var(--hairline)' : undefined,
-    borderBottom: row === 0 ? '1px solid var(--hairline)' : undefined,
-  })
+  // FROM THE STARTING WEIGHT, not from the first of the fourteen rows the
+  // chart holds — see changeSinceStart for the two ways that went wrong.
+  const weightDeltaKg = changeSinceStart(data.startingWeightKg, data.weightSeries)
+
+  // ONE COUNT FOR "DONE" (her M39 ruling): the shared capped count off the
+  // week's own cell, the same one the strips and the coach read.
+  const todayCell = week.days.find(d => d.date === data.today)
+  const shared = sessionSetCount(todayCell?.session, todayCell?.workingLogs)
+  const setsLogged = shared?.logged ?? data.session.setsLogged
+  const setsPlanned = shared?.planned ?? data.session.setsPlanned
+  const status = data.session.status
+  const done = status === 'done'
+  const card = done ? readSessionSummary(profile.id, data.today) : null
+  // PRs: the finish card's own list when this phone has it (what she was told
+  // at Finish), else today's records off the PR cache.
+  const prCount = card ? card.prs.length : (data.prsToday ?? []).length
+  const topPr: string | null = card && card.prs.length > 0
+    ? personalBest(readingFor(card.prs[0].result))
+    : (data.prsToday ?? []).length > 0 ? personalBest(bestReadingOf(data.prsToday[0].metric, data.prsToday[0].value)) : null
+  const topPrLift = card && card.prs.length > 0 ? card.prs[0].exerciseName : (data.prsToday ?? [])[0]?.exerciseName ?? null
+  const minutes = card?.summary.durationMinutes ?? data.sessionMinutes ?? null
+
+  // THE GLANCE LINE — what is in it, the lead lift, and tomorrow (the old
+  // Tomorrow row moved in here, 2a). Each part is dropped when unknown.
+  const glanceParts: string[] = []
+  if (data.session.activity) {
+    // An activity session reads like one: "20 min · Easy", not "0 exercises" (the walking plan, user test 8 Oct 2026).
+    glanceParts.push(`${data.session.activity.minutes} min`)
+    if (data.session.activity.effort) glanceParts.push(data.session.activity.effort)
+  } else {
+    if (status === 'in_progress' && data.session.minutesLeft != null) glanceParts.push(`~${data.session.minutesLeft} min left`)
+    if (status !== 'in_progress') glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
+  }
+  // DELIBERATE DEVIATION FROM THE HANDOFF, kept: no "next" — the app knows the
+  // heaviest lift, not the running order.
+  const lift = data.session.leadLift && !data.session.activity ? leadLiftPhrase(data.session.leadLift, status) : null
+  if (lift) glanceParts.push(lift)
+  const tomorrow = data.tomorrow ?? null
+  if (tomorrow) glanceParts.push(tomorrow.rest ? 'rest tomorrow' : `${tomorrow.focus} tomorrow`)
+  const sessionGlance = glanceParts.join(' · ')
+
+  // THE LATEST PR for the weight panel's footer — the newest, not the biggest.
+  const latestPr = [...data.recentPRs].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
+  const vol = data.volume ?? { thisWeek: 0, lastWeekSoFar: 0 }
+  const volPct = vol.lastWeekSoFar > 0 ? Math.round(((vol.thisWeek - vol.lastWeekSoFar) / vol.lastWeekSoFar) * 100) : null
+
+  const heroWash: CSSProperties = { background: 'radial-gradient(120% 90% at 100% 0%, var(--hero-wash), transparent 60%), var(--surface-raised)' }
+  const weekRow = week.days.length > 0 && (
+    <div>
+      <HomeWeekStrip days={week.days} todayName={data.dayName} done={week.sessionsDone} planned={week.sessionsPlanned} />
+      <HomeWeekBoundaryNote days={week.days} todayDate={activeSession.date} />
+    </div>
+  )
+  const cardioLines = cardioToday.length > 0 && (
+    <div data-testid="home-cardio-today">
+      {cardioToday.map(l => (
+        <p key={l.clientId ?? l.id} className="text-[0.78125rem] text-muted-foreground">✓ {cardioLine(l)}</p>
+      ))}
+    </div>
+  )
 
   return (
-    // design_handoff_app_polish, direction 1a: one column, no boxes. Sections
-    // are a .ds-label plus hairline-separated rows; the only filled things
-    // left on this screen are the nudge, the CTA and the Tomorrow row.
-    // The two ambient radial washes and the grain overlay are GONE with the
-    // cards — a borderless page does not need a textured panel behind it, and
-    // test:hero-surface §2 (which pinned their -12px geometry) moved to
-    // pinning their absence.
+    // design handoff 2a, 10 Oct 2026: one column, side padding from the app
+    // shell, 10px between blocks. Panels are filled again, by role: the hero,
+    // the day so far and the weight each are one object.
     <div className="relative -mx-1 px-1">
-      <div className="relative flex flex-col gap-[26px]">
-        {/* 1. WHO AND WHEN. The greeting is the page's headline; the streak is
-            a chip beside it, not a competing number. */}
-        <div className="flex items-start justify-between gap-3">
+      <div className="relative flex flex-col gap-2.5">
+        {/* 1. WHO AND WHEN */}
+        <div className="flex items-start justify-between gap-3 pb-1.5">
           <div className="min-w-0">
             <p className="ds-label">{dateLabel}</p>
-            <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">{greeting}</h2>
+            <h2 className="mt-1 text-[1.625rem] font-bold leading-[1.1] tracking-[-.03em]">{greeting}</h2>
           </div>
           <span
-            className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1"
+            className="mt-1 inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5"
             style={{ background: 'var(--surface-raised)' }}
+            data-testid="home-streak"
           >
-            <span aria-hidden className={`inline-block size-[5px] rounded-full ${data.streak > 0 ? 'bg-primary' : 'bg-[color:var(--text-dim)]'}`} />
+            <span aria-hidden className={`inline-block size-[5px] rounded-full ${data.streak > 0 ? 'bg-primary glow-mint-box' : 'bg-[color:var(--text-dim)]'}`} />
             <span className="tabular-mono text-[0.8125rem] font-semibold">{data.streak}</span>
-            <span className="text-[0.6875rem] text-muted-foreground">day{data.streak === 1 ? '' : 's'} streak</span>
+            {/* "sessions in a row", not the brief's "day streak": the streak
+                counts sessions (test:history-streak). */}
+            <span className="text-[0.6875rem] text-muted-foreground" data-testid="home-streak-label">{streakLabel(data.streak)}</span>
           </span>
         </div>
 
-        {/* 2. THE TRAINER'S LINE — see TrainerNudge. First an adaptation
-            message that needs an answer, then the coach tip, then nothing.
-            The reply chips are keyed to the tip and stay under it. */}
-        {homeNudge && (
-          <div>
-            <TrainerNudge {...homeNudge} />
-            {!trainerNudge && replyChips.length > 0 && (
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {replyChips.map(chip => (
-                  <button
-                    key={chip.label}
-                    type="button"
-                    onClick={() => { setChatPrefill(chip.prefill); window.location.hash = tabHash('chat') }}
-                    className="inline-flex min-h-[34px] items-center rounded-full px-3 text-[0.75rem]"
-                    style={{ background: 'var(--accent)' }}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* 2. THE TRAINER'S NOTE */}
+        {trainerNudge
+          ? <TrainerNudge {...trainerNudge} />
+          : plainTips.length > 0 && <HomeCoachNote tips={plainTips} />}
 
-        {/* SHOPPING, ON THE DAY SHE SHOPS — design handoff 2d. Between the
-            nudge and today's session, and only on that day: the list is
-            built from the week's meals and is a weekly errand, so it comes
-            to her rather than waiting behind a tile. The card decides for
-            itself whether to render; there is nothing to show most days. */}
+        {/* SHOPPING, ON THE DAY SHE SHOPS — between the note and the hero. */}
         <ShopDayCard
           profileId={profile.id}
           exercisePlan={exercisePlan}
@@ -576,152 +509,160 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           nowMs={Date.now()}
         />
 
-        {/* 3. TODAY'S SESSION — label, focus, one glance line, CTA, then the
-            week strip UNDER the button. The strip's own label row is dropped:
-            the header above already says which week this is. */}
-        <div data-tour="hero">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="ds-label">Today&apos;s session</p>
-            {data.session.status !== 'rest' && data.session.status !== 'unknown' && data.session.status !== 'moved' && data.session.estimatedMinutes != null && (
-              <span className="text-[0.6875rem] text-muted-foreground">~{data.session.estimatedMinutes} min</span>
-            )}
-          </div>
-
-          {data.session.status === 'unknown' ? (
-            /* THE PLAN IS NOT HERE YET — and it is not a rest day. Ashley's
-               ruling, 8 Sep 2026, offered "Checking your plan…" here vs
-               holding the whole screen on its loading line vs drawing the
-               last-known session: she chose this one, so everything Home does
-               know (streak, calories, water, steps, weight, PRs) stays on
-               screen and only the block that needs the plan waits for it.
-               No CTA: there is nothing yet to start. */
-            <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">Checking your plan…</p>
-          ) : data.session.status === 'moved' && data.session.movedTo ? (
-            <>
-              {/* THE SESSION HAS LEFT. The first version kept the focus and
-                  the Start button here with a grey "still here if you want it
-                  today" under them; Ashley, 8 Sep 2026: "it didnt move my
-                  workout." Now Home says where it went and offers nothing to
-                  start — the Exercise tab draws the same rule, and its card
-                  carries the one way back. */}
-              <p className="mt-1.5 text-[1.5625rem] font-bold tracking-[-.02em] glow-text">Moved to {data.session.movedTo.dayName}</p>
-              <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">
-                {data.session.focus ?? "Today's session"} is waiting for you on {data.session.movedTo.dayName} · {week.sessionsDone} of {week.sessionsPlanned} session{week.sessionsPlanned === 1 ? '' : 's'} done
-              </p>
-            </>
-          ) : data.session.status === 'rest' ? (
-            <>
-              {/* NO truncate, so the glow is not clipped — the handoff calls
-                  this out and the old comment here explained why: overflow
-                  hidden cuts glow-text's halo into a hard rectangle. A long
-                  focus name wraps now instead. */}
-              <p className="mt-1.5 text-[1.5625rem] font-bold tracking-[-.02em] glow-text">Rest day</p>
-              <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">
-                Recovery is part of the program · {week.sessionsDone} of {week.sessionsPlanned} session{week.sessionsPlanned === 1 ? '' : 's'} done
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="mt-1.5 flex items-baseline justify-between gap-3">
-                <span className="min-w-0 text-[1.5625rem] font-bold tracking-[-.02em] glow-text">{data.session.focus}</span>
-                {data.session.status !== 'not_started' && (
-                  <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
-                    {data.session.status === 'in_progress' ? `${data.session.setsLogged} of ${data.session.setsPlanned} sets` : 'Done'}
+        {/* 3. TODAY'S SESSION */}
+        {done ? (
+          <div
+            data-tour="hero"
+            data-home-hero="done"
+            className="flex flex-col gap-3 rounded-[22px] px-[18px] py-4"
+            style={prCount > 0
+              ? { background: 'radial-gradient(120% 100% at 0% 0%, rgba(var(--glow-rgb), .18), transparent 60%), var(--surface-raised)', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .45), 0 0 calc(26px * var(--glow-strength, 1)) rgba(var(--glow-rgb), .22)' }
+              : { background: 'var(--surface-raised)' }}
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="glow-mint whitespace-nowrap text-[0.65625rem] font-semibold uppercase tracking-[.2em] text-primary-text">Done · {data.session.focus}</p>
+              {card && (
+                <button type="button" onClick={() => setSummaryOpen(true)} className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold text-text-tertiary" data-home-summary>
+                  Summary ›
+                </button>
+              )}
+            </div>
+            {/* THE LIFT LINE SURVIVES THE FINISH (L9, 9 Oct 2026): "Romanian
+                deadlifts 30kg per hand today" is what she lifted, and a done
+                day is exactly when that is worth reading. The same glance
+                line as before the session, now saying what was done. */}
+            {sessionGlance && <p className="-mt-1.5 text-[0.78125rem] text-muted-foreground" data-testid="home-session-glance">{sessionGlance}</p>}
+            {prCount > 0 && topPr && (
+              <div className="flex items-center gap-3" data-home-pr>
+                <span className="glow-mint-box flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(var(--glow-rgb), .16)', color: 'var(--primary-text)', '--glow-strength': 'calc(var(--glow-strength, 1) * .5)' } as CSSProperties}>
+                  <Trophy className="glow-icon size-[18px]" aria-hidden />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[0.6875rem] uppercase tracking-[.12em] text-muted-foreground">New PR</span>
+                  <span className="block truncate text-[0.9375rem]">
+                    {topPrLift} <span className="tabular-mono glow-mint-lg font-bold" style={{ color: 'var(--num-hero)' }}>{topPr}</span>
                   </span>
+                </span>
+              </div>
+            )}
+            <div className="grid grid-cols-3 pt-2.5" style={{ borderTop: '1px solid var(--hairline)' }} data-home-done-stats>
+              <span>
+                <span className="block tabular-mono text-base font-bold">{minutes != null ? `${minutes} min` : '—'}</span>
+                <span className="block text-[0.6875rem] text-muted-foreground">time</span>
+              </span>
+              <span>
+                <span className="block tabular-mono text-base font-bold">{setsLogged}/{setsPlanned}</span>
+                <span className="block text-[0.6875rem] text-muted-foreground">sets</span>
+              </span>
+              <span>
+                <span className={`block tabular-mono text-base font-bold ${prCount > 0 ? 'glow-mint text-primary-text' : ''}`}>{prCount} PR{prCount === 1 ? '' : 's'}</span>
+                <span className="block text-[0.6875rem] text-muted-foreground">this session</span>
+              </span>
+            </div>
+            {cardioLines}
+          </div>
+        ) : (
+          <div data-tour="hero" data-home-hero={status} className="flex flex-col gap-3 rounded-[22px] p-[18px]" style={heroWash}>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="glow-mint whitespace-nowrap text-[0.65625rem] font-semibold uppercase tracking-[.2em] text-primary-text">Today&apos;s session</p>
+              {status === 'in_progress'
+                ? <span className="tabular-mono text-[0.6875rem] text-muted-foreground">{setsLogged} of {setsPlanned} sets</span>
+                : status === 'not_started' && data.session.sessionLength && (
+                  <span className="text-[0.6875rem] text-muted-foreground" data-testid="home-session-length">{data.session.sessionLength}</span>
+                )}
+            </div>
+
+            {data.session.status === 'unknown' ? (
+              /* THE PLAN IS NOT HERE YET — and it is not a rest day (her 8 Sep
+                 ruling). No CTA: there is nothing yet to start. */
+              <p className="text-[0.78125rem] text-muted-foreground">Checking your plan…</p>
+            ) : data.session.status === 'moved' && data.session.movedTo ? (
+              <div>
+                <p className="glow-text text-[1.875rem] font-bold leading-[1.02] tracking-[-.03em]">Moved to {data.session.movedTo.dayName}</p>
+                <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">
+                  {data.session.focus ?? "Today's session"} is waiting for you on {data.session.movedTo.dayName} · {week.sessionsDone} of {week.sessionsPlanned} session{week.sessionsPlanned === 1 ? '' : 's'} done
+                </p>
+              </div>
+            ) : data.session.status === 'rest' ? (
+              <div>
+                <p className="glow-text text-[1.875rem] font-bold leading-[1.02] tracking-[-.03em]">Rest day</p>
+                <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">
+                  Recovery is part of the program · {week.sessionsDone} of {week.sessionsPlanned} session{week.sessionsPlanned === 1 ? '' : 's'} done
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="glow-text text-[1.875rem] font-bold leading-[1.02] tracking-[-.03em]">{data.session.focus}</p>
+                <p className="mt-1.5 text-[0.78125rem] text-muted-foreground" data-testid="home-session-glance">{sessionGlance}</p>
+                {data.session.movedFrom && (
+                  <p className="mt-1 text-[0.78125rem] text-muted-foreground">{data.session.movedFrom.dayName}&apos;s session, moved here.</p>
                 )}
               </div>
-              <p className="mt-1.5 text-[0.78125rem] text-muted-foreground">{sessionGlance}</p>
-              {/* THE RECEIVING END of a move: this session came from another
-                  day, and the line says so. The day it LEFT is the 'moved'
-                  branch above, not a line under a session that is no longer
-                  here. */}
-              {data.session.movedFrom && (
-                <p className="mt-1 text-[0.78125rem] text-muted-foreground">
-                  {data.session.movedFrom.dayName}&apos;s session, moved here.
-                </p>
-              )}
-              {data.session.status !== 'done' && (
-                <Button
-                  size="cta"
-                  className="mt-3.5 w-full glow-bloom-once"
-                  style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white) 0%, var(--primary) 55%, var(--primary-2) 100%)' }}
-                  onClick={() => { window.location.hash = tabHash('exercise') }}
-                >
-                  {data.session.status === 'not_started' ? 'Start session' : 'Continue session'}
-                </Button>
-              )}
-            </>
-          )}
+            )}
 
-          {week.days.length > 0 && (
-            <div className="mt-3.5">
-              <HomeWeekStrip days={week.days} todayName={data.dayName} />
-              <HomeWeekStripLabels days={week.days} todayDate={activeSession.date} />
-            </div>
-          )}
-        </div>
+            {cardioLines}
+            {weekRow}
 
-        {/* 4. TODAY SO FAR — four facts on hairlines, not tiles. Calories are
-            read-only and point at the tab that owns them; the other three are
-            logged here. Every write goes straight to its store and the number
-            moves from the store's own synchronous return. */}
-        <div data-tour="tiles">
-          <p className="ds-label">Today so far</p>
-          <div className="mt-1.5 grid grid-cols-2" style={{ borderTop: '1px solid var(--hairline)' }}>
-            {/* Calories — a pointer, exactly as before. */}
+            {(status === 'not_started' || status === 'in_progress') && (
+              <Button
+                size="cta"
+                className="glow-bloom-once glow-mint-box h-[52px] w-full rounded-[14px] text-[0.9375rem] font-bold"
+                style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white) 0%, var(--primary) 55%, var(--primary-2) 100%)', color: 'var(--primary-foreground)' }}
+                onClick={() => { window.location.hash = tabHash('exercise') }}
+              >
+                {status === 'not_started' ? 'Start session' : 'Continue session'}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* 4 + 5. THE DAY SO FAR, AND WEIGHT — one tour stop: the copy says
+            water, steps and the weigh-in are logged here, and the weigh-in
+            now opens from the weight panel, so the spotlight covers both. */}
+        <div data-tour="tiles" className="flex flex-col gap-2.5">
+          <div className="grid grid-cols-2 overflow-hidden rounded-[18px]" style={{ background: 'var(--surface-raised)' }} data-home-today>
+            {/* Calories — a pointer to the tab that owns them. */}
             <button
               type="button"
               onClick={() => { window.location.hash = tabHash('nutrition') }}
               className="text-left"
-              style={cellStyle(0, 0)}
+              style={todayCell2(0, 0)}
             >
-              <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-                <Flame className="size-3" aria-hidden /> Calories
-              </span>
-              <span className="mt-1 block tabular-mono text-[1.375rem] font-bold leading-none">
-                {Math.round(data.caloriesEaten).toLocaleString()}
-                <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">
-                  {data.hasNutritionTargets ? `/ ${Math.round(data.caloriesTarget).toLocaleString()}` : 'no target yet'}
-                </span>
-              </span>
-              <span className="mt-2 block h-[2px] w-full rounded-full" style={{ background: 'var(--hairline)' }}>
-                <span
-                  className="block h-[2px] rounded-full"
-                  style={{
-                    width: `${Math.round((data.hasNutritionTargets && data.caloriesTarget > 0 ? Math.min(1, data.caloriesEaten / data.caloriesTarget) : 0) * 100)}%`,
-                    background: 'var(--primary)',
-                  }}
-                />
-              </span>
+              <MetricHead icon={Flame} label="Calories" color="var(--primary)" />
+              <MetricValue value={Math.round(data.caloriesEaten).toLocaleString()} unit={data.hasNutritionTargets ? `/ ${Math.round(data.caloriesTarget).toLocaleString()}` : 'no target yet'} />
+              <MetricBar share={data.hasNutritionTargets && data.caloriesTarget > 0 ? data.caloriesEaten / data.caloriesTarget : 0} color="var(--primary)" glow />
             </button>
 
-            {/* Water — quick-add, with the undo the Nutrition row already has. */}
-            <div style={cellStyle(1, 0)}>
-              <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-                <Droplets className="size-3" aria-hidden /> Water
-              </span>
-              <span className="mt-1 block tabular-mono text-[1.375rem] font-bold leading-none" style={{ color: 'var(--chart-3)' }}>
-                {waterShown.toLocaleString()}
-                <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">/ {data.waterTargetMl.toLocaleString()} ml</span>
-              </span>
+            {/* Protein — read-only, like calories. */}
+            <button
+              type="button"
+              onClick={() => { window.location.hash = tabHash('nutrition') }}
+              className="text-left"
+              style={todayCell2(1, 0)}
+            >
+              <MetricHead icon={Beef} label="Protein" color="var(--chart-2)" />
+              <MetricValue value={String(Math.round(data.proteinEaten))} unit={data.hasNutritionTargets ? `/ ${Math.round(data.proteinTarget)} g` : 'g · no target yet'} />
+              <MetricBar share={data.hasNutritionTargets && data.proteinTarget > 0 ? data.proteinEaten / data.proteinTarget : 0} color="var(--chart-2)" />
+            </button>
+
+            {/* Water — quick-add, with the six-second undo. */}
+            <div style={todayCell2(0, 1)}>
+              <MetricHead icon={Droplets} label="Water" color="var(--chart-3)" />
+              <MetricValue value={(waterShown / 1000).toFixed(1)} unit={`/ ${(data.waterTargetMl / 1000).toFixed(1)} L`} />
               <span className="mt-2 flex flex-wrap items-center gap-1.5">
                 {[250, 500].map(ml => (
                   <button
                     key={ml}
                     type="button"
                     onClick={() => handleAddWater(ml)}
-                    className="hit-slop-44 rounded-full px-2 py-1 text-[0.6875rem] font-semibold"
+                    className="hit-slop-44 inline-flex h-6 items-center rounded-full px-2.5 text-[0.6875rem] font-semibold"
                     style={{ background: 'color-mix(in oklab, var(--chart-3) 15%, transparent)', color: 'var(--chart-3)' }}
                   >
                     +{ml}
                   </button>
                 ))}
                 {lastWaterLog && (
-                  <button
-                    type="button"
-                    onClick={handleUndoWater}
-                    className="hit-slop-44 rounded-full px-2 py-1 text-[0.6875rem] text-muted-foreground"
-                  >
+                  <button type="button" onClick={handleUndoWater} className="hit-slop-44 inline-flex h-6 items-center rounded-full px-2 text-[0.6875rem] text-muted-foreground">
                     undo
                   </button>
                 )}
@@ -729,169 +670,251 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               {waterError && <span className="mt-1 block text-[0.6875rem] text-[color:var(--role-warn-text)]">{waterError}</span>}
             </div>
 
-            {/* Steps — the inline input opens in place. */}
-            <div style={cellStyle(0, 1)}>
-              <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-                <Footprints className="size-3" aria-hidden /> Steps
-              </span>
-              <span className="mt-1 block tabular-mono text-[1.375rem] font-bold leading-none">
-                {stepsToday.toLocaleString()}
-                <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">/ {stepsTarget.toLocaleString()}</span>
-              </span>
+            {/* Steps — tap the cell to type today's count. */}
+            <div style={todayCell2(1, 1)}>
               {stepsOpen ? (
-                <span className="mt-2 flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    autoFocus
-                    value={stepsInput}
-                    onChange={e => setStepsInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') void handleLogSteps() }}
-                    placeholder={String(stepsToday || '')}
-                    aria-label="Steps today"
-                    className="h-8 w-[4.5rem] rounded-[9px] px-2 text-[0.75rem] tabular-mono"
-                    style={{ background: 'var(--surface-raised)' }}
-                  />
-                  <button type="button" onClick={() => void handleLogSteps()} className="hit-slop-44 text-[0.6875rem] font-semibold text-primary-text">
-                    Log
-                  </button>
-                </span>
+                <>
+                  <MetricHead icon={Footprints} label="Steps" color="var(--chart-4)" />
+                  <span className="mt-2 flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      autoFocus
+                      value={stepsInput}
+                      onChange={e => setStepsInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') void handleLogSteps() }}
+                      placeholder={String(stepsToday || '')}
+                      aria-label="Steps today"
+                      className="h-8 w-[4.5rem] rounded-[9px] px-2 text-[0.75rem] tabular-mono"
+                      style={{ background: 'var(--surface-sunken)' }}
+                    />
+                    <button type="button" onClick={() => void handleLogSteps()} className="hit-slop-44 text-[0.6875rem] font-semibold text-primary-text">
+                      Log
+                    </button>
+                  </span>
+                  {/* WHERE THE TARGET COMES FROM — shown while the input is open. */}
+                  <span className="mt-1.5 block text-[0.625rem] leading-[1.35] text-muted-foreground/80">
+                    Target from the activity level your calorie target uses — override it in your profile.
+                  </span>
+                </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setStepsOpen(true)}
-                  className="hit-slop-44 mt-2 block text-[0.6875rem] font-semibold text-primary-text"
-                >
-                  Log ›
+                <button type="button" onClick={() => setStepsOpen(true)} className="block w-full text-left" aria-label={`Steps: ${stepsToday.toLocaleString()} of ${stepsTarget.toLocaleString()}. Tap to log today's steps.`}>
+                  <MetricHead icon={Footprints} label="Steps" color="var(--chart-4)" />
+                  <MetricValue value={stepsToday.toLocaleString()} unit={`/ ${compactSteps(stepsTarget)}`} />
+                  <MetricBar share={stepsTarget > 0 ? stepsToday / stepsTarget : 0} color="var(--chart-4)" />
                 </button>
-              )}
-              {/* WHERE THE TARGET COMES FROM, kept from the row this cell
-                  replaced: the step target is derived from the same
-                  activity_level the calorie target's PAL multiplier uses
-                  (steps-target.ts), and that is not guessable from a number
-                  on a tile. Shown while the input is open — the moment it is
-                  relevant — rather than taking a permanent line. */}
-              {stepsOpen && (
-                <span className="mt-1.5 block text-[0.625rem] leading-[1.35] text-muted-foreground/80">
-                  Target from the activity level your calorie target uses — override it in your profile.
-                </span>
               )}
               {stepsError && <span className="mt-1 block text-[0.6875rem] text-[color:var(--role-warn-text)]">{stepsError}</span>}
             </div>
+          </div>
 
-            {/* Weight — the weigh-in input opens under the grid, unchanged. */}
-            <div style={cellStyle(1, 1)}>
-              <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-                <Scale className="size-3" aria-hidden /> Weight
-              </span>
-              {/* hit-slop-44: the number is 22px tall by design (it is the
-                  headline of this cell, not a button-shaped control), and a
-                  22px target is half the comfortable minimum. The slop is an
-                  invisible ::after — nothing moves and nothing looks
-                  different. Measured before: the probe 21px above its centre
-                  landed on the "Weight" label beside it. */}
-              <button
-                type="button"
-                onClick={() => setWeighInOpen(o => !o)}
-                className="mt-1 block text-left hit-slop-44"
-                aria-expanded={weighInOpen}
-              >
-                <span className="block tabular-mono text-[1.375rem] font-bold leading-none">
+          {/* WEIGHT — the chart, the latest PR and this week's volume. The
+              header is the door to the weigh-in (the old Weight cell was its
+              only one). */}
+          <div className="overflow-hidden rounded-[18px] px-3.5 pt-3.5" style={{ background: 'var(--surface-raised)' }} data-home-weight>
+            <button
+              type="button"
+              onClick={() => setWeighInOpen(o => !o)}
+              aria-expanded={weighInOpen}
+              className="flex w-full items-baseline justify-between gap-3 text-left"
+            >
+              <span className="text-[0.75rem] text-text-tertiary">Weight</span>
+              <span className="flex items-baseline gap-2">
+                <span className="tabular-mono text-[1.25rem] font-bold">
                   {lastWeighIn ? lastWeighIn.kg.toFixed(1) : '—'}
-                  <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">
-                    {lastWeighIn ? `kg · ${lastWeighIn.date === data.today ? 'today ✓' : weighInDayLabel(lastWeighIn.date, data.today)}` : 'log one'}
+                  <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">{lastWeighIn ? 'kg' : 'log one'}</span>
+                </span>
+                {weightDeltaKg != null && (
+                  <span className="glow-mint tabular-mono text-[0.75rem] font-semibold text-primary-text">
+                    {weightDeltaKg > 0 ? '+' : ''}{weightDeltaKg.toFixed(1)}<span className="sr-only"> kg since you started</span>
                   </span>
-                </span>
-              </button>
-              {weightDeltaKg != null && (
-                <span className="mt-2 block text-[0.6875rem] font-semibold text-primary-text">
-                  {weightDeltaKg > 0 ? '+' : ''}{weightDeltaKg.toFixed(1)} kg since week 1
-                </span>
-              )}
-            </div>
-          </div>
-          {weighInOpen && profile.id && (
-            <div className="mt-3">
-              <WeighInCard profileId={profile.id} onWeightLogged={handleWeighInChanged} />
-            </div>
-          )}
-        </div>
-
-        {/* 5. WEIGHT TREND. The rolling-average "Progress" block is gone: its
-            number is the Weight cell above, and the shape of the change is
-            this chart. */}
-        <div>
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="ds-label">Weight trend</p>
-            {data.weightGoalKg != null && (
-              <span className="text-[0.6875rem] text-muted-foreground">goal {data.weightGoalKg} kg</span>
+                )}
+              </span>
+            </button>
+            {data.weightSeries.length > 0 ? (
+              <WeighInTrendChart series={data.weightSeries} goalKg={data.weightGoalKg} />
+            ) : (
+              <p className="mt-2.5 pb-1 text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
             )}
-          </div>
-          {data.weightSeries.length > 0 ? (
-            <WeighInTrendChart series={data.weightSeries} goalKg={data.weightGoalKg} />
-          ) : (
-            <p className="mt-2.5 text-xs text-muted-foreground">Log a weigh-in to see your trend here.</p>
-          )}
-          {data.weightSeries.length === 1 && (
-            <p className="mt-1.5 text-[0.6875rem] text-muted-foreground/70">1 weigh-in so far — the trend firms up with more.</p>
-          )}
-        </div>
-
-        {/* 6. RECENT PRs — up to three, and the section is not there at all
-            when there are none. */}
-        {data.recentPRs.length > 0 && (
-          <div>
-            <p className="ds-label">Recent PRs</p>
-            <div className="mt-1.5" style={{ borderTop: '1px solid var(--hairline)' }}>
-              {data.recentPRs.slice(0, 3).map(pr => (
-                <div
-                  key={pr.exerciseName}
-                  className="flex items-baseline justify-between gap-3 py-3"
-                  style={{ borderBottom: '1px solid var(--hairline)' }}
-                >
-                  <span className="min-w-0 truncate text-[0.8125rem]">{pr.exerciseName}</span>
-                  {/* The prototype shows "60 kg × 9". RecentPR still carries
-                      no rep count for a LOADED lift, and a rep number nobody
-                      recorded would be an invention — so a loaded record is
-                      still the weight alone.
-                      What changed 16 Sep 2026 is that not every record is a
-                      weight. `{pr.weightKg} kg` printed "0 kg" for a
-                      bodyweight best and would have printed "12 kg" for a
-                      12-rep one. The unit comes from the phrasebook with the
-                      number, and there is no default branch to fall into.
-                      NEVER A best_set READING HERE, and that is a fact about
-                      the source rather than an omission: this list is built
-                      from the PR CACHE's heaviest-ever figures, which only
-                      move when the bar does. The estimate-driven best exists
-                      only on a single session's result, so it shows up in the
-                      session summary and the exercise's own PR list. */}
-                  <span className="shrink-0 tabular-mono text-[0.8125rem] font-semibold text-primary-text">
-                    {personalBest(bestReadingOf(pr.metric, pr.value))}
-                  </span>
-                </div>
-              ))}
+            {weighInOpen && profile.id && (
+              <div className="mt-3">
+                <WeighInCard profileId={profile.id} onWeightLogged={handleWeighInChanged} />
+              </div>
+            )}
+            <div className="mt-3 grid grid-cols-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+              <div className="py-3 pr-3" style={{ borderRight: '1px solid var(--hairline)' }} data-home-latest-pr>
+                <span className="block truncate text-[0.6875rem] text-muted-foreground">
+                  {latestPr ? `${shortLiftName(latestPr.exerciseName)} PR · ${prDay(latestPr.date, data.today)}` : 'Latest PR'}
+                </span>
+                {/* The unit comes with the number, from the phrasebook — a
+                    bodyweight best is reps, never "0 kg". */}
+                <span className={`mt-0.5 block text-[0.875rem] ${latestPr ? 'tabular-mono font-bold glow-mint text-primary-text' : 'text-muted-foreground'}`}>
+                  {latestPr ? personalBest(bestReadingOf(latestPr.metric, latestPr.value)) : 'none this week'}
+                </span>
+              </div>
+              <div className="py-3 pl-3" data-home-volume>
+                <span className="block text-[0.6875rem] text-muted-foreground">Volume this week</span>
+                <span className="mt-0.5 block tabular-mono text-[0.875rem] font-bold">
+                  {vol.thisWeek} set{vol.thisWeek === 1 ? '' : 's'}
+                  {volPct != null && (
+                    <span className={`ml-1.5 text-[0.6875rem] font-semibold ${volPct > 0 ? 'glow-mint text-primary-text' : 'text-muted-foreground'}`}>
+                      {volPct > 0 ? '+' : ''}{volPct}%
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
-        )}
-
-        {/* 7. TOMORROW — the one filled row on the page. */}
-        {data.tomorrowLabel != null && (
-        <button
-          type="button"
-          onClick={() => { window.location.hash = tabHash('exercise') }}
-          className="flex w-full items-center justify-between gap-3 rounded-[14px] px-3.5 py-3 text-left"
-          style={{ background: 'var(--surface-raised)' }}
-        >
-          <span className="min-w-0">
-            <span className="block text-[0.6875rem] text-muted-foreground">Tomorrow</span>
-            <span className="mt-0.5 block truncate text-[0.84375rem] font-medium">
-              {data.tomorrowLabel.replace(/^Tomorrow:\s*/, '')}
-            </span>
-          </span>
-          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        </button>
-        )}
+        </div>
       </div>
+      {card && (
+        <Suspense fallback={null}>
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={card} />
+        </Suspense>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// The pieces of the 2a layout.
+// ---------------------------------------------------------------------------
+
+/** A cell of the 2x2 "today so far" panel: hairlines on the inner edges only. */
+function todayCell2(col: 0 | 1, row: 0 | 1): CSSProperties {
+  return {
+    padding: '11px 12px',
+    borderRight: col === 0 ? '1px solid var(--hairline)' : undefined,
+    borderBottom: row === 0 ? '1px solid var(--hairline)' : undefined,
+  }
+}
+
+function MetricHead({ icon: Icon, label, color }: { icon: typeof Flame; label: string; color: string }) {
+  return (
+    <span className="flex items-center gap-2 text-[0.75rem] text-text-tertiary">
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color }}>
+        <Icon className="size-3.5" aria-hidden />
+      </span>
+      {label}
+    </span>
+  )
+}
+
+function MetricValue({ value, unit }: { value: string; unit: string }) {
+  return (
+    <span className="mt-2 block tabular-mono text-[1.375rem] font-bold leading-none">
+      {value}
+      <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">{unit}</span>
+    </span>
+  )
+}
+
+function MetricBar({ share, color, glow }: { share: number; color: string; glow?: boolean }) {
+  return (
+    <span className="mt-2.5 block h-[3px] w-full rounded-full" style={{ background: 'var(--surface-sunken)' }}>
+      <span
+        className={`block h-[3px] rounded-full ${glow ? 'glow-mint-box' : ''}`}
+        style={{ width: `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`, background: color }}
+      />
+    </span>
+  )
+}
+
+/** "9k" for a round 9,000; "7.5k" for 7,500; the number itself under 1,000. */
+function compactSteps(n: number): string {
+  if (n < 1000) return n.toLocaleString()
+  const k = n / 1000
+  return `${Number.isInteger(k) ? k : k.toFixed(1)}k`
+}
+
+/** "Bench" for the four lifts the app names short, else the lift's own name. */
+function shortLiftName(name: string): string {
+  return LIFT_SHORT_NAME[name] ?? name
+}
+
+/** "today", else the weekday ("Thu") — every PR shown here is from the last seven days. */
+function prDay(date: string, today: string): string {
+  return date === today ? 'today' : dayNameOf(date).slice(0, 3)
+}
+
+function capitalise(s: string): string {
+  return s ? s[0].toUpperCase() + s.slice(1) : s
+}
+
+interface HomeTip { key: string; text: string; tag: string; prefill: string }
+
+/** What a tip is about, for "TRAINER · TAG". */
+function tipTag(key: string): string {
+  if (key === 'protein_streak' || key === 'water_pace') return 'Nutrition'
+  if (key === 'weight_trend') return 'Progress'
+  return 'Training'
+}
+
+/**
+ * What "Ask ↗" types into the chat for her: the reply chips' own question
+ * where a tip had one (kept from the chips this note replaces), else a plain
+ * "tell me more" about that line. A draft she can edit, never sent for her.
+ */
+const TIP_PREFILL: Record<string, string> = {
+  lift_progress: 'What changed to move that lift?',
+  protein_streak: 'What have I been doing differently with protein?',
+  weight_trend: 'What is driving my weight trend right now?',
+}
+function tipPrefill(key: string, text: string): string {
+  return TIP_PREFILL[key] ?? `Tell me more about this: "${text}"`
+}
+
+/**
+ * THE ROTATING NOTE — 2a. Every 6s the next tip, with a quarter-second fade.
+ * Tapping the line moves on and a dot jumps; either restarts the 6s.
+ *
+ * IT CAN BE STOPPED, because text that moves on its own past five seconds
+ * must be (WCAG 2.2.2): it never moves for anyone whose phone asks for
+ * reduced motion, and it holds still while a finger or keyboard is on it.
+ * One tip: no dots and no movement. None: the caller draws nothing.
+ */
+export function HomeCoachNote({ tips }: { tips: HomeTip[] }) {
+  const [index, setIndex] = useState(0)
+  const [fading, setFading] = useState(false)
+  const [held, setHeld] = useState(false)
+  const [cycle, setCycle] = useState(0)
+  const count = tips.length
+  const i = Math.min(index, count - 1)
+  const reduced = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  const go = (next: number) => {
+    setFading(true)
+    window.setTimeout(() => { setIndex(((next % count) + count) % count); setFading(false) }, 250)
+    setCycle(c => c + 1)
+  }
+
+  useEffect(() => {
+    if (count < 2 || reduced || held) return
+    const id = window.setTimeout(() => go(i + 1), 6000)
+    return () => window.clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i, count, reduced, held, cycle])
+
+  const tip = tips[i]
+  return (
+    <div
+      data-home-note
+      data-tip-key={tip.key}
+      onFocusCapture={() => setHeld(true)}
+      onBlurCapture={() => setHeld(false)}
+      onPointerDown={() => setHeld(true)}
+      onPointerUp={() => setHeld(false)}
+      onPointerLeave={() => setHeld(false)}
+    >
+      <TrainerNudge
+        text={tip.text}
+        tag={tip.tag}
+        openChat
+        askPrefill={tip.prefill}
+        fading={fading}
+        onTextTap={count > 1 ? () => go(i + 1) : undefined}
+        pager={count > 1 ? { count, index: i, onSelect: n => { if (n !== i) go(n) } } : undefined}
+      />
     </div>
   )
 }

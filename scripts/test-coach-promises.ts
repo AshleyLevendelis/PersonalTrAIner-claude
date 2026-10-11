@@ -870,7 +870,10 @@ console.log('\nThe coach speaks after a tool runs, and the server reads the mess
   check('log_meal asks whether SHE named the food', /const evidence = userNamedFood\(\{/.test(meal))
   check('...whether it was an advice question', /const advice = isAdviceQuestion\(message\)/.test(meal))
   check('...whether it was a judgement question', /const evaluation = isEvaluationQuestion\(message\)/.test(meal))
-  check('...and whether the database recognised anything at all', /const nothingIdentified = computed\.lines\.every\(\(l\) => !l\.entry\)/.test(meal))
+  // Re-anchored 9 Oct 2026: "recognised nothing" now also means "recognised
+  // the food but could not read how much" — a known food at an unknown amount
+  // has no number either (it used to be costed at one gram).
+  check('...and whether the database could put a number on anything at all', /const nothingIdentified = computed\.lines\.every\(\(l\) => !l\.entry \|\| l\.grams == null\)/.test(meal))
   const adviceArm = meal.slice(meal.indexOf('if (advice || !evidence.named)'), meal.indexOf('if (nothingIdentified)'))
   check('an advice question, or a food the model invented, gets words and the one-line offer', adviceArm.length > 0 && /Say "add it" and I'll put it in\./.test(adviceArm))
   check('...with the model\'s own arithmetic forbidden', /forbid: \[macroArithmetic/.test(adviceArm))

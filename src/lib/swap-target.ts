@@ -124,23 +124,47 @@ export function resolveSwapTarget(input: {
   }
 
   const day = input.days.find(d => d.day === dayName)!
-  const hit = resolveExerciseOnDay(input.exerciseArg, day.exercises)
+  return resolveExerciseOnSession({ exerciseArg: input.exerciseArg, sayDay: dayName, planDayName: dayName, exercises: day.exercises })
+}
+
+/**
+ * Which exercise, on a session that has ALREADY been resolved.
+ *
+ * 9 Oct 2026 (H15). The coach's tools used to resolve the day here, by
+ * weekday name, against the plan's raw rows — so "swap the kickbacks on
+ * Friday", said about Monday's session moved to Friday, found Friday's own
+ * empty row and answered "Friday is a rest day". The day is now resolved by
+ * session-ref.ts (the same cells the week strip is drawn from) and this takes
+ * its answer in two parts, because they are two different things:
+ *
+ *   sayDay      — the weekday the person sees it on; every sentence uses it
+ *   planDayName — the plan row it lives in; the result's `dayName`, the key
+ *                 the edit writes to
+ */
+export function resolveExerciseOnSession(input: {
+  exerciseArg: string
+  sayDay: string
+  planDayName: string
+  exercises: { name: string }[]
+}): SwapTargetResult {
+  const { sayDay, exercises } = input
+  const hit = resolveExerciseOnDay(input.exerciseArg, exercises)
   if (!hit) {
     return {
       ok: false,
       reason: 'no_exercise',
-      message: day.exercises.length === 0
-        ? `${dayName} is a rest day — there's nothing on it to swap.`
-        : `I couldn't match "${input.exerciseArg.trim()}" to anything on ${dayName}. It has: ${day.exercises.map(e => e.name).join(', ')}.`,
+      message: exercises.length === 0
+        ? `${sayDay} is a rest day — there's nothing on it to swap.`
+        : `I couldn't match "${input.exerciseArg.trim()}" to anything on ${sayDay}. It has: ${exercises.map(e => e.name).join(', ')}.`,
     }
   }
   if ('ambiguous' in hit) {
     return {
       ok: false,
       reason: 'ambiguous_exercise',
-      message: `${dayName} has more than one of those — ${hit.ambiguous.join(' and ')}. Which one?`,
+      message: `${sayDay} has more than one of those — ${hit.ambiguous.join(' and ')}. Which one?`,
     }
   }
 
-  return { ok: true, dayName, exIndex: hit.index, exerciseName: day.exercises[hit.index].name }
+  return { ok: true, dayName: input.planDayName, exIndex: hit.index, exerciseName: exercises[hit.index].name }
 }

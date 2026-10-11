@@ -86,7 +86,9 @@ const read = () => ev(`(() => {
     hasExerciseList: [...document.querySelectorAll('*')].some(n => n.children.length === 0 && /^(Main lift|Accessory|Primer|Finisher|Superset [A-Z])$/.test(n.textContent.trim())),
     // The Exercise strip's cell carries the day letter before the glyph
     // ("T→"); Home's carries the glyph alone. Read the mark, not the label.
-    todayCell: (() => { const n = document.querySelector('[aria-label$="moved to another day"]'); return n ? n.textContent.trim().slice(-1) : null })(),
+    // RE-ANCHORED 10 Oct 2026 (design handoff 2c): the strip is a name over a
+    // dot, so the cell's state is its data-dot, not a trailing glyph.
+    todayCell: (() => { const n = document.querySelector('[aria-label$="moved to another day"]'); return n ? n.getAttribute('data-dot') : null })(),
     strip: text,
     sample: text.replace(/\s+/g, ' ').slice(0, 240),
   }
@@ -120,7 +122,7 @@ check('3. ...and offers the way back instead of "Train it anyway"', moved.saysDo
 check('4. the session itself has LEFT — no exercise list on the day it moved from', !moved.hasExerciseList, moved)
 check('5. and it is NOT reported as a swap for another activity, nor as a rest day',
   !/swapped today for/i.test(moved.strip) && !/Rest day ·/.test(moved.strip), moved.sample)
-check('5b. the Exercise strip writes → on today\'s cell', moved.todayCell === '→', moved.todayCell)
+check('5b. the Exercise strip marks today\'s cell moved away', moved.todayCell === 'away', moved.todayCell)
 
 await shoot('session-move-exercise')
 
@@ -142,8 +144,11 @@ const stripLabels = await ev(`(() => [...document.querySelectorAll('[aria-label]
   .filter(l => /rest day|missed|due|done|moved|swapped|recovery/i.test(l)))()`)
 check('8. the week strip says the day moved, rather than that it is due or missed',
   Array.isArray(stripLabels) && stripLabels.some(l => /moved to another day/i.test(l)), stripLabels)
-const homeCell = await ev(`(() => { const n = document.querySelector('[aria-label$="moved to another day"]'); return n ? n.textContent.trim() : null })()`)
-check('9. ...and Home\'s strip writes → on today\'s cell, not the plain today dot', homeCell === '→', homeCell)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's week is circles now and
+// a day's state is the circle's LOOK. Same 8 Sep property: today's cell says it
+// moved (dim, away) — it does not wear today's ring as if still due.
+const homeCell = await ev(`(() => { const n = document.querySelector('[data-home-week] [aria-label$="moved to another day"]'); return n ? n.getAttribute('data-look') : null })()`)
+check('9. ...and Home\'s strip shows today\'s cell as moved away, not as today still due', homeCell === 'away', homeCell)
 
 await shoot('session-move-home')
 

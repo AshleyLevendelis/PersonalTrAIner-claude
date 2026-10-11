@@ -141,7 +141,8 @@ check('no Start session button over a session it cannot name',
 check('no Tomorrow row guessed from the same empty plan',
   !/\nTomorrow\n/.test(homeEarly), homeEarly.slice(0, 400))
 check('the rest of Home is still on screen — this is a block waiting, not a blank page',
-  /TODAY SO FAR/.test(homeEarly) && /Calories/.test(homeEarly), homeEarly.slice(0, 200))
+  // 2a dropped the "Today so far" heading; the panel itself is the evidence.
+  /Calories/.test(homeEarly) && /Protein/.test(homeEarly) && /Water/.test(homeEarly) && /Steps/.test(homeEarly), homeEarly.slice(0, 200))
 await shoot('rest-day-race-home-waiting')
 
 await wait(5000)

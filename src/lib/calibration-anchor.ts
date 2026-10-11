@@ -29,7 +29,7 @@
 import type { MesocycleWeek, UserProfile, WorkoutDay, ExerciseSetLog } from './types'
 import { getActiveMesocycleWeek } from './calculations'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
-import { isExternallyLoaded } from './load-prescription'
+import { isExternallyLoaded, statedCeilingKg } from './load-prescription'
 import { getSetsForDate } from './set-log-store'
 import { saveMesocycleWeek } from './mesocycle-persistence'
 import { patchBlockFromLiftedKg, type LiftedAnchor } from './beat-target-offer'
@@ -39,6 +39,26 @@ export interface CalibrationAnchor {
   exerciseName: string
   plannedKg: number
   liftedKg: number
+  /**
+   * What next week's row for this lift reads AFTER the re-anchor, taken from
+   * the patched plan itself — the number and the printed string ("~24kg per
+   * hand"). Set by planCalibrationAnchors; absent on an anchor that has only
+   * been detected, not yet applied.
+   *
+   * It exists because the sentence used to be built from `liftedKg`, and the
+   * plan from a clamped copy of it (test log H18, 9 Oct 2026: "Week 2 now
+   * starts Romanian Deadlifts from your 30kg set" over a week 2 that read
+   * 24kg per hand, the heaviest dumbbells he had said he owns). A receipt is
+   * read off what was written, or it is a second opinion.
+   */
+  nextWeek?: {
+    kg: number
+    label: string
+    /** True when next week's own number changed — the only thing the sentence may claim. */
+    moved: boolean
+    /** True when it stopped short of the lifted weight because of a limit the person told us. */
+    atStatedLimit: boolean
+  }
 }
 
 /**
@@ -70,13 +90,34 @@ export function calibrationAnchorsFor(
   return out
 }
 
-/** The sentence the app says about it, in the coach's voice rather than a receipt. */
-export function calibrationAnchorMessage(nextWeekNumber: number, applied: CalibrationAnchor[]): string {
-  const parts = applied.map(a => `${a.exerciseName} from your ${a.liftedKg}kg set`)
+/**
+ * The sentence the app says about it, in the coach's voice rather than a
+ * receipt — or null when there is nothing true to say.
+ *
+ * IT SAYS WHAT NEXT WEEK NOW READS. For a lift written at the weight that was
+ * lifted that is the old sentence unchanged ("from your 30kg set"). Where the
+ * plan stopped short of it, the number quoted is the one on the plan, and when
+ * the reason is a limit the person gave us, it says so. A lift whose next week
+ * did not move is not mentioned at all, and if none moved there is no
+ * sentence: "now starts" over an unchanged number is a claim, not a receipt.
+ */
+export function calibrationAnchorMessage(nextWeekNumber: number, applied: CalibrationAnchor[]): string | null {
+  // An anchor with no `nextWeek` was applied by an older caller that did not
+  // read the plan back; it keeps the original wording rather than vanishing.
+  const told = applied.filter(a => a.nextWeek == null || a.nextWeek.moved)
+  if (told.length === 0) return null
+  const parts = told.map(a => {
+    const n = a.nextWeek
+    if (!n || n.kg >= a.liftedKg) return `${a.exerciseName} from your ${a.liftedKg}kg set`
+    const label = n.label.replace(/^~/, '')
+    return n.atStatedLimit
+      ? `${a.exerciseName} at ${label}, the heaviest you've told me you have`
+      : `${a.exerciseName} at ${label}`
+  })
   const list = parts.length <= 2
     ? parts.join(' and ')
     : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
-  return `Week ${nextWeekNumber} now starts ${list} — not the ${applied.length === 1 ? 'guess' : 'guesses'} it was printed with.`
+  return `Week ${nextWeekNumber} now starts ${list} — not the ${told.length === 1 ? 'guess' : 'guesses'} it was printed with.`
 }
 
 export interface CalibrationAnchorPlan {
@@ -117,7 +158,24 @@ export function planCalibrationAnchors(
   for (const a of anchors) {
     const anchor: LiftedAnchor = { blockNumber, dayName, exIndex: a.exIndex, exerciseName: a.exerciseName, liftedKg: a.liftedKg, fromWeekInBlock }
     const r = patchBlockFromLiftedKg(next, profile, anchor)
-    if (r.patched) { next = r.next; applied.push(a) }
+    if (!r.patched) continue
+    // READ THE RECEIPT OFF THE PLAN. Next week's row, before and after.
+    const slotIn = (plan: MesocycleWeek[]) => plan
+      .find(w => w.week_number === weekNumber + 1)?.days.find(d => d.day === dayName)?.exercises[a.exIndex]
+    const before = slotIn(next)
+    const after = slotIn(r.next)
+    next = r.next
+    const entry = getExerciseEntry(a.exerciseName)
+    const stated = entry ? statedCeilingKg(entry, profile) : null
+    applied.push(after?.suggested_load_kg == null ? a : {
+      ...a,
+      nextWeek: {
+        kg: after.suggested_load_kg,
+        label: after.suggested_load ?? `${after.suggested_load_kg}kg`,
+        moved: after.suggested_load_kg !== before?.suggested_load_kg,
+        atStatedLimit: stated != null && after.suggested_load_kg < a.liftedKg && after.suggested_load_kg >= stated,
+      },
+    })
   }
   if (applied.length === 0) return NOTHING(mesocycle)
   // Untouched weeks keep their identity through the patch helper's map, so

@@ -24,8 +24,17 @@ export interface ActiveSessionRecord {
   date: string
   dayName: string
   liveWeek: number
-  status: 'running' | 'finished'
-  startedAtIso: string
+  /**
+   * 'idle' — the record exists only to hold something typed or chosen before
+   * training began (a half-typed weight, "my hips feel tight"). It is NOT a
+   * session: it has no start time, and nothing treats it as one. Before 9 Oct
+   * 2026 any such note stored `running` with a start time of that keystroke,
+   * so a reload showed a session nobody had started and the finish card
+   * counted the minutes since the first digit.
+   */
+  status: 'idle' | 'running' | 'finished'
+  /** When the session opened: the Start workout tap, or the first set ticked. Absent while `idle`. */
+  startedAtIso?: string
   finishedAtIso?: string
   lastActivityIso: string
   /**
@@ -51,11 +60,11 @@ export interface ActiveSessionRecord {
   restTotalMs?: number
   /** User-typed off-plan exercise names for today (P2) — the DETECTED half of offPlanWork is computed from logs + the day's plan, not stored here. */
   declaredOffPlan?: string[]
-  /** Snapshot of pr-engine's PR cache taken at startSession() — the finish
-   * summary diffs today's logged maxes against THIS, not the live cache
-   * (which checkForPR has already mutated mid-session). Absent for a
-   * session that was silently opened by logSet rather than an explicit
-   * Start tap. */
+  /** Every lift's record from BEFORE this session's day, stamped when the
+   * session opens — by either route, through sessionStartStamp. The finish
+   * card prefers the same thing freshly derived (pr-engine's getPRBaseline)
+   * and falls back to this copy when the records could not be read, e.g.
+   * finishing with no connection since the app opened. */
   prSnapshotAtStart?: Record<string, PRRecord>
   /**
    * Weight/reps TYPED into a set row but not yet ticked, plus any extra set
@@ -153,6 +162,37 @@ export function saveActiveSessionRecord(record: ActiveSessionRecord): void {
 
 export function clearActiveSessionRecords(profileId: string): void {
   localStorage.removeItem(storageKey(profileId))
+}
+
+/**
+ * WHAT OPENING A SESSION STAMPS — one function, both ways in (M7, M12, 9 Oct 2026).
+ *
+ * A session opens two ways: the Start workout button, and — forgiving by
+ * design — the first set ticked without it. They were two hand-written
+ * patches and had drifted apart in everything the rest of the app assumes is
+ * the same: the tick stamped no start time the screen could see ("Session
+ * running · 0:00", for the whole session) and no personal-best baseline (so
+ * the finish card called every lift a record). Both paths call this now, so
+ * the list of facts is written once.
+ *
+ * `explicit` is the button: it always starts the clock at `nowIso`. A tick
+ * keeps a start the session already has — the set after a Start tap, or one
+ * more set logged after Finish, which reopens the same session rather than
+ * beginning a second one.
+ */
+export function sessionStartStamp(
+  existing: ActiveSessionRecord | null,
+  nowIso: string,
+  prBaseline: Record<string, PRRecord>,
+  explicit: boolean,
+): Pick<ActiveSessionRecord, 'status' | 'startedAtIso' | 'finishedAtIso' | 'prSnapshotAtStart'> {
+  const keep = !explicit && !!existing?.startedAtIso && existing.status !== 'idle'
+  return {
+    status: 'running',
+    startedAtIso: keep ? existing!.startedAtIso : nowIso,
+    finishedAtIso: undefined,
+    prSnapshotAtStart: keep && existing!.prSnapshotAtStart ? existing!.prSnapshotAtStart : prBaseline,
+  }
 }
 
 /** D7's "6h of inactivity" grace window — the one place this number lives. */

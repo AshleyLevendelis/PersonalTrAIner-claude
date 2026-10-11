@@ -194,8 +194,13 @@ console.log('\n6. The dock is never covered, and a live round owns the tab')
   // <RoundCard` is now the shape that would be WRONG. The property is
   // unchanged and stronger: while a round runs there is nothing that can hide
   // the card short of asking for full screen.
+  // RE-ANCHORED 10 Oct 2026 (design handoff 4c): the idle card left the sheet
+  // (the preview replaced it), so the running card is drawn on the tab while
+  // live and IN the sheet while live. Both places, same card, same condition.
+  const sheet = stripComments(readFileSync(join(ROOT, 'src/components/timers/RoundTimerSheet.tsx'), 'utf8'))
   check('a running round is always visible',
-    /<RoundCard\s+live=\{roundLive\}/.test(tools) && !/\{roundLive && <RoundCard/.test(tools))
+    /\{roundLive && \([\s\S]{0,200}<RoundCard live /.test(tools) && /<RoundTimerSheet[\s\S]{0,80}live=\{roundLive\}/.test(tools)
+    && /\{live \? \([\s\S]{0,120}<RoundCard live/.test(sheet))
   check('...and the field takes the tab only when she asks for it',
     /if \(roundLive && timers\.roundFullScreen\)/.test(tools))
   check('...and a finished one still holds, so the red state does not vanish',

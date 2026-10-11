@@ -76,21 +76,25 @@ await openRoundTimer()
 check('0. Tools offers the timer without opening anything',
   await ev(`(() => { const b = document.querySelector('[data-protocol="30-30"]'); if (!b) return false; b.click(); return true })()`))
 await wait(700)
-check('0b. ...with the card already describing what Start would run',
-  await ev(`/READY · 10 ROUNDS/i.test(document.querySelector('[data-round-card]')?.innerText || '')`),
-  await ev(`document.querySelector('[data-round-card]')?.innerText || ''`))
+// 4c: the idle card became the sheet's preview.
+check('0b. ...with the preview already describing what Start would run',
+  await ev(`/10 rounds · 0:30 work · 0:30 rest/.test(document.querySelector('[data-round-preview]')?.innerText || '')`),
+  await ev(`document.querySelector('[data-round-preview]')?.innerText || ''`))
 const panelText = await ev(`document.body.innerText`)
-check('1. the card says a countdown is coming, before you press anything',
-  /10s countdown/.test(panelText), (panelText.match(/Start · [^\n]*/) || ['no such line'])[0])
+check('1. Start says a countdown is coming, before you press anything',
+  /Start · 10s countdown/.test(panelText), (panelText.match(/Start[^\n]*/) || ['no such line'])[0])
 
+// 4c: FULL SCREEN IS A SWITCH NOW, read when Start is pressed — the old
+// "Full screen" button started the round by itself, which is what she asked
+// to stop. So this run turns the switch on and presses Start ONLY, and the
+// field must already be up.
+check('2a. the full-screen switch turns on',
+  await ev(`(() => { const b = document.querySelector('[data-fullscreen-switch]'); if (!b) return false; b.click(); return true })()`)
+  && (await wait(200), await ev(`document.querySelector('[data-fullscreen-switch]')?.getAttribute('aria-checked') === 'true'`)))
 check('2. Start is pressed',
-  await ev(`(() => { const b = document.querySelector('[data-round-card-start]'); if (!b) return false; b.click(); return true })()`))
-await wait(900)
-// FULL SCREEN IS OPT-IN NOW, so the flooded field this run measures has to be
-// asked for. The countdown itself starts with the round, not with the view.
-check('2b. the field is opened from the card',
-  await ev(`(() => { const b = document.querySelector('[data-round-card-fullscreen]'); if (!b) return false; b.click(); return true })()`))
-await wait(600)
+  await ev(`(() => { const b = document.querySelector('[data-round-sheet-start]'); if (!b) return false; b.click(); return true })()`))
+await wait(1200)
+check('2b. ...and with the switch on, Start alone opened the field', !!(await field()), await ev(`document.body.innerText.slice(0, 160)`))
 
 const first = await field()
 check('3. it is COUNTING DOWN, not already working', /^Get ready/.test(first?.label ?? ''), first)

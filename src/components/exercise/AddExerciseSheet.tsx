@@ -10,6 +10,7 @@ import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getAdditionCandidates } from '@/lib/exercise-add-candidates'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import type { UserProfile, WorkoutDay } from '@/lib/types'
+import { tierWords } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
 // PUTTING ONE EXERCISE INTO A SESSION — the last operation in the exercise
@@ -143,7 +144,7 @@ export function AddExerciseSheet({
           <div className="flex flex-wrap gap-1">
             {[...new Set([
               exercise.movement_pattern.replace(/_/g, ' '),
-              exercise.mechanics_tier.replace(/_/g, ' '),
+              tierWords(exercise.mechanics_tier),
             ])].map(label => (
               <Badge key={label} variant="secondary" className="text-xs">{label}</Badge>
             ))}

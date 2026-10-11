@@ -200,9 +200,14 @@ check('the unknown state has its own branch, ahead of the rest-day one',
 check('...and it says what Ashley chose on 8 Sep', /Checking your plan…/.test(homeCode))
 check('...with no Start button under it — there is nothing to start yet',
   !/Checking your plan…[\s\S]{0,400}Start session/.test(homeCode))
-check('the estimate chip is withheld too', /status !== 'rest' && data\.session\.status !== 'unknown'/.test(homeCode))
-check('the Tomorrow row is dropped rather than guessed',
-  /data\.tomorrowLabel != null && \(/.test(homeCode))
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): the length chip is drawn only
+// before a session starts (so never while unknown), and "Tomorrow" moved from
+// its own row into the glance line, read from data.tomorrow — which the loader
+// leaves null while the plan is unknown.
+check('the estimate chip is withheld too', /: status === 'not_started' && data\.session\.sessionLength && \(/.test(homeCode))
+check('the Tomorrow line is dropped rather than guessed',
+  /const tomorrow = data\.tomorrow \?\? null\s*if \(tomorrow\)/.test(homeCode)
+  && /tomorrow: !planKnown \? null/.test(stripComments(readFileSync('src/lib/dashboard-data.ts', 'utf8'))))
 check('an unknown day is never written to the cache the next cold open reads',
   /if \(fresh\.session\.status !== 'unknown'\) saveDashboardCache/.test(homeCode))
 

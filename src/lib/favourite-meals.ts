@@ -142,12 +142,20 @@ export async function markFavourite(profileId: string, meal: FavouriteMealInput)
     return false
   }
 
+  // WHOLE NUMBERS, ROUNDED HERE — at the one write, so no caller can forget.
+  // The four columns are `integer`, and a meal's macros carry one decimal
+  // (46.6 g of protein): PostgREST does not round a decimal into an integer
+  // column, it rejects the row. From the day the heart shipped (19 Sep 2026)
+  // to 9 Oct it had never saved a single real meal — 0 of 152 library dishes
+  // have whole-number protein, carbs and fat — and said nothing (M21). These
+  // figures are a summary for the coach's "used Nx" line, not what the day is
+  // costed from; whole grams lose nothing.
   const row = {
     meal_slot: meal.slot,
-    calories: meal.calories,
-    protein: meal.protein,
-    carbs: meal.carbs,
-    fat: meal.fat,
+    calories: Math.round(meal.calories),
+    protein: Math.round(meal.protein),
+    carbs: Math.round(meal.carbs),
+    fat: Math.round(meal.fat),
     portion_size: meal.portionSize || null,
     prep: meal.prep || null,
   }

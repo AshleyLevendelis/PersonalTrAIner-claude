@@ -44,6 +44,13 @@ export interface DraftMessage {
   /** Chip card already answered/locked (so resume doesn't re-open it). */
   slotCardResolved?: boolean
   /**
+   * A NEWER message now carries this question's card, so this copy no longer
+   * renders. The coach asked the same thing again further down and the chips
+   * moved with the question. `slotCard` is kept — it is how the conversation
+   * counts how many times a question has been asked.
+   */
+  slotCardSuperseded?: boolean
+  /**
    * This card was re-opened by the user to CHANGE an answer they already
    * gave, rather than asked for the first time.
    *
@@ -77,6 +84,14 @@ export interface OnboardingDraft {
   messages: DraftMessage[]
   pendingContextFacts: PendingContextFact[]
   pendingGoals: PendingGoal[]
+  /**
+   * Questions the coach parked ("I'll answer that properly once you're set
+   * up"), in the person's own words. Sent back to the coach each turn so the
+   * APP counts them — the cap of two is the owner's condition for parking at
+   * all — and handed to the first chat after setup, where the promise is kept
+   * (parked-questions.ts). Optional: a draft saved before this has none.
+   */
+  parkedQuestions?: string[]
   /**
    * Stamped true by the conversational flow's Generate button just before it
    * hands off to App.tsx's completion pipeline. The flush of queued context
@@ -120,6 +135,7 @@ export function loadOnboardingDraft(): OnboardingDraft | null {
       messages: Array.isArray(parsed.messages) ? parsed.messages : [],
       pendingContextFacts: Array.isArray(parsed.pendingContextFacts) ? parsed.pendingContextFacts : [],
       pendingGoals: Array.isArray(parsed.pendingGoals) ? parsed.pendingGoals : [],
+      parkedQuestions: Array.isArray(parsed.parkedQuestions) ? parsed.parkedQuestions.filter(q => typeof q === 'string') : [],
     }
   } catch {
     localStorage.removeItem(DRAFT_KEY)

@@ -79,7 +79,6 @@ export function SlotNumericCard({
   busy,
   editing = false,
   onResolve,
-  onDecline,
 }: {
   slotKey: string
   values: OnboardingSlotValues
@@ -93,8 +92,6 @@ export function SlotNumericCard({
    */
   editing?: boolean
   onResolve: (entries: { key: SlotKey; raw: string }[]) => void
-  /** Record these as answered with NO value — see canDeclineSlot. */
-  onDecline: (keys: SlotKey[]) => void
 }) {
   const def = getSlotDef(slotKey)
   const fields = (editing ? (def ? [def] : []) : (def ? numericGroupFor(def.key) : []).map(k => getSlotDef(k)!))
@@ -129,7 +126,7 @@ export function SlotNumericCard({
   const allBlank = fields.every(d => rawOf(d.key).trim() === '')
 
   return (
-    <div className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+    <div data-slot-card={def.key} className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
       {fields.map(d => {
         const bad = showErrors && !isOk(d)
         return (
@@ -141,7 +138,10 @@ export function SlotNumericCard({
                 are on one card, so the sentence naming kg belongs to only one
                 of them. */}
             <label className="text-xs text-muted-foreground" htmlFor={`slot-${d.key}`}>
-              {d.shortLabel}{UNIT[d.key] ? <span className="text-muted-foreground/70"> ({UNIT[d.key]})</span> : null}
+              {/* The slot's own unit where this card has nothing richer to
+                  say — the three load ceilings were missing from the map
+                  above and so asked for "Heaviest dumbbells" in no unit. */}
+              {d.shortLabel}{(UNIT[d.key] ?? d.unit) ? <span className="text-muted-foreground/70"> ({UNIT[d.key] ?? d.unit})</span> : null}
             </label>
             <Input
               id={`slot-${d.key}`}
@@ -199,19 +199,9 @@ export function SlotNumericCard({
       {showErrors && allBlank && (
         <p className="text-[0.6875rem] text-muted-foreground">
           {declinable
-            ? 'Fill in what you can, or tap “Prefer not to say”.'
+            ? 'Fill in what you can, or tap Skip at the top.'
             : 'Fill these in to carry on.'}
         </p>
-      )}
-      {declinable && (
-        <Button
-          variant="ghost"
-          className="w-full min-h-[44px] text-sm text-muted-foreground"
-          disabled={busy}
-          onClick={() => onDecline(fields.map(d => d.key))}
-        >
-          Prefer not to say
-        </Button>
       )}
     </div>
   )

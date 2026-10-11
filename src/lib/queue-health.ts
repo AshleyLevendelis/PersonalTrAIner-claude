@@ -24,6 +24,8 @@ import * as waterStore from './water-store'
 import * as groceryStore from './grocery-store'
 import * as cardioStore from './cardio-log-store'
 import * as mealStore from './meal-store'
+import { isConnectionFailure } from './connection-error'
+import { didNotSaveReason } from './coach-voice'
 
 /** Which queue an item came from — drives the label the user reads, nothing else. */
 export type QueueKind = 'set' | 'water' | 'grocery' | 'cardio' | 'meal'
@@ -44,9 +46,27 @@ export interface FailedItem {
   label: string
   /** The day it belongs to, when the queue records one. */
   date: string
-  /** The underlying failure, for the details line. Never the primary message. */
+  /**
+   * The underlying failure, exactly as it was thrown. FOR THE CONSOLE AND FOR
+   * CHOOSING WORDS — never drawn. The card printed it verbatim until 9 Oct
+   * 2026 ("TypeError: Failed to fetch"); it goes through plainSyncError,
+   * below, now.
+   */
   errorMessage: string
+  /** True when the queue itself knows the server said no, rather than never being reached. Picks which of the two sentences is shown. */
+  refused: boolean
   failedAt: string
+}
+
+/**
+ * THE FAILURE, AS A SENTENCE — the only form of it the card may draw.
+ *
+ * `refused` is passed when the queue itself knows the server said no. The
+ * message alone cannot always tell: a refusal can mention a timeout, and a
+ * timeout on its own reads as a dead connection.
+ */
+export function plainSyncError(raw: string | null | undefined, opts: { refused?: boolean } = {}): string {
+  return didNotSaveReason(!opts.refused && isConnectionFailure(raw ?? ''))
 }
 
 /**
@@ -68,6 +88,7 @@ export function getAllFailedItems(): FailedItem[] {
     label: `${i.exerciseName} · set ${i.setNumber}`,
     date: i.date,
     errorMessage: i.errorMessage,
+    refused: i.reason === 'permanent',
     failedAt: i.failedAt,
   })))
 
@@ -77,6 +98,7 @@ export function getAllFailedItems(): FailedItem[] {
     label: i.label,
     date: i.date,
     errorMessage: i.errorMessage,
+    refused: i.reason === 'permanent',
     failedAt: i.failedAt,
   })))
 
@@ -86,6 +108,7 @@ export function getAllFailedItems(): FailedItem[] {
     label: i.label,
     date: '',
     errorMessage: i.errorMessage,
+    refused: i.reason === 'permanent',
     failedAt: i.failedAt,
   })))
 
@@ -97,6 +120,9 @@ export function getAllFailedItems(): FailedItem[] {
     label: i.activity_name || 'Cardio',
     date: i.date,
     errorMessage: "Wouldn't sync",
+    // A cardio log only reaches `failed` on a failure that was NOT a dead
+    // connection (see cardio-log-store's syncPass), so the app could not save it.
+    refused: true,
     failedAt: i.date,
   })))
 
@@ -106,6 +132,9 @@ export function getAllFailedItems(): FailedItem[] {
     label: i.label,
     date: i.date,
     errorMessage: i.errorMessage,
+    // meal-store only dead-letters a rejection (its own note: "a dead-lettered
+    // meal event is poison data").
+    refused: true,
     failedAt: i.failedAt,
   })))
 

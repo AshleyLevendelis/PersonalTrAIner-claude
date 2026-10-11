@@ -1,4 +1,6 @@
 import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
+import { blockSwapEndsOn } from '@/lib/block-swap-until'
+import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useCallback, useState } from 'react'
 import { useAppRoute, programHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -14,6 +16,7 @@ import { TodayPanel } from './TodayPanel'
 import { lazy, Suspense } from 'react'
 import type { SwapTarget } from './SwapDialog'
 const SwapDialog = lazy(() => import('./SwapDialog').then(m => ({ default: m.SwapDialog })))
+const BanExerciseSheet = lazy(() => import('./BanExerciseSheet').then(m => ({ default: m.BanExerciseSheet })))
 import { ExerciseDetailDialog, type ExerciseDetailTab } from './ExerciseDetailDialog'
 import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'
@@ -21,6 +24,9 @@ import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import type { ReasonAnswer } from './EditReasonStep'
 import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
+import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { ActiveAdaptationLines } from './ActiveAdaptationLines'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §5.1 — the view switcher: 'today' (TodayPanel, the
@@ -35,7 +41,20 @@ interface ExerciseTabProps {
   exclusions: string[]
   /** Soft likes/dislikes — reorders the swap list, removes nothing. */
   softExercisePreferences?: { liked: string[]; disliked: string[] }
+  /**
+   * The profile a POOL is built from — the saved one plus anything temporarily
+   * being eased off (effective-constraints.ts). Read by the swap list, add,
+   * the session rebuild and the warm-up. Never saved.
+   */
   profile?: UserProfile
+  /** The profile as SAVED. Anything here that writes the profile uses this one. */
+  storedProfile?: UserProfile
+  /** Temporary changes running now — drawn as a line above today's session. */
+  activeAdaptations?: PlanAdaptationRow[]
+  endingAdaptationId?: string | null
+  onEndAdaptation?: (id: string) => Promise<string | null>
+  /** Fired when a row here starts a temporary change, so App re-reads them. */
+  onAdaptationsChanged?: () => void
   profileId?: string
   /** Fired when steps are logged HERE, so the chat tab (which never unmounts) re-reads them. */
   planCreatedAt?: string
@@ -43,7 +62,8 @@ interface ExerciseTabProps {
   devOverrideDay?: string | null
   devBypassLocks?: boolean
   onSwapExercise: (weekNumber: number, dayName: string, exIndex: number, newExercise: ExerciseEntry, scope: SwapScope) => void | Promise<void>
-  onBanExercise: (exerciseName: string) => void | Promise<void>
+  /** The WRITE behind a ban. Called only from the confirm sheet this tab owns — never straight from a menu item (M10). */
+  onBanExercise: (exerciseName: string) => Promise<import('@/lib/screen-ban').BanOutcome | void> | void
   /** The second-sport volume toggle on the workout card rewrites the plan from the live week; these carry the result into App state. */
   onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
   onProfileChanged?: (patch: Partial<UserProfile>) => void
@@ -67,6 +87,11 @@ export function ExerciseTab({
   exclusions,
   softExercisePreferences,
   profile,
+  storedProfile,
+  activeAdaptations,
+  endingAdaptationId,
+  onEndAdaptation,
+  onAdaptationsChanged,
   profileId,
   planCreatedAt,
   devOverrideWeek,
@@ -90,6 +115,19 @@ export function ExerciseTab({
   const isProgramView = route.kind === 'program'
 
   const [swapTarget, setSwapTarget] = useState<SwapTarget | null>(null)
+  // WHEN "REST OF BLOCK" ENDS, said on the swap (runs 3-4, M40b; her 10 Oct
+  // ruling "Keep to the block, say it").
+  const todayStr = getLocalDateString(getAppNow(profile?.id))
+  const swapBlockEndsOn = blockSwapEndsOn(mesocycle ?? [], swapTarget?.weekNumber ?? liveWeek, planCreatedAt)
+  // EVERY BAN ON THIS TAB GOES THROUGH ONE QUESTION (M10, 9 Oct 2026). Today's
+  // card, a peeked day and the programme view each called the write directly
+  // from a menu item; they now all hand a NAME to this, which opens the
+  // confirm sheet. The write is reachable from the sheet's own button only.
+  // "I don't like it" on the swap dialog and the take-out sheet lands here
+  // too (M27) — the design has always said that answer keeps the exercise out
+  // for good, and until now no screen did.
+  const [banTarget, setBanTarget] = useState<string | null>(null)
+  const requestBan = (exerciseName: string) => { setBanTarget(exerciseName) }
   const [plateCalcOpen, setPlateCalcOpen] = useState(false)
   const [plateCalcWeight, setPlateCalcWeight] = useState(0)
   // ONE TARGET, ONE DIALOG, THREE TABS. There were two dialogs about one
@@ -153,21 +191,26 @@ export function ExerciseTab({
   const applyInjury = useCallback(async (
     answer: Extract<ReasonAnswer, { type: 'injury' }>,
   ): Promise<string | null> => {
-    if (!profile || !mesocycle) return 'No plan to edit.'
+    // THE SAVED PROFILE, not the pool one: a lasting injury is written to the
+    // profile from here, and a temporary one must never ride along with it.
+    const saved = storedProfile ?? profile
+    if (!saved || !mesocycle) return 'No plan to edit.'
     const { applyInjuryFromRow } = await import('@/lib/screen-adaptations')
-    const r = await applyInjuryFromRow(profile, mesocycle, liveWeek, answer.hurt, answer.area)
+    const r = await applyInjuryFromRow(saved, mesocycle, planCreatedAt, answer.hurt, answer.area, exclusions)
     if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
-    if (r.addInjuryCode) onProfileChanged?.({ injuries: [...(profile.injuries ?? []), r.addInjuryCode] })
+    if (r.addInjuryCode) onProfileChanged?.({ injuries: [...(saved.injuries ?? []), r.addInjuryCode] })
+    if (r.mesocycle) onAdaptationsChanged?.()
     return r.message
-  }, [profile, mesocycle, liveWeek, onMesocycleUpdated, onProfileChanged])
+  }, [storedProfile, profile, mesocycle, planCreatedAt, exclusions, onMesocycleUpdated, onProfileChanged, onAdaptationsChanged])
 
   const applyEquipment = useCallback(async (tier: string): Promise<string | null> => {
-    if (!profile || !mesocycle) return 'No plan to edit.'
+    const saved = storedProfile ?? profile
+    if (!saved || !mesocycle) return 'No plan to edit.'
     const { applyEquipmentFromRow } = await import('@/lib/screen-adaptations')
-    const r = await applyEquipmentFromRow(profile, mesocycle, liveWeek, tier)
-    if (r.mesocycle) onMesocycleUpdated?.(r.mesocycle)
+    const r = await applyEquipmentFromRow(saved, mesocycle, planCreatedAt, tier, exclusions)
+    if (r.mesocycle) { onMesocycleUpdated?.(r.mesocycle); onAdaptationsChanged?.() }
     return r.message
-  }, [profile, mesocycle, liveWeek, onMesocycleUpdated])
+  }, [storedProfile, profile, mesocycle, planCreatedAt, exclusions, onMesocycleUpdated, onAdaptationsChanged])
 
   /**
    * THE SWAP'S FOUR ANSWERS. Two of them are not swaps: "it hurts" is the
@@ -181,6 +224,19 @@ export function ExerciseTab({
     if (answer.type === 'equipment') return applyEquipment(answer.tier)
     return null
   }, [applyInjury, applyEquipment])
+
+  // One sheet, rendered by whichever of the two views below is showing.
+  const banSheet = banTarget ? (
+    <Suspense fallback={null}>
+      <BanExerciseSheet
+        exerciseName={banTarget}
+        mesocycle={mesocycle ?? []}
+        loadGuard={() => loadPlanEditContext(profile ?? { id: profileId, injuries: [] }, mesocycle ?? [], planCreatedAt).then(c => c.isProtected)}
+        onConfirm={onBanExercise}
+        onClose={() => setBanTarget(null)}
+      />
+    </Suspense>
+  ) : null
 
   if (isProgramView) {
     // DevTestPanel mounts here — program surface, dev-gated — never above
@@ -205,6 +261,7 @@ export function ExerciseTab({
           plan={plan}
           mesocycle={mesocycle}
           profileId={profileId}
+          injuries={profile?.injuries}
           initialWeek={route.kind === 'program' ? route.week : undefined}
           // WIRED, not merely available. ExerciseTab has had logsVersion since
           // the week strip needed it and never passed it down, so the program
@@ -212,7 +269,7 @@ export function ExerciseTab({
           // screen. Same prop, same signal, one more reader.
           refreshToken={logsVersion}
           onOpenSwap={setSwapTarget}
-          onBanExercise={onBanExercise}
+          onBanExercise={requestBan}
           onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
           onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
         />
@@ -225,7 +282,11 @@ export function ExerciseTab({
           onConfirm={handleConfirmSwap}
           impactFor={swapImpact}
             onReason={handleSwapReason}
+          onDislike={requestBan}
+          blockEndsOn={swapBlockEndsOn}
+          today={todayStr}
         /></Suspense>
+        {banSheet}
         <ExerciseDetailDialog
           open={!!detailTarget}
           onOpenChange={open => { if (!open) setDetailTarget(null) }}
@@ -243,21 +304,31 @@ export function ExerciseTab({
       {/* A cardio log that failed to sync used to be invisible and
           unrecoverable — the store's retry/discard functions had no caller. */}
       <FailedCardioNotice />
+      {/* A temporary change to the plan says so here for as long as it runs,
+          with the way to end it (M25). The same component as Profile's. */}
+      <ActiveAdaptationLines
+        adaptations={activeAdaptations ?? []}
+        profileId={profileId}
+        endingId={endingAdaptationId}
+        onEnd={onEndAdaptation}
+        className="mb-3 space-y-2"
+      />
       <TodayPanel
         plan={plan}
         mesocycle={mesocycle}
         exclusions={exclusions}
         profile={profile}
+        storedProfile={storedProfile}
         profileId={profileId}
         planCreatedAt={planCreatedAt}
         logsVersion={logsVersion}
         onLogsUpdated={onLogsUpdated}
         devOverrideDay={devOverrideDay}
         onOpenProgram={() => { window.location.hash = programHash(liveWeek) }}
-        onOpenSwap={(dayName, exIndex, exerciseName) => setSwapTarget({ dayName, exIndex, exerciseName })}
+        onOpenSwap={(dayName, exIndex, exerciseName, sayDay) => setSwapTarget({ dayName, sayDay, exIndex, exerciseName })}
           onInjury={applyInjury}
           onEquipment={applyEquipment}
-        onBanExercise={onBanExercise}
+        onBanExercise={requestBan}
         onMesocycleUpdated={onMesocycleUpdated}
         onProfileChanged={onProfileChanged}
         onOpenPlateCalc={handleOpenPlateCalc}
@@ -276,7 +347,11 @@ export function ExerciseTab({
         onConfirm={handleConfirmSwap}
         impactFor={swapImpact}
             onReason={handleSwapReason}
+        onDislike={requestBan}
+        blockEndsOn={swapBlockEndsOn}
+        today={todayStr}
       /></Suspense>
+      {banSheet}
       <PlateCalculator
         open={plateCalcOpen}
         onOpenChange={setPlateCalcOpen}

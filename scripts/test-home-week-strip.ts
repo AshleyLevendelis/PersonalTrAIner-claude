@@ -18,7 +18,7 @@ import React from 'react'
 import { readFileSync } from 'fs'
 import { execSync } from 'child_process'
 import { HomeWeekStrip } from '../src/components/HomeWeekStrip'
-import { GLYPH, STATE_LABEL } from '../src/lib/week-glyphs'
+import { STATE_LABEL } from '../src/lib/week-glyphs'
 import type { TrainingWeekDay, DayGlyphState } from '../src/hooks/useTrainingWeek'
 
 let failures = 0
@@ -47,47 +47,63 @@ const cellFor = (html: string, dayName: string, state: DayGlyphState): string =>
   return html.slice(at, end)
 }
 const render = (days: TrainingWeekDay[]) =>
-  renderToStaticMarkup(React.createElement(HomeWeekStrip, { days, todayName: 'Tuesday' }))
-const DOT = 'size-[6px]'
+  renderToStaticMarkup(React.createElement(HomeWeekStrip, { days, todayName: 'Tuesday', done: 1, planned: 4 }))
+const lookOf = (html: string, dayName: string, state: DayGlyphState): string | null => {
+  const label = `aria-label="${dayName}: ${STATE_LABEL[state]}"`
+  const at = html.indexOf(label)
+  if (at < 0) return null
+  return html.slice(at, at + 200).match(/data-look="(\w+)"/)?.[1] ?? null
+}
 
 // ---------------------------------------------------------------------------
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): the glyphs became circles with
+// the day's letter, and STATE is carried by the circle's look. The 8 Sep
+// property is unchanged and is what is checked: today's cell says what
+// happened today, and only a day still due today wears today's ring.
 console.log('\n[1] Today\'s cell, state by state')
 // ---------------------------------------------------------------------------
 {
-  const cell = cellFor(render(week('due')), 'Tuesday', 'due')
-  check('a day that is due today is the dot — the one state the dot means', cell.includes(DOT) && !cell.includes(GLYPH.due), cell)
+  check('a day that is due today wears today\'s ring — the one state that ring means', lookOf(render(week('due')), 'Tuesday', 'due') === 'today')
 }
+const EXPECT: Partial<Record<DayGlyphState, string>> = { swapped: 'done', moved: 'away', done: 'done', partial: 'partial', rest_chosen: 'rest', missed: 'missed' }
 for (const state of ['swapped', 'moved', 'done', 'partial', 'rest_chosen', 'missed'] as DayGlyphState[]) {
-  const cell = cellFor(render(week(state)), 'Tuesday', state)
-  check(`today ${state} writes ${GLYPH[state]}, not the dot`, cell.includes(GLYPH[state]) && !cell.includes(DOT), cell)
+  const look = lookOf(render(week(state)), 'Tuesday', state)
+  check(`today ${state} looks ${EXPECT[state]}, not today's ring`, look === EXPECT[state], look)
 }
 {
-  // Today still LOOKS like today: the ring and the wash survive whatever the
-  // glyph says, or the eye loses which cell is now.
-  const cell = cellFor(render(week('swapped')), 'Tuesday', 'swapped')
-  check('...and the cell still carries today\'s ring', /border:1px solid rgba\(var\(--glow-rgb\), ?\.45\)/.test(cell), cell)
+  const html = render(week('swapped'))
+  check('...and every cell is still SPOKEN by its full state (dayLabel)', html.includes('aria-label="Tuesday: swapped for another activity"'), html.slice(0, 200))
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n[2] Every other day is exactly as before')
+console.log('\n[2] Every other day')
 // ---------------------------------------------------------------------------
 {
-  const html = render(week('due', { Thursday: 'due', Monday: 'done', Saturday: 'swapped' }))
-  check('a due day that is not today is the glyph, not the dot', cellFor(html, 'Thursday', 'due').includes(GLYPH.due) && !cellFor(html, 'Thursday', 'due').includes(DOT))
-  check('a finished day shows ✓', cellFor(html, 'Monday', 'done').includes(GLYPH.done))
-  check('a swapped day shows ⇄', cellFor(html, 'Saturday', 'swapped').includes(GLYPH.swapped))
+  const html = render(week('due', { Thursday: 'due', Monday: 'done', Saturday: 'swapped', Sunday: 'missed' }))
+  check('a due day that is not today is a plain circle, not today\'s ring', lookOf(html, 'Thursday', 'due') === 'due')
+  check('a finished day is filled', lookOf(html, 'Monday', 'done') === 'done')
+  check('a swapped day counts as done', lookOf(html, 'Saturday', 'swapped') === 'done')
+  check('a missed day is the warn ring', lookOf(html, 'Sunday', 'missed') === 'missed')
+  check('a rest day is sunken', lookOf(html, 'Wednesday', 'rest') === 'rest')
   check('no day is drawn twice', (html.match(/role="img"/g) ?? []).length === 7)
+  check('the week count sits beside them', /data-home-week-count[^>]*>1\/4</.test(html), html.slice(-200))
 }
 
 // ---------------------------------------------------------------------------
 console.log('\n[3] The two strips use the one rule for today')
 // ---------------------------------------------------------------------------
-// The shared vocabulary file exists so the marks cannot drift; today's cell
-// is the rule that DID drift. Both strips must carry it verbatim.
-for (const rel of ['src/components/HomeWeekStrip.tsx', 'src/components/exercise/WeekContextRow.tsx']) {
-  const code = strip(readFileSync(rel, 'utf8'))
-  check(`${rel} draws the dot only for a day that is today AND due`, /isToday && d\.state === 'due' \?/.test(code))
-  check(`...and never the bare today test the old Home strip had`, !/\{isToday \? \(/.test(code))
+{
+  const home = strip(readFileSync('src/components/HomeWeekStrip.tsx', 'utf8'))
+  check('Home asks the look function, which gives today\'s ring only to a day still due',
+    /weekCircleLook\(d, isToday\)/.test(home) && /case 'due': return isToday \? 'today' : 'due'/.test(home))
+  const ex = strip(readFileSync('src/components/exercise/WeekContextRow.tsx', 'utf8'))
+  // 2c: Exercise's strip marks the day ON SCREEN (today, or a peek) with the
+  // hollow accent dot; every other day gets its state's dot, and a due day's
+  // is plain — the accent belongs to the day being looked at, never to "due".
+  check('src/components/exercise/WeekContextRow.tsx gives the accent dot only to the day on screen, and a due day a plain one',
+    /\{isSelected \? \(\s*<span aria-hidden className="size-\[5px\] rounded-full" style=\{\{ boxShadow: 'inset 0 0 0 1px var\(--primary\)' \}\}/.test(ex)
+    && /due: \{ background: 'var\(--text-dim\)' \}/.test(ex))
+  check('...and never the bare today test the old Home strip had', !/\{isToday \? \(/.test(ex))
 }
 
 // ---------------------------------------------------------------------------

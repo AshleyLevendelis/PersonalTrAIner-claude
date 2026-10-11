@@ -290,6 +290,92 @@ export function estimateRequiredDaySeconds(day: WorkoutDay): number {
   return estimateDaySeconds(day) - optionalFillerSeconds(day)
 }
 
+// ---------------------------------------------------------------------------
+// A DAY'S LENGTH, IN PARTS — the one place a day's printed length is made.
+//
+// estimateDaySeconds answers "how much of somebody's evening does this day
+// ask for" and three screens printed it bare, as "~37 min". Reported from the
+// gym floor (test log H4, time cap): a day of seven working sets read "9 sets
+// · ~37 min" because 15 of those minutes were an OPTIONAL mobility flow, the
+// "9" counted two warm-up sets, and the 30-minute walk underneath — which the
+// engine had deliberately made a SEPARATE session ("to preserve your strict
+// lifting window") and correctly left out of the estimate — was drawn as the
+// session's "Finisher". The engine meant 22 minutes of training, a separate
+// walk and an optional stretch; the screen said 37 minutes and then 30 more.
+//
+// So the parts are named once, here, and every screen that prints a day's
+// length reads them: the programme list, the Exercise tab's header and Home.
+// (And the header's other bug, L17 — today's minutes shown while another day
+// is open — is fixed by handing this the day being SHOWN.)
+//
+// THE WORDS ARE THE APP'S VOICE AND ARE ASHLEY'S TO CHANGE. Built 9 Oct 2026
+// as her plan's recommended option B, decided unprompted and reversible in
+// formatDayLength alone: work and optional, apart — "~22 min · + 15 optional".
+// ---------------------------------------------------------------------------
+
+export interface DayLengthParts {
+  /** The session itself: warm-up, every set and rest, and a finisher that is part of the session. */
+  workMinutes: number
+  /** Optional filler on the end of the session (a mobility flow, or an optional light finisher). 0 when there is none. */
+  optionalMinutes: number
+  /**
+   * A SEPARATE session the plan puts on the same day (`independent_session`)
+   * — never part of this session's length, never a "finisher". 0 when none.
+   */
+  separateMinutes: number
+  /** Sets of the day's work. A warm-up drill is not one of them. */
+  workingSets: number
+  /** Sets of movement prep (the day's primer rows). */
+  warmupSets: number
+}
+
+export function dayLengthParts(day: WorkoutDay): DayLengthParts {
+  if (day.exercises.length === 0) {
+    return { workMinutes: 0, optionalMinutes: 0, separateMinutes: separateSessionMinutes(day), workingSets: 0, warmupSets: 0 }
+  }
+  let workingSets = 0
+  let warmupSets = 0
+  for (const ex of day.exercises) {
+    const entry = EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase())
+    if (ex.tier === 'tier_0_primer' || entry?.mechanics_tier === 'primer') warmupSets += ex.sets
+    else workingSets += ex.sets
+  }
+  // Rounded so that the two printed numbers ADD UP to the day's rounded total:
+  // the optional part is a whole number of minutes already (the filler is
+  // sized in minutes), so the work is the total less it.
+  const optionalMinutes = Math.round(optionalFillerSeconds(day) / 60)
+  const totalMinutes = Math.round(estimateDaySeconds(day) / 60)
+  return {
+    workMinutes: Math.max(0, totalMinutes - optionalMinutes),
+    optionalMinutes,
+    separateMinutes: separateSessionMinutes(day),
+    workingSets,
+    warmupSets,
+  }
+}
+
+/** Minutes of a same-day session that is NOT part of the lifting session. */
+function separateSessionMinutes(day: WorkoutDay): number {
+  return isSeparateSession(day.recommendedCardio) ? (day.recommendedCardio?.duration ?? 0) : 0
+}
+
+/**
+ * True for a cardio block the plan has made its own session rather than part
+ * of the lifting one. The screens ask this before calling anything a
+ * "Finisher": a 30-minute walk scheduled apart from a 30-45 minute lifting day
+ * is not the end of that day.
+ */
+export function isSeparateSession(cardio: { timing?: string } | null | undefined): boolean {
+  return cardio?.timing === 'independent_session'
+}
+
+/** "~22 min · + 15 optional", or "~40 min" when nothing on the day is optional. */
+export function formatDayLength(parts: Pick<DayLengthParts, 'workMinutes' | 'optionalMinutes'>): string {
+  return parts.optionalMinutes > 0
+    ? `~${parts.workMinutes} min · + ${parts.optionalMinutes} optional`
+    : `~${parts.workMinutes} min`
+}
+
 /**
  * The day with its optional filler shrunk — or removed — just enough for the
  * whole day to fit `limitSeconds`. Touches nothing else. Returns the SAME

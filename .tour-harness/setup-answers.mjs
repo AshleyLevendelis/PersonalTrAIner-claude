@@ -31,6 +31,15 @@ const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => { const p = q.url.split('?')[0]; const f = join(DIST, p === '/' ? '/.tour-harness/profile.html' : p); if (!existsSync(f)) { r.writeHead(404); r.end('nf'); return } r.writeHead(200, { 'Content-Type': T[extname(f)] ?? 'application/octet-stream' }); r.end(readFileSync(f)) })
 await new Promise(r => server.listen(0, r)); const port = server.address().port
+// A BROWSER ALREADY ON THIS PORT IS NOT OURS. 10 Oct 2026: a Chromium left
+// over from an earlier run held 9443, this driver attached to its page, which
+// never had focus, so no field could lose focus and nothing saved; five checks
+// went red on code that passed the day before, and no edit to the app could
+// have told why. Refuse rather than talk to a stranger.
+if (await fetch('http://127.0.0.1:9443/json/version').then(() => true, () => false)) {
+  console.error('    ✗ 0. port 9443 is already taken by another browser, so this run would drive the wrong page. Close it (pkill -f "[c]hromium.*9443") and run again.')
+  server.close(); process.exit(1)
+}
 const chrome = spawn('/opt/pw-browsers/chromium', ['--headless=new', '--remote-debugging-port=9443', '--no-sandbox', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
 const wait = ms => new Promise(r => setTimeout(r, ms)); let t
 for (let i = 0; i < 80; i++) { try { const l = await fetch('http://127.0.0.1:9443/json/list').then(r => r.json()); const g = l.find(x => x.type === 'page'); if (g) { t = g.webSocketDebuggerUrl; break } } catch {} await wait(250) }
@@ -73,35 +82,26 @@ const tap = async sel => { const r = await rectOf(sel); if (!r) return false; aw
 // flake on a slower machine.
 const dialogReady = () => until(() => has('[data-slot="dialog-content"]'), v => v)
 
-// The "You" group is COLLAPSED by default (Group's own useState(false)), so
-// every row inside it is absent from the DOM until it is opened. A driver that
-// asserted the rows were missing without opening it would pass on a build that
-// had deleted them.
-const openYouGroup = async () => {
+// RE-ANCHORED 10 Oct 2026 (design handoff 2d). Profile is a page of rows,
+// each opening its editors on a sheet of their own, so a step opens the SHEET
+// that holds what it is about. A row's editors are absent from the DOM until
+// its sheet is open, so a driver asserting a row was missing without opening
+// the sheet would pass on a build that had deleted it.
+const openSheet = async rowLabel => {
+  await ev(`document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click()`)
+  await wait(250)
   const opened = await ev(`(() => {
-    const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^You$/i.test((x.textContent || '').trim()))
+    const b = document.querySelector('[data-profile-row=${JSON.stringify(JSON.stringify(rowLabel)).slice(1, -1)}]')
     if (!b) return 'no-button'
-    if (b.getAttribute('aria-expanded') !== 'true') b.click()
+    b.click()
     return 'ok'
   })()`)
   await wait(400)
   return opened
 }
-
-// The dietary picker lives in the "Nutrition" group, not "You" — read off
-// ProfileScreen's own <Group label> rather than guessed, because the heading
-// above the picker says "Dietary & cooking" and matching THAT would find a
-// non-collapsible h3 and never open anything.
-const openDietaryGroup = async () => {
-  const opened = await ev(`(() => {
-    const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^Nutrition$/i.test((x.textContent || '').trim()))
-    if (!b) return 'no-button'
-    if (b.getAttribute('aria-expanded') !== 'true') b.click()
-    return 'ok'
-  })()`)
-  await wait(400)
-  return opened
-}
+// The weight caps sit with Equipment; the dietary picker is the Diet sheet.
+const openYouGroup = () => openSheet('Equipment')
+const openDietaryGroup = () => openSheet('Diet')
 
 // React controls these inputs, so setting .value directly is ignored — the
 // prototype setter plus an input event is what swap-request.mjs uses to drive
@@ -183,12 +183,15 @@ check('0. the Profile screen mounts', await dialogReady())
 // on the count matching the picker below it rather than on the literal "4",
 // so changing the fixture cannot make this pass by accident.
 const summary = await text('[data-slot="dialog-content"]')
+// The picker is on the Schedule sheet since 2d (10 Oct 2026): the header is
+// read on the page of rows first, then the picker on its own sheet.
+await openSheet('Schedule')
 const daysPicked = await ev(`[...document.querySelectorAll('[data-slot="toggle-group-item"]')].filter(b => b.getAttribute('data-state') === 'on').length`)
 check('0a. the header counts the days she actually trains',
   daysPicked > 0 && daysPicked < 7 && summary.includes(`${daysPicked} days/week`),
   { daysPicked, saidInstead: (/(\d+) days\/week/.exec(summary) ?? [])[0] ?? 'nothing' })
 
-check('0b. the "You" group opens', (await openYouGroup()) === 'ok')
+check('0b. the Equipment sheet opens', (await openYouGroup()) === 'ok')
 
 // --- the rows exist and are legible ---------------------------------------
 const rows = await until(ceilingInputs, v => Array.isArray(v) && v.length === 3)
@@ -301,6 +304,7 @@ const startRow = () => ev(`(() => {
   }
 })()`)
 
+await openSheet('Goal')
 const start = await until(startRow, v => v && v.hasControl)
 check('6a. the starting point is on the screen at all', !!start, start)
 check('6b. ...showing the answer already given, not an empty box',
@@ -355,6 +359,7 @@ await shoot('setup-answers-5-rebuild-offer')
 // Ashley's ruling, 16 Sep 2026, from three options: rebuild the rest of the
 // block around the new length. This reads that ruling off the real screen —
 // a source gate can prove the branch exists and cannot prove anyone reaches it.
+await openSheet('Schedule')
 {
   const receiptWas = await text('[data-testid="reprice-receipt"]')
   await ev(`(() => {
@@ -424,6 +429,7 @@ await shoot('setup-answers-5-rebuild-offer')
 // Ashley's ruling, 17 Sep 2026, from three options: training AND food, from
 // this week. Both halves have to be on the card BEFORE the tap, and that is
 // what 7j reads.
+await openSheet('Goal')
 {
   const receiptWas = await text('[data-testid="reprice-receipt"]')
   await ev(`(() => {
@@ -488,6 +494,7 @@ await shoot('setup-answers-5-rebuild-offer')
 // holds why the RE-PRICE path cannot act on them; this holds that they are on
 // the screen at all, which is what "locked" actually meant to somebody using
 // the app.
+await openSheet('Known lifts')
 const knownLifts = await ev(`(() => {
   const box = document.querySelector('[data-testid="known-lifts"]')
   if (!box) return null
@@ -511,6 +518,7 @@ await shoot('setup-answers-7-known-lifts')
 // wrong: this screen already listed them with edit and delete. What it could
 // not do was ADD one, and the group is hidden entirely when there are none —
 // so a first dislike had no screen route at all.
+await openSheet('Exercises to avoid')
 const avoidRow = await ev(`(() => {
   const label = [...document.querySelectorAll('span')].find(s => /^Exercises to avoid$/.test((s.textContent || '').trim()))
   if (!label) return null
@@ -525,22 +533,21 @@ check('7b. ...with somewhere to type one, not just a list to read',
   !!avoidRow && avoidRow.hasInput, avoidRow)
 check('7c. ...and says what it is for in plain words',
   !!avoidRow && avoidRow.hint.length > 10, avoidRow?.hint)
-// BESIDE FOODS TO AVOID, because they are the same kind of promise and the
-// person looking for one will look where the other is.
-// ADJACENT IN THE DOM, not within N characters of rendered text. The first
-// version measured a character distance and failed at 400 for no reason worth
-// pinning: the two rows are siblings, and how much text the tag lists happen
-// to contain between them is not the property.
-const avoidNeighbours = await ev(`(() => {
-  const labels = [...document.querySelectorAll('span')]
-  const f = labels.find(s => /^Foods to avoid$/.test((s.textContent || '').trim()))
-  const e = labels.find(s => /^Exercises to avoid$/.test((s.textContent || '').trim()))
-  if (!f || !e) return null
-  const fb = f.parentElement, eb = e.parentElement
-  return { siblings: fb.parentElement === eb.parentElement, adjacent: fb.nextElementSibling === eb }
+// ITS OWN ROW SINCE 2d (10 Oct 2026), in the Training group, where a
+// training answer is looked for. It sat beside Foods to avoid when Profile was
+// one long list; on a page of rows the row's NAME is how it is found, so the
+// check is that the row exists by that name and opens to this editor.
+const avoidOnRows = await ev(`(() => {
+  document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click()
+  return null
 })()`)
-check('7d. ...in the same group as Foods to avoid', !!avoidNeighbours && avoidNeighbours.siblings, avoidNeighbours)
-check('7e. ...and right beside it', !!avoidNeighbours && avoidNeighbours.adjacent, avoidNeighbours)
+await wait(250)
+const avoidRowItself = await ev(`(() => {
+  const b = document.querySelector('[data-profile-row="Exercises to avoid"]')
+  return b ? { group: b.closest('[data-profile-group]')?.getAttribute('data-profile-group') ?? null } : null
+})()`)
+check('7d. ...on its own row, by that name', !!avoidRowItself, { avoidOnRows, avoidRowItself })
+check('7e. ...in the Training group', avoidRowItself?.group === 'Training', avoidRowItself)
 await shoot('setup-answers-6-exercises-to-avoid')
 
 // --- 7f. AN AMBIGUOUS WORD IS ASKED WHERE SHE TYPED, WITH BUTTONS (user test 8 Oct 2026, #31).
@@ -576,7 +583,7 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?fullgym=1` })
 await wait(3000)
 await dialogReady()
 check('4a. the full-gym profile still shows Profile', await has('[data-slot="dialog-content"]'))
-check('4b. ...its "You" group opens', (await openYouGroup()) === 'ok')
+check('4b. ...its Equipment sheet opens', (await openYouGroup()) === 'ok')
 check('4c. ...and the weight-cap rows are absent', !(await has('[data-testid="stated-ceilings"]')))
 // The group is genuinely rendered, so 4c is not passing on an empty screen.
 check('4d. ...while the rest of the group is still there',

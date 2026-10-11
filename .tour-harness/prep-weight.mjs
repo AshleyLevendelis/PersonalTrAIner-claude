@@ -24,7 +24,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -104,7 +104,7 @@ if (card.found) {
   await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()==='Kettlebell Swings'); if(n) n.scrollIntoView({block:'center'})})()`)
   await wait(600)
   const shot = await send('Page.captureScreenshot', { format: 'png' })
-  writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/prep-weight.png', Buffer.from(shot.result.data, 'base64'))
+  writeFileSync(new URL('./prep-weight.png', import.meta.url).pathname, Buffer.from(shot.result.data, 'base64'))
 }
 
 // ---------------------------------------------------------------------------

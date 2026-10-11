@@ -84,7 +84,9 @@ await openRoundTimer()
 // THE PROPERTIES ARE UNCHANGED: the tab names only protocols that exist, a
 // preset fills the choice without starting it, a second preset replaces the
 // first rather than merging, and every one of them is thumb-sized.
-const cardText = () => ev(`document.querySelector('[data-round-card]')?.innerText?.replace(/\\s+/g, ' ')?.trim() || ''`)
+// 4c (10 Oct 2026): what Start would run is read off the sheet's PREVIEW now
+// (the idle card became it), so "the card" below means the preview.
+const cardText = () => ev(`document.querySelector('[data-round-preview]')?.innerText?.replace(/\\s+/g, ' ')?.trim() || ''`)
 const chip = key => `[data-protocol="${key}"]`
 
 const tabText = await ev(`document.body.innerText`)
@@ -107,7 +109,7 @@ check('4. tapping Tabata registers', await tap(chip('tabata')))
 await wait(600)
 const after = await cardText()
 check('5. ...and the card now describes Tabata — 8 rounds, 3:50, 20s/10s',
-  after !== before && /READY · 8 ROUNDS/i.test(after) && /3:50/.test(after) && /20s work · 10s rest/.test(after),
+  after !== before && /^3:50 /.test(after) && /8 rounds · 0:20 work · 0:10 rest/.test(after),
   { before, after })
 
 // THE THING THAT WOULD BE WORST TO GET WRONG. A preset that STARTS on tap
@@ -121,7 +123,7 @@ check('7. a second preset overwrites the first rather than merging with it',
 await wait(600)
 const boxing = await cardText()
 check('8. ...boxing reads 3 rounds of 3 minutes with a minute off',
-  /READY · 3 ROUNDS/i.test(boxing) && /3 min work · 1 min rest/.test(boxing) && /11:00/.test(boxing), boxing)
+  /^11:00 /.test(boxing) && /3 rounds · 3:00 work · 1:00 rest/.test(boxing), boxing)
 
 // ONE-HANDED ON A GYM FLOOR. 44px is the floor the rest of this app is held to.
 const small = await ev(`(() => [...document.querySelectorAll('[data-protocol]')]
@@ -141,7 +143,8 @@ check('10. there is an EMOM chip now', await tap(chip('emom')))
 await wait(600)
 const emomCard = await cardText()
 check('11. ...and the card reads ten sixty-second intervals',
-  /READY · 10 INTERVALS/i.test(emomCard) && /every 1 min/.test(emomCard) && /10:00/.test(emomCard), emomCard)
+  /^10:00 /.test(emomCard) && /EMOM · a new minute starts every 1:00, 10 times/.test(emomCard)
+  && (await ev(`document.querySelector('[data-step-row="rounds"]')?.innerText || ''`)).startsWith('Minutes'), emomCard)
 // AN EMOM HAS NO REST TO NAME, and the card must not invent one — the whole
 // reason `style` exists is that the numbers alone cannot tell an EMOM from
 // ten continuous intervals.
@@ -154,7 +157,7 @@ await shoot('round-presets-emom')
 
 // A ten-minute EMOM with a ten-second lead-in: start it, skip the countdown,
 // and read what the running screen calls the interval.
-check('15. Start is pressed', await ev(`(() => { const b = document.querySelector('[data-round-card-start]'); if (!b) return false; b.click(); return true })()`))
+check('15. Start is pressed', await ev(`(() => { const b = document.querySelector('[data-round-sheet-start]'); if (!b) return false; b.click(); return true })()`))
 await wait(1200)
 check('16. it counts you in first, same as any round', await ev(`/GET READY/i.test(document.body.innerText)`),
   (await ev(`document.body.innerText`)).slice(0, 120))
@@ -196,45 +199,27 @@ await openRoundTimer()
 // than "A round is running", and the idle card is still one tap in — which
 // openRoundTimer above has already taken.
 const released = await ev(`(() => {
-  const idleCard = !!document.querySelector('[data-round-card][data-round-phase="idle"]')
+  const idleCard = !!document.querySelector('[data-round-preview]')
   const t = document.body.innerText
   return idleCard && /Everything here/i.test(t) && /Round timer, stopwatch, lap timer/i.test(t) && !/A round is running/i.test(t)
 })()`)
 check('20b. the round released the tab, so the idle card and the list are back', released === true,
   (await ev(`document.body.innerText`)).slice(0, 120))
-check('21. the Custom setup opens again', await tap('[data-protocol="custom"]') && (await wait(700), await ev(`!!document.querySelector('[data-round-setup]')`)))
-await wait(300)
-// 2 rounds x 1s work / 1s rest, and skip the ten-second countdown.
-// The short round this section needs is not on the chip rows — they hold
-// human values — so it goes through the Custom escape hatch on both, then
-// steps the count down from eight to two.
-await ev(`(() => {
-  const tap = sel => { const el = document.querySelector(sel); if (el) el.click(); return !!el }
-  tap('[data-work="custom"]'); tap('[data-rest="custom"]')
-})()`)
-await wait(300)
-await ev(`(() => {
-  const set = (el, v) => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })) }
-  const ins = [...document.querySelectorAll('input[type=number]')]
-  if (ins.length >= 2) { set(ins[0], '1'); set(ins[1], '1') }
-})()`)
-await wait(500)
-// ONE TAP AT A TIME. A synchronous burst is batched into one render, so every
-// handler reads the same stale count and the last write wins.
-for (let i = 0; i < 14; i++) {
-  const n = await ev(`document.querySelector('[data-round-card]')?.innerText?.match(/READY · (\\d+)/i)?.[1] || ''`)
-  if (Number(n) <= 2) break
-  await ev(`(() => { const b = document.querySelector('[data-rounds-down]'); if (b) b.click(); return !!b })()`)
-  await wait(120)
-}
-check('22. Start is pressed', await ev(`(() => { const b = document.querySelector('[data-round-card-start]'); if (!b) return false; b.click(); return true })()`))
+// 4c: no Custom panel — the steppers are on the sheet. The shortest round they
+// allow is 10s work / 5s rest; two of them is 25s after the countdown.
+const stepVal = f => ev(`document.querySelector('[data-step-value="${f}"]')?.textContent?.trim() || ''`)
+const stepTo = async (f, want, dir) => { for (let i = 0; i < 20 && (await stepVal(f)) !== want; i++) { await tap(`[data-step="${f}"][data-dir="${dir}"]`); await wait(120) } return stepVal(f) }
+check('21. the steppers are on the sheet, no setup to open',
+  (await stepTo('rounds', '2', 'down')) === '2' && (await stepTo('work', '0:10', 'down')) === '0:10' && (await stepTo('rest', '0:05', 'up')) === '0:05',
+  [await stepVal('rounds'), await stepVal('work'), await stepVal('rest')])
+check('22. Start is pressed', await ev(`(() => { const b = document.querySelector('[data-round-sheet-start]'); if (!b) return false; b.click(); return true })()`))
 await wait(1000)
 await tap('[data-round-card-fullscreen]')
 await wait(500)
 check('23. tapping skips the countdown', await tap('[role="button"][aria-label^="Get ready"]'))
-// 2x1s work + 1x1s rest = 3s, plus slack.
-await wait(6000)
-const finished = await ev(`/Log session/.test(document.body.innerText)`)
+// 2x10s work + 1x5s rest = 25s: POLLED, never a fixed guess.
+let finished = false
+for (let i = 0; i < 60 && !finished; i++) { await wait(1000); finished = await ev(`/Log session/.test(document.body.innerText)`) }
 check('24. the finished round offers to log it', finished === true,
   (await ev(`document.body.innerText`)).slice(0, 160))
 

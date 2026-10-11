@@ -94,9 +94,15 @@ console.log('\n4. It changed what is said, and not one set')
   // the shortfall one — so the check failed on a change that improved the
   // screen. The property is that the DESCRIBER'S VERDICT is what reaches the
   // row, whatever else is alongside it.
-  check('...and passes both the number and the reason',
-    /estimatedMinutes=\{sessionEstimate\.minutes\}/.test(panel) &&
-    /shortfallNote=\{sessionEstimate\.note\}/.test(panel) &&
+  // RE-ANCHORED AGAIN 9 Oct 2026, deliberately. The row no longer takes a bare
+  // number: it takes the day's length already worded by the one shared helper
+  // ("~22 min · + 15 optional"), so the header, the programme list and Home
+  // cannot print three different lengths for one day. The property is the
+  // same — the length AND the describer's verdict both reach the row.
+  check('...and passes both the length and the reason',
+    /sessionEstimate\.length \?/.test(panel) &&
+    /length: formatDayLength\(dayLengthParts\(workout\)\)/.test(panel) &&
+    /\{sessionEstimate\.note && \(/.test(panel) &&
     /describeSessionShortfall\(/.test(panel) &&
     /note: \[[^\]]*shortfall\?\.note[^\]]*\]/.test(panel))
   check('...telling it about deloads and low recovery, so it can stay quiet for those',
@@ -121,13 +127,18 @@ console.log('\n4. It changed what is said, and not one set')
   check('...and the line never claims a time the session did not reach',
     /actual <= shortened/.test(panel) && /as low as this one goes/.test(panel))
 
-  const row = stripComments(readFileSync(join(ROOT, 'src/components/exercise/WeekContextRow.tsx'), 'utf8'))
+  // DESIGN HANDOFF 2c (10 Oct 2026): the length moved from the week row to
+  // the hero's meta line, so the reason moved with it. Same property: the
+  // reason sits beside the number, never behind an expander.
+  const metaAt = panel.indexOf('data-testid="hero-meta"')
+  const noteAt = panel.indexOf('data-testid="session-length-note"')
   check('the reason is shown next to the number, not hidden behind the expander',
-    /\{shortfallNote &&/.test(row) && !/expanded && shortfallNote/.test(row))
+    metaAt > 0 && noteAt > metaAt && noteAt - metaAt < 1200 && !/expanded && sessionEstimate\.note/.test(panel), { metaAt, noteAt })
   // estimatedMinutes was a documented prop that nothing ever passed, so the
-  // "~52 min" chip its own header describes never rendered.
-  check('the minutes chip it always described now actually renders',
-    /estimatedMinutes != null\) headerParts\.push/.test(row))
+  // "~52 min" chip its own header describes never rendered. (Since 9 Oct 2026
+  // the prop is `sessionLength`, a worded length — see above.)
+  check('the length it always described actually renders, on the hero\'s meta line',
+    /data-testid="hero-meta">[\s\S]{0,200}\$\{sessionEstimate\.length\}/.test(panel))
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

@@ -5363,6 +5363,38 @@ export function isBandEquipped(entry: ExerciseEntry): boolean {
   return entry.equipment.some(e => e === 'resistance band')
 }
 
+/**
+ * IS THIS MOVEMENT BALLISTIC — thrown, jumped or swung, with no lowering phase
+ * a person controls?
+ *
+ * Asked by exactly one rule: a ballistic movement never carries an eccentric
+ * tempo cue. "2s down · drive up" on a kettlebell swing is not a harder
+ * version of the swing, it is a different and worse exercise — the bell is
+ * meant to fall and be caught by the hips, and slowing it turns a hip snap
+ * into a front raise (NSCA exercise technique: ballistic and plyometric
+ * movements are prescribed for intent and speed, never for time under
+ * tension). Found 9 Oct 2026 on a tester's plan, where a knee adaptation
+ * swapped a tempo'd glute bridge for Kettlebell Swing (Heavy) and the cue came
+ * with it.
+ *
+ * NAMED BY WHAT THE ENTRY IS, not by a hand-kept list of names: the catalogue
+ * already files jumps and throws under the explosive substitution groups and
+ * the primer swing under 'swing'; the one working-set swing is filed under its
+ * hinge group (so it can substitute for a hinge), which is why the name is
+ * read too. `test:slot-replacement` holds the other direction — every entry
+ * whose own coaching note or cues call it ballistic or explosive must answer
+ * true here — so a new jump or throw cannot be added without this noticing.
+ */
+const BALLISTIC_GROUPS = new Set(['explosive_lower', 'explosive_upper', 'swing'])
+export function isBallisticMovement(entry: ExerciseEntry): boolean {
+  if (BALLISTIC_GROUPS.has(entry.substitution_group)) return true
+  // A swing is ballistic when there is a bell in the hand. "Leg Swings" is a
+  // mobility drill that shares the word and nothing else — the same trap
+  // load-prescription.ts's categorize() records falling into.
+  if (/\bswings?\b/i.test(entry.name)) return entry.equipment.some(e => e === 'kettlebell' || e === 'dumbbell')
+  return /\b(jumps?|slams?|snatch|cleans?|throws?|plyo|burpees?|bounds?)\b/i.test(entry.name)
+}
+
 /** True when this movement must be excluded for a trainee with these flagged joints. An indicated movement is never excluded, even if it loads the joint. */
 export function isContraindicatedFor(entry: ExerciseEntry, flaggedJoints: Set<string>): boolean {
   if (isIndicatedFor(entry, flaggedJoints)) return false
@@ -5525,7 +5557,8 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
   // a shrug whatever is in your hands. The other splits this map makes are
   // deliberate sub-families (Push-Ups apart from Dumbbell Bench Press inside
   // 'bench_press'; single-leg calf work apart from bilateral) and are left
-  // exactly as they are; test:movement-families pins which is which.
+  // exactly as they are; test:movement-families pins which is which (that
+  // gate did not exist until 9 Oct 2026 — this comment named it for a month).
   // The shrugs need no entries here at all: their substitution_group IS
   // 'shrug', so getMovementFamily's fallback already puts every one of them —
   // dumbbell, cable, machine, band, backpack — in the same family. Four
@@ -5549,6 +5582,38 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
   'Broad Jumps': 'jump',
   'Push-Ups': 'push_up',
   'Plyo Push-Ups': 'push_up',
+  // -------------------------------------------------------------------------
+  // TWO DELIBERATE SPLITS, 9 Oct 2026 — decided as a CSCS coach, and each is a
+  // claim that two movements are different enough to share a day. The
+  // one-per-family rule exists to stop a day listing the same lift twice; its
+  // test is "would a coach call these the same exercise", and for these they
+  // would not. (docs/plans/a-shoulders-day-with-shoulder-work.md)
+  //
+  // Why it mattered: the shoulder-friendly presses all sat in 'bench_press'
+  // and both band triceps movements in 'tricep_extension', so a shoulder flag
+  // left a chest day ONE press and ONE triceps movement at every equipment
+  // tier — measured on 2,304 seeded bodybuilding plans, 576 of 576 flagged
+  // plans with any kit. A full-gym, 60-90 minute trainee got six working sets.
+  //
+  // By NAMED ENTRY, not by a looser rule, and test:movement-families lists
+  // every split in this map so a new one cannot arrive unannounced.
+  //
+  // 1. A neutral-grip dumbbell press is not a flat barbell (or floor) press:
+  //    different implement, grip, bar path, and where in the range it loads. A
+  //    coach programmes a barbell or floor press and a dumbbell press in one
+  //    session routinely. (Landmine Press, the plan's third arm, was already
+  //    apart: it is filed as an overhead press.)
+  'Neutral-Grip Dumbbell Press': 'neutral_grip_press',
+  // 2. Elbow extension with the shoulder neutral (pushdown), extended
+  //    (kickback) and flexed (overhead, lying): three different lengths for
+  //    the long head. The flexed arm keeps the group's own name, so Overhead
+  //    Tricep Extension and Skull Crushers still exclude each other — and both
+  //    stay contraindicated for a shoulder flag; no tag moved.
+  'Tricep Pushdowns': 'tricep_pushdown',
+  'Rope Tricep Pushdown': 'tricep_pushdown',
+  'Straight-Bar Tricep Pushdown': 'tricep_pushdown',
+  'Band Tricep Pushdown': 'tricep_pushdown',
+  'Band Tricep Kickback': 'tricep_kickback',
 }
 
 /**
@@ -5558,6 +5623,34 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
  */
 export function getMovementFamily(entry: ExerciseEntry): string {
   return MOVEMENT_FAMILIES[entry.name] ?? entry.substitution_group
+}
+
+/**
+ * THE SAME MOVEMENT TWICE, as opposed to two variations of one. Same family,
+ * same plane, and an implement in common: Dumbbell Bench Press beside Incline
+ * Dumbbell Press is variety (two angles); a Plank beside a Dead Bug, or three
+ * bodyweight squats, is one movement three times.
+ *
+ * The quality scorer has drawn the line here since it was written
+ * (duplicate_movement_family). Since 9 Oct 2026 the selector's refill loop
+ * draws it in the same place, through this function — it used to admit
+ * anything, which is how three air squats landed on one day.
+ */
+export function isGenuineDuplicate(a: ExerciseEntry, b: ExerciseEntry): boolean {
+  return a.name !== b.name &&
+    getMovementFamily(a) === getMovementFamily(b) &&
+    a.angle_vector === b.angle_vector &&
+    a.equipment.some(eq => b.equipment.includes(eq))
+}
+
+/**
+ * The override table itself, read-only, for test:movement-families — which
+ * checks that every name in it is a live catalogue entry (a 'Cable Rows' key
+ * sat here naming nothing) and that every split it makes is one the gate
+ * lists with its reason.
+ */
+export function movementFamilyOverrides(): Readonly<Record<string, string>> {
+  return MOVEMENT_FAMILIES
 }
 
 // ---------------------------------------------------------------------------

@@ -265,7 +265,9 @@ function absentClaim(t: Transcript): Violation[] {
 // against the prompt's own does-not-exist paragraph below, so this list cannot
 // quietly disagree with what the coach is told.
 export const FORBIDDEN_FEATURES = [
-  'subscription', 'billing', 'payment', 'data export', 'export your data',
+  // 'data export' and 'export your data' left this list on 10 Oct 2026 (M37):
+  // Profile > App has "Download my data", so a route to it is the right answer.
+  'subscription', 'billing', 'payment',
   'progress photo', 'community', 'social feed', 'app store', 'google play',
 ]
 const NAV = /\b(go to|head to|head over|tap|click|press|open|select|navigate|you(?:'ll| will| can)? find|find (?:it|them|this)|under|from the|via the|in the|scroll to|swipe)\b/i

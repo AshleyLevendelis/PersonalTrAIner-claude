@@ -1,6 +1,6 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry} from './exercise-db'
-import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, hasBetterLoadingPeer, TRACKS } from './exercise-plan'
+import { EXERCISE_DATABASE, getMovementFamily, isGenuineDuplicate, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry} from './exercise-db'
+import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, hasBetterLoadingPeer, TRACKS, dayHoldsDefiningWork, pullHeavyIsPrescribed } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
 import { setRandomSource, resetRandomSource } from './exercise-plan'
@@ -431,15 +431,22 @@ function scoreStructure(mesocycle: MesocycleWeek[], profile: UserProfile): Dimen
     }
 
     // Day label must match its content — no "Squat & Carry" without a
-    // squat, no "Push & Press" without an overhead press.
-    const dayPatterns = new Set(day.exercises.map(ex => dbEntry(ex.name)?.movement_pattern).filter(Boolean))
-    if (day.focus === 'Squat & Carry' && !dayPatterns.has('knee_dominant') && !dayPatterns.has('single_leg')) {
+    // squat, no "Push & Press" without an overhead press, and since 9 Oct 2026
+    // no "Shoulders & Abs" without shoulder work or "Chest & Triceps" without
+    // a press. The rule used to name two labels by hand; it now asks the
+    // track's own defining patterns through the same function the generator's
+    // viability check uses, so the two cannot disagree about what a name
+    // promises.
+    //
+    // THIS CHANGED WHAT THE RULE MEASURES: it covers six labels where it
+    // covered two. Counts from before 9 Oct 2026 are not comparable. (A day
+    // the generator could not build is renamed before it gets here, so on
+    // generated plans the count should be zero for the four new labels — the
+    // rule is there for edits, and for the day that stops being true.)
+    const dayEntries = day.exercises.map(ex => dbEntry(ex.name)).filter((e): e is ExerciseEntry => !!e)
+    if (!dayHoldsDefiningWork(day.focus, dayEntries)) {
       violatedRules.add('day_label_mismatch')
-      deductions.push({ rule: 'day_label_mismatch', day: day.day, weekNumber: 1, detail: `"${day.day}" is labeled Squat & Carry but contains no squat-pattern exercise` })
-    }
-    if (day.focus === 'Push & Press' && !dayPatterns.has('vertical_push')) {
-      violatedRules.add('day_label_mismatch')
-      deductions.push({ rule: 'day_label_mismatch', day: day.day, weekNumber: 1, detail: `"${day.day}" is labeled Push & Press but contains no overhead-press pattern` })
+      deductions.push({ rule: 'day_label_mismatch', day: day.day, weekNumber: 1, detail: `"${day.day}" is labeled ${day.focus} but holds none of the work that name promises` })
     }
 
     // Superset partners must be physically ADJACENT in the rendered order
@@ -834,10 +841,9 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
   // equipment ['barbell','dumbbells']) as the same implement as its
   // dumbbell-specific sibling (Dumbbell Shrugs) when it's actually done that
   // way, without conflating cable and machine resistance curves.
-  const sameImplement = (a: ExerciseEntry, b: ExerciseEntry): boolean =>
-    a.equipment.some(eq => b.equipment.includes(eq))
-  const isGenuineDuplicate = (a: ExerciseEntry, b: ExerciseEntry): boolean =>
-    a.angle_vector === b.angle_vector && sameImplement(a, b)
+  // The definition lives in exercise-db (isGenuineDuplicate) since 9 Oct 2026,
+  // because the selector's refill loop now refuses exactly what this rule
+  // deducts for — one line, drawn in one place.
 
   for (const day of week1?.days ?? []) {
     const families = new Map<string, Exercise[]>()
@@ -1017,7 +1023,6 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
   // Same exclusions as below, for the same reason: a week can only be
   // faulted for what its own equipment AND injuries AND bans could supply.
   const pool = getConstrainedPool(profile, exclusions)
-  const isPress = (e: ExerciseEntry) => e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push'
   // PULL-HEAVY IS NOT A FLAW WHEN THERE WAS ONE PRESS TO BE HAD. Ashley's
   // ruling, 24 Sep 2026, from three options: don't count it — over keeping
   // the flag, and over cutting pulling to match. Measured that day: 366 of
@@ -1030,10 +1035,12 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
   // direction that costs a shoulder — and so is pull-heavy wherever a second
   // press existed. THIS CHANGED WHAT THE RULE MEASURES: counts from before
   // 24 Sep are not comparable.
-  const pressOptions = pool.filter(isPress).length
+  // The same question, asked through the same function, that stops the
+  // generator's weekly pass trimming pulling on these plans (9 Oct 2026).
+  const onePressLeft = pullHeavyIsPrescribed(profile, exclusions)
   if (pushSets > 0 && pullSets > 0) {
     const ratio = pushSets / pullSets
-    const unavoidablyPullHeavy = ratio < 0.6 && pressOptions <= 1
+    const unavoidablyPullHeavy = ratio < 0.6 && onePressLeft
     if ((ratio < 0.6 || ratio > 1.6) && !unavoidablyPullHeavy) {
       violatedRules.add('push_pull_imbalance')
       deductions.push({

@@ -116,7 +116,7 @@ const toolDeclarations = [
   {
     name: "record_goal",
     description:
-      "Save a concrete stated target (a goal weight, or a directional aim) AFTER the user has confirmed any inference you made from it. Body-weight targets in kg only.",
+      "Save a concrete stated target (a goal weight, or a directional aim) AFTER the user has confirmed any inference you made from it. Body-weight targets in kg only. ONE call per target: a single sentence is a single goal, so never record the same target twice in different words.",
     parameters: {
       type: "object",
       properties: {
@@ -127,6 +127,21 @@ const toolDeclarations = [
         raw_phrase: { type: "string" },
       },
       required: ["metric", "display_text", "raw_phrase"],
+    },
+  },
+  {
+    name: "park_question",
+    description:
+      "Call this in the SAME turn you tell someone you'll answer their training, nutrition or supplement question once they're set up (see DETOURS). The app keeps the question and puts it back in front of them the moment their plan is built, so 'I'll come back to it' is true. Never promise to come back to a question without this call. Not for pain, medication, allergies, extreme targets, or a question about the question you just asked — those are answered at once and never parked.",
+    parameters: {
+      type: "object",
+      properties: {
+        question: {
+          type: "string",
+          description: "Their question, in their own words, trimmed to the question itself.",
+        },
+      },
+      required: ["question"],
     },
   },
   {
@@ -204,6 +219,17 @@ Deno.serve(async (req: Request) => {
     const catalog: SlotCatalogEntry[] = Array.isArray(state?.slotCatalog) ? state.slotCatalog : [];
     const filled: Record<string, string> = state?.filled ?? {};
     const remaining: string[] = Array.isArray(state?.remaining) ? state.remaining : [];
+    // Questions already parked this conversation, counted by the APP rather
+    // than by asking the model to re-read its own history: the cap on
+    // deferrals is Ashley's condition for deferring at all ("so it doesn't
+    // feel like being handled"), and a model that miscounts breaks it.
+    const parked: string[] = Array.isArray(state?.parkedQuestions)
+      ? state.parkedQuestions.filter((q: unknown): q is string => typeof q === "string").slice(0, 5)
+      : [];
+    const PARK_LIMIT = 2;
+    const parkedLine = parked.length >= PARK_LIMIT
+      ? `PARKED SO FAR: ${parked.length} — THE LIMIT IS REACHED. Do not park anything else in this conversation: answer the next such question in one or two plain sentences, then go back to what you were asking.`
+      : `PARKED SO FAR: ${parked.length} of ${PARK_LIMIT} allowed.`;
 
     const filledLines = Object.entries(filled)
       .map(([k, v]) => `- ${k}: ${v}`)
@@ -268,6 +294,7 @@ This is a checklist for YOU, never a route to march. It is written in the app's 
 - NEGATIONS ARE ANSWERS, not just something to acknowledge. "No snacks", "none really", "nothing", "no restrictions" are certain, closed-set answers — set_slot with an empty value for multi-selects (dietaryPreferences, injuries, favoriteCuisines), or the matching "false"/"no" option for a yes-no slot (includeSnacks). Saying "got it, noted" without the call leaves the slot empty and the app will ask again.
 - EXERCISES THEY WON'T DO ARE AN ANSWER, not just a grumble. "Never give me burpees", "I hate lunges, don't put them in" → set_slot(dislikedExercises=...) with the exercise name as they said it, comma-separated for several. This is the exact mirror of dislikedFoods and it works the same way: the named exercise is kept out of the plan being built. NEVER ASK for this — it is not on the question list and adding it would be a question nobody needs — but record it the moment they volunteer one. Distinguish a hard no from a moan: "burpees are horrible but fine" is NOT a dislikedExercises answer, "never give me burpees" is. If you are not sure which they mean, ask in one clause.
 - WHAT THEY CAN ACTUALLY LOAD IS AN ANSWER TOO, and it is the one thing here you must never ask for. "I've only got 12kg dumbbells", "my heaviest kettlebell is 16", "the bag holds about 10kg" → set_slot(maxDumbbellKg=12) / set_slot(maxSingleImplementKg=16) / set_slot(maxImprovisedKg=10). Kilograms, per hand for dumbbells. It stops the plan prescribing weights they do not own, and it saves the app asking them later. NEVER ASK — someone who has not started training cannot answer "how much can you load", and this is not on the question list. Record it ONLY when they state the number themselves: never infer it from their bodyweight, their goal, their experience, or what a tier "usually" means. If they mention an implement without a number, say nothing about it and move on.
+- A SESSION LENGTH IS STORED AS A BAND, NEVER AS AN EXACT NUMBER. sessionDuration has four values and nothing finer. "40 minutes tops, hard stop" is recorded as 30-45 — and a 30-45 plan aims at the middle of that band and is allowed to run to 45. So do NOT say "forty minutes it is" or "I'll keep you to 40": that is a promise the app does not keep. Say what is true, in a clause: "that puts you on the 30–45 setting, so I'll plan to that band" — the app's own confirmation line shows the band and what it can run to. If they said the limit is hard, also record_context_fact it ("hard stop at 40 minutes — sessions must not overrun") so their coach knows afterwards. The same goes for any exact figure inside a band (50 minutes is 45-60; 70 is 60-90).
 - INJURIES CAN GROW. If injuries was already answered and the user later mentions a NEW pain or niggle, call set_slot(injuries=...) again with the FULL list — everything already recorded, plus the new one. Losing a previously-recorded injury because a later message only mentioned the new one is a safety miss, not a UI quirk.
 - One present_slot per turn at most — only one set of chips can render. So when you group two asks in a turn, at most ONE of them gets chips; ask the other in plain text and map their answer with set_slot. Numeric asks (age/height/weight) have no chips at all, which is exactly why they group so easily. The slot_key you present MUST be the exact question your sentence just asked — if your words ask about cardio, present conditioningPreference, not something else. Chips under the wrong question are worse than no chips.
 - EVERY turn must contain conversational reply text — never a bare tool call with nothing said. After recording an answer, keep talking in the SAME turn — carry the conversation forward (the app renders a dead silence otherwise). This is about saying SOMETHING, not about passing judgment on what they answered: a natural next sentence is enough.
@@ -287,9 +314,27 @@ This is a checklist for YOU, never a route to march. It is written in the app's 
 - Mixed equipment access ("full gym some days, just dumbbells at home"): the plan runs on ONE equipment tier for now — say so plainly in one clause, recommend the tier that fits most of their week, confirm it, and record_context_fact with the real situation so their coach knows.
 - Starting from nothing: if what you already know (never trained + sedentary day-to-day) tells you their first plan will be walking rather than a gym session, say so plainly when equipment, style, session length, or cardio preference come up — "these matter once we add real training in; for now it's just about the walking" — rather than asking as if a gym session starts tomorrow. Keep asking them (they'll matter once they graduate to lifting), just don't let them sound like they're shaping a plan they aren't getting yet.
 
-=== OFF-TOPIC DURING ONBOARDING ===
+=== DETOURS DURING ONBOARDING ===
 ${OFF_TOPIC_RULES}
-Onboarding adjustment for FACTUAL questions only: prefer deferring with a reason — "good one — let me get to know you first and I'll answer that properly once we're set up" — over answering in full. Defer at most TWICE in the whole conversation (count your own earlier deferrals in the history); after two, stop deferring — answer briefly per the rule above and return to the next question, so it doesn't feel like being handled. NEVER defer anything covered by the scope rules or allergen rules below — those are answered or redirected immediately, every time.
+
+A REAL COACHING QUESTION, ASKED MID-SETUP, IS PARKED — NOT ANSWERED. This is the owner's ruling for setup, and it is firmer than anything else in this prompt about being helpful: while you are still getting to know someone, a question that is not part of answering what you asked gets a warm deferral WITH A REASON, and that includes a perfectly good training, nutrition or supplement question. "What does creatine actually do, should I take it?", "is fasted cardio better?", "how much protein do I need?", "are squats bad for your knees?" are all good questions — and mid-setup the honest answer to every one of them starts "it depends on things I'm about to ask you". So say that, and keep going:
+- ONE warm sentence: it's a good question, and you'll answer it properly once they're set up — and WHY: the answer depends on what you're about to learn about them (how they train, what they eat, what they're aiming at). Not "later" with no reason; the reason is what stops it sounding like a brush-off.
+- Call park_question in that same turn. That call is what makes the promise true: the app puts their question back in front of them as soon as the plan is built. Never say you'll come back to something without it.
+- Then go straight back to the question you were on, in the same turn — and if that question has chips, call present_slot for it again so they come with it.
+- Do not answer-and-park. A "quick version" followed by "more later" is the full answer arriving anyway.
+- ${parkedLine} Parking everything is its own failure — it feels like being handled. So the cap is two for the whole conversation; after that you answer briefly (one or two plain sentences, no lecture) and return to your question.
+
+WORKED EXAMPLE — the shape, not a script. You were waiting on session length and they wrote "what does creatine actually do, should I take it?":
+  Reply: "Good question, and I'd rather answer it properly than in passing — whether it's worth it for you depends on how you train and eat, which is exactly what I'm finding out. I'll come back to it as soon as you're set up. So, those three days: how long have you realistically got each time?"
+  Calls: park_question(question: "what does creatine actually do, should I take it?") and present_slot(slot_key: "sessionDuration")
+  NOT this: three sentences on what creatine does and a dose, then the question. That is the answer in full, which is exactly what was ruled out.
+
+WHAT IS NEVER PARKED — these are answered or redirected at once, every time, exactly as their own rules say:
+- pain that isn't ordinary soreness, anything about medication, an extreme target or timeline, anything in disordered-eating territory (the SCOPE rules below);
+- an allergy, or any question about whether a food is safe (the ALLERGEN rules below);
+- a question ABOUT THE QUESTION you just asked — "why do you need my weight?", "what counts as intermediate?", "what's the difference between those two?". That is someone deciding how to answer. Answer it in a sentence and carry on; it never counts toward the cap;
+- what the app does or where something is (APP REALITY below) — one line, then back.
+Trivia (the capital of France) and task requests (write my email) are handled by the two rules at the top of this section, as always.
 
 === APP REALITY (if they ask what the app does) ===
 ${APP_REALITY}
@@ -297,14 +342,23 @@ ${APP_REALITY}
 === SCOPE — WHEN TO REDIRECT (never deferred, never softened) ===
 ${SCOPE_SAFETY_RULES}
 
+ONBOARDING-SPECIFIC: "answer substantively and practically" in the first line above describes the coach once setup is finished. During setup, a real training or nutrition question is PARKED per DETOURS above. Everything else in this block — pain, symptoms, medication, extreme numbers, disordered eating — is acted on at once, mid-setup or not, and is never parked.
+
 ${ALLERGEN_HONESTY_BLOCK}
 
 ONBOARDING-SPECIFIC: this applies from the FIRST message, not only once the dietary-preferences question is reached. If an allergy comes up early — even before you've asked about diet at all — use the framing above (what the app actually did, never a safety guarantee) right then, in your own words but keeping the substance intact, before moving on to anything else.
 
 ONBOARDING-SPECIFIC (mechanical, not just framing): milk/dairy, egg, fish, tree nuts, peanuts, soy, gluten, and shellfish are the app's eight tagged, enforced categories. When the user discloses an allergy to any of them, call set_slot(dietaryPreferences=...) with the matching tag (dairy-free / egg-free / fish-free / nut-free — covers both peanuts and tree nuts — soy-free / gluten-free / shellfish-free) ADDED to whatever they've already told you, in the SAME turn you acknowledge it. This is not optional and record_context_fact is not a substitute for it — only a value on dietaryPreferences actually keeps that food out of their meals; a context fact is memory only, never read by meal generation. Celery, sesame, mustard, lupin and sulphites now have real tags too — the same set_slot(dietaryPreferences=...) treatment as the other seven (celery-free / sesame-free / mustard-free / lupin-free / sulphite-free). All twelve are enforced by meal generation; record_context_fact is NOT a substitute for any of them.
 
+=== NEVER DESCRIBE A PLAN YOU HAVE NOT SEEN ===
+You do not build the plan and you cannot see it — the app builds it after this conversation ends. So anything you say about what their training will be like, at any point and above all in your closing recap, may use ONLY what they told you: how many days, how long, what they're aiming at, where and with what they train, what to work around.
+- NEVER NAME A SESSION FORMAT: no "circuit", "HIIT", "intervals", "supersets", "Tabata", "AMRAP", "high-intensity" anything, "full-body blast". The app decides how sessions are built, and it is often not what you would guess — for fat loss it keeps proper weight training and adds conditioning on top; it does not turn the lifting sessions into circuits. Said live to a real person: "I'll put together a focused, high-intensity dumbbell circuit." Nothing had been built yet, and what the app builds for fat loss is weight training with conditioning added, not that. A format you name is a promise the app can break on day one.
+- NEVER NAME AN EXERCISE they will do. You do not know which ones are in the plan.
+- WHERE THEY TRAIN IS AN ANSWER YOU WERE GIVEN — USE IT. Read equipment in ALREADY ANSWERED before you describe them. Do not say "gym" to someone whose equipment is Home gym, Minimalist or Bodyweight only: "you know your way around a gym" was said live to someone training at home with dumbbells. Say "training", "lifting", "your sessions", or name their actual set-up.
+- THIS IS WHAT A GOOD RECAP SOUNDS LIKE: "Three days a week, about 40 minutes a time, built around your dumbbells and aimed at fat loss — have a look and I'll build it." Every clause is something they said. NOT: "I'll put together a focused, high-intensity dumbbell circuit for you."
+
 === FINISHING ===
-When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you'll build and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
+When STILL UNKNOWN is empty, give a one-line warm recap made ONLY of what they told you (see the section above — no session format, no exercise names, no "gym" unless that is where they train) and call complete_onboarding. The app shows them the full review and the generate button — you don't generate anything yourself. If they want to change an earlier answer at any point, just set_slot the new value.`;
 
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
     if (Array.isArray(history) && history.length > 0) {
@@ -420,9 +474,20 @@ When STILL UNKNOWN is empty, give a one-line warm recap of the shape of what you
     // The model asks for them itself, in the same turn it asks the question,
     // so this file still makes ONE call per turn rather than two — the cost
     // and latency saving that deleting the forced call bought is kept.
-    // ConversationalOnboarding.tsx carries a deterministic backstop for the
-    // turn where the model forgets, which is the same model-first/
-    // deterministic-behind shape the rest of this file already uses.
+    //
+    // WHAT STANDS BEHIND THE MODEL, STATED EXACTLY (rewritten 9 Oct 2026 —
+    // this paragraph used to claim "a deterministic backstop for the turn
+    // where the model forgets", and no such thing existed). The client reads
+    // the reply and decides the card itself (src/lib/onboarding-chip-match.ts):
+    //   - chips asked for under a sentence that asks a DIFFERENT question are
+    //     not shown; if the sentence plainly asks one other open question,
+    //     that question's card is shown instead;
+    //   - a question re-asked while its earlier card is still unanswered
+    //     takes that card with it, asked for or not;
+    //   - a first asking where the model simply forgot present_slot gets NO
+    //     chips. That is deliberate: inventing a menu from prose alone is the
+    //     forced-chips leg again by another route. The typing box still
+    //     works, and the stuck-rescue and stall-breaker still bring chips.
     //
     // WHAT IS DELIBERATELY UNCHANGED: every path that fires when something
     // has actually gone wrong. A set_slot value that fails validation still

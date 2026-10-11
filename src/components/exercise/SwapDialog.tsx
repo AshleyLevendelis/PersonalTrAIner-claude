@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
+import { shortDate } from '@/lib/day-labels'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
+import { isNothingToChangeMessage } from '@/lib/edit-reason'
+import { tierWords, blockSwapLine } from '@/lib/coach-voice'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
 import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
@@ -23,7 +26,14 @@ import type { UserProfile } from '@/lib/types'
 // ---------------------------------------------------------------------------
 
 export interface SwapTarget {
+  /** The PLAN ROW the exercise lives in — the key the swap writes to. */
   dayName: string
+  /**
+   * The weekday it is SHOWN on, when that is a different word: Monday's
+   * session moved to Friday is keyed "Monday" and said "Friday". Absent on an
+   * ordinary day, where the two agree.
+   */
+  sayDay?: string
   exIndex: number
   exerciseName: string
   /**
@@ -44,6 +54,9 @@ export function SwapDialog({
   onConfirm,
   impactFor,
   onReason,
+  onDislike,
+  blockEndsOn,
+  today,
 }: {
   target: SwapTarget | null
   onClose: () => void
@@ -70,6 +83,15 @@ export function SwapDialog({
    * it did.
    */
   onReason?: (answer: ReasonAnswer) => Promise<string | null>
+  /** "I don't like it" — opens the ban confirm for this exercise. Absent, that answer is an ordinary swap. */
+  onDislike?: (exerciseName: string) => void
+  /**
+   * The first day of the next block, when "Rest of block" ends (runs 3-4,
+   * M40b; Ashley 10 Oct 2026, "Keep to the block, say it"). Null on the last
+   * block; absent when the caller cannot know.
+   */
+  blockEndsOn?: string | null
+  today?: string
 }) {
   const [asked, setAsked] = useState(false)
   const [reasonBusy, setReasonBusy] = useState(false)
@@ -145,6 +167,18 @@ export function SwapDialog({
   const answerReason = async (a: ReasonAnswer) => {
     // Busy and don't-like-it are still swaps — the answer only says which
     // scope the person is really after, and the list below is the same list.
+    // "I DON'T LIKE IT" IS A BAN, NOT A SWAP (M27, 9 Oct 2026). The design's
+    // route table has said so since 15 Sep ("keep it out from now on") and
+    // this threw the answer away: busy and don't-like-it both just revealed
+    // the same list and then asked "Today only / Rest of block". It now hands
+    // the exercise to the same confirm the ⋮ menu's ban opens, which says
+    // what will replace it and can be undone. Unwired, it stays a swap.
+    if (a.type === 'reason' && a.reason === 'dislike' && onDislike && target) {
+      const name = target.exerciseName
+      handleClose()
+      onDislike(name)
+      return
+    }
     if (a.type === 'reason') { setAsked(true); return }
     setReasonBusy(true); setReasonError(null)
     const refusal = await onReason?.(a) ?? null
@@ -169,7 +203,7 @@ export function SwapDialog({
               // Two of the four answers never reach a replacement list at all,
               // so promising one above the question is the app describing
               // something it may not be about to do.
-              <>{target?.dayName}</>
+              <>{target?.sayDay ?? target?.dayName}</>
             ) : (
               <>Constraint-checked replacements for <span className="font-semibold text-foreground">{target?.exerciseName}</span></>
             )}
@@ -183,15 +217,26 @@ export function SwapDialog({
               exerciseName={target?.exerciseName ?? 'it'}
               busy={reasonBusy}
               onAnswer={answerReason}
-              onSkip={() => setAsked(true)}
+              onSkip={() => { setReasonError(null); setAsked(true) }}
+              // A REFUSAL BELONGS TO THE STEP THAT PRODUCED IT (M8). "Back" is
+              // the child's own state, so the red line from the kit step sat
+              // under the reasons, and under whatever was tapped next.
+              onStepChange={() => setReasonError(null)}
+              currentEquipment={profile?.equipment_access}
             />
-            {reasonError && <p className="text-xs text-destructive" data-testid="swap-reason-error">{reasonError}</p>}
+            {/* "NOTHING TO CHANGE" IS NOT AN ERROR. onReason hands back one
+                string for both a failure and a deliberate no-op, and drawing
+                both red told someone whose plan was already fine that
+                something had gone wrong. edit-reason.ts knows which is which. */}
+            {reasonError && (isNothingToChangeMessage(reasonError)
+              ? <p className="text-xs text-muted-foreground" data-testid="swap-reason-note">{reasonError}</p>
+              : <p className="text-xs text-destructive" data-testid="swap-reason-error">{reasonError}</p>)}
           </>
         ) : (<>
         {!pendingSwap && currentEntry && (
           <div className="flex flex-wrap gap-1.5 pb-2">
             <Badge variant="outline" className="text-xs">{currentEntry.movement_pattern.replace(/_/g, ' ')}</Badge>
-            <Badge variant="outline" className="text-xs">{currentEntry.mechanics_tier.replace(/_/g, ' ')}</Badge>
+            <Badge variant="outline" className="text-xs">{tierWords(currentEntry.mechanics_tier)}</Badge>
             <Badge variant={currentEntry.joint_stress === 'high' ? 'destructive' : 'secondary'} className="text-xs">
               <ShieldAlert className="size-3 mr-1" />
               {currentEntry.joint_stress} joint stress
@@ -204,7 +249,7 @@ export function SwapDialog({
         {!pendingSwap && (
           replacements.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No alternative exercises fit your equipment, injuries and skill level for this movement pattern. Search below to pick anything from the full catalog instead.
+              No alternative exercises fit your equipment, injuries and skill level for this movement pattern. Search below to pick from all exercises instead.
             </p>
           ) : (
             <>
@@ -234,7 +279,7 @@ export function SwapDialog({
             {replacements.length < INITIAL_SHOWN && (
               <p className="text-xs text-muted-foreground px-1 pb-1" data-testid="swap-short-list-reason">
                 {replacements.length === 1 ? "That's the only alternative" : `Only ${replacements.length} alternatives`} that fit your
-                equipment, injuries and skill level for this movement. Search below for anything else in the catalog.
+                equipment, injuries and skill level for this movement. Search below for any other exercise.
               </p>
             )}
             <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -249,7 +294,7 @@ export function SwapDialog({
                     <div className="space-y-1">
                       <p className="font-medium text-sm">{exercise.name}</p>
                       <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
+                        <Badge variant="secondary" className="text-xs">{tierWords(exercise.mechanics_tier)}</Badge>
                         {exercise.joint_stress === 'low' && currentEntry?.joint_stress !== 'low' && (
                           <Badge className="text-xs bg-primary/15 text-primary-text">
                             lower stress
@@ -319,7 +364,7 @@ export function SwapDialog({
                             <p className="font-medium text-sm">{exercise.name}</p>
                             <div className="flex flex-wrap gap-1">
                               <Badge variant="secondary" className="text-xs">{exercise.movement_pattern.replace(/_/g, ' ')}</Badge>
-                              <Badge variant="secondary" className="text-xs">{exercise.mechanics_tier.replace(/_/g, ' ')}</Badge>
+                              <Badge variant="secondary" className="text-xs">{tierWords(exercise.mechanics_tier)}</Badge>
                             </div>
                             {/* THE NOTE THE RANKED LIST HAS AND THIS ONE DID NOT.
                                 Searching the catalogue told you strictly less
@@ -378,13 +423,26 @@ export function SwapDialog({
               onClick={() => applyScope('permanent')}
             >
               <p className="font-medium text-sm">Rest of block</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Swaps it for the rest of this training block; later blocks re-plan from your base program.
+              <p className="text-xs text-muted-foreground mt-0.5" data-testid="swap-block-until">
+                {blockEndsOn !== undefined ? blockSwapLine(blockEndsOn ? shortDate(blockEndsOn, today) : null) : 'Swaps it for the rest of this training block; later blocks re-plan from your base program.'}
                 {currentEntry?.mechanics_tier === 'tier1_compound'
                   ? ' Main lift — this resets to a conservative starting weight so you can find it fresh, rather than inheriting a number that belonged to a different movement.'
                   : ' Loads recompute for the new movement right away.'}
               </p>
             </button>
+            {/* FOR GOOD IS A DIFFERENT THING, offered beside it (her 10 Oct ruling):
+                a block swap ends when the plan changes exercises; a ban does not. */}
+            {onDislike && target && (
+              <button
+                type="button"
+                className="hit-slop-44 w-full text-center text-xs font-semibold text-primary-text"
+                data-testid="swap-never-again"
+                disabled={busy}
+                onClick={() => { const name = target.exerciseName; handleClose(); onDislike(name) }}
+              >
+                Never give me {target.exerciseName} again
+              </button>
+            )}
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPendingSwap(null)}>
               {busy ? (
                 <span className="inline-flex items-center gap-2">

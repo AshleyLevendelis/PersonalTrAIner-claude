@@ -19,6 +19,7 @@
 // partial-unique-client_id convention every other table uses.
 // ---------------------------------------------------------------------------
 
+import { readKeptHeldSizes } from './held-sizes-kept'
 import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
 import type { PoolOption } from './meal-generation'
@@ -234,18 +235,86 @@ const CATEGORY_MAP: Record<FoodCategory, GroceryCategory> = {
 }
 
 /**
- * Fix 4.8 (ux-sweep) — CATEGORY_MAP alone routed every food-db 'protein'
- * entry to meat_fish, which is right for chicken/beef/fish but put
- * kidney beans, black beans, lentils, and whey protein powder in the
- * same aisle as raw meat — a shopper trips on that immediately. Both
- * already carry the tag that says why they don't belong there
- * (is_legume, or contains_dairy on a non-dairy-category entry i.e. the
- * powder), so this reads those tags rather than adding new ones.
+ * WHICH AISLE, WHEN THE DATABASE CATEGORY ALONE GETS IT WRONG.
+ *
+ * Fix 4.8 (ux-sweep) moved beans, lentils and protein powder out of the meat
+ * aisle. 9 Oct 2026 (the test log's L26) found the rest of it: EGGS under
+ * "Meat & Fish", BUTTER under "Dry Goods", and tofu beside the chicken. The
+ * map sent every `protein` to the meat aisle and every `fat` to dry goods.
+ *
+ * The rule now reads the food's own tags, adding none:
+ *   - a protein is in Meat & fish only if it IS meat or fish;
+ *   - eggs go with dairy (the aisle is labelled "Dairy & eggs");
+ *   - every other protein — tofu, tempeh, seitan, Quorn, meat-free mince and
+ *     sausages, beans, lentils, protein powder — is dry goods. The table has
+ *     six aisles and the database only allows those six (a CHECK constraint),
+ *     so there is no "chilled" or "meat-free" aisle to send them to. Decided
+ *     unprompted, reversible: dry goods is where the beans and the protein
+ *     powder already were;
+ *   - a fat made from milk (butter, ghee) is dairy.
+ * An aisle only moves on the next rebuild; a row already on a list keeps the
+ * aisle it was saved with.
  */
-function categoryForEntry(entry: { category: FoodCategory; tags: { is_legume?: boolean; contains_dairy?: boolean } }): GroceryCategory {
-  if (entry.category === 'protein' && entry.tags.is_legume) return 'dry_goods'
-  if (entry.category === 'protein' && entry.tags.contains_dairy) return 'dry_goods'
+function categoryForEntry(entry: { name: string; category: FoodCategory; tags: { contains_meat?: boolean; contains_pork?: boolean; contains_fish?: boolean; contains_shellfish?: boolean; contains_dairy?: boolean } }): GroceryCategory {
+  const t = entry.tags
+  if (entry.category === 'protein') {
+    if (t.contains_meat || t.contains_pork || t.contains_fish || t.contains_shellfish) return 'meat_fish'
+    // Eggs by NAME, not by the egg tag: Quorn is bound with egg and carries
+    // the tag, and Quorn is not what "Dairy & eggs" means.
+    if (/^egg\b/.test(entry.name)) return 'dairy'
+    return 'dry_goods'
+  }
+  if (entry.category === 'fat' && t.contains_dairy) return 'dairy'
   return CATEGORY_MAP[entry.category]
+}
+
+/**
+ * WHAT YOU BUY, NOT WHAT IS ON THE PLATE.
+ *
+ * The food database is cooked-basis for grains ("cooked weight for
+ * grains/meat/rice"), which is right for costing a recipe and wrong for a
+ * shopping list: a week of rice read "white rice cooked ~650g" (M23, 9 Oct
+ * 2026). Nobody buys cooked rice, and 650 g of cooked rice is about 235 g
+ * from the bag.
+ *
+ * For each of these the list shows `name` and multiplies the recipe's cooked
+ * grams by `perCooked` — the dry weight that cooks up to one gram.
+ *
+ * THE FACTOR IS (this table's own kcal per 100 g cooked) / (kcal per 100 g
+ * dry, USDA FoodData Central), so the bag weight carries exactly the energy
+ * the recipe was costed at. It lands on the usual kitchen figures: rice
+ * roughly triples, pasta a bit more than doubles. The dry figures used, per
+ * 100 g, as recalled from the USDA tables (a wrong one is a one-line change):
+ * white rice 365, brown rice 367, basmati 356, pasta 371, wholewheat pasta
+ * 348, gluten-free pasta 357, couscous 376, quinoa 368, egg noodles 384, rice
+ * noodles 364, bulgur 342, cornmeal for polenta 362, millet 378, buckwheat
+ * 343, pearl barley 352.
+ *
+ * NOT here: beans and lentils (bought tinned as often as dry, and a tin's
+ * drained weight is the cooked weight), meat and fish (raw-versus-cooked is a
+ * resolver question with a plan of its own), and gnocchi (bought as it is).
+ *
+ * THE KEY IS NEVER TOUCHED. `canonical_key` is the database name and is unique
+ * per profile; only what the row SAYS and how much it asks for change. The
+ * name must still resolve to the same food, because the display layer looks a
+ * row's purchase unit up by its name — test:grocery-shopping holds both.
+ */
+export const AS_BOUGHT: Record<string, { name: string; perCooked: number }> = {
+  'white rice cooked': { name: 'white rice', perCooked: 0.36 },
+  'brown rice cooked': { name: 'brown rice', perCooked: 0.34 },
+  'basmati rice cooked': { name: 'basmati rice', perCooked: 0.34 },
+  'pasta cooked': { name: 'pasta', perCooked: 0.43 },
+  'wholewheat pasta cooked': { name: 'wholewheat pasta', perCooked: 0.43 },
+  'gluten free pasta': { name: 'gluten free pasta', perCooked: 0.45 },
+  'couscous cooked': { name: 'couscous', perCooked: 0.30 },
+  'quinoa cooked': { name: 'quinoa', perCooked: 0.33 },
+  'egg noodles cooked': { name: 'egg noodles', perCooked: 0.36 },
+  'rice noodles cooked': { name: 'rice noodles', perCooked: 0.30 },
+  'bulgur wheat cooked': { name: 'bulgur wheat', perCooked: 0.24 },
+  'polenta cooked': { name: 'polenta', perCooked: 0.23 },
+  'millet cooked': { name: 'millet', perCooked: 0.31 },
+  'buckwheat cooked': { name: 'buckwheat', perCooked: 0.27 },
+  'barley': { name: 'pearl barley', perCooked: 0.35 },
 }
 
 export function resolveGroceryTarget(name: string): {
@@ -253,17 +322,27 @@ export function resolveGroceryTarget(name: string): {
   displayName: string
   category: GroceryCategory
   needsReview: boolean
-  toGrams: (quantity: number, unit: string) => number
+  /** Grams, or null when the amount cannot be read ("2 shallots" with no piece weight) — never the bare number. */
+  toGrams: (quantity: number, unit: string) => number | null
+  /**
+   * Grams to BUY for each gram a recipe uses (AS_BOUGHT): 0.36 for rice, 1 for
+   * almost everything. Applied ONLY where the grams came from a recipe (the
+   * list built from the meal plan). An amount somebody typed or asked the
+   * coach for — "500g rice" — is already what they mean to buy.
+   */
+  asBoughtPerRecipeGram: number
 } {
   const trimmed = name.trim()
   const entry = lookupIngredient(trimmed)
   if (entry) {
+    const shop = AS_BOUGHT[entry.name]
     return {
       canonicalKey: entry.name.toLowerCase(),
-      displayName: entry.name,
+      displayName: shop?.name ?? entry.name,
       category: categoryForEntry(entry),
       needsReview: false,
-      toGrams: (quantity, unit) => unitToGrams(entry, unit, quantity),
+      toGrams: (quantity, unit) => unitToGrams(entry, unit, quantity, trimmed),
+      asBoughtPerRecipeGram: shop?.perCooked ?? 1,
     }
   }
   return {
@@ -271,7 +350,8 @@ export function resolveGroceryTarget(name: string): {
     displayName: trimmed,
     category: 'other',
     needsReview: true,
-    toGrams: (quantity, unit) => unitToGrams(null, unit, quantity),
+    toGrams: (quantity, unit) => unitToGrams(null, unit, quantity, trimmed),
+    asBoughtPerRecipeGram: 1,
   }
 }
 
@@ -391,20 +471,28 @@ export function addItemLocal(input: {
   // and stores the merged row in grams, matching generation's own convention.
   if (existing) {
     const sameUnit = existing.unit === input.unit
-    const existingQuantity = sameUnit ? existing.quantity : target.toGrams(existing.quantity, existing.unit)
-    const addQuantity = sameUnit ? input.quantity : target.toGrams(input.quantity, input.unit)
+    const existingGrams = sameUnit ? existing.quantity : target.toGrams(existing.quantity, existing.unit)
+    const addGrams = sameUnit ? input.quantity : target.toGrams(input.quantity, input.unit)
+    // AN AMOUNT THAT CANNOT BE READ IS NOT ADDED AS A NUMBER. "Add spinach"
+    // (one, no unit) onto a 100 g row used to add ONE GRAM through the old
+    // unknown-unit-means-grams default (9 Oct 2026). The row keeps the amount
+    // it had and is marked as a rough estimate, which is the screen's own way
+    // of saying "tap to set the amount".
+    const unreadable = existingGrams == null || addGrams == null
+    const existingQuantity = unreadable ? existing.quantity : existingGrams
+    const addQuantity = unreadable ? 0 : addGrams
     const item: PendingItem = {
       id: existing.id,
       profileId: input.profileId,
       canonicalKey: existing.canonical_key,
       displayName: existing.display_name,
       quantity: existingQuantity + addQuantity,
-      unit: sameUnit ? existing.unit : 'g',
+      unit: sameUnit || unreadable ? existing.unit : 'g',
       category: existing.category,
       source: existing.source,
       mealRefs: existing.meal_refs,
       checked: existing.checked,
-      needsReview: existing.needs_review,
+      needsReview: existing.needs_review || unreadable,
       createdAt: existing.created_at,
       attempts: 0,
       dismissed: existing.dismissed,
@@ -645,6 +733,8 @@ function assembleDates(
    * the list.
    */
   runFrom: string,
+  /** Dates where Undo kept the planned sizes around a swap: the list shops what the screen shows. */
+  keepHeldSizes: string[] = [],
 ): { date: string; chosen: Partial<Record<MealSlotName, PoolOption>> }[] {
   if (dates.length === 0) return []
   const first = dates.reduce((a, b) => (b < a ? b : a), runFrom)
@@ -655,7 +745,7 @@ function assembleDates(
   // ingredients are stored at LUNCH size, so summing dinner and lunch
   // separately is already right and needs no special case here.
   const wanted = new Set(dates)
-  return serveDates({ dates: run, pools, targets, softLikedFoods, shape, pinsByDate })
+  return serveDates({ dates: run, pools, targets, softLikedFoods, shape, pinsByDate, keepHeldSizes })
     .filter(s => wanted.has(s.date))
     .map(s => ({ date: s.date, chosen: s.day.chosen }))
 }
@@ -666,6 +756,8 @@ interface AggregatedIngredient {
   category: GroceryCategory
   needsReview: boolean
   grams: number
+  /** Counts whose weight could not be read ("2 shallots"): kept as a count and flagged, never added to `grams` as if they were grams. */
+  uncounted?: { quantity: number; unit: string }
   mealRefs: MealRef[]
 }
 
@@ -727,7 +819,7 @@ export interface GenerateGroceryListResult {
 export async function generateGroceryList(input: GenerateGroceryListInput): Promise<GenerateGroceryListResult> {
   const days = Math.max(1, Math.min(MAX_HORIZON_DAYS, input.days ?? DEFAULT_HORIZON_DAYS))
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.startDate]: { ...(input.pinsByDate?.[input.startDate] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, datesFrom(input.startDate, days), input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.startDate)
+  const planned = assembleDates(input.mealPools, input.targets, datesFrom(input.startDate, days), input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.startDate, readKeptHeldSizes(input.profileId))
   return reconcileGenerated(input.profileId, planned, input.startDate)
 }
 
@@ -760,16 +852,23 @@ async function reconcileGenerated(
         const grams = target.toGrams(ing.quantity, ing.unit)
         const ref: MealRef = { day, slot: option.slot, mealName: option.name, date }
         const existing = aggregate.get(target.canonicalKey)
-        if (existing) {
-          existing.grams += grams
-          if (!existing.mealRefs.some(r => r.date === ref.date && r.slot === ref.slot && r.mealName === ref.mealName)) {
-            existing.mealRefs.push(ref)
-          }
+        const row: AggregatedIngredient = existing ?? {
+          canonicalKey: target.canonicalKey, displayName: target.displayName, category: target.category,
+          needsReview: target.needsReview, grams: 0, mealRefs: [],
+        }
+        if (!existing) aggregate.set(target.canonicalKey, row)
+        if (grams != null) {
+          // A recipe's cooked rice becomes the dry rice to buy (AS_BOUGHT).
+          row.grams += grams * target.asBoughtPerRecipeGram
         } else {
-          aggregate.set(target.canonicalKey, {
-            canonicalKey: target.canonicalKey, displayName: target.displayName, category: target.category,
-            needsReview: target.needsReview, grams, mealRefs: [ref],
-          })
+          // "5 rye crispbreads" was FIVE GRAMS on the list until 9 Oct 2026
+          // (M23). A count the food database cannot weigh stays a count and
+          // the row says it is a rough estimate.
+          row.needsReview = true
+          row.uncounted = { quantity: (row.uncounted?.quantity ?? 0) + ing.quantity, unit: row.uncounted?.unit ?? ing.unit }
+        }
+        if (!row.mealRefs.some(r => r.date === ref.date && r.slot === ref.slot && r.mealName === ref.mealName)) {
+          row.mealRefs.push(ref)
         }
       }
     }
@@ -788,7 +887,10 @@ async function reconcileGenerated(
 
   for (const agg of aggregate.values()) {
     const existing = existingGenerated.get(agg.canonicalKey)
-    const roundedGrams = Math.round(agg.grams)
+    // Nothing weighable at all: show the count she would buy, not "0g".
+    const amount = agg.grams > 0 || !agg.uncounted
+      ? { quantity: Math.round(agg.grams), unit: 'g' }
+      : { quantity: agg.uncounted.quantity, unit: agg.uncounted.unit }
     if (existing?.dismissed) {
       // Deliberately removed by the user — leave it dismissed, don't resurrect it.
       existingGenerated.delete(agg.canonicalKey)
@@ -811,7 +913,7 @@ async function reconcileGenerated(
       existingGenerated.delete(agg.canonicalKey)
       enqueueUpsert({
         id: existing.id, profileId: profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
-        quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
+        quantity: amount.quantity, unit: amount.unit, category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: existing.checked, needsReview: agg.needsReview, createdAt: existing.created_at, attempts: 0,
         dismissed: false, userEdited: false,
       })
@@ -819,7 +921,7 @@ async function reconcileGenerated(
     } else {
       enqueueUpsert({
         id: generateId(), profileId: profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
-        quantity: roundedGrams, unit: 'g', category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
+        quantity: amount.quantity, unit: amount.unit, category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
         checked: false, needsReview: agg.needsReview, createdAt: new Date().toISOString(), attempts: 0,
         dismissed: false, userEdited: false,
       })
@@ -916,7 +1018,7 @@ export async function addGroceryDays(input: AddGroceryDaysInput): Promise<AddGro
   }
   const covered = [...new Set([...before, ...wanted])].sort()
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today)
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today, readKeptHeldSizes(input.profileId))
   const result = await reconcileGenerated(input.profileId, planned, input.today)
   return { ...result, alreadyCovered: false, covered }
 }
@@ -935,7 +1037,7 @@ export async function removeGroceryDays(input: AddGroceryDaysInput): Promise<Add
   }
   const covered = before.filter(d => !input.dates.includes(d))
   const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
-  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today)
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today, readKeptHeldSizes(input.profileId))
   const result = await reconcileGenerated(input.profileId, planned, input.today)
   return { ...result, alreadyCovered: false, covered }
 }

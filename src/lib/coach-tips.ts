@@ -15,6 +15,8 @@
 // ---------------------------------------------------------------------------
 
 import { seededRngFromKey } from './seeded-random'
+import { recordPhrase, type RecordFact } from './coach-voice'
+import { expectedByNow, WAKING_DAY, WAKING_START_HOUR, WAKING_END_HOUR, PACE_KEEPING_UP_FRACTION } from './pace'
 
 export interface CoachTipContext {
   /** YYYY-MM-DD, used only to seed rotation — never a data source itself. */
@@ -32,8 +34,8 @@ export interface CoachTipContext {
   loggedOfScheduledSoFarThisWeek: number
   /** null when there's not enough weigh-in history for a rolling trend yet. */
   weightTrend: { ratePerWeekKg: number; towardGoal: boolean | null } | null
-  /** PRs set within the last 7 days, from the PR cache. */
-  recentPRs: { exerciseName: string; weightKg: number }[]
+  /** Records genuinely beaten within the last 7 days — never a first log, never movement prep. The KIND travels with the number. */
+  recentPRs: RecordFact[]
   /**
    * Water so far today and the day's target, plus the LOCAL hour — the only
    * time-of-day-sensitive rule here, and the reason the hour is passed in
@@ -43,8 +45,14 @@ export interface CoachTipContext {
    */
   waterMl: number
   waterTargetMl: number
-  /** 0-23, local. */
+  /** 0-23, local, on the APP's clock (getAppNow) — never the machine's. */
   hourOfDay: number
+  /**
+   * True on the day the account or the plan was created. No pace line is
+   * said that day: at 21:53, seconds after signing up, the water rule said
+   * "about 1850ml behind" about a day the person had not been here for.
+   */
+  firstDay: boolean
 }
 
 interface Rule {
@@ -96,7 +104,7 @@ const RULES: Rule[] = [
     evaluate: ctx => {
       if (ctx.recentPRs.length === 0) return null
       const pr = ctx.recentPRs[0]
-      return `New PR this week: ${pr.exerciseName} at ${pr.weightKg}kg.`
+      return `New PR this week: ${recordPhrase(pr)}.`
     },
   },
   {
@@ -121,7 +129,7 @@ const RULES: Rule[] = [
     // and a rule that always won would be a daily nag.
     key: 'water_pace',
     evaluate: ctx => {
-      const START = 8, END = 22
+      const START = WAKING_START_HOUR, END = WAKING_END_HOUR
       // EVERY INPUT CHECKED FOR BEING A NUMBER AT ALL, not just for its value.
       // Written as `ctx.waterTargetMl <= 0`, this rule ran on a context that
       // carried no water fields — `undefined <= 0` is false, so it fell
@@ -134,9 +142,10 @@ const RULES: Rule[] = [
       if (![waterMl, waterTargetMl, hourOfDay].every(n => typeof n === 'number' && Number.isFinite(n))) return null
       if (waterTargetMl <= 0) return null
       if (hourOfDay < START + 2 || hourOfDay > END) return null
-      const elapsed = Math.min(hourOfDay - START, END - START)
-      const expected = waterTargetMl * (elapsed / (END - START))
-      if (waterMl >= expected * 0.6) return null
+      // The same "how much by now?" every pace rule asks (pace.ts). It is
+      // zero on the person's first day, which is what keeps this quiet then.
+      const expected = expectedByNow(waterTargetMl, { hour: hourOfDay, firstDay: ctx.firstDay === true }, WAKING_DAY)
+      if (expected <= 0 || waterMl >= expected * PACE_KEEPING_UP_FRACTION) return null
       const behind = Math.round((expected - waterMl) / 50) * 50
       if (behind < 250) return null
       return `You're about ${behind}ml behind on water for this time of day.`
@@ -147,7 +156,10 @@ const RULES: Rule[] = [
     evaluate: ctx => {
       if (ctx.scheduledSoFarThisWeek === 0) return null
       if (ctx.loggedOfScheduledSoFarThisWeek === ctx.scheduledSoFarThisWeek && ctx.scheduledSoFarThisWeek >= 2) {
-        return `Every planned session this week, done — ${ctx.scheduledSoFarThisWeek} for ${ctx.scheduledSoFarThisWeek}.`
+        // SO FAR, because it counts only the sessions already due (runs 3-4,
+        // M39): "Every planned session this week, done — 2 for 2" sat beside
+        // "2 of 3 sessions done" with a session still to come.
+        return `Every session due so far this week, done — ${ctx.scheduledSoFarThisWeek} for ${ctx.scheduledSoFarThisWeek}.`
       }
       return null
     },
@@ -191,6 +203,20 @@ export function selectCoachTipWithKey(ctx: CoachTipContext): SelectedCoachTip | 
   // same order — so which tip shows on a given day does not change.
   const rng = seededRngFromKey(`coach-tip:${ctx.today}`)
   return eligible[Math.floor(rng() * eligible.length)]
+}
+
+/**
+ * EVERY TIP THAT IS TRUE TODAY, the day's seeded pick first — Home's coach
+ * note rotates through them (design handoff 2a, 10 Oct 2026). Same rules,
+ * same order otherwise, so the tip that opens the note is the one that used
+ * to be the only one.
+ */
+export function eligibleCoachTips(ctx: CoachTipContext): SelectedCoachTip[] {
+  const eligible = RULES
+    .map(r => ({ key: r.key, text: r.evaluate(ctx) }))
+    .filter((e): e is SelectedCoachTip => e.text !== null)
+  const first = selectCoachTipWithKey(ctx)
+  return first ? [first, ...eligible.filter(e => e.key !== first.key)] : eligible
 }
 
 export function selectCoachTip(ctx: CoachTipContext): string | null {

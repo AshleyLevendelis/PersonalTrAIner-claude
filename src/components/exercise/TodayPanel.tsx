@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
@@ -6,9 +7,12 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
-import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
+import { reconnectingLine } from '@/lib/coach-voice'
+import { readCardioLogsForDate } from '@/lib/cardio-log-store'
+import { cardioLine, splitActivity } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
@@ -17,12 +21,13 @@ import { getLastWorkingSessionDate } from '@/lib/set-log-store'
 import { addDays } from '@/lib/session-move'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { layoffCardLine, layoffLiftNote, layoffRestartOffer } from '@/lib/coach-voice'
-import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '@/lib/session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds, dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { executeSecondSportVolume } from '@/lib/pending-action-executor'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
@@ -33,6 +38,7 @@ import { WeekContextRow } from './WeekContextRow'
 import { PeekPanel } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
+import { NextSetButton } from './NextSetButton'
 // DEFERRED, the same trade the two nutrition sheets took on 14 Sep: a sheet
 // nobody has opened yet has no business in the chunk that has to arrive before
 // the first pixel. It costs one extra chunk header in the total and takes its
@@ -42,7 +48,7 @@ import type { TightnessAnswer } from './TightnessSheet'
 import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
 import { SupersetGroup } from './SupersetGroup'
-import { FinisherRow } from './FinisherRow'
+import { FinishSection } from './FinisherRow'
 import { isScheduledDay, dayDetail } from '@/lib/activity-day'
 import { AdditionalWorkSection } from './AdditionalWorkSection'
 import { AddUnplannedWork } from './AddUnplannedWork'
@@ -60,6 +66,7 @@ import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { settleWeek } from '@/lib/settle-week'
+import { sessionRefFromCell, sessionRefForPlanDay, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
 import { executeCardioSession } from '@/lib/pending-action-executor'
@@ -73,11 +80,14 @@ const RemoveExerciseSheet = lazy(() => import('./RemoveExerciseSheet').then(m =>
 // Same bargain as the two above: a sheet reached from one button at the foot
 // of the list, carrying the whole exercise catalogue's search with it.
 const AddExerciseSheet = lazy(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
+const FinishCheckSheet = lazy(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
+import { readSessionSummary, saveSessionSummary } from '@/lib/session-summary-store'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { CircuitOffer } from './CircuitOffer'
+import { describeDayGap } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
@@ -96,6 +106,7 @@ export function TodayPanel({
   mesocycle,
   exclusions,
   profile,
+  storedProfile,
   profileId,
   planCreatedAt,
   logsVersion,
@@ -118,7 +129,10 @@ export function TodayPanel({
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
   exclusions: string[]
+  /** The profile a pool is built from: the saved one plus anything temporarily eased off. */
   profile?: UserProfile
+  /** The profile as saved — what a rebuild regenerates from. */
+  storedProfile?: UserProfile
   profileId?: string
   /** When this plan came into being — days before it were never prescribed. */
   planCreatedAt?: string
@@ -129,7 +143,7 @@ export function TodayPanel({
   /** Fired when steps are logged here, so the always-mounted chat tab re-reads them. */
   devOverrideDay?: string | null
   onOpenProgram: () => void
-  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
+  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string, sayDay?: string) => void
   onBanExercise: (exerciseName: string) => void | Promise<void>
   onMesocycleUpdated?: (mesocycle: MesocycleWeek[]) => void
   /**
@@ -156,7 +170,7 @@ export function TodayPanel({
   /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
   onRestartPlan?: () => Promise<string | null>
 }) {
-  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas } = useActiveSession()
+  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas, loadState, setsKnown } = useActiveSession()
 
   // Audit §6.4 — hold the screen awake for as long as the session is
   // actually running, and no longer. Before this the phone dimmed and locked
@@ -168,6 +182,8 @@ export function TodayPanel({
   // How tall BottomDock currently is, so the fixed CTA bar below rides above
   // it instead of under it — the same published height the chat composer uses.
   const { dockHeightPx } = useBottomDockHeight()
+  // The list the running button reads its next set from (NextSetButton).
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null)
   // The week's phase-focus / note disclosure. Lifted out of WeekContextRow
   // because the clamped nudge below it opens the same thing — a "Do…" that
   // ends in an ellipsis has to lead somewhere, and chat is not where the rest
@@ -208,16 +224,53 @@ export function TodayPanel({
   const [addOpen, setAddOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
+  // THE CARD SURVIVES LEAVING THE TAB (2a): read back for the day, so "View
+  // summary" works after a trip to Home or a reload, and a new day starts clean.
+  useEffect(() => { setSummaryData(readSessionSummary(profileId, today)) }, [profileId, today])
   const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
   const [summaryCloseFailed, setSummaryCloseFailed] = useState(false)
+  const [summarySavedCardio, setSummarySavedCardio] = useState<string[]>([])
+
+  // THE QUESTION BEFORE FINISHING (M12). Finish ended the session on one tap,
+  // whatever was left: the tester's stopped at 9 of 24 sets. Asked only when
+  // planned sets remain AND something has been logged — with nothing logged
+  // the line under the button already says what Finish will do, and with
+  // everything done there is nothing to ask.
+  const [finishCheck, setFinishCheck] = useState<{ done: number; planned: number; left: { name: string; sets: number }[] } | null>(null)
+  const requestFinish = () => {
+    if (!workout) { void handleFinish(); return }
+    const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
+    const progress = plannedSetProgress(logs, plannedExercises)
+    const anyLogged = logs.some(l => !l.is_warmup)
+    if (progress.remaining > 0 && anyLogged) {
+      setFinishCheck({
+        done: progress.done,
+        planned: progress.planned,
+        left: plannedExercises
+          .map(ex => ({ name: ex.name, sets: plannedSetProgress(logs, [ex]).remaining }))
+          .filter(l => l.sets > 0),
+      })
+      return
+    }
+    void handleFinish()
+  }
 
   const handleFinish = async () => {
     const result = await finishSession()
     if (!result || !workout) return
+    // THE WEEK RE-READS WHEN A SESSION CLOSES (runs 3-4, M39, found by
+    // verify:finish-check): every other write on this panel refreshes it, and
+    // Finish did not, so today's cell stayed "due" and its count read 0 sets
+    // until the app reloaded.
+    weekTrain.refresh()
+    onLogsUpdated?.()
     setSummaryCloseFailed(!!result.serverCloseFailed)
     if (result.nothingLogged) {
       // No summary to compute — the point is to say the day did not close.
+      // What WAS saved is said, though: finishing after a walk and no set read
+      // "Nothing logged" over a walk the screen had just listed (H7's leftover).
       setSummaryData(null)
+      setSummarySavedCardio((await readCardioLogsForDate(profileId!, today)).rows.map(l => splitActivity(l.activity_name).name))
       setSummaryNothingLogged(true)
       setSummaryOpen(true)
       return
@@ -226,7 +279,7 @@ export function TodayPanel({
     onCalibrationSessionFinished?.({ date: today, dayName: workout.day })
     const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
-    const prs = computeSessionPRs(result.prSnapshotAtStart, logs)
+    const prs = computeSessionPRs(result.prBaseline, logs)
     // "What next session prescribes" reuses the same function already called
     // above for the live progressedLoads badges — scoped to a date AFTER
     // today so today's own just-logged sets resolve as "last session" from
@@ -250,7 +303,13 @@ export function TodayPanel({
           return [ex.name, rec] as const
         })
     )
-    setSummaryData({ summary, prs, progressions })
+    // TODAY'S CARDIO, READ AT THE MOMENT OF FINISHING through the one reader
+    // (H21) — the finisher, anything unplanned, and anything still waiting on
+    // this phone. It never rejects, so a dead connection cannot stop the card.
+    const cardio = (await readCardioLogsForDate(profileId!, today)).rows.map(cardioLine)
+    const card = { summary, prs, progressions, cardio }
+    setSummaryData(card)
+    if (profileId) saveSessionSummary(profileId, today, card)
     setSummaryOpen(true)
   }
 
@@ -282,6 +341,8 @@ export function TodayPanel({
   // stays a straight plan lookup — a move is a fact about a date, and there
   // is no date being borrowed.
   const todayCell = borrowedDayName ? undefined : weekTrain.days.find(d => d.date === today)
+  // The same count the strips and the coach use (session-count.ts).
+  const finishedShort = shortOfPlan(sessionSetCount(todayCell?.session, todayCell?.workingLogs))
   // `session` is the moved-in session on the receiving end of a move, the
   // plan's own row on an ordinary day, and null on the ORIGIN of a move — and
   // on the origin it stays null. The first version let the plan lookup put the
@@ -310,6 +371,20 @@ export function TodayPanel({
   // replaced with Muay Thai — the app agreeing with itself on one screen and
   // not the other. Same source as the glyph (useTrainingWeek), never a second
   // read of the same row.
+  // THE ONE REFERENCE EVERY EDIT ON THIS SCREEN TAKES (H19, 9 Oct 2026).
+  // The card above is drawn from the resolver; until now every edit below it
+  // was addressed by `effectiveDayName`, which is the weekday being LOOKED at.
+  // On Monday's session moved to Friday that is Friday's own empty row, and
+  // the screen answered "There's no session on Friday to shorten" about the
+  // session it was showing. `todayRef.planDayName` is the row the session
+  // lives in; `todayRef.sayDay` is the only name a sentence may use.
+  // Borrowing a day is a straight look at another weekday's prescription, so
+  // it is a plan-row reference with nothing to resolve.
+  const todayRef: SessionRef = borrowedDayName || !todayCell
+    ? sessionRefForPlanDay({ date: today, planDayName: effectiveDayName, session: workout, weekNumber: liveWeek })
+    : sessionRefFromCell(todayCell, liveWeek)
+  /** Says the day on screen in whatever an edit wrote with the plan row's name. */
+  const say = (text: string | null): string | null => sayDayIn(text, todayRef)
   const swappedToday = weekTrain.days.find(d => d.date === today)?.state === 'swapped'
     ? (weekTrain.days.find(d => d.date === today)?.swappedForActivity || 'something else')
     : null
@@ -335,7 +410,7 @@ export function TodayPanel({
     scope: SwapScope,
   ): Promise<string | null> => {
     if (!profileId || !mesocycle) return 'No plan to edit.'
-    if (!next.changed) return next.refusal ?? "That couldn't be changed."
+    if (!next.changed) return say(next.refusal ?? "That couldn't be changed.")
     onMesocycleUpdated?.(next.mesocycle)
     try {
       await saveScopedEdit(profileId, next.mesocycle, liveWeek, scope)
@@ -360,15 +435,19 @@ export function TodayPanel({
    */
   const handleAddCardio = async (activity: string, minutes: number, targetRpe: number): Promise<string | null> => {
     if (!profileId || !profile || !mesocycle || mesocycle.length === 0) return 'No plan to add it to yet.'
+    // Through the reference, so a day that has taken a session IN is never
+    // mistaken for the free day its own plan row still describes.
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
     const result = await executeCardioSession(profile, mesocycle, {
       weekNumber: liveWeek,
-      dayName: todayName,
+      dayName: target.planDayName,
       activity,
       minutes,
       targetRpe,
       scope: 'permanent',
     })
-    if (result.receipt.failed.length > 0) return result.receipt.failed[0].error
+    if (result.receipt.failed.length > 0) return say(result.receipt.failed[0].error)
     onMesocycleUpdated?.(result.mesocycle)
     weekTrain.refresh()
     onLogsUpdated?.()
@@ -377,8 +456,10 @@ export function TodayPanel({
 
   const dropExercise = async (exIndex: number, scope: SwapScope): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
     return applySessionEdit(
-      removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope }),
+      removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, exIndex, scope }),
       scope,
     )
   }
@@ -400,9 +481,11 @@ export function TodayPanel({
     if (!profile || !mesocycle) return 'No plan to edit.'
     const week = mesocycle.find(w => w.week_number === liveWeek)
     if (!week) return "I can't see this week on your plan just now."
-    const result = shortenDayTo(week, effectiveDayName, profile, minutes)
-    if (!result.changed) return result.refusal ?? "I couldn't shorten that one."
-    const settled = settleWeek(result.week, effectiveDayName, profile)
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
+    const result = shortenDayTo(week, target.planDayName, profile, minutes)
+    if (!result.changed) return say(result.refusal ?? "I couldn't shorten that one.")
+    const settled = settleWeek(result.week, target.planDayName, profile)
     return applySessionEdit(
       { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
       'today',
@@ -424,10 +507,12 @@ export function TodayPanel({
    */
   const rebuildToday = async (): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
     const result = await rebuildDayAroundMainLift({
-      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exclusions,
+      mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, exclusions,
     })
-    if (!result.changed) return result.refusal ?? "I couldn't rebuild that one."
+    if (!result.changed) return say(result.refusal ?? "I couldn't rebuild that one.")
     const saved = await applySessionEdit({ mesocycle: result.mesocycle, changed: true }, 'today')
     if (saved) return saved
     // WHAT IT COULD NOT DO IS SAID, NOT SWALLOWED. A rebuild that quietly left
@@ -465,18 +550,29 @@ export function TodayPanel({
   const lighterToday = async (): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
     const week = mesocycle.find(w => w.week_number === liveWeek)
-    const day = week?.days.find(d => d.day === effectiveDayName)
+    const target = editTarget(todayRef)
+    if (!target.ok) return target.refusal
+    const planDay = target.planDayName
+    const day = week?.days.find(d => d.day === planDay)
     if (!week || !day) return "I can't see today's session just now."
+    // AN EMPTY DAY IS NOT A DAY AT ITS FLOOR (M26). adjustDayVolume changes
+    // nothing and blocks nothing on a day with no exercises, and that used to
+    // print "Every exercise is already at its minimum" about a rest day.
+    if (day.exercises.length === 0) return "There's no session here to make lighter."
     if (!isVolumeAdjustable(week)) return "This is a deload week — it's already lighter on purpose."
     const result = adjustDayVolume(day, 'lighter', profile)
     if (!result.changed) {
-      return result.blocked[0]
-        ? `Nothing left to take out — ${result.blocked[0].name} is ${result.blocked[0].reason}.`
-        : 'Every exercise is already at its minimum.'
+      // SAY WHAT THE MINIMUM IS, AND WHAT IS STILL POSSIBLE (M26). The bare
+      // "Every exercise is already at its minimum." answered "I'm wiped" with
+      // a dead end. The numbers are the session's own.
+      const sets = day.exercises.reduce((n, e) => n + (e.sets ?? 0), 0)
+      const floor = `${todayRef.sayDay}'s session is already as light as it goes: ${sets} sets across ${day.exercises.length} exercises, the fewest that still trains each one.`
+      const blocked = result.blocked[0] ? ` (${result.blocked[0].name} is ${result.blocked[0].reason}.)` : ''
+      return `${floor}${blocked} You can still swap an exercise for an easier one, shorten the session, or move it to another day from the day menu.`
     }
     const settled = settleWeek(
-      { ...week, days: week.days.map(d => (d.day === effectiveDayName ? result.day : d)) },
-      effectiveDayName,
+      { ...week, days: week.days.map(d => (d.day === planDay ? result.day : d)) },
+      planDay,
       profile,
     )
     return applySessionEdit(
@@ -494,9 +590,11 @@ export function TodayPanel({
     // moving is one tap on a menu item and then the menu is gone, so without
     // this a failed save would look exactly like a move that happened and
     // then un-happened — the silent write the app is not allowed to have.
+    const target = editTarget(todayRef)
+    if (!target.ok) { setMoveError(target.refusal); return }
     setMoveError(
       await applySessionEdit(
-        moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
+        moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
         'today',
       ),
     )
@@ -517,13 +615,16 @@ export function TodayPanel({
    */
   const priceAddition = async (entry: ExerciseEntry) => {
     if (!profile || !mesocycle) return null
-    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === effectiveDayName)
+    const target = editTarget(todayRef)
+    if (!target.ok) return null
+    const planDay = target.planDayName
+    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === planDay)
     if (!day) return null
     const tier = mapTier(entry.mechanics_tier)
     const programming = peerProgrammingFor(day.exercises, tier)
     if (!programming) return null
     const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
-    return { load, day }
+    return { load, day, planDay }
   }
 
   const addExercise = async (entry: ExerciseEntry, scope: SwapScope): Promise<string | null> => {
@@ -531,7 +632,7 @@ export function TodayPanel({
     const priced = await priceAddition(entry)
     if (!priced) return `I couldn't work out what to prescribe for ${entry.name} here.`
     return applySessionEdit(
-      addExerciseToSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, entry, load: priced.load, scope }),
+      addExerciseToSession({ mesocycle, profile, weekNumber: liveWeek, dayName: priced.planDay, entry, load: priced.load, scope }),
       scope,
     )
   }
@@ -551,17 +652,19 @@ export function TodayPanel({
     const priced = await priceAddition(entry)
     if (!priced) return nothing
     const result = addExerciseToSession({
-      mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName,
+      mesocycle, profile, weekNumber: liveWeek, dayName: priced.planDay,
       entry, load: priced.load, scope: 'today',
     })
     if (!result.changed) return nothing
     const afterWeek = result.mesocycle.find(w => w.week_number === liveWeek)
-    const afterDay = afterWeek?.days.find(d => d.day === effectiveDayName)
+    const afterDay = afterWeek?.days.find(d => d.day === priced.planDay)
     const minutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : null
     const capMinutes = Math.round(getSessionMaximumSeconds(profile.session_duration_preference) / 60)
     const overBy = minutes != null && minutes > capMinutes ? minutes - capMinutes : null
+    const impact = describeEditImpact(mesocycle.find(w => w.week_number === liveWeek), afterWeek, priced.planDay)
     return {
-      ...describeEditImpact(mesocycle.find(w => w.week_number === liveWeek), afterWeek, effectiveDayName),
+      cost: say(impact.cost),
+      balancing: say(impact.balancing),
       minutes,
       overBy,
     }
@@ -575,13 +678,16 @@ export function TodayPanel({
   const removalBalanceCost = (exIndex: number, scope: SwapScope): { cost: string | null; balancing: string | null } => {
     const nothing = { cost: null, balancing: null }
     if (!profile || !mesocycle) return nothing
-    const result = removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: effectiveDayName, exIndex, scope })
+    const target = editTarget(todayRef)
+    if (!target.ok) return nothing
+    const result = removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, exIndex, scope })
     if (!result.changed) return nothing
-    return describeEditImpact(
+    const impact = describeEditImpact(
       mesocycle.find(w => w.week_number === liveWeek),
       result.mesocycle.find(w => w.week_number === liveWeek),
-      effectiveDayName,
+      target.planDayName,
     )
+    return { cost: say(impact.cost), balancing: say(impact.balancing) }
   }
 
   const openWhatHappened = () => {
@@ -800,7 +906,11 @@ export function TodayPanel({
     setVolumeBusy(true)
     setVolumeError(null)
     try {
-      const result = await executeSecondSportVolume(profile, mesocycle, exclusions, { keepFullVolume: keepFull, fromWeek: liveWeek })
+      // The SAVED profile is what a rebuild regenerates from; the days already
+      // trained, and anything temporarily being eased off, come in the context.
+      const saved = storedProfile ?? profile
+      const context = await loadPlanEditContext(saved, mesocycle, planCreatedAt)
+      const result = await executeSecondSportVolume(saved, mesocycle, exclusions, { keepFullVolume: keepFull, fromWeek: liveWeek }, context)
       if (result.receipt.failed.length > 0) { setVolumeError(result.receipt.failed[0].error); return }
       onMesocycleUpdated(result.mesocycle)
       onProfileChanged(result.profilePatch)
@@ -836,12 +946,17 @@ export function TodayPanel({
   const peekWorkout = peekDay && !peekMovedTo
     ? (peekCell?.session ?? liveWeekPlan.find(d => d.day === peekDay))
     : null
+  // The peeked day's reference — a swap opened from the peek writes to the
+  // row the session LIVES in (Monday's, for a session moved to Friday), and
+  // a day swapped for football or rested on purpose opens none.
+  const peekRef: SessionRef | null = peekCell ? sessionRefFromCell(peekCell, liveWeek) : null
 
   // Turn 5: session-progress 2px line — total sets logged today across every
   // exercise on the live day, over total sets planned. Only meaningful (and
   // only rendered) for the live-session branch below; rest/recovery/peek
   // don't have a "sets" concept.
   const totalSetsPlanned = workout && !isRestDay && !isActiveRecovery ? workout.exercises.reduce((s, ex) => s + ex.sets, 0) : 0
+  const heroCount = workout && !isRestDay && !isActiveRecovery ? sessionSetCount(workout, logs) : null
   const totalSetsLogged = workout && !isRestDay && !isActiveRecovery
     ? workout.exercises.reduce((s, ex) => s + setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length, 0)
     : 0
@@ -851,7 +966,16 @@ export function TodayPanel({
   // a WeekContextRow prop and documented in its header — it had simply never
   // been passed, so the "~52 min" chip it describes never rendered at all.
   const sessionEstimate = (() => {
-    if (!workout || workout.exercises.length === 0) return { minutes: undefined, note: undefined }
+    // THE HEADER SHOWS THE DAY THAT IS OPEN (test log L17). It printed today's
+    // minutes while another day was being looked at: a 40-minute leg day read
+    // "~22 min" because today was the short one. While peeking, the length is
+    // the peeked day's — and the shortfall note, which is about TODAY's
+    // session against the length asked for, is not shown at all.
+    if (peekDay) {
+      const shown = peekWorkout && peekWorkout.exercises.length > 0 ? peekWorkout : null
+      return { length: shown ? formatDayLength(dayLengthParts(shown)) : undefined, note: undefined }
+    }
+    if (!workout || workout.exercises.length === 0) return { length: undefined, note: undefined }
     const seconds = estimateDaySeconds(workout)
     // A DAY SOMEBODY SHORTENED SAYS SO. Otherwise the only trace of "I've only
     // got 25 minutes" is a session that is quietly two exercises thinner than
@@ -882,7 +1006,9 @@ export function TodayPanel({
       shortenedToMinutes: shortened,
     })
     return {
-      minutes: actual,
+      // Work and optional, apart — one helper, shared with the programme list
+      // and Home (see dayLengthParts).
+      length: formatDayLength(dayLengthParts(workout)),
       note: [shortenedLine, shortfall?.note].filter(Boolean).join(' ') || undefined,
     }
   })()
@@ -923,6 +1049,7 @@ export function TodayPanel({
         days={weekTrain.days}
         todayName={todayName}
         todayDate={today}
+        selectedDay={peekDay ?? todayName}
         onSelectDay={d => setPeekDay(d)}
         weekNumber={liveWeek}
         totalWeeks={totalWeeks}
@@ -932,8 +1059,6 @@ export function TodayPanel({
         isCalibrationWeek={currentMesoWeekObj?.isCalibrationWeek}
         phaseFocus={currentMesoWeekObj?.phase_focus}
         coachNote={currentMesoWeekObj?.coach_note}
-        estimatedMinutes={sessionEstimate.minutes}
-        shortfallNote={sessionEstimate.note}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
         onOpenWhatHappened={profileId ? openWhatHappened : undefined}
@@ -960,7 +1085,7 @@ export function TodayPanel({
       </Suspense>
       <Suspense fallback={null}>
       <AddExerciseSheet
-        target={addOpen && workout ? { dayName: effectiveDayName, day: workout } : null}
+        target={addOpen && workout ? { dayName: todayRef.sayDay, day: workout } : null}
         onClose={() => setAddOpen(false)}
         profile={profile}
         exclusions={exclusions}
@@ -973,9 +1098,10 @@ export function TodayPanel({
         target={removeTarget}
         onClose={() => setRemoveTarget(null)}
         onDrop={scope => dropExercise(removeTarget!.exIndex, scope)}
-        onSwapInstead={() => removeTarget && onOpenSwap(removeTarget.dayName, removeTarget.exIndex, removeTarget.exerciseName)}
+        onSwapInstead={() => removeTarget && onOpenSwap(todayRef.planDayName, removeTarget.exIndex, removeTarget.exerciseName, todayRef.sayDay)}
         balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : { cost: null, balancing: null })}
         onReason={handleRemoveReason}
+        onDislike={() => removeTarget && void onBanExercise(removeTarget.exerciseName)}
       />
       </Suspense>
 
@@ -1004,16 +1130,35 @@ export function TodayPanel({
             <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
           </div>
         ) : (
-          <PeekPanel
-            workout={peekWorkout}
-            dayLabel={peekDay}
-            movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
-            onExit={() => setPeekDay(null)}
-            onSwap={(exIndex, name) => peekDay && onOpenSwap(peekDay, exIndex, name)}
-            onBan={handleBan}
-            onOpenDetail={onOpenDetail}
-            banBusyName={banBusy}
-          />
+          <>
+            {/* THE DAY SAYS WHAT WAS DONE ON IT — M14, 9 Oct 2026. Today's card
+                has said "You swapped today for…" since 8 Sep; a peeked day,
+                which a past one always is, fell straight through to the
+                planned session with the fact in hand and unused. So "football,
+                60 min, Hard" on Tuesday left a ⇄ on the strip and a Back &
+                Biceps card that had never heard of it. The planned list stays,
+                dimmed: it is what the plan had, not what happened. */}
+            {peekCell?.state === 'swapped' && peekCell.swappedLine && (
+              <InsightBanner tone="ai" data-testid="peek-swapped">
+                <span className="text-sm">
+                  You did something else instead: <span className="font-semibold">{peekCell.swappedLine}</span>.
+                </span>
+              </InsightBanner>
+            )}
+            <div className={peekCell?.state === 'swapped' ? 'opacity-60' : undefined}>
+              <PeekPanel
+                workout={peekWorkout}
+                dayLabel={peekDay}
+                movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
+                sessionLength={sessionEstimate.length}
+                onExit={() => setPeekDay(null)}
+                onSwap={(exIndex, name) => peekRef && editTarget(peekRef).ok && onOpenSwap(peekRef.planDayName, exIndex, name, peekRef.sayDay)}
+                onBan={handleBan}
+                onOpenDetail={onOpenDetail}
+                banBusyName={banBusy}
+              />
+            </div>
+          </>
         )
       ) : isMovedAway && movedAwayTo ? (
         <MovedDayCard
@@ -1139,10 +1284,26 @@ export function TodayPanel({
               )}
             </div>
             <p className="mt-1.5 text-[2.25rem] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
-            <div className="mt-3 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
+            {/* THE META LINE (2c): what is in it and how long, then the sets —
+                the SHARED capped count (her M39 "one count"), so this, Home
+                and the finished bar cannot say different fractions. */}
+            <div className="mt-2 flex items-baseline justify-between gap-3 text-[0.75rem] text-muted-foreground">
+              <span data-testid="hero-meta">
+                {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}
+              </span>
+              {heroCount && <span className="tabular-mono" data-testid="hero-sets">{heroCount.logged}/{heroCount.planned} sets</span>}
+            </div>
+            {/* THE REASON BESIDE THE NUMBER (audit §6.5). The length moved
+                from the week row to this line in 2c, so the "why is it shorter
+                than I asked for" line moved with it: always visible, never
+                behind an expander. */}
+            {sessionEstimate.note && (
+              <p className="mt-1 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{sessionEstimate.note}</p>
+            )}
+            <div className="mt-2 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
               <div
                 className="h-[2px] rounded-full bg-primary glow-mint-box"
-                style={{ width: `${totalSetsPlanned > 0 ? Math.min(100, (totalSetsLogged / totalSetsPlanned) * 100) : 0}%` }}
+                style={{ width: `${heroCount && heroCount.planned > 0 ? Math.min(100, (heroCount.logged / heroCount.planned) * 100) : 0}%` }}
               />
             </div>
             {/* START MOVED OUT OF THE HERO on 6 Sep 2026 — it is the fixed
@@ -1152,17 +1313,31 @@ export function TodayPanel({
                 already declines to carry a second entry point for it. */}
             {status === 'running' && (
               <>
-                <Button size="sm" className="mt-3" onClick={handleFinish}>Finish session</Button>
+                <Button size="sm" className="mt-3" onClick={requestFinish}>Finish session</Button>
                 {/* The line between a look and a workout, said before Finish
                     is tapped rather than after: with nothing logged, Finish
                     closes the screen and counts nothing (useActiveSession).
                     Gone the moment a set lands. */}
-                {totalSetsLogged === 0 && (
+                {/* ...and only when the app KNOWS nothing is logged. On a
+                    reload with no connection and nothing remembered, zero is
+                    not a count (H20). */}
+                {totalSetsLogged === 0 && setsKnown && (
                   <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
                     Nothing logged yet — finishing now closes this screen without counting a workout. Log a set and it counts.
                   </p>
                 )}
               </>
+            )}
+            {/* THE READ FAILED, AND THE SCREEN SAYS SO — H20, 9 Oct 2026. The
+                sets drawn below are the phone's own copy, so nothing has gone
+                blank; this is the one line that explains why a set might read
+                "waiting to send". Quiet on purpose: nothing is wrong with the
+                workout. The sentence it shows is chosen by what is TRUE — see
+                reconnectingLine — and it goes the moment a read lands. */}
+            {loadState === 'failed' && (
+              <p role="status" data-testid="sets-reconnecting" className="mt-2 text-xs leading-[1.5] text-[color:var(--role-warn-text)]">
+                {reconnectingLine(setsKnown || logs.length > 0)}
+              </p>
             )}
           </div>
 
@@ -1174,10 +1349,21 @@ export function TodayPanel({
             todayNudge.source === 'week-note'
               // Clamped, so its chevron must open the REST OF THIS SENTENCE
               // (the week disclosure above), never the chat tab.
-              ? <TrainerNudge text={todayNudge.text} clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
-              : <TrainerNudge text={todayNudge.text} openChat />
+              ? <TrainerNudge text={todayNudge.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
+              : <TrainerNudge text={todayNudge.text} tag="Training" openChat askPrefill={`Tell me more about this: "${todayNudge.text}"`} />
           )}
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} />
+          {finishCheck && (
+            <Suspense fallback={null}>
+              <FinishCheckSheet
+                done={finishCheck.done}
+                planned={finishCheck.planned}
+                left={finishCheck.left}
+                onKeepGoing={() => setFinishCheck(null)}
+                onFinish={() => { setFinishCheck(null); void handleFinish() }}
+              />
+            </Suspense>
+          )}
           {/* WHAT CAN YOU ACTUALLY LOAD — asked at first use, not in
               onboarding (Ashley's call: someone who has never trained cannot
               answer it, and onboarding is where people drop out). Rendered
@@ -1206,11 +1392,13 @@ export function TodayPanel({
               />
             )
           })()}
-          {workout!.pattern_gap_note && (
-            <InsightBanner tone="warning" className="text-xs">
-              {workout!.pattern_gap_note}
-            </InsightBanner>
-          )}
+          {/* Derived from the day as it is and the profile as it is — it used
+              to be stamped at generation and went on naming a flag nobody had.
+              A plain note, not a warning: nothing is wrong with the day. */}
+          {(() => {
+            const gap = describeDayGap(workout!, { injuries: profile?.injuries ?? [] })
+            return gap ? <p className="text-xs text-muted-foreground" data-testid="day-gap-note">{gap}</p> : null
+          })()}
           {workout!.block_size_note && (
             <div className="flex items-start gap-2">
               <Clock className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
@@ -1251,9 +1439,11 @@ export function TodayPanel({
             </Suspense>
           )}
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
+          <div ref={setListEl} data-today-exercises>
           <ExerciseList
             workout={workout!}
-            dayName={effectiveDayName}
+            dayName={todayRef.planDayName}
+            sayDay={todayRef.sayDay}
             currentMesoWeekObj={currentMesoWeekObj}
             progressedLoads={progressedLoads}
             progressedAddedLoads={progressedAddedLoads}
@@ -1266,7 +1456,7 @@ export function TodayPanel({
             onOpenDetail={onOpenDetail}
             banBusy={banBusy}
             onBan={handleBan}
-            onRemove={profileId && mesocycle ? (exIndex, name) => setRemoveTarget({ dayName: effectiveDayName, exIndex, exerciseName: name }) : undefined}
+            onRemove={profileId && mesocycle ? (exIndex, name) => setRemoveTarget({ dayName: todayRef.sayDay, exIndex, exerciseName: name }) : undefined}
             onMove={profileId && mesocycle ? moveExercise : undefined}
             onSetCompleted={(exerciseName, setNumber, _weight, _reps, restStr, sets) => {
               const restSeconds = parseRestSeconds(restStr)
@@ -1276,17 +1466,16 @@ export function TodayPanel({
               }
             }}
           />
-          {(workout!.recommendedCardio || workout!.mobilityFiller) && (
-            <>
-              <p className="ds-label-compact">Finish</p>
-              {workout!.recommendedCardio && <FinisherRow cardio={workout!.recommendedCardio} />}
-              {/* The optional mobility close-out on a day that already had its
-                  cardio and still ran short — applyDurationFiller. Its own row,
-                  after the cardio, because that is the order to do them in. */}
-              {workout!.mobilityFiller && <FinisherRow cardio={workout!.mobilityFiller} label="Optional" />}
-            </>
-          )}
-          <AdditionalWorkSection plannedExercises={workout!.exercises} profile={profile} onOpenPlateCalc={onOpenPlateCalc} />
+          </div>
+          {/* "Finish" for what ends the session; "Also today" for a session the
+              plan set apart from it. FinishSection decides which is which. */}
+          <FinishSection cardio={workout!.recommendedCardio} mobilityFiller={workout!.mobilityFiller} />
+          <AdditionalWorkSection
+            plannedExercises={workout!.exercises}
+            plannedCardio={[workout!.recommendedCardio?.activity, workout!.mobilityFiller?.activity]}
+            profile={profile}
+            onOpenPlateCalc={onOpenPlateCalc}
+          />
           {/* VISIBLE AGAIN, and the "⋮" menu no longer carries it. Turn 5 put
               it behind that menu; the polish handoff puts it back at the foot
               of the list, which is where someone finishing a session looks
@@ -1327,10 +1516,11 @@ export function TodayPanel({
             open={unplannedWorkOpen}
             onOpenChange={setUnplannedWorkOpen}
             hideTrigger
+            equipmentAccess={profile?.equipment_access}
           />
           {/* Clears the fixed CTA bar below, so the last row is never sitting
               underneath it. Matches the bar's own height plus its fade. */}
-          {status === 'idle' && <div aria-hidden className="h-[100px]" />}
+          {(status === 'idle' || status === 'running' || status === 'finished') && <div aria-hidden className="h-[100px]" />}
         </div>
       )}
 
@@ -1351,6 +1541,30 @@ export function TodayPanel({
           A finished day gets no primary action: the work is done, and the
           summary it produced is the thing to look at. `idle` is the only
           state that means "not started". */}
+      {/* A FINISHED SESSION LOOKS FINISHED (runs 3-4, LOW): after Finish the
+          card was the plan with its bar gone and nothing saying so. The same
+          place Start sat says it is done, and opens the summary when there is
+          one to open. */}
+      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'finished' && (
+        <div
+          className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
+          style={{
+            bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`,
+            background: 'linear-gradient(to top, var(--background) 70%, transparent)',
+          }}
+        >
+          <Button
+            className="h-[52px] w-full text-[0.9375rem] font-semibold"
+            variant="outline"
+            data-testid="session-finished"
+            disabled={!summaryData}
+            onClick={() => setSummaryOpen(true)}
+          >
+            {/* DONE, WITH THE COUNT when it closed short (Ashley, 10 Oct 2026). */}
+            {`✓ ${finishedShort ? `Done · ${finishedShort}` : 'Session finished'}${summaryData ? ' · View summary' : ''}`}
+          </Button>
+        </div>
+      )}
       {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && (
         <div
           className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
@@ -1372,6 +1586,17 @@ export function TodayPanel({
         </div>
       )}
 
+      {/* DURING THE SESSION, THE NEXT SET (design handoff 2c, 10 Oct 2026):
+          "Log set 3 · Bench 80 kg × 6", read off the tick that would save it
+          and pressing that tick — see next-set-label.ts. Gone when no open
+          row has a set left to log, rather than guessing at one. */}
+      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'running' && (
+        <NextSetButton
+          root={listEl}
+          bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`}
+        />
+      )}
+
       {/* STEPS MOVED TO HOME, 6 Sep 2026 — design_handoff_app_polish's
           "Today so far" grid, which logs them in place. The row is REMOVED
           here rather than left as a second writer: two tabs owning one number
@@ -1385,6 +1610,7 @@ export function TodayPanel({
 function ExerciseList({
   workout,
   dayName,
+  sayDay,
   currentMesoWeekObj,
   progressedLoads,
   progressedAddedLoads,
@@ -1402,7 +1628,10 @@ function ExerciseList({
   onSetCompleted,
 }: {
   workout: WorkoutDay
+  /** The PLAN ROW this session lives in — the key a swap writes to. */
   dayName: string
+  /** The weekday it is shown on, when that differs (a moved-in session). */
+  sayDay?: string
   currentMesoWeekObj?: MesocycleWeek
   progressedLoads: Record<string, number>
   progressedAddedLoads: Record<string, number>
@@ -1411,7 +1640,7 @@ function ExerciseList({
   layoff: LayoffStatus
   /** Reaches SetGrid via ExerciseRow, to judge a typed weight — see set-plausibility.ts. */
   profile?: UserProfile
-  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string) => void
+  onOpenSwap: (dayName: string, exIndex: number, exerciseName: string, sayDay?: string) => void
   onOpenPlateCalc: (weightKg: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   onOpenDetail?: (exerciseName: string) => void
@@ -1512,7 +1741,7 @@ function ExerciseList({
       onOpenHistory,
       onOpenDetail,
       profile,
-      onSwap: () => onOpenSwap(dayName, exIndex, ex.name),
+      onSwap: () => onOpenSwap(dayName, exIndex, ex.name, sayDay),
       onBan: () => onBan(ex.name),
       onRemove: onRemove ? () => onRemove(exIndex, ex.name) : undefined,
       onMove: onMove ? (direction: -1 | 1) => onMove(exIndex, direction) : undefined,
@@ -1522,6 +1751,8 @@ function ExerciseList({
       onSetCompleted,
       expanded,
       onToggleExpanded: () => setExpandOverrides(prev => ({ ...prev, [exIndex]: !expanded })),
+      // "01", "02" in the order the session is done, supersets included.
+      index: flatExIndexes.indexOf(exIndex) + 1,
     }
   }
 

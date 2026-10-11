@@ -13,6 +13,13 @@ import { substituteForInjury } from '../src/lib/plan-adaptations'
 import { getExerciseEntry } from '../src/lib/exercise-db'
 import { isContraindicatedFor } from '../src/lib/exercise-db'
 import type { UserProfile, EquipmentAccess, TrainingStyle, TrainingExperience } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// These gates address whole plan weeks on a plan nobody has trained on: every
+// row of the named weeks, and no day protected. (A live plan addresses days by
+// date and loads the real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
+const rowsOfWeeks = (m: { week_number: number; days: { day: string }[] }[], weeks: number[]) =>
+  m.filter(w => weeks.includes(w.week_number)).flatMap(w => w.days.map(d => ({ weekNumber: w.week_number, dayName: d.day })))
 
 function buildProfile(overrides: Partial<UserProfile>): UserProfile {
   return {
@@ -81,7 +88,7 @@ async function main() {
 
           const flaggedJoints = getFlaggedJoints([injuryCode])
           const result = await substituteForInjury({
-            mesocycle, profile, injuryCode, weekNumbers: [1], exclusions: [],
+            mesocycle, profile, injuryCode, targetDays: rowsOfWeeks(mesocycle, [1]), exclusions: [], context: GATE_CONTEXT,
           })
           combosChecked++
 
@@ -113,7 +120,7 @@ async function main() {
   if (tightMesocycle.length > 0) {
     const flaggedJoints = getFlaggedJoints(['shoulders'])
     const result = await substituteForInjury({
-      mesocycle: tightMesocycle, profile: tightProfile, injuryCode: 'shoulders', weekNumbers: [1], exclusions: [],
+      mesocycle: tightMesocycle, profile: tightProfile, injuryCode: 'shoulders', targetDays: rowsOfWeeks(tightMesocycle, [1]), exclusions: [], context: GATE_CONTEXT,
     })
     const week1 = result.mesocycle.find(w => w.week_number === 1)
     let allClean = true

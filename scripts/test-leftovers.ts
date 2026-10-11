@@ -294,7 +294,10 @@ console.log('\n6. Both cards say which repeat this is')
   check('the dinner promises the repeat before it happens', /data-meal-cook-extra=/.test(card) && /COOK_ONCE\.dinner/.test(card))
   check('...only on a dinner that is actually being doubled', /option\.reusedTomorrow === true &&/.test(card))
   check('both sentences come from the shared phrasebook, not written inline',
-    /import \{ COOK_ONCE \}/.test(card) && !/Last night's dinner'/.test(strip(card)))
+    // THE PROPERTY, not the spelling of the import: COOK_ONCE comes from the
+    // phrasebook. It was `/import \{ COOK_ONCE \}/`, which went red on 9 Oct
+    // 2026 when the same line imported a second phrase beside it.
+    /import \{[^}]*\bCOOK_ONCE\b[^}]*\} from '@\/lib\/coach-voice'/.test(card) && !/Last night's dinner'/.test(strip(card)))
   check('the phrasebook says tomorrow\'s lunch is this one', /tomorrow/i.test(COOK_ONCE.dinner))
   check('...and names last night on the other side', /last night/i.test(COOK_ONCE.lunch))
 }

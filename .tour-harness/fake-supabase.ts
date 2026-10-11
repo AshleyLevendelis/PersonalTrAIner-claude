@@ -48,6 +48,103 @@ const SLOW_MS = (() => {
   }
 })()
 
+/**
+ * A CONNECTION THAT IS UP BUT DEAD — `window.__netDown = true`, or `?netdown=1`
+ * to start that way. Added 9 Oct 2026 for H20.
+ *
+ * Every request, read or write, comes back the way the real client reports a
+ * dead network: RESOLVED, with `{ data: null, error }` and an empty `code` —
+ * not thrown (postgrest-js, read in the installed package). `navigator.onLine`
+ * is left alone on purpose: the bug is the case where the browser never learns
+ * it is offline, so the app's `online`/`offline` guards cannot help.
+ *
+ * Until this existed the fake always answered, and that is why no driver had
+ * ever seen a logged set read back as "0 logged": a fake that cannot fail a
+ * read cannot show what a failed read does to the screen. Off by default, so
+ * every existing run is unchanged. Combine with `?slow=` for the seconds a real
+ * dead read takes to give up.
+ */
+const NET_DOWN_AT_START = (() => {
+  try { return new URLSearchParams(location.search).get('netdown') === '1' } catch { return false }
+})()
+if (NET_DOWN_AT_START) (window as unknown as { __netDown?: boolean }).__netDown = true
+const netDown = () => (window as unknown as { __netDown?: boolean }).__netDown === true
+const DEAD = () => ({ data: null, error: { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' } })
+
+/**
+ * THE COLUMNS POSTGRES HOLDS AS WHOLE NUMBERS — and refuses anything else for.
+ *
+ * WHY, 9 Oct 2026 (the test log's M21). The favourite heart had never saved a
+ * real meal: it wrote the meal's protein, carbs and fat with one decimal
+ * (46.6) into `integer` columns, and PostgREST does not round — it rejects the
+ * row (22P02, "invalid input syntax for type integer"). Every check of the
+ * heart ran against this fake, which took 46.6 without a word, so the browser
+ * driver showed a heart filling in while the real one did nothing. "A fake
+ * must fill what the database fills" has a twin: A FAKE MUST REFUSE WHAT THE
+ * DATABASE REFUSES, or the whole class is invisible.
+ *
+ * Read off supabase/migrations (every `integer`/`smallint`/`bigint` column of
+ * a CREATE TABLE or an ADD COLUMN) and written out here, because this file is
+ * bundled for the browser and cannot read SQL. test:meal-favourite section 9
+ * re-derives the list from the migrations and fails when the two differ, so a
+ * new integer column cannot be forgotten.
+ *
+ * Only NUMBERS are judged. null is allowed (nullability is a different
+ * constraint), and a whole number is allowed whatever its size.
+ */
+export const INTEGER_COLUMNS: Record<string, readonly string[]> = {
+  ai_usage_daily: ['requests'],
+  cardio_logs: ['avg_heart_rate', 'duration_minutes', 'intensity_rpe'],
+  coach_moment_facts: ['streak_days'],
+  daily_nutrition_targets: ['calculated_bmr', 'calculated_tdee', 'estimated_eee', 'target_calories', 'target_carbs_g', 'target_fats_g', 'target_protein_g'],
+  daily_steps: ['steps'],
+  exercise_plans: ['sets', 'week_number'],
+  exercise_set_logs: ['drop_index', 'reps_completed', 'set_number', 'week_number'],
+  favorite_meals: ['calories', 'carbs', 'fat', 'protein', 'times_used'],
+  fitness_profiles: ['age', 'daily_step_target', 'meals_per_day', 'water_target_ml'],
+  load_suggestions: ['block_number', 'exercise_index'],
+  meal_plan_slots: ['pool_index'],
+  meal_plans: ['calories', 'carbs', 'fat', 'protein', 'sub_calories', 'sub_carbs', 'sub_fat', 'sub_protein'],
+  mesocycle_weeks: ['block_number', 'week_in_block', 'week_number'],
+  nutrition_cache: ['calories', 'carbs', 'fat', 'protein'],
+  pending_actions: ['payload_version'],
+  set_logs: ['reps_completed', 'set_number', 'week_number'],
+  water_logs: ['amount_ml'],
+  weight_basis_offers: ['applied_from_week'],
+  workout_exercises: ['execution_order', 'rest_seconds', 'rpe_target', 'sets', 'tier'],
+  workout_logs: ['reps_completed', 'set_number'],
+  workout_sessions: ['duration_minutes', 'week_number'],
+}
+
+/**
+ * Defaults the real table fills in that a writer then READS BACK and does
+ * arithmetic on. One so far: a favourite's `times_used` (DEFAULT 1 in the
+ * migration). The heart's second tap adds one to it; with no default here that
+ * was `undefined + 1`, and the whole-number check above — correctly — refused
+ * the NaN. Found the first time the heart's update path was run at all.
+ */
+const COLUMN_DEFAULTS: Record<string, Row> = {
+  favorite_meals: { times_used: 1 },
+}
+
+/** The first value in `row` that an integer column would refuse, or null. */
+export function integerViolation(tableName: string, row: Row): { column: string; value: number } | null {
+  for (const column of INTEGER_COLUMNS[tableName] ?? []) {
+    const value = row[column]
+    if (typeof value === 'number' && !Number.isInteger(value)) return { column, value }
+  }
+  return null
+}
+
+/** Every write this fake refused for a non-integer, so a driver can ask "did anything else trip?" (window.__intRejects). */
+const rejectAsPostgres = (tableName: string, v: { column: string; value: number }) => {
+  try {
+    const w = window as unknown as { __intRejects?: { table: string; column: string; value: number }[] }
+    ;(w.__intRejects ??= []).push({ table: tableName, ...v })
+  } catch { /* no window: a logic gate is calling this directly */ }
+  return { data: null, error: { code: '22P02', message: `invalid input syntax for type integer: "${v.value}"`, details: null, hint: null } }
+}
+
 export function makeFakeSupabase(db: Db) {
   const table = (name: string) => (db[name] ??= [])
 
@@ -63,6 +160,7 @@ export function makeFakeSupabase(db: Db) {
     const orders: [string, boolean][] = []
 
     const exec = () => {
+      if (netDown()) return DEAD()
       const rows0 = table(name)
       // A WRITE A DRIVER WANTS TO FAIL. Opt-in: a driver sets window.__failWrite
       // to a predicate over (table, operation, row); nothing sets it by
@@ -71,6 +169,13 @@ export function makeFakeSupabase(db: Db) {
       const failWrite = (window as unknown as { __failWrite?: (t: string, o: string, r: Row) => boolean }).__failWrite
       if (failWrite && (op === 'insert' || op === 'upsert' || op === 'delete') && (op === 'delete' ? failWrite(name, op, {}) : payload.some(r => failWrite(name, op, r)))) {
         return { data: null, error: { code: '08006', message: 'simulated write failure' } }
+      }
+      // A DECIMAL IN A WHOLE-NUMBER COLUMN IS REFUSED, AS POSTGRES REFUSES IT
+      // (INTEGER_COLUMNS above). Before anything is stored: a rejected insert
+      // leaves no row, and a rejected update changes none.
+      for (const row of op === 'insert' || op === 'upsert' ? payload : op === 'update' ? [updateObj] : []) {
+        const bad = integerViolation(name, row)
+        if (bad) return rejectAsPostgres(name, bad)
       }
       if (op === 'insert' || op === 'upsert') {
         // RETURN THE STORED ROWS, not the payload. The payload has no `id` —
@@ -89,7 +194,18 @@ export function makeFakeSupabase(db: Db) {
           // sorts on it, and the sort threw — so the list read back EMPTY
           // while the table held every row. Read off the harness's one clock,
           // not the machine's, so a run gives the same answer on a Tuesday.
-          else { const row = { id: crypto.randomUUID(), created_at: new Date(anchorNowMs()).toISOString(), ...raw }; rows0.push(row); stored.push(row) }
+          // A DRIVER MAY CHOOSE ONE INPUT OF A NEW ROW (9 Oct 2026):
+          // `window.__rowPatch = { pending_actions: () => ({ expires_at }) }`.
+          // An offer's window is ten real minutes and no driver can wait that
+          // long; this lets one be made eight seconds from its end, so the
+          // card's OWN timer is what is watched. Opt-in, applied to inserts
+          // only, and absent on every run that does not set it.
+          // ...AND THE COLUMN DEFAULTS A WRITER RELIES ON (COLUMN_DEFAULTS below).
+          else {
+            const patch = (window as unknown as { __rowPatch?: Record<string, (row: Row) => Row> }).__rowPatch?.[name]
+            const row = { id: crypto.randomUUID(), created_at: new Date(anchorNowMs()).toISOString(), ...(COLUMN_DEFAULTS[name] ?? {}), ...raw, ...(patch ? patch(raw) : {}) }
+            rows0.push(row); stored.push(row)
+          }
         }
         const out = stored.map(r => ({ ...r }))
         return { data: single ? (out[0] ?? null) : out, error: null }
@@ -168,6 +284,15 @@ export function makeFakeSupabase(db: Db) {
         return api
       },
       in: (c: string, vs: unknown[]) => { filters.push(r => vs.includes(r[c])); return api },
+      // SQL LIKE — `%` any run, `_` one character, everything else literal.
+      // Missing until 9 Oct 2026, so the one production query that uses it
+      // (sweepStaleForTarget, after a tap-swap) threw here and read as "that
+      // swap didn't save": a fake must answer what the database answers.
+      like: (c: string, pattern: string) => {
+        const re = new RegExp('^' + pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$')
+        filters.push(r => typeof r[c] === 'string' && re.test(r[c] as string))
+        return api
+      },
       match: (obj: Row) => { for (const [c, v] of Object.entries(obj)) filters.push(r => r[c] === v); return api },
       order: (c: string, opts?: { ascending?: boolean }) => { orders.push([c, opts?.ascending !== false]); return api },
       limit: (n: number) => { limitN = n; return api },

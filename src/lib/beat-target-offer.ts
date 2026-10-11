@@ -61,7 +61,10 @@ export interface BeatTargetPayload {
   exIndex: number
   exerciseName: string
   plannedKg: number
+  /** What the new block starts at: last block's best set in the new block's reps (carriedForRepRange). */
   liftedKg: number
+  /** The new block's rep range, so the sentence can say what the number is for. */
+  repsLabel?: string
 }
 
 export interface BeatTargetOffer {
@@ -88,12 +91,33 @@ export interface BeatTargetOffer {
 export function beatTargetInBlock(
   sessionsInBlock: ExerciseHistorySession[],
   plannedKg: number,
+  /** What the last block says the NEW one can start at (carriedForRepRange). Defaults to the weight last lifted. */
+  carryKg?: number,
 ): boolean {
   if (sessionsInBlock.length < MIN_SESSIONS_TO_JUDGE) return false
   if (didExerciseStallInBlock(sessionsInBlock)) return false
   // The person is working above what the next block is about to ask for.
   // Strictly above: equal is the plan being correct, not behind.
-  return lastLoggedWeight(sessionsInBlock) > plannedKg
+  return (carryKg ?? lastLoggedWeight(sessionsInBlock)) > plannedKg
+}
+
+/**
+ * THE LAST BLOCK'S BEST SET, SAID IN THE NEW BLOCK'S REPS (runs 3-4, M43;
+ * Ashley, 10 Oct 2026: "adjust for the new rep range"). A new block changes the
+ * rep range, so last block's working weight is the wrong number to start from:
+ * 18 kg x 11 is about 20 kg for 6-8. Decided as a CSCS coach: the set's
+ * estimated one-rep max (Epley, the formula every record here uses) taken back
+ * down to the TOP of the new range, so the bottom of it still leaves a rep or
+ * two in reserve. Rounded down to the half kilo; the confirm then clamps it to
+ * the kit and the stated limit through prescribeLoad. Null when the range has
+ * no number to aim at.
+ */
+export function carriedForRepRange(e1rmKg: number, repsLabel: string | undefined | null): number | null {
+  const tops = (repsLabel ?? '').match(/\d+/g)?.map(Number).filter(n => n > 0) ?? []
+  if (!(e1rmKg > 0) || tops.length === 0) return null
+  const top = Math.max(...tops)
+  const kg = top === 1 ? e1rmKg : e1rmKg / (1 + top / 30)
+  return Math.floor(kg * 2) / 2
 }
 
 /**
@@ -104,9 +128,12 @@ export function beatTargetInBlock(
  * last two reps were clean. It reports what was lifted and what was planned,
  * and asks.
  */
-export function offerText(exerciseName: string, plannedKg: number, liftedKg: number): string {
-  return `You've been working ${exerciseName} at ${liftedKg}kg, and the next block is planned from ${plannedKg}kg. `
-    + `Want me to start it from what you're actually lifting?`
+export function offerText(exerciseName: string, plannedKg: number, liftedKg: number, repsLabel?: string): string {
+  return repsLabel
+    ? `Your ${exerciseName} sets last block work out at about ${liftedKg}kg for this block's ${repsLabel} reps, and it is planned from ${plannedKg}kg. `
+      + `Want me to start it from that?`
+    : `You've been working ${exerciseName} at ${liftedKg}kg, and the next block is planned from ${plannedKg}kg. `
+      + `Want me to start it from what you're actually lifting?`
 }
 
 /**
@@ -183,7 +210,10 @@ export async function checkForBeatTargetOffer(
 
       const sessionsInBlock = (await getExerciseHistory(profileId, ex.id ?? getExerciseId(ex.name)))
         .filter(s => s.date >= start && s.date < end)
-      if (!beatTargetInBlock(sessionsInBlock, plannedKg)) continue
+      // In the new block's reps, from the most recent session's best set.
+      const recent = [...sessionsInBlock].sort((a, b) => b.date.localeCompare(a.date))[0]
+      const carryKg = recent ? (carriedForRepRange(recent.topSetE1RM, ex.reps) ?? lastLoggedWeight(sessionsInBlock)) : 0
+      if (!beatTargetInBlock(sessionsInBlock, plannedKg, carryKg)) continue
 
       candidates.push({
         blockNumber: currentWeek.block_number,
@@ -191,7 +221,8 @@ export async function checkForBeatTargetOffer(
         exIndex,
         exerciseName: ex.name,
         plannedKg,
-        liftedKg: lastLoggedWeight(sessionsInBlock),
+        liftedKg: carryKg,
+        repsLabel: ex.reps,
       })
     }
   }
@@ -219,7 +250,7 @@ export async function checkForBeatTargetOffer(
     },
   })
 
-  return { id: row.id, text: offerText(best.exerciseName, best.plannedKg, best.liftedKg), payload: best }
+  return { id: row.id, text: offerText(best.exerciseName, best.plannedKg, best.liftedKg, best.repsLabel), payload: best }
 }
 
 export interface ConfirmBeatTargetParams {
@@ -277,6 +308,23 @@ export function patchBlockFromLiftedKg(
   const entry = getExerciseEntry(anchor.exerciseName)
   if (!entry) return { next: mesocycle, patched: false }
   const fromWeek = anchor.fromWeekInBlock ?? 1
+  // WHAT THE PLAN CAN ACTUALLY BE WRITTEN AT. Somebody who has said their
+  // heaviest dumbbells are 24kg and logs a borrowed 30 is re-anchored to 24 —
+  // prescribeLoad clamps the forced number to what they own. Working from the
+  // lifted figure anyway got two things wrong (test log H18, 9 Oct 2026): the
+  // deload was written at 70% of 30 rather than of 24, which rounds to the
+  // same dumbbell as the loading weeks when the limit is low, so the recovery
+  // week stopped being lighter; and a week already printed AT the limit was
+  // rewritten with the identical number and reported as changed, which is how
+  // the app came to announce "now starts from your 30kg set" over a plan that
+  // read 24 before and after.
+  //
+  // ASKED OF prescribeLoad ITSELF rather than re-derived from the ceilings: it
+  // is the one place every clamp lives (the table, a stated limit, and a bag's
+  // strap limit, which is not a "ceiling" in the other two's sense). A first
+  // version capped at the stated/table ceiling only and still wrote a
+  // backpack's deload at 70% of a logged 26kg the bag is never prescribed.
+  const reachableKg = prescribeLoad(entry, profile, { forceStartingWeightKg: anchor.liftedKg }).starting_weight_kg ?? anchor.liftedKg
 
   let patched = false
   const next = mesocycle.map(week => {
@@ -293,8 +341,14 @@ export function patchBlockFromLiftedKg(
     // the anchor, and prescribeLoad's own rounding holds it at the
     // equipment floor where that lands under it (the generator's
     // deloadAtFloor case, reached by the same arithmetic).
-    const targetKg = week.is_deload ? anchor.liftedKg * DELOAD_LOAD_FRACTION : anchor.liftedKg
-    if (target.suggested_load_kg != null && target.suggested_load_kg >= targetKg) return week
+    const targetKg = week.is_deload ? reachableKg * DELOAD_LOAD_FRACTION : reachableKg
+    // NEVER DOWNWARD — except a deload sitting ABOVE its own fraction (runs
+    // 3-4, M43: a deload stored at the 24 kg limit, as heavy as the loading
+    // weeks, was never lowered because this guard only ever raised). A deload
+    // is defined by being lighter; bringing it down to its fraction is the
+    // plan keeping its own rule, not this path acting as a brake.
+    const deloadTooHeavy = week.is_deload && target.suggested_load_kg != null && target.suggested_load_kg > targetKg
+    if (!deloadTooHeavy && target.suggested_load_kg != null && target.suggested_load_kg >= targetKg) return week
 
     const load = prescribeLoad(entry, profile, {
       targetRpeLabel: target.intensity || '',
@@ -303,12 +357,23 @@ export function patchBlockFromLiftedKg(
       repRangeLabel: target.reps,
       forceStartingWeightKg: targetKg,
     })
+    // "PATCHED" MEANS THE NUMBER MOVED. Rounding to a real dumbbell or one
+    // more clamp inside prescribeLoad (a backpack's strap limit) can hand back
+    // exactly what was already printed; that week is left as it was, and if
+    // every week is, nothing was patched and nothing may be announced.
+    if (load.starting_weight_kg === target.suggested_load_kg) return week
     const patchedEx: Exercise = {
       ...target,
       suggested_load: load.display,
       suggested_load_kg: load.starting_weight_kg,
       per_set_load: load.per_set,
       load_guidance: load.basis,
+      // WHY IT IS WHERE IT IS, from the same calculation as the number. This
+      // patch used to leave the old week's reason standing ("next weight up is
+      // too big a jump") beside a weight that had just jumped — and a week
+      // re-anchored to the person's own dumbbell limit carried no reason for
+      // stopping there at all.
+      load_hold: load.hold ?? undefined,
     }
     patched = true
     return {
@@ -363,8 +428,11 @@ export async function confirmBeatTargetOffer(
   await Promise.all(
     next.filter(w => w.block_number === payload.blockNumber).map(w => saveMesocycleWeek(profileId, w)),
   )
+  // THE RECEIPT QUOTES WHAT WAS WRITTEN, read back off the plan — not the
+  // lifted figure, which a stated dumbbell limit can sit below.
+  const writtenKg = plannedKgForSlot(next, payload.blockNumber, payload.dayName, payload.exIndex, payload.exerciseName)
   await resolvePendingAction(offerId, 'done', {
-    landed: [`${payload.exerciseName} starts block ${payload.blockNumber} at ${payload.liftedKg}kg.`],
+    landed: [`${payload.exerciseName} starts block ${payload.blockNumber} at ${writtenKg ?? payload.liftedKg}kg.`],
     failed: [],
   })
   return next

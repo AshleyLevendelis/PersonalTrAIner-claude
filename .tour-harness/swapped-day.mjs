@@ -100,10 +100,17 @@ await shoot('swapped-day')
 await ev(`location.hash = '#/tab/dashboard'`); await wait(2500)
 let homeCell = null
 for (let i = 0; i < 16 && homeCell === null; i++) {
-  homeCell = await ev(`(() => { const n = document.querySelector('[aria-label$="swapped for another activity"]'); return n ? n.textContent.trim() : null })()`)
+  // RE-ANCHORED 9 Oct 2026 (M14): the cell used to be found by the sentence
+  // "swapped for another activity". It names the activity now, so it is found
+  // by the part of the sentence that did not change and the name is asserted.
+  homeCell = await ev(`(() => { const n = document.querySelector('[role="img"][aria-label*=": swapped for "]'); return n ? { look: n.getAttribute('data-look'), label: n.getAttribute('aria-label') } : null })()`)
   if (homeCell === null) await wait(500)
 }
-check('5. Home\'s strip marks today as swapped — ⇄, not the plain today dot', homeCell === '⇄', homeCell)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's week is seven lettered
+// circles with four looks. A swapped day was trained, so it is FILLED, not the
+// open "today, still to do" ring — and the spoken label keeps "swapped for".
+check('5. Home\'s strip marks today as swapped — filled, not the plain today ring', homeCell?.look === 'done', homeCell)
+check('5b. ...and says what for — "swapped for Muay Thai", not "another activity"', /: swapped for Muay Thai$/.test(homeCell?.label ?? ''), homeCell)
 
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)

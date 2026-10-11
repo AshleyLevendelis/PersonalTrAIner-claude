@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Trophy } from 'lucide-react'
 import type { SessionSummary } from '@/lib/session-derive'
 import { readingFor, type SessionPRHit } from '@/lib/pr-engine'
-import { personalBest, BEST_SET_QUALIFIER } from '@/lib/coach-voice'
+import { personalBest, BEST_SET_QUALIFIER, noSetsButCardio, extraSetsNote } from '@/lib/coach-voice'
 import type { DoubleProgressionRecommendation } from '@/lib/progression-engine'
 
 export interface SessionSummaryData {
@@ -24,6 +24,15 @@ export interface SessionSummaryData {
    * own units into that sentence.
    */
   progressions: (readonly [string, { note: string; didProgress: boolean } | null])[]
+  /**
+   * The cardio logged today, one line each — "Brisk walk · 30 min · Easy".
+   *
+   * H21, 9 Oct 2026: the tester ticked the planned finisher, the row confirmed
+   * it with Undo, and this card — built from set logs alone — did not mention
+   * it. ITS OWN LINES, NOT FOLDED INTO THE TILES: Duration, Volume and Sets
+   * are the lifting's. (Decided unprompted, reversible — BACKLOG, 9 Oct.)
+   */
+  cardio?: string[]
 }
 
 export function SessionSummaryDialog({
@@ -32,6 +41,7 @@ export function SessionSummaryDialog({
   data,
   nothingLogged = false,
   serverCloseFailed = false,
+  savedCardio = [],
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -40,6 +50,8 @@ export function SessionSummaryDialog({
   nothingLogged?: boolean
   /** The sets are saved but the session's completed stamp didn't reach the server. The app retries; this stops the dialog claiming it already worked. */
   serverCloseFailed?: boolean
+  /** With `nothingLogged`: the cardio that WAS logged today, by name — so the card does not say "Nothing logged" over a walk it has saved. */
+  savedCardio?: string[]
 }) {
   const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
@@ -47,7 +59,7 @@ export function SessionSummaryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm max-h-[85vh]">
         <DialogHeader>
-          <DialogTitle>{nothingLogged ? 'Nothing logged' : serverCloseFailed ? 'Session saved' : 'Session complete'}</DialogTitle>
+          <DialogTitle>{nothingLogged ? (savedCardio.length > 0 ? 'No sets logged' : 'Nothing logged') : serverCloseFailed ? 'Session saved' : 'Session complete'}</DialogTitle>
         </DialogHeader>
         {serverCloseFailed && !nothingLogged && (
           // "Complete" is a claim about the record, and the record did not
@@ -58,6 +70,9 @@ export function SessionSummaryDialog({
             Your sets are saved. Finishing the session hasn&apos;t synced yet — the app will
             keep trying, so there&apos;s nothing you need to do.
           </p>
+        )}
+        {nothingLogged && savedCardio.length > 0 && (
+          <p className="text-sm leading-[1.5]" data-testid="summary-saved-cardio">{noSetsButCardio(savedCardio)}</p>
         )}
         {nothingLogged && (
           <p className="text-sm leading-[1.5] text-muted-foreground">
@@ -70,20 +85,33 @@ export function SessionSummaryDialog({
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-lg bg-[color:var(--surface-deep)] p-2.5">
                 <p className="tabular-mono text-lg font-bold">{data.summary.durationMinutes}<span className="text-xs font-normal text-muted-foreground">m</span></p>
-                <p className="ds-label-compact mt-0.5">Duration</p>
+                <p className="ds-label-compact mt-0.5">Training time</p>
               </div>
               <div className="rounded-lg bg-[color:var(--surface-deep)] p-2.5">
                 <p className="tabular-mono text-lg font-bold">{Math.round(data.summary.totalVolumeKg).toLocaleString()}<span className="text-xs font-normal text-muted-foreground">kg</span></p>
                 <p className="ds-label-compact mt-0.5">Volume</p>
               </div>
               <div className="rounded-lg bg-[color:var(--surface-deep)] p-2.5">
-                <p className="tabular-mono text-lg font-bold">{data.summary.setsCompleted}<span className="text-xs font-normal text-muted-foreground">/{data.summary.setsPrescribed}</span></p>
-                <p className="ds-label-compact mt-0.5">Sets</p>
+                {/* PLANNED over planned, and anything beyond the plan BESIDE it
+                    (L29): "7/9" used to count an added exercise in the 7 and
+                    not in the 9. The words come from the phrasebook. */}
+                <p className="tabular-mono text-lg font-bold" data-testid="summary-sets">{data.summary.setsCompleted}<span className="text-xs font-normal text-muted-foreground">/{data.summary.setsPrescribed}</span></p>
+                <p className="ds-label-compact mt-0.5" data-testid="summary-sets-label">Planned sets</p>
+                {data.summary.extraSets > 0 && (
+                  <p className="mt-0.5 text-[0.6875rem] text-muted-foreground" data-testid="summary-sets-extra">{extraSetsNote(data.summary.extraSets)}</p>
+                )}
               </div>
             </div>
 
+            {(data.cardio?.length ?? 0) > 0 && (
+              <div className="space-y-1.5" data-testid="summary-cardio">
+                <p className="ds-label-compact">Cardio</p>
+                {data.cardio!.map((line, i) => <p key={i} className="text-sm">{line}</p>)}
+              </div>
+            )}
+
             {data.prs.length > 0 && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" data-testid="summary-prs">
                 <p className="ds-label-compact">New PRs</p>
                 {data.prs.map(pr => (
                   <p key={pr.exerciseName} className="flex items-center gap-1.5 text-sm">

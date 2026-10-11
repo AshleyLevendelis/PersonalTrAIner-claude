@@ -1,9 +1,11 @@
+import { useLayoutEffect, useRef } from 'react'
 import { Star } from 'lucide-react'
 import { useTimers } from '@/hooks/useTimers'
 import {
-  ROUND_PRESETS, chipNumbers, describeRoundPreset, presetForConfig, sameRoundConfig, sessionRoundNumber, sessionTotalRounds,
+  ROUND_PRESETS, chipNumbers, describeRoundPreset, roundStyleOf, sameRoundConfig, sessionRoundNumber, sessionTotalRounds,
   type RoundConfig,
 } from '@/lib/timer-engine'
+import { clock, workingSeconds } from '@/lib/round-setup'
 
 // ---------------------------------------------------------------------------
 // THE PROTOCOLS, AS THE WHOLE CONTROL SURFACE — design handoff frame 4a,
@@ -61,48 +63,89 @@ export function protocolChoices(
   return out
 }
 
-export function ProtocolChips({ choices, live, selected, customOpen, onOpenCustom }: {
+/**
+ * WHICH CARD IS LIT — 4c. The first card whose numbers ARE the selection:
+ * Today, then the table. Nothing matching means the selection is her own
+ * numbers, and that is the Custom card.
+ */
+export function selectedChoiceKey(choices: ProtocolChoice[], active: RoundConfig | null): string | null {
+  if (!active) return null
+  return choices.find(c => c.key !== 'custom' && sameRoundConfig(c.config, active))?.key ?? 'custom'
+}
+
+/**
+ * THE PRESET CARDS — design handoff 4c, 10 Oct 2026, replacing the chip row.
+ *
+ * A horizontal row of 98×76 cards: the name, the numbers (chipNumbers, read
+ * from the config so a card cannot describe a protocol it does not run), and
+ * a sub-line — the total, "every 1:00" for an EMOM, "from {session}" for
+ * Today, and "save as preset" on Custom while her numbers are an unsaved draft.
+ *
+ * CUSTOM HAPPENS BY ITSELF. Any stepper change makes the selection a draft
+ * that matches no preset, which lights Custom with the draft's numbers; a
+ * tap on Custom then saves it. Step back onto a preset's numbers and that
+ * preset lights instead. A tap while a round is running still QUEUES.
+ */
+export function PresetCards({ choices, live, selected, todaysSessionName }: {
   choices: ProtocolChoice[]
-  /** A round is running, so a tap queues rather than selects. */
   live: boolean
-  /**
-   * What is chosen right now — passed in rather than read from the provider,
-   * because the tab resolves "nothing chosen yet" to today's conditioning or
-   * the first protocol, and the card and the chips have to agree about that
-   * fallback or the card describes a protocol no chip is showing as picked.
-   */
+  /** What Start would run (idle) — the tab resolves "nothing chosen" once, for the preview and the cards. */
   selected: RoundConfig | null
-  customOpen: boolean
-  onOpenCustom: (open: boolean) => void
+  /** The plan's name for today's session, for the Today card's "from …". */
+  todaysSessionName?: string | null
 }) {
   const timers = useTimers()
   const active = live ? timers.roundConfig : selected
   const queued = timers.queuedRoundConfig
+  const litKey = selectedChoiceKey(choices, active)
+  const saved = timers.customRoundConfig
+  // A DRAFT is a selection that matches no card and is not what she saved.
+  const isDraft = !live && litKey === 'custom' && !!active && !(saved && sameRoundConfig(saved, active))
+  const rowRef = useRef<HTMLDivElement>(null)
 
-  // Which round a queued switch would land on, said the same way the card
-  // says it — one derivation, so the badge and the strip cannot disagree.
   const landsOn = live && timers.roundConfig
     ? Math.min(sessionRoundNumber(timers.roundConfig, timers.currentRound) + 1, sessionTotalRounds(timers.roundConfig))
     : 0
 
+  // THE LIT CARD IS ON SCREEN — when the sheet opens and whenever a stepper
+  // moves the light to another card (Custom sits at the far end). By
+  // scrollLeft, not scrollIntoView, which would also scroll the sheet itself.
+  useLayoutEffect(() => {
+    const row = rowRef.current
+    const card = row?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (!row || !card) return
+    const left = card.offsetLeft - row.offsetLeft
+    if (left < row.scrollLeft || left + card.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = Math.max(0, left - 18)
+  }, [litKey])
+
   const onTap = (choice: ProtocolChoice) => {
-    if (choice.key === 'custom') { onOpenCustom(!customOpen); return }
-    onOpenCustom(false)
-    if (live) timers.queueRoundConfig(choice.config)
-    else timers.selectRoundConfig(choice.config)
+    let config = choice.config
+    if (choice.key === 'custom') {
+      // SAVE THE DRAFT, or bring back what she saved.
+      if (isDraft && active) { timers.setCustomRoundConfig(active); return }
+      config = saved ?? choice.config
+    }
+    if (live) timers.queueRoundConfig(config)
+    else timers.selectRoundConfig(config)
   }
 
   return (
-    <div className="flex flex-wrap gap-2" data-protocol-chips>
+    <div
+      ref={rowRef}
+      data-protocol-chips
+      className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {choices.map(choice => {
-        // THE CUSTOM CHIP IS ON WHEN ITS PANEL IS OPEN or when what is
-        // selected is genuinely custom — a config that matches no preset. A
-        // bare numbers match would light Custom whenever her saved numbers
-        // happened to equal a preset's, showing two chips selected at once.
-        const on = choice.key === 'custom'
-          ? customOpen || (!!active && !presetForConfig(active) && sameRoundConfig(active, choice.config))
-          : !!active && sameRoundConfig(active, choice.config)
+        const on = litKey === choice.key
         const isQueued = !!queued && sameRoundConfig(queued, choice.config)
+        const shown = choice.key === 'custom' && isDraft && active ? active : choice.key === 'custom' ? (saved ?? choice.config) : choice.config
+        const sub = choice.fromToday
+          ? (todaysSessionName ? `from ${todaysSessionName}` : 'from your plan')
+          : choice.key === 'custom' && isDraft
+            ? 'save as preset'
+            : roundStyleOf(shown) === 'emom'
+              ? `every ${clock(shown.workSeconds)}`
+              : clock(workingSeconds(shown))
         return (
           <button
             key={choice.key}
@@ -111,28 +154,26 @@ export function ProtocolChips({ choices, live, selected, customOpen, onOpenCusto
             aria-pressed={on}
             title={choice.key === 'custom' ? undefined : describeRoundPreset({ key: choice.key, label: choice.label, config: choice.config })}
             onClick={() => onTap(choice)}
-            className="flex items-center gap-[7px] rounded-full px-[13px] text-[0.8125rem] font-semibold"
+            className="relative flex h-[76px] w-[98px] shrink-0 flex-col justify-between rounded-[14px] px-[11px] py-[10px] text-left"
             style={{
-              height: 44,
               background: on ? 'rgba(var(--glow-rgb), .14)' : 'var(--surface-raised)',
-              border: isQueued
-                ? '1px solid var(--role-warn)'
-                : on ? '1px solid rgba(var(--glow-rgb), .45)' : '1px solid transparent',
-              color: on ? 'var(--primary-text)' : 'var(--foreground)',
+              boxShadow: isQueued
+                ? 'inset 0 0 0 1.5px var(--role-warn)'
+                : on ? 'inset 0 0 0 1.5px var(--primary), 0 0 calc(16px * var(--glow-strength, 1)) rgba(var(--glow-rgb), .25)' : undefined,
             }}
           >
-            {choice.fromToday && <Star className="size-[13px] shrink-0" aria-hidden />}
-            {choice.label}
-            <span
-              className="tabular-mono text-[0.6875rem] font-medium"
-              style={{ color: on ? 'color-mix(in srgb, var(--primary-text) 75%, transparent)' : 'var(--muted-foreground)' }}
-            >
-              {chipNumbers(choice.config, choice.label)}
+            <span className="flex items-center gap-1 text-[0.8125rem] font-semibold" style={{ color: on ? 'var(--primary-text)' : 'var(--foreground)' }}>
+              {choice.fromToday && <Star className="size-[12px] shrink-0" aria-hidden />}
+              {choice.label}
+            </span>
+            <span className="block">
+              <span className="tabular-mono block text-[0.6875rem] text-text-tertiary">{chipNumbers(shown, choice.label)}</span>
+              <span className="block truncate text-[0.625rem] text-muted-foreground">{sub}</span>
             </span>
             {isQueued && (
               <span
                 data-protocol-queued-badge
-                className="shrink-0 rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold"
+                className="absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[0.5625rem] font-semibold"
                 style={{ background: 'var(--role-warn)', color: 'var(--phase-rest-ink)' }}
               >
                 from round {landsOn}

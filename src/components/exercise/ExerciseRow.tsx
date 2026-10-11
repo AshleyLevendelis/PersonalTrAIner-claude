@@ -5,6 +5,7 @@ import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreV
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary, setProgress } from '@/lib/session-derive'
+import { loggedCountLabel } from '@/lib/coach-voice'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine } from './ExerciseLine'
 import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel, takesPlateCalculator } from '@/lib/load-prescription'
@@ -61,6 +62,8 @@ export interface ExerciseRowProps {
   canMoveDown?: boolean
   /** Passed straight through to SetGrid, which needs it to judge a typed weight — see set-plausibility.ts. */
   profile?: SetGridProps['profile']
+  /** Its place in today's session, printed "01" on the collapsed line (design handoff 2c). */
+  index?: number
 }
 
 export function ExerciseRow({
@@ -86,8 +89,9 @@ export function ExerciseRow({
   canMoveUp,
   canMoveDown,
   profile,
+  index,
 }: ExerciseRowProps) {
-  const { logs, setsFor, requestedSetFocus, clearSetFocusRequest } = useActiveSession()
+  const { logs, setsFor, requestedSetFocus, clearSetFocusRequest, setsKnown, loadState } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
@@ -154,7 +158,17 @@ export function ExerciseRow({
       data-exercise-name={ex.name}
       className={
         expanded
-          ? 'relative overflow-hidden rounded-[18px] pt-4 space-y-2.5'
+          // overflow-CLIP, NOT overflow-hidden (tester's L27, 9 Oct 2026).
+          // `hidden` still makes a SCROLLABLE box, and the "⋮" button's
+          // invisible 44px tap area reached 8px past the card's right edge —
+          // so the card was 8px wider inside than out, could be scrolled
+          // sideways by anything that centres an element horizontally, and
+          // never scrolled back: the title read "3and Tricep Kickback".
+          // `clip` trims the same pixels without making a scroll box, and the
+          // header below keeps the tap area inside the card (its pr-2), so
+          // there is nothing left over to scroll to. verify:tap-targets asks
+          // every card both questions.
+          ? 'relative overflow-clip rounded-[18px] pt-4 space-y-2.5'
           : `rounded-[10px] space-y-2 ${allSetsLogged ? 'opacity-70' : ''}`
       }
     >
@@ -181,6 +195,11 @@ export function ExerciseRow({
         onToggleExpanded={onToggleExpanded}
         allSetsLogged={allSetsLogged}
         loggedSummary={formatCompletedSummary(loggedSets)}
+        index={index}
+        // WORKING sets, the same count as the track's "Working n/N": a ramp
+        // set logged is not a set of the exercise done.
+        setsDone={rampProgress.workingDone}
+        progressing={progressionNote?.didProgress}
       />
       {/* ONE CONTINUOUS TRACK, RAMP THEN WORKING — the handoff's progress row.
           It replaces a bare "2/3 sets" that counted working sets only, so a
@@ -222,7 +241,7 @@ export function ExerciseRow({
 
       {expanded && (
         <>
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 pr-2">
             <div className="min-w-0 flex-1">
               {/* THE STRIP IS GONE FROM TODAY'S CARD, 17 Sep 2026, and the
                   grid below has the build-up as real rows instead — Ashley's
@@ -278,7 +297,7 @@ export function ExerciseRow({
                 {/* A lift with no weight renders no LoadChip at all (see its
                     header). Tempo takes that slot when there is one — it is
                     what the trainee is actually meant to progress. */}
-                <TempoChip tempo={ex.tempo} />
+                <TempoChip ex={ex} />
                 {ex.suggested_added_load_kg != null ? (
                   <AddedLoadChip ex={ex} />
                 ) : ex.suggested_assistance_kg != null ? (
@@ -295,8 +314,11 @@ export function ExerciseRow({
                 )}
               </div>
               {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} />}
-              <p className="mt-2 text-xs text-text-tertiary">
-                {ex.sets} working sets · {completedSets} logged
+              {/* ONE TEXT NODE, deliberately — verify:one-number finds this line
+                  as a leaf. The second half is only a number when the phone
+                  has something to count from (H20; see loggedCountLabel). */}
+              <p className="mt-2 text-xs text-text-tertiary" data-testid="logged-count">
+                {`${ex.sets} working sets · ${loggedCountLabel(completedSets, { known: setsKnown, loading: loadState === 'loading' })}`}
               </p>
               {/* REST, as a number you can read before you have trained.
                   Until now ex.rest reached this component only as
@@ -421,7 +443,7 @@ export function ExerciseRow({
                     Take out of this session
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan}>
+                <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan} data-testid="ban-exercise">
                   <Ban className="size-3.5" />
                   {banBusy ? 'Banning…' : 'Ban exercise'}
                 </DropdownMenuItem>

@@ -1,5 +1,5 @@
 import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise, UserProfile } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, meetsCapabilityRequirement, type ExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, meetsCapabilityRequirement, isBallisticMovement, type ExerciseEntry } from './exercise-db'
 import { getExperienceConfig, isSkillAppropriate } from './experience-config'
 import { isExternallyLoaded, preservesRelativeLoad } from './load-prescription'
 
@@ -624,6 +624,39 @@ export function describeTempo(tempo: string | undefined | null): string | null {
   return parts.join(' · ')
 }
 
+/**
+ * THE TEMPO A SCREEN MAY SHOW FOR THIS EXERCISE — describeTempo, with a second
+ * line of defence in front of it.
+ *
+ * Every surface that prints a tempo goes through here rather than calling
+ * describeTempo on the stored value. The stored value should already be right:
+ * generation only writes one where it is the lever, and since 9 Oct 2026 a
+ * replacement only carries one onto a lift that can use it. But plans saved
+ * before that fix still hold "2-0-1" on a Spanish Squat hold and on a
+ * kettlebell swing, and they keep it until that slot is next edited. So the
+ * three things a tempo can NEVER be true of are refused at the last step, by
+ * what the exercise is and by what its prescription string actually holds:
+ * a hold, carry or interval (no reps to slow), a warm-up move, and anything
+ * thrown, jumped or swung.
+ *
+ * Deliberately narrower than generation's own rule (isTempoEligible): whether
+ * a lift carrying a weight should have one depends on the person's backpack
+ * ceiling, which a render site does not have. Hiding only the impossible
+ * cases means this can never remove a cue the engine meant.
+ */
+export function describeExerciseTempo(
+  ex: Pick<Exercise, 'name' | 'tempo' | 'reps' | 'prescription_type'>,
+): string | null {
+  const described = describeTempo(ex.tempo)
+  if (!described) return null
+  if (!/^\d+(\s*-\s*\d+)?$/.test(String(ex.reps).trim())) return null
+  const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+  const type = entry?.prescription_type ?? ex.prescription_type ?? 'reps'
+  if (type !== 'reps') return null
+  if (entry && (entry.mechanics_tier === 'primer' || isBallisticMovement(entry))) return null
+  return described
+}
+
 /** Seconds one rep takes at this tempo. No fudge factor: the tempo IS the rep time. */
 export function tempoSecondsPerRep(t: Tempo): number {
   return t.eccentric + t.pause + t.concentric
@@ -697,14 +730,21 @@ export function shiftReps(reps: string, delta: number, minReps: number): string 
   // week to week, since a plain rep-range shift can't touch them. That's a
   // real "nothing is progressing" gap: bodyweight holds otherwise have no
   // load to ramp AND no reps to ramp.
+  //
+  // SNAPPED TO FIVE SECONDS since 9 Oct 2026, as a backstop. Generation no
+  // longer sends a hold through here at all (see stepHoldSeconds — a rep delta
+  // is the wrong size for seconds, and "Plank 3x34-49s" is what it produced);
+  // this is so that no caller left, or added later, can print a duration
+  // nobody can count to.
+  const sayable = (seconds: number) => Math.max(MIN_HOLD_SECONDS, Math.round(seconds / 5) * 5)
   const timeRange = reps.match(/^(\d+)\s*-\s*(\d+)\s*s$/)
   if (timeRange) {
-    const low = Math.max(MIN_HOLD_SECONDS, Number(timeRange[1]) + delta)
+    const low = sayable(Number(timeRange[1]) + delta)
     const spread = Number(timeRange[2]) - Number(timeRange[1])
     return `${low}-${low + spread}s`
   }
   const timeSingle = reps.match(/^(\d+)\s*s$/)
-  if (timeSingle) return `${Math.max(MIN_HOLD_SECONDS, Number(timeSingle[1]) + delta)}s`
+  if (timeSingle) return `${sayable(Number(timeSingle[1]) + delta)}s`
 
   // Distance prescriptions ('40m') pass through untouched — see the isCarry
   // handling in exercise-plan.ts, which routes carries to ramp LOAD instead
@@ -736,6 +776,48 @@ export function stepIntervalSeconds(baseSeconds: number, weekInBlock: number, is
   if (isDeload) return baseSeconds
   const week = Math.min(Math.max(1, weekInBlock), 3)
   return baseSeconds + (week - 1) * INTERVAL_STEP_SECONDS
+}
+
+/**
+ * A HOLD STEPS IN FIVE-SECOND BLOCKS — the hold's twin of stepIntervalSeconds,
+ * added 9 Oct 2026 for the same reason that one exists.
+ *
+ * A tester's plan read "Plank 3x34-49s". The hold had been moved by shiftReps,
+ * which adds its REP delta to the seconds: the phase's rep_shift (+3 in
+ * Anatomical Adaptation, -3 in Strength, -4 in Power) plus one a week. So a
+ * plank read 33-48s / 34-49s / 35-50s in one block and 27-42s / 28-43s /
+ * 29-44s in another — the reps/seconds unit mismatch INTERVAL_STEP_SECONDS'
+ * comment above describes, left in place for holds.
+ *
+ * DECIDED AS A CSCS COACH. Week 1 of a block is the base, week 2 is +5s,
+ * week 3 is +10s, and the deload returns to the base:
+ *   30-45s -> 35-50s -> 40-55s -> 30-45s
+ *   - One second a week is below what anyone can execute or perceive, so the
+ *     old ramp was noise rather than overload. Isometric holds are progressed
+ *     in round blocks of time a person can count (5-10s is the usual step),
+ *     up to about a minute, after which the VARIATION is progressed, not the
+ *     clock. Week 3 tops out at 55s, inside that.
+ *   - The phase's rep_shift no longer moves a hold. It exists to trade reps
+ *     against LOAD (fewer, heavier reps in a strength block); an unloaded hold
+ *     has no load to trade, so a strength block was simply prescribing a
+ *     shorter plank with nothing in exchange.
+ *   - The deload is the base: ten seconds (about a fifth) shorter than the
+ *     week before it, which is a real back-off, where the old arithmetic
+ *     moved it by one or two seconds in either direction.
+ *
+ * Returns null for anything that is not a seconds prescription, so the caller
+ * decides what happens to it rather than this function guessing.
+ */
+const HOLD_STEP_SECONDS = 5
+
+export function stepHoldSeconds(base: string, weekInBlock: number, isDeload: boolean): string | null {
+  const steps = isDeload ? 0 : Math.min(Math.max(1, weekInBlock), 3) - 1
+  const add = steps * HOLD_STEP_SECONDS
+  const range = base.match(/^(\d+)\s*-\s*(\d+)\s*s$/)
+  if (range) return `${Number(range[1]) + add}-${Number(range[2]) + add}s`
+  const single = base.match(/^(\d+)\s*s$/)
+  if (single) return `${Number(single[1]) + add}s`
+  return null
 }
 
 export function adjustRest(rest: string, deltaSeconds: number): string {

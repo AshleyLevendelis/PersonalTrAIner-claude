@@ -34,13 +34,14 @@ import { isExternallyLoaded } from '@/lib/load-prescription'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { WorkoutDay } from '@/lib/types'
 import { estimateDaySeconds } from '@/lib/session-duration'
+import { dayVerbs, type DayVerb } from '@/lib/day-verbs'
 
 export interface WhatHappenedTarget {
   date: string
   dayName: string
 }
 
-type Verb = 'did_elsewhere' | 'missed' | 'move' | 'rest' | 'something_else' | 'shorten' | 'lighter' | 'rebuild'
+type Verb = DayVerb
 type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten' | 'rebuild'
 
 /**
@@ -133,27 +134,15 @@ export function WhatHappenedSheet({
 
   // WHICH VERBS APPLY. Computed from the day's state, never a fixed list: a
   // logged day has nothing to explain, a future day can be moved or rested
-  // but not missed, and a day already moved away is answered by its undo.
-  const verbs: Verb[] = useMemo(() => {
-    if (!target || isDone || !hasSession || movedAway) return []
-    const out: Verb[] = []
-    if (isPast) out.push('did_elsewhere')
-    if ((isPast || isToday) && !declared.missed) out.push('missed')
-    out.push('move')
-    if (!declared.rest) out.push('rest')
-    if ((isPast || isToday) && !declared.swapped) out.push('something_else')
-    // TODAY ONLY, and only while there is still a session to change. A past
-    // day cannot be made shorter — it already happened — and a future one is
-    // the ongoing volume change's job, not this one's. Both are also gated on
-    // the caller supplying a handler, so a surface that cannot edit the plan
-    // never shows a control that would do nothing.
-    if (isToday && !declared.rest && !declared.missed && !declared.swapped) {
-      if (onShorten) out.push('shorten')
-      if (onLighter) out.push('lighter')
-      if (onRebuild) out.push('rebuild')
-    }
-    return out
-  }, [target, isDone, hasSession, movedAway, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild])
+  // but not missed, a day already moved away is answered by its undo, and a
+  // day before the plan began had nothing planned on it at all. The rule is
+  // dayVerbs (src/lib/day-verbs.ts), so a gate can ask it.
+  const beforePlan = cell?.state === 'before_plan'
+  const verbs: Verb[] = useMemo(() => (target ? dayVerbs({
+    isDone, hasSession, movedAway: !!movedAway, beforePlan, isPast, isToday,
+    declared: { missed: declared.missed, rest: declared.rest, swapped: !!declared.swapped },
+    canShorten: !!onShorten, canLighter: !!onLighter, canRebuild: !!onRebuild,
+  }) : []), [target, isDone, hasSession, movedAway, beforePlan, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild])
 
   // Every day this week the resolver would accept as a destination — the
   // same function, the same rules (a free day, inside this mesocycle week,
@@ -225,11 +214,13 @@ export function WhatHappenedSheet({
    * as though it were worth a tap.
    */
   const shortenChoices = useMemo(() => {
-    const day = plan.find(d => d.day === target?.dayName)
+    // The session RUN on this date, not the weekday's own row — on a day a
+    // session moved onto, that row is empty and no times were offered (H19).
+    const day = session
     if (!day || day.exercises.length === 0) return [] as number[]
     const nowMinutes = estimateDaySeconds(day) / 60
     return SHORTEN_CHOICES.filter(m => m <= nowMinutes - 5)
-  }, [plan, target?.dayName])
+  }, [session])
 
   const saveSomethingElse = () => {
     const name = activity.trim()
@@ -264,6 +255,21 @@ export function WhatHappenedSheet({
 
   const saveDidElsewhere = () => {
     if (!session) return
+    // A LOADED LIFT WITH NO WEIGHT IS ASKED FOR, NOT SAVED AT 0 KG (runs 3-4,
+    // found by verify:what-happened behind "Done, with the count"): its sets
+    // were written at 0 kg, which every count in the app reads as a broken
+    // row, so a full session logged here read "16 of 19". The live set grid
+    // already refuses a blank weight on a "type it" box; this is that rule.
+    const needWeight = session.exercises.filter((ex, i) => {
+      const r = rowFor(i, ex)
+      const entry = getExerciseEntry(ex.name)
+      const bodyweight = entry ? !isExternallyLoaded(entry) : r.weight.trim() === ''
+      return !bodyweight && Math.round(Number(r.sets) || 0) > 0 && !(Number(r.weight) > 0)
+    }).map(ex => ex.name)
+    if (needWeight.length > 0) {
+      setError(`Add the weight for ${needWeight.join(', ')}, or put its sets to 0.`)
+      return
+    }
     return run(async () => {
       const sets: Parameters<typeof writeHistoricalSession>[0]['sets'] = []
       session.exercises.forEach((ex, i) => {
@@ -354,7 +360,7 @@ export function WhatHappenedSheet({
         {phase === 'menu' && (
           <div className="space-y-2" data-testid="what-happened-verbs">
             {isDone && <p className="text-sm text-muted-foreground">Nothing to explain — this session is logged.</p>}
-            {!isDone && !hasSession && !movedAway && <p className="text-sm text-muted-foreground">No session was planned for {when}.</p>}
+            {!isDone && (!hasSession || beforePlan) && !movedAway && <p className="text-sm text-muted-foreground" data-testid="what-happened-nothing-planned">No session was planned for {when}.</p>}
             {isToday && hasSession && !isDone && (
               <p className="text-xs text-muted-foreground">Did it? Tick the sets below — every one you log counts.</p>
             )}

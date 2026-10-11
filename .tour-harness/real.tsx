@@ -28,6 +28,8 @@
 // holds the real one; if these two ever disagree, believe that gate.
 // ---------------------------------------------------------------------------
 
+import { swapOnScreen } from '@/lib/screen-swap'
+import { banOnScreen } from '@/lib/screen-ban'
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -36,7 +38,8 @@ import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { resolveLoadFields } from '@/lib/warmup'
-import { computeTargets } from '@/lib/nutrition-targets'
+import { computeTargets, retargetAfterWeighIn } from '@/lib/nutrition-targets'
+import { targetsMoved } from '@/lib/coach-voice'
 import { getPools, setMealPick } from '@/lib/meal-store'
 import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
 import { checkMealRefit } from '@/lib/meal-refit'
@@ -48,9 +51,12 @@ import type { UserProfile, MacroTargets } from '@/lib/types'
 import { Dashboard } from '@/components/Dashboard'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
+import { getActiveAdaptations, endAdaptationEarly, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { ToolsTab } from '@/components/ToolsTab'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { ProfileMenu } from '@/components/ProfileMenu'
+import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { AppTour } from '@/components/AppTour'
 import { TOUR_STEPS } from '@/lib/app-tour-steps'
 // The app's own provider tree. Not decoration: useActiveSession throws
@@ -61,10 +67,12 @@ import { AppearanceProvider } from '@/hooks/useAppearance'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
+import { BottomDock } from '@/components/BottomDock'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { formatRampSets } from '@/lib/session-derive'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { getExerciseId, getExerciseEntry, EXERCISE_DATABASE, contraindicatedJoints, isIndicatedFor } from '@/lib/exercise-db'
+import { estimateDaySeconds, optionalFillerSeconds } from '@/lib/session-duration'
 import { prescribeLoad, isExternallyLoaded } from '@/lib/load-prescription'
 import { buildRestartedPlan } from '@/lib/plan-restart'
 import { ANCHOR_ISO, anchorDate, anchorNowMs, daysAgo, iso as isoOf, nearestAnchorDate } from './anchor.mjs'
@@ -72,6 +80,8 @@ import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
 import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { useMealPlanActions } from '@/hooks/useMealPlanActions'
+import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { useServablePools } from '@/hooks/useServablePools'
 import { markRestrictionBreakers } from '@/lib/meal-restriction-check'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
@@ -108,7 +118,15 @@ const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001'
 // otherwise pinning a day would reshape the week and move the day you were
 // aiming at.
 const TODAY_ISO = new URLSearchParams(location.search).get('today') ?? ANCHOR_ISO
-setDevClockOverride(PROFILE_ID, TODAY_ISO)
+// ?clock=HH:MM — the time of day on the anchor, for the pace lines ("behind"
+// depends on the hour). Noon when absent, as every run before 9 Oct 2026 was.
+// Still the app's own seam (the dev clock), never the machine's.
+const CLOCK = new URLSearchParams(location.search).get('clock')
+const WEIGH_IN_ANCHOR = new URLSearchParams(location.search).get('anchor') === '1'
+const WEIGH_IN_HELD = new URLSearchParams(location.search).get('held') === '1'
+setDevClockOverride(PROFILE_ID, TODAY_ISO, CLOCK)
+// ?joined=today — the account was made today (no pace line is said that day).
+const JOINED_TODAY = new URLSearchParams(location.search).get('joined') === 'today'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // TODAY MUST BE A TRAINING DAY or the tour legitimately drops its set stop
@@ -122,7 +140,16 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 // is that it is always the SAME training day, so the plan every driver reads
 // stops being reshaped once a night.
 const todayIdx = anchorDate().getDay()
-const availableIdx = new Set([todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
+// ?freetoday=1 — YESTERDAY TRAINS AND TODAY DOES NOT, for verify:moved-edit
+// (9 Oct 2026). The only way to stand ON a session that was moved: the driver
+// moves yesterday's missed session onto today through the app's own "What
+// happened?" sheet and then edits it. Nothing about the move is seeded — the
+// fixture chooses the week's shape and the app does the rest. Off by default,
+// so every existing run of this harness is unchanged.
+const FREE_TODAY = new URLSearchParams(location.search).get('freetoday') === '1'
+const availableIdx = new Set(FREE_TODAY
+  ? [(todayIdx + 6) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
+  : [todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 
 // ?absurd=1 — the weight-plausibility check, on the screen it argues on.
 //
@@ -186,6 +213,14 @@ const FINISHER = new URLSearchParams(location.search).get('finisher') === '1'
 // running the harness's own day pattern and seed across 108 variants, not by
 // guessing — the first guess (30-45) gave the live week no such day at all.
 const MOBILITY = new URLSearchParams(location.search).get('mobility') === '1'
+// ?sam=1 — THE TESTER'S PROFILE (test log H4), for verify:day-length. Minimalist
+// kit, bodybuilding, four days, 30-45 minutes, intermediate, fat loss, and a
+// shoulder flag. It is the profile where a day's printed length was "9 sets ·
+// ~37 min" over seven working sets, a 30-minute walk the engine had made a
+// SEPARATE session was drawn as the session's "Finisher", and "Shoulders & Abs"
+// carried "not a bug, just a real gap". The plan is generated, never
+// hand-built: the driver asks the page which day holds what.
+const SAM = new URLSearchParams(location.search).get('sam') === '1'
 // ?walker=1 — THE BEGINNER'S WALKING PLAN, the only plan the app generates
 // whose days hold a prescribed ACTIVITY instead of exercises.
 //
@@ -216,7 +251,7 @@ const profile: UserProfile = {
   // old size. The app now SAYS so (meal-refit's residue line), and the harness
   // stops describing a profile that eats a snack it does not budget for.
   meals_per_day: 3, include_snacks: true,
-  fitness_goal: FINISHER || WALKER || MOBILITY ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
+  fitness_goal: FINISHER || WALKER || MOBILITY || SAM ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   ...(WALKER ? { start_preference: 'move_more' as const } : {}),
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
   //
@@ -226,10 +261,10 @@ const profile: UserProfile = {
   // three splits and three seeds before picking this one, rather than
   // hand-seeding a plan row, which would have proved only that a string I
   // wrote myself renders.
-  equipment_access: WALKER ? 'bodyweight' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: MOBILITY ? ['shoulders'] : [],
-  training_style: WALKER || OFF_STYLE ? 'functional' : MOBILITY ? 'bodybuilding' : 'hybrid',
-  training_experience: WALKER || MOBILITY ? 'beginner' : 'intermediate', session_duration_preference: MOBILITY ? '90+' : '45-60',
-  workout_split_preference: LEG_CURL ? 'push_pull_legs' : 'upper_lower',
+  equipment_access: WALKER ? 'bodyweight' : SAM ? 'minimalist' : LEG_CURL ? 'home_gym' : 'full_gym', injuries: MOBILITY || SAM ? ['shoulders'] : [],
+  training_style: WALKER || OFF_STYLE ? 'functional' : MOBILITY || SAM ? 'bodybuilding' : 'hybrid',
+  training_experience: WALKER || MOBILITY ? 'beginner' : 'intermediate', session_duration_preference: MOBILITY ? '90+' : SAM ? '30-45' : '45-60',
+  workout_split_preference: LEG_CURL ? 'push_pull_legs' : SAM ? 'ai_recommendation' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
@@ -237,7 +272,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - 9 * 86400000).toISOString(),
+  created_at: AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
@@ -476,6 +511,35 @@ const awayTarget = (() => {
 // The fixture's latest weigh-in date, which verify:home-weight counts its days from.
 ;(window as unknown as { __weighInTarget: unknown }).__weighInTarget = { date: isoOf(anchorDate()) }
 
+// ?done=1 — TODAY'S SESSION FINISHED, every planned set logged, with one
+// personal best beaten on the heaviest lift (design handoff 2a's Done panel,
+// 10 Oct 2026). INPUT ONLY: the sets as the database holds them, the session
+// row as finishing writes it, and one earlier, lighter set for the record to
+// beat. What the panel says — time, count, PR — the app works out.
+const DONE_TODAY = new URLSearchParams(location.search).get('done') === '1'
+const doneSeed = (() => {
+  if (!DONE_TODAY) return null
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
+  if (!day) return null
+  const heaviest = [...day.exercises].filter(e => (e.suggested_load_kg ?? 0) > 0)
+    .sort((a, b) => (b.suggested_load_kg ?? 0) - (a.suggested_load_kg ?? 0))[0]
+  const sets = day.exercises.flatMap(ex => Array.from({ length: ex.sets }, (_, i) => ({
+    id: `dn-${ex.id}-${i}`, user_id: PROFILE_ID, session_id: 'sess-done',
+    exercise_id: getExerciseId(ex.name) ?? ex.id, exercise_name: ex.name, set_number: i + 1,
+    weight_kg: ex.suggested_load_kg ?? 0, reps_completed: 8, is_bodyweight: !(ex.suggested_load_kg ?? 0), is_warmup: false,
+    completed_at: anchorDate().toISOString(), date: isoOf(anchorDate()),
+  })))
+  const before = heaviest ? [{
+    id: 'dn-before', user_id: PROFILE_ID, session_id: 'sess-before',
+    exercise_id: getExerciseId(heaviest.name) ?? heaviest.id, exercise_name: heaviest.name, set_number: 1,
+    weight_kg: Math.max(2.5, (heaviest.suggested_load_kg ?? 0) - 5), reps_completed: 8, is_bodyweight: false, is_warmup: false,
+    completed_at: new Date(anchorNowMs() - 6 * 86400000).toISOString(), date: isoOf(new Date(anchorNowMs() - 6 * 86400000)),
+  }] : []
+  return { sets: [...before, ...sets], prLift: heaviest?.name ?? null, planned: day.exercises.reduce((n, e) => n + e.sets, 0) }
+})()
+;(window as unknown as { __doneSeed: unknown }).__doneSeed = doneSeed && { prLift: doneSeed.prLift, planned: doneSeed.planned }
+
 // A CARD WITH NO EXTERNAL LOAD ON TODAY'S SESSION — published for
 // verify:bodyweight-progress §3, 23 Sep 2026. That section asked "today's first
 // card" and its comment named Band Pull-Aparts; when new catalogue entries
@@ -532,6 +596,40 @@ const awayTarget = (() => {
     day: hit.day, date: nearestAnchorDate(hit.day),
     cardio: hit.recommendedCardio!.activity, cardioMinutes: hit.recommendedCardio!.duration,
     mobility: hit.mobilityFiller!.activity, mobilityMinutes: hit.mobilityFiller!.duration,
+  }
+})()
+
+// WHAT EACH DAY OF THE LIVE WEEK IS MADE OF — published for verify:day-length.
+//
+// The INPUTS a length is built from, never the worded length itself: the
+// driver reads "~22 min · + 15 optional" off the screen and checks it against
+// these seconds, so a helper that worded the wrong number cannot agree with
+// itself. From the live week, training days only, like the targets above.
+;(window as unknown as { __dayLengthTargets: unknown }).__dayLengthTargets = (() => {
+  // THE WEEK OF THE DATE ON SCREEN, not the anchor's. A driver that pins
+  // `today=` to a weekday's nearest date can land in the plan week before or
+  // after the anchor's, where the same day runs a minute longer or shorter —
+  // found on this driver's first run, as a header "arguing" with a programme
+  // row about a figure both had right.
+  const shown = new Date(`${TODAY_ISO}T12:00:00`)
+  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, shown, mesocycle.length)
+  const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan
+  return {
+    liveWeek,
+    today: DAYS[shown.getDay()],
+    days: liveDays.filter(d => d.exercises.length > 0).map(d => ({
+      day: d.day,
+      date: nearestAnchorDate(d.day),
+      focus: d.focus,
+      totalSeconds: estimateDaySeconds(d),
+      optionalSeconds: optionalFillerSeconds(d),
+      workingSets: d.exercises.filter(e => (e as unknown as { tier?: string }).tier !== 'tier_0_primer').reduce((n, e) => n + e.sets, 0),
+      allSets: d.exercises.reduce((n, e) => n + e.sets, 0),
+      cardio: d.recommendedCardio ? { activity: d.recommendedCardio.activity, minutes: d.recommendedCardio.duration, timing: d.recommendedCardio.timing, filler: !!d.recommendedCardio.is_filler } : null,
+      mobilityMinutes: d.mobilityFiller?.duration ?? null,
+      hasOverheadPress: d.exercises.some(e => getExerciseEntry(e.name)?.movement_pattern === 'vertical_push'),
+      warmupMinutes: Math.round((d.warmup?.total_seconds ?? 0) / 60),
+    })),
   }
 })()
 
@@ -643,7 +741,11 @@ const priced = (slot: string, name: string, ingredients: { name: string; quantit
 const refitChosen = {
   breakfast: priced('breakfast', 'Porridge with milk', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 250, unit: 'ml' }]),
   lunch: priced('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 150, unit: 'g' }]),
-  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' }]),
+  // ?spoon=1 adds a spoon of oil to the dinner, so a resize has a spoon amount
+  // to round (verify:kitchen-amounts). Off by default: every other run of this
+  // fixture keeps the dinner, and therefore the targets, it always had.
+  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' },
+    ...(new URLSearchParams(location.search).get('spoon') === '1' ? [{ name: 'olive oil', quantity: 1, unit: 'tbsp' }] : [])]),
   snack: priced('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
 }
 const refitBase = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
@@ -663,11 +765,32 @@ const driftedMacros: MacroTargets | null = REFIT
   : macros
 
 const today = isoOf(anchorDate())
+const ATE_OVER = new URLSearchParams(location.search).get('ateover') != null ? Number(new URLSearchParams(location.search).get('ateover')) : null
+// ?swappedpast=1 — A DAY EARLIER THIS WEEK, REPLACED BY FOOTBALL. For M14
+// (9 Oct 2026): "I did something else instead — football, 60 min, Hard" left a
+// ⇄ on the strip and a day card that still showed the planned session.
+// ?swapped=1 above swaps TODAY, whose card has always said so; the gap was a
+// day you have to tap to look at, which a past day always is.
+//
+// Two days back is one of this fixture's four training days (availableIdx) and
+// sits inside the same Monday-to-Sunday week as the anchor Wednesday, so the
+// strip has a cell for it. The two rows are exactly what the What-happened
+// sheet writes: the day flag, and the activity's own cardio log.
+const SWAPPED_PAST = new URLSearchParams(location.search).get('swappedpast') === '1'
+const swappedPastDate = isoOf(new Date(anchorNowMs() - 2 * 86400000))
+;(window as unknown as { __swappedPast: unknown }).__swappedPast = SWAPPED_PAST
+  ? { date: swappedPastDate, dayName: DAYS[new Date(`${swappedPastDate}T12:00:00`).getDay()] }
+  : null
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
   // A weigh-in so the Dashboard's trend has something real to draw rather
   // than rendering its empty state, which is not what the tour spotlights.
-  daily_metrics: [
+  // ?held=1 (verify:weigh-in §5): yesterday's weigh-in was a surprising 62 kg
+  // that she confirmed, so it is saved and WAITING, and there is none today.
+  daily_metrics: WEIGH_IN_HELD ? [
+    { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: 62 },
+    { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
+  ] : [
     { id: 'm1', profile_id: PROFILE_ID, date: today, weight_kg: 80 },
     { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
     // ?weighins=1: one more weigh-in INSIDE the plan (which began nine days before the anchor), so
@@ -719,6 +842,19 @@ const db: Db = {
             completed_at: new Date(anchorNowMs() - back * 86400000).toISOString(),
             date: isoOf(new Date(anchorNowMs() - back * 86400000)),
           })),
+          // AN EARLIER, LIGHTER BELT SESSION — added 9 Oct 2026. The +12kg
+          // below used to be the only belt set ever logged, and reached Home's
+          // "Recent PRs" as a record. A first log is a baseline now (M12): it
+          // has to BEAT something to be one, so the fixture gives it something
+          // to beat.
+          {
+            id: 'bwbelt0', user_id: PROFILE_ID, session_id: 'bw-sess-belt0',
+            exercise_id: getExerciseId('Dips') ?? 'dips', exercise_name: 'Dips',
+            set_number: 1, weight_kg: 0, reps_completed: 5, added_load_kg: 10,
+            is_bodyweight: true, is_warmup: false,
+            completed_at: new Date(anchorNowMs() - 10 * 86400000).toISOString(),
+            date: isoOf(new Date(anchorNowMs() - 10 * 86400000)),
+          },
           {
             id: 'bwbelt', user_id: PROFILE_ID, session_id: 'bw-sess-belt',
             exercise_id: getExerciseId('Dips') ?? 'dips', exercise_name: 'Dips',
@@ -741,6 +877,7 @@ const db: Db = {
           }
         })
       : []),
+    ...(doneSeed?.sets ?? []),
     ...(loggedTarget
       ? Array.from({ length: Math.min(3, loggedTarget.sets) }, (_, i) => ({
           id: `lg${i}`, user_id: PROFILE_ID, session_id: 'sess-logged',
@@ -764,7 +901,10 @@ const db: Db = {
   // check cannot show. Today IS a training day in this fixture and tomorrow
   // is not (availableIdx), so this is the ordinary case — the session moves
   // to the next free day, which is the one she asked for.
-  workout_sessions: new URLSearchParams(location.search).get('swapped') === '1'
+  workout_sessions: doneSeed
+    ? [{ id: 'sess-done', profile_id: PROFILE_ID, date: today, is_completed: true, duration_minutes: 46,
+        started_at: anchorDate().toISOString(), finished_at: anchorDate().toISOString() }]
+    : new URLSearchParams(location.search).get('swapped') === '1'
     ? [{ id: 'ws-swap', profile_id: PROFILE_ID, date: today, is_completed: false, swapped_for_activity: 'Muay Thai' }]
     : new URLSearchParams(location.search).get('moved') === '1'
     ? [{
@@ -772,19 +912,38 @@ const db: Db = {
         split_type: 'moved', duration_minutes: 0,
         moved_to_date: isoOf(new Date(anchorNowMs() + 86400000)),
       }]
+    : SWAPPED_PAST
+    ? [{ id: 'ws-swap-past', profile_id: PROFILE_ID, date: swappedPastDate, is_completed: false, split_type: 'swapped', duration_minutes: 0, swapped_for_activity: 'Football' }]
     : [],
-  // ?circuit=1: two timer blocks already logged today, as INPUT (the rows the round timer's sheet
-  // writes), so verify:circuit-log can ask what the Today card offers (her circuit ruling A, 8 Oct 2026).
-  cardio_logs: new URLSearchParams(location.search).get('circuit') === '1'
-    ? [
-        { id: 'c1', user_id: PROFILE_ID, date: today, activity_name: 'Skipping rope', duration_minutes: 15, intensity_rpe: 7, notes: '5 × 3 min', completed_at: anchorDate().toISOString() },
-        { id: 'c2', user_id: PROFILE_ID, date: today, activity_name: 'Assault bike', duration_minutes: 4, intensity_rpe: 8, notes: '5 × 15s, 45s rest', completed_at: anchorDate().toISOString() },
-      ]
-    : [],
+  cardio_logs: [
+    ...(SWAPPED_PAST
+      ? [{
+          id: 'c-football', user_id: PROFILE_ID, date: swappedPastDate, activity_name: 'Football',
+          duration_minutes: 60, intensity_rpe: 7, notes: 'Swapped in place of the prescribed lifting session',
+          completed_at: new Date(anchorNowMs() - 2 * 86400000).toISOString(),
+        }]
+      : []),
+    // ?circuit=1: two timer blocks already logged today, as INPUT (the rows the round timer's sheet
+    // writes), so verify:circuit-log can ask what the Today card offers (her circuit ruling A, 8 Oct 2026).
+    ...(new URLSearchParams(location.search).get('circuit') === '1'
+      ? [
+          { id: 'c1', user_id: PROFILE_ID, date: today, activity_name: 'Skipping rope', duration_minutes: 15, intensity_rpe: 7, notes: '5 × 3 min', completed_at: anchorDate().toISOString() },
+          { id: 'c2', user_id: PROFILE_ID, date: today, activity_name: 'Assault bike', duration_minutes: 4, intensity_rpe: 8, notes: '5 × 15s, 45s rest', completed_at: anchorDate().toISOString() },
+        ]
+      : []),
+  ],
   // A logged step count so the new ring renders — without one the row is
   // still the input, which is a different state.
   daily_steps: [{ id: 's1', profile_id: PROFILE_ID, date: today, steps: 7400 }],
-  meal_events: new URLSearchParams(location.search).get('ate') === '1'
+  // ?ateover=N (with ?refit=1&drift=1, whose day sits exactly on its target):
+  // lunch eaten N kcal heavier than its planned dish — verify:day-as-shown,
+  // runs 3-4 H24 and Ashley's ruling A (10 Oct 2026).
+  meal_events: ATE_OVER != null
+    ? [{ id: 'me-over', profile_id: PROFILE_ID, date: today, slot: 'lunch', event_type: 'confirmed',
+        meal_name: refitChosen.lunch.name,
+        macros: { kcal: refitChosen.lunch.macros.calories + ATE_OVER, protein: refitChosen.lunch.macros.protein, carbs: refitChosen.lunch.macros.carbs + Math.round(ATE_OVER * 0.15), fat: refitChosen.lunch.macros.fat + Math.round(ATE_OVER * 0.045) },
+        source: 'manual', client_id: 'seed-over', created_at: anchorDate().toISOString() }]
+    : new URLSearchParams(location.search).get('ate') === '1'
     ? [
         // Eaten under the name the slot still shows — the quiet-note case.
         { id: 'me1', profile_id: PROFILE_ID, date: today, slot: 'breakfast', event_type: 'confirmed',
@@ -801,8 +960,22 @@ const db: Db = {
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
-  daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
+  // ?anchor=1 / ?held=1: the target row every account has had since 9 Oct 2026
+  // — what set the targets at sign-up (anchorTargetsAtSignUp), at the 80 kg
+  // the fixture started on. Behind a flag because the drivers written before
+  // that date were built on an empty table.
+  daily_nutrition_targets: (WEIGH_IN_ANCHOR || WEIGH_IN_HELD) && macros ? [{
+    id: 't1', profile_id: PROFILE_ID, date: String(profile.created_at).slice(0, 10), workout_split: 'REST',
+    target_calories: macros.calories, target_protein_g: macros.protein, target_carbs_g: macros.carbs, target_fats_g: macros.fat,
+    calculated_weight_kg: profile.weight_kg,
+  }] : [], workout_exercises: [], weight_basis_offers: [],
 }
+// A DRIVER'S OWN ROWS. A script the driver registers to run before the page
+// (Page.addScriptToEvaluateOnNewDocument) may define window.__seedDb; it is
+// handed the tables before the app reads anything. Nothing defines it by
+// default. It supplies INPUT only — rows as the database would hold them —
+// never anything the app derives.
+;(window as unknown as { __seedDb?: (tables: typeof db, ctx: { profileId: string; today: string }) => void }).__seedDb?.(db, { profileId: PROFILE_ID, today })
 setSupabaseClient(makeFakeSupabase(db) as never)
 // The stored rows, for a driver that must read the FIGURE the app wrote rather
 // than the words it drew — the cardio drivers check the RPE a tap stored, the
@@ -917,14 +1090,23 @@ const TOPFIT = new URLSearchParams(location.search).get('topfit') === '1'
 // the database underneath is fake, and a driver can make a write fail
 // (window.__failWrite) to prove a half-saved swap is put back.
 const DAYMOVE = new URLSearchParams(location.search).get('daymove') === '1'
+// ?regen=1 (with daymove=1) — "REGENERATE ALL", PRESSED FOR REAL (9 Oct 2026,
+// test log M22). The app's own hook (useMealPlanActions) is handed to the
+// Nutrition tab instead of `noop`, and the model call behind the meal writer
+// answers after ?regenwait=<ms> so the working state can be seen. Everything
+// between the tap and the screen — the generator's verification, what storage
+// keeps, the read back, the picks — is the app's own.
+const REGEN = new URLSearchParams(location.search).get('regen') === '1'
+const REGEN_WAIT_MS = Number(new URLSearchParams(location.search).get('regenwait') ?? '0')
 const NO_PINS = {}
-if (TOPUP) {
+if (TOPUP || REGEN) {
   const realFetch = window.fetch.bind(window)
   let made = 0
   window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
     if (!url.includes('/functions/v1/generate-meals')) return realFetch(input as RequestInfo, init)
     ;(window as unknown as { __generatorCalls: number }).__generatorCalls++
+    if (REGEN_WAIT_MS > 0) await new Promise(resolve => setTimeout(resolve, REGEN_WAIT_MS))
     if (TOPUP_FAIL) return new Response(JSON.stringify({ error: 'simulated cut-off reply' }), { status: 502 })
     const body = JSON.parse(String(init?.body ?? '{}')) as { slots: { slot: string; count: number }[] }
     // Shaped like generate-meals' output; the app verifies and sizes them.
@@ -984,7 +1166,13 @@ const leftoverPools = (() => {
     // gives the leftover back rather than serve one dish twice, so a thin pool
     // starves the very feature this run exists to show.
     breakfast: [dish('breakfast', 'Oats and yoghurt', 118, 440, 20), dish('breakfast', 'Eggs on toast', 124, 430, 21), dish('breakfast', 'Rice pudding bowl', 112, 450, 19)],
-    lunch: [dish('lunch', 'Chicken salad bowl', 158, 587, 26), dish('lunch', 'Rice and greens', 165, 575, 27), dish('lunch', 'Warm grain salad', 152, 600, 25)],
+    lunch: [dish('lunch', 'Chicken salad bowl', 158, 587, 26), dish('lunch', 'Rice and greens', 165, 575, 27), dish('lunch', 'Warm grain salad', 152, 600, 25),
+      // ?bigswap=1: ONE lunch about a quarter bigger than the rest, so a swap
+      // to it needs the day's other meals re-sized (verify:swap-knock-on, M34).
+      // Every other option here is within a few kcal of its neighbours, and on
+      // those no swap ever moves the day: measured, 18 of 18 held "nothing to
+      // say". The input is chosen here; what the app serves is the app's.
+      ...(new URLSearchParams(location.search).get('bigswap') === '1' ? [dish('lunch', 'Big rice bowl', 190, 760, 32)] : [])],
     dinner: [dish('dinner', 'Roast chicken tray bake', 118, 440, 20), dish('dinner', 'Chicken and rice pot', 124, 430, 21), dish('dinner', 'Baked chicken and rice', 112, 450, 19),
       ...(KEPT ? [(() => {
         const ingredients = [
@@ -1111,6 +1299,24 @@ function Harness() {
     dietaryPreferences: profile.dietary_preferences,
     dislikedFoods: () => [],
   })
+  // SWAP, REGENERATE ONE, REGENERATE ALL — THE APP'S OWN HOOK, handed what
+  // this page's screen holds, exactly as App.tsx hands it what App's holds.
+  const [regenBusy, setRegenBusy] = useState(false)
+  const [regenError, setRegenError] = useState<string | null>(null)
+  const mealActions = useMealPlanActions({
+    profileId: PROFILE_ID,
+    today: () => today,
+    pools: livePools as never,
+    picks: dayMovePicks as never,
+    showingName: slot => (mealDays.today?.day.chosen as Record<string, PoolOption> | undefined)?.[slot]?.name,
+    generation: driftedMacros ? { profileId: PROFILE_ID, targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks } : null,
+    slotLabel: MEAL_SLOT_LABEL,
+    setPools: setLivePools as never,
+    setPicks: setDayMovePicks as never,
+    setGenerating: setRegenBusy,
+    setError: setRegenError,
+    setUnrecognised: () => {},
+  })
   // ?topup=1: the button, through the app's own function. What App.tsx adds
   // around it (the first-build gate) is held by test:meal-top-up.
   const topUpSlots = driftedMacros ? Object.keys(computeSlotBudgets(driftedMacros, mealShape.mealsPerDay, mealShape.includeSnacks)) as never[] : []
@@ -1148,6 +1354,15 @@ function Harness() {
   // The options each slot holds, by name, so a driver can see a resized copy added and taken away again.
   ;(window as unknown as { __libraryNames: string[] }).__libraryNames = MEAL_LIBRARY.map(d => d.name)
   ;(window as unknown as { __mealOptions: unknown }).__mealOptions = () => db.meal_plan_slots.map(r => ({ slot: r.slot, name: r.name }))
+  // The week as the app's hook serves it, by date and meal — for
+  // verify:meal-knock-on to compare with what a card SAID would change.
+  ;(window as unknown as { __weekMeals: unknown }).__weekMeals = () => {
+    const out: Record<string, Record<string, string>> = {}
+    const t = mealDays.today
+    if (t) out[t.date] = Object.fromEntries(Object.entries(t.day.chosen).map(([sl, o]) => [sl, (o as PoolOption).name]))
+    for (const d of mealDays.upcoming) out[d.date] = d.meals as Record<string, string>
+    return out
+  }
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
     if (DAYMOVE) setDayMovePicks(prev => ({ ...prev, [slot]: chosenName }))
@@ -1234,6 +1449,25 @@ function Harness() {
     return null
   }
 
+  // TEMPORARY CHANGES TO THE PLAN, HELD AS App.tsx HOLDS THEM (9 Oct 2026, for
+  // verify:adaptation-line). The store, the edit context and the ending are
+  // the app's own; this is only App's few lines of state around them, because
+  // the harness mounts the tab without App.
+  const [activeAdaptations, setActiveAdaptations] = useState<PlanAdaptationRow[]>([])
+  const [endingAdaptationId, setEndingAdaptationId] = useState<string | null>(null)
+  const refreshAdaptations = () => { void getActiveAdaptations(PROFILE_ID).then(setActiveAdaptations) }
+  const handleEndAdaptation = async (adaptationId: string): Promise<string | null> => {
+    setEndingAdaptationId(adaptationId)
+    try {
+      const context = await loadPlanEditContext(profile, editedMeso, profile.created_at)
+      const result = await endAdaptationEarly(PROFILE_ID, adaptationId, { mesocycle: editedMeso, isProtected: context.isProtected, profile, exclusions: [] })
+      if (!result.mesocycle) return "That didn't end just now — try again in a moment."
+      setEditedMeso(result.mesocycle)
+      setActiveAdaptations(prev => prev.filter(a => a.id !== adaptationId))
+      return null
+    } finally { setEndingAdaptationId(null) }
+  }
+
   // THE LIVE SESSION'S TIERS, published for verify:exercise-add, 14 Sep 2026.
   //
   // WHY. Its check 4c said "it was not simply appended to the end", which is a
@@ -1255,6 +1489,22 @@ function Harness() {
   const livePlan = planArrived ? exercisePlan : []
   const liveMeso = planArrived ? editedMeso : []
 
+  // A SAVED WEIGH-IN, AS App.tsx HANDLES IT (handleWeightLogged): the app's
+  // one retarget function, its targets onto the screen, its notice when the
+  // target really moved. App shows the notice in its banner; here it lands on
+  // the window for verify:weigh-in to read.
+  const [homeMacros, setHomeMacros] = useState(macros)
+  const handleWeightLogged = async () => {
+    const retarget = await retargetAfterWeighIn(PROFILE_ID, profile, exercisePlan)
+    setHomeMacros(retarget.targets)
+    const result = await retarget.recorded
+    const moved = result.previous && retarget.targets ? targetsMoved(result.previous, retarget.targets, 'weigh_in') : null
+    ;(window as unknown as { __weighInRetarget: unknown }).__weighInRetarget = {
+      calories: retarget.targets?.calories ?? null, anchorKg: retarget.anchorKg,
+      notice: result.changedFromPrior && moved ? moved : null,
+    }
+  }
+
   const noop = () => {}
   return (
     <AppearanceProvider>
@@ -1272,36 +1522,68 @@ function Harness() {
         <ProfileMenu onOpenProfile={noop} onNewPlan={noop} />
       </div>
 
+      {/* App.tsx's own wrapper for the sync badge, reproduced (App.tsx:3063).
+          Mounted 9 Oct 2026: it draws nothing unless something is waiting,
+          sending or has failed, and until it was here no driver could see the
+          "didn't save" card at all. */}
+      <div className="fixed left-3 right-14 z-40 flex justify-start" style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}>
+        <OfflineStatusIndicator />
+      </div>
+
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
-          <Dashboard profile={profile} macros={macros} exercisePlan={livePlan}
+          <Dashboard profile={profile} macros={homeMacros} exercisePlan={livePlan}
             mesocycle={liveMeso} planCreatedAt={profile.created_at}
+            onWeightLogged={handleWeightLogged}
 />
         )}
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
-            latestWeightKg={80} profileId={PROFILE_ID} date={today}
+            latestWeightKg={80} profileId={PROFILE_ID} date={today} planCreatedAt={profile.created_at}
             pools={servablePools as never} chosen={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
             avoidFoods={compileFoodDislikes(AVOID_FACTS)}
-            isGeneratingMeals={false} mealRegenerateError={null}
+            isGeneratingMeals={regenBusy} mealRegenerateError={regenError} mealsRegeneratingAll={mealActions.regeneratingAll}
+            onDismissRegenerateError={() => setRegenError(null)}
             onMealPickApplied={handleMealPickApplied as never}
             mealRefit={refit?.needed && !refitDeclined ? refit : null}
             mealRefitError={refitError}
             onMealRefitConfirm={() => { void handleRefitConfirm() }}
             onMealRefitDecline={() => setRefitDeclined(true)}
-            onSwapMealSlot={noop} onRegenerateMealSlot={noop} onRegenerateAllMeals={noop}
+            // The app's own handlers in the one mode that holds picks the way App
+            // does (?daymove=1&regen=1); `noop` elsewhere, as every driver written
+            // before 9 Oct 2026 was built on.
+            onSwapMealSlot={REGEN ? mealActions.swap : noop} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}
             mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
             onMealTopUp={() => { void handleTopUp() }}
             onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}
             onDismissMealTopUpNote={() => setTopUpNote(null)}
-            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove} />
+            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove}
+            // The app's own held state and its Undo (runs 3-4, M34), as App passes them.
+            heldAround={TOPUP || DAYMOVE ? mealDays.today?.day.heldAround : undefined} onKeepHeldSizes={mealDays.keepHeldSizes} />
         )}
         {activeTab === 'exercise' && (
           <ExerciseTab plan={planBornAt === profile.created_at ? exercisePlan : editedMeso[0]?.days ?? exercisePlan} mesocycle={editedMeso} exclusions={[]}
             profile={profile} profileId={PROFILE_ID} planCreatedAt={planBornAt}
-            onMesocycleUpdated={setEditedMeso}
             onRestartPlan={restartPlan}
-            onSwapExercise={noop} onBanExercise={noop}
+            activeAdaptations={activeAdaptations}
+            endingAdaptationId={endingAdaptationId}
+            onAdaptationsChanged={refreshAdaptations}
+            onEndAdaptation={handleEndAdaptation}
+            onMesocycleUpdated={setEditedMeso}
+            // THE APP'S OWN SWAP (screen-swap.ts), not a copy of it: App.tsx
+            // calls this same function, so a driver that taps a swap here is
+            // tapping the code that ships. Its sentence lands in the window
+            // for a driver to read, as App's lands in its banner.
+            onSwapExercise={async (weekNumber, dayName, exIndex, newExercise, scope) => {
+              const said = await swapOnScreen({ profile, mesocycle: editedMeso, weekNumber, dayName, exIndex, newExercise, scope, show: setEditedMeso })
+              ;(window as unknown as { __swapSaid: string | null }).__swapSaid = said
+            }}
+            // THE APP'S OWN BAN (screen-ban.ts), reached through the Exercise
+            // tab's own confirm sheet — App.tsx calls this same function.
+            onBanExercise={name => banOnScreen({
+              profile, mesocycle: editedMeso, exerciseName: name, exclusions: [],
+              planCreatedAt: planBornAt, show: setEditedMeso, reloadMemory: async () => {},
+            })}
             onDevOverrideWeekChange={noop} onDevOverrideDayChange={noop}
             onDevBypassLocksChange={noop} onLogsSeeded={noop} />
         )}
@@ -1317,6 +1599,11 @@ function Harness() {
         )}
       </main>
 
+      {/* ?dock=1 — the app's own dock (rest timer, "Session running"), mounted
+          where App.tsx mounts it. Off by default so every existing run of this
+          harness is unchanged: it is a fixed bar above the tab bar, and a
+          driver written before it existed never expected one there. */}
+      {new URLSearchParams(location.search).get('dock') === '1' && <BottomDock />}
       {/* As App.tsx does (the grocery screen is not mounted on this page). */}
       <BottomTabBar activeTab={activeTab} onTabChange={t => { window.location.hash = tabHash(t as Tab) }} flatChatDisc={activeTab === 'chat'} />
       {/* ?tour=off walks the screens on their own — the scrim covers most of

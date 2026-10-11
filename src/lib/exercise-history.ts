@@ -15,6 +15,10 @@ import type { BestReading } from './coach-voice'
 
 import { supabase } from './supabase'
 import { isMalformedZeroWeight, getSetsForSession } from './set-log-store'
+import { readCardioLogs } from './cardio-log-store'
+import { cardioLine } from './cardio-lines'
+import { dayNameOf } from './session-move'
+import { setVolumeKg } from './session-derive'
 import { prMetricFor, calculateE1RM, type PRMetric } from './pr-engine'
 
 export interface ExerciseHistorySetRow {
@@ -280,15 +284,18 @@ export function derivePRHistory(sessions: ExerciseHistorySession[]): PRMoment[] 
     // maxima now, and a session can push any of them.
     const where = { date: session.date, sessionId: session.sessionId }
 
-    if (session.topSetAddedLoadKg > runningMaxAdded) {
+    // A FIRST LOG IS A BASELINE (pr-engine's comparePR, 9 Oct 2026): each
+    // running best has to exist before a session can beat it, so the first
+    // session of a lift opens its record and is not listed as one.
+    if (runningMaxAdded > 0 && session.topSetAddedLoadKg > runningMaxAdded) {
       moments.push({ ...blank, ...where, addedLoadKg: session.topSetAddedLoadKg, kind: 'added_load', metric: 'added_load' })
     }
-    if (session.topSetReps > runningMaxReps) {
+    if (runningMaxReps > 0 && session.topSetReps > runningMaxReps) {
       moments.push({ ...blank, ...where, reps: session.topSetReps, kind: 'reps', metric: 'reps' })
     }
     const isWeightPR = session.topSetWeightKg > runningMaxWeight
     const isE1RMPR = session.topSetE1RM > runningMaxE1RM
-    if (isWeightPR || isE1RMPR) {
+    if ((runningMaxWeight > 0 || runningMaxE1RM > 0) && (isWeightPR || isE1RMPR)) {
       moments.push({
         ...blank,
         ...where,
@@ -317,12 +324,30 @@ export interface SessionHistoryEntry {
   totalSets: number
   /** True when the sets query for this session failed — totalVolumeKg/totalSets are 0 as a placeholder, NOT a real "nothing logged" result. Callers must render this distinctly (e.g. "Couldn't load"), never as a genuine zero. */
   loadError?: boolean
+  /**
+   * The cardio logged on this date, one line each — "Brisk walk · 30 min ·
+   * Easy". ITS OWN LINES, NEVER FOLDED INTO THE FIGURES ABOVE: duration,
+   * volume and sets are the lifting's, and a walk added to them would make
+   * every earlier session incomparable. (Decided unprompted, reversible —
+   * BACKLOG, 9 Oct 2026.) Joined on the date: `cardio_logs` has no session id,
+   * and "one fact, one home" (types.ts) says it should not grow one.
+   */
+  cardio: string[]
+  /** A date with cardio and no session row at all. Listed so the work is not lost; flagged so a count of LIFTING sessions can leave it out. */
+  cardioOnly?: boolean
 }
 
-/** Pure — sets × reps summed, and a raw count. Bodyweight sets (weight 0) contribute 0 volume, matching computeSessionSummary's convention. */
-export function sumVolumeAndSets(sets: { weightKg: number; repsCompleted: number }[]): { totalVolumeKg: number; totalSets: number } {
+/**
+ * Pure — volume summed, and a raw count. Bodyweight sets (weight 0) contribute
+ * 0. A set that says which exercise it was is counted through setVolumeKg, so
+ * a pair of dumbbells counts both hands here exactly as on the finish card; a
+ * bare weight and reps is counted as given.
+ */
+export function sumVolumeAndSets(sets: { weightKg: number; repsCompleted: number; exerciseName?: string }[]): { totalVolumeKg: number; totalSets: number } {
   return {
-    totalVolumeKg: sets.reduce((sum, s) => sum + s.weightKg * s.repsCompleted, 0),
+    totalVolumeKg: sets.reduce((sum, s) => sum + (s.exerciseName
+      ? setVolumeKg({ exercise_name: s.exerciseName, weight_kg: s.weightKg, reps_completed: s.repsCompleted })
+      : s.weightKg * s.repsCompleted), 0),
     totalSets: sets.length,
   }
 }
@@ -331,7 +356,7 @@ export function sumVolumeAndSets(sets: { weightKg: number; repsCompleted: number
 export async function getSessionHistory(userId: string, limit = 30): Promise<SessionHistoryEntry[]> {
   const { data, error } = await supabase
     .from('workout_sessions')
-    .select('id, date, split_type, day, duration_minutes, is_completed')
+    .select('*')
     .eq('profile_id', userId)
     .order('date', { ascending: false })
     .limit(limit)
@@ -339,10 +364,21 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
     console.error(`getSessionHistory(${userId}) failed to load workout_sessions:`, error)
     throw error
   }
-  if (!data) return []
+  const rows = data ?? []
 
-  const entries = await Promise.all(
-    data.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean }) => {
+  // ONE RANGED READ of cardio through the one reader, joined on date below.
+  // From the oldest session listed when the list was cut at `limit` (cardio
+  // older than that belongs to a page nobody is looking at); from the
+  // beginning otherwise. It carries what is still waiting on this phone, so a
+  // finisher logged a moment ago is in the history it is opened from.
+  const oldest = rows.length >= limit ? rows[rows.length - 1].date : '0000-01-01'
+  const cardioByDate = new Map<string, string[]>()
+  for (const log of (await readCardioLogs(userId, { from: oldest })).rows) {
+    cardioByDate.set(log.date, [...(cardioByDate.get(log.date) ?? []), cardioLine(log)])
+  }
+
+  const allRows: SessionHistoryEntry[] = await Promise.all(
+    rows.map(async (row: { id: string; date: string; split_type: string; day: string | null; duration_minutes: number | null; is_completed: boolean }) => {
       const base = {
         sessionId: row.id,
         date: row.date,
@@ -350,6 +386,7 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
         day: row.day,
         durationMinutes: row.duration_minutes,
         isCompleted: row.is_completed,
+        cardio: cardioByDate.get(row.date) ?? [],
       }
       // A failed sets query must render as "couldn't load", never as a
       // silent 0kg/0sets indistinguishable from a genuinely empty session —
@@ -357,8 +394,11 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
       // getSetsForSession, which now throws instead of swallowing the error).
       try {
         const sets = await getSetsForSession(row.id)
+        // Volume as the finish card counts it (session-derive's setVolumeKg:
+        // a pair of dumbbells counts both hands), so one session does not
+        // show two different totals on two screens.
         const { totalVolumeKg, totalSets } = sumVolumeAndSets(
-          sets.filter(s => !s.is_warmup).map(s => ({ weightKg: s.weight_kg, repsCompleted: s.reps_completed }))
+          sets.filter(s => !s.is_warmup).map(s => ({ weightKg: s.weight_kg, repsCompleted: s.reps_completed, exerciseName: s.exercise_name }))
         )
         return { ...base, totalVolumeKg, totalSets }
       } catch (setsError) {
@@ -367,7 +407,44 @@ export async function getSessionHistory(userId: string, limit = 30): Promise<Ses
       }
     })
   )
-  return entries
+
+  // A ROW IS NOT A SESSION (M15/M30, 9 Oct 2026). Marking a day as rest,
+  // moved, missed or swapped stores that note as a row in this same table
+  // (daily-tracking.ts) — so history listed "swapped · 0m · 0kg · 0 sets" as a
+  // session, and "moved · 2026-10-10" for a move away from a day that had not
+  // happened yet; two workouts read as five. And Start workout creates a row
+  // before any set exists. A session is the working sets in it: a row with
+  // none is a note about a day, and is not listed. A row whose sets could not
+  // be READ stays, saying so — unknown is not zero.
+  const sessionEntries = allRows.filter(e => e.loadError || e.totalSets > 0)
+
+  // A DATE WITH CARDIO AND NO SESSION ON IT — a walk on a rest day, a class on
+  // a day off, football on a day swapped for it. It was done, so it is in the
+  // record, as the activity it was.
+  const listed = new Set(sessionEntries.map(e => e.date))
+  const cardioEntries: SessionHistoryEntry[] = [...cardioByDate.entries()]
+    .filter(([date]) => !listed.has(date))
+    .map(([date, cardio]) => ({
+      sessionId: `cardio:${date}`, date, splitType: 'cardio', day: dayNameOf(date), durationMinutes: null,
+      isCompleted: true, totalVolumeKg: 0, totalSets: 0, cardio, cardioOnly: true,
+    }))
+  return [...sessionEntries, ...cardioEntries].sort((a, b) => b.date.localeCompare(a.date))
+}
+
+/**
+ * A history row's title, from the one thing every row has: its date.
+ *
+ * It read the session row's own `day`, which a session started with the
+ * button did not have — so Friday's was titled by its fallback, "training",
+ * beside "Thursday" (M30). The weekday is a fact about the date.
+ */
+export function sessionTitle(entry: Pick<SessionHistoryEntry, 'date'>): string {
+  return `${dayNameOf(entry.date)} · ${entry.date}`
+}
+
+/** "N sessions" — workouts. A day of cardio with no lifting is listed in history but is not one (decided 9 Oct 2026, unprompted: the number keeps the meaning it has always had). */
+export function countSessions(entries: SessionHistoryEntry[]): number {
+  return entries.filter(e => !e.cardioOnly).length
 }
 
 /**

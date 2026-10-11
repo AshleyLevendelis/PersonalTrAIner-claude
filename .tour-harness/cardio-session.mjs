@@ -22,7 +22,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -71,7 +71,7 @@ const restDate = await ev(`(() => {
 })()`)
 check('0. the fixture has a rest day to fill', !!restDate && !!restDate.date, restDate)
 if (!restDate) {
-  writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/cardio-session.png',
+  writeFileSync(new URL('./cardio-session.png', import.meta.url).pathname,
     Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
   console.error('\nNo rest day in the fixture — nothing to add to.\n')
   ws.close(); chrome.kill(); server.close(); process.exit(1)
@@ -154,7 +154,7 @@ const after = await ev(`(() => {
   }
 })()`)
 
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/cardio-session.png',
+writeFileSync(new URL('./cardio-session.png', import.meta.url).pathname,
   Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 
 // THE WHOLE COMPLAINT, IN ONE CHECK. Before today this produced a day with

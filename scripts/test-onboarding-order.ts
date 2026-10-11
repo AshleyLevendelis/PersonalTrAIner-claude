@@ -233,7 +233,10 @@ console.log('\n7. The composer describes the question that is on screen')
   const block = /const pendingHint = \(\) => \{[\s\S]*?\}\)\(\)/.exec(src)?.[0]
     ?? /const pendingHint = \(\(\) => \{[\s\S]*?\}\)\(\)/.exec(src)?.[0] ?? ''
   check('the hint reads the conversation, not just the slot list',
-    /m\.slotCard && !m\.slotCardResolved/.test(block) && /m\.asksSlot/.test(block), block.slice(0, 200))
+    // isLiveCard(m) is "an unanswered card that is still the one on screen" —
+    // the same reading of the conversation, now also skipping a card whose
+    // question has since been re-asked further down (9 Oct 2026).
+    /isLiveCard\(m\)/.test(block) && /m\.asksSlot/.test(block), block.slice(0, 200))
   check('...and still falls back to the canonical next open slot',
     /openSlotsInOrder\(confirmed, values\)\[0\]/.test(block))
 

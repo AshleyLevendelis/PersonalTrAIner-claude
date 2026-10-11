@@ -30,7 +30,7 @@
 
 import { statedCeilingKg } from './load-prescription'
 import { getExerciseEntry } from './exercise-db'
-import { rebuildAgainstProfile } from './plan-adaptations'
+import { rebuildAgainstProfile, type PlanEditContext } from './plan-adaptations'
 import { saveMesocycleWeek } from './mesocycle-persistence'
 import type { MesocycleWeek, UserProfile } from './types'
 
@@ -99,6 +99,8 @@ export async function reconcileToStatedCeilings(
   profile: UserProfile,
   exclusions: string[],
   currentWeek: number,
+  /** Which days are already trained — a rebuild never rewrites one. */
+  context: PlanEditContext,
 ): Promise<CeilingReconcileResult> {
   const violations = findCeilingViolations(mesocycle, profile, currentWeek)
   if (violations.length === 0) return { messages: [], violations: [] }
@@ -108,7 +110,7 @@ export async function reconcileToStatedCeilings(
   // numbers always produce the same rebuild — the convention
   // rebuildForWeightBasis follows and for the same reason.
   const seedKey = `stated-ceiling:${profileId}:${profile.max_dumbbell_kg ?? '-'}:${profile.max_single_implement_kg ?? '-'}:${profile.max_improvised_kg ?? '-'}`
-  const rebuilt = await rebuildAgainstProfile(profile, exclusions, mesocycle, weekNumbers, seedKey)
+  const rebuilt = await rebuildAgainstProfile(profile, exclusions, mesocycle, weekNumbers, context, seedKey)
 
   const touched = rebuilt.filter(w => weekNumbers.includes(w.week_number))
   await Promise.all(touched.map(w => saveMesocycleWeek(profileId, w)))

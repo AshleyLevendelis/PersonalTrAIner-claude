@@ -95,7 +95,11 @@ console.log('\n2. Closed-set validation accepts every declared value, rejects ga
 for (const def of ONBOARDING_SLOTS) {
   if (!def.options) continue
   if (def.control === 'single') {
-    const good = def.options.every(o => {
+    // Every value the person can TAP — offeredOptionsFor, re-anchored 9 Oct
+    // 2026. It read def.options, which is now also how a value that is no
+    // longer offered (the combat style) keeps its label; such a value must
+    // NOT validate as a new answer, and test:style-picker holds that half.
+    const good = offeredOptionsFor(def)!.every(o => {
       const coerced =
         def.key === 'knowsWorkingLifts' || def.key === 'includeSnacks'
           ? String(o.value) === 'true'
@@ -104,7 +108,7 @@ for (const def of ONBOARDING_SLOTS) {
             : String(o.value)
       return def.validate(coerced)
     })
-    check(`${def.key} accepts all its own values`, good)
+    check(`${def.key} accepts every value it offers`, good)
     check(`${def.key} rejects out-of-set`, !def.validate('definitely_not_a_value'))
   } else if (def.control === 'multi') {
     const first = String(def.options[0].value)
@@ -239,7 +243,16 @@ console.log('\n10. Everyone answers the same questions')
 for (const key of ['trainingExperience', 'conditioningPreference', 'equipment', 'trainingStyle', 'fitnessGoal'] as SlotKey[]) {
   check(`${key}: required for everyone`, isSlotRequired(getSlotDef(key)!, initialSlotValues()))
 }
-check('offeredOptionsFor hides nothing today', ONBOARDING_SLOTS.every(d => !d.options || offeredOptionsFor(d)!.length === d.options.length))
+// RE-ANCHORED 9 Oct 2026, deliberately. This read "offeredOptionsFor hides
+// nothing today" and asserted every question offered every option — true
+// until Ashley's August ruling to take the combat training style out of the
+// pickers was finally built (test log M3). The property worth keeping is the
+// other half: nothing is hidden BY ACCIDENT. Exactly which style is hidden,
+// and on which surfaces, is test:style-picker's job.
+check('offeredOptionsFor hides nothing except from the training-style question',
+  ONBOARDING_SLOTS.every(d => !d.options || d.key === 'trainingStyle' || offeredOptionsFor(d)!.length === d.options.length))
+check('...and the training-style question still offers a real choice',
+  (offeredOptionsFor(getSlotDef('trainingStyle')!) ?? []).length >= 2)
 
 console.log('\n11. assembleProfile produces one shape of profile')
 const gymProfile = assembleProfile(fullValues())

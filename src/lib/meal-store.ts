@@ -485,9 +485,30 @@ export async function getEatenProteinByDate(
   profileId: string,
   dates: string[],
 ): Promise<Record<string, number> | null> {
+  const byDay = await getEatenByDate(profileId, dates)
+  if (!byDay) return null
+  return Object.fromEntries(Object.entries(byDay).map(([d, v]) => [d, v.protein]))
+}
+
+/** What was logged as eaten on one day: the four numbers and how many entries made them. */
+export interface EatenDay { kcal: number; protein: number; carbs: number; fat: number; meals: number }
+
+/**
+ * WHAT WAS LOGGED AS EATEN, PER DAY, in one ranged read (runs 3-4, H26,
+ * 10 Oct 2026: the coach could not say what was eaten yesterday). The SAME
+ * arithmetic getEatenProteinByDate always used, now for all four numbers, so
+ * the streak and the coach count one way: no voided rows, the three eaten
+ * event types, the pending queue merged and deduped by client_id. Null when
+ * the read fails, never a day of zeros.
+ */
+export async function getEatenByDate(
+  profileId: string,
+  dates: string[],
+): Promise<Record<string, EatenDay> | null> {
   if (dates.length === 0) return {}
 
-  let serverEvents: { date: string; clientId: string; eventType: string; protein: number }[] = []
+  type Row = { date: string; clientId: string; eventType: string; macros: MealMacros | null }
+  let serverEvents: Row[] = []
   try {
     const { data, error } = await supabase
       .from('meal_events')
@@ -500,7 +521,7 @@ export async function getEatenProteinByDate(
       date: row.date,
       clientId: row.client_id ?? `server_${row.created_at}`,
       eventType: row.event_type,
-      protein: row.macros?.protein ?? 0,
+      macros: row.macros ?? null,
     }))
   } catch {
     return null
@@ -508,15 +529,20 @@ export async function getEatenProteinByDate(
 
   const wanted = new Set(dates)
   const seen = new Set(serverEvents.map(e => e.clientId))
-  const localOnly = loadPending()
+  const localOnly: Row[] = loadPending()
     .filter(e => e.profileId === profileId && wanted.has(e.date) && !seen.has(e.clientId))
-    .map(e => ({ date: e.date, clientId: e.clientId, eventType: e.eventType, protein: e.macros?.protein ?? 0 }))
+    .map(e => ({ date: e.date, clientId: e.clientId, eventType: e.eventType, macros: e.macros ?? null }))
 
-  const byDate: Record<string, number> = {}
-  for (const date of dates) byDate[date] = 0
+  const byDate: Record<string, EatenDay> = {}
+  for (const date of dates) byDate[date] = { kcal: 0, protein: 0, carbs: 0, fat: 0, meals: 0 }
   for (const e of [...serverEvents, ...localOnly]) {
     if (e.eventType !== 'confirmed' && e.eventType !== 'swapped_in' && e.eventType !== 'extra') continue
-    byDate[e.date] = (byDate[e.date] ?? 0) + e.protein
+    const d = byDate[e.date] ?? (byDate[e.date] = { kcal: 0, protein: 0, carbs: 0, fat: 0, meals: 0 })
+    d.kcal += e.macros?.kcal ?? 0
+    d.protein += e.macros?.protein ?? 0
+    d.carbs += e.macros?.carbs ?? 0
+    d.fat += e.macros?.fat ?? 0
+    d.meals += 1
   }
   return byDate
 }

@@ -420,8 +420,13 @@ check('the Profile screen offers the starting point',
 check('...using onboarding\'s own option list, not a second copy of it',
   /Row label="Starting from"[\s\S]{0,400}?options=\{START_PREFERENCE_OPTIONS\}/.test(startScreen)
   && !/(const|let)\s+START_PREFERENCE_OPTIONS/.test(startScreen))
-check('...beside Equipment, with the rest of "You"',
-  /Row label="Equipment"[\s\S]{0,2000}Row label="Starting from"/.test(startScreen))
+// 2d (10 Oct 2026): it sits in the Goal sheet, with the goal it qualifies.
+{
+  const at = startScreen.indexOf("case 'goal': return (")
+  const goalSheet = at >= 0 ? startScreen.slice(at, startScreen.indexOf('case ', at + 10)) : ''
+  check('...in the Goal sheet, with the goal and experience it sits beside',
+    /Row label="Goal"/.test(goalSheet) && /Row label="Experience"/.test(goalSheet) && /Row label="Starting from"/.test(goalSheet))
+}
 // THE ROAD IT TAKES. CEILING_FIELDS is the re-price trigger's own list; this
 // answer must not be on it, and must be on the invalidating one instead.
 check('...and it is NOT on the re-price trigger\'s list of fields',

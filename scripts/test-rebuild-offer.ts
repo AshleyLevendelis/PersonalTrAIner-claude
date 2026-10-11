@@ -25,6 +25,13 @@ import { detectPlanInvalidation, rebuildFromCurrentWeek, PLAN_INVALIDATING_FIELD
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile } from '../src/lib/types'
+import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+// These gates address whole plan weeks on a plan nobody has trained on: every
+// row of the named weeks, and no day protected. (A live plan addresses days by
+// date and loads the real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
+const rowsOfWeeks = (m: { week_number: number; days: { day: string }[] }[], weeks: number[]) =>
+  m.filter(w => weeks.includes(w.week_number)).flatMap(w => w.days.map(d => ({ weekNumber: w.week_number, dayName: d.day })))
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failures = 0
@@ -89,10 +96,22 @@ console.log('\n2. And nothing else does')
   const same = detectPlanInvalidation(base({ injuries: ['knees'] }), { injuries: ['knees'] })
   check('re-saving the same injuries does not', same === null, same)
 
-  // Removing one leaves a plan that is merely more cautious than it needs to
-  // be. Not urgent, and not worth interrupting somebody for.
+  // RE-ANCHORED ON PURPOSE, 9 Oct 2026 (test log H5). This pinned "removing
+  // an injury does not", on the reasoning that such a plan is "merely more
+  // cautious than it needs to be". Measured on the tester's plan it was one
+  // press a week and a third leg day for sixteen weeks, with a note on screen
+  // sending him to Profile, where un-ticking did nothing. A removal now makes
+  // the same offer an addition does, with its own words. Decided unprompted
+  // and reversible (the plan's owner question 1, recommended answer B):
+  // declining costs nothing and changes nothing.
   const removed = detectPlanInvalidation(base({ injuries: ['knees'] }), { injuries: [] })
-  check('removing an injury does not', removed === null, removed)
+  check('removing an injury offers a rebuild too', removed !== null && removed.field === 'injuries', removed)
+  check('...in its own words, not the "you just added that" ones', !!removed && removed.title !== detectPlanInvalidation(base(), { injuries: ['knees'] })?.title && !/you added that/.test(removed.detail) && /from today/.test(removed.detail), removed)
+  check('...and says nothing already logged or done is touched', !!removed && /already logged/.test(removed.detail) && /already done/.test(removed.detail), removed?.detail)
+  // An entry typed before the picker existed never changed a plan, so
+  // clearing one has nothing to give back and nothing to ask.
+  const legacyCleared = detectPlanInvalidation(base({ injuries: ['knees', 'tennis elbow'] }), { injuries: ['knees'] })
+  check('clearing a free-text entry the plan never acted on does not', legacyCleared === null, legacyCleared)
 
   // training_days joined this list after the audit's own diet-change probe
   // caught it missing: the plan is built from the days marked available, so
@@ -263,7 +282,7 @@ console.log('\n3. A rebuild changes the weeks ahead and NOT the weeks behind')
   const beforeAhead = snapshot(meso.filter(w => w.week_number >= CURRENT))
 
   const injured = base({ injuries: ['knees'] })
-  const result = await rebuildFromCurrentWeek(injured, [], meso, CURRENT)
+  const result = await rebuildFromCurrentWeek(injured, [], meso, CURRENT, GATE_CONTEXT)
   check('the rebuild succeeds', result.ok, result.error)
   check(`...covering every week from ${CURRENT} on`,
     result.weeksRebuilt === meso.filter(w => w.week_number >= CURRENT).length, result.weeksRebuilt)
@@ -328,7 +347,11 @@ console.log('\n4. Nothing rebuilds without somebody saying yes')
     /couldn't be rebuilt right now/.test(app))
   // The rebuild must start from the live week, or it would rewrite history.
   check('it starts from the current week, not from week 1',
-    /getActiveMesocycleWeek\([\s\S]{0,200}rebuildFromCurrentWeek/.test(app))
+    /getActiveMesocycleWeek\([\s\S]{0,460}rebuildFromCurrentWeek/.test(app))
+  // ...and, since 9 Oct 2026, it is handed which DAYS of that week are already
+  // trained: "from this week onwards" used to rewrite those too.
+  check('...and is handed the days already trained, read at the tap',
+    /const context = await loadPlanEditContext\(profile, mesocycle, mesocycleCreatedAt \?\? profile\.created_at\)\s*const result = await rebuildFromCurrentWeek\(profile, effectiveExclusions, mesocycle, currentWeek, context\)/.test(app))
 
   // THE WORDS HAVE TO REACH A SCREEN. Everything above proves the offer is
   // RAISED and that saying yes or no does the right thing; none of it proves

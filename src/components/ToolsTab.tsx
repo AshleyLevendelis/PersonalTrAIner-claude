@@ -4,27 +4,25 @@ import { Disc, History, BookOpen, Timer, ChevronRight, List, TimerReset, ArrowLe
 // loads: the round setup unfolds only under the Custom chip and the stopwatch
 // opens from a row. Eagerly imported they pushed the app chunk 1 kB past its
 // budget (test:bundle, 13 Sep 2026) for two panels most sessions never open.
-const RoundSetupPanel = lazy(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.RoundSetupPanel })))
+const RoundTimerSheet = lazy(() => import('@/components/timers/RoundTimerSheet').then(m => ({ default: m.RoundTimerSheet })))
 const StopwatchPanel = lazy(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { getSessionHistory } from '@/lib/exercise-history'
-import { getPRCache } from '@/lib/pr-engine'
+import { getSessionHistory, countSessions } from '@/lib/exercise-history'
+import { getRecordsBeaten, refreshPRCacheFromDB } from '@/lib/pr-engine'
 import { getAllItems, subscribeGroceryStore } from '@/lib/grocery-store'
 import { programHash, groceryHash } from '@/lib/app-route'
 import { RoundField } from '@/components/timers/RoundField'
 import { RoundCard } from '@/components/timers/RoundCard'
-import { ProtocolChips, protocolChoices } from '@/components/timers/ProtocolChips'
 import { useTimers } from '@/hooks/useTimers'
 import { useActiveSession } from '@/hooks/useActiveSession'
+import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { parseConditioningInterval, ROUND_PRESETS } from '@/lib/timer-engine'
-import type { WorkoutDay, MesocycleWeek } from '@/lib/types'
+import type { WorkoutDay, MesocycleWeek, EquipmentAccess } from '@/lib/types'
 import type { RoundLogSummary } from '@/lib/timer-engine'
 import { AddUnplannedWork } from '@/components/exercise/AddUnplannedWork'
 import { CircuitOffer } from '@/components/exercise/CircuitOffer'
-import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { sessionForDate } from '@/lib/session-move'
 
 // ---------------------------------------------------------------------------
 // TOOLS IS ONE TIMER SURFACE — design handoff 2a (12 Sep 2026), then 4a
@@ -90,33 +88,42 @@ export interface ToolsTabProps {
   mesocycle?: MesocycleWeek[]
   /** Which mesocycle week is live, so the block number is the one they are in. */
   liveWeek?: number
+  /** The kit tier, so the cardio quick picks on the "log this round" sheet are ones the person can do. */
+  equipmentAccess?: EquipmentAccess
   /** When the plan began, so "is today's session still due" is the same answer Today gives. */
   planCreatedAt?: string
-  /** App's logsVersion: bumped by a day write elsewhere, so the offer below re-reads the day. */
+  /** App's logsVersion: bumped by a day write made elsewhere (the coach moving a session), so Tools re-reads today. */
   logsVersion?: number
   /** Tell App a day changed (the circuit counted as today's workout), so every screen re-reads it. */
   onLogsUpdated?: () => void
 }
 
-export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCreatedAt, logsVersion, onLogsUpdated }: ToolsTabProps) {
+/** Stable identity, so a missing plan does not hand the week hook a fresh array each render. */
+const EMPTY_PLAN: WorkoutDay[] = []
+
+export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipmentAccess, planCreatedAt, logsVersion, onLogsUpdated }: ToolsTabProps) {
   const timers = useTimers()
   // The session facade already owns "which day is it" (frozen at session
   // start, dev-clock aware). Deriving it again here from a fresh Date would
   // be a second answer to a question this app deliberately has one owner for.
-  const { dayName, date: today, logs: setLogs } = useActiveSession()
-  // TODAY, THE WAY THE TODAY CARD SEES IT, for the circuit offer under a logged block (her ruling A,
-  // 8 Oct 2026): the same week hook and the same per-date lookup, so the two places cannot disagree
-  // about whether the session is still due.
-  const liveDays = mesocycle?.find(w => w.week_number === liveWeek)?.days ?? exercisePlan ?? []
+  const { date: today, logs: setLogs } = useActiveSession()
+  // TODAY'S SESSION IS THE ONE RUN TODAY, moves taken into account — the same
+  // seven cells the week strip is drawn from. This looked the weekday up in
+  // the plan's raw rows, so on a day a session had moved ONTO it offered no
+  // conditioning timer, and on the day it had moved OFF it offered the timer
+  // for a session being done elsewhere (H19's twentieth reader, 9 Oct 2026).
+  // The same hook also answers the circuit offer under a logged block (her ruling A, 8 Oct 2026), so the two
+  // places cannot disagree about whether the session is still due.
+  const liveDays = mesocycle?.find(w => w.week_number === liveWeek)?.days ?? exercisePlan ?? EMPTY_PLAN
   const week = useTrainingWeek(profileId, today, liveDays, planCreatedAt, logsVersion, mesocycle)
-  const todaysSession = sessionForDate({ date: today, plan: liveDays, moves: week.moves }).day ?? undefined
-  const todaysConditioning = (exercisePlan ?? []).find(d => d.day === dayName)?.recommendedCardio
+  const todayCell = week.days.find(d => d.date === today)
+  const todaysSession = (todayCell?.movedTo ? null : todayCell?.session) ?? undefined
+  const todaysConditioning = todaysSession?.recommendedCardio
 
   const [historyCount, setHistoryCount] = useState<{ sessions: number; prs: number } | null>(null)
   const [groceryCount, setGroceryCount] = useState<{ total: number; checked: number } | null>(null)
   const [plateOpen, setPlateOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [customOpen, setCustomOpen] = useState(false)
   // THE TIMERS SHEET, and which of the three is open inside it. `null` is the
   // three-way chooser; the rest are the panels. One piece of state, so the
   // sheet cannot be open on a timer it is not showing.
@@ -131,12 +138,16 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
   useEffect(() => {
     if (!profileId) return
     let cancelled = false
-    void getSessionHistory(profileId, 100)
-      .then(rows => {
+    void Promise.all([getSessionHistory(profileId, 100), refreshPRCacheFromDB(profileId).catch(() => {})])
+      .then(([rows]) => {
         if (cancelled) return
-        // PRs come from the same cache the Home list and the set grid read;
-        // counting them here rather than deriving a second definition.
-        setHistoryCount({ sessions: rows.length, prs: Object.keys(getPRCache(profileId)).length })
+        // RECORDS BEATEN, not exercises logged. This counted the cache's keys
+        // — one per exercise ever logged — so two workouts read "7 PRs" with
+        // no record broken. Same list Home's "Recent PRs" is drawn from.
+        // LIFTING SESSIONS, as it has always counted: the history now also
+        // lists a day of cardio with no lifting (H7), and that must not turn
+        // "5 sessions" into 7 without anyone deciding it should.
+        setHistoryCount({ sessions: countSessions(rows), prs: getRecordsBeaten(profileId).length })
       })
       .catch(() => { if (!cancelled) setHistoryCount(null) })
     return () => { cancelled = true }
@@ -190,7 +201,6 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
   // above a chip row with nothing lit.
   const todaysConfig = parseConditioningInterval(todaysConditioning?.activity)
   const idleConfig = timers.selectedRoundConfig ?? todaysConfig ?? ROUND_PRESETS[0].config
-  const choices = protocolChoices(todaysConfig, timers.customRoundConfig)
 
   // THE SHEET WHERE THE FINISHED ROUND IS WRITTEN DOWN. Rendered once, beside
   // both branches, because the full-screen branch returns early and a sheet
@@ -200,6 +210,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
       open={!!roundToLog}
       onOpenChange={o => { if (!o) setRoundToLog(null) }}
       hideTrigger
+      equipmentAccess={equipmentAccess}
       // ABOVE THE FIELD, NOT UNDER IT. The full-screen branch below renders
       // this beside RoundField, which is fixed and opaque over the whole
       // viewport — so an in-flow sheet opened where nobody could see it.
@@ -239,7 +250,9 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
       // this tab is mostly for, and it carries the tour stop, which used to
       // point at the round card that is no longer here at rest.
       label: 'Timers',
-      sub: roundLive ? 'A round is running' : 'Round timer, stopwatch, lap timer',
+      // A FINISHED ROUND IS NOT RUNNING (runs 3-4, LOW): it said "A round is
+      // running" until Log session or Reset.
+      sub: roundLive ? (timers.isRoundComplete ? 'Round finished — log it' : 'A round is running') : 'Round timer, stopwatch, lap timer',
       icon: TimerReset,
       tour: 'toolstimer',
       onClick: () => { setTimerPick(roundLive ? 'round' : null); setTimersOpen(true) },
@@ -342,7 +355,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
           Choosing a mode CLEARS the timer record, so the chooser refuses to
           walk away from a live round rather than wiping it silently; that was
           already true of the old stopwatch row and is stated on the row. */}
-      <Dialog open={timersOpen} onOpenChange={o => { setTimersOpen(o); if (!o) setCustomOpen(false) }}>
+      <Dialog open={timersOpen} onOpenChange={setTimersOpen}>
         {/* NO max-w OVERRIDE. The stopwatch dialog this replaces carried
             `max-w-[22rem]` (352px), which is NARROWER than DialogContent's own
             `max-w-[calc(100%-2rem)]` (358px on a 390px phone) — so the round
@@ -350,7 +363,17 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
             "Full screen" wrapped onto two lines. Read off a screenshot, not
             reasoned about. The default matches the tab, so the card renders
             the same in both places. */}
-        <DialogContent className="[&_[data-slot=dialog-body]]:px-3">
+        {/* THE ROUND TIMER IS A FULL-SCREEN SHEET — 4c. Its own top bar
+            ("‹ Timers", the title, the sound toggle) and a docked Start, so
+            the dialog's padding, header and ✕ step aside for it. The list and
+            the stopwatch keep the ordinary dialog. */}
+        <DialogContent
+          showCloseButton={timerPick !== 'round'}
+          className={timerPick === 'round'
+            ? 'inset-0 top-0 left-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 pt-[env(safe-area-inset-top,0px)] sm:max-w-none [&_[data-slot=dialog-body]]:p-0 [&_[data-slot=dialog-body]]:gap-0'
+            : '[&_[data-slot=dialog-body]]:px-3'}
+        >
+          {timerPick !== 'round' && (
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {timerPick && (
@@ -363,9 +386,10 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
                   <ArrowLeft className="size-4" aria-hidden />
                 </button>
               )}
-              {timerPick === 'round' ? 'Round timer' : timerPick === 'lap' ? 'Lap timer' : timerPick === 'stopwatch' ? 'Stopwatch' : 'Timers'}
+              {timerPick === 'lap' ? 'Lap timer' : timerPick === 'stopwatch' ? 'Stopwatch' : 'Timers'}
             </DialogTitle>
           </DialogHeader>
+          )}
 
           {timerPick === null && (
             <div data-testid="timer-choices">
@@ -397,24 +421,16 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, planCre
           )}
 
           {timerPick === 'round' && (
-            <div className="flex flex-col gap-3">
-              <RoundCard live={roundLive} idleConfig={idleConfig} onLogSession={setRoundToLog} />
-              <ProtocolChips
-                choices={choices}
+            <Suspense fallback={null}>
+              <RoundTimerSheet
+                todaysConfig={todaysConfig}
                 live={roundLive}
-                selected={roundLive ? timers.roundConfig : idleConfig}
-                customOpen={customOpen}
-                onOpenCustom={setCustomOpen}
+                selected={idleConfig}
+                todaysSessionName={todaysConfig ? (todayCell?.session?.focus ?? null) : null}
+                onBack={() => setTimerPick(null)}
+                onLogSession={setRoundToLog}
               />
-              {customOpen && (
-                <Suspense fallback={null}>
-                  <RoundSetupPanel onDone={() => setCustomOpen(false)} />
-                </Suspense>
-              )}
-              <p className="text-[0.71875rem] leading-[1.45] text-muted-foreground">
-                Rest between sets runs itself in the session dock — this is for conditioning.
-              </p>
-            </div>
+            </Suspense>
           )}
 
           {(timerPick === 'stopwatch' || timerPick === 'lap') && (

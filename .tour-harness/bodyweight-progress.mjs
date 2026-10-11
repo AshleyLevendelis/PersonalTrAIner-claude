@@ -17,7 +17,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -54,7 +54,7 @@ const tapCentre = async selectorFn => {
   }
   return true
 }
-const shoot = async name => writeFileSync(`/home/user/PersonalTrAIner-claude/.tour-harness/${name}.png`,
+const shoot = async name => writeFileSync(new URL(`./${name}.png`, import.meta.url).pathname,
   Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 
 let failures = 0
@@ -79,36 +79,22 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1#/t
 await wait(5000)
 
 const home = await ev('document.body.innerText')
-check('1a. the PR section is on screen at all', /Recent PRs/i.test(home), home.slice(0, 200))
-
-// THE FIXTURE MUST BE THE ONE THIS IS ABOUT. Without this the six checks
-// below could all pass against a page that never had a bodyweight record.
-check('1b. the bodyweight exercise reached the list', /Pull-Ups/i.test(home), home.slice(0, 400))
-
-// The section, isolated — so "12 reps" appearing somewhere else on Home
-// cannot satisfy a check about the PR list.
-const prBlock = await ev(`(() => {
-  const label = [...document.querySelectorAll('*')].find(n => n.children.length === 0 && /^Recent PRs$/i.test(n.textContent.trim()))
-  return label ? (label.parentElement?.innerText ?? '') : ''
-})()`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's "Recent PRs" list became
+// ONE cell in the weight panel — the latest PR. In this fixture the latest is
+// the bodyweight one (Pull-Ups, 2 days back), which is the record this driver
+// exists for. The belt record (Dips, 3 days back) is no longer on Home; its
+// "+12kg" rendering is held by test:bodyweight-progress through personalBest.
+check('1a. the PR cell is on screen at all', await ev(`!!document.querySelector('[data-home-latest-pr]')`), home.slice(0, 200))
+const prBlock = await ev(`document.querySelector('[data-home-latest-pr]')?.innerText ?? ''`)
+check('1b. the bodyweight exercise reached it', /Pull-Ups/i.test(prBlock), prBlock)
 check('1c. the PR block was found, so the checks below are not vacuous', prBlock.length > 0, prBlock)
 check('1d. the bodyweight best reads in REPS', /Pull-Ups[\s\S]*?\b14 reps\b/.test(prBlock), prBlock)
-// THE DEFECT THIS EXISTS FOR. Before today the renderer printed `${value} kg`
-// with no branch: a bodyweight record showed "0 kg", and a reps record would
-// have shown "14 kg" — a number in the wrong unit, which reads as correct.
-check('1e. ...and NOT as kilograms', !/Pull-Ups[\s\S]*?\b14 ?kg\b/.test(prBlock), prBlock)
-check('1f. ...and not as the "0 kg" it used to show', !/Pull-Ups[\s\S]*?\b0 ?kg\b/.test(prBlock), prBlock)
-check('1g. the belt record reads as ADDED weight, with its plus', /Dips[\s\S]*?\+12kg/.test(prBlock), prBlock)
-check('1h. ...and the belt is not reported as reps', !/Dips[\s\S]*?\b12 reps\b/.test(prBlock), prBlock)
+// THE DEFECT THIS EXISTS FOR: `${value} kg` with no branch printed "0 kg"
+// for a bodyweight record and would have printed "14 kg" for a reps one.
+check('1e. ...and NOT as kilograms', !/\b14 ?kg\b/.test(prBlock), prBlock)
+check('1f. ...and not as the "0 kg" it used to show', !/\b0 ?kg\b/.test(prBlock), prBlock)
 
-// SCROLL TO IT BEFORE SHOOTING. The section sits below the fold on a 390x844
-// phone, and innerText reads it whether it is visible or not — so a
-// screenshot taken at the top proves the checks ran, not that anyone could
-// read the result. The picture is the point.
-await ev(`(() => {
-  const label = [...document.querySelectorAll('*')].find(n => n.children.length === 0 && /^Recent PRs$/i.test(n.textContent.trim()))
-  label?.scrollIntoView({ block: 'center' })
-})()`)
+await ev(`document.querySelector('[data-home-latest-pr]')?.scrollIntoView({ block: 'center' })`)
 await wait(600)
 await shoot('bodyweight-progress-home')
 
@@ -128,47 +114,26 @@ await wait(5000)
 // person reaches it: expand the exercise, open its menu, choose History.
 // Walking the real controls rather than deep-linking a state, because a
 // route nobody can tap is not a route.
+// RE-ANCHORED 10 Oct 2026 (design handoff 2c). A collapsed row starts with
+// its number ("02 Pull-Ups") and carries no menu until it is opened, so the
+// walk up from the name's text landed on another row's menu. The row is found
+// by its own data-exercise-name, opened by its own toggle, and its menu is
+// brought on screen before the tap — a mouse event at off-screen coordinates
+// lands on nothing.
+const ROW = `[...document.querySelectorAll('[data-exercise-name]')].find(e => /^Pull-?Ups?$/i.test(e.getAttribute('data-exercise-name') ?? ''))`
 const opened = await ev(`(() => {
-  const leaf = [...document.querySelectorAll('*')]
-    .find(n => n.children.length === 0 && /^Pull-?Ups?$/i.test((n.textContent ?? '').trim()))
-  if (!leaf) return 'no leaf'
-  // WALK UP TO THIS EXERCISE'S ROW, NOT JUST TO SOMETHING WITH A BUTTON.
-  // The first version stopped at the first ancestor holding any button and
-  // landed on a CONTAINER — so the menu it opened belonged to Band
-  // Pull-Aparts, the row above, and the dialog that appeared was that
-  // exercise's. It looked like a failure of the feature and was a failure of
-  // the selector. The row is the smallest ancestor that has a menu button
-  // AND whose own text still starts with this exercise's name.
-  let row = leaf
-  for (let i = 0; i < 8 && row; i++) {
-    const own = (row.innerText ?? '').trim()
-    if (row.querySelector?.('[aria-haspopup="menu"]') && /^Pull-?Ups?/i.test(own)) break
-    row = row.parentElement
-  }
-  if (!row || !row.querySelector?.('[aria-haspopup="menu"]')) return 'no row'
-  const header = [...row.querySelectorAll('button')].find(b => /Pull-?Ups?/i.test(b.textContent ?? ''))
-  ;(header ?? leaf).click()
+  const row = ${ROW}
+  if (!row) return 'no row'
+  row.scrollIntoView({ block: 'center' })
+  const toggle = row.querySelector('[role="button"]')
+  if (!toggle) return 'no toggle'
+  toggle.click()
   return 'expanded'
 })()`)
 await wait(900)
-// RE-QUERY AFTER THE EXPANSION, never cache the node across it. Expanding
-// re-renders the row, so a reference taken beforehand can be detached from
-// the document — and a detached node still answers getBoundingClientRect
-// with a plausible box, so the tap "succeeded" at coordinates belonging to
-// nothing. That is why this reported an open menu with no items in it.
-const menuOpened = await tapCentre(`(() => {
-  const leaf = [...document.querySelectorAll('*')]
-    .find(n => n.children.length === 0 && /^Pull-?Ups?$/i.test((n.textContent ?? '').trim()))
-  if (!leaf) return null
-  let row = leaf
-  for (let i = 0; i < 8 && row; i++) {
-    if (row.querySelector?.('[aria-haspopup="menu"]') && /^Pull-?Ups?/i.test((row.innerText ?? '').trim())) {
-      return row.querySelector('[aria-haspopup="menu"]')
-    }
-    row = row.parentElement
-  }
-  return null
-})()`)
+await ev(`(${ROW})?.querySelector('[aria-haspopup="menu"]')?.scrollIntoView({ block: 'center' })`)
+await wait(300)
+const menuOpened = await tapCentre(`(${ROW})?.querySelector('[aria-haspopup="menu"]')`)
 await wait(800)
 const clickedHistory = await tapCentre(`[...document.querySelectorAll('[role="menuitem"]')]
   .find(n => /^History$/i.test((n.textContent ?? '').trim()))`)

@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Pencil, Trash2, Check, X, Plus, ChevronDown, Heart } from 'lucide-react'
+import { Pencil, Trash2, Check, X, Plus, ChevronRight, Heart } from 'lucide-react'
 import { watchFavouriteNames, unmarkFavourite } from '@/lib/favourite-meals'
 import {
   getAllFacts, getAllGoals, getAllContextFacts, createFact,
@@ -38,15 +38,18 @@ import { derivedStepsTargetFor } from '@/lib/steps-target'
 import { updateProfileField } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
 import { AppearanceSection } from '@/components/AppearanceSection'
+import { THEME_PREVIEWS } from '@/lib/appearance-palette'
 import type { ThemeName, AccentOverride } from '@/lib/appearance-store'
 import type { RevealSpeed } from '@/lib/reveal-speed-store'
 import {
-  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, STYLE_OPTIONS, RECOVERY_OPTIONS, START_PREFERENCE_OPTIONS,
+  EXPERIENCE_OPTIONS, EQUIPMENT_OPTIONS, styleOptionsFor, RECOVERY_OPTIONS, START_PREFERENCE_OPTIONS,
   CONDITIONING_PREF_OPTIONS, ACTIVITY_OPTIONS, DIETARY_OPTIONS, FAVORITE_CUISINE_OPTIONS,
   INJURY_OPTIONS, COOKING_TIME_OPTIONS, MEALS_PER_DAY_OPTIONS, DURATION_OPTIONS, BREAKFAST_STYLE_OPTIONS,
   DAYS_FULL, partitionInjuries, GOAL_OPTIONS,
 } from '@/lib/onboarding-slots'
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
+import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { ActiveAdaptationLines } from '@/components/exercise/ActiveAdaptationLines'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference, FitnessGoal } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
@@ -54,6 +57,7 @@ import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
 import { dietTargetCaveat } from '@/lib/coach-voice'
+import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_LABEL, type WeighInCheck } from '@/lib/weigh-in-check'
 
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
 // push plumbing are needed by nobody on first paint (test:bundle holds the
@@ -108,6 +112,10 @@ interface ProfileScreenProps {
    * explicit confirm changes a plan.
    */
   onPlanInvalidated?: (invalidation: PlanInvalidation) => void
+  /** Temporary changes to the plan running now — listed under Injuries with "End now" (M25). */
+  activeAdaptations?: PlanAdaptationRow[]
+  endingAdaptationId?: string | null
+  onEndAdaptation?: (id: string) => Promise<string | null>
   /**
    * Fired after a corrected implement ceiling is SAVED — the three numbers
    * that cap every prescribed weight.
@@ -125,6 +133,10 @@ interface ProfileScreenProps {
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
   initialSection?: 'goals' | 'facts' | 'context' | 'dietary'
+  /** What the top bar's "‹" goes back to — the tab Profile was opened from (2d). */
+  backLabel?: string
+  /** Today's calorie target, for the stat strip — App's own macros, never worked out again here. */
+  calorieTarget?: number | null
   /** Chat typewriter reveal-speed preference — see reveal-speed-store.ts. */
   revealSpeed: RevealSpeed
   onRevealSpeedChange: (speed: RevealSpeed) => void
@@ -147,36 +159,54 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 /**
- * ONE OF FOUR. Profile used to be eight headings and every editor in the app
- * open at once — about six screens of controls, most of them set once. The
- * design handoff's answer is four named groups you drill into; this is that,
- * with the existing editors moved inside unchanged rather than rebuilt as
- * sub-screens (there are none, and `initialSection` is a scroll-to-ref, not a
- * route).
- *
- * `forceOpen` is what keeps that ref working: a section somebody was sent
- * here to fix ("your dietary restrictions can't be enforced") must not land
- * inside a collapsed group, which would scroll to nothing.
+ * ONE OF FOUR — design handoff 2d (10 Oct 2026). Profile was four collapsible
+ * groups with every editor inside; it is now four titled lists of rows, each
+ * row showing the current answer and opening the editors it names on a page
+ * of their own (`sheetBody`). The editors are the same ones, moved, not
+ * rebuilt — the handoff's own rule: "every field the current screen edits
+ * must still be reachable from one of these rows".
  */
-function Group({
-  label, forceOpen, children,
-}: { label: string; forceOpen?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const isOpen = open || !!forceOpen
+function ProfileGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ borderTop: '1px solid var(--hairline)' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={isOpen}
-        className="hit-slop-44 flex w-full items-center justify-between gap-2 py-3 text-left"
-      >
-        <span className="ds-label">{label}</span>
-        <ChevronDown className={`size-3.5 shrink-0 text-primary-text transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      <div hidden={!isOpen} className="pb-4 space-y-4">{children}</div>
-    </div>
+    <section className="space-y-2" data-profile-group={label}>
+      <h3 className="ds-label">{label}</h3>
+      <div className="rounded-2xl px-3.5" style={{ background: 'var(--surface-raised)' }}>{children}</div>
+    </section>
   )
+}
+
+function SheetRow({ label, value, onOpen }: { label: string; value: string; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex min-h-[50px] w-full items-center gap-3 text-left [&:not(:first-child)]:border-t"
+      style={{ borderColor: 'color-mix(in srgb, var(--foreground) 7%, transparent)' }}
+      data-profile-row={label}
+    >
+      <span className="shrink-0 text-[0.875rem]">{label}</span>
+      <span className="ml-auto min-w-0 truncate whitespace-nowrap text-[0.8125rem] text-muted-foreground">{value}</span>
+      <ChevronRight className="size-4 shrink-0 text-[color:var(--text-dim)]" aria-hidden />
+    </button>
+  )
+}
+
+type ProfileSheet =
+  | 'body' | 'goal' | 'injuries'
+  | 'schedule' | 'equipment' | 'lifts' | 'style' | 'exavoid'
+  | 'diet' | 'likes' | 'avoid' | 'meals'
+  | 'tone' | 'remembers' | 'appearance' | 'reminders'
+
+const SHEET_TITLE: Record<ProfileSheet, string> = {
+  body: 'Height & weight', goal: 'Goal', injuries: 'Injuries',
+  schedule: 'Schedule', equipment: 'Equipment', lifts: 'Known lifts', style: 'Style & recovery', exavoid: 'Exercises to avoid',
+  diet: 'Diet', likes: 'Foods you like', avoid: 'Foods to avoid', meals: 'Meals & shopping',
+  tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders',
+}
+
+/** A deep link names a section; this is the sheet that holds it, so its scroll still lands. */
+const SHEET_FOR_SECTION: Record<NonNullable<ProfileScreenProps['initialSection']>, ProfileSheet> = {
+  goals: 'goal', facts: 'remembers', context: 'remembers', dietary: 'diet',
 }
 
 /**
@@ -416,10 +446,19 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, backLabel = 'Back', calorieTarget }: ProfileScreenProps) {
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
+  // What the shared weigh-in check made of the last weight typed here (see the
+  // weight row). Held, not acted on.
+  const [weightCheck, setWeightCheck] = useState<WeighInCheck | null>(null)
+  // A weight far from the one it replaces, typed and NOT YET SAVED: Ashley's
+  // ruling of 9 Oct 2026 is to ask first and save only on yes.
+  const [weightAsking, setWeightAsking] = useState<{ kg: number; differenceKg: number; previousKg: number } | null>(null)
+  // Bumped by "No, change it" so the box goes back to the saved figure.
+  const [weightFieldKey, setWeightFieldKey] = useState(0)
+  const weightFieldRef = useRef<HTMLSpanElement>(null)
   const [facts, setFacts] = useState<UserFactRow[]>([])
   const [goals, setGoals] = useState<UserGoalRow[]>([])
   const [contextFacts, setContextFacts] = useState<UserContextFactRow[]>([])
@@ -925,71 +964,86 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label,
   ].filter(Boolean).join(' · ')
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh]">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Profile</DialogTitle>
-          <DialogDescription>Everything the app knows about you — correct or remove anything here.</DialogDescription>
-        </DialogHeader>
+  // WHICH SHEET IS OPEN (design handoff 2d, 10 Oct 2026). Profile is a page
+  // of rows now; each row opens the editors it names, the same editors as
+  // before, on a page of their own. A deep link (initialSection) opens the
+  // sheet holding the section it scrolls to, so the scroll still lands.
+  const [sheet, setSheet] = useState<ProfileSheet | null>(null)
+  useEffect(() => {
+    if (!open) { setSheet(null); return }
+    setSheet(initialSection ? SHEET_FOR_SECTION[initialSection] : null)
+  }, [open, initialSection])
 
-        {/* WHO THIS IS, before the list of what it knows. The one-line
-            summary underneath is read straight off the profile rather than
-            stored: goal, days a week, equipment — the three answers that
-            decide what every screen in the app shows. */}
-        <div className="flex items-center gap-3.5">
-          <span
-            aria-hidden
-            className="flex size-14 shrink-0 items-center justify-center rounded-full text-[1.25rem] font-bold"
-            style={{ background: 'color-mix(in oklab, var(--surface-raised) 50%, var(--surface-deep))' }}
-          >
-            {(profile.display_name?.trim()?.[0] ?? '·').toUpperCase()}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-[1.25rem] font-bold tracking-[-.02em]">
-              {profile.display_name?.trim() || 'Your profile'}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{identitySummary}</p>
-          </div>
-        </div>
+  const nowKg = latestWeightKg != null && latestWeightKg > 0 ? latestWeightKg : profile.weight_kg ?? null
+  const goalKg = goals.find(g => g.metric === 'body_weight_kg' && g.status === 'active')?.target_value ?? null
+  const availableDays = (profile.training_days ?? []).filter(d => d.available).map(d => d.day.slice(0, 3))
+  const knownLift = profile.known_bench_kg != null ? `Bench ${profile.known_bench_kg} kg`
+    : profile.known_squat_kg != null ? `Squat ${profile.known_squat_kg} kg`
+    : profile.known_deadlift_kg != null ? `Deadlift ${profile.known_deadlift_kg} kg` : 'Not set'
+  const rememberedCount = grouped.reduce((n, g) => n + g.items.length, 0) + contextFacts.length
+  const listOrNone = (xs: string[], none: string) => xs.length === 0 ? none : xs.length <= 2 ? xs.join(', ') : `${xs.slice(0, 2).join(', ')} +${xs.length - 2}`
 
-        {saveError && (
-          <InsightBanner tone="warning" className="items-start justify-between">
-            <span>{saveError}</span>
-            <button type="button" onClick={() => setSaveError(null)} className="shrink-0 text-xs font-semibold underline">
-              Dismiss
-            </button>
-          </InsightBanner>
-        )}
-
-        {/* FOUR GROUPS, and everything that used to be eight headings open at
-            once now lives inside one of them. The editors themselves are
-            unchanged — this is where they sit, not how they work. */}
-        <Group label="You">
-        {/* Identity & metrics */}
-        <div className="space-y-2">
+  // WHAT EACH SHEET HOLDS. Every editor the old four collapsible groups held
+  // is in exactly one of these; test:profile-groups holds that list.
+  const sheetBody = (s: ProfileSheet): React.ReactNode => {
+    switch (s) {
+      case 'body': return (
+                <div className="space-y-2">
           <h3 className="ds-label">Identity &amp; metrics</h3>
           <div className="text-sm">
             <Row label="Name"><EditableStringField value={profile.display_name} placeholder="Not set" onSave={v => savePatch({ display_name: v })} /></Row>
             <Row label="Age"><EditableTextField value={profile.age} unit="years" min={13} max={100} onSave={n => savePatch({ age: n })} /></Row>
             <Row label="Gender"><EditableSelectField value={profile.gender} options={GENDER_OPTIONS as { value: 'male' | 'female'; label: string }[]} onSave={v => savePatch({ gender: v })} /></Row>
             <Row label="Height"><EditableTextField value={profile.height_cm} unit="cm" min={100} max={250} onSave={n => savePatch({ height_cm: n })} /></Row>
-            <Row label="Onboarding weight"><EditableTextField value={profile.weight_kg} unit="kg" min={25} max={350} onSave={n => savePatch({ weight_kg: n })} /></Row>
+            {/* The same "is this believable?" check the weigh-in card asks
+                (weigh-in-check.ts), against the figure being replaced.
+                ASHLEY'S RULING, 9 Oct 2026 — "Ask, and hold the target": a
+                surprising figure is asked about and saved only on yes. The
+                HOLD needs nothing here: this is the starting weight, and the
+                calorie target is worked out from the weigh-in average
+                (App's targetWeightAnchorKg), which this field does not move. */}
+            <Row label="Onboarding weight">
+              <span ref={weightFieldRef} data-testid="profile-weight-field" data-weigh-in-check={weightCheck?.verdict}>
+                <EditableTextField key={weightFieldKey} value={profile.weight_kg} unit="kg" min={25} max={350} onSave={n => {
+                  const verdict = checkWeighIn(n, profile.weight_kg ?? null, 0)
+                  setWeightCheck(verdict)
+                  if (verdict.verdict === 'surprising' && profile.weight_kg != null) {
+                    setWeightAsking({ kg: n, differenceKg: verdict.differenceKg, previousKg: profile.weight_kg })
+                    return
+                  }
+                  setWeightAsking(null)
+                  savePatch({ weight_kg: n })
+                }} />
+              </span>
+            </Row>
+            {weightAsking && (
+              <div role="group" aria-label="Check this weight" data-testid="profile-weight-question" className="space-y-2.5 rounded-xl border border-border bg-[color:var(--surface-raised)] px-3.5 py-3">
+                <p className="text-[0.8125rem] leading-snug text-foreground" aria-live="polite">{profileWeightQuestionText(weightAsking.differenceKg, weightAsking.previousKg, weightAsking.kg)}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-11 flex-1 text-[0.8125rem]" data-testid="profile-weight-yes" onClick={() => { const kg = weightAsking.kg; setWeightAsking(null); savePatch({ weight_kg: kg }) }}>
+                    {weighInYesLabel(weightAsking.kg)}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-11 flex-1 text-[0.8125rem]" data-testid="profile-weight-no" onClick={() => {
+                    // Nothing was saved. The box goes back to the saved figure,
+                    // selected, so the next thing typed replaces it.
+                    setWeightAsking(null)
+                    setWeightFieldKey(k => k + 1)
+                    requestAnimationFrame(() => { const box = weightFieldRef.current?.querySelector('input'); box?.focus(); box?.select() })
+                  }}>
+                    {WEIGH_IN_NO_LABEL}
+                  </Button>
+                </div>
+              </div>
+            )}
             <Row label="Current weight">
               <span className="text-sm">{latestWeightKg != null && latestWeightKg > 0 ? `${latestWeightKg} kg` : 'Log a weigh-in on Dashboard'}</span>
             </Row>
           </div>
         </div>
-
-        {/* Training setup */}
-        <div className="space-y-2">
-          <h3 className="ds-label">Training setup</h3>
+      )
+      case 'goal': return (
+        <div className="space-y-4">
           <div className="text-sm">
-            {/* The three gym-only fields below are optional on UserProfile (an
-                activity-format profile has no equipment tier or lifting style).
-                The `??` here is display-only — an activity profile shows the
-                same neutral placeholder any unset field would, rather than
-                these rows vanishing mid-edit. */}
             {/* WHAT YOU'RE TRAINING FOR — added 17 Sep 2026, and it was the
                 last setup answer on NEITHER surface. Not for want of
                 machinery: fitness_goal was already in
@@ -1013,7 +1067,6 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 this lands. See that effect for the notice that goes with it. */}
             <Row label="Goal"><EditableSelectField value={profile.fitness_goal} options={GOAL_OPTIONS} onSave={v => savePatch({ fitness_goal: v as FitnessGoal })} /></Row>
             <Row label="Experience"><EditableSelectField value={profile.training_experience ?? ''} options={EXPERIENCE_OPTIONS} onSave={v => savePatch({ training_experience: v as TrainingExperience })} /></Row>
-            <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
             {/* WHERE YOU'RE STARTING FROM — added 14 Sep 2026, on Ashley's
                 instruction to close the setup answers that could never be
                 changed afterwards. This one was the most consequential of them:
@@ -1031,402 +1084,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               options={START_PREFERENCE_OPTIONS}
               onSave={v => savePatch({ start_preference: v as StartPreference })}
             /></Row>
-            {/* WHAT YOU CAN LIFT — added 13 Sep 2026, beside Equipment
-                because that is the field that decides whether these apply at
-                all, and because they are the same kind of fact: what this
-                person's training actually has available.
-
-                NOT A FIFTH GROUP, though the first attempt made one.
-                test:profile-groups pins exactly four, and it is right to:
-                the design handoff's answer to "eight headings and every
-                editor open at once" was four named groups, and a fifth for
-                three rows would start the drift back. The gate blocked a
-                change that should have fitted the design instead of bending
-                it.
-
-                These three were collected at setup and then locked — no way
-                to see them, no way to correct them. They are not preferences:
-                `statedCeilingKg` treats any number it finds as a HARD CLAMP
-                on every prescribed weight (load-prescription.ts:818), so a
-                wrong one quietly holds every session below what she can
-                actually do, and she had no way to say so.
-
-                ONLY FOR A TRAINEE WHOSE KIT IS LIMITED. `assembleProfile`
-                discards all three for a full-gym answer
-                (onboarding-slots.ts:1138) — "a FULL-GYM ANSWER DISCARDS
-                THEM… writing it anyway would clamp a gym trainee to a home
-                number for sixteen weeks". Offering the rows to a gym trainee
-                would be a control that must not take effect. */}
-            {profile.equipment_access !== 'full_gym' && (
-              <div data-testid="stated-ceilings">
-                <Row label="Heaviest dumbbell (per hand)">
-                  <EditableTextField
-                    value={profile.max_dumbbell_kg ?? undefined}
-                    unit="kg" min={1} max={100}
-                    onSave={n => savePatch({ max_dumbbell_kg: n, load_ceilings_declined: false })}
-                  />
-                </Row>
-                <Row label="Heaviest single weight">
-                  <EditableTextField
-                    value={profile.max_single_implement_kg ?? undefined}
-                    unit="kg" min={1} max={100}
-                    onSave={n => savePatch({ max_single_implement_kg: n, load_ceilings_declined: false })}
-                  />
-                </Row>
-                <Row label="What your backpack holds">
-                  <EditableTextField
-                    value={profile.max_improvised_kg ?? undefined}
-                    unit="kg" min={1} max={60}
-                    onSave={n => savePatch({ max_improvised_kg: n, load_ceilings_declined: false })}
-                  />
-                </Row>
-                {/* A DECLINE IS A VALUE, NOT AN ABSENCE — the reason
-                    load_ceilings_declined is its own column. Reversible from
-                    here, because "I'm not sure" stops the app asking and
-                    somebody who later finds out needs a way back in. */}
-                {profile.load_ceilings_declined && (
-                  <p className="pt-1 text-xs text-muted-foreground" data-testid="ceilings-declined">
-                    You said you weren't sure what these weigh, so nothing is capped. Fill any of them
-                    in and I'll use it.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* THE THREE KNOWN LIFTS — the last setup answers that could never
-                be corrected. Added 14 Sep 2026 on Ashley's ruling: "rebuild
-                only when it matters".
-                ONLY SHOWN WHEN THEY WERE ASKED. Onboarding asks these of
-                someone skipping the calibration week, or keeps whatever was
-                volunteered. Rendering three empty boxes to somebody who was
-                never asked would be a control that cannot take effect — the
-                same rule the weight caps above follow for a full-gym profile. */}
-            {(profile.skip_calibration_week || knownLiftsAnswered) && (
-              <div data-testid="known-lifts" className="space-y-1">
-                <Row label="Your squat">
-                  <EditableTextField
-                    value={profile.known_squat_kg ?? undefined}
-                    unit="kg" min={20} max={400}
-                    onSave={n => savePatch({ known_squat_kg: n })}
-                  />
-                </Row>
-                <Row label="Your bench press">
-                  <EditableTextField
-                    value={profile.known_bench_kg ?? undefined}
-                    unit="kg" min={20} max={300}
-                    onSave={n => savePatch({ known_bench_kg: n })}
-                  />
-                </Row>
-                <Row label="Your deadlift">
-                  <EditableTextField
-                    value={profile.known_deadlift_kg ?? undefined}
-                    unit="kg" min={20} max={500}
-                    onSave={n => savePatch({ known_deadlift_kg: n })}
-                  />
-                </Row>
-                {/* HER RULING'S OTHER HALF, and it has to be on the screen or
-                    the app is silently doing nothing. After a calibration week
-                    the plan is anchored to what was actually lifted, so these
-                    numbers are a record and correcting one changes no weight.
-                    Saying so is the difference between "nothing happened" and
-                    "nothing happened, and here is why". */}
-                {!profile.skip_calibration_week && (
-                  <p className="pt-1 text-xs text-muted-foreground" data-testid="known-lifts-record-only">
-                    Your plan follows what you've actually lifted since your first week, so correcting
-                    one of these updates the record and changes no weights.
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Training days</span>
-              <TrainingDaysEditor days={profile.training_days} onSave={v => savePatch({ training_days: v })} />
-            </div>
-            {/* OTHER TRAINING — a second sport on a standing weekly schedule.
-                Written by the coach (propose_concurrent_activity) and shown
-                here so a stored activity is never invisible until someone
-                asks about it. Adding stays chat-only: the coach is the
-                surface that can ask which evenings. Removing is here, through
-                the same armed delete every other row uses, and goes through
-                savePatch so the plan-invalidation offer fires — the week was
-                built AROUND this, so taking it away is a reason to rebuild. */}
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Other training</span>
-              {(profile.concurrent_activities ?? []).length === 0 ? (
-                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">None yet — tell your Personal TrAIner in chat ("I also do Muay Thai on Tuesday and Thursday evenings") and the plan is rebuilt around it.</p>
-              ) : (
-                <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
-                  {(profile.concurrent_activities ?? []).map(a => {
-                    const key = `activity:${a.name}`
-                    return (
-                      <Badge key={key} variant="secondary" className="text-[0.625rem] gap-1 pr-1">
-                        {describeActivity(a)}
-                        <button
-                          type="button"
-                          onClick={() => requestDelete(key, async () => { savePatch({ concurrent_activities: (profile.concurrent_activities ?? []).filter(x => x.name !== a.name) }) })}
-                          aria-label={armedDeleteKey === key ? `Tap again to remove ${a.name}` : `Remove ${a.name}`}
-                          className={`hit-slop-44 ${armedDeleteKey === key ? 'text-destructive' : ''}`}
-                        >
-                          <X className="size-2.5" />
-                        </button>
-                      </Badge>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            <Row label="Session length"><EditableSelectField value={profile.session_duration_preference} options={DURATION_OPTIONS} onSave={v => savePatch({ session_duration_preference: v })} /></Row>
-            <Row label="Style"><EditableSelectField value={profile.training_style ?? ''} options={STYLE_OPTIONS} onSave={v => savePatch({ training_style: v as TrainingStyle })} /></Row>
-            <Row label="Activity level"><EditableSelectField value={profile.activity_level} options={ACTIVITY_OPTIONS} onSave={v => savePatch({ activity_level: v })} /></Row>
-            {/* Directly under Activity level, because that is what it
-                overrides. The placeholder shows the band that activity level
-                produces, so leaving it alone is visibly a choice rather than
-                an empty field — and someone who types the same number is not
-                changing anything they weren't already getting. */}
-            <Row label="Daily steps">
-              <EditableTextField
-                value={profile.daily_step_target ?? undefined}
-                unit="steps"
-                min={1000}
-                max={50000}
-                placeholder={`${derivedStepsTargetFor(profile.activity_level).toLocaleString()} (from activity level)`}
-                onSave={n => savePatch({ daily_step_target: n })}
-              />
-            </Row>
-            <Row label="Recovery capacity"><EditableSelectField value={profile.recovery_capacity} options={RECOVERY_OPTIONS} onSave={v => savePatch({ recovery_capacity: v })} /></Row>
-            <Row label="Conditioning"><EditableSelectField value={profile.conditioning_preference} options={CONDITIONING_PREF_OPTIONS} onSave={v => savePatch({ conditioning_preference: v })} /></Row>
           </div>
-        </div>
-
-        </Group>
-
-        <Group label="Nutrition" forceOpen={initialSection === 'dietary'}>
-        {/* Dietary & cooking */}
-        <div className="space-y-2">
-          <h3 className="ds-label">Dietary &amp; cooking</h3>
-          <div className="space-y-3 text-sm">
-            {/* Dietary-safety round 2 — the two lanes are now visibly
-                different things, and only the canonical one is pickable.
-                This was free text before, which let a user type an
-                unenforceable value ("shellfish") that looked saved and did
-                nothing. Copy explains the difference in strength without a
-                word about tags or the food database. */}
-            <div ref={dietaryRef} className="space-y-1.5">
-              <span className="text-muted-foreground">Dietary restrictions</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
-              <ToggleGroup
-                type="multiple"
-                value={profile.dietary_preferences}
-                onValueChange={(next: string[]) => savePatch({ dietary_preferences: next })}
-                className="flex flex-wrap justify-start gap-1.5"
-              >
-                {DIETARY_OPTIONS.map(o => (
-                  <ToggleGroupItem
-                    key={o.value}
-                    value={o.value}
-                    className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
-                  >
-                    {o.icon} {o.label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-              {/* THE SAME SENTENCE AS SETUP, FROM THE SAME PHRASEBOOK — Ashley
-                  ruled it onto the setup screen (20 Sep 2026) and this is the
-                  other place the choice is made. Saying it once at setup and
-                  going silent when somebody turns Keto on here would leave the
-                  app honest only to people who chose it on day one. */}
-              {dietTargetCaveat(profile.dietary_preferences ?? []) && (
-                <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground/70">
-                  {dietTargetCaveat(profile.dietary_preferences ?? [])}
-                </p>
-              )}
-            </div>
-            {/* BEFORE "Foods to avoid", not after: beside it, as her ruling asked,
-                without splitting the two avoid lists, which sit together on purpose. */}
-            <div className="space-y-1.5" data-testid="profile-food-likes">
-              <span className="text-muted-foreground">Foods and meals I like</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">New meals are made with these in mind, and they're favoured when each day's meals are picked. They never override what you avoid.</p>
-              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" />
-              {likeRefusal && <p role="alert" data-testid="profile-like-refused" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">{likeRefusal}</p>}
-              {heartedMeals.length > 0 && (
-                <div className="space-y-1 pt-1" data-testid="profile-hearted-meals">
-                  <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Meals you've hearted count too:</p>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {heartedMeals.map(name => (
-                      <li key={name} className="flex items-center gap-1 rounded-full bg-[color:var(--surface-raised)] py-1 pl-2.5 pr-1 text-xs" data-hearted-meal={name} data-clashes={clashingHearts.has(name) ? 'yes' : 'no'}>
-                        <Heart className={`size-3 fill-current ${clashingHearts.has(name) ? 'text-muted-foreground' : 'text-primary'}`} aria-hidden />
-                        <span className={clashingHearts.has(name) ? 'text-muted-foreground line-through' : undefined}>{name}</span>
-                        <button
-                          type="button"
-                          onClick={() => void unheart(name)}
-                          aria-label={`Remove ${name} from your hearted meals`}
-                          className="hit-slop-44 flex size-5 items-center justify-center rounded-full text-muted-foreground"
-                        >
-                          <X className="size-3" aria-hidden />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  {clashingHearts.size > 0 && (
-                    <p data-testid="profile-hearts-clash" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">
-                      {[...clashingHearts].join(', ')} {clashingHearts.size === 1 ? 'clashes' : 'clash'} with what you avoid, so {clashingHearts.size === 1 ? "it isn't" : "they aren't"} served. {clashingHearts.size === 1 ? 'It comes' : 'They come'} back if that changes.
-                    </p>
-                  )}
-                </div>
-              )}
-              {/* Outside the list, so a read that failed before anything was
-                  shown still says so rather than looking like no hearts. */}
-              {heartError && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{heartError}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-muted-foreground">Foods to avoid</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
-              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
-            </div>
-            {/* EXERCISES TO AVOID — the same control, the other side of the
-                app. These become the same user_facts rows a "never give me
-                burpees" chat turn produces, so the coach and the screen are
-                writing to one place rather than two. */}
-            <div className="space-y-1.5">
-              <span className="text-muted-foreground">Exercises to avoid</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything you'd rather never see in a session.</p>
-              <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" resetKey={exerciseAvoidReset} inputTestId="exercise-avoid-input" />
-              {exerciseAvoidAsk && (
-                <div className="space-y-2 pt-1" data-testid="exercise-avoid-ask" role="status">
-                  <p className="text-xs leading-snug">{exerciseAvoidAsk.candidates.length > 0 ? `Which "${exerciseAvoidAsk.typed}" do you mean?` : exerciseAvoidAsk.reason}</p>
-                  {exerciseAvoidAsk.candidates.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {exerciseAvoidAsk.candidates.map(name => (
-                        <Button key={name} size="sm" variant="outline" className="min-h-11 text-xs" data-testid="exercise-avoid-choice" onClick={() => void pickExerciseDislike(exerciseAvoidAsk.typed, name)}>
-                          {name}
-                        </Button>
-                      ))}
-                      <Button size="sm" variant="ghost" className="min-h-11 text-xs" onClick={() => setExerciseAvoidAsk(null)}>Never mind</Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            {/* Honesty-copy round — applies to BOTH fields above (the
-                canonical picker's tag-based checks AND the free-text
-                avoid-list's literal name match, which has its own blind spot:
-                no synonym expansion, so "sesame" doesn't catch "tahini").
-                Deliberately placed after both, with a hairline rule, rather
-                than nested inside the picker's own div — nested there it read
-                as belonging only to the ToggleGroup, at the same space-y-3 gap
-                as every other unrelated field in this card, which risked
-                being misread as "the avoid-list doesn't have this limitation." */}
-            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
-              These filters check ingredients we recognise. We can't check brands,
-              preparation, or cross-contamination. If you have a food allergy,
-              always check ingredients yourself.
-            </p>
-            <div className="space-y-1">
-              <span className="text-muted-foreground">Favorite cuisines</span>
-              <EditableTagList values={profile.favorite_cuisines ?? []} onSave={v => savePatch({ favorite_cuisines: v })} placeholder={`e.g. ${FAVORITE_CUISINE_OPTIONS[0]?.label ?? 'Italian'}`} />
-            </div>
-            <Row label="Cooking time"><EditableSelectField value={profile.cooking_time_preference ?? 'moderate'} options={COOKING_TIME_OPTIONS} onSave={v => savePatch({ cooking_time_preference: v })} /></Row>
-            <Row label="Meals per day"><EditableSelectField value={profile.meals_per_day ?? 3} options={MEALS_PER_DAY_OPTIONS} onSave={v => savePatch({ meals_per_day: v })} /></Row>
-            <Row label="Include snacks">
-              <Button size="sm" variant={profile.include_snacks ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ include_snacks: !profile.include_snacks })}>
-                {profile.include_snacks ? 'Yes' : 'No'}
-              </Button>
-            </Row>
-            {/* COOK ONCE, EAT TWICE. On by default (Ashley, 19 Sep 2026), so an
-                absent value reads as Yes rather than as off — the same
-                convention include_snacks uses one row above. Turning it off
-                frees lunch to be its own dish again from the next day. */}
-            <Row label="Batch cook lunches">
-              <Button size="sm" variant={(profile.batch_cooking ?? true) ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ batch_cooking: !(profile.batch_cooking ?? true) })}>
-                {(profile.batch_cooking ?? true) ? 'Yes' : 'No'}
-              </Button>
-            </Row>
-            {/* WHICH DAY SHE SHOPS — design handoff 2d. The Home card is
-                driven by it, and a card that appears on a day the app chose
-                for her with no way to move it is the app being confidently
-                wrong on the screen she opens first. Local, like the theme:
-                see shop-day-store for why it is not a profile column.
-                "Work it out for me" is a real option, not a null hiding as
-                one — it is the derived default, and it moves with the plan. */}
-            <Row label="Shopping day">
-              <EditableSelectField
-                value={shopDayChoice}
-                options={SHOP_DAY_OPTIONS(exercisePlan)}
-                onSave={v => { setShopDay(v === 'auto' ? null : v as DayName); setShopDayChoice(v as string) }}
-              />
-            </Row>
-            <Row label="Breakfast style"><EditableSelectField value={profile.breakfast_style ?? 'cooked'} options={BREAKFAST_STYLE_OPTIONS} onSave={v => savePatch({ breakfast_style: v })} /></Row>
-          </div>
-        </div>
-
-        </Group>
-
-        {/* goals / facts / context ALL live in this group — every
-            initialSection value except 'dietary' scrolls to a ref inside it,
-            and a ref inside a collapsed group scrolls to nothing. */}
-        <Group label="Personal TrAIner" forceOpen={initialSection === 'goals' || initialSection === 'facts' || initialSection === 'context'}>
-        {/* INJURIES MOVED HERE, 6 Sep 2026. It sat between the training
-            settings and the dietary ones, which put "my shoulder hurts"
-            among the dropdowns. It belongs with the things the Personal
-            TrAIner works around and remembers — the handoff's own grouping,
-            and the honest one. The picker itself is untouched. */}
-        {/* Injuries — a picker, for the same reason the dietary restrictions
-            above are one. Audit §2.2: this was free text, and the plan engine
-            only understands eight exact codes, so twelve of fourteen ordinary
-            entries were stored, shown back, and changed nothing. "Lower back"
-            — the field's own placeholder — was one of them. */}
-        <div className="space-y-2">
-          <h3 className="ds-label">Injuries</h3>
-          <div className="space-y-2.5 text-sm">
-            <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
-            <ToggleGroup
-              type="multiple"
-              value={injuryCodes}
-              onValueChange={(next: string[]) => savePatch({ injuries: [...next, ...unrecognisedInjuries] })}
-              className="flex flex-wrap justify-start gap-1.5"
-            >
-              {INJURY_OPTIONS.map(o => (
-                <ToggleGroupItem
-                  key={o.value}
-                  value={o.value}
-                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
-                >
-                  {o.icon} {o.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-            {unrecognisedInjuries.length > 0 && (
-              /* Kept, not deleted. These were typed when the field was free
-                 text; they never changed the plan, and quietly removing them
-                 would be the same silent discarding this fix is about. Said
-                 plainly, with a way to clear each one. */
-              <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
-                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
-                  These are saved but don't change your plan — the app can only work around the areas above. Tell your Personal TrAIner in Chat about anything else.
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {unrecognisedInjuries.map((v: string) => (
-                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[0.6875rem] text-muted-foreground">
-                      {v}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${v}`}
-                        className="hit-slop-44 text-muted-foreground hover:text-foreground"
-                        onClick={() => savePatch({ injuries: [...injuryCodes, ...unrecognisedInjuries.filter((u: string) => u !== v)] })}
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-
         {goals.length > 0 && (
           <div ref={goalsRef} className="space-y-2">
             <h3 className="ds-label">Goals</h3>
@@ -1502,7 +1161,488 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Separator className="my-2" />
           </div>
         )}
+        </div>
+      )
+      case 'injuries': return (
+        <>
+        {/* INJURIES MOVED HERE, 6 Sep 2026. It sat between the training
+            settings and the dietary ones, which put "my shoulder hurts"
+            among the dropdowns. It belongs with the things the Personal
+            TrAIner works around and remembers — the handoff's own grouping,
+            and the honest one. The picker itself is untouched. */}
+        {/* Injuries — a picker, for the same reason the dietary restrictions
+            above are one. Audit §2.2: this was free text, and the plan engine
+            only understands eight exact codes, so twelve of fourteen ordinary
+            entries were stored, shown back, and changed nothing. "Lower back"
+            — the field's own placeholder — was one of them. */}
+        <div className="space-y-2">
+          <h3 className="ds-label">Injuries</h3>
+          <div className="space-y-2.5 text-sm">
+            <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
+            {/* WHAT IS BEING EASED OFF RIGHT NOW (M25). A temporary change is
+                deliberately not one of the toggles below — it ends on its own
+                and must never become a lasting injury — so until 9 Oct 2026 it
+                was shown nowhere, and this is where the tester looked. */}
+            <ActiveAdaptationLines
+              adaptations={activeAdaptations ?? []}
+              profileId={profileId}
+              endingId={endingAdaptationId}
+              onEnd={onEndAdaptation}
+              className="space-y-2"
+            />
+            <ToggleGroup
+              type="multiple"
+              value={injuryCodes}
+              onValueChange={(next: string[]) => savePatch({ injuries: [...next, ...unrecognisedInjuries] })}
+              className="flex flex-wrap justify-start gap-1.5"
+            >
+              {INJURY_OPTIONS.map(o => (
+                <ToggleGroupItem
+                  key={o.value}
+                  value={o.value}
+                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
+                >
+                  {o.icon} {o.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {unrecognisedInjuries.length > 0 && (
+              /* Kept, not deleted. These were typed when the field was free
+                 text; they never changed the plan, and quietly removing them
+                 would be the same silent discarding this fix is about. Said
+                 plainly, with a way to clear each one. */
+              <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                  These are saved but don't change your plan — the app can only work around the areas above. Tell your Personal TrAIner in Chat about anything else.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {unrecognisedInjuries.map((v: string) => (
+                    <span key={v} className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-[0.6875rem] text-muted-foreground">
+                      {v}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${v}`}
+                        className="hit-slop-44 text-muted-foreground hover:text-foreground"
+                        onClick={() => savePatch({ injuries: [...injuryCodes, ...unrecognisedInjuries.filter((u: string) => u !== v)] })}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        </>
+      )
+      case 'schedule': return (
+        <div className="space-y-3 text-sm">
+            <div className="space-y-1">
+              <span className="text-muted-foreground">Training days</span>
+              <TrainingDaysEditor days={profile.training_days} onSave={v => savePatch({ training_days: v })} />
+            </div>
+            {/* OTHER TRAINING — a second sport on a standing weekly schedule.
+                Written by the coach (propose_concurrent_activity) and shown
+                here so a stored activity is never invisible until someone
+                asks about it. Adding stays chat-only: the coach is the
+                surface that can ask which evenings. Removing is here, through
+                the same armed delete every other row uses, and goes through
+                savePatch so the plan-invalidation offer fires — the week was
+                built AROUND this, so taking it away is a reason to rebuild. */}
+            <div className="space-y-1">
+              <span className="text-muted-foreground">Other training</span>
+              {(profile.concurrent_activities ?? []).length === 0 ? (
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">None yet — tell your Personal TrAIner in chat ("I also do Muay Thai on Tuesday and Thursday evenings") and the plan is rebuilt around it.</p>
+              ) : (
+                <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
+                  {(profile.concurrent_activities ?? []).map(a => {
+                    const key = `activity:${a.name}`
+                    return (
+                      <Badge key={key} variant="secondary" className="text-[0.625rem] gap-1 pr-1">
+                        {describeActivity(a)}
+                        <button
+                          type="button"
+                          onClick={() => requestDelete(key, async () => { savePatch({ concurrent_activities: (profile.concurrent_activities ?? []).filter(x => x.name !== a.name) }) })}
+                          aria-label={armedDeleteKey === key ? `Tap again to remove ${a.name}` : `Remove ${a.name}`}
+                          className={`hit-slop-44 ${armedDeleteKey === key ? 'text-destructive' : ''}`}
+                        >
+                          <X className="size-2.5" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <Row label="Session length"><EditableSelectField value={profile.session_duration_preference} options={DURATION_OPTIONS} onSave={v => savePatch({ session_duration_preference: v })} /></Row>
+        </div>
+      )
+      case 'equipment': return (
+        <div className="text-sm">
+            <Row label="Equipment"><EditableSelectField value={profile.equipment_access ?? ''} options={EQUIPMENT_OPTIONS} onSave={v => savePatch({ equipment_access: v as EquipmentAccess })} /></Row>
+            {/* WHAT YOU CAN LIFT — added 13 Sep 2026, beside Equipment
+                because that is the field that decides whether these apply at
+                all, and because they are the same kind of fact: what this
+                person's training actually has available.
 
+                NOT A FIFTH GROUP, though the first attempt made one.
+                test:profile-groups pins exactly four, and it is right to:
+                the design handoff's answer to "eight headings and every
+                editor open at once" was four named groups, and a fifth for
+                three rows would start the drift back. The gate blocked a
+                change that should have fitted the design instead of bending
+                it.
+
+                These three were collected at setup and then locked — no way
+                to see them, no way to correct them. They are not preferences:
+                `statedCeilingKg` treats any number it finds as a HARD CLAMP
+                on every prescribed weight (load-prescription.ts:818), so a
+                wrong one quietly holds every session below what she can
+                actually do, and she had no way to say so.
+
+                ONLY FOR A TRAINEE WHOSE KIT IS LIMITED. `assembleProfile`
+                discards all three for a full-gym answer
+                (onboarding-slots.ts:1138) — "a FULL-GYM ANSWER DISCARDS
+                THEM… writing it anyway would clamp a gym trainee to a home
+                number for sixteen weeks". Offering the rows to a gym trainee
+                would be a control that must not take effect. */}
+            {profile.equipment_access !== 'full_gym' && (
+              <div data-testid="stated-ceilings">
+                <Row label="Heaviest dumbbell (per hand)">
+                  <EditableTextField
+                    value={profile.max_dumbbell_kg ?? undefined}
+                    unit="kg" min={1} max={100}
+                    onSave={n => savePatch({ max_dumbbell_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                <Row label="Heaviest single weight">
+                  <EditableTextField
+                    value={profile.max_single_implement_kg ?? undefined}
+                    unit="kg" min={1} max={100}
+                    onSave={n => savePatch({ max_single_implement_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                <Row label="What your backpack holds">
+                  <EditableTextField
+                    value={profile.max_improvised_kg ?? undefined}
+                    unit="kg" min={1} max={60}
+                    onSave={n => savePatch({ max_improvised_kg: n, load_ceilings_declined: false })}
+                  />
+                </Row>
+                {/* A DECLINE IS A VALUE, NOT AN ABSENCE — the reason
+                    load_ceilings_declined is its own column. Reversible from
+                    here, because "I'm not sure" stops the app asking and
+                    somebody who later finds out needs a way back in. */}
+                {/* Only when nothing IS capped (runs 3-4, LOW): it showed under a
+                    filled-in 24 kg dumbbell. */}
+                {profile.load_ceilings_declined && profile.max_dumbbell_kg == null && profile.max_single_implement_kg == null && profile.max_improvised_kg == null && (
+                  <p className="pt-1 text-xs text-muted-foreground" data-testid="ceilings-declined">
+                    You said you weren't sure what these weigh, so nothing is capped. Fill any of them
+                    in and I'll use it.
+                  </p>
+                )}
+              </div>
+            )}
+        </div>
+      )
+      case 'lifts': return (
+        <div className="text-sm">
+            {/* THE THREE KNOWN LIFTS — the last setup answers that could never
+                be corrected. Added 14 Sep 2026 on Ashley's ruling: "rebuild
+                only when it matters".
+                ONLY SHOWN WHEN THEY WERE ASKED. Onboarding asks these of
+                someone skipping the calibration week, or keeps whatever was
+                volunteered. Rendering three empty boxes to somebody who was
+                never asked would be a control that cannot take effect — the
+                same rule the weight caps above follow for a full-gym profile. */}
+            {(profile.skip_calibration_week || knownLiftsAnswered) && (
+              <div data-testid="known-lifts" className="space-y-1">
+                <Row label="Your squat">
+                  <EditableTextField
+                    value={profile.known_squat_kg ?? undefined}
+                    unit="kg" min={20} max={400}
+                    onSave={n => savePatch({ known_squat_kg: n })}
+                  />
+                </Row>
+                <Row label="Your bench press">
+                  <EditableTextField
+                    value={profile.known_bench_kg ?? undefined}
+                    unit="kg" min={20} max={300}
+                    onSave={n => savePatch({ known_bench_kg: n })}
+                  />
+                </Row>
+                <Row label="Your deadlift">
+                  <EditableTextField
+                    value={profile.known_deadlift_kg ?? undefined}
+                    unit="kg" min={20} max={500}
+                    onSave={n => savePatch({ known_deadlift_kg: n })}
+                  />
+                </Row>
+                {/* HER RULING'S OTHER HALF, and it has to be on the screen or
+                    the app is silently doing nothing. After a calibration week
+                    the plan is anchored to what was actually lifted, so these
+                    numbers are a record and correcting one changes no weight.
+                    Saying so is the difference between "nothing happened" and
+                    "nothing happened, and here is why". */}
+                {!profile.skip_calibration_week && (
+                  <p className="pt-1 text-xs text-muted-foreground" data-testid="known-lifts-record-only">
+                    Your plan follows what you've actually lifted since your first week, so correcting
+                    one of these updates the record and changes no weights.
+                  </p>
+                )}
+              </div>
+            )}
+        </div>
+      )
+      case 'style': return (
+        <div className="space-y-3 text-sm">
+            <Row label="Style"><EditableSelectField value={profile.training_style ?? ''} options={styleOptionsFor(profile.training_style)} onSave={v => savePatch({ training_style: v as TrainingStyle })} /></Row>
+            <Row label="Activity level"><EditableSelectField value={profile.activity_level} options={ACTIVITY_OPTIONS} onSave={v => savePatch({ activity_level: v })} /></Row>
+            {/* Directly under Activity level, because that is what it
+                overrides. The placeholder shows the band that activity level
+                produces, so leaving it alone is visibly a choice rather than
+                an empty field — and someone who types the same number is not
+                changing anything they weren't already getting. */}
+            <Row label="Daily steps">
+              <EditableTextField
+                value={profile.daily_step_target ?? undefined}
+                unit="steps"
+                min={1000}
+                max={50000}
+                placeholder={`${derivedStepsTargetFor(profile.activity_level).toLocaleString()} (from activity level)`}
+                onSave={n => savePatch({ daily_step_target: n })}
+              />
+            </Row>
+            <Row label="Recovery capacity"><EditableSelectField value={profile.recovery_capacity} options={RECOVERY_OPTIONS} onSave={v => savePatch({ recovery_capacity: v })} /></Row>
+            <Row label="Conditioning"><EditableSelectField value={profile.conditioning_preference} options={CONDITIONING_PREF_OPTIONS} onSave={v => savePatch({ conditioning_preference: v })} /></Row>
+        </div>
+      )
+      case 'exavoid': return (
+        <div className="space-y-3 text-sm">
+            {/* EXERCISES TO AVOID — the same control, the other side of the
+                app. These become the same user_facts rows a "never give me
+                burpees" chat turn produces, so the coach and the screen are
+                writing to one place rather than two. */}
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground">Exercises to avoid</span>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything you'd rather never see in a session.</p>
+              <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" resetKey={exerciseAvoidReset} inputTestId="exercise-avoid-input" />
+              {exerciseAvoidAsk && (
+                <div className="space-y-2 pt-1" data-testid="exercise-avoid-ask" role="status">
+                  <p className="text-xs leading-snug">{exerciseAvoidAsk.candidates.length > 0 ? `Which "${exerciseAvoidAsk.typed}" do you mean?` : exerciseAvoidAsk.reason}</p>
+                  {exerciseAvoidAsk.candidates.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {exerciseAvoidAsk.candidates.map(name => (
+                        <Button key={name} size="sm" variant="outline" className="min-h-11 text-xs" data-testid="exercise-avoid-choice" onClick={() => void pickExerciseDislike(exerciseAvoidAsk.typed, name)}>
+                          {name}
+                        </Button>
+                      ))}
+                      <Button size="sm" variant="ghost" className="min-h-11 text-xs" onClick={() => setExerciseAvoidAsk(null)}>Never mind</Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+        </div>
+      )
+      case 'diet': return (
+        <div className="space-y-3 text-sm">
+            {/* Dietary-safety round 2 — the two lanes are now visibly
+                different things, and only the canonical one is pickable.
+                This was free text before, which let a user type an
+                unenforceable value ("shellfish") that looked saved and did
+                nothing. Copy explains the difference in strength without a
+                word about tags or the food database. */}
+            <div ref={dietaryRef} className="space-y-1.5">
+              <span className="text-muted-foreground">Dietary restrictions</span>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
+              <ToggleGroup
+                type="multiple"
+                value={profile.dietary_preferences}
+                onValueChange={(next: string[]) => savePatch({ dietary_preferences: next })}
+                className="flex flex-wrap justify-start gap-1.5"
+              >
+                {DIETARY_OPTIONS.map(o => (
+                  <ToggleGroupItem
+                    key={o.value}
+                    value={o.value}
+                    className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
+                  >
+                    {o.icon} {o.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              {/* THE SAME SENTENCE AS SETUP, FROM THE SAME PHRASEBOOK — Ashley
+                  ruled it onto the setup screen (20 Sep 2026) and this is the
+                  other place the choice is made. Saying it once at setup and
+                  going silent when somebody turns Keto on here would leave the
+                  app honest only to people who chose it on day one. */}
+              {dietTargetCaveat(profile.dietary_preferences ?? []) && (
+                <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                  {dietTargetCaveat(profile.dietary_preferences ?? [])}
+                </p>
+              )}
+            </div>
+            {/* Honesty-copy round — applies to BOTH fields above (the
+                canonical picker's tag-based checks AND the free-text
+                avoid-list's literal name match, which has its own blind spot:
+                no synonym expansion, so "sesame" doesn't catch "tahini").
+                Deliberately placed after both, with a hairline rule, rather
+                than nested inside the picker's own div — nested there it read
+                as belonging only to the ToggleGroup, at the same space-y-3 gap
+                as every other unrelated field in this card, which risked
+                being misread as "the avoid-list doesn't have this limitation." */}
+            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
+              These filters check ingredients we recognise. We can't check brands,
+              preparation, or cross-contamination. If you have a food allergy,
+              always check ingredients yourself.
+            </p>
+        </div>
+      )
+      case 'likes': return (
+        <div className="space-y-3 text-sm">
+            {/* BEFORE "Foods to avoid", not after: beside it, as her ruling asked,
+                without splitting the two avoid lists, which sit together on purpose. */}
+            <div className="space-y-1.5" data-testid="profile-food-likes">
+              <span className="text-muted-foreground">Foods and meals I like</span>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">New meals are made with these in mind, and they're favoured when each day's meals are picked. They never override what you avoid.</p>
+              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" />
+              {likeRefusal && <p role="alert" data-testid="profile-like-refused" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">{likeRefusal}</p>}
+              {heartedMeals.length > 0 && (
+                <div className="space-y-1 pt-1" data-testid="profile-hearted-meals">
+                  <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Meals you've hearted count too:</p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {heartedMeals.map(name => (
+                      <li key={name} className="flex items-center gap-1 rounded-full bg-[color:var(--surface-raised)] py-1 pl-2.5 pr-1 text-xs" data-hearted-meal={name} data-clashes={clashingHearts.has(name) ? 'yes' : 'no'}>
+                        <Heart className={`size-3 fill-current ${clashingHearts.has(name) ? 'text-muted-foreground' : 'text-primary'}`} aria-hidden />
+                        <span className={clashingHearts.has(name) ? 'text-muted-foreground line-through' : undefined}>{name}</span>
+                        <button
+                          type="button"
+                          onClick={() => void unheart(name)}
+                          aria-label={`Remove ${name} from your hearted meals`}
+                          className="hit-slop-44 flex size-5 items-center justify-center rounded-full text-muted-foreground"
+                        >
+                          <X className="size-3" aria-hidden />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {clashingHearts.size > 0 && (
+                    <p data-testid="profile-hearts-clash" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">
+                      {[...clashingHearts].join(', ')} {clashingHearts.size === 1 ? 'clashes' : 'clash'} with what you avoid, so {clashingHearts.size === 1 ? "it isn't" : "they aren't"} served. {clashingHearts.size === 1 ? 'It comes' : 'They come'} back if that changes.
+                    </p>
+                  )}
+                </div>
+              )}
+              {/* Outside the list, so a read that failed before anything was
+                  shown still says so rather than looking like no hearts. */}
+              {heartError && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{heartError}</p>}
+            </div>
+        </div>
+      )
+      case 'avoid': return (
+        <div className="space-y-3 text-sm">
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground">Foods to avoid</span>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
+              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
+            </div>
+            {/* Honesty-copy round — applies to BOTH fields above (the
+                canonical picker's tag-based checks AND the free-text
+                avoid-list's literal name match, which has its own blind spot:
+                no synonym expansion, so "sesame" doesn't catch "tahini").
+                Deliberately placed after both, with a hairline rule, rather
+                than nested inside the picker's own div — nested there it read
+                as belonging only to the ToggleGroup, at the same space-y-3 gap
+                as every other unrelated field in this card, which risked
+                being misread as "the avoid-list doesn't have this limitation." */}
+            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
+              These filters check ingredients we recognise. We can't check brands,
+              preparation, or cross-contamination. If you have a food allergy,
+              always check ingredients yourself.
+            </p>
+        </div>
+      )
+      case 'meals': return (
+        <div className="space-y-3 text-sm">
+            <div className="space-y-1">
+              <span className="text-muted-foreground">Favorite cuisines</span>
+              <EditableTagList values={profile.favorite_cuisines ?? []} onSave={v => savePatch({ favorite_cuisines: v })} placeholder={`e.g. ${FAVORITE_CUISINE_OPTIONS[0]?.label ?? 'Italian'}`} />
+            </div>
+            <Row label="Cooking time"><EditableSelectField value={profile.cooking_time_preference ?? 'moderate'} options={COOKING_TIME_OPTIONS} onSave={v => savePatch({ cooking_time_preference: v })} /></Row>
+            <Row label="Meals per day"><EditableSelectField value={profile.meals_per_day ?? 3} options={MEALS_PER_DAY_OPTIONS} onSave={v => savePatch({ meals_per_day: v })} /></Row>
+            <Row label="Include snacks">
+              <Button size="sm" variant={profile.include_snacks ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ include_snacks: !profile.include_snacks })}>
+                {profile.include_snacks ? 'Yes' : 'No'}
+              </Button>
+            </Row>
+            {/* COOK ONCE, EAT TWICE. On by default (Ashley, 19 Sep 2026), so an
+                absent value reads as Yes rather than as off — the same
+                convention include_snacks uses one row above. Turning it off
+                frees lunch to be its own dish again from the next day. */}
+            <Row label="Batch cook lunches">
+              <Button size="sm" variant={(profile.batch_cooking ?? true) ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ batch_cooking: !(profile.batch_cooking ?? true) })}>
+                {(profile.batch_cooking ?? true) ? 'Yes' : 'No'}
+              </Button>
+            </Row>
+            {/* WHICH DAY SHE SHOPS — design handoff 2d. The Home card is
+                driven by it, and a card that appears on a day the app chose
+                for her with no way to move it is the app being confidently
+                wrong on the screen she opens first. Local, like the theme:
+                see shop-day-store for why it is not a profile column.
+                "Work it out for me" is a real option, not a null hiding as
+                one — it is the derived default, and it moves with the plan. */}
+            <Row label="Shopping day">
+              <EditableSelectField
+                value={shopDayChoice}
+                options={SHOP_DAY_OPTIONS(exercisePlan)}
+                onSave={v => { setShopDay(v === 'auto' ? null : v as DayName); setShopDayChoice(v as string) }}
+              />
+            </Row>
+            <Row label="Breakfast style"><EditableSelectField value={profile.breakfast_style ?? 'cooked'} options={BREAKFAST_STYLE_OPTIONS} onSave={v => savePatch({ breakfast_style: v })} /></Row>
+        </div>
+      )
+      case 'tone': return (
+        <>
+        {/* REPLY SPEED IS NOT A REMEMBERED FACT. It lived inside the
+            `contextFacts.length > 0` branch below, so a trainee the coach had
+            never stored a note about could not reach it at all — a preference
+            control that appeared only once something unrelated existed.
+            Hoisted out; the notes keep their own conditional block. */}
+        <div className="space-y-2">
+          <h3 className="ds-label">Tone</h3>
+          <div>
+            <p className="text-sm font-medium">Chat reveal speed</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">How fast your Personal TrAIner's replies type out — Off shows them instantly</p>
+            <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
+              {(['off', 'slow', 'normal', 'fast'] as const).map(level => (
+                <button
+                  key={level}
+                  type="button"
+                  aria-pressed={revealSpeed === level}
+                  onClick={() => onRevealSpeedChange(level)}
+                  className={`h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
+                    revealSpeed === level
+                      ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
+                      : 'text-muted-foreground'
+                  }`}
+                  style={revealSpeed === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[0.71875rem] leading-[1.5] text-muted-foreground/80">
+              Reduced-motion system settings always show replies instantly, regardless of this choice.
+            </p>
+          </div>
+        </div>
+        </>
+      )
+      case 'remembers': return (
+        <div className="space-y-4">
+        {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {grouped.length > 0 && (
           <div ref={factsRef} className="space-y-4">
             {grouped.map(({ kind, items }) => (
@@ -1540,41 +1680,6 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Separator className="my-2" />
           </div>
         )}
-
-        {/* REPLY SPEED IS NOT A REMEMBERED FACT. It lived inside the
-            `contextFacts.length > 0` branch below, so a trainee the coach had
-            never stored a note about could not reach it at all — a preference
-            control that appeared only once something unrelated existed.
-            Hoisted out; the notes keep their own conditional block. */}
-        <div className="space-y-2">
-          <h3 className="ds-label">Tone</h3>
-          <div>
-            <p className="text-sm font-medium">Chat reveal speed</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">How fast your Personal TrAIner's replies type out — Off shows them instantly</p>
-            <div className="mt-3 flex gap-[3px] rounded-xl bg-background p-[3px]">
-              {(['off', 'slow', 'normal', 'fast'] as const).map(level => (
-                <button
-                  key={level}
-                  type="button"
-                  aria-pressed={revealSpeed === level}
-                  onClick={() => onRevealSpeedChange(level)}
-                  className={`h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
-                    revealSpeed === level
-                      ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
-                      : 'text-muted-foreground'
-                  }`}
-                  style={revealSpeed === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-[0.71875rem] leading-[1.5] text-muted-foreground/80">
-              Reduced-motion system settings always show replies instantly, regardless of this choice.
-            </p>
-          </div>
-        </div>
-
         {contextFacts.length > 0 && (
           <div ref={contextRef} className="space-y-2">
             <h3 className="ds-label">Things it remembers about you</h3>
@@ -1606,17 +1711,133 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             ))}
           </div>
         )}
-
         {!loading && goals.length === 0 && grouped.length === 0 && contextFacts.length === 0 && (
           <p className="text-sm text-muted-foreground">Nothing recorded yet — state a preference, goal, or constraint in chat and it'll show up here.</p>
         )}
-
-        </Group>
-
-        <Group label="App">
+        </div>
+      )
+      case 'appearance': return (
+        <>
         <AppearanceSection appearance={appearance} />
-
+        </>
+      )
+      case 'reminders': return (
+        <>
         {profile.id && <Suspense fallback={null}><RemindersSection profileId={profile.id} /></Suspense>}
+        </>
+      )
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        className="inset-0 top-0 left-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 pt-[env(safe-area-inset-top,0px)] sm:max-w-none [&_[data-slot=dialog-body]]:content-start [&_[data-slot=dialog-body]]:gap-[22px] [&_[data-slot=dialog-body]]:px-[22px] [&_[data-slot=dialog-body]]:pt-0"
+        data-profile-page
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Profile</DialogTitle>
+          <DialogDescription>Everything the app knows about you — correct or remove anything here.</DialogDescription>
+        </DialogHeader>
+
+        {/* THE TOP BAR (2d): back to where she came from. In a sheet it goes
+            back to the page of rows, never straight out of Profile. */}
+        <div className="-mb-2 flex h-[52px] items-center">
+          <button
+            type="button"
+            className="hit-slop-44 text-[0.8125rem] text-muted-foreground"
+            onClick={() => sheet ? setSheet(null) : onOpenChange(false)}
+            data-profile-back
+          >
+            ‹ {sheet ? 'Profile' : backLabel}
+          </button>
+        </div>
+
+        {saveError && (
+          <InsightBanner tone="warning" className="items-start justify-between">
+            <span>{saveError}</span>
+            <button type="button" onClick={() => setSaveError(null)} className="shrink-0 text-xs font-semibold underline">
+              Dismiss
+            </button>
+          </InsightBanner>
+        )}
+
+        {sheet ? (
+          <div className="space-y-4" data-profile-sheet={sheet}>
+            <h2 className="text-[1.375rem] font-bold tracking-[-.02em]">{SHEET_TITLE[sheet]}</h2>
+            {sheetBody(sheet)}
+          </div>
+        ) : (
+          <>
+            {/* WHO THIS IS (2d): the initial in a ringed circle, the name, and
+                the summary read straight off the profile — goal, days a week,
+                equipment, never stored. */}
+            <div className="flex items-center gap-4">
+              <span
+                aria-hidden
+                className="flex size-16 shrink-0 items-center justify-center rounded-full text-[1.5rem] font-bold"
+                style={{ background: 'color-mix(in srgb, var(--role-ai-accent) 40%, transparent)', boxShadow: 'inset 0 0 0 2px var(--primary), 0 0 calc(16px * var(--glow-strength, 1)) rgba(var(--glow-rgb), .45)' }}
+              >
+                {(profile.display_name?.trim()?.[0] ?? '·').toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="break-words text-[1.5rem] font-bold leading-tight tracking-[-.02em] glow-text">
+                  {profile.display_name?.trim() || 'Your profile'}
+                </p>
+                <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">{identitySummary}</p>
+              </div>
+            </div>
+
+            {/* THE STAT STRIP (2d): weight now, the goal weight, the day's
+                calories. A number the app does not have is a dash, never a
+                guess. */}
+            <div className="grid grid-cols-3" style={{ borderTop: '1px solid var(--hairline)', borderBottom: '1px solid var(--hairline)' }} data-profile-stats>
+              {[
+                { key: 'now', value: nowKg != null ? String(nowKg) : '—', label: 'kg now' },
+                { key: 'goal', value: goalKg != null ? String(goalKg) : '—', label: 'kg goal' },
+                { key: 'kcal', value: calorieTarget != null ? Math.round(calorieTarget).toLocaleString() : '—', label: 'kcal / day' },
+              ].map((st, i) => (
+                <div key={st.key} className="px-3 py-3" style={i > 0 ? { borderLeft: '1px solid var(--hairline)' } : undefined} data-profile-stat={st.key}>
+                  <p className={`tabular-mono text-[1.125rem] font-bold ${st.key === 'goal' && goalKg != null ? 'text-primary-text glow-mint' : ''}`}>{st.value}</p>
+                  <p className="text-[0.6875rem] text-muted-foreground">{st.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <ProfileGroup label="Body & goals">
+              <SheetRow label="Height & weight" value={[profile.height_cm ? `${profile.height_cm} cm` : null, nowKg != null ? `${nowKg} kg` : null].filter(Boolean).join(' · ') || 'Not set'} onOpen={() => setSheet('body')} />
+              <SheetRow label="Goal" value={[GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label, goalKg != null ? `${goalKg} kg` : null].filter(Boolean).join(' → ') || 'Not set'} onOpen={() => setSheet('goal')} />
+              <SheetRow label="Injuries" value={listOrNone([...injuryCodes.map(code => INJURY_OPTIONS.find(o => o.value === code)?.label ?? code), ...unrecognisedInjuries], 'None')} onOpen={() => setSheet('injuries')} />
+            </ProfileGroup>
+
+            <ProfileGroup label="Training">
+              <SheetRow label="Schedule" value={availableDays.join(' ') || 'Not set'} onOpen={() => setSheet('schedule')} />
+              <SheetRow label="Equipment" value={EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label ?? 'Not set'} onOpen={() => setSheet('equipment')} />
+              {/* Only where they were asked — the same rule as before. */}
+              {(profile.skip_calibration_week || knownLiftsAnswered) && (
+                <SheetRow label="Known lifts" value={knownLift} onOpen={() => setSheet('lifts')} />
+              )}
+              {/* ITS OWN ROW, in Training (2d): it is a training answer, and
+                  inside "Style & recovery" it would be one more thing a person
+                  has to guess the location of. */}
+              <SheetRow label="Exercises to avoid" value={listOrNone(exerciseDislikeValues, 'None')} onOpen={() => setSheet('exavoid')} />
+              <SheetRow label="Style & recovery" value={styleOptionsFor(profile.training_style).find(o => o.value === profile.training_style)?.label ?? 'Not set'} onOpen={() => setSheet('style')} />
+            </ProfileGroup>
+
+            <ProfileGroup label="Food">
+              <SheetRow label="Diet" value={listOrNone((profile.dietary_preferences ?? []).map(v => DIETARY_OPTIONS.find(o => o.value === v)?.label ?? v), 'No restrictions')} onOpen={() => setSheet('diet')} />
+              <SheetRow label="Foods you like" value={listOrNone(foodLikeValues, 'None yet')} onOpen={() => setSheet('likes')} />
+              <SheetRow label="Foods to avoid" value={listOrNone(hardFoodDislikeValues, 'None')} onOpen={() => setSheet('avoid')} />
+              <SheetRow label="Meals & shopping" value={`Shop ${shopDayChoice === 'auto' ? defaultShopDay(exercisePlan) : shopDayChoice}`} onOpen={() => setSheet('meals')} />
+            </ProfileGroup>
+
+            <ProfileGroup label="Personal TrAIner & app">
+              <SheetRow label="Reply speed" value={revealSpeed[0].toUpperCase() + revealSpeed.slice(1)} onOpen={() => setSheet('tone')} />
+              <SheetRow label="Remembers" value={loading ? '…' : `${rememberedCount} thing${rememberedCount === 1 ? '' : 's'}`} onOpen={() => setSheet('remembers')} />
+              <SheetRow label="Appearance" value={THEME_PREVIEWS[appearance.theme]?.label ?? ''} onOpen={() => setSheet('appearance')} />
+              {profile.id && <SheetRow label="Reminders" value="" onOpen={() => setSheet('reminders')} />}
+            </ProfileGroup>
 
         {/* Audit §1.4 — there was neither of these. "New Plan" cleared the
             browser and started fresh without deleting a single row, so
@@ -1683,7 +1904,6 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </div>
           </div>
         </div>
-        </Group>
 
         {/* THE FOOTER. "New Plan" moved here from the gear menu — it is the
             most consequential thing a person can do from a settings surface
@@ -1702,6 +1922,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             Start a new plan…
           </Button>
         </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

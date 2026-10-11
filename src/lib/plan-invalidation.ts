@@ -22,8 +22,9 @@
 // ---------------------------------------------------------------------------
 
 import type { UserProfile, MesocycleWeek, SessionDuration } from './types'
-import { rebuildAgainstProfile } from './plan-adaptations'
+import { rebuildAgainstProfile, type PlanEditContext } from './plan-adaptations'
 import { getDurationBudgetSeconds } from './session-duration'
+import { getFlaggedJoints } from './exercise-plan'
 
 /**
  * The fields that make an existing plan wrong, and nothing else.
@@ -80,6 +81,23 @@ export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_dea
 export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'session_duration_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
+/**
+ * The offer made when an injury is taken OFF — one object, so the Profile tick
+ * and the coach's "recovered" card say the same thing (`injuryRemovalOffer`).
+ * "From today" rather than "from this week onwards": it is the literal truth
+ * now that a rebuild leaves trained days alone, and the sentence says what the
+ * person gets back and what it costs them (the exercises ahead can change).
+ */
+export const REMOVED_INJURY_OFFER: PlanInvalidation = {
+  field: 'injuries',
+  title: 'Rebuild your plan now that\'s cleared?',
+  detail:
+    'Your plan was built to keep clear of that area, so it is still leaving work out. I can ' +
+    'rebuild it from today so that work comes back. Some of the exercises ahead will change. ' +
+    'Everything you have already logged, and every session you have already done, stays ' +
+    'exactly as it is.',
+}
+
 export interface PlanInvalidation {
   field: PlanInvalidatingField
   /** What to tell the user, in their terms — never a field name. */
@@ -102,9 +120,6 @@ export function detectPlanInvalidation(
     const was = [...(before.injuries ?? [])].sort()
     const now = [...(patch.injuries ?? [])].sort()
     if (was.join('|') !== now.join('|')) {
-      // Only an ADDED injury is a safety problem — removing one leaves a plan
-      // that is merely more cautious than it needs to be, which is not
-      // urgent and not worth a dialog.
       const added = now.filter(i => !was.includes(i))
       if (added.length > 0) {
         return {
@@ -116,6 +131,26 @@ export function detectPlanInvalidation(
             'work around it. Everything you have already logged stays exactly as it is.',
         }
       }
+      // A REMOVAL OFFERS TOO — test log H5, 9 Oct 2026, the plan's owner
+      // question 1 built as its recommended answer (B) and recorded as decided
+      // unprompted and reversible.
+      //
+      // Until then this branch returned nothing, on the reasoning that a plan
+      // built around an injury is "merely more cautious than it needs to be".
+      // Measured on the tester's own profile: without the shoulder flag Monday
+      // has three chest exercises and ten working sets instead of two and
+      // seven, and Saturday is a real shoulder day instead of a third leg day.
+      // "More cautious" was one press a week for sixteen weeks, with a note on
+      // screen sending the person to Profile, where un-ticking did nothing.
+      //
+      // Declining costs nothing and changes nothing. Nothing already trained
+      // is touched: rebuildAgainstProfile keeps every trained day as it was.
+      //
+      // ONLY FOR AN AREA THE PLAN ACTUALLY WORKED AROUND. Profile still holds
+      // free-text entries from before the picker ("tennis elbow"); they never
+      // changed a plan, so clearing one has nothing to give back.
+      const removed = was.filter(i => !now.includes(i))
+      if (removed.some(code => getFlaggedJoints([code]).size > 0)) return REMOVED_INJURY_OFFER
     }
   }
 
@@ -291,6 +326,12 @@ export async function rebuildFromCurrentWeek(
   exclusions: string[],
   mesocycle: MesocycleWeek[],
   currentWeek: number,
+  /**
+   * Which days are already trained, and what is temporarily being eased off.
+   * Required: "from this week onwards" used to mean the whole live week,
+   * including the days of it already done. See rebuildAgainstProfile.
+   */
+  context: PlanEditContext,
 ): Promise<RebuildResult> {
   const forward = mesocycle.filter(w => w.week_number >= currentWeek).map(w => w.week_number)
   if (forward.length === 0) {
@@ -301,7 +342,7 @@ export async function rebuildFromCurrentWeek(
   }
 
   try {
-    const rebuilt = await rebuildAgainstProfile(profile, exclusions, mesocycle, forward)
+    const rebuilt = await rebuildAgainstProfile(profile, exclusions, mesocycle, forward, context)
     return { ok: true, mesocycle: rebuilt, weeksRebuilt: forward.length }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }

@@ -348,6 +348,9 @@ export interface Exercise {
    * afterwards:
    *   'ceiling'    the unverified ramp reached the standards estimate
    *   'implement'  the improvised-implement safety cap
+   *   'stated_limit'
+   *                at the heaviest dumbbell/kettlebell the trainee has said
+   *                they own (see LoadPrescription.hold)
    *   'floor'      rounded up to the bar / the lightest pair
    *   'matched'    lowered by enforceOneWeightPerPrescription to match the
    *                same lift's other slot this week
@@ -364,7 +367,7 @@ export interface Exercise {
    * The load_guidance sentence says the first three in words; this is the
    * same fact in a form a measurement can read. Absent otherwise.
    */
-  load_hold?: 'ceiling' | 'implement' | 'floor' | 'matched' | 'unaffordable_step'
+  load_hold?: 'ceiling' | 'implement' | 'stated_limit' | 'floor' | 'matched' | 'unaffordable_step'
   /**
    * What the frozen-load rep bump did this week, when it ran at all (the
    * weight did not move from last week and the lift is eligible):
@@ -554,16 +557,6 @@ export interface WorkoutDay {
    */
   is_scheduled?: boolean
   /**
-   * Plain-language note for the (rare) case a required movement pattern for
-   * this day genuinely has nothing eligible under the trainee's equipment
-   * and injury constraints, even after trying a nearest-pattern substitute
-   * (see fillSlot's "(none)" case in exercise-plan.ts). Previously this only
-   * reached an internal trace (constraint_trace.structure_adjusted) — never
-   * the trainee. Set once on the base plan and carried through periodized
-   * weeks unchanged (same convention as conditioning_note).
-   */
-  pattern_gap_note?: string
-  /**
    * Plain-language note for the case a block's exercise structure had to
    * lose a whole exercise (not just sets) to fit that block's own real
    * rest cost — see sizeBlockToRestBudget in exercise-plan.ts. Set once per
@@ -669,10 +662,18 @@ export interface ChatPendingActionView {
   kind: string
   status: import('./pending-actions-store').PendingActionStatus
   diff: import('./pending-actions-store').ProposalDiff
+  /**
+   * When the offer stops working (pending_actions.expires_at). Carried onto
+   * the card so it can LOOK expired once it is (L33) and so the coach's
+   * history can say the offer is closed (H22.1) — until 9 Oct 2026 the only
+   * way either found out was somebody tapping a dead button. Optional:
+   * cards cached before that date do not have it.
+   */
+  expiresAt?: string
 }
 
 export interface ChatReceiptView {
-  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_add' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_session_shorten' | 'propose_session_length' | 'propose_schedule_change' | 'propose_style_change' | 'propose_goal_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'propose_session_activity_swap' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'grocery_day_added' | 'water_logged' | 'steps_logged'
+  kind: 'log_workout' | 'propose_exercise_swap' | 'propose_exercise_add' | 'propose_exercise_remove' | 'propose_exercise_reorder' | 'propose_meal_swap' | 'propose_custom_meal' | 'propose_meal_food_add' | 'propose_meal_food_remove' | 'propose_meal_food_replace' | 'propose_meal_food_resize' | 'propose_injury_adaptation' | 'propose_injury_as_lasting' | 'propose_injury_recovered' | 'propose_equipment_adaptation' | 'propose_volume_change' | 'propose_session_shorten' | 'propose_session_length' | 'propose_schedule_change' | 'propose_style_change' | 'propose_goal_change' | 'propose_concurrent_activity' | 'propose_rest_day' | 'propose_missed_session' | 'propose_session_activity_swap' | 'propose_weigh_in' | 'memory_fact_saved' | 'memory_goal_saved' | 'memory_context_fact_saved' | 'display_name_saved' | 'grocery_item_added' | 'grocery_day_added' | 'water_logged' | 'steps_logged'
   title: string
   rows: { label: string; detail: string; note?: string }[]
   summary?: string
@@ -709,6 +710,14 @@ export interface ChatMessage {
   clarification?: ChatClarificationView
   quickReplies?: string[]
   created_at?: string
+  /**
+   * How this turn's request ENDED, when the turn itself no longer says:
+   * 'refused' on a reply that is the app declining to build a card, and the
+   * last known outcome of a card whose view was dropped when history was
+   * re-read from the server. Never rendered — read only by the history the
+   * coach is sent (chat-plan-context.ts, stampTurnOutcome).
+   */
+  outcome?: import('./chat-plan-context').TurnOutcome
 }
 
 // ReplaceFoodAction/ReplaceExerciseAction are gone — categorically
@@ -959,6 +968,24 @@ export interface ExerciseSetLog {
    */
   drop_index?: number
   completed_at?: string
+  /**
+   * WHERE THIS ROW STANDS WITH THE SERVER. Absent on a row the server has —
+   * which is every row read from it, so nothing that predates this field has
+   * to change.
+   *
+   *   saving  — on this phone, its first attempt to send under way (normally
+   *             gone in under a second)
+   *   waiting — on this phone, an attempt has failed or the phone is offline;
+   *             it sends itself when a request gets through
+   *   failed  — the server refused it, or the app gave up. Kept on this phone
+   *             and on the grid until someone retries or deletes it.
+   *
+   * Never a column: it is set by set-log-store's read and nowhere else, and no
+   * write path spreads one of these rows. Added 9 Oct 2026 (H20) so a set that
+   * has not reached the server can be on the grid AND say so — before it, a
+   * set that gave up left the screen altogether.
+   */
+  syncStatus?: 'saving' | 'waiting' | 'failed'
   /**
    * Assistance used (kg), for an assistance-loaded exercise (today, only
    * Pull-Ups (Assisted)) — undefined/null for every ordinary set. Column

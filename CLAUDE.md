@@ -785,8 +785,9 @@ menu" stays true when a copy is also left outside it.
     be CHANGED or REMOVED from the screen. What the screen cannot do is ADD one
     — and the group is hidden entirely when there are none, so a first dislike
     has no screen route at all. **CLOSED the same day**: "Exercises to avoid"
-    now sits beside "Foods to avoid" on Profile, so it is **both** on every
-    operation. The typed word is RESOLVED against the catalogue before it is
+    sat beside "Foods to avoid" on Profile, so it is **both** on every
+    operation (since the 10 Oct 2026 layout pass it is its own Profile row,
+    in Training). The typed word is RESOLVED against the catalogue before it is
     stored, because the exclusion filter matches a full exercise name — "squats"
     stored as typed bans nothing while looking on screen exactly like a ban that
     worked — and an ambiguous word asks which rather than guessing, the rule the
@@ -1338,6 +1339,72 @@ menu" stays true when a copy is also left outside it.
 - Works one-handed on a phone on a gym floor — `verify:tap-targets`,
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
+
+### Her rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
+- **Kit: "Remember what they say."** Asked how someone should tell the app what kit they have
+  (revisiting her 9 Sep "fix the words"), from options: keep the four equipment choices AND remember
+  the specifics people say in setup or to the coach ("I've got dumbbells and a bench", "I don't own
+  bands"), shown as ticks on Profile. No new setup question; nobody's plan changes unless they say
+  something. `MISSING` (lead: `wip/k3-kit-list`, design in `tracer-reports/A-equipment.md`)
+- **A surprising weigh-in: "Ask, and hold the target."** More than about 3% from the last one is
+  asked about ("That's 19 kg lighter than this morning — is 62 right?") and saved only on yes; even
+  then the calorie target waits for a second day that agrees. BUILT on the branch (N1), unverified
+  on a phone
+- **The allergy and diet path: "Build all four."** (1) "I don't eat pork" said in passing goes into
+  Foods to avoid with a visible tick; (2) setup stops promising "entirely nut-free" and uses the
+  honest wording the meal screens already use; (3) food matching gets stricter (a "chicken caesar
+  wrap" is not an empty tortilla; bare "chicken" must not match a meat-free product); (4) recipe
+  steps are checked against allergies and avoids. `MISSING`, all four; safety-adjacent, so each gets
+  a plan before a build (`docs/plans/ingredient-lookup-truth.md` exists for (3))
+
+### Her rulings of 10 Oct 2026, from runs 3-4 of the live-app test (`docs/test-log-2026-10-09/runs-3-4-trace.md`)
+- **A logged meal stays as eaten; the rest of the day fits around it: "A, with two
+  conditions."** (1) When other meals are re-sized, ONE line says so, with an Undo; (2) only the
+  SAME dishes, by about 25% either way; beyond that the meals are left alone and the line says
+  plainly how far over or under the day is. Today's screen only: the stored meals and the
+  shopping list do not change. The header, its verdict and the rows come from one calculation,
+  so they cannot disagree. `day-as-shown`, `verify:day-as-shown`
+- **Toast counts as bread now.** French toast is its own food and keeps its egg and milk.
+  `meal-amounts`
+- **The heaviest logged set carries into the next block, under the stated kit limit, adjusted
+  for the new rep range.** It collided with her 1 Sep "offer, never apply" and her three-session
+  bar, and was put to her the same day: **"Offer it"**, from three options (over applying it
+  automatically, and over applying it only after three sessions). Block start says "last block
+  you did 18 kg x 11, that's 19 kg for 6-8, use it?" and nothing changes until she taps yes.
+  `beat-target` §6
+- **A swap keeps the day's other dishes: "Resize, else leave."** Swapping a meal (or moving one
+  between days) for one of the plan's own dishes leaves every other meal of that day on the dish
+  it showed; they re-size together, about 25% either way, with one line and an Undo, and beyond
+  that they are left alone and the line says how far over or under. **Scope, the same day, from
+  three options: "Plan's own dishes only"** — a meal asked for by name, built from the fridge or
+  edited still re-plans the rest of the day, so her 1 Sep "plan the rest of my meals" stands.
+  `docs/plans/swap-keeps-the-other-meals.md`, `hold-around-pins`, `verify:swap-knock-on`
+- **A session finished short is "Done, with the count".** Still a tick, and the day says "5 of 18
+  sets" beside it, over a separate part-done mark and over keeping it as it was. One count for the
+  strips, Home, the Exercise bar and the coach. `session-count`, `verify:finish-check`
+- **"Rest of block" means the block, and says so: "Keep to the block, say it."** The swap names
+  the day the next block starts ("Swaps it until Mon 5 Oct, when your next block starts and your
+  plan changes exercises.") and offers "Never give me this one again" beside it for good. Rejected:
+  carrying a swap into later blocks, and a third "from now on" choice. `block-swap-until`,
+  `verify:moved-edit`
+
+### Her layout pass of 10 Oct 2026 (`docs/plans/layout-revamp-oct10.md`), merged to `main` 11 Oct 2026
+- **"Build all six, then show me"**, and **"Personal TrAIner" stays** over the brief's "Coach".
+  Home, Nutrition, Exercise, Profile, setup and the round-timer sheet, layout only: every control
+  moved, none removed. `test:layout-revamp`, `test:exercise-layout`, `test:round-setup`,
+  `test:profile-groups`, `test:onboarding-style`, and the browser drivers re-anchored to the new
+  screens. Shown to her as screenshots; merged on her "Merge", 11 Oct 2026.
+- **The Exercise tab's running button presses the tick it describes**: "Log set 3 · Bench 80 kg ×
+  6" is read off the set row's own tick, so it can never promise one weight and save another; with
+  no weight to take it opens the box instead. `test:exercise-layout`
+- **Setup is one question per screen**, and a card she has not answered holds the screen open.
+  Skip is the old "Prefer not to say", moved to the header, never on a multi-select. One tap
+  answers a single-choice question: her ruling 11 Oct 2026, **"Move straight on"**, over the
+  brief's select-then-Next. `test:onboarding-style`
+- **Profile is a page of rows**; every editor it had is in exactly one row's sheet, and a deep link
+  opens the sheet holding its section. `test:profile-groups`
+- **Home's coach note rotates, and stops**: held while touched or focused, never moving under
+  reduced motion; an adaptation question is never rotated away. `test:layout-revamp`
 
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an

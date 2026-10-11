@@ -17,15 +17,16 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Check, Dumbbell, Plus, Trophy, Trash2 } from 'lucide-react'
+import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, loggedSetReading } from '@/lib/coach-voice'
-import { checkForPR, getTopPRSet, toSessionSets, type PRResult } from '@/lib/pr-engine'
+import { lastTime, sameAsSet, setReading, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
+import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
 
 // REPLACED 8 Sep 2026 by set-plausibility.ts's MAX_LOGGABLE_SET_KG. The old
@@ -162,7 +163,7 @@ export function SetGrid({
   onOpenPlateCalc,
 }: SetGridProps) {
   const {
-    profileId, date: today, dayName, liveWeek, logs, setsFor, ghosts, loadGhosts, logSet, deleteSet, refresh,
+    profileId, date: today, dayName, liveWeek, logs, setsFor, ghosts, loadGhosts, logSet, deleteSet, retrySet, refresh,
     setDraft, saveSetDraft, clearSetDrafts, extraSetsFor, setExtraSets,
   } = useActiveSession()
 
@@ -330,6 +331,20 @@ export function SetGrid({
   )
 
   const [inputs, setInputs] = useState<Record<string, SetInputState>>({})
+  /**
+   * A HOLD TIMER ON A TIMED SET'S ROW (runs 3-4, M42): a plank had no timer,
+   * so the seconds were guessed and typed. Start, hold, Stop: the seconds go
+   * into the box, which the ✓ then saves like any typed number. One at a time.
+   */
+  const [holdTimer, setHoldTimer] = useState<{ ref: SetRef; startedAt: number; seconds: number } | null>(null)
+  useEffect(() => {
+    if (!holdTimer) return
+    const id = setInterval(() => {
+      // Date.now() as a stopwatch: elapsed time, never a date.
+      setHoldTimer(t => (t ? { ...t, seconds: Math.floor((Date.now() - t.startedAt) / 1000) } : t))
+    }, 250)
+    return () => clearInterval(id)
+  }, [holdTimer?.startedAt])
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
   /**
    * A weight past what the app believes this trainee can load, said out loud
@@ -439,17 +454,30 @@ export function SetGrid({
     // week exists to replace it — so a default here is the guess writing
     // itself into the ledger three times. Set 1 keeps its default: the probe
     // IS the number, and one tap is right when the guess is right.
-    if (calibrationProbe && setNumber > 1) return ''
-    const perSet = perSetLoadKg?.[setNumber - 1]
-    if (perSet != null) return String(perSet)
-    if (suggestedLoadKg != null) return String(suggestedLoadKg)
-    // NEVER INVENT 0 FOR A MOVEMENT THAT NEEDS A WEIGHT. Ashley, 18 Sep 2026:
-    // her kettlebell swings offered a faint 0, and a blank tap would have
-    // logged 0kg against a bell she had actually loaded to 24. A default is a
-    // prescription, and `load-prescription.ts:12` forbids the app inventing
-    // one. Zero stays where it is the honest record — a movement carrying no
-    // external load, where 0kg x 12 is exactly what happened.
-    return catalogEntryIsLoaded ? '' : '0'
+    return workingBlankFor(ref).text
+  }
+  /**
+   * A WORKING SET'S BLANK BOX — see blankWeightFor for the order and why (H25,
+   * 10 Oct 2026: last session's 30 kg used to outrank today's plan of 24 and
+   * the 24 she had just typed on the set above).
+   */
+  const workingBlankFor = (ref: SetRef): BlankWeight => {
+    const setNumber = ref.setNumber
+    const probeSet = calibrationProbe && setNumber > 1
+    const ghost = ghostFor(ref)
+    return blankWeightFor({
+      carry: carriedWeightFor(setNumber, existingLogs, perSetLoadKg),
+      noCarry: probeSet,
+      planKg: probeSet ? null : (perSetLoadKg?.[setNumber - 1] ?? suggestedLoadKg ?? null),
+      lastTimeKg: ghost ? Number(ghost.weight_kg) : null,
+      // NEVER INVENT 0 FOR A MOVEMENT THAT NEEDS A WEIGHT. Ashley, 18 Sep 2026:
+      // her kettlebell swings offered a faint 0, and a blank tap would have
+      // logged 0kg against a bell she had actually loaded to 24. A default is a
+      // prescription, and `load-prescription.ts:12` forbids the app inventing
+      // one. Zero stays where it is the honest record — a movement carrying no
+      // external load, where 0kg x 12 is exactly what happened.
+      fallback: probeSet || catalogEntryIsLoaded ? '' : '0',
+    })
   }
   /** What the empty box SHOWS — the default where one exists, a prompt where it does not. */
   /**
@@ -464,7 +492,19 @@ export function SetGrid({
    * step before the set was logged. Ashley's ruling, 24 Sep 2026, from three
    * options: on these days the tour says to type the weight, then tap ✓.
    */
-  const offersNoWeight = (ref: SetRef): boolean => !ghostFor(ref) && defaultWeightFor(ref) === ''
+  /**
+   * LAST SESSION, ONLY WHERE IT IS WHAT THE BOXES HOLD (H25, decided as a CSCS
+   * coach, 10 Oct 2026). A row takes both of its faint numbers from ONE
+   * source: today's plan (its weight and the bottom of its rep range) or, when
+   * the plan carries no weight, last session's set, marked "last time" as
+   * Ashley ruled on 18 Sep. Mixing the two would print last week's 11 reps
+   * beside this week's 24 kg and mark half a row as history.
+   */
+  const drivingGhostFor = (ref: SetRef) => {
+    const g = ghostFor(ref)
+    return g && workingBlankFor(ref).source === 'last_time' ? g : undefined
+  }
+  const offersNoWeight = (ref: SetRef): boolean => defaultWeightFor(ref) === ''
 
   const weightPlaceholderFor = (ref: SetRef): string => {
     const d = defaultWeightFor(ref)
@@ -515,6 +555,19 @@ export function SetGrid({
     return /\d+/.exec(prescribedReps ?? '')?.[0] ?? ''
   }
 
+  /**
+   * A calibration week's set 2 onwards with nothing typed: the save below
+   * refuses it ("set 1 was the probe"), so the tick must not be offered as a
+   * one-tap log either. One predicate, read by the save and by the tick's
+   * data-next-weight, so the Exercise tab's button cannot promise a log the
+   * save would refuse.
+   */
+  const probeNeedsWeight = (ref: SetRef): boolean => {
+    const input = inputFor(ref)
+    return !!calibrationProbe && !isWarm(ref) && !isDrop(ref) && ref.setNumber > 1
+      && !input.isBodyweight && !input.weight.trim() && !drivingGhostFor(ref)
+  }
+
   const handleSaveSet = (ref: SetRef) => {
     if (!profileId) return
     const setNumber = ref.setNumber
@@ -529,7 +582,7 @@ export function SetGrid({
     // site, because two of them take loose values and cannot see the row.
     const drop = isDrop(ref)
     const input = inputFor(ref)
-    const ghost = ghostFor(ref)
+    const ghost = drivingGhostFor(ref)
 
     // Reps: typed -> ghost (repeat-last-week's tap-the-check convenience) ->
     // the PRESCRIBED bottom of the range -> reject with a visible row error.
@@ -557,21 +610,22 @@ export function SetGrid({
     // lift an empty weight would otherwise resolve to "bodyweight" and be
     // logged as a set she never did. The message names the probe so the
     // refusal reads as the design, not a fault.
-    if (calibrationProbe && !warm && !drop && setNumber > 1 && !input.isBodyweight && !input.weight.trim() && !ghost) {
+    if (probeNeedsWeight(ref)) {
       setRowErrors(prev => ({ ...prev, [k]: 'Type the weight you lifted — set 1 was the probe' }))
       return
     }
 
-    // Weight: bodyweight is always 0. Otherwise typed -> ghost (repeat last
-    // week) -> this row's own prescribed default (the exact number already
-    // shown as the input's placeholder — leaving it blank must log what the
+    // Weight: bodyweight is always 0. Otherwise typed -> this row's blank
+    // value (workingBlankFor: the set just done, today's plan, then last
+    // session only when the plan has no number — H25), which is the exact
+    // number already shown as the input's placeholder — leaving it blank must log what the
     // placeholder promised, never silently 0). A blank weight with no ghost
     // used to fall through to weight_kg=0, which downstream code flags as
     // malformed and drops from every summary/history view without telling
     // the user their tap didn't actually count.
     const weight = input.isBodyweight
       ? 0
-      : parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : defaultWeightFor(ref))) || 0
+      : parseFloat(input.weight || defaultWeightFor(ref)) || 0
     // A 0kg save without the BW flag produces exactly the "malformed
     // zero-weight" row every summary/history reader silently filters out —
     // the tap would look successful (rest timer starts) but the set vanishes.
@@ -689,12 +743,18 @@ export function SetGrid({
     // animation, and the DB-derived cache then quietly drops it on the next
     // refresh — a flicker, which is harder to notice and harder to report
     // than a wrong record that stays put.
-    const pr = warm || drop ? null : checkForPR(profileId, exerciseName, {
+    // NOT A LIFTING RECORD ON A TIMED, DISTANCE OR INTERVAL SET (runs 3-4,
+    // M42, decided as a CSCS coach): the record engine counts reps, so a
+    // 35-second plank after a 33 became "most reps 35". A hold is progressed
+    // by time and a carry by distance; neither is a lifting record, and a
+    // record in the wrong unit is worse than none.
+    const countedInReps = (prescriptionType ?? 'reps') === 'reps'
+    const pr = warm || drop || !countedInReps ? null : checkForPR(profileId, exerciseName, {
       weightKg: storedWeightKg,
       reps,
       isBodyweight: storedIsBodyweight,
       addedLoadKg,
-    })
+    }, today)
     if (pr) {
       setAnimatingPr(true)
       setTimeout(() => setAnimatingPr(false), 2000)
@@ -706,7 +766,7 @@ export function SetGrid({
       ...existingLogs.filter(l => l.set_number !== setNumber),
       { user_id: profileId, date: today, exercise_name: exerciseName, exercise_id: exerciseId, set_number: setNumber, weight_kg: storedWeightKg, reps_completed: reps, is_bodyweight: storedIsBodyweight, added_load_kg: addedLoadKg },
     ]
-    const topPR = warm || drop ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs))
+    const topPR = warm || drop || !countedInReps ? null : getTopPRSet(profileId, exerciseName, toSessionSets(projectedLogs), today)
     setPrBadgeSet(topPR ? { rowKey: rowKey({ kind: 'working', setNumber: topPR.setNumber }), result: topPR.result } : null)
 
     // THE REST TIMER AND THE SAME-SESSION TOAST BELONG TO WORKING SETS. A
@@ -793,10 +853,17 @@ export function SetGrid({
         const warm = isWarm(ref)
         const drop = isDrop(ref)
         const isSaved = !!loggedRowFor(ref)
+        // WHERE THE ROW STANDS WITH THE SERVER (H20, 9 Oct 2026). `failed` is
+        // a set the server refused: it stays on the grid — it used to leave
+        // it — but it does not wear the mint "saved" tint, and its tick is
+        // not announced as saved. `waiting` is held on this phone and sends
+        // itself; it keeps the tint, because held is what it is.
+        const sync = loggedRowFor(ref)?.syncStatus
+        const didNotSave = sync === 'failed'
         const input = inputFor(ref)
         const isBW = input.isBodyweight
         const isPRSet = prBadgeSet?.rowKey === k
-        const ghost = ghostFor(ref)
+        const ghost = drivingGhostFor(ref)
         // The caption sits above the FIRST row of each block rather than
         // wrapping them, so both blocks stay inside one grid and the weight
         // column runs unbroken down the card.
@@ -827,7 +894,9 @@ export function SetGrid({
         // set, and only once that row is actually saved. Offering it under an
         // empty box would be asking for a continuation of a set that has not
         // happened.
-        const showAddDrop = rowIndex === lastRowIndexOfLastLoggedSet && isSaved
+        // AND ONLY ON A SET COUNTED IN REPS (M42): a drop is a lighter
+        // continuation of a lift, and a plank or a carry has none.
+        const showAddDrop = rowIndex === lastRowIndexOfLastLoggedSet && isSaved && (prescriptionType ?? 'reps') === 'reps'
         const padClass = railed
           ? (drop ? 'pl-5 pr-1' : 'pl-2 pr-1')
           : (drop ? 'pl-4 pr-1 rounded-l-[8px]' : 'px-1 rounded-l-[8px]')
@@ -854,6 +923,7 @@ export function SetGrid({
           )}
           <div
             data-testid={warm ? 'warmup-row' : drop ? 'drop-row' : 'working-row'}
+            data-sync={isSaved ? (sync ?? 'saved') : undefined}
             // THE TOUR'S TARGET IS THE WHOLE ROW when the weight must be typed:
             // the tour blocks every tap outside its spotlight, so a spotlight
             // on the ✓ alone would ask for a weight it will not let anyone
@@ -878,7 +948,7 @@ export function SetGrid({
             // working volume", which a drop does.
             style={railed ? { borderLeft: `2px solid ${warm ? 'var(--ramp-rail)' : 'color-mix(in srgb, var(--primary) 55%, transparent)'}` } : undefined}
             className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-r-[8px] py-0.5 transition-colors ${drop ? 'relative' : ''} ${padClass} ${
-              isSaved ? (warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : ''
+              isSaved ? (didNotSave ? 'bg-[color:var(--role-warn-bg)]' : warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : ''
             }`}
           >
             {/* The tether — an elbow from the row above into this one, so a
@@ -919,7 +989,7 @@ export function SetGrid({
               min="0"
               max={MAX_LOGGABLE_SET_KG}
               step="0.5"
-              placeholder={isBW ? 'BW' : (ghost ? String(ghost.weight_kg) : weightPlaceholderFor(ref))}
+              placeholder={isBW ? 'BW' : weightPlaceholderFor(ref)}
               value={isBW ? '' : input.weight}
               onChange={e => updateInput(ref, 'weight', e.target.value)}
               onFocus={scrollRowIntoView}
@@ -941,7 +1011,7 @@ export function SetGrid({
                 variant="ghost"
                 size="icon-xs"
                 className="size-7 text-muted-foreground hover:text-foreground"
-                onClick={() => onOpenPlateCalc(parseFloat(input.weight || (ghost ? String(ghost.weight_kg) : '0')) || 0)}
+                onClick={() => onOpenPlateCalc(parseFloat(input.weight || defaultWeightFor(ref)) || 0)}
                 disabled={isBW}
                 aria-label="Plate calculator"
               >
@@ -1000,12 +1070,31 @@ export function SetGrid({
                   color: warm ? 'var(--ramp-on)' : 'var(--primary-foreground)',
                 }}
                 onClick={() => handleSaveSet(ref)}
+                // WHAT THIS TICK WOULD SAVE, said on the tick itself, for the
+                // Exercise tab's "Log set 3 · Bench 80 kg × 6" button (design
+                // handoff 2c, 10 Oct 2026). The same expressions the two boxes
+                // show, so the button can only ever describe what this tick
+                // saves — and it presses this tick. Drop rows are left out:
+                // a drop is offered from its parent, never as "next".
+                data-next-set={!isSaved && !drop ? setLabelLong(ref) : undefined}
+                // EMPTY when there is no weight to take: the button then
+                // opens the box instead of pressing a tick that would refuse.
+                data-next-weight={!isSaved && !drop ? (isBW ? 'BW' : probeNeedsWeight(ref) ? '' : (input.weight || defaultWeightFor(ref))) : undefined}
+                data-next-unit={!isSaved && !drop ? (loadUnitLabel ?? 'kg') : undefined}
+                data-next-weight-box={!isSaved && !drop ? `setgrid-weight-${exerciseId}-${rowKey(ref)}` : undefined}
+                data-next-reps={!isSaved && !drop ? (input.reps || (ghost ? String(ghost.reps_completed) : defaultRepsFor(ref))) : undefined}
                 // THE KIND IS IN THE SPOKEN LABEL TOO. Warm-up 2 and working
                 // set 2 both read "Save set 2" until 17 Sep 2026, so a screen
                 // reader — and every driver — could not tell the two tick
                 // buttons apart. setLabelLong was imported for this and never
                 // wired, which is the declared-but-not-rendered shape again.
-                aria-label={isSaved ? `${setLabelLong(ref)} saved` : `Save ${setLabelLong(ref).toLowerCase()}`}
+                aria-label={!isSaved
+                  ? `Save ${setLabelLong(ref).toLowerCase()}`
+                  : didNotSave
+                    ? `${setLabelLong(ref)} didn't save — save it again`
+                    : sync === 'waiting'
+                      ? `${setLabelLong(ref)} waiting to send`
+                      : `${setLabelLong(ref)} saved`}
               >
                 <Check className="size-3.5" />
               </Button>
@@ -1023,13 +1112,47 @@ export function SetGrid({
             const logged = loggedRowFor(ref)
             if (!logged) return null
             const armed = confirmDeleteSet === k
+            // THE RECEIPT SAYS WHAT IS TRUE OF THIS ROW. "✓" means the phone
+            // has it and nothing has gone wrong — which is what the tick has
+            // always meant here (the store is local-first; see its header).
+            // A set that has been waiting on a connection says so, and a set
+            // the server refused says so and offers the one thing to do
+            // about it. Neither ever just disappears.
+            // IN ITS OWN UNIT (M42): "33 reps" was a 33-second plank, and
+            // "1 reps" was one rep.
+            const reading = setReading({
+              count: logged.reps_completed,
+              unit: logged.unit ?? prescriptionUnit(prescriptionType),
+              isBodyweight: !!logged.is_bodyweight,
+              weightKg: logged.weight_kg,
+            })
+            const state = logged.syncStatus
+            // THE FIRST TIME A LIFT IS LOGGED, where a PR badge used to be.
+            // It was a trophy; a first log has nothing before it to beat
+            // (pr-engine's comparePR). Said once per exercise, under its
+            // first working set, and only when the app has read the history
+            // it is making a claim about.
+            const firstLog = !drop && !isWarm(ref) && !!profileId
+              && ref.setNumber === Math.min(...existingLogs.map(l => l.set_number))
+              && isFirstTimeLogged(profileId, exerciseName, today)
             return (
-              <div className={`flex items-center justify-between gap-2 -mt-0.5 ${drop ? 'pl-5 pr-1' : 'px-1'}`}>
-                <p className="text-[0.625rem] text-primary-text">
-                  {setLabelLong(ref)}: {logged.is_bodyweight
-                    ? `${logged.reps_completed} reps · Bodyweight`
-                    : `${logged.reps_completed} reps @ ${logged.weight_kg}kg`} ✓
+              <>
+              <div className={`flex items-center justify-between gap-2 -mt-0.5 ${drop ? 'pl-5 pr-1' : 'px-1'}`} data-testid="set-receipt">
+                <p className={`min-w-0 text-[0.625rem] ${state === 'failed' ? 'text-destructive' : state === 'waiting' ? 'text-[color:var(--role-warn-text)]' : 'text-primary-text'}`}>
+                  {setLabelLong(ref)}: {reading}{state === 'failed' ? ` · ${SET_DID_NOT_SAVE}` : state === 'waiting' ? ` · ${SET_WAITING_TO_SEND}` : ' ✓'}
                 </p>
+                {state === 'failed' && profileId && (
+                  <button
+                    type="button"
+                    data-testid="set-retry"
+                    onClick={() => retrySet({ userId: profileId, date: today, exerciseId, setNumber: ref.setNumber, isWarmup: isWarm(ref), dropIndex: ref.dropIndex ?? 0 })}
+                    className="hit-slop-44 flex shrink-0 items-center gap-1 text-[0.625rem] font-medium text-foreground"
+                    aria-label={`Try saving ${setLabelLong(ref).toLowerCase()} again`}
+                  >
+                    <RotateCcw className="size-2.5" />
+                    Retry
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleDeleteSet(ref)}
@@ -1040,6 +1163,10 @@ export function SetGrid({
                   {armed ? 'Tap to confirm' : 'Delete'}
                 </button>
               </div>
+              {firstLog && (
+                <p className="px-1 text-[0.625rem] text-muted-foreground" data-testid="first-log-note">{FIRST_LOG_NOTE}</p>
+              )}
+              </>
             )
           })()}
           {/* "+ ADD A DROP" — one link, under the last row of the last logged
@@ -1093,14 +1220,12 @@ export function SetGrid({
           {calibrationProbe && !warm && !drop && setNumber > 1 && !isSaved && (() => {
             const prev = existingLogs.find(l => l.set_number === setNumber - 1)
             if (!prev || prev.is_bodyweight || !(Number(prev.weight_kg) > 0)) return null
-            const mode = catalogEntry ? loadingMode(catalogEntry) : 'stack'
-            const step = plateStepKg(mode)
             const base = Number(prev.weight_kg)
-            const rungs: number[] = []
-            for (const target of [base * 1.05, base * 1.10]) {
-              const floor = (rungs[rungs.length - 1] ?? base) + step
-              rungs.push(Math.max(roundToPlate(target, mode), floor))
-            }
+            // The ladder itself lives in load-prescription.ts (nextSetRungsKg)
+            // so that it stops at a dumbbell or kettlebell limit the person
+            // has told us — "+2 · 32" was offered to someone whose heaviest
+            // dumbbells are 24kg.
+            const rungs = nextSetRungsKg(base, catalogEntry, profile)
             const opts = [base, ...rungs].map(kg => ({
               kg,
               // Trailing .0 trimmed: "+5", not "+5.0", and "+2.5" intact.
@@ -1143,6 +1268,44 @@ export function SetGrid({
               boxes. Only where a ghost is actually driving the placeholder,
               and never once the row is saved — then the boxes hold today's
               real numbers and the marker would be describing nothing. */}
+          {/* THE HOLD TIMER (M42): a line under a timed set's row, so the
+              row itself keeps its columns and its tap targets. */}
+          {prescriptionType === 'time' && !warm && !drop && !isSaved && (
+            holdTimer && rowKey(holdTimer.ref) === k ? (
+              <button
+                type="button"
+                data-testid="hold-timer-stop"
+                className="hit-slop-44 px-1 -mt-0.5 text-left text-[0.75rem] font-semibold text-primary-text tabular-mono"
+                onClick={() => { updateInput(ref, 'reps', String(Math.max(1, holdTimer.seconds))); setHoldTimer(null) }}
+              >
+                Stop · {holdTimer.seconds} s
+              </button>
+            ) : (
+              <button
+                type="button"
+                data-testid="hold-timer-start"
+                className="hit-slop-44 px-1 -mt-0.5 text-left text-[0.75rem] font-semibold text-primary-text disabled:opacity-40"
+                disabled={!!holdTimer}
+                onClick={() => setHoldTimer({ ref, startedAt: Date.now(), seconds: 0 })}
+              >
+                Start hold timer
+              </button>
+            )
+          )}
+          {/* AND WHEN THE WEIGHT IS THE SET JUST DONE (H25): said only where it
+              differs from today's plan, the one case a reader could mistake
+              the faint number for a prescription. */}
+          {!isSaved && !warm && !drop && !isBW && (() => {
+            const blank = workingBlankFor(ref)
+            const plan = perSetLoadKg?.[ref.setNumber - 1] ?? suggestedLoadKg ?? null
+            // Not for a bodyweight carry: "0 · weight from set 1" says nothing.
+            if (blank.source !== 'carried' || blank.fromSet == null || String(plan) === blank.text || !(Number(blank.text) > 0)) return null
+            return (
+              <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="carried-weight">
+                {sameAsSet(blank.fromSet)}
+              </p>
+            )
+          })()}
           {ghost && !isSaved && (
             <p className="text-[0.625rem] text-muted-foreground/80 px-1 -mt-0.5 text-right" data-testid="last-time">
               {lastTime(loggedSetReading(ghost))}

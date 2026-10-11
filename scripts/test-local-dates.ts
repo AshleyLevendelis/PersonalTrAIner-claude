@@ -152,7 +152,13 @@ console.log('\n3. No calendar date is derived from a UTC slice, except where it 
 console.log('\n4. The dashboard measures the streak and the plan start on local dates')
 {
   const dash = stripComments(readFileSync(join(ROOT, 'src/lib/dashboard-data.ts'), 'utf8'))
-  check('the 35-day streak window uses getLocalDateString', /const dateStr = getLocalDateString\(d\)/.test(dash))
+  // RE-ANCHORED 9 Oct 2026: the walk moved out of dashboard-data into
+  // streak.ts's buildStreakDays (the streak is built per date now, M16/M31).
+  // The property is unchanged — the window steps on LOCAL CALENDAR dates from
+  // the local "today", never on fixed milliseconds and never through UTC.
+  const streakSrc = stripComments(readFileSync(join(ROOT, 'src/lib/streak.ts'), 'utf8'))
+  check('the 35-day streak window steps on local calendar dates',
+    /buildStreakDays\(\{\s*todayStr,/.test(dash) && /const date = addDays\(input\.todayStr, -i\)/.test(streakSrc) && !/toISOString|86400000|86_400_000/.test(streakSrc))
   check('the plan start date is converted to a local date before comparison',
     /planStartStr = planCreatedAt \? getLocalDateString\(new Date\(planCreatedAt\)\)/.test(dash))
 }

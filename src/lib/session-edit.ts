@@ -223,7 +223,7 @@ export function addExerciseToSession(params: AddExerciseParams): SessionEditResu
       basis: UNPRICED_BASIS,
     } as unknown as LoadPrescription
     const slot: Exercise = {
-      ...applyReplacement(template, entry, priced, profile.session_duration_preference),
+      ...applyReplacement(template, entry, priced, profile),
       // THE PEER'S SUPERSET REST DOES NOT COME WITH IT. applyReplacement
       // clears `superset_label` but carries `rest`, and a peer that was half
       // of a pair carries `rest: 'alternate'` — which on a slot with no

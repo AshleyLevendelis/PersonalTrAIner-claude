@@ -202,8 +202,15 @@ console.log('\nN. THE PLATE CALCULATOR, WHERE THERE ARE PLATES')
   // 149 of 201 entries fall through to 'stack' — press-ups among them, and
   // the plate-loaded machines too. Hiding the calculator from all of them is
   // the same defect in the other direction, so the rule reads the equipment.
+  // RE-ANCHORED 9 Oct 2026. This used to prove the point with a PRESS-UP
+  // ("a stack, and it keeps the calculator") — which pinned a plate calculator
+  // onto a bodyweight row, the thing test log L12 reported. The property was
+  // never about press-ups: it is that a plate-loaded machine, which also falls
+  // through to 'stack', must keep the control. Held on one that really is.
+  const sled = getExerciseEntry('Leg Press')!
   check('...and the rule is not simply "every stack"',
-    loadingMode(bw) === 'stack' && takesPlateCalculator(bw) === true, { mode: loadingMode(bw) })
+    loadingMode(sled) === 'stack' && takesPlateCalculator(sled) === true, { mode: loadingMode(sled) })
+  void bw
   // A row whose exercise is not in the catalogue keeps the control: the app
   // does not know it is pin-loaded, and removing a working control on a guess
   // is worse than leaving one that is merely unhelpful.
@@ -218,8 +225,47 @@ console.log('\nN. THE PLATE CALCULATOR, WHERE THERE ARE PLATES')
   const balls = EXERCISE_DATABASE.filter(e => (e.equipment ?? []).includes('medicine ball'))
   check('no medicine-ball movement is offered a plate calculator',
     balls.length >= 2 && balls.every(e => takesPlateCalculator(e) === false), balls.map(e => e.name))
-  check('...while a kettlebell, whose adjustable version does exist, keeps it',
-    takesPlateCalculator(getExerciseEntry('Kettlebell Swings')!) === true)
+  // RE-ANCHORED 9 Oct 2026, deliberately reversing the line that stood here
+  // ("a kettlebell, whose adjustable version does exist, keeps it"). Test log
+  // L12: a tester with no barbell had a plate calculator, opening on a 20kg
+  // bar, on every set row — kettlebell swings, backpack rows, band work and
+  // bodyweight squats among them. An adjustable kettlebell is loaded with its
+  // own inserts, not with bar plates, so the control described kit that was
+  // not in front of him on those rows either.
+  console.log('     ...and not where there is nothing to load plates onto (L12)')
+  const live = EXERCISE_DATABASE.filter(e => !e.retired)
+  const only = (item: string) => live.filter(e => (e.equipment ?? []).filter(x => x !== 'bodyweight').every(x => x === item) && (e.equipment ?? []).includes(item))
+  const bells = only('kettlebell'), bags = only('weighted backpack'), bands = only('resistance band')
+  check(`no kettlebell-only movement is offered one (${bells.length})`, bells.length >= 2 && bells.every(e => takesPlateCalculator(e) === false), bells.filter(e => takesPlateCalculator(e)).map(e => e.name))
+  check(`no weighted-bag movement is offered one (${bags.length})`, bags.length >= 5 && bags.every(e => takesPlateCalculator(e) === false), bags.filter(e => takesPlateCalculator(e)).map(e => e.name))
+  check(`no band movement is offered one (${bands.length})`, bands.length >= 15 && bands.every(e => takesPlateCalculator(e) === false), bands.filter(e => takesPlateCalculator(e)).map(e => e.name))
+  // UNLOADED ROWS: a press-up, a plank, a jump — nothing carries a weight, so
+  // there is nothing to work out. The four lifts that take a belt keep it:
+  // a dip belt is loaded with plates.
+  const unloaded = live.filter(e => !isExternallyLoaded(e) && !e.accepts_added_load)
+  check(`no unloaded movement is offered one (${unloaded.length})`, unloaded.length >= 90 && unloaded.every(e => takesPlateCalculator(e) === false), unloaded.filter(e => takesPlateCalculator(e)).slice(0, 8).map(e => e.name))
+  const belted = live.filter(e => e.accepts_added_load)
+  check(`...but the lifts that take a belt keep it — a dip belt is loaded with plates (${belted.length})`, belted.length >= 3 && belted.every(e => takesPlateCalculator(e) === true), belted.filter(e => !takesPlateCalculator(e)).map(e => e.name))
+  // WHAT IS DELIBERATELY NOT TOUCHED. Dumbbells are Ashley's open question
+  // (an adjustable pair IS plate-loaded and the catalogue cannot tell), so
+  // every row a dumbbell can do keeps the control exactly as it had it —
+  // including the three a dumbbell OR a kettlebell does.
+  const dumbbellRows = live.filter(e => isExternallyLoaded(e) && (e.equipment ?? []).some(x => x === 'dumbbell' || x === 'dumbbells') && !(e.equipment ?? []).some(x => /cable/i.test(x)))
+  check(`every dumbbell row is left exactly as it was (${dumbbellRows.length})`, dumbbellRows.length >= 20 && dumbbellRows.every(e => takesPlateCalculator(e) === true), dumbbellRows.filter(e => !takesPlateCalculator(e)).map(e => e.name))
+  check('...Goblet Squats among them (a dumbbell or a kettlebell)', takesPlateCalculator(getExerciseEntry('Goblet Squats')!) === true)
+  // "BODYWEIGHT" BESIDE AN IMPLEMENT IS THE PERSON, NOT A PLACE TO PUT PLATES.
+  // No catalogue entry offers bodyweight OR a kettlebell today, so this is
+  // held on a constructed one: without the rule, "any one of these" would
+  // read bodyweight as a plate-loadable option and keep the control.
+  const eitherBodyOrBell = { ...getExerciseEntry('Kettlebell Swing (Heavy)')!, equipment: ['bodyweight', 'kettlebell'], equipment_alternatives: true }
+  check('a lift done with bodyweight OR a kettlebell has nothing to load plates onto', takesPlateCalculator(eitherBodyOrBell) === false)
+  const eitherBellOrBar = { ...getExerciseEntry('Kettlebell Swing (Heavy)')!, equipment: ['kettlebell', 'barbell'], equipment_alternatives: true }
+  check('...while one a BARBELL can also do keeps it', takesPlateCalculator(eitherBellOrBar) === true)
+  const needsBoth = { ...getExerciseEntry('Kettlebell Swing (Heavy)')!, equipment: ['kettlebell', 'bench'], equipment_alternatives: false }
+  check('...and one that needs a kettlebell AND a bench has none (the bench carries no load)', takesPlateCalculator(needsBoth) === false)
+  // And nothing with real plates lost it.
+  const plated = live.filter(e => (e.equipment ?? []).some(x => ['barbell', 'EZ bar', 'trap bar', 't-bar', 'smith machine', 'leg press machine', 'hack squat machine', 'belt squat machine'].includes(x)))
+  check(`every bar and plate-loaded machine still has it (${plated.length})`, plated.length >= 15 && plated.every(e => takesPlateCalculator(e) === true), plated.filter(e => !takesPlateCalculator(e)).map(e => e.name))
 }
 
 console.log('\nO. WHAT STANDS WHERE THE WEIGHT WOULD GO, WHEN THERE IS NONE')

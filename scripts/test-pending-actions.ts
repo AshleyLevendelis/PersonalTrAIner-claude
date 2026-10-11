@@ -536,7 +536,11 @@ async function main() {
     } catch { refused = true }
     check('createPendingAction refuses a style change with no pre-image', refused)
 
-    const result = await executeStyleChange(styleProfile, styleMeso, [], { trainingStyle: 'combat', fromWeek })
+    // A plan nobody has trained on: no day is protected. (A live plan loads
+    // the real guard — see test:adaptations-respect-trained.)
+    const { untrainedPlanContext } = await import('../src/lib/plan-adaptations')
+    const gateContext = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
+    const result = await executeStyleChange(styleProfile, styleMeso, [], { trainingStyle: 'combat', fromWeek }, gateContext)
     check('the rebuild succeeded', result.receipt.failed.length === 0, result.receipt)
     check('the receipt names the new style in the user\'s words and the week it rebuilt from',
       result.receipt.landed.some(l => /Combat \/ conditioning/.test(l)) && result.receipt.landed.some(l => l.includes(`from week ${fromWeek}`)),

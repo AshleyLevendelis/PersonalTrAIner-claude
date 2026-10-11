@@ -68,7 +68,12 @@ console.log('\n1. The meal keeps what it had; the food keeps its amount')
       r.diff.rows[0].field === 'Adding to' && r.diff.rows[0].before === 'breakfast' && /banana/.test(r.diff.rows[0].after), r.diff.rows[0])
     check('...shows the before and after numbers', r.diff.rows.some(row => row.field === 'Calories' && /450 kcal/.test(row.before)), r.diff.rows)
     check('...says the meal was not re-portioned', r.diff.implications?.some(i => /no re-portioning/.test(i.text)) === true)
-    check('...and that the rest of the day re-fits', r.diff.implications?.some(i => /re-fits/.test(i.text)) === true)
+    // RE-ANCHORED 9 Oct 2026 (test log H9). This pinned the card ASSERTING that
+    // "the rest of the day re-fits" — the sentence that sat on a card which
+    // replaced a dinner and a snack. What the rest of the plan does is now read
+    // off a trial and added by the caller (test:meal-knock-on); the builder
+    // must say nothing about it.
+    check('...and asserts nothing about the rest of the day (that is read off a trial now)', r.diff.implications?.some(i => /re-?fits/i.test(i.text)) === false)
     check('the original meal is kept in the options', r.diff.implications?.some(i => /original stays/.test(i.text)) === true)
     check('the option is named as the meal plus the food', /parfait/i.test(r.payload.option.name) && /banana/i.test(r.payload.option.name), r.payload.option.name)
   }
@@ -142,7 +147,8 @@ console.log("\n8. It says \"today\", not a date off her own clock")
     meal_slot: 'breakfast', food_lines: ['1 banana'], date: '2026-09-05', origin_verbatim_quote: 'x',
   } })
   const otherSaid = other.ok ? (other.diff.implications ?? []).map(i => i.text).join(' ') : ''
-  check('...while another day is still named', /2026-09-05/.test(otherSaid), otherSaid)
+  // RE-ANCHORED 9 Oct 2026 (L24): named as a day a person would say, not as the stored date.
+  check('...while another day is still named — by its weekday, never as a stored date', /for Saturday;/.test(otherSaid) && !/\d{4}-\d{2}-\d{2}/.test(otherSaid), otherSaid)
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

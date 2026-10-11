@@ -122,7 +122,7 @@ const rowPropsBody = rowPropsStart < 0 ? '' : today.slice(rowPropsStart, today.i
 check('rowProps exists to be checked (sanity check on this check)', rowPropsBody.length > 200, rowPropsBody.length)
 check('TodayPanel forwards it into rowProps — the line that makes it appear',
   /onOpenDetail/.test(rowPropsBody))
-check('...and into the peek', /<PeekPanel[\s\S]{0,400}?onOpenDetail=\{onOpenDetail\}/.test(today))
+check('...and into the peek', /<PeekPanel[\s\S]{0,600}?onOpenDetail=\{onOpenDetail\}/.test(today))
 
 console.log('\n4. Searching the catalogue no longer tells you less than browsing it\n')
 // The two lists use different loop variables, and that is the discriminator:

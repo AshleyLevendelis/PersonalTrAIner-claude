@@ -61,14 +61,23 @@ export interface SlotCatalogEntry {
 // here has to change.
 
 const RECORDED_NUDGE =
-  "(System: those are recorded and the app has already shown the user a confirmation for each. Now write your actual turn to them — pick the conversation up and carry it forward. Two to four sentences, one paragraph, no lists, no \"let me know\" ending, and do not repeat the recorded values back at them. If your turn asks a closed-set question, call present_slot for it in this same turn so the chips render.)";
+  "(System: the answers are recorded and the app has already shown the user a confirmation for each. NO CHIPS ARE ON SCREEN YET — a present_slot you called without saying anything was not shown, because chips only ever appear under a question you ask in words. Now write your actual turn to them — pick the conversation up and carry it forward. Two to four sentences, one paragraph, no lists, no \"let me know\" ending, and do not repeat the recorded values back at them. If your turn asks a closed-set question, call present_slot in this same turn for THAT question — the one your sentence asks, not the one you had in mind a moment ago.)";
+
+// What a present_slot is told when the leg that called it said nothing. The
+// other calls are simply "recorded"; this one is not, and saying so is what
+// gives the next leg a reason to ask for the chips that fit its own words.
+const PRESENT_NOT_SHOWN =
+  "not shown — chips only appear under a question you ask in words. Ask the question, and call present_slot again in this same turn for the question you actually ask.";
 
 // The text-only leg has no tools, so a "call present_slot" sentence could
 // only be obeyed by leaking call syntax as text — these say the opposite.
-// Chips are recovered downstream by index.ts's chip-recovery leg. Two
-// variants because the leg is reached from two different situations: after
-// a round trip whose calls are already confirmed to the user, or after a
-// first turn that carried nothing at all.
+// It cannot ask for chips itself. The chips an earlier, silent leg asked for
+// are still forwarded (after any from the leg that spoke — see resolveReply),
+// and the CLIENT shows them only if this leg's sentence asks that question
+// (src/lib/onboarding-chip-match.ts); there is no second model call to
+// recover them. Two variants because the leg is reached from two different
+// situations: after a round trip whose calls are already confirmed to the
+// user, or after a first turn that carried nothing at all.
 const TEXT_ONLY_RECORDED_NUDGE =
   "(System: plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded. Anything you already recorded has been confirmed to the user by the app. Write your turn to them now: pick the conversation up and carry it forward. Two to four sentences, one paragraph, no lists, and do not repeat recorded values back at them.)";
 
@@ -155,6 +164,23 @@ export function floorReply(
  * Then the deterministic floor. Every leg's text passes through
  * sanitizeReply before it counts as a reply, so a leak-shaped answer keeps
  * the chain going instead of shipping as silence.
+ *
+ * THE SAME-LEG RULE FOR CHIPS (9 Oct 2026, test log H14). The words and the
+ * chips used to be merged into one flat list with no record of which leg
+ * produced what, so leg 1's present_slot("mealsPerDay") ended up under leg
+ * 2's "how old are you, and what are your current height and weight?". Now:
+ *
+ *   - a present_slot from the leg that WROTE THE REPLY comes first;
+ *   - a present_slot from a leg that said nothing is answered "not shown"
+ *     (so the next leg knows to ask again for its own question) and is
+ *     forwarded only AFTER those, as a fallback;
+ *   - the client reads the reply and shows a card only when the sentence asks
+ *     that card's question. That check, not this ordering, is the guarantee:
+ *     ordering decides which RIGHT chips win, never whether wrong ones show.
+ *
+ * The fallback is kept rather than dropped because a third of round trips
+ * end on the tools-less leg, which cannot ask for chips at all; dropping the
+ * earlier request there would lose chips that were right.
  */
 export async function resolveReply(opts: {
   firstParts: GeminiPart[];
@@ -173,23 +199,47 @@ export async function resolveReply(opts: {
   // pure instruction for the client (which owns validation and all writes)
   // — so the whole set passes through in order, alongside any text.
   let reply = sanitizeReply(textOf(firstParts));
-  const actions: ClientAction[] = callsOf(firstParts).map((c) => ({
-    name: c.name,
-    args: c.args ?? {},
-  }));
-  if (reply) return { reply, actions };
-
   const firstCalls = callsOf(firstParts);
-  const mergeCalls = (parts: GeminiPart[]) => {
+  // One leg wrote the words and made the calls: nothing to reconcile.
+  if (reply) return { reply, actions: firstCalls.map((c) => ({ name: c.name, args: c.args ?? {} })) };
+
+  const isPresent = (c: { name: string }) => c.name === "present_slot";
+  const actions: ClientAction[] = [];
+  // present_slot requests, kept apart from everything else until the end:
+  // `spoken` came from the leg whose words are the reply, `silent` from a leg
+  // that said nothing.
+  const spoken: ClientAction[] = [];
+  const silent: ClientAction[] = [];
+  const mergeCalls = (parts: GeminiPart[], wroteTheReply: boolean) => {
     for (const c of callsOf(parts)) {
-      // Drop what an earlier leg already asked for. A repeated present_slot
-      // is the damaging one — it renders a second copy of the same
-      // question — so identical (tool, slot) pairs never merge twice.
-      const dup = actions.some(
-        (a) => a.name === c.name && a.args?.slot_key === (c.args ?? {}).slot_key,
+      const action = { name: c.name, args: c.args ?? {} };
+      if (isPresent(c)) {
+        (wroteTheReply ? spoken : silent).push(action);
+        continue;
+      }
+      // Drop what an earlier leg already asked for. Keyed on the slot for the
+      // slot tools, and on the whole call for the ones that have no slot
+      // (record_context_fact, record_goal): keying those on a slot_key they
+      // do not carry made every later one look like a repeat of the first,
+      // so a second, different fact from a later leg was silently lost.
+      const dup = actions.some((a) =>
+        a.name === action.name &&
+        ("slot_key" in action.args || "slot_key" in a.args
+          ? a.args.slot_key === action.args.slot_key
+          : JSON.stringify(a.args) === JSON.stringify(action.args))
       );
-      if (!dup) actions.push({ name: c.name, args: c.args ?? {} });
+      if (!dup) actions.push(action);
     }
+  };
+  mergeCalls(firstParts, false);
+  /** The chips to forward, most trusted first, one per slot. */
+  const presentsInOrder = (): ClientAction[] => {
+    const seen = new Set<unknown>();
+    return [...spoken, ...[...silent].reverse()].filter((a) => {
+      if (seen.has(a.args.slot_key)) return false;
+      seen.add(a.args.slot_key);
+      return true;
+    });
   };
 
   // The transcript the recovery legs continue from. With calls: the round
@@ -205,7 +255,10 @@ export async function resolveReply(opts: {
       {
         role: "user",
         parts: firstCalls.map((c) => ({
-          functionResponse: { name: c.name, response: { status: "recorded" } },
+          functionResponse: {
+            name: c.name,
+            response: { status: isPresent(c) ? PRESENT_NOT_SHOWN : "recorded" },
+          },
         })),
       },
     ]
@@ -219,7 +272,7 @@ export async function resolveReply(opts: {
     const followUp = await callGemini(withNudge(RECORDED_NUDGE), true);
     if (followUp.ok) {
       reply = sanitizeReply(textOf(followUp.parts));
-      mergeCalls(followUp.parts);
+      mergeCalls(followUp.parts, !!reply);
     } else {
       log("onboarding-chat: follow-up leg failed", followUp.status, followUp.errorText);
     }
@@ -240,9 +293,16 @@ export async function resolveReply(opts: {
   }
 
   if (!reply) {
-    const floor = floorReply(catalog, remaining, actions, variantSeed);
+    // The floor pins its own question to the first chips already asked for
+    // (see floorReply), so it is handed them here and only that one request
+    // goes out — its sentence asks exactly that question.
+    const held = presentsInOrder();
+    const floor = floorReply(catalog, remaining, [...actions, ...held], variantSeed);
     reply = floor.reply;
-    actions.push(...floor.extraActions);
+    // ...unless the floor had to ask something else (the request named a slot
+    // the catalog does not have), in which case it brings its own.
+    const floorAsksItsOwn = floor.extraActions.some(isPresent);
+    actions.push(...(floorAsksItsOwn ? [] : held.slice(0, 1)), ...floor.extraActions);
     // Loud on purpose: every firing means three model legs produced nothing.
     // If this line shows up often in the function logs, the model or the
     // prompt has regressed and the floor is papering over it.
@@ -250,7 +310,8 @@ export async function resolveReply(opts: {
       hadCalls: firstCalls.length > 0,
       remainingCount: remaining.length,
     });
+    return { reply, actions };
   }
 
-  return { reply, actions };
+  return { reply, actions: [...actions, ...presentsInOrder()] };
 }

@@ -26,6 +26,7 @@ import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets } from './d
 import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
+import { weighInStanding, heldWeighInOn, type WeighInStanding, type WeighInReading, type HeldWeighIn } from './weigh-in-check'
 
 export interface ComputeTargetsOptions {
   /** Latest daily_metrics weigh-in, if any — overrides profile.weight_kg. */
@@ -86,6 +87,24 @@ export async function getLatestWeightKg(profileId: string): Promise<number | nul
   return Number.isFinite(kg) && kg > 0 ? kg : null
 }
 
+/**
+ * The first weigh-in ever recorded — the starting weight for someone who gave
+ * none at sign-up. `select('*')` so no column list can break on a migration.
+ */
+export async function getEarliestWeightKg(profileId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('daily_metrics')
+    .select('*')
+    .eq('profile_id', profileId)
+    .order('date', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) return null
+  const kg = Number(data.weight_kg)
+  return Number.isFinite(kg) && kg > 0 ? kg : null
+}
+
 /** Recent weigh-ins for the Nutrition tab's history list (newest first). */
 export async function getRecentWeighIns(profileId: string, limit = 7): Promise<{ date: string; weight_kg: number }[]> {
   const { data, error } = await supabase
@@ -108,6 +127,21 @@ export async function getRecentWeighIns(profileId: string, limit = 7): Promise<{
  * the extra complexity.
  */
 export const TARGET_WEIGHT_ANCHOR_THRESHOLD_KG = 1
+
+/**
+ * "TODAY", ONCE, for everything about weigh-ins and the targets they drive:
+ * the person's own calendar date, on the app's clock.
+ *
+ * The weigh-in card has always saved a weigh-in on this date. The two
+ * functions below read "today" as `new Date().toISOString()` — the UTC date —
+ * until 9 Oct 2026, so between midnight and 1 am in British summer time
+ * today's weigh-in was dated tomorrow as far as the 7-day window was
+ * concerned, and under the developer clock the window sat on the machine's
+ * date while the rows sat on the app's. One definition, used by all three.
+ */
+export function targetsToday(profileId: string | undefined): string {
+  return getLocalDateString(getAppNow(profileId))
+}
 
 export interface EffectiveTargetWeight {
   /** The weight to feed into computeTargets — either a fresh 7-day average (the anchor moved) or last time's anchor held flat (the move was inside the noise band). Undefined when the user never gave a weight and has no weigh-ins: there is no anchor, and callers must not invent one. */
@@ -142,27 +176,69 @@ export interface EffectiveTargetWeight {
  * change) so it stays consistent across devices rather than drifting per
  * client, the way a localStorage-only tracker would.
  */
+/**
+ * WHICH WEIGH-INS THE TARGET MAY FOLLOW, read once for everything that asks.
+ *
+ * Ashley's ruling, 9 Oct 2026 ("Ask, and hold the target"): a weigh-in far
+ * from the last one is saved only on her yes, and even then the calorie
+ * target does not move until a second day agrees. The sorting itself is
+ * weigh-in-check.ts's `weighInStanding`; this reads what it needs — the last
+ * fourteen weigh-ins and every weight a target has been set from.
+ */
+export interface WeighInPicture {
+  today: string
+  /** Newest first, as stored — what the weigh-in card lists. */
+  recent: { date: string; weight_kg: number }[]
+  /** The weights targets have been set from, oldest first. */
+  anchors: WeighInReading[]
+  /** The weight the STANDING target was set from (the newest target row's), or null when that row carries none. */
+  lastAnchorKg: number | null
+  standing: WeighInStanding
+  /** The NEWEST weigh-in, when it is one the target is not following yet. */
+  heldLatest: HeldWeighIn | null
+}
+
+export async function getWeighInPicture(profileId: string): Promise<WeighInPicture> {
+  const today = targetsToday(profileId)
+  const recent = await getRecentWeighIns(profileId, 14)
+  const targetRows = await getNutritionTargets(profileId, '1970-01-01', today).catch(() => [])
+  const anchors = targetRows
+    .filter(r => r.calculated_weight_kg != null && Number(r.calculated_weight_kg) > 0)
+    .map(r => ({ date: r.date, kg: Number(r.calculated_weight_kg) }))
+  const lastAnchorKg = targetRows.length > 0 ? targetRows[targetRows.length - 1].calculated_weight_kg ?? null : null
+  const standing = weighInStanding(recent.map(w => ({ date: w.date, kg: w.weight_kg })), anchors)
+  return { today, recent, anchors, lastAnchorKg, standing, heldLatest: recent.length > 0 ? heldWeighInOn(standing, recent[0].date) : null }
+}
+
 /** fallbackWeightKg may be undefined when the user never gave a weight; callers then get whatever the weigh-in series holds, or nothing. */
 export async function getEffectiveTargetWeightKg(
   profileId: string,
   fallbackWeightKg?: number,
 ): Promise<EffectiveTargetWeight> {
-  // The person's own calendar day, on the app's clock: weigh-ins are written under it
-  // (WeighInCard), so a UTC "today" put the seven-day window a day out of step for anyone
-  // whose evening or morning sits on the other side of UTC midnight. docs/plans/week-boundaries.md S4.
-  const todayStr = getLocalDateString(getAppNow(profileId))
-  const recentWeighIns = await getRecentWeighIns(profileId, 14)
+  const todayStr = targetsToday(profileId)
+  const picture = await getWeighInPicture(profileId)
+  // THE AVERAGE IS TAKEN OVER THE WEIGH-INS THE TARGET TRUSTS. A held one —
+  // surprising, confirmed, and not yet agreed with by another day — is saved
+  // and shown, and is not in this sum.
   const trend = computeWeightTrend(
-    recentWeighIns.map(w => ({ date: w.date, weightKg: w.weight_kg })),
+    picture.standing.trusted.map(w => ({ date: w.date, weightKg: w.kg })),
     todayStr,
     null,
   )
-  if (!trend) return { weightKg: fallbackWeightKg }
+  const lastAnchorKg = picture.lastAnchorKg
 
-  const recentTargets = await getNutritionTargets(profileId, '1970-01-01', todayStr).catch(() => [])
-  const lastAnchorKg = recentTargets.length > 0
-    ? recentTargets[recentTargets.length - 1].calculated_weight_kg ?? null
-    : null
+  if (!trend) {
+    // No trusted weigh-in in the last week. With nothing held this is what it
+    // always was: the standing figure the caller passed. With something held
+    // that figure may BE the held weigh-in (callers pass the newest one), so
+    // the target stays on what last set it — or, with no record of that, on
+    // the newest weigh-in it does trust. (Something can only be held AGAINST
+    // one of those, so one of them exists.)
+    if (picture.standing.held.length === 0) return { weightKg: fallbackWeightKg }
+    const lastTrusted = picture.standing.trusted[picture.standing.trusted.length - 1]
+    const lastRecorded = picture.anchors[picture.anchors.length - 1]
+    return { weightKg: lastAnchorKg ?? lastTrusted?.kg ?? lastRecorded?.kg }
+  }
 
   if (lastAnchorKg == null) return { weightKg: trend.rollingAvgKg }
   if (Math.abs(trend.rollingAvgKg - lastAnchorKg) >= TARGET_WEIGHT_ANCHOR_THRESHOLD_KG) {
@@ -212,7 +288,7 @@ export async function snapshotTargetsIfChanged(
 ): Promise<SnapshotResult> {
   if (!targets) return { snapshotted: false, changedFromPrior: false, previous: null }
   try {
-    const today = getLocalDateString(getAppNow(profileId))
+    const today = targetsToday(profileId)
     const recent = await getNutritionTargets(profileId, '1970-01-01', today)
     const last = recent.length > 0 ? recent[recent.length - 1] : null
 
@@ -257,4 +333,62 @@ export async function snapshotTargetsIfChanged(
     console.error('Target snapshot failed (non-blocking):', err)
     return { snapshotted: false, changedFromPrior: false, previous: null }
   }
+}
+
+/**
+ * THE FIRST ANCHOR, written the moment the plan is made.
+ *
+ * Ashley's ruling: targets follow a 7-day average and only move once it has
+ * shifted 1 kg from the average that last set them. Until 9 Oct 2026 nothing
+ * recorded what "last set them" was at sign-up — onboarding set the targets
+ * and never wrote a snapshot — so for the whole first session there was no
+ * anchor, and the first weigh-in BECAME it. Sign up at 82 kg, weigh in at
+ * 81.2 the same day, and the calorie target moved from 1,697 to 1,689 with no
+ * notice (test log H10): a 0.8 kg move the rule exists to ignore.
+ *
+ * Returns the anchor it wrote, or null when there is no weight or no target
+ * to anchor to — nothing is invented.
+ */
+export async function anchorTargetsAtSignUp(
+  profileId: string,
+  profile: UserProfile,
+  targets: MacroTargets | null,
+): Promise<number | null> {
+  const startKg = profile.weight_kg
+  if (!targets || startKg == null || !(startKg > 0)) return null
+  await snapshotTargetsIfChanged(profileId, profile, targets, startKg)
+  return startKg
+}
+
+export interface WeighInRetarget {
+  /** The newest weigh-in — for display ("your current weight is X"). */
+  latestWeightKg: number | null
+  /** The weight the targets are computed from now: the anchor, held or moved. */
+  anchorKg: number | null
+  targets: MacroTargets | null
+  /** Settles when the change, if there was one, has been recorded — and says what it replaced, for the notice. */
+  recorded: Promise<SnapshotResult>
+}
+
+/**
+ * Everything a new weigh-in does to the targets, in the one order it has to
+ * happen: read the newest weight, ask whether the 7-day average has moved the
+ * anchor, compute the targets from the anchor, record them if they changed.
+ *
+ * It lived inline in App's weigh-in handler. It is here so the ruling it
+ * carries can be RUN by a gate (test:weigh-in-targets) instead of read.
+ */
+export async function retargetAfterWeighIn(
+  profileId: string,
+  profile: UserProfile,
+  exercisePlan?: WorkoutDay[],
+): Promise<WeighInRetarget> {
+  const latestWeightKg = await getLatestWeightKg(profileId).catch(() => null)
+  // A fresh weigh-in is exactly the case the anchor threshold exists for —
+  // recompute it (it may or may not actually move) rather than assuming this
+  // new reading itself is the new anchor.
+  const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? profile.weight_kg)
+  const anchorKg = effective.weightKg ?? null
+  const targets = computeTargets(profile, { latestWeightKg: anchorKg, exercisePlan })
+  return { latestWeightKg, anchorKg, targets, recorded: snapshotTargetsIfChanged(profileId, profile, targets, anchorKg) }
 }

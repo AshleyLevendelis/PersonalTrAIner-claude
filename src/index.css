@@ -170,6 +170,16 @@
    * animations below inherit the same multiplier, which is why glow "Off"
    * also visually stills them (they animate between two invisible states). */
   --glow-strength: 1;
+
+  /* A well INSIDE a raised panel — bar tracks, a rest day's dot (design
+   * handoff 2a, 10 Oct 2026). Derived from the canvas rather than set per
+   * theme, so all nine themes get one that reads as "below the panel". */
+  --surface-sunken: color-mix(in srgb, var(--background) 58%, transparent);
+
+  /* The trainer note's sparkle and its "TRAINER · TAG" label (2a). The violet
+   * of the AI role on a dark canvas; darker on paper, below. */
+  --role-ai-accent: #9C8DFF;
+  --role-ai-label: #B8AEFF;
 }
 
 [data-glow="off"] { --glow-strength: 0; }
@@ -586,6 +596,8 @@
  * a designer's call about hue, not mine. */
 [data-canvas="light"] {
   --role-warn-text: #9A3F0B;
+  --role-ai-accent: #6A58E8;
+  --role-ai-label: #5644C9;
 }
 
 [data-canvas="light"] .glow-text,
@@ -600,6 +612,9 @@
  * button on paper looks like a printing fault. */
 [data-canvas="light"] .glow-mint-box {
   box-shadow: 0 6px 16px rgba(var(--glow-rgb), .25);
+}
+[data-canvas="light"] .glow-violet-soft {
+  box-shadow: none;
 }
 /* .glow-bloom-once is `both`-filled, so its END state is what the CTA wears
  * at rest — overriding the class alone would not reach it. Its own keyframe
@@ -690,6 +705,33 @@
   }
 }
 
+/* OPENING A DIALOG MUST NOT MOVE THE PAGE (9 Oct 2026, the test log's L25).
+ *
+ * Desktop only. Every dialog, menu and select locks page scroll while it is
+ * open. The lock hides the scrollbar, so the window gets about 15px wider, and
+ * the library pads the BODY by the same amount to hold the page still. But the
+ * tab bar, the gear and the session dock are `position: fixed`, which is
+ * measured from the window and not the body — so they slid 15px (7.5px for
+ * anything centred) every time something opened, and back when it closed.
+ *
+ * Two lines, and both are needed:
+ *   1. keep the scrollbar's room at all times, so the window never changes
+ *      width when the bar goes;
+ *   2. tell the library NOT to pad the body. With the room already kept, its
+ *      padding would move the page 7.5px the other way.
+ * The second has to out-rank a rule the library injects with !important: same
+ * importance, one more element in the selector. It is outside the layers above
+ * on purpose — the injected rule is unlayered too.
+ *
+ * Phones draw the scrollbar over the page and never had the problem; there
+ * both lines do nothing. verify:dialog-shift holds it on a desktop window. */
+html {
+  scrollbar-gutter: stable;
+}
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
 @layer utilities {
   /* One dot of the onboarding typing indicator. Reduced motion keeps the
    * dots visible and simply stops them moving — removing them entirely would
@@ -719,15 +761,17 @@
     background: linear-gradient(135deg, var(--primary), var(--primary-2));
     animation: obCoachPulse 3s ease infinite;
   }
+  /* Setup's answer bubble (design handoff 2e, 10 Oct 2026): what she said,
+     on the right, small and quiet — the question is what the screen is for.
+     The violet wash is the AI-role accent, so it follows the theme. */
   .ob-user-bubble {
-    background: linear-gradient(135deg,
-      color-mix(in oklab, var(--secondary) 72%, var(--border)),
-      var(--secondary));
-    border: 1px solid rgba(var(--glow-rgb), .18);
+    border-radius: 16px 16px 4px 16px;
+    padding: 10px 16px;
+    font-size: 0.84375rem;
+    line-height: 1.45;
+    color: var(--text-tertiary);
+    background: color-mix(in srgb, var(--role-ai-accent) 22%, transparent);
   }
-  .ob-tick { width: 16px; height: 4px; border-radius: 2px; transition: background .3s; }
-  .ob-tick-on { background: var(--primary); }
-  .ob-tick-off { background: color-mix(in oklab, var(--border) 60%, transparent); }
   .ob-input {
     background: color-mix(in oklab, var(--input) 70%, transparent);
     border: 1.5px solid var(--border);
@@ -820,6 +864,11 @@
   }
   .glow-violet-box {
     box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(156, 141, 255, calc(.45 * var(--glow-strength)));
+  }
+  /* The trainer's note (design handoff 2a, 10 Oct 2026): the same violet,
+   * softer — a note sitting on the page, not a control asking to be pressed. */
+  .glow-violet-soft {
+    box-shadow: 0 0 calc(22px * var(--glow-strength)) rgba(156, 141, 255, calc(.22 * var(--glow-strength)));
   }
   .glow-icon {
     filter: drop-shadow(0 0 calc(8px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.90 * var(--glow-strength))));
@@ -1121,3 +1170,4 @@
     opacity: 0;
   }
 }
+

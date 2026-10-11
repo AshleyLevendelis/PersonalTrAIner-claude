@@ -63,7 +63,9 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
  * comments record exactly that failure.
  */
 function contextKeys(): string[] {
-  const start = client.indexOf('const buildContext = () => {')
+  // Re-anchored 10 Oct 2026 (H26): the builder now takes this turn's eaten
+  // log as a parameter, so it is found by name rather than by its exact head.
+  const start = client.search(/const buildContext = \([^)]*\) => \{/)
   if (start < 0) return []
   const lines = client.slice(start).split('\n')
   const keys: string[] = []

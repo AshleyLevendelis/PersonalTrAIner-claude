@@ -3,6 +3,9 @@ import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, t
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
+import type { MealKnockOn } from './meal-knock-on'
+import { dayLabel } from './day-labels'
+import { KNOCK_ON } from './coach-voice'
 
 // ---------------------------------------------------------------------------
 // "Add a banana to my breakfast" — a food JOINING a meal that is already on
@@ -56,6 +59,21 @@ export type MealFoodAddResult =
   | { ok: false; reason: string }
 
 const signed = (n: number, unit: string) => `${n > 0 ? '+' : ''}${n}${unit}`
+
+/** How far the meal now sits from its usual share of the day — a figure the builder computed, said plainly. Shared with the custom meal's card. */
+export const shareLine = (slot: string, vsBudget: number): string =>
+  `That is ${Math.abs(vsBudget)} kcal ${vsBudget > 0 ? 'over' : 'under'} the usual ${slot} share.`
+
+/**
+ * The card with what the trial found added to it (meal-knock-on.ts): every
+ * other meal that changes, a day taken off target, the shopping list. No
+ * trial (null) — the card says it could not check, rather than saying nothing
+ * or asserting that things "re-fit".
+ */
+export function withKnockOn(diff: ProposalDiff, knockOn: MealKnockOn | null): ProposalDiff {
+  const lines = knockOn ? knockOn.lines : [{ severity: 'info' as const, text: KNOCK_ON.unknown }]
+  return { ...diff, implications: [...(diff.implications ?? []), ...lines] }
+}
 
 export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFoodAddResult {
   const { rawArgs, currentMeal } = input
@@ -119,14 +137,17 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
     ],
     implications: [
       { severity: 'info', text: `Your ${slot} keeps everything it had — ${added} joins it at the amount you said, no re-portioning.` },
-      { severity: 'info', text: `The rest of the day re-fits around it${vsBudget !== 0 ? ` (${vsBudget > 0 ? `${vsBudget} kcal over` : `${-vsBudget} kcal under`} the usual ${slot} share)` : ''}.` },
-      // "today", not "2026-09-16" — meal-food-edit.ts's rule, which this file
-      // did not follow: a date she can read off her own phone's clock is not
-      // information, it is the app talking to itself in front of her. Invisible
-      // while this was coach-only and the sentence scrolled past in a chat
-      // bubble; found the moment it went on a screen and the screenshot was
-      // read.
-      { severity: 'info', text: `Becomes your ${slot} for ${date === input.todayDate ? 'today' : date}; the original stays in your ${slot} options.` },
+      // WHAT ELSE CHANGES IS NOT SAID HERE. This line used to read "The rest
+      // of the day re-fits around it" — a sentence written in advance, on a
+      // card for an edit that replaced a dinner and a snack (test log H9,
+      // 9 Oct 2026). What the rest of the plan does is now READ OFF A TRIAL by
+      // the caller and added to this card (withKnockOn, below); the builder
+      // states only what it computed itself.
+      ...(vsBudget !== 0 ? [{ severity: 'info' as const, text: shareLine(slot, vsBudget) }] : []),
+      // "today" or the weekday, never "2026-09-16" — meal-food-edit.ts's rule:
+      // a date she can read off her own phone's clock is not information, it
+      // is the app talking to itself in front of her.
+      { severity: 'info', text: `Becomes your ${slot} for ${dayLabel(date, input.todayDate)}; the original stays in your ${slot} options.` },
     ],
     rationale: typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote.trim() ? rawArgs.origin_verbatim_quote.trim() : undefined,
     reversible: true,

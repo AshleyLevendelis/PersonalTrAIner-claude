@@ -1,0 +1,80 @@
+# Runs 3 and 4 (9-10 Oct 2026): traced, then built
+
+Traced on `claude/test-log-fixes-oct9` (forks main at `0df0bc12`, the build the runs used), then
+built on her "Build it" of 10 Oct 2026. The trace column is kept as it was written; the status
+column is updated. Nothing here is on `main` or deployed.
+
+Status key: **fixed** on the branch / **partly** / **open** / **hers** (waits on her ruling).
+
+## HIGH
+
+| # | What she saw | Cause | Status |
+|---|---|---|---|
+| H24 | Header "1692 planned · on target" while the rows sum 1,801; same after a coach-logged meal (1,498 vs 1,690) | The header and its verdict add up the PLAN's dishes (`App.tsx:481-489` → `MealPlan.tsx` `TotalsHero`). A LOGGED meal's row shows what was eaten (`MealPlan.tsx:928`). Once any meal is logged at a different size, header and rows disagree. The coach's log writes the eaten meal and leaves the plan's dish in the header's sum. | **fixed**: one calculation (`day-as-shown.ts`) for header, verdict and rows. Her ruling A with both conditions built (re-size the same dishes within 25%, one line with Undo; beyond that, say how far over or under). Her exact banana case (nothing logged, 1,692 vs 1,801) did NOT reproduce on the test data, old build or new; cause on her day unproven, and the two numbers can no longer disagree whatever it was |
+| H24b | "The rest of the day re-fits around it" | Leftover unchecked claim after an ingredient edit (`MealPlan.tsx:1027`). | **fixed**: the claim is gone |
+| H25 | A blank tick logged last session's 30 kg against a plan of 24, twice | A blank box saved typed → LAST SESSION → plan. | **fixed**: today's previous set, then today's plan, then last session only when the plan has no number. One function for the grey number, the save and the plate calculator. A "type it" box refuses a blank tick (her check 2) |
+| H26 | Coach "can't see what you logged yesterday", sends you to "calorie rings for yesterday" | The coach was given no food log; the prompt sent it to a past day Nutrition cannot open. | **fixed**, needs `chat-gemini` deploy: today and the seven days before, as logged |
+| H6 | "2 large eggs, 2 slices of wholemeal toast and 10g butter" = 263 kcal | No toast alias. | **fixed** (her ruling: toast is bread; french toast keeps its egg and milk). ~439 kcal, 25 g protein. Needs `chat-gemini` deploy for the coach's copy |
+
+## MEDIUM
+
+| # | Cause | Status |
+|---|---|---|
+| M33 "0 LEFT" when 112 over | Clamp at zero | **fixed**: "112 over" |
+| M34 lunch swap changed the snack | The day is re-searched after a swap pin | **fixed** (her ruling "Resize, else leave", scope "Plan's own dishes only"): the other meals keep their dishes and re-size within about 25%, one line with Undo; beyond that the gap is said. A by-name or fridge meal still re-plans the day. Driven in a browser |
+| M35 ban after a finished session rewrote that day | No trained-day guard on ban | **fixed**, screen and coach |
+| M36 "you hit your lifting sessions" at 9/24 and 5/18 | Past days reached the coach as "CLOSED" only | **fixed** ("CLOSED at 9 of 24 planned working sets"), needs `chat-gemini` deploy |
+| M37 coach says there's no data export | Listed as not existing, gates enforced it | **fixed**, needs `chat-gemini` + `onboarding-chat` deploys |
+| M38 swap makes a timed hold "MAIN LIFT" | Holds not excluded from promotion | **fixed** (CSCS, mine): a hold, carry or interval is never the main lift, label and rest floor alike |
+| M39 "2 of 3" became "done — 2 for 2"; 5 of 18 counts as Done | Two week counters; Finish = Done | **fixed**, her ruling "Done, with the count": "Done · 5 of 18 sets" on Home, the Exercise bar and the strips' spoken labels; Finish now refreshes the week; "I did it" no longer saves sets nothing counts. The tip says "due so far"; one week counter for screen and tip still lands with the week work on the other branch |
+| M40 swap/ban don't survive the block; bands back after "no bands" | (a) bans not passed to block rotation; (b) "rest of block" by design; (c) no kit list | (a) **fixed**; (b) **fixed**, her ruling "Keep to the block, say it": the swap says the day the block ends and offers "never give me this one" beside it; (c) **open**, hand-over job 3 (kit list) |
+| M41 swap list offers what a knee adaptation removed | | **fixed** earlier on the branch; not driven in a browser |
+| M42 timed holds | No hold timer, receipt said reps, records compared seconds as reps, "Add a drop" on anything | **fixed**: start/stop timer, said in seconds, no lifting record in the wrong unit, no drop on a hold |
+| M43 deload at the 24 kg limit; week 5 at 16 after 18×11 | (a) stored deload never lowered; (b) nothing carries a logged weight into the next block | (a) **fixed**; (b) **fixed**: the block-start offer carries last block's best set into the new reps, under the kit limit. She ruled it stays an OFFER (10 Oct) |
+
+## LOW
+
+| Item | Status |
+|---|---|
+| "Fat is behind" at 9pm, three meals unlogged | **fixed**: three or more meals past their time and unlogged says "3 of today's meals still to log, so these numbers are only what's logged so far"; otherwise protein is named first when it is one of the gaps |
+| "banana added to your lunch." | **fixed** |
+| "flakingly combine" | **fixed in the prompt** (plain cooking English), needs `generate-meals` deploy; a model can still ignore it |
+| "A round is running" after it ends | **fixed**: "Round finished — log it". The red is the design's done colour, left |
+| Finished session doesn't look finished | **fixed**: "✓ Session finished · View summary" where Start sat |
+| "tier2 compound", "catalog" | **fixed** on the swap and the add sheets |
+| "full home gym setup" to a Minimalist | **fixed**, needs `chat-gemini` deploy |
+| "nothing is capped" under a 24 kg dumbbell | **fixed**: shown only when nothing is capped, and a number typed later clears "not sure" |
+
+## Decisions
+
+Hers, settled 10 Oct 2026:
+1. H24: **A** — the eaten meal stays as eaten and the rest re-size around it, with her two
+   conditions (one line with Undo; same dishes, about 25% either way, else say the gap).
+2. H6: toast counts as bread now.
+3. M43b: carry it, under the stated kit limit, adjusted for the new rep range.
+
+4. M43b collision (carrying automatically would override her 1 Sep "offer, never apply" and her
+   three-session bar): **offer it**, over applying automatically and over applying after three
+   sessions.
+
+5. M34: **"Resize, else leave"** (over resize-else-re-pick and over keeping today's re-pick), and
+   for scope **"Plan's own dishes only"** (a by-name or fridge meal still re-plans the day, her
+   1 Sep rule). Plan: `docs/plans/swap-keeps-the-other-meals.md`.
+
+6. M39: **"Done, with the count"**, over a part-done mark and over keeping it as it was.
+
+7. M40b: **"Keep to the block, say it"**, over carrying swaps into later blocks and over a third
+   "from now on" choice.
+
+None still open from runs 3-4.
+
+Mine under the CSCS delegation (basis in BACKLOG):
+- H25: a blank box means the set just done, else today's plan; last session only when the plan
+  has no number.
+- M38: a hold, carry or interval is never the main lift.
+- M42: no lifting record in the wrong unit.
+- LOW: a logging gap is not an eating gap; protein named first.
+
+## Deploys this list needs
+`chat-gemini` (H26, H6, M36, M37, coach kit words), `onboarding-chat` (M37), `generate-meals`
+(method wording). Everything else is frontend. No database change. The coach exam is stale.

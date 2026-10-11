@@ -36,7 +36,7 @@
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { getExerciseEntry } from '../src/lib/exercise-db'
 import { isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG } from '../src/lib/load-prescription'
-import { getPhaseTempo, formatTempo, parseTempo, describeTempo, tempoSecondsPerRep } from '../src/lib/periodization'
+import { getPhaseTempo, formatTempo, parseTempo, describeTempo, describeExerciseTempo, tempoSecondsPerRep } from '../src/lib/periodization'
 import { estimateSlotsSeconds } from '../src/lib/session-duration'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { readFileSync } from 'fs'
@@ -253,9 +253,31 @@ console.log('\n6. It reaches the screen, in English')
   const line = readFileSync(join(ROOT, 'src/components/exercise/ExerciseLine.tsx'), 'utf8')
   const chip = readFileSync(join(ROOT, 'src/components/exercise/LoadChip.tsx'), 'utf8')
   const row = readFileSync(join(ROOT, 'src/components/exercise/ExerciseRow.tsx'), 'utf8')
-  check('the collapsed line renders it', /describeTempo\(ex\.tempo\)/.test(line))
+  // RE-ANCHORED 9 Oct 2026. These two pinned the exact call —
+  // `describeTempo(ex.tempo)` and `<TempoChip tempo={ex.tempo}` — and went red
+  // when both sites were moved onto describeExerciseTempo, the display guard
+  // that refuses a tempo on a hold, a warm-up move or a swing (L30: a
+  // replacement had left "2s down · drive up" on a kettlebell swing and a
+  // timed hold, and plans saved before the fix still carry it). The property
+  // was always "the screen shows the tempo", so that is what is held now:
+  // both sites go through the guard, and the guard is checked by its answers.
+  const code = (src: string) => src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('the collapsed line renders it, through the display guard', /describeExerciseTempo\(ex\)/.test(code(line)))
+  check('...and not straight off the stored value', !/describeTempo\(/.test(code(line)))
   check('a TempoChip exists', /export function TempoChip/.test(chip))
-  check('the expanded row renders that chip', /<TempoChip tempo=\{ex\.tempo\}/.test(row))
+  check('the chip goes through the display guard too', /describeExerciseTempo\(ex\)/.test(code(chip)) && !/describeTempo\(/.test(code(chip)))
+  check('the expanded row renders that chip', /<TempoChip ex=\{ex\}/.test(code(row)))
+  const shown = (name: string, reps: string, tempo: string | null = '2-0-1') => {
+    const e = getExerciseEntry(name)!
+    return describeExerciseTempo({ name, reps, tempo: tempo ?? undefined, prescription_type: e.prescription_type })
+  }
+  check('the guard SHOWS a tempo on a weightless rep-counted lift', shown('Box Squat (Bodyweight)', '10-12') === '2s down · drive up', shown('Box Squat (Bodyweight)', '10-12'))
+  check('...never on a timed hold', shown('Spanish Squat', '30-45s') === null, shown('Spanish Squat', '30-45s'))
+  check('...nor on a hold whose stored string happens to read like reps', shown('Spanish Squat', '10-12') === null, shown('Spanish Squat', '10-12'))
+  check('...never on a kettlebell swing', shown('Kettlebell Swing (Heavy)', '10-12') === null, shown('Kettlebell Swing (Heavy)', '10-12'))
+  check('...never on a warm-up move', shown('Scapular Push-Ups', '8') === null, shown('Scapular Push-Ups', '8'))
+  check('...never when the string is not a rep count, whatever the entry says', shown('Box Squat (Bodyweight)', '40m') === null, shown('Box Squat (Bodyweight)', '40m'))
+  check('...and nothing is invented where none is stored', shown('Box Squat (Bodyweight)', '10-12', null) === null)
   check('"4-1-1" is never shown raw — it is described',
     describeTempo('4-1-1') === '4s down · 1s pause · drive up', String(describeTempo('4-1-1')))
   check('an absent tempo describes to nothing, not "undefined"', describeTempo(undefined) === null)

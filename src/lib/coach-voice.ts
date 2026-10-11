@@ -269,6 +269,19 @@ const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 const poss = (day: string) => `${day}'s`
 
 /**
+ * What ELSE an edit to one meal changes — adding a food, a custom meal
+ * (meal-knock-on.ts). The changes themselves are said in the day swap's own
+ * sentences (DAY_MOVE, below); these are the three it has no use for.
+ */
+export const KNOCK_ON = {
+  /** The trial ran and no other meal moved. */
+  none: 'No other meal on your plan changes.',
+  /** There was no week to try it on, or the trial failed: said, never guessed. */
+  unknown: "I couldn't check what this does to your other meals.",
+  listUnknown: "I couldn't check your shopping list. If this day is on it, rebuild the list afterwards to match.",
+}
+
+/**
  * SWAPPING A MEAL WITH ANOTHER DAY'S — Ashley's ruling, 29 Sep 2026, from three
  * options: they SWAP PLACES (Monday's dinner goes to Wednesday and Wednesday's
  * comes to Monday), over giving the emptied day a fresh dinner and over eating
@@ -485,6 +498,114 @@ export type LoggedSetReading =
   | { kind: 'bodyweight'; reps: number }
   | { kind: 'added_load'; addedKg: number; reps: number }
 
+/** What is left of the day's calories, or how far over it is: never "0 left" past the target (M33). */
+export function kcalLeftOrOver(remainingKcal: number): string {
+  const n = Math.round(remainingKcal)
+  return n < 0 ? `${-n} over` : `${n} left`
+}
+
+/** "lunch", "lunch and dinner", "breakfast, lunch and snack". */
+function slotList(slots: string[]): string {
+  return slots.length <= 1 ? (slots[0] ?? '') : `${slots.slice(0, -1).join(', ')} and ${slots[slots.length - 1]}`
+}
+
+/**
+ * THE ONE LINE UNDER TODAY'S MEALS WHEN THE DAY FITS AROUND WHAT WAS EATEN
+ * (Ashley's ruling, 10 Oct 2026: "says so in one line with an undo"; beyond
+ * about 25% "leaves the meals alone and says plainly how far over or under").
+ * Null when there is nothing to say.
+ */
+export function aroundEatenLine(a:
+  | { kind: 'none' }
+  | { kind: 'kept'; deltaKcal: number }
+  | { kind: 'resized'; factor: number; slots: string[]; eatenVsPlanKcal: number; eatenSlots: string[] }
+  | { kind: 'too_far'; deltaKcal: number }): string | null {
+  const gap = (d: number) => `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
+  if (a.kind === 'none') return null
+  if (a.kind === 'kept') return `Your meals are as planned. Today is ${gap(a.deltaKcal)}.`
+  if (a.kind === 'too_far') return `Today is ${gap(a.deltaKcal)}: too far to fix by changing portions, so your meals are as planned.`
+  const more = a.eatenVsPlanKcal > 0
+  const pct = Math.round(Math.abs(a.factor - 1) * 100)
+  return `${slotList(a.eatenSlots).replace(/^./, c => c.toUpperCase())} came to ${Math.abs(a.eatenVsPlanKcal)} kcal ${more ? 'more' : 'less'} than planned, so ${slotList(a.slots)} ${a.slots.length === 1 ? 'is' : 'are'} ${pct}% ${a.factor < 1 ? 'smaller' : 'bigger'} today.`
+}
+
+/**
+ * THE ONE LINE WHEN A SWAP HELD THE DAY'S OTHER DISHES (runs 3-4, M34;
+ * Ashley 10 Oct 2026, "Resize, else leave"): the same promise as the logged-
+ * meal line above, one line, an Undo beside a resize, and the gap said
+ * plainly when the dishes could not fit. Null when there is nothing to say.
+ */
+export function heldAroundLine(h:
+  | { kind: 'none'; slots: string[] }
+  | { kind: 'resized'; factor: number; slots: string[]; deltaKcal: number }
+  | { kind: 'too_far'; slots: string[]; deltaKcal: number }
+  | { kind: 'kept'; slots: string[]; deltaKcal: number }): string | null {
+  const gap = (d: number) => `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
+  const yours = `your ${slotList(h.slots)}`
+  if (h.kind === 'none') return null
+  if (h.kind === 'kept') return `Kept ${yours} as planned after your swap. The day is ${gap(h.deltaKcal)}.`
+  if (h.kind === 'too_far') return `Kept ${yours} as planned: fitting ${h.slots.length === 1 ? 'it' : 'them'} around your swap would take more than a 25% change. The day is ${gap(h.deltaKcal)}.`
+  const pct = Math.round(Math.abs(h.factor - 1) * 100)
+  return `To fit around your swap, ${yours} ${h.slots.length === 1 ? 'is' : 'are'} ${pct}% ${h.factor < 1 ? 'smaller' : 'bigger'}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
+}
+
+/**
+ * WHAT A LOGGED SET SAYS UNDER ITS ROW, in its own unit (runs 3-4, M42): a
+ * 33-second plank read "33 reps" and one rep read "1 reps".
+ */
+export function setReading(set: { count: number; unit: 'reps' | 'seconds' | 'meters'; isBodyweight: boolean; weightKg: number }): string {
+  const n = set.count
+  const amount = set.unit === 'seconds' ? `${n} s` : set.unit === 'meters' ? `${n} m` : `${n} ${n === 1 ? 'rep' : 'reps'}`
+  return set.isBodyweight ? `${amount} · Bodyweight` : `${amount} @ ${set.weightKg}kg`
+}
+
+/**
+ * ONE OTHER MEAL A SWAP CHANGED, said after the tap (runs 3-4, M34). A
+ * different dish is named; a resize is said as a size.
+ */
+export function swapKnockOnLine(c: { slot: string; kind: 'dish' | 'size'; from: string | null; to: string; fromKcal: number | null; toKcal: number }): string {
+  const slot = c.slot.charAt(0).toUpperCase() + c.slot.slice(1)
+  if (c.kind === 'dish') return `${slot} changed too, so the day still fits: ${c.from ?? 'nothing'} is now ${c.to}.`
+  return `${slot} changed size so the day still fits: ${c.to}, ${c.fromKcal ?? '?'} → ${c.toKcal} kcal.`
+}
+
+/**
+ * WHAT "REST OF BLOCK" MEANS, said on the swap (Ashley, 10 Oct 2026, "Keep to
+ * the block, say it"): the date it ends and that the plan then changes
+ * exercises. `until` is the next block's first day as the screen says a date
+ * ("Mon 5 Oct", day-labels.ts's shortDate, formatted by the caller so the
+ * phrasebook imports nothing); null on the last block.
+ */
+export function blockSwapLine(until: string | null): string {
+  return until
+    ? `Swaps it until ${until}, when your next block starts and your plan changes exercises.`
+    : 'Swaps it for the rest of your plan.'
+}
+
+/**
+ * A CATALOGUE TIER IN PLAIN WORDS (runs 3-4, LOW): the swap sheet printed
+ * "tier2 compound". Never a raw code on screen.
+ */
+export function tierWords(tier: string | null | undefined): string {
+  switch (tier) {
+    case 'tier1_compound': return 'main compound'
+    case 'tier2_compound': return 'compound'
+    case 'tier3_isolation': return 'isolation'
+    case 'primer': return 'warm-up'
+    case 'cardio': return 'cardio'
+    default: return (tier ?? '').replace(/_/g, ' ').replace(/\btier\s*\d\b/g, '').trim() || 'exercise'
+  }
+}
+
+/**
+ * THE WEIGHT IN THE BOX IS THE SET JUST DONE (H25, 10 Oct 2026). Shown under a
+ * working row only when the carried number differs from the plan's, so the
+ * faint figure never reads as a prescription it is not.
+ */
+export function sameAsSet(setNumber: number): string {
+  return `weight from set ${setNumber}`
+}
+
 export function lastTime(reading: LoggedSetReading): string {
   // NEVER A BARE COUNT. "last time 9" beside a weight box reads as 9kg;
   // the kind travels with the number, same rule as personalBest.
@@ -570,6 +691,22 @@ export function bestReadingOf(metric: 'load' | 'added_load' | 'reps', value: num
   if (metric === 'reps') return { kind: 'reps', reps: value }
   if (metric === 'added_load') return { kind: 'added_load', addedKg: value }
   return { kind: 'load', weightKg: value }
+}
+
+/**
+ * "Back Squat at 62.5kg" / "Press-Up at 15 reps" / "Chin-Up at +10kg" — a
+ * record named in a sentence, with its unit, in ONE place.
+ *
+ * Four sentence builders (the Home tip, the coach's two nudges, and the text
+ * handed to the coach) each wrote `${name} at ${weightKg}kg` off a shape that
+ * carried only a weight — so a reps record, whose weight is legitimately 0,
+ * came out as "Standing Band Hip Abduction at 0kg" (M16/L32, 9 Oct 2026). The
+ * kind travels with the number now and none of them can drop it: the shape
+ * they are handed has no `weightKg` to reach for.
+ */
+export interface RecordFact { exerciseName: string; metric: 'load' | 'added_load' | 'reps'; value: number }
+export function recordPhrase(pr: RecordFact): string {
+  return `${pr.exerciseName} at ${personalBest(bestReadingOf(pr.metric, pr.value))}`
 }
 
 export function ask(verbPhrase: string): string {
@@ -658,6 +795,124 @@ export function supersetAlternation(rampedLabels: string[] = []): string {
 export function didNotSave(thing: string): string {
   return `${thing} didn't save. Check your connection and give it another go.`
 }
+
+/**
+ * WHY SOMETHING ON THE "DIDN'T SAVE" LIST DID NOT SAVE, in words — H20, 9 Oct
+ * 2026.
+ *
+ * The card printed the failure exactly as the browser threw it: the tester
+ * read "Dumbbell Floor Press · set 4 · TypeError: Failed to fetch". Nobody
+ * should have to know what a TypeError is to find out whether their set is
+ * safe, and `queue-health.ts` already said so about its own field ("the
+ * underlying failure ... never the primary message") — the card ignored it.
+ *
+ * TWO SENTENCES, because there are two situations a person can act on
+ * differently: there was no connection (try again when there is one), or the
+ * app could not save it (trying again may not help). Everything else the raw
+ * text might say — a constraint name, a column, a status — is for the console,
+ * which still gets it.
+ *
+ * WHICH of the two applies is decided by `queue-health.plainSyncError`, which
+ * can see the failure; this holds the words and nothing else, so the
+ * phrasebook stays the leaf `test:coach-voice` §1 keeps it.
+ */
+export function didNotSaveReason(noConnection: boolean): string {
+  return noConnection ? 'There was no connection when this was saved.' : "The app couldn't save this."
+}
+
+/**
+ * What is true of ANYTHING on that list, whichever queue it came from: every
+ * one of them keeps a refused item on the phone until it is retried or thrown
+ * away. The same sentence the cardio notice has used since 30 Aug, so the two
+ * surfaces that say it cannot drift.
+ */
+export const STILL_ON_THIS_DEVICE = 'Still saved on this device, but not in your history yet.'
+
+/**
+ * THE SESSION SCREEN WHEN IT CANNOT REACH THE SERVER — H20.
+ *
+ * `known` is the claim's licence. "Your sets are safe" is only said when the
+ * rows on screen are ones this phone holds or the server has confirmed; when
+ * the phone has never managed to read the day, it does not know what is saved
+ * and says the one thing it does know — that whatever is logged now is kept.
+ */
+export function reconnectingLine(known: boolean): string {
+  return known
+    ? 'Reconnecting — your sets are safe.'
+    : "Reconnecting — can't check today's sets yet. Anything you log now is kept on this phone."
+}
+
+/**
+ * "3 working sets · 2 logged" — the second half, which is only a number when
+ * the phone has something to count from. On a reload with a dead connection
+ * and nothing remembered, "0 logged" is not a fact, it is the absence of one;
+ * that is what the tester read as six lost sets.
+ */
+export function loggedCountLabel(count: number, state: { known: boolean; loading: boolean }): string {
+  if (state.known || count > 0) return `${count} logged`
+  return state.loading ? 'checking what’s logged…' : 'can’t check what’s logged yet'
+}
+
+/** Under a set row that has not reached the server yet. */
+export const SET_WAITING_TO_SEND = 'on this phone, waiting to send'
+
+/**
+ * What the app says the first time a lift is logged, where it used to raise a
+ * trophy. Decided unprompted on 9 Oct 2026 (reversible — the tracer's owner
+ * question, default taken as instructed): nothing special beyond this one
+ * quiet line. A first log is where a record STARTS; it is not one.
+ */
+/**
+ * What the streak is CALLED, after its number: "2 sessions in a row".
+ *
+ * It said "2 days streak" over a count of planned sessions done — two
+ * sessions a week apart are a streak of 2 and are not two days. Decided
+ * unprompted on 9 Oct 2026, reversible (the owner question's default): keep
+ * the idea of a streak, name the unit it actually counts.
+ */
+export function streakLabel(count: number): string {
+  return `${count === 1 ? 'session' : 'sessions'} in a row`
+}
+
+/**
+ * THE QUESTION BEFORE FINISHING WITH SETS STILL TO DO (M12, 9 Oct 2026).
+ *
+ * One tap on Finish ended a session at 9 of 24 sets with nothing asked. The
+ * layout design drew this sheet (LAYOUT-DESIGN.md §3.7 — the partial variant
+ * "lists the unlogged remainder ... without judgment") and it was never
+ * built. Decided unprompted, reversible, from the brief's own wording: asked
+ * only when planned sets remain; never when everything is done.
+ */
+export const FINISH_CHECK = {
+  title: (done: number, planned: number) => `${done} of ${planned} sets done — finish anyway?`,
+  finish: 'Finish',
+  keepGoing: 'Keep going',
+} as const
+
+/** "+1 extra" — sets beyond the plan, said beside the fraction and never inside it. Empty when there are none. */
+export function extraSetsNote(extraSets: number): string {
+  return extraSets > 0 ? `+${extraSets} extra` : ''
+}
+
+/**
+ * Finish tapped with cardio logged and no set. The card said "Nothing logged"
+ * over a walk it had just listed as saved. Decided unprompted, reversible
+ * (X1's owner question, option b): say what IS saved, without deciding that a
+ * walk closes a lifting day.
+ */
+export function noSetsButCardio(activities: string[]): string {
+  const what = activities.length === 1 ? activities[0].toLowerCase() : 'cardio'
+  return `No sets logged — your ${what} is saved.`
+}
+
+/** The sync badge, in the words the waiting row itself uses ("on this phone, waiting to send"). It read "Saved Offline (2 sets queued)". */
+export function setsWaitingToSend(count: number): string {
+  return `${count} set${count === 1 ? '' : 's'} waiting to send`
+}
+
+export const FIRST_LOG_NOTE = 'First time logged — this is your baseline'
+/** Under a set row the server refused, beside its Retry. */
+export const SET_DID_NOT_SAVE = "didn't save"
 
 /**
  * The narrator. The audit found "I", "We", "Couldn't" and the passive in one
@@ -781,6 +1036,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_missed_session: { done: 'Marked as missed', failed: "I couldn't mark that day" },
   propose_session_move: { done: 'Moved', failed: "I couldn't move that session" },
   propose_session_activity_swap: { done: 'Swapped', failed: "I couldn't swap that day" },
+  propose_weigh_in: { done: 'Weigh-in saved', failed: "I couldn't save that weigh-in" },
   propose_injury_adaptation: { done: 'Adapted', failed: "I couldn't adapt it" },
   propose_injury_as_lasting: { done: 'Saved', failed: "I couldn't save that" },
   propose_injury_recovered: { done: 'Cleared', failed: "I couldn't clear that" },

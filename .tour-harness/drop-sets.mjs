@@ -22,7 +22,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -50,7 +50,7 @@ ws.addEventListener('message', e => {
 })
 const send = (m, p = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method: m, params: p })) })
 const ev = async x => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })).result?.result?.value
-const shoot = async name => writeFileSync(`/home/user/PersonalTrAIner-claude/.tour-harness/${name}.png`,
+const shoot = async name => writeFileSync(new URL(`./${name}.png`, import.meta.url).pathname,
   Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
 
 let failures = 0

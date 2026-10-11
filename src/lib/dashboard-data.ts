@@ -14,20 +14,24 @@ import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-s
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
 import { effortForRpe, effortLabel } from './cardio-effort'
 import { getCardioLogsForDateMerged } from './cardio-log-store'
-import { getRecentWeighIns } from './nutrition-targets'
+import { getRecentWeighIns, getEarliestWeightKg } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
-import { getPRCache, type PRMetric } from './pr-engine'
+import { getPRCache, getRecordsBeaten, refreshPRCacheFromDB, type PRMetric, type RecordBeaten } from './pr-engine'
+import { formatLoad, labelModeForEntry, isPerSideLoad, type LoadLabelMode } from './load-prescription'
+import { getExerciseEntry } from './exercise-db'
 import { getActiveGoals } from './memory-store'
-import { computeStreak, type StreakDayInput } from './streak'
+import { computeStreak, buildStreakDays, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
-import { selectCoachTipWithKey, type CoachTipContext } from './coach-tips'
+import { selectCoachTipWithKey, eligibleCoachTips, type CoachTipContext, type SelectedCoachTip } from './coach-tips'
+import { weekVolume } from './week-volume'
+import { expectedByNow, paceClock } from './pace'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
 import { planDaysForDate } from './plan-week'
 import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
-import { estimateDaySeconds } from './session-duration'
+import { dayLengthParts, formatDayLength } from './session-duration'
 import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
 
 /**
@@ -61,12 +65,22 @@ export interface TodaySession {
    * Every value here was already in the plan; none of it was surfaced.
    */
   exerciseCount: number
-  /** Whole minutes, from the same estimator the time cap and the audit use. */
+  /**
+   * Whole minutes of the session's WORK, from the same estimator the time cap
+   * and the audit use. The optional stretch on the end is not in this number
+   * since 9 Oct 2026 — it is in `sessionLength`, said as optional.
+   */
   estimatedMinutes: number | null
+  /**
+   * The day's length as every screen prints it — "~22 min · + 15 optional" —
+   * from dayLengthParts/formatDayLength, the one helper the programme list
+   * and the Exercise tab's header also read. Null where there is no session.
+   */
+  sessionLength: string | null
   /** Minutes still to go, once sets have been logged. Null before that. */
   minutesLeft: number | null
-  /** The heaviest external load in the session, e.g. "bench from 92.5 kg". */
-  leadLift: { name: string; kg: number } | null
+  /** The heaviest external load in the session — see leadLiftPhrase for how it is said. */
+  leadLift: LeadLift | null
   /**
    * Set when today's session has been MOVED to another day ("I'll do it
    * tomorrow") — status is 'moved', focus names what left, and nothing else is
@@ -85,6 +99,55 @@ export interface TodaySession {
   activity?: { minutes: number; effort: string | null } | null
 }
 
+export interface LeadLift {
+  name: string
+  /** What the plan prescribes, in the implement's own terms (one dumbbell of a pair, or the bar). */
+  kg: number
+  /** How that number is counted — per hand, per leg, or the whole load. Never printed as a bare "kg". */
+  labelMode: LoadLabelMode
+  /** The heaviest working set actually logged on it today, or null when it has not been lifted yet. */
+  loggedKg: number | null
+}
+
+/**
+ * "Barbell Bench Press" -> "Bench". The glance line has one line of a phone's
+ * width to carry three facts. Every key is a name the catalogue really has
+ * (test:what-a-pr-is checks each one): three of the eight that stood in
+ * Dashboard.tsx matched nothing — "Romanian Deadlift" for the catalogue's
+ * "Romanian Deadlifts", and two lifts the catalogue does not hold — so they
+ * fell to the full name, lower-cased ("romanian deadlifts from 16 kg").
+ */
+export const LIFT_SHORT_NAME: Record<string, string> = {
+  'Barbell Bench Press': 'Bench',
+  'Barbell Squats': 'Squat',
+  'Deadlifts': 'Deadlift',
+  'Trap Bar Deadlift': 'Trap bar',
+  'Overhead Press': 'Overhead press',
+  'Romanian Deadlifts': 'RDL',
+}
+
+/**
+ * Home's lift line (L9, 9 Oct 2026). It read "romanian deadlifts from 16 kg"
+ * after 30 per hand had been logged: the name lower-cased, a per-hand figure
+ * under a bare "kg", and the PLAN's number quoted over a session that had
+ * already happened.
+ *
+ * - The name as the catalogue writes it, or a short form of it.
+ * - The unit from the one formatter ("16kg per hand"), never hand-rolled.
+ * - What was LIFTED once it has been ("… 30kg per hand today"); the plan's
+ *   figure before that. A finished session whose lead lift was never logged
+ *   says nothing about it — the plan's number there would describe work that
+ *   did not happen.
+ * - No "next": the app knows the heaviest lift, not the running order.
+ */
+export function leadLiftPhrase(lead: LeadLift, status: TodaySession['status']): string | null {
+  const name = LIFT_SHORT_NAME[lead.name] ?? lead.name
+  if (lead.loggedKg != null) return `${name} ${formatLoad(lead.loggedKg, lead.labelMode).replace(/^~/, '')} today`
+  if (status === 'done') return null
+  const planned = formatLoad(lead.kg, lead.labelMode)
+  return status === 'in_progress' ? `${name} ${planned}` : `${name} from ${planned}`
+}
+
 export interface PhaseContext {
   weekNumber: number
   totalWeeks: number
@@ -96,15 +159,45 @@ export interface PhaseContext {
 
 export interface RecentPR {
   exerciseName: string
-  /** Kept for callers that only ever meant external load. Legitimately 0 on
-   * a bodyweight or belt record — read `value` with `metric`, not this. */
-  weightKg: number
+  // NO `weightKg`. It was "kept for callers that only ever meant external
+  // load" and four sentence builders reached for it, printing "at 0kg" for a
+  // reps record. Removing the field is what makes that unwritable.
   /** What this record IS. Home must branch on it: a reps figure rendered
    * into a kilogram slot reads as a weight, and looks correct. */
   metric: PRMetric
   /** The number to show, in the metric's own units. */
   value: number
   date: string
+}
+
+/**
+ * Home's "Recent PRs", from the records that were actually BEATEN (9 Oct 2026).
+ *
+ * This took every PR-cache entry dated in the last week — and on somebody's
+ * first week that is every exercise they logged, in database order, so the
+ * list led with the session's warm-up moves and held no loaded lift at all.
+ * A first log is a baseline and movement prep holds no record (pr-engine).
+ * What is left is ordered as a coach would read it out: weight on the bar or
+ * the belt before bodyweight reps, the bigger improvement first, then the
+ * newer. One line per lift.
+ */
+export function pickRecentPRs(beaten: RecordBeaten[], todayStr: string): RecentPR[] {
+  const perLift = new Map<string, RecordBeaten>()
+  for (const r of beaten) {
+    const age = daysAgo(r.date, todayStr)
+    if (age < 0 || age > 7) continue
+    const held = perLift.get(r.exerciseName)
+    // A loaded record over a reps one, else the newer.
+    const loadedFirst = held ? Number(r.metric !== 'reps') - Number(held.metric !== 'reps') : 1
+    if (!held || loadedFirst > 0 || (loadedFirst === 0 && r.date >= held.date)) perLift.set(r.exerciseName, r)
+  }
+  const gain = (r: RecordBeaten) => (r.value - r.previous) / r.previous
+  return [...perLift.values()]
+    .sort((a, b) =>
+      Number(b.metric !== 'reps') - Number(a.metric !== 'reps')
+      || gain(b) - gain(a)
+      || b.date.localeCompare(a.date))
+    .map(r => ({ exerciseName: r.exerciseName, metric: r.metric, value: r.value, date: r.date }))
 }
 
 export interface WeightSeriesPoint {
@@ -118,6 +211,24 @@ export interface DashboardData {
   session: TodaySession
   /** Null while the plan has not arrived — the row is dropped rather than guessed at. */
   tomorrowLabel: string | null
+  /**
+   * Tomorrow, structured, for the session hero's glance line (design handoff
+   * 2a moved "Tomorrow" from its own row into that line). Null while the plan
+   * is unknown, for the same reason tomorrowLabel is.
+   */
+  tomorrow: { rest: true } | { rest: false; focus: string } | null
+  /** Every coach tip true today, the day's pick first — the Home note rotates through them (2a). */
+  coachTips: SelectedCoachTip[]
+  /** Records beaten TODAY, ranked like recentPRs — the "Done" panel's PR row and count (2a). */
+  prsToday: RecentPR[]
+  /** Training minutes of today's session, only once it was finished (the column defaults to 45 before that). */
+  sessionMinutes: number | null
+  /**
+   * Working sets logged this calendar week so far, and last week over the SAME
+   * days (Mon..same weekday) — never a part week against a whole one (2a's
+   * "Volume this week"). Warm-ups and drops are not volume (getRecentLogs).
+   */
+  volume: { thisWeek: number; lastWeekSoFar: number }
   coachTip: string | null
   /** Which rule produced coachTip — drives the bubble's reply chips. */
   coachTipKey: string | null
@@ -156,6 +267,8 @@ export interface DashboardData {
   weightSinceWeekOneKg: number | null
   /** The active body_weight_kg goal's target, if one exists — drawn as a reference line on the Home trend chart. Null when no goal has been set (no UI existed to set one before this; chat's record_goal was the only path). */
   weightGoalKg: number | null
+  /** Where she started: the weight given at sign-up, or the first weigh-in ever when none was given. What "since you started" is measured from — never the first row of the 14 the chart happens to hold. */
+  startingWeightKg: number | null
   recentPRs: RecentPR[]
   streak: number
   whatsLeftLine: string | null
@@ -267,41 +380,67 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     : false
 
   let explicitlyCompleted = false
+  let sessionMinutes: number | null = null
   if (!isRestDay) {
-    const { data } = await supabase.from('workout_sessions').select('is_completed').eq('profile_id', profileId).eq('date', todayStr).maybeSingle()
-    explicitlyCompleted = !!data?.is_completed
+    // select('*') and read defensively: a named column is a parse-time
+    // dependency (CLAUDE.md), and this row now also gives the Done panel its time.
+    const { data } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).eq('date', todayStr).maybeSingle()
+    const row = data as { is_completed?: boolean; finished_at?: string | null; duration_minutes?: number | null } | null
+    explicitlyCompleted = !!row?.is_completed
+    // ONLY A FINISHED SESSION HAS A REAL DURATION: the column defaults to 45.
+    if (row?.is_completed && row.finished_at && typeof row.duration_minutes === 'number' && row.duration_minutes > 0) sessionMinutes = row.duration_minutes
   }
 
   // The glance line's three facts, derived here rather than in the component:
-  // Dashboard.tsx renders, this file is the one aggregator. estimateDaySeconds
-  // is the SAME estimator the plan's time cap and test:audit use, so the
-  // number on Home cannot disagree with the number the plan was built to.
-  const estimatedMinutes = todayWorkoutDay && todayWorkoutDay.exercises.length > 0
-    ? Math.round(estimateDaySeconds(todayWorkoutDay) / 60)
-    : null
+  // Dashboard.tsx renders, this file is the one aggregator. dayLengthParts
+  // is built on the SAME estimator the plan's time cap and test:audit use, so
+  // the number on Home cannot disagree with the number the plan was built to
+  // — and it is the same helper the programme list and the Exercise tab's
+  // header read, so the three cannot disagree with each other.
+  const lengthParts = todayWorkoutDay && todayWorkoutDay.exercises.length > 0 ? dayLengthParts(todayWorkoutDay) : null
+  const estimatedMinutes = lengthParts ? lengthParts.workMinutes : null
+  const sessionLength = lengthParts ? formatDayLength(lengthParts) : null
   // The heaviest externally-loaded lift, which is what people actually want to
   // know before deciding to go. Bodyweight and band work carry no kg and are
   // skipped rather than reported as 0.
-  const leadLift = (todayWorkoutDay?.exercises ?? [])
+  //
+  // RANKED BY WHAT IS ACTUALLY MOVED: a pair of 16kg dumbbells is 32, and
+  // sorting the per-hand 16 against a bar's total put it below lifts it
+  // outweighs.
+  const leadLift: LeadLift | null = (todayWorkoutDay?.exercises ?? [])
     .filter(e => typeof e.suggested_load_kg === 'number' && (e.suggested_load_kg ?? 0) > 0)
-    .sort((a, b) => (b.suggested_load_kg ?? 0) - (a.suggested_load_kg ?? 0))
-    .map(e => ({ name: e.name, kg: e.suggested_load_kg as number }))[0] ?? null
+    .map(e => {
+      const entry = getExerciseEntry(e.name)
+      const kg = e.suggested_load_kg as number
+      const logged = nonWarmupToday
+        .filter(l => l.exercise_name === e.name && !l.is_bodyweight && (l.drop_index ?? 0) === 0 && Number(l.weight_kg) > 0)
+        .map(l => Number(l.weight_kg))
+      return {
+        name: e.name,
+        kg,
+        labelMode: entry ? labelModeForEntry(entry) : 'total' as LoadLabelMode,
+        loggedKg: logged.length > 0 ? Math.max(...logged) : null,
+        moved: entry && isPerSideLoad(entry) ? kg * 2 : kg,
+      }
+    })
+    .sort((a, b) => b.moved - a.moved)
+    .map(({ moved: _moved, ...lead }) => lead)[0] ?? null
 
   const session: TodaySession = !planKnown
     ? { status: 'unknown', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
-        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
+        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null }
     // AHEAD OF REST: a moved day has no session on it either, and the whole
     // point is that it is not called a rest day.
     : todayResolved.movedTo
     ? { status: 'moved', focus: movedAwayFocus, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
-        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null,
+        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null,
         movedTo: todayResolved.movedTo }
     : isRestDay
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
-        exerciseCount: 0, estimatedMinutes: null, minutesLeft: null, leadLift: null }
+        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null }
     : activityToday
     ? { status: activityDoneToday ? 'done' : 'not_started', focus: activityToday.activity, exerciseNames: [],
-        setsLogged: 0, setsPlanned: 0, exerciseCount: 0, estimatedMinutes: activityToday.duration,
+        setsLogged: 0, setsPlanned: 0, exerciseCount: 0, estimatedMinutes: activityToday.duration, sessionLength: null,
         minutesLeft: null, leadLift: null, movedFrom: todayResolved.movedFrom,
         activity: { minutes: activityToday.duration, effort: (() => { const k = effortForRpe(activityToday.targetRpe); return k ? effortLabel(k) : null })() } }
     : {
@@ -318,6 +457,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
         setsPlanned,
         exerciseCount: todayWorkoutDay!.exercises.length,
         estimatedMinutes,
+        sessionLength,
         // Pro-rated by sets remaining rather than re-estimated: the estimator
         // works on a whole day, and a part-finished day is not a smaller day.
         minutesLeft: estimatedMinutes != null && setsPlanned > 0 && nonWarmupToday.length > 0
@@ -348,9 +488,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // getRecentWeighIns returns newest-first; the Home trend chart plots
   // left-to-right chronologically, so this is the one place that reverses it.
   const weightSeries: WeightSeriesPoint[] = [...weighIns].reverse().map(w => ({ date: w.date, kg: w.weight_kg }))
+  const startingWeightKg = profile.weight_kg != null && profile.weight_kg > 0
+    ? profile.weight_kg
+    : await getEarliestWeightKg(profileId).catch(() => null)
 
   // ---- Recent PRs -----------------------------------------------------------
-  const prCache = getPRCache(profileId)
   // WHICH of an exercise's records to show. A belt outranks bodyweight for
   // the same reason prMetricFor puts it first — a weighted chin-up is its
   // own lift — and external load outranks both because an exercise that has
@@ -359,15 +501,16 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // The KIND travels with the number. It used to be `weightKg: pr.maxWeight`
   // and Home printed it beside a "kg", so a reps record would have rendered
   // "12 kg" — a number in the wrong unit, which reads as true.
-  const recentPRs: RecentPR[] = Object.entries(prCache)
-    .filter(([, pr]) => daysAgo(pr.date, todayStr) >= 0 && daysAgo(pr.date, todayStr) <= 7)
-    .map(([exerciseName, pr]) => {
-      const metric: PRMetric = pr.maxWeight > 0 ? 'load' : pr.maxAddedLoad > 0 ? 'added_load' : 'reps'
-      const value = metric === 'load' ? pr.maxWeight : metric === 'added_load' ? pr.maxAddedLoad : pr.maxReps
-      return { exerciseName, weightKg: pr.maxWeight, metric, value, date: pr.date }
-    })
-    .filter(pr => pr.value > 0)
-    .sort((a, b) => b.date.localeCompare(a.date))
+  // READ AGAIN FIRST. The records are held in memory and re-read by the
+  // Exercise tab as each set is ticked — which is BEFORE that set has reached
+  // the server, so they run one set behind, and the set left out is the last
+  // one of the session: the likeliest to be the best. Found by a driver that
+  // beat a record on its final set and saw no "Recent PRs" on Home.
+  await refreshPRCacheFromDB(profileId).catch(() => {})
+  const beatenAll = getRecordsBeaten(profileId)
+  const recentPRs = pickRecentPRs(beatenAll, todayStr)
+  const prsToday = pickRecentPRs(beatenAll.filter(r => r.date === todayStr), todayStr)
+  const prCache = getPRCache(profileId)
 
   // ---- Streak + session-pace + protein-adherence window (shared reads) ---
   const [workingLogs, cardioLogs] = await Promise.all([
@@ -376,52 +519,53 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   ])
   const loggedDates = new Set<string>([...workingLogs.map(l => l.date), ...cardioLogs.map(c => c.date)])
 
-  // A day is scheduled if it SAYS it is (is_scheduled), falling back to the
-  // old "has exercises" inference only for plans stored before that field
-  // existed. Without the field, an activity-shaped day — a walk, a swim, no
-  // exercises array — would never count as scheduled, so logging it could
-  // never build a streak: streak.ts treats an unscheduled day as transparent,
-  // putting a completed walk in the same bucket as an untouched rest day.
+  // THE STREAK COUNTS PLANNED SESSIONS ON THE DATE THEY RAN (streak.ts's
+  // buildStreakDays, 9 Oct 2026). It asked only "is this weekday a training
+  // day?", so a moved session scored nothing where it was done and a miss
+  // where it was not; see that function for the rule and why.
   //
-  // AND A DAY IS SCHEDULED IF ITS SESSION IS STILL ON IT. Each date is read
-  // through the same per-date resolver Home and the strip use: a day whose
-  // session was moved away holds nothing (it is owed on the day it went to,
-  // so it is neither a miss nor a "done"), and the day it landed on holds it.
-  // The weekday-only version counted the origin as scheduled, so an optional
-  // walk logged there read as the planned session done (user test 8 Oct
-  // 2026, #20: "Every planned session this week, done — 2 for 2" while the
-  // moved session was still owed).
+  // It needs every day note in the window, not just this week's moves: one
+  // read of the rows that carry them. `*`, so a database without one of the
+  // note columns still answers. A FAILED READ IS NOT "NO NOTES" — it falls
+  // back to the moves this screen was handed and says so, rather than
+  // silently scoring every moved session as a miss.
+  const windowStart = addDays(todayStr, -34)
+  const { data: noteRows, error: noteError } = await supabase
+    .from('workout_sessions')
+    .select('*')
+    .eq('profile_id', profileId)
+    // An arrival inside the window can come from an origin before it.
+    .gte('date', addDays(windowStart, -35))
+    .lte('date', addDays(todayStr, 35))
+  if (noteError) console.error('The streak could not read moved and swapped days; counting from this week\'s moves only:', noteError)
+  const notes = (noteRows ?? []) as { date: string; moved_to_date?: string | null; swapped_for_activity?: string | null }[]
+  const windowMoves: SessionMove[] = noteError
+    ? moves
+    : notes.filter(r => !!r.moved_to_date).map(r => ({ fromDate: r.date, toDate: r.moved_to_date as string }))
+  const planStartForStreak = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null
+  const streakDays: StreakDayInput[] = buildStreakDays({
+    todayStr,
+    plan: exercisePlan,
+    // Each date in its own plan week (week boundaries S2), as Home and the strip read it.
+    planFor: date => planDaysForDate(date, todayStr, activeWeekDays, mesocycle, planCreatedAt).days,
+    moves: windowMoves,
+    swappedDates: new Set(notes.filter(r => !!r.swapped_for_activity).map(r => r.date)),
+    setDates: new Set(workingLogs.map(l => l.date)),
+    cardioDates: new Set(cardioLogs.map(c => c.date)),
+    planStartStr: planStartForStreak,
+    // Noon, as every other date walk in this file: a fixed-millisecond step
+    // over five weeks crosses a clock change twice a year.
+    planWeekOf: date => getActiveMesocycleWeek(planCreatedAt, new Date(`${date}T12:00:00`), totalWeeks),
+  })
+  // What "the planned session was done" means for each day of the window: a
+  // lifting day needs working sets; an activity-shaped day (a walk) is done by
+  // the activity. An optional walk on a lifting day keeps the streak alive and
+  // does not stand in for the session (user test 8 Oct 2026, #20).
   const workingDates = new Set(workingLogs.map(l => l.date))
   const sessionDoneByDate = new Map<string, boolean>()
-  const streakDays: StreakDayInput[] = []
-  for (let i = 34; i >= 0; i--) {
-    // Same reason as tomorrow above: a fixed-millisecond walk back over
-    // five weeks crosses a clock change twice a year, and when it does it
-    // either repeats a date or skips one — silently, in the input to the
-    // streak. Stepped on the calendar date instead.
-    const d = new Date(`${addDays(todayStr, -i)}T12:00:00`)
-    // One date convention, and it is the local calendar one every write in
-    // this app uses. This was a ternary comparing the UTC date against
-    // todayStr and falling back to a hand-rolled local format — which took
-    // the local branch in every case that could differ, so the UTC half
-    // decided nothing and only made the line hard to read. Same helper as
-    // set-log-store, so "the day the user says it is" means one thing.
-    const dateStr = getLocalDateString(d)
-    const resolved = sessionForDate({
-      date: dateStr,
-      plan: planDaysForDate(dateStr, todayStr, activeWeekDays, mesocycle, planCreatedAt).days,
-      moves,
-    })
-    const held = resolved.day
-    const scheduled = held != null && (held.is_scheduled ?? held.exercises.length > 0)
-    const logged = loggedDates.has(dateStr)
-    // What "the planned session was done" means for THIS day: a lifting day
-    // needs working sets; an activity-shaped day (a walk) is done by the
-    // activity. An optional walk on a lifting day keeps the streak alive and
-    // does not stand in for the session.
-    sessionDoneByDate.set(dateStr, held != null && held.exercises.length > 0 ? workingDates.has(dateStr) : logged)
-    if (dateStr === todayStr && scheduled && !logged) continue // today, not over yet — not a miss (streak.ts's contract)
-    streakDays.push({ date: dateStr, scheduled, logged, planWeek: getActiveMesocycleWeek(planCreatedAt, d, totalWeeks) })
+  for (const d of streakDays) {
+    const held = sessionForDate({ date: d.date, plan: planDaysForDate(d.date, todayStr, activeWeekDays, mesocycle, planCreatedAt).days, moves: windowMoves }).day
+    sessionDoneByDate.set(d.date, held != null && held.exercises.length > 0 ? workingDates.has(d.date) : loggedDates.has(d.date))
   }
   const streakResult = computeStreak(streakDays)
 
@@ -528,6 +672,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     })
     .filter((x): x is { name: string; deltaKg: number } => x !== null)
 
+  // ONE CLOCK FOR EVERY PACE LINE ON HOME, and it is the app's (`now` comes
+  // from getAppNow), not the machine's: the hour used to be `new Date()` read
+  // right here, so under the harness's fixed today the water tip still moved
+  // with the wall clock. "First day" is the account's or the plan's.
+  const clock = paceClock(now, [profile.created_at, planCreatedAt])
   const coachTipCtx: CoachTipContext = {
     today: todayStr,
     proteinAdherenceStreakDays: proteinStreak,
@@ -537,15 +686,17 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     scheduledSoFarThisWeek,
     loggedOfScheduledSoFarThisWeek,
     weightTrend: weightTrend ? { ratePerWeekKg: weightTrend.ratePerWeekKg ?? 0, towardGoal: weightTrend.onTrackForGoal } : null,
-    recentPRs: recentPRs.map(p => ({ exerciseName: p.exerciseName, weightKg: p.weightKg })),
+    recentPRs,
     // Both already read above for the water tile — passed through rather than
     // re-fetched. The hour is read HERE, not inside coach-tips, which is a
     // pure function by design.
     waterMl,
     waterTargetMl,
-    hourOfDay: new Date().getHours(),
+    hourOfDay: now.getHours(),
+    firstDay: clock.firstDay,
   }
   const selectedTip = selectCoachTipWithKey(coachTipCtx)
+  const coachTips = eligibleCoachTips(coachTipCtx)
   const coachTip = selectedTip?.text ?? null
   const coachTipKey = selectedTip?.key ?? null
 
@@ -555,13 +706,22 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     const remaining = session.setsPlanned - session.setsLogged
     if (remaining > 0) gaps.push(`${remaining} set${remaining === 1 ? '' : 's'} left in today's session`)
   }
-  if (ledger.eaten.kcal === 0) gaps.push('no meals logged yet')
+  // "No meals logged yet" is only worth an amber line once a meal was DUE —
+  // it used to show at 07:01, before anybody has had breakfast, and on the
+  // evening somebody signed up. Every meals-per-day shape starts with
+  // breakfast, so that one slot is the whole question; pace.ts holds when.
+  const aMealWasDue = expectedByNow(1, clock, { kind: 'meals', meals: [{ slot: 'breakfast', amount: 1 }] }) > 0
+  if (ledger.eaten.kcal === 0 && aMealWasDue) gaps.push('no meals logged yet')
   const weighedInRecently = weighIns.filter(w => daysAgo(w.date, todayStr) <= 13).length >= 3
   const weighedInToday = weighIns.some(w => w.date === todayStr)
   if (weighedInRecently && !weighedInToday) gaps.push('no weigh-in yet today')
   const whatsLeftLine = gaps.length > 0 ? gaps.join(' · ') : null
 
   // ---- Phase context --------------------------------------------------------
+  // THIS WEEK'S VOLUME against last week's SAME days. Calendar weeks, Monday
+  // first, the same week the Home strip draws.
+  const volume = weekVolume(workingLogs, todayStr)
+
   const phase: PhaseContext | null = liveWeekData
     ? {
         weekNumber: liveWeekData.week_number,
@@ -578,6 +738,12 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     dayName,
     session,
     tomorrowLabel,
+    tomorrow: !planKnown ? null
+      : tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0 ? { rest: false, focus: tomorrowWorkoutDay.focus } : { rest: true },
+    coachTips,
+    prsToday,
+    sessionMinutes,
+    volume,
     coachTip,
     coachTipKey,
     consistency,
@@ -597,6 +763,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
       return since.length > 1 ? Math.round((since[since.length - 1].kg - since[0].kg) * 10) / 10 : null
     })(),
     weightGoalKg: weightGoal?.target_value ?? null,
+    startingWeightKg,
     recentPRs,
     streak: streakResult.currentStreak,
     whatsLeftLine,

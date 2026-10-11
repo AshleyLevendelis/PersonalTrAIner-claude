@@ -5,6 +5,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseId } from '@/lib/exercise-db'
 import { computeOffPlanWork } from '@/lib/session-derive'
 import { SetGrid, type SetGridProps } from './SetGrid'
+import { CardioReceipts, useCardioReceiptsToday } from './CardioSetRow'
 import type { Exercise } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
@@ -16,10 +17,21 @@ import type { Exercise } from '@/lib/types'
 
 export function AdditionalWorkSection({
   plannedExercises,
+  plannedCardio,
   profile,
   onOpenPlateCalc,
 }: {
   plannedExercises: Exercise[]
+  /**
+   * The activities today's own rows read back (the finisher, the optional
+   * close-out) — each claims its log, so it is not drawn a second time here.
+   *
+   * H7, 9 Oct 2026: this section listed the lifts done outside the plan and
+   * none of the cardio. "Add unplanned work → Cardio → skipping rope, 12 min"
+   * saved, the panel closed, and the session showed nothing — the tester
+   * looked for it exactly here. Read through the same hook the rest day uses.
+   */
+  plannedCardio: readonly (string | null | undefined)[]
   /**
    * Threaded in 8 Sep 2026, for the same reason the plate-calculator handler
    * was: extra work is loaded work. Without it these rows would be the only
@@ -38,11 +50,12 @@ export function AdditionalWorkSection({
   const { logs, declaredOffPlan, undeclareOffPlan, setsFor } = useActiveSession()
   const plannedIds = new Set(plannedExercises.map(ex => ex.id ?? getExerciseId(ex.name)))
   const items = computeOffPlanWork(declaredOffPlan, logs, plannedIds, getExerciseId)
+  const cardio = useCardioReceiptsToday(plannedCardio)
 
-  if (items.length === 0) return null
+  if (items.length === 0 && cardio.receipts.length === 0) return null
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="additional-work">
       <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">Additional work</span>
       {items.map(item => {
         const completedSets = setsFor(item.exerciseId, item.name).length
@@ -80,6 +93,7 @@ export function AdditionalWorkSection({
           </div>
         )
       })}
+      <CardioReceipts {...cardio} testid="additional-cardio" />
     </div>
   )
 }

@@ -107,100 +107,92 @@ const settled = await text()
 check('1a. Tools leads with the list, not a timer',
   /Everything here/i.test(settled || '') && /Timers\s*\n?\s*Round timer, stopwatch, lap timer/i.test(settled || ''),
   (settled || '').slice(0, 200))
-check('1b. ...and the idle card is in the sheet, one tap in', await seen('[data-round-card][data-round-phase="idle"]'))
+// 4c (10 Oct 2026): THE IDLE CARD BECAME THE SHEET'S PREVIEW. The sheet is
+// full screen with its own top bar, cards, steppers and a docked Start.
+check('1b. ...and the round-timer sheet is open, one tap in', await seen('[data-round-sheet] [data-round-preview]'))
 check('1c. ...and the truth about the rest timer', /runs itself in the session dock/.test(settled || ''))
 check('1d. the six-tile grid is gone', !/Rest timer/.test(settled || ''), (settled || '').slice(0, 300))
-// 4b: the list is the tab, and it is headed "Everything here" because it now
-// IS everything — the timers moved into it rather than sitting above it.
 check('1e. the list carries every tool, timers included',
   /Everything here/i.test(settled || '') && /Timers/.test(settled || ''), (settled || '').slice(0, 300))
-// AND GROCERY IS BACK, which REVERSES the 12 Sep assertion that stood here.
-// Ashley reported it missing from Tools on 14 Sep; it is a row again, pointing
-// at the same one grocery screen Nutrition and Home point at.
 check('1f. ...and the grocery list is one of them again', /Grocery list/i.test(settled || ''), (settled || '').slice(0, 400))
-// THE ROW IS GONE AND THE PROTOCOLS TOOK ITS PLACE — frame 4a.
 check('1g. there is no row to a second screen any more', !(await seen('[data-change-intervals]')))
-const chipTexts = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => b.textContent.trim())`)
-check('1h. the protocols are chips on the tab', Array.isArray(chipTexts) && chipTexts.length >= 5, chipTexts)
+const chipTexts = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => b.innerText.trim())`)
+check('1h. the protocols are preset cards', Array.isArray(chipTexts) && chipTexts.length >= 7, chipTexts)
 check('1i. ...each carrying its own numbers', chipTexts.every(t => /\d/.test(t)), chipTexts)
 check('1j. ...and none of them says its numbers twice',
   !chipTexts.some(t => { const m = t.match(/(\d+)\/(\d+)/g); return m && m.length > 1 }), chipTexts)
-// EVERY CHIP ON ONE LINE. test:tools-grid counts characters as a proxy for
-// wrapping; this is the thing it proxies for, measured at 390px.
-const chipLines = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => Math.round(b.getBoundingClientRect().height))`)
-check('1k. every chip is a single 44px pill, not a wrapped one', chipLines.every(h => h <= 48), chipLines)
-// THE IDLE CARD SAYS WHAT YOU WOULD BE STARTING.
-const idleCard = await ev(`document.querySelector('[data-round-card]')?.innerText || ''`)
-check('1l. the idle card holds a total and what it is made of',
-  /READY · 8 ROUNDS/i.test(idleCard) && /3:50/.test(idleCard) && /20s work · 10s rest/.test(idleCard), idleCard)
-check('1m. ...and promises the countdown before you press', /10s countdown/.test(idleCard), idleCard)
+// 4c: CARDS, NOT PILLS. The old 44px-pill rule became "every card is the
+// same 98x76 and nothing inside it spills" — measured, because a wrapped
+// label is invisible to every source check.
+const cardBoxes = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => { const r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), spill: b.scrollHeight > b.clientHeight + 1 } })`)
+check('1k. every card is 98x76 and nothing in it spills', cardBoxes.every(c => c.w === 98 && c.h === 76 && !c.spill), cardBoxes)
+check('1k2. ...and the row scrolls inside itself, the page does not scroll sideways',
+  await ev('document.documentElement.scrollWidth <= window.innerWidth'), await ev('[document.documentElement.scrollWidth, window.innerWidth]'))
+// AND THE SHEET ITSELF IS PHONE-WIDE. The dialog clips what overflows, so the
+// page never scrolls sideways even when the sheet is 780px wide with its right
+// half cut off — which is what it was before min-w-0 (found on a screenshot).
+check('1k3. the sheet is no wider than the phone', await ev('Math.round(document.querySelector("[data-round-sheet]")?.getBoundingClientRect().width ?? 9999) <= window.innerWidth'),
+  await ev('Math.round(document.querySelector("[data-round-sheet]")?.getBoundingClientRect().width ?? -1)'))
+const preview = () => ev(`document.querySelector('[data-round-preview]')?.innerText?.replace(/\\s+/g, ' ')?.trim() || ''`)
+const idle = await preview()
+check('1l. the preview holds a total and what it is made of',
+  /^3:50 /.test(idle) && /8 rounds · 0:20 work · 0:10 rest · no rest after the last/.test(idle), idle)
+const startText = () => ev(`document.querySelector('[data-round-sheet-start]')?.textContent?.trim() || ''`)
+check('1m. ...and Start promises the countdown before you press', (await startText()) === 'Start · 10s countdown', await startText())
+check('1n. the Tabata card is the one lit', await ev(`document.querySelector('[data-protocol="tabata"]')?.getAttribute('aria-pressed') === 'true'`))
 await shoot('tools-timer-settled')
 
-// --- 2. the card re-reads as a protocol is chosen ---------------------------
-const clockNow = () => ev(`document.querySelector('[data-round-card-clock]')?.textContent?.trim() || ''`)
-const beforePick = await clockNow()
+// --- 2. the preview re-reads as a protocol is chosen ------------------------
+const totalNow = () => ev(`document.querySelector('[data-round-total]')?.textContent?.trim() || ''`)
+const beforePick = await totalNow()
 check('2a. tapping a different protocol', await tapSel('[data-protocol="boxing"]'))
 await wait(500)
-const afterPick = await clockNow()
-check('2b. ...re-reads the card\'s total, with no second screen in between',
+const afterPick = await totalNow()
+check('2b. ...re-reads the total, with no second screen in between',
   afterPick !== beforePick && afterPick === '11:00', { beforePick, afterPick })
 check('2c. ...and nothing started', !(await seen('[data-round-card-primary]')))
 
-// --- 3. Custom unfolds in place, and starts a short round -------------------
-check('3a. the Custom chip opens the setup where it stands', await tapSel('[data-protocol="custom"]') && (await wait(500), await seen('[data-round-setup]')))
-// The short work and rest this run needs are not on the chip rows — they are
-// deliberately human values — so it goes through the Custom escape hatch,
-// which is the part of the redesign most likely to be quietly dropped.
-const hatches = await ev(`(() => {
-  const tap = sel => { const el = document.querySelector(sel); if (!el) return false; el.click(); return true }
-  if (!tap('[data-work="custom"]')) return 'no work custom'
-  if (!tap('[data-rest="custom"]')) return 'no rest custom'
-  return 'chips'
-})()`)
-check('3b. work and rest have a custom escape hatch', hatches === 'chips', hatches)
+// --- 3. the steppers make it hers, Custom lights by itself, and it starts ----
+// A SHORT ROUND so the rest of this run has a boundary to queue onto and a
+// finish to reach: 3 rounds of 10s work / 5s rest, countdown off = 40s.
+// ONE TAP AT A TIME with a beat between — a burst inside one frame is a
+// driver artefact a thumb cannot produce (see the old note on the stepper).
+const stepVal = f => ev(`document.querySelector('[data-step-value="${f}"]')?.textContent?.trim() || ''`)
+const stepTo = async (f, want, dir) => { for (let i = 0; i < 20 && (await stepVal(f)) !== want; i++) { await tapSel(`[data-step="${f}"][data-dir="${dir}"]`); await wait(120) } return stepVal(f) }
+await tapSel('[data-protocol="tabata"]'); await wait(300)
+check('3a. rounds step down to 3', (await stepTo('rounds', '3', 'down')) === '3', await stepVal('rounds'))
+check('3b. work steps down to 0:10', (await stepTo('work', '0:10', 'down')) === '0:10', await stepVal('work'))
+check('3c. rest steps down to 0:05', (await stepTo('rest', '0:05', 'down')) === '0:05', await stepVal('rest'))
+const lit = await ev(`[...document.querySelectorAll('[data-protocol][aria-pressed="true"]')].map(b => b.dataset.protocol)`)
+check('3d. any change lights Custom by itself, and only Custom', JSON.stringify(lit) === '["custom"]', lit)
+check('3d2. ...whose card says the draft is unsaved', /save as preset/.test(await ev(`document.querySelector('[data-protocol="custom"]')?.innerText || ''`)))
+// Countdown to Off: Off → 5 → 10 → 15 → Off, from the default 10.
+const countdownChip = () => ev(`document.querySelector('[data-option="countdown"]')?.innerText?.replace(/\\s+/g, ' ')?.trim() || ''`)
+for (let i = 0; i < 4 && !/Off$/.test(await countdownChip()); i++) { await tapSel('[data-option="countdown"]'); await wait(150) }
+check('3e. the countdown can be switched off', /Countdown Off$/.test(await countdownChip()), await countdownChip())
+const custom = await preview()
+check('3f. the preview states what is about to run, live',
+  /^0:40 /.test(custom) && /3 rounds · 0:10 work · 0:05 rest/.test(custom) && !/countdown/.test(custom), custom)
+check('3f2. ...and Start says it will start now', (await startText()) === 'Start now', await startText())
+check('3g. tapping Custom saves the draft', await tapSel('[data-protocol="custom"]'))
 await wait(300)
-const typed = await ev(`(() => {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-  const nums = [...document.querySelectorAll('input[type=number]')]
-  if (nums.length < 2) return nums.length
-  ;[4, 2].forEach((v, i) => { setter.call(nums[i], String(v)); nums[i].dispatchEvent(new Event('input', { bubbles: true })) })
-  return 'set'
-})()`)
-check('3c. a 4s work / 2s rest can be typed into them', typed === 'set', typed)
-// STEPPED DOWN TO THREE — the stepper is the only way to set the count, so
-// the run exercises it rather than routing round it. Three, not two, so there
-// is a boundary left to queue a switch onto.
-//
-// ONE TAP AT A TIME, with a beat between. A burst of twelve synchronous
-// .click()s is batched into one render, so every handler reads the same stale
-// count and the last write wins — the stepper landed on 4 rather than 3 and
-// the failure looked like a stepper bug. It is a driver artefact: a thumb
-// cannot tap twelve times inside one frame.
-const roundsShown = () => ev(`document.querySelector('[data-round-card]')?.innerText?.match(/READY · (\\d+)/i)?.[1] || ''`)
-let stepped = 'no stepper'
-if (await seen('[data-rounds-down]')) {
-  for (let i = 0; i < 14 && Number(await roundsShown()) > 3; i++) { await tapSel('[data-rounds-down]'); await wait(120) }
-  for (let i = 0; i < 14 && Number(await roundsShown()) < 3; i++) { await tapSel('[data-rounds-up]'); await wait(120) }
-  stepped = (await roundsShown()) === '3' ? 'stepped' : `landed on ${await roundsShown()}`
-}
-check('3d. the rounds stepper sets the count', stepped === 'stepped', stepped)
-await wait(400)
-// THE CARD IS THE SUMMARY NOW. 4a: "Changing any chip re-reads the card's
-// total live, so the number you're about to commit to is always the one on
-// the card." So the check reads the CARD, not a line inside the panel.
-const customCard = await ev(`document.querySelector('[data-round-card]')?.innerText || ''`)
-check('3e. the card states what is about to run, live',
-  /READY · 3 ROUNDS/i.test(customCard) && /4s work · 2s rest/.test(customCard), customCard)
+check('3g2. ...and it stops saying "save as preset"', !/save as preset/.test(await ev(`document.querySelector('[data-protocol="custom"]')?.innerText || ''`)))
 await shoot('tools-timer-custom')
-const started = await ev(`(() => {
-  const b = document.querySelector('[data-round-card-start]')
-  if (!b) return false; b.click(); return true
-})()`)
-check('3f. ...and the card starts it', started)
+// BACK ON, AT 5s: the run below samples the ready colour during the
+// countdown, and with none there is no ready phase to sample. One more tap
+// walks Off → 5, which is also the label following the chip.
+await tapSel('[data-option="countdown"]'); await wait(150)
+check('3g3. one more tap sets a 5s countdown, and Start says so', (await startText()) === 'Start · 5s countdown', await startText())
+check('3h. ...and Start starts it', await tapSel('[data-round-sheet-start]'))
 await wait(1500)
 
 // --- 4. the card, not the flood ---------------------------------------------
 check('4a. a running round shows as a card', await seen('[data-round-card]'))
+// THE COUNTDOWN SHE CHOSE IS THE ONE THAT RUNS — 5s here, not the 10s every
+// round used to get. Read off the running card's own clock, 1.5s in.
+const leadClock = await ev(`document.querySelector('[data-round-card-clock]')?.textContent?.trim() || ''`)
+const leadSecs = Number((leadClock.match(/(\d+):(\d+)/) || [])[2] ?? (leadClock.match(/\d+/) || [])[0])
+check('4a2. ...counting down from the 5s she set, not the old 10s', Number.isFinite(leadSecs) && leadSecs > 0 && leadSecs <= 5, leadClock)
 // STILL THE POINT OF THIS CHECK: a running round is a card on the tab, not a
 // takeover — the list is still under it. Re-anchored off the heading text,
 // which 4b renamed.
@@ -244,7 +236,7 @@ check('5d. back to the card, round still running', await seen('[data-round-card]
 // see: that tapping 40/20 during a round changes nothing about the round you
 // are in, says which round it WILL change, and can be taken back.
 const roundNow = () => ev(`document.querySelector('[data-round-card]')?.innerText?.match(/ROUND (\\d+) OF (\\d+)/i)?.slice(1)?.join('/') || ''`)
-await wait(9500)
+await wait(800)
 // 4b: starting a round CLOSES the timers sheet (you asked for a round, you get
 // the tab back with the clock on it), so the chips are two taps away again.
 // The Timers row opens straight onto the round view while one is live, which
@@ -273,6 +265,9 @@ check('6g. ...which clears both the strip and the badge',
 // grey ready button stood in for mint; a mutation that painted the finished
 // card in the WORKING colour then passed, because grey and mint differ. Three
 // samples, three colours, all compared.
+// POLLED INTO THE WORK PHASE (4c's shortest round is 10s on / 5s off, so a
+// fixed sample point can land in a rest): the card says which phase it is in.
+for (let i = 0; i < 30 && !(await seen('[data-round-card][data-round-phase="work"]')); i++) await wait(250)
 const workSample = await cardPrimary()
 check('7a. mid-round the card is in its working colour', !!workSample && workSample.bg !== readySample?.bg, { ready: readySample?.bg, work: workSample?.bg })
 await shoot('tools-timer-card-work')
@@ -282,7 +277,7 @@ await shoot('tools-timer-card-work')
 // finished card never appeared" — a false failure that looks exactly like a
 // real one.
 let done = await cardPrimary()
-for (let i = 0; i < 40 && done?.label !== 'Log session'; i++) { await wait(1000); done = await cardPrimary() }
+for (let i = 0; i < 60 && done?.label !== 'Log session'; i++) { await wait(1000); done = await cardPrimary() }
 check('7b. the finished card offers to log the session', done?.label === 'Log session', done)
 check('7c. ...and it is not the working colour, nor the ready one',
       !!done && !!workSample && done.bg !== workSample.bg && done.bg !== readySample?.bg,

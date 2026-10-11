@@ -18,9 +18,12 @@
 // ---------------------------------------------------------------------------
 
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
-import { rebuildForWeightBasis } from '../src/lib/plan-adaptations'
+import { rebuildForWeightBasis, untrainedPlanContext } from '../src/lib/plan-adaptations'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, MesocycleWeek, WorkoutDay } from '../src/lib/types'
+// A plan nobody has trained on: no day is protected. (A live plan loads the
+// real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
 
 function buildProfile(overrides: Partial<UserProfile>): UserProfile {
   return {
@@ -180,7 +183,7 @@ for (const persona of PERSONAS) {
   // fresh generation, so what this measures is what the app actually applies.
   const quietDebug = console.debug, quietWarn = console.warn
   console.debug = () => {}; console.warn = () => {}
-  const mesoRebuilt = await rebuildForWeightBasis({
+  const mesoRebuilt = await rebuildForWeightBasis({ context: GATE_CONTEXT,
     profile: declined,
     basisWeightKg: stated.weight_kg!,
     exclusions: [],

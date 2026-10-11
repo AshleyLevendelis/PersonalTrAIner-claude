@@ -19,7 +19,7 @@ import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
-const DIST = '/home/user/PersonalTrAIner-claude/.tour-harness/dist/'
+const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const server = createServer((q, r) => {
   const p = q.url.split('?')[0]
@@ -87,7 +87,7 @@ const last = rows[rows.length - 1]
 if (last) await ev(`window.scrollTo(0, ${Math.max(0, last.top - 500)})`)
 await wait(400)
 const shot = await send('Page.captureScreenshot', { format: 'png' })
-writeFileSync('/home/user/PersonalTrAIner-claude/.tour-harness/mobility-filler.png', Buffer.from(shot.result.data, 'base64'))
+writeFileSync(new URL('./mobility-filler.png', import.meta.url).pathname, Buffer.from(shot.result.data, 'base64'))
 
 console.log('\nA SHORT DAY WITH ITS CARDIO, AND THE OPTIONAL REST OF ITS TIME\n')
 const cardioRow = rows.find(r => r.label === 'Finisher') ?? null

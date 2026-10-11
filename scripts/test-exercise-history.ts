@@ -70,7 +70,10 @@ function main() {
     { sessionId: 'd', date: '2026-01-22', sets: [], topSetWeightKg: 60, topSetE1RM: 60, topSetReps: 0, topSetAddedLoadKg: 0 },
   ]
   const prMoments = derivePRHistory(prSessions)
-  check('exactly 3 PR moments (50, 55, 60) — the 52 regression is not one', prMoments.length === 3, prMoments)
+  // RE-ANCHORED 9 Oct 2026 (M12): this expected THREE and counted the first
+  // session's 50 as a record. A first log is a baseline — there was nothing
+  // before it to beat.
+  check('exactly 2 PR moments (55, 60) — the opening 50 is the baseline and the 52 regression is not one', prMoments.length === 2 && !prMoments.some(m => m.sessionId === 'a'), prMoments)
   check('no PR moment at the regression session', !prMoments.some(m => m.sessionId === 'c'), prMoments)
   check('newest-first for display', prMoments[0].sessionId === 'd', prMoments)
 

@@ -2,6 +2,284 @@
 
 Newest first. One line each.
 
+- [x] **LAYOUT PASS, SIX SCREENS (10-11 Oct 2026): MERGED to `main` 11 Oct 2026 on her word ("Merge").**
+  That merge also brings in `claude/test-log-fixes-oct9`, which the layout branch was cut from.
+  `claude/coach-empty-text-fix-2c4bzv` is NOT in it and is still to merge.
+  Her design zip (2a Home, 2b Nutrition, 2c Exercise, 2d Profile, 2e setup, 4c round timer), sent with
+  no message. Her rulings: **"Build all six, then show me"** (from four options) and **keep "Personal
+  TrAIner"** over the brief's "Coach" (from three). Every decision, with its reason, is in
+  `docs/plans/layout-revamp-oct10.md`.
+  - **Built:** Home (greeting and streak, one rotating coach note that holds on touch and stays still
+    under reduced motion, the session hero with its week circles, a Done panel with the day's summary,
+    Today 2x2, the weight panel with the latest PR and the week's sets against last week's same days);
+    Nutrition (day header with a Grocery pill, four rings, kcal left, Up next / Later / Eaten);
+    Exercise (week label, seven-column strip, the length and its shortfall reason on the hero, numbered
+    rows with set dots and a load chip, and a running "Log set 3 · Bench 80 kg × 6" button that presses
+    the tick it describes); Profile (a page of rows, each opening the editors it always had); setup (one
+    question per screen, Skip where a question could already be declined, a mic where speech works);
+    the round-timer sheet.
+  - **Her ruling, 11 Oct 2026, "Move straight on"** (from two: move straight on, or wait for Next):
+    one tap answers a single-choice setup question, over the brief's select-then-Next. Nothing changed.
+  - **Other deviations, shown to her with the screenshots:** "Reply speed" instead of the brief's "Tone" (that is the only control there);
+    only the "Accessory" section label is dropped on Exercise (Main lift, Primer, Finisher, Superset say
+    something); Exercises to avoid is its own Profile row in Training.
+  - **Found and fixed on the way, by the browser drivers:** the Done panel had dropped the lift line
+    (L9); the coach note's three page dots, 5px apart with 44px tap areas, took each other's taps; a
+    peeked day had lost its length when the length moved to the hero; a question card she had not
+    answered vanished when she typed something else in setup. And a bug found by reading: the coach's
+    "Ask ↗" prefill was read once at mount, so a prefill set later never arrived.
+  - **Checked:** new gates `test:round-setup`, `test:exercise-layout`, `test:layout-revamp` (61 mutations
+    in all, every one caught, five only after a check was tightened or a case added); `test:profile-groups`
+    and `test:onboarding-style` rewritten for the new screens; 23 browser drivers re-anchored and green;
+    screenshots read in four themes; `test:bundle` measured both ends (2,229 kB before, 2,257 after).
+  - **Needs:** the `chat-gemini` deploy (the coach's description of Home changed). Frontend on merge.
+  - **Full sweep, 11 Oct 2026, on a frozen copy of 30dabf86:** 373 of 377 passed. The four that did not:
+    `test:meal-quality`, `test:schema-parity` and `verify:rls` (no database reachable from a cloud
+    session, each saying so), and `test:coach-exam-fresh` (the coach's prompt changed; the exam must be
+    re-run). The one later app change (setup receipts) re-ran its gate and the four setup drivers: green.
+  - **Not done:** the coach exam was not re-run (she said "Run exam" on 11 Oct; it needs her machine) (the coach's prompt changed, so its scores are stale
+    until it is); the Home harness has no fixture with a rest timer running, so the Log-set button
+    riding above the rest dock is proven by construction only.
+  - **CSCS review** (the Exercise screen is the only one that touches what is prescribed, and it changes
+    nothing prescribed): 1. training effect: none, it is presentation; the Log-set button saves exactly
+    what the tick saves, including refusing a calibration set 2 with a blank box. 2. takes away: nothing;
+    every control moved, none removed. 3. fundamentals: the main lift stays labelled. 4. no floor or
+    ceiling touched. 5. in scope.
+
+- [~] **RUNS 3 AND 4 OF THE LIVE-APP TEST: BUILT (10 Oct 2026), on `claude/test-log-fixes-oct9`.**
+  Her "Build it", and her answer to the first decision the same day: **A, with two conditions**
+  (when other meals are re-sized, one line says so with an Undo; only the same dishes, about 25%
+  either way, beyond which the meals are left alone and the line says how far over or under).
+  She also asked three checks first and ruled twice more: **reproduce the header case exactly**
+  (it did NOT reproduce on the test data, old build or new, so the cause on her day is unproven;
+  the header and rows now come from one calculation and cannot disagree); **what a blank tick
+  saves on a "type it" box** (nothing: it refuses); **toast counts as bread now**; and **carry
+  the heaviest set into the next block, under the stated kit limit, adjusted for the new reps**.
+  Status of every item: `docs/test-log-2026-10-09/runs-3-4-trace.md`. Seven commits, each with
+  its own checks and mutation counts in its message.
+  - **Fixed:** H24, H24b, H25, H26, H6, M33, M35, M36, M37, M38, M40a, M42, M43a, and all eight
+    LOW items.
+  - **Partly:** M34 (a swap now says which other meals changed; the visible line is proven by
+    logic only, because no harness fixture moved another meal in 18 swaps), M39 (the tip says
+    "due so far"; one week counter lands with the week work on the other branch), M43b (below).
+  - **Hers, to ask one at a time:** ~~the M43b collision~~ (answered 10 Oct: **"Offer it"**, over
+    applying automatically and over applying after three sessions; what is built stands), ~~M34~~ (answered 10 Oct: **"Resize, else leave"**, scope **"Plan's own dishes
+    only"** after the collision with her 1 Sep fridge-meal rule was put to her; plan in
+    `docs/plans/swap-keeps-the-other-meals.md`; BUILT, see the M34 bullet below), ~~M39~~ (answered 10 Oct: **"Done, with the
+    count"**, over a part-done mark and over keeping it; BUILT, see the M39 bullet below; was: is a
+    short session "Done"?), ~~M40b~~ (answered 10 Oct: **"Keep to the block, say it"**; BUILT).
+  - **Open:** M40c (no bands means no band work), which is hand-over job 3, the kit list.
+  **M43b COLLIDES WITH TWO OF HER OLDER RULINGS, so it was built as an OFFER and is put to her.**
+  Carrying a logged weight into the next block automatically after one session would override
+  her 1 Sep "offer, never apply" (calibration alone applies, 10 Sep) and her three-session
+  evidence bar. The offer now carries last block's best set into the new block's reps (Epley
+  1RM back down to the top of the new range, floored to the half kilo: 18 kg x 11 is 19 kg for
+  6-8) and the confirm still clamps to the kit and stated limit. Per CLAUDE.md, a collision is
+  put to her with both rules named, not resolved by picking the newer.
+  **CSCS DECISIONS (mine under her delegation), with the basis:**
+  - H25: a blank weight box means "same as the set I just did", else today's plan, else last
+    session only when the plan carries no number. Basis: a working set's load is set by today's
+    prescription and today's performance; last session's number is history, and the tester's
+    30 kg against a 24 kg plan was a load nobody prescribed.
+  - M38: a hold, carry or interval is never the main lift (label and rest floor alike). Basis: a
+    main lift is the session's progression anchor, loaded and counted in reps; a timed or
+    distance effort cannot carry that, and no main lift beats a wrong one.
+  - M42: a timed, distance or interval set claims no lifting record. Basis: a record in the
+    wrong unit (seconds compared as reps) is worse than none.
+  - LOW, the evening food line: three or more meals past their time and unlogged is a LOGGING
+    gap, not an eating gap, and the line says so; otherwise protein is named first when it is
+    one of the gaps. Basis: a day is planned around protein, and fat's small target made it
+    "widest" for a few grams. Two unlogged keeps the ordinary line, which already names the
+    meal "still to log"; a meal whose time has not come never counts. **This is when the app
+    speaks, which is hers**; built because the report was a defect, and flagged in the report.
+    CSCS five for the prescription changes (H25, M38, M43): (1) the stimulus is today's
+    prescription, not yesterday's; (2) takes away nothing but a wrong number and a wrong label;
+    (3) progression is kept (the carry and the offer both move UP, under the limit); (4) no floor
+    or ceiling redefined — the rest floor follows the same anchor rule; (5) in scope.
+  **The last slice (LOW):** `test:runs34-low` (17 checks, 10/10 mutations), `test:nutrition-
+  layout` +5 and re-anchored (protein first is a deliberate change), `test:pace-clock` two
+  re-anchored, 6/6 mutations on the food line, `verify:finish-check` 2h-2j (4/4 browser
+  mutations). The "add exercise" sheet had the same "tier2 compound" and was fixed with the
+  swap sheet.
+  **M34 BUILT (10 Oct), her "Resize, else leave", scope "Plan's own dishes only".** A swap or a
+  move between days to one of the plan's own dishes holds every other dish of that day; they
+  re-size together by ONE factor within 0.75-1.25, one line with Undo ("To fit around your swap,
+  your breakfast and dinner are 15% smaller. Same dishes."); beyond the band, or when a held dish
+  cannot be costed, they stay as planned and the gap is said. Undo is per date on the phone and
+  read by the screen, its trials and the shopping list. A leftover lunch stays last night's
+  dinner. Today's fit-around-what-was-eaten counts from the dish as planned, so the two re-sizes
+  stay inside 25% together. **Found while building:** sized on calories alone, a held day could
+  land its kcal and miss protein (a day-move fixture, 12 kcal under and off target), so the
+  factor is chosen for the whole day: a straight-line model ranks the factors, the real re-size
+  proves each, because a 2% factor can round to no change. And the hold first dropped last
+  night's leftover when the PLANNED day had given it up; it now takes the leftover from the day
+  with her pin. `test:hold-around-pins` (50 checks, 25 mutations, all caught after four cases
+  were added for the ones that first got through), `verify:swap-knock-on` rewritten (9 checks,
+  4/4; walks 16 swaps over six days; the harness week's lunches were all within a few kcal, so
+  18 of 18 swaps needed nothing, and one bigger real-food lunch is added behind `?bigswap=1`,
+  input only). Re-anchored to the new rule, each read first: meal-variety §7, meal-day-move (a
+  re-fit swap now keeps every dish), meal-knock-on, coach-knows, session-continuity. 101 of 103
+  derived gates and 14 meal drivers green first time; the two were those text checks.
+  **Not measured:** how often a real plan's swap lands "too far" rather than re-sized; the
+  harness fixtures cannot say, and her saved meals cannot be read from here.
+  **M39 BUILT (10 Oct), her "Done, with the count".** A session finished short is still a tick,
+  and says the count: Home "Done · 5 of 18 sets", Exercise's bar "✓ Done · 3 of 19 sets · View
+  summary", each strip cell's spoken label "done, 3 of 19 sets". One count (`session-count.ts`:
+  planned working sets, warm-ups and drops out, capped per lift) for the strips, the bar and the
+  coach's "CLOSED at N of M"; it agrees with today's own counter. **Two defects found behind it,
+  both by browser drivers, both fixed:** (1) Finish never refreshed the week, so today's cell
+  stayed "due" and its count read 0 until the app reloaded; it now re-reads the week like every
+  other write on that panel. (2) "I did it, not in the app" saved a loaded lift with an empty
+  weight box at 0 kg, a row every count in the app reads as broken, so a full session logged
+  there read "16 of 19" (Russian Twist's three sets). It now asks for the weight by name and
+  writes nothing, the live grid's own rule for a blank "type it" box. `test:session-count` (16
+  checks, 7/7), `verify:finish-check` 2h/2h2 (2/2), `verify:what-happened` 10e2/10e3/10g (2/2).
+  62 of 63 derived gates green first time; the one was `verify:what-happened` reading the new
+  count on the day that exposed defect (2).
+  **M40b BUILT (10 Oct), her "Keep to the block, say it"** (over carrying a swap into later
+  blocks and over a third "from now on" choice). The swap's "Rest of block" now reads "Swaps it
+  until Mon 5 Oct, when your next block starts and your plan changes exercises." ("for the rest
+  of your plan" on the last block), with "Never give me <exercise> again" beside it, the ban that
+  lasts. The date is the next block's first day from the plan's own block numbers, counted the
+  way the live week is. `test:block-swap-until` (12 checks, 10 mutations: 9 caught, 1 exposed a
+  redundant guard, deleted), `verify:moved-edit` 2d2/2d3 (2/2). One derived gate went red:
+  `test:coach-voice` holds that the phrasebook imports nothing, and the new line had pulled in
+  the date formatter; the screen now formats the date and hands the phrasebook the words.
+  **Not changed:** the add and remove sheets' own "Rest of block" choices (her question was the
+  swap); they could take the same line.
+  **Full sweep at `79550ac9` (10 Oct, after every ruling was built): 374 gates, 370 passed.** The
+  four reds, each read for its own words: `test:meal-quality` ("VITE_SUPABASE_URL /
+  VITE_SUPABASE_ANON_KEY must be set"), `test:schema-parity` ("Failed to link to TEST"),
+  `verify:rls` ("No database to read") — no database from a cloud session — and
+  `test:coach-exam-fresh`, red by design until the exam is re-run against coach
+  `c1770715fa68b933` (28 cases, 52 turns).
+  **Needs:** the `chat-gemini`, `onboarding-chat` and `generate-meals` deploys; the coach exam
+  is stale and must be re-run on her machine. No migration. Not on `main`.
+  One derived check went red on correct code and was re-anchored: `test:one-today` pinned the
+  space under the list to the Start bar alone; it now holds it to every state that draws a bottom
+  bar (3/3 mutations). 130 of 131 derived gates green first time.
+  **Full sweep at `1c06d57c`: 371 gates, 366 passed.** Red: the usual environmental three
+  (`test:meal-quality`, `test:schema-parity`, `verify:rls`, each read for its own "could not
+  reach it" sentence), `test:coach-exam-fresh` by design, and `verify:setup-answers`, which was
+  NOT the app. It failed identically on every commit back to the one that passed it on 9 Oct; a
+  probe showed the page never had focus, and four Chromium processes left over from earlier runs
+  held the driver's port 9443, so it drove a stranger's page. Killed, it passed. **I first blamed
+  the driver's typing helper (type and blur in one step) and "fixed" that; it changed nothing and
+  was reverted. The tell I skipped: a failure that is identical across commits is about the
+  machine, not the code.** The driver now refuses to run when its port is taken, with the fix in
+  the message (proven both ways: green on a clean port, refuses with one held). Other drivers
+  share the shape and were not changed; the 30 Sep note in CLAUDE.md names the class.
+
+- [x] **RUNS 3 AND 4 OF THE LIVE-APP TEST (9-10 Oct 2026): 4 HIGH, 11 MEDIUM, 8 LOW, TRACED, NOT
+  BUILT.** (Built 10 Oct: see the entry above.) Ashley's list, added to the hand-over's jobs. Report only, waiting on "build it".
+  Every item, its cause, and whether this branch already fixes it: `docs/test-log-2026-10-09/
+  runs-3-4-trace.md`. Fixed already: M41 (swap list sees an active adaptation), the first-log
+  record on a hold (part of M42), the add-food "re-fits" promise (part of H24), most of H6.
+  Worst open ones: H25 (a blank tick saves LAST SESSION's weight over today's plan), M40a (every
+  rebuild drops your bans from block 2 onward, checked by hand), M35 (a ban rewrites a day
+  already trained), H24 (header adds up the plan while rows show what was eaten).
+  **Four decisions are hers** (listed in the file); three are mine under the CSCS delegation and
+  are recorded there. HANDOVER.md's "a meal swap left the other meals alone" corrected (M34).
+
+- [x] **JOB 2 OF THE 9 OCT HAND-OVER: THE BRANCH VERIFIED ON A SETTLED TREE (9 Oct 2026).**
+  Full sweep at `44d4b19b`, 362 gates. A container restart killed it at 310; the other 52 were
+  run on the same commit and all passed. **Reds, read one by one:** `test:meal-quality`,
+  `test:schema-parity` and `verify:rls` are the usual environmental three (no database from a
+  cloud session); `test:coach-exam-fresh` is red by design until the exam is re-run. Four were
+  real and none was a defect in the app:
+  - `test:bounds-and-boundaries` was pinned to the Tools line my own job-1 fix changed (Tools
+    now reads THIS week of the block). Re-anchored on the property; 3/3 mutations caught.
+  - `verify:warmup-rows` needed a bodyweight lift on the day, and H4 (a day named for a body
+    part trains it) moved the Cossack squat off it. The driver now takes either of two
+    bodyweight rep lifts and says which; a mutation showing warm-ups on every lift was caught.
+  - `verify:reminders` read the streak by its old words ("N days streak"); the pill now says
+    "N sessions in a row". It reads the pill's number by testid; a mutation sending streak+1 was
+    caught.
+  - `verify:swap-request` swapped the day's FIRST exercise, which is now a movement-prep drill
+    (Band Face Pulls -> Wall Slides, two primers): the card was right to report no cost. The
+    harness now takes the first training lift (Chin-Ups -> Barbell Bench Press); a mutation
+    marking every warning as a note was caught.
+  **FOUND BY READING THE SCREENSHOT, AND FIXED (CSCS review, mine under her delegation):** the
+  swap card told a trainee that chest going from 3 sets a week to 6 was "past the point where
+  more does more, for most people". It said that on ANY rise of 40% or more, whatever the
+  numbers, and 6 sets a week is under any productive range. The comment above the counting
+  already explains why the app holds no absolute ceiling (its counting is generous), so the
+  sentence made a claim the code had deliberately refused to make. It now says the relative
+  cost it can stand behind: "...that's more to recover from before the next session that trains
+  it." The rise still costs something on the card, with the same "swap one out instead". Not on
+  this branch only: main has the same sentence. CSCS five: (1) no change to any prescription,
+  only to what a card says; (2) takes away a false claim and nothing else; (3) fundamentals
+  untouched; (4) no floor or ceiling redefined, and the fix is precisely that it stops implying
+  one; (5) in scope. `test:edit-tradeoff` §10 (4 checks, 3/3 mutations: the old sentence back,
+  the up branch switched off, the wrong number). Derived gates for the file all green, plus
+  `test:bundle`, `test:no-dead-code` and four card drivers. Screenshot re-read.
+  **Noticed, not changed:** the same card names only the biggest move (chest up), not the back
+  work the swap removes; a cross-pattern swap costs two muscles and states one.
+
+- [~] **THE 9 OCT TEST-LOG FIXES — 88 ISSUES FROM TWO RUNS AS A NEW USER, BRANCH
+  `claude/test-log-fixes-oct9` (58 commits on `main` at `0df0bc12`; NOT on `main`, nothing deployed,
+  no migration).** Ashley asked a cloud session to use the live app as a new user ("Sam") and log
+  what breaks; two runs on 8-9 Oct found 23 High, 32 Medium, 33 Low (`docs/test-log-2026-10-09/test-log-runs-1-2.md`).
+  She said "resolve all those issues". Eight read-only tracers found each cause (`docs/test-log-2026-10-09/tracer-reports/`),
+  builders fixed them in parallel lanes, and the work arrived as a git bundle (that session could
+  not push). Hand-over: `docs/test-log-2026-10-09/HANDOVER.md`. **FOLDED IN 9 Oct 2026 by the session that picked it up;
+  each lane's full entry stays in `docs/test-log-2026-10-09/backlog-entries/`, one bullet per lane here** (pasting 3,700
+  lines of reports in five layouts would have broken this list; nothing is dropped, every bullet
+  names its file).
+  - **X1 (Exercise tab):** logged cardio shows on every screen that says what you did (H7, H21,
+    M14) through one cardio reader; sets never look lost when the connection drops. `X1.md`.
+  - **X2 (Exercise tab):** Finish asks first when sets are left; the summary counts planned sets,
+    training time and both hands; a first log is a baseline, not a PR; the streak counts planned
+    sessions done, on the day trained (M12, L29, L15, M15, M16, M30, M31). `X2.md`.
+  - **X3 (Exercise tab):** "Add an exercise" offers what the day is for (M13); "What happened?"
+    offers nothing before the plan began; a card cannot slide sideways (L27). `X3.md`.
+  - **N1 (Nutrition):** typed meals no longer logged far too low ("2 eggs" was two grams), H6
+    fixes 1-4; a surprising weigh-in is asked about and the target waits for a second day (H10,
+    L31); "on the number" (L20). `N1.md`.
+  - **N2 (Nutrition):** "behind" only once its time has passed (L28, L8); resized meals in
+    measurable amounts (L18); shopping-list aisles and first-run button (L26, M23); the favourite
+    heart saves or says it did not (M21); adding a food says which meals change (H9 card only);
+    Regenerate all, mechanical half (M22). H9's search preference NOT done. `N2.md`.
+  - **O1 (Onboarding and tour):** chips belong to their question (H14, M2); edits open where tapped
+    (M4, L3); "Combat / conditioning" no longer offered (M3, an August ruling never written down);
+    a question asked mid-setup is parked, at most twice, and comes back in the first chat (M1, L4,
+    M5). `O1.md`.
+  - **P2 (Coach):** the coach is told what actually happened (H23, H22 context half, H8 context);
+    moved sessions editable from their own screen and the coach (H15, H19); ban asks first and can
+    be undone, timed-out cards look it (M10, M27, M29, M8, M26, L22, L33). `P2.md`.
+  - **E1 (Engine):** swaps carry nothing over (L30), loads respect the kit owned (H18 mechanical
+    half, H1-H3 mechanical halves), M32, L12, L14; plans written for H4, H5, H11, M25. `E1.md`.
+  - **E2 (Engine):** a day named for a body part trains it; a day's length says what it is made of
+    (H4, L17). **Two measured costs**: a band triceps move second on chest days for people with
+    cables or dumbbells, and a band raise beside the dumbbell raise on 479 of 1,728 Shoulders days;
+    leg sets per week fell about 25% (median 36 → 27). Quality on a 768-plan sample 11.522 → 11.481,
+    all `worse_implement_than_available`. `E2.md`.
+  - **A2 (Adaptations):** temporary changes leave trained days alone, cover the dates asked for,
+    can be seen and ended (H11, H5, H17 partly, M25 line, M24). A ban and a ceiling re-price still
+    rewrite trained days. `A2.md`.
+  **HER RULINGS, 9 Oct 2026** (recorded in CLAUDE.md): (1) **kit: "Remember what they say"** — keep
+  the four choices, remember specifics said in setup or to the coach, show them as ticks on
+  Profile, no new setup question, nobody's plan changes unless they say something (NOT BUILT; lead
+  `wip/k3-kit-list`); (2) **surprising weigh-in: "Ask, and hold the target"** (BUILT, N1);
+  (3) **allergy and diet path: "Build all four"** — passing "I don't eat pork" goes into Foods to
+  avoid with a tick; setup stops promising "entirely nut-free"; stricter food matching; recipe steps
+  checked against allergies and avoids (NONE BUILT).
+  **DECIDED WITHOUT ASKING HER, reversible, to put to her one at a time:** logged cardio is its own
+  line on the finish card, history and Home; a first log says "First time logged — this is your
+  baseline", no PR; the streak counts planned sessions done ("2 sessions in a row"); Finish with
+  sets left asks first; "behind" only once its time has passed; the shopping list's button reads
+  "Build my list", aisles "Dairy & eggs"; "I don't like it — and not again" bans with confirm and
+  Undo; an expired coach suggestion is greyed "This suggestion has expired — ask again"; removing an
+  injury offers a rebuild from today; an active temporary change shows on Profile and Exercise with
+  "End now"; edits made during a temporary change survive its end; day length reads "~22 min · + 15
+  optional". Every new sentence is hers to reword (most in `coach-voice.ts`).
+  **STATE WHEN PICKED UP (relayed, then re-measured below):** 252 of 257 fast gates green; red:
+  `test:bundle` (all four budgets over), `test:adaptations-respect-trained`, `test:coach-voice`,
+  `test:home-week-strip`, `test:harness-clock`. Not run on the final tree: the drivers sweep,
+  audit, quality. Nothing seen on a phone; no edge-function handler executed.
+  **Deploys once merged (her word each):** frontend; `chat-gemini`; `onboarding-chat`. No migration.
+  **Open questions and remaining work:** `docs/test-log-2026-10-09/HANDOVER.md` sections "Outstanding work" and
+  "Questions still hers".
 - [x] **A WORKOUT MADE OF TIMER BLOCKS — RULED A AND BUILT 8 Oct 2026** (plan:
   `docs/plans/timer-circuit-log.md`; on the branch, NOT on `main`). Ashley, from the gym: she
   skipped the session and did 5 x 3 min skipping rope, 3 x 30s push-ups, 3 x 30s sit-ups and

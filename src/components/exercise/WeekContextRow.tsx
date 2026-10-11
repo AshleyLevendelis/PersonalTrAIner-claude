@@ -1,8 +1,9 @@
-import { ChevronDown, MoreVertical, History, CalendarDays } from 'lucide-react'
+import type * as React from 'react'
+import { ChevronDown, MoreHorizontal, History, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
-import { GLYPH, STATE_LABEL, weekBoundaryIndex, weekBoundaryNote } from '@/lib/week-glyphs'
+import { dayLabel, weekBoundaryIndex, weekBoundaryNote } from '@/lib/week-glyphs'
 
 // ---------------------------------------------------------------------------
 // Turn 5 — merges what were three separate rows (WeekStrip, ContextLine,
@@ -25,15 +26,47 @@ import { GLYPH, STATE_LABEL, weekBoundaryIndex, weekBoundaryNote } from '@/lib/w
 // the gate asserting they were read the dead file. Deleted; this reads the one
 // source. SHORT_DAY stays local: single letters here, three on Home, which is
 // presentation and legitimately differs.
-const SHORT_DAY: Record<string, string> = {
-  Monday: 'M', Tuesday: 'T', Wednesday: 'W', Thursday: 'T',
-  Friday: 'F', Saturday: 'S', Sunday: 'S',
+/**
+ * THE DOT UNDER A DAY (design handoff 2c, 10 Oct 2026): accent when the day's
+ * training is done, warn when it was missed, none on a rest day. The brief
+ * names three; the week has ten states, and each maps to the nearest — the
+ * full state is still SPOKEN through dayLabel. Exported so the gate asks it.
+ *   done, swapped (did something else instead) → done
+ *   partial → part (a half-strength accent)
+ *   missed → missed
+ *   due (a training day not yet trained) → due (a dim dot, so it does not
+ *     read as a rest day)
+ *   moved → away (dim, like rest: the session is on the day it moved to)
+ *   rest, recovery, rest_chosen, before_plan → none
+ */
+export type StripDot = 'done' | 'part' | 'missed' | 'due' | 'away' | 'none'
+export function stripDot(state: TrainingWeekDay['state']): StripDot {
+  switch (state) {
+    case 'done': case 'swapped': return 'done'
+    case 'partial': return 'part'
+    case 'missed': return 'missed'
+    case 'due': return 'due'
+    case 'moved': return 'away'
+    default: return 'none'
+  }
+}
+const DOT_STYLE: Record<StripDot, React.CSSProperties | null> = {
+  done: { background: 'var(--primary)' },
+  part: { background: 'color-mix(in srgb, var(--primary) 50%, transparent)' },
+  missed: { background: 'var(--role-warn)' },
+  due: { background: 'var(--text-dim)' },
+  away: { boxShadow: 'inset 0 0 0 1px var(--text-dim)' },
+  none: null,
+}
+const DAY3: Record<string, string> = {
+  Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
 }
 
 export function WeekContextRow({
   days,
   todayName,
   todayDate,
+  selectedDay,
   onSelectDay,
   weekNumber,
   totalWeeks,
@@ -43,8 +76,6 @@ export function WeekContextRow({
   isCalibrationWeek,
   phaseFocus,
   coachNote,
-  estimatedMinutes,
-  shortfallNote,
   onOpenProgram,
   onOpenSessionHistory,
   onOpenWhatHappened,
@@ -56,6 +87,8 @@ export function WeekContextRow({
   todayName: string
   /** Today's date, so the line under the strip can say whether the new training week has begun. Optional: without it no line is drawn. */
   todayDate?: string
+  /** The day on screen — today, or the day being peeked at. Defaults to today. */
+  selectedDay?: string
   onSelectDay: (dayName: string) => void
   weekNumber: number
   totalWeeks: number
@@ -65,9 +98,6 @@ export function WeekContextRow({
   isCalibrationWeek?: boolean
   phaseFocus?: string
   coachNote?: string
-  estimatedMinutes?: number
-  /** Why today runs shorter than the length they asked for — see session-shortfall.ts. Absent when it does not. */
-  shortfallNote?: string
   onOpenProgram?: () => void
   onOpenSessionHistory?: () => void
   /** Opens the "What happened?" sheet for the day on screen — the five day-level verbs, on the screen too (10 Sep 2026). */
@@ -90,9 +120,10 @@ export function WeekContextRow({
   // Tab-restructure handoff — "Wk 3/16 · B1 Hypertrophy · ~52 min" as one
   // line, block number included (blockNumber was accepted as a prop before
   // this round but never actually rendered).
-  const headerParts = [`Wk ${weekNumber}/${totalWeeks}`]
+  // DESIGN HANDOFF 2c: "Week 3 of 16 · Hypertrophy" as the row's label. The
+  // day's length moved to the hero's meta line, beside the sets count.
+  const headerParts = [`Week ${weekNumber} of ${totalWeeks}`]
   if (phaseToken) headerParts.push(blockNumber != null ? `B${blockNumber} ${phaseToken}` : phaseToken)
-  if (estimatedMinutes != null) headerParts.push(`~${estimatedMinutes} min`)
 
   return (
     // NO CARD. The --surface-raised box around this row went on 6 Sep 2026
@@ -104,8 +135,9 @@ export function WeekContextRow({
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          className="min-w-0 flex-1 text-left text-[0.78125rem] text-text-tertiary"
+          className="ds-label min-w-0 flex-1 truncate text-left"
           onClick={onOpenProgram}
+          data-testid="week-context-header"
         >
           {headerParts.join(' · ')}
         </button>
@@ -129,7 +161,7 @@ export function WeekContextRow({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" aria-label="More options">
-                  <MoreVertical className="size-4" />
+                  <MoreHorizontal className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -155,13 +187,6 @@ export function WeekContextRow({
         </div>
       </div>
 
-      {/* ALWAYS VISIBLE, not behind the expander. The "~35 min" beside a
-          request for 45-60 is right there in the header; the reason has to be
-          too, or somebody reads the number and concludes the app ignored what
-          they asked for. Audit §6.5. */}
-      {shortfallNote && (
-        <p className="mt-2 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{shortfallNote}</p>
-      )}
 
       {/* THE NOTES ARE ON SCREEN, NOT ONLY BEHIND THE CHEVRON. The tour
           promises "my notes on it" for this tab, and every week of every plan
@@ -199,33 +224,44 @@ export function WeekContextRow({
         </div>
       )}
 
-      <div className="mt-3 flex items-start justify-between">
+      {/* THE DAY STRIP (2c): seven equal columns, 46px tall — the day's name
+          over a 5px dot. The day on screen (today, or the day peeked at) is
+          lifted, its name in accent and its dot hollow. Tapping another day
+          keeps the peek it always opened. A hairline before the first day of
+          a new training week says where the week changes (week boundaries S5). */}
+      <div className="mt-3 grid grid-cols-7 gap-1" data-exercise-strip>
         {days.map((d, i) => {
           const isToday = d.dayName === todayName
+          const isSelected = d.dayName === (selectedDay ?? todayName)
+          const dot = stripDot(d.state)
+          const rest = dot === 'none'
           return (
             <button
               key={d.date}
               type="button"
               onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
+              data-strip-day={d.dayName}
+              data-dot={dot}
               data-week-boundary={i === boundary ? 'start' : undefined}
-              className="hit-slop-day relative flex flex-col items-center gap-1 rounded-[9px] px-1.5 py-1"
-              style={isToday ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.4)' } : undefined}
+              aria-current={isSelected ? 'date' : undefined}
+              className="relative flex h-[46px] flex-col items-center justify-center gap-1.5 rounded-xl"
+              style={isSelected ? { background: 'var(--surface-raised)', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .4)' } : undefined}
               // This used to interpolate the raw state, so a screen reader
               // announced "Monday: before_plan" — an identifier, not English.
-              // The same defect STATE_LABEL was written to fix, still live
-              // here because that fix went into the copy nothing renders.
-              aria-label={`${d.dayName}: ${STATE_LABEL[d.state]}`}
+              // dayLabel is the vocabulary's own sentence, shared with Home's
+              // strip, and names what a swapped day was swapped for (M14).
+              aria-label={dayLabel(d)}
             >
-              {i === boundary && <span aria-hidden className="absolute -left-px top-1 bottom-1 w-px bg-border" data-testid="week-boundary-mark" />}
-              <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
-                {SHORT_DAY[d.dayName] ?? d.dayName.slice(0, 1)}
+              {i === boundary && <span aria-hidden className="absolute -left-[3px] top-1 bottom-1 w-px bg-border" data-testid="week-boundary-mark" />}
+              <span className={`text-[0.6875rem] ${isSelected ? 'font-semibold text-primary-text' : rest ? 'text-[color:var(--text-dim)]' : 'text-text-tertiary'}`}>
+                {DAY3[d.dayName] ?? d.dayName.slice(0, 3)}
               </span>
-              {isToday && d.state === 'due' ? (
-                <span aria-hidden className="size-[7px] rounded-full bg-primary glow-dot" />
+              {isSelected ? (
+                <span aria-hidden className="size-[5px] rounded-full" style={{ boxShadow: 'inset 0 0 0 1px var(--primary)' }} />
+              ) : DOT_STYLE[dot] ? (
+                <span aria-hidden className={`size-[5px] rounded-full ${dot === 'done' ? 'glow-mint-box' : ''}`} style={DOT_STYLE[dot]!} />
               ) : (
-                <span className={`text-[0.75rem] leading-none ${isToday ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}>
-                  {GLYPH[d.state]}
-                </span>
+                <span aria-hidden className="size-[5px]" />
               )}
             </button>
           )
@@ -235,7 +271,7 @@ export function WeekContextRow({
       {boundaryNote && <p className="mt-1.5 text-center text-[0.6875rem] text-muted-foreground" data-testid="week-boundary-note">{boundaryNote}</p>}
 
       {onOpenProgram && (
-        <button type="button" className="mt-3 text-[0.71875rem] font-semibold text-primary-text" onClick={onOpenProgram}>
+        <button type="button" className="hit-slop-44 mt-3 text-[0.71875rem] font-semibold text-primary-text" onClick={onOpenProgram}>
           See the whole program ›
         </button>
       )}

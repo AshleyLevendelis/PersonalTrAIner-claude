@@ -139,11 +139,21 @@ console.log('\n1. The libraries are cached separately from the app')
   // the affected gates by grepping for the changed source files can never
   // name it. Any change under src/ is a change to the bundle; run this gate
   // for all of them. 280 is 8 kB over the 272 measured today.
-  // MOVED 8 Oct 2026: 280 -> 284. Measured on a clean worktree the same day: 278.4 kB gzipped before
-  // the timer-circuit log (her ruling A) and 279.8 kB after, so that feature cost 1.3 kB and the
-  // other 6.4 kB of the old margin had eroded since 23 Sep. The new line is 4 kB above 279.8.
-  headroom('a deploy re-downloads', appGzip, 284, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 284, appGzip)
+  // MOVED 9 Oct 2026: 280 -> 305 kB gzipped, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 297. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  // MOVED 10 Oct 2026 for her six-screen layout pass (design handoff 2a-2e, 4c), on her 15 Sep ruling
+  // ("raise it with room to grow"). MEASURED through this gate, the base on a clean worktree of fc516ab4:
+  //     before Home   deploy 303 gz   paint 458 gz   app 1048 raw
+  //     after Home    deploy 305 gz   paint 461 gz   app 1055 raw
+  // Home is the default tab, so its new panels and the rotating note are first-paint code by nature.
+  // Room is left for Nutrition and Exercise, the other two first-paint screens in the same pass; each
+  // re-measures this as it lands.
+  //     after all six (Home, Nutrition, Exercise, Profile, setup, round timer), measured 10 Oct 2026:
+  //                   deploy 308 gz   paint 464 gz   app 1065 raw   (10, 10 and 25 kB of room left)
+  headroom('a deploy re-downloads', appGzip, 318, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 318, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -216,9 +226,14 @@ console.log('\n2b. The coach is not on the path to first paint')
   // worktree of the commit before: 427, so the row costs 2 kB gzipped. It sat
   // at 427 of 428 with 1 kB printed as left since 23 Sep. 437 is 8 kB over
   // today's 429, the margin every move here has used.
-  headroom('first paint fetches', firstLoadGzip, 437, 'kB gzipped')
+  // MOVED 9 Oct 2026: 437 -> 461 kB gzipped, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 453. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  // MOVED 10 Oct 2026: 461 -> 474, the layout pass — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 474, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 437, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 474, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -316,7 +331,12 @@ console.log('\n3. Nothing has crept back up')
   // real UI on a card that previously ended in three text links, and the
   // ceiling had four. Raised with room the way Ashley's 15 Sep ruling says,
   // to 24 kB of measured headroom above 961.
-  const APP_CHUNK_BUDGET_KB = 985
+  // MOVED 9 Oct 2026: 985 -> 1,052 kB raw, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 1,032. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  // MOVED 10 Oct 2026: 1,052 -> 1,090 raw, the layout pass — see the deploy figure above for both ends.
+  const APP_CHUNK_BUDGET_KB = 1090
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -516,9 +536,22 @@ console.log('\n3. Nothing has crept back up')
   // measured. The library is meant to GROW, so the next hundred dishes will
   // raise it again; the headroom line prints the remainder every run, and the
   // data is the first thing to move to a file fetched on demand if that
-  // becomes the larger half of this figure. 2,144 was 18 above the 2,126 measured on 1 Oct;
-  // 8 Oct measured 2,148 after the week-boundary and coming-back-after-a-break work, so 2,160.
-  const TOTAL_BUDGET_KB = 2160
+  // becomes the larger half of this figure. 2,116 is 18 above the 2,098 measured.
+  // MOVED 9 Oct 2026: 2,116 -> 2,221 kB raw, on her 15 Sep ruling below ("raise it with room to grow").
+  // Measured on the test-log fixes branch: 2,201. The growth is 58 commits of fixes, spread thin over core
+  // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
+  // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
+  // MOVED 10 Oct 2026: 2,221 -> 2,245, the round-timer setup sheet (design handoff 4c, the first
+  // screen of her six-screen layout pass). MEASURED both ends through this gate, the base on a clean
+  // worktree of the plan commit: before total 2219 app 1049; after total 2229 app 1048. The sheet is
+  // its own lazy chunk (8 kB) and the card row moved inside it, so the app chunk went DOWN by 1; the
+  // three figures a person waits for did not move. 2,245 is 16 above the 2,229 measured, on her 15 Sep
+  // ruling ("raise it with room to grow"); the other five screens re-measure it as they land.
+  // MOVED 10 Oct 2026: 2,245 -> 2,275, the rest of the layout pass (Home, Nutrition, Exercise,
+  // Profile, setup). MEASURED both ends through this gate: before (fc516ab4, clean worktree) total
+  // 2229; after all six, 2257 (+28, spread over the five screens' markup and four small modules).
+  // 2,275 is 18 above the 2,257 measured, on her 15 Sep ruling ("raise it with room to grow").
+  const TOTAL_BUDGET_KB = 2275
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

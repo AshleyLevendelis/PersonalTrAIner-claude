@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ShieldAlert, Info } from 'lucide-react'
 import type { ChatPendingActionView } from '@/lib/types'
+import { pendingWindowPassed } from '@/lib/pending-actions-store'
 
 // ---------------------------------------------------------------------------
 // VISION-ARCHITECTURE.md §2.4 — "rendering the effect, not prose." ONE
@@ -28,7 +29,26 @@ export function ProposalCard({
    */
   onAlternative?: (prompt: string) => void
 }) {
-  const { diff, status } = pendingAction
+  const { diff } = pendingAction
+  // A CARD THAT HAS TIMED OUT LOOKS TIMED OUT, WITHOUT BEING TAPPED (L33,
+  // 9 Oct 2026). An offer stops working after its window, and the only way
+  // anyone found out was tapping Apply on a card that looked exactly as live
+  // as the day it was made. The card now knows when it stops working: it is
+  // checked the moment it is drawn (a card restored from an earlier visit)
+  // and once more when the time comes. On the REAL clock — a window about
+  // elapsed time is measured on the clock that elapses.
+  //
+  // Decided unprompted, reversible: nothing is said about the limit while the
+  // card is live. No countdown, no "good for ten minutes".
+  const [timedOut, setTimedOut] = useState(() => pendingAction.status === 'pending' && pendingWindowPassed(pendingAction.expiresAt))
+  useEffect(() => {
+    if (pendingAction.status !== 'pending' || !pendingAction.expiresAt) return
+    const left = Date.parse(pendingAction.expiresAt) - Date.now()
+    if (!(left > 0)) { setTimedOut(true); return }
+    const timer = setTimeout(() => setTimedOut(true), Math.min(left, 2_147_000_000))
+    return () => clearTimeout(timer)
+  }, [pendingAction.status, pendingAction.expiresAt])
+  const status: ChatPendingActionView['status'] = timedOut && pendingAction.status === 'pending' ? 'expired' : pendingAction.status
   const [scope, setScope] = useState<string | undefined>(diff.editable?.find(e => e.field === 'scope')?.options[0])
   const [busy, setBusy] = useState<'confirm' | 'reject' | null>(null)
 
@@ -80,7 +100,11 @@ export function ProposalCard({
   // flow (ChatAssistant.tsx already applies the pl-9 avatar-offset to its
   // parent), a left rule standing in for the removed border/background.
   return (
-    <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--role-ai-border)] text-sm space-y-2.5">
+    <div
+      className={`mt-2 pl-3.5 border-l-2 border-[color:var(--role-ai-border)] text-sm space-y-2.5 ${status === 'expired' ? 'opacity-60' : ''}`}
+      data-testid="proposal-card"
+      data-card-status={status}
+    >
       <div className="space-y-2">
         <span className="block text-[0.59375rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--role-ai)]">
           Proposed change
@@ -144,7 +168,7 @@ export function ProposalCard({
       {isStale ? (
         <p className="text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
       ) : isTerminal ? (
-        terminalNote && <p className="text-xs text-muted-foreground">{terminalNote}</p>
+        terminalNote && <p className="text-xs text-muted-foreground" data-testid="proposal-terminal-note">{terminalNote}</p>
       ) : (
         // Fix — confirmation-card stuck loop, Part 3: these stay the primary,
         // unambiguous way to answer, sized to the same min-h-[44px] touch

@@ -13,7 +13,8 @@ import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } f
 import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { planDaysForDate } from '@/lib/plan-week'
-import type { MesocycleWeek, WorkoutDay } from '@/lib/types'
+import { swappedActivityLine } from '@/lib/cardio-lines'
+import type { ExerciseSetLog, MesocycleWeek, WorkoutDay } from '@/lib/types'
 
 export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen' | 'moved'
 
@@ -32,6 +33,15 @@ export interface TrainingWeekDay {
    * come to disagree; the state and the name now travel together.
    */
   swappedForActivity?: string | null
+  /**
+   * The same activity WITH what was logged for it — "Football · 60 min ·
+   * Hard" — or just its name when no minutes were given. Null on a day that
+   * was not swapped. Built here, from the week's own cardio rows, for the
+   * reason `swappedForActivity` is carried here: the day card, the programme
+   * view and both strips all say it, and four readers of one fact is how they
+   * come to disagree (M14 — the strip drew ⇄ and nothing else said what for).
+   */
+  swappedLine?: string | null
   /** Set on the ORIGIN of a move — where this day's session went. */
   movedTo?: { date: string; dayName: string } | null
   /** Set on the TARGET of a move — where this day's session came from. */
@@ -54,6 +64,8 @@ export interface TrainingWeekDay {
    * happened to, and there are now four ways that can be false.
    */
   session?: WorkoutDay | null
+  /** The working sets logged on this date (warm-ups out). The coach reads them to say "closed at 9 of 24" (runs 3-4, M36). */
+  workingLogs?: ExerciseSetLog[]
 }
 
 export interface TrainingWeekResult {
@@ -269,11 +281,13 @@ function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[]
       dayName,
       state,
       swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null,
+      swappedLine: swappedActivityLine(dashboardDay?.session?.swapped_for_activity, dashboardDay?.cardioLogs ?? []),
       markedMissed: !!dashboardDay?.session?.marked_missed,
       deliberateRest: !!dashboardDay?.session?.deliberate_rest,
       movedTo: resolved.movedTo,
       movedFrom: resolved.movedFrom,
       session: resolved.day,
+      workingLogs: dashboardDay?.workingLogs ?? [],
       ...(planWeek !== undefined ? { planWeek } : {}),
     }
   })

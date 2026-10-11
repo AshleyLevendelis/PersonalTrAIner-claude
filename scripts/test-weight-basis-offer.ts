@@ -46,10 +46,13 @@ import {
   headlineChange,
   offerText,
 } from '../src/lib/weight-basis-offer'
-import { rebuildForWeightBasis } from '../src/lib/plan-adaptations'
+import { rebuildForWeightBasis, untrainedPlanContext } from '../src/lib/plan-adaptations'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, MesocycleWeek } from '../src/lib/types'
+// A plan nobody has trained on: no day is protected. (A live plan loads the
+// real guard — see test:adaptations-respect-trained.)
+const GATE_CONTEXT = untrainedPlanContext({ planCreatedAt: new Date(2026, 0, 5).toISOString(), today: '2026-01-05', moves: [] })
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -141,12 +144,12 @@ console.log('\n1. Offered only when there is something dishonest to correct')
   const rebuildArgs = {
     profile: DECLINED, basisWeightKg: REAL_WEIGHT_KG, exclusions: [], weekNumbers: allWeeks,
   }
-  const rebuiltAll = await rebuildForWeightBasis({ ...rebuildArgs, mesocycle: declinedPlan })
+  const rebuiltAll = await rebuildForWeightBasis({ context: GATE_CONTEXT, ...rebuildArgs, mesocycle: declinedPlan })
   check('the un-rebuilt plan DOES change, so it is offered',
     rebuildChangesAnything(declinedPlan, rebuiltAll, allWeeks))
   check('a weight-only rebuild is STILL flagged assumed_body (sex is still a guess)',
     planHasAssumedBodyLoads(rebuiltAll))
-  const second = await rebuildForWeightBasis({ ...rebuildArgs, mesocycle: rebuiltAll })
+  const second = await rebuildForWeightBasis({ context: GATE_CONTEXT, ...rebuildArgs, mesocycle: rebuiltAll })
   check('...but re-previewing it changes nothing, so it is never re-offered',
     !rebuildChangesAnything(rebuiltAll, second, allWeeks))
 
@@ -154,8 +157,8 @@ console.log('\n1. Offered only when there is something dishonest to correct')
   // directly: preview and confirm are two separate generation runs, and if
   // they disagreed the offer could name a lift the applied rebuild never
   // contained.
-  const previewA = await rebuildForWeightBasis({ ...rebuildArgs, mesocycle: declinedPlan })
-  const previewB = await rebuildForWeightBasis({ ...rebuildArgs, mesocycle: declinedPlan })
+  const previewA = await rebuildForWeightBasis({ context: GATE_CONTEXT, ...rebuildArgs, mesocycle: declinedPlan })
+  const previewB = await rebuildForWeightBasis({ context: GATE_CONTEXT, ...rebuildArgs, mesocycle: declinedPlan })
   check('two runs of the same rebuild produce the same plan',
     !rebuildChangesAnything(previewA, previewB, allWeeks) &&
     JSON.stringify(previewA) === JSON.stringify(previewB))
@@ -180,7 +183,7 @@ console.log('\n3. The rebuild itself')
   const liveWeek = 6
   const weekNumbers = rebuildableWeekNumbers(declinedPlan, liveWeek)
   const before = declinedPlan
-  const after = await rebuildForWeightBasis({
+  const after = await rebuildForWeightBasis({ context: GATE_CONTEXT,
     profile: DECLINED, basisWeightKg: REAL_WEIGHT_KG, exclusions: [], mesocycle: before, weekNumbers,
   })
 
@@ -235,7 +238,7 @@ console.log('\n3. The rebuild itself')
   // because after the rebuild nothing about its body is assumed any more.
   const weightOnlyGap = { ...buildProfile({}), weight_kg: undefined } as UserProfile
   const gapPlan = generate(weightOnlyGap, 'wbo2')
-  const gapRebuilt = await rebuildForWeightBasis({
+  const gapRebuilt = await rebuildForWeightBasis({ context: GATE_CONTEXT,
     profile: weightOnlyGap, basisWeightKg: 85, exclusions: [],
     mesocycle: gapPlan, weekNumbers: rebuildableWeekNumbers(gapPlan, 1),
   })
@@ -258,7 +261,7 @@ console.log('\n4. What they are shown before they agree')
 // ---------------------------------------------------------------------------
 {
   const weekNumbers = rebuildableWeekNumbers(declinedPlan, 1)
-  const after = await rebuildForWeightBasis({
+  const after = await rebuildForWeightBasis({ context: GATE_CONTEXT,
     profile: DECLINED, basisWeightKg: REAL_WEIGHT_KG, exclusions: [], mesocycle: declinedPlan, weekNumbers,
   })
   const change = headlineChange(declinedPlan, after, weekNumbers)
@@ -296,7 +299,7 @@ console.log('\n4. What they are shown before they agree')
   const tiny = withoutBody(buildProfile({ training_experience: 'novice' }))
   const tinyPlan = generate(tiny, 'wbo3')
   const tinyWeeks = rebuildableWeekNumbers(tinyPlan, 1)
-  const tinyRebuilt = await rebuildForWeightBasis({
+  const tinyRebuilt = await rebuildForWeightBasis({ context: GATE_CONTEXT,
     profile: tiny, basisWeightKg: 42, exclusions: [], mesocycle: tinyPlan, weekNumbers: tinyWeeks,
   })
   const tinyChange = headlineChange(tinyPlan, tinyRebuilt, tinyWeeks)

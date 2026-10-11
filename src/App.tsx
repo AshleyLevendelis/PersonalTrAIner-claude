@@ -22,25 +22,29 @@ import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } fr
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
-import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged } from '@/lib/nutrition-targets'
+import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged, anchorTargetsAtSignUp, retargetAfterWeighIn } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
-import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, clearMealPick, type MealSlotName } from '@/lib/meal-store'
+import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { useMealPlanActions } from '@/hooks/useMealPlanActions'
 import { watchFavouriteNames } from '@/lib/favourite-meals'
 import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@/lib/meal-refit'
 import { supabase } from '@/lib/supabase'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { buildRestartedPlan } from '@/lib/plan-restart'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
-import { swapExerciseInMesocycle, banExerciseFromMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
-import { sweepStaleForTarget } from '@/lib/pending-actions-store'
-import { checkAndRevertExpiredAdaptations, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { type SwapScope } from '@/lib/mesocycle-edit'
+import { swapOnScreen } from '@/lib/screen-swap'
+import { banOnScreen, type BanOutcome } from '@/lib/screen-ban'
+import { checkAndRevertExpiredAdaptations, endAdaptationEarly, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
+import { effectiveConstraints, constraintProfile } from '@/lib/effective-constraints'
 import { reconcileToStatedCeilings } from '@/lib/ceiling-reconcile'
 import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
@@ -249,6 +253,9 @@ function App() {
    * mean the connection is down, and saying so twice adds nothing.
    */
   const [writeError, setWriteError] = useState<string | null>(null)
+  // A failure belongs to the screen it happened on (M29): leaving the tab
+  // puts it away rather than carrying "That swap didn't save" onto Nutrition.
+  useEffect(() => { setWriteError(null) }, [activeTab])
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
@@ -623,6 +630,32 @@ function App() {
   const [newPlanResetting, setNewPlanResetting] = useState(false)
   /** Injury/equipment plan_adaptations still active when the New Plan dialog opens — New Plan creates a brand-new profile row (see handleReset), which orphans anything tied to the old profile_id, including these. Fetched fresh on open (Part 3, injury-persistence fix) so the loss is named and consented-to rather than silent. */
   const [activeAdaptationsForReset, setActiveAdaptationsForReset] = useState<PlanAdaptationRow[]>([])
+  /**
+   * EVERY TEMPORARY CHANGE RUNNING NOW ("easing off your knees until 22 Oct").
+   *
+   * Loaded with the plan and re-read whenever one starts or ends. Until 9 Oct
+   * 2026 the only reader of this table was the "Start a new plan" warning
+   * above, so nothing that picked an exercise knew an adaptation existed: the
+   * travel card put Box Squat back five minutes after the knee adaptation
+   * (H17), Profile showed no sign of it (M25), and the coach was told there
+   * were no injuries on file. See effective-constraints.ts.
+   */
+  const [activeAdaptations, setActiveAdaptations] = useState<PlanAdaptationRow[]>([])
+  const [endingAdaptationId, setEndingAdaptationId] = useState<string | null>(null)
+  const refreshAdaptations = () => {
+    if (!profile?.id) return
+    getActiveAdaptations(profile.id).then(setActiveAdaptations).catch(console.error)
+  }
+  /**
+   * THE PROFILE A POOL OF EXERCISES IS BUILT FROM: the saved one, plus what is
+   * temporarily being eased off. Handed to everything that picks or offers an
+   * exercise (swap list, add, ban's replacement, session rebuild, the coach's
+   * cards). NEVER to anything that saves the profile — those keep `profile`.
+   */
+  const poolProfile = useMemo(
+    () => (profile ? constraintProfile(profile, effectiveConstraints(profile, activeAdaptations, getAppNow(profile.id))) : null),
+    [profile, activeAdaptations],
+  )
   // Chat typewriter reveal-speed preference — per-profile (reveal-speed-store.ts),
   // read once the profile resolves and written back on every change from Settings.
   const [revealSpeed, setRevealSpeedState] = useState<RevealSpeed>(DEFAULT_REVEAL_SPEED)
@@ -1126,21 +1159,42 @@ function App() {
     }
 
     // Lazy check-on-load sweep (no scheduled-job infra exists in this
-    // codebase) — silently restores any injury/equipment adaptation whose
-    // stated period has passed, surfacing only a client-authored message,
-    // never a model-narrated one.
-    if (restoredProfile.id) {
-      checkAndRevertExpiredAdaptations(restoredProfile.id).then(result => {
-        if (result.mesocycle) {
-          setMesocycle(prev => {
-            const byWeek = new Map(prev.map(w => [w.week_number, w]))
-            for (const w of result.mesocycle!) byWeek.set(w.week_number, w)
-            return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
-          })
-        }
-        if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages.map(text => ({ text }))])
-      }).catch(console.error)
-    }
+    // codebase) — ends any injury/equipment adaptation whose stated period has
+    // passed, surfacing only a client-authored message, never a model-narrated
+    // one.
+    //
+    // IT RUNS FIRST AND THE BLOCK CHECKS BELOW WAIT FOR IT (9 Oct 2026). It
+    // used to be a sibling fire-and-forget: two writers of the same weeks
+    // starting from the same snapshot, which is the exact hazard the comment
+    // on the chain below describes. And it loads the edit context once — which
+    // days are already trained, what is temporarily being eased off — for
+    // everything in that chain that rebuilds.
+    let sweptMesocycle = restoredMesocycle
+    const editContextReady = restoredProfile.id && restoredMesocycle.length > 0
+      ? loadPlanEditContext(restoredProfile, restoredMesocycle, fullMesocycle?.createdAt ?? restoredProfile.created_at ?? undefined)
+      : null
+    const adaptationSweep = editContextReady
+      ? editContextReady.then(async context => {
+          try {
+            const result = await checkAndRevertExpiredAdaptations(restoredProfile.id!, {
+              mesocycle: restoredMesocycle, isProtected: context.isProtected, profile: restoredProfile, exclusions: restoredExclusions,
+            })
+            if (result.mesocycle) {
+              sweptMesocycle = result.mesocycle
+              setMesocycle(prev => {
+                const byWeek = new Map(prev.map(w => [w.week_number, w]))
+                for (const w of result.mesocycle!) byWeek.set(w.week_number, w)
+                return [...byWeek.values()].sort((a, b) => a.week_number - b.week_number)
+              })
+            }
+            if (result.messages.length > 0) setAdaptationMessages(prev => [...prev, ...result.messages.map(text => ({ text }))])
+          } catch (err) {
+            console.error(err)
+          }
+          setActiveAdaptations(context.adaptations)
+          return context
+        })
+      : null
 
     // VISION.md Step 4 + Step 5 — same lazy check-on-load sweep pattern as
     // the adaptation-expiry check just above, run right after it. Both fire
@@ -1165,7 +1219,14 @@ function App() {
       // over, is what lets Step 6 see Step 4 and 5's patches without
       // threading them through each promise's resolved value.
       let workingMesocycle = restoredMesocycle
-      checkForBlockReview(restoredProfile.id, restoredMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+      // Set by the first link and read by the two rebuilds further down.
+      let editContext: Awaited<NonNullable<typeof editContextReady>> | null = null
+      ;(adaptationSweep ?? Promise.resolve(null))
+        .then(context => {
+          editContext = context
+          workingMesocycle = sweptMesocycle
+          return checkForBlockReview(restoredProfile.id!, workingMesocycle, restoredProfile, blockCheckPlanCreatedAt, blockCheckNow)
+        })
         .then(blockReviewResult => {
           if (blockReviewResult.mesocycle) {
             workingMesocycle = blockReviewResult.mesocycle
@@ -1202,12 +1263,16 @@ function App() {
           // already trained against would change what their own logs are
           // measured against. Idempotent — it looks for prescribed loads
           // above the ceiling, so after a rebuild there is nothing to find.
+          // No context means the plan could not be checked for trained days,
+          // and a rebuild that cannot check does not run.
+          if (!editContext) return { messages: [], violations: [] }
           return reconcileToStatedCeilings(
             restoredProfile.id!,
             workingMesocycle,
             restoredProfile,
             restoredExclusions,
             getActiveMesocycleWeek(blockCheckPlanCreatedAt, blockCheckNow, workingMesocycle.length),
+            editContext,
           )
         })
         .then(ceilingResult => {
@@ -1252,7 +1317,7 @@ function App() {
           // than the confirm, and could name a banned lift in the offer text.
           return getActiveFacts(restoredProfile.id!)
             .catch(() => [] as UserFactRow[])
-            .then(facts => checkForWeightBasisOffer({
+            .then(facts => editContext ? checkForWeightBasisOffer({
               profileId: restoredProfile.id!,
               profile: restoredProfile,
               mesocycle: workingMesocycle,
@@ -1260,7 +1325,8 @@ function App() {
               exclusions: compileExerciseExclusions(facts),
               planCreatedAt: blockCheckPlanCreatedAt,
               now: blockCheckNow,
-            }))
+              context: editContext,
+            }) : null)
         })
         .then(weightBasisOffer => {
           if (weightBasisOffer) {
@@ -1693,6 +1759,16 @@ function App() {
     if (data) {
       enrichedProfile.id = data.id
       localStorage.setItem(STORAGE_KEY, data.id)
+      // THE FIRST ANCHOR. The 1 kg rule compares the 7-day average with "the
+      // average that last set the target", and at sign-up nothing had recorded
+      // one — so the first weigh-in became it, and 82 kg -> 81.2 kg the same
+      // day moved the target (test log H10). Written here, held in state so
+      // this session reads it without a reload. Not awaited beyond the write
+      // itself failing quietly: a missed anchor is the old behaviour, never a
+      // blocked sign-up.
+      anchorTargetsAtSignUp(data.id, enrichedProfile, calculatedMacros)
+        .then(anchorKg => { if (anchorKg != null && activeProfileIdRef.current === data.id) setTargetWeightAnchorKg(anchorKg) })
+        .catch(err => console.error('Anchoring the first targets failed:', err))
       // Conversational-onboarding draft: context facts / goals volunteered
       // mid-conversation queue in the draft (user_context_facts/user_goals
       // need a profile_id that didn't exist until this insert). Flush them
@@ -1942,7 +2018,9 @@ function App() {
     // deleted rather than left unreachable: an unreachable second writer is
     // one restored code path away from being the same bug again.
     if (action.type === 'ban_exercise') {
-      handleBanExercise(action.exercise_name)
+      // No sheet on this path to show the result in, so a failure goes to
+      // the one write-error slot as it always did.
+      void handleBanExercise(action.exercise_name).then(r => setWriteError(r.error))
     }
   }
 
@@ -2008,98 +2086,39 @@ function App() {
   // wired to swapPoolMeal in M0). Picking a specific alternative just
   // records the choice as a session-local override (manualMealPicks) —
   // the pool itself doesn't change, only which option is "today's pick".
-  const handleSwapMealSlot = async (slot: MealSlotName, chooseName: string) => {
-    if (!profile?.id) return
-    const applied = await swapPoolMeal(profile.id, slot, chosenMeals[slot]?.name, chooseName)
-    if (!applied) return
-    // Persist BEFORE updating the on-screen pick (UX-sweep fix) — this used
-    // to update React state first, so a confirmed swap could look applied
-    // on screen even when the write below never landed.
-    const todayDate = getSessionDateContext(profile.id).date
-    try {
-      await setMealPick(profile.id, todayDate, slot, applied.name)
-    } catch (err) {
-      console.error('handleSwapMealSlot: setMealPick failed — not applying the swap on screen', err)
-      return
-    }
-    setManualMealPicks(prev => ({ ...prev, [slot]: applied.name }))
-    // §2.3 — same sweep as the exercise swap path, same scope_key prefix propose_meal_swap uses.
-    await sweepStaleForTarget(profile.id, `${profile.id}:propose_meal_swap:${slot}`)
-  }
-
-  const handleRegenerateMealSlot = async (slot: MealSlotName) => {
-    if (!profile?.id || !macros) return
-    setIsGeneratingMeals(true)
-    setMealRegenerateError(null)
-    const hadExistingOptions = (mealPools[slot]?.length ?? 0) > 0
-    try {
-      const result = await generateMealPools({
-        profileId: profile.id,
-        targets: macros,
-        dietaryPreferences: profile.dietary_preferences,
-        mealsPerDay: profile.meals_per_day,
-        includeSnacks: profile.include_snacks,
-        cookingTimePreference: profile.cooking_time_preference,
-        favoriteCuisines: profile.favorite_cuisines,
-        dislikedFoods: effectiveDislikedFoods,
-        timingRules: compiledTimingRules,
-        breakfastStyle: profile.breakfast_style,
-        likedFoods: typedFoodLikes,
-        favouriteMeals: steerableFavouriteMeals,
-        onlySlots: [slot],
-      })
-      // Surfacing round — a dietary_preferences value the app can't enforce
-      // fails every proposal identically, so this is checked before anything
-      // else and short-circuits: there's nothing a per-slot message or a
-      // retry can add once the actual cause is known.
-      if (result.unrecognisedPreferences.length > 0) {
-        setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
-        return
-      }
-      setUnrecognisedDietaryRestrictions(null)
-      // A total failure comes back as an empty array for the slot — persistPools
-      // already leaves that slot's DB rows untouched in that case, so mirror
-      // that here: don't overwrite the on-screen pool or clear the manual pick
-      // with nothing. Only apply/clear when generation actually produced
-      // options for this slot.
-      if ((result.accepted[slot]?.length ?? 0) === 0) {
-        // Don't claim options were "kept" when this slot never had any —
-        // that reads as a lie the first time generation fails on a fresh
-        // plan, when the pool was already empty going in. generatorReached
-        // distinguishes "the call worked, nothing fit" (deterministic — name
-        // what'd help) from "the call itself failed" (transient — try again
-        // is the honest advice there).
-        setMealRegenerateError(
-          result.generatorReached
-            ? (hadExistingOptions
-                ? `${couldNot(`fit a new ${MEAL_SLOT_LABEL[slot]} option`)} I've kept your existing one — try loosening a restriction or widening your calorie range.`
-                : `${MEAL_SLOT_LABEL[slot]} doesn't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off this slot.`)
-            : (hadExistingOptions
-                ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
-                : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`)
-        )
-        return
-      }
-      // READ BACK, not the generator's answer: what was stored also holds the
-      // meals that survive a regenerate (hearted, or asked for by name), and
-      // drops a fresh one sharing a kept one's name. Showing `accepted` left
-      // kept meals off the screen until the next reload. If the read fails,
-      // the generator's answer is still better than nothing.
-      const stored = await getPools(profile.id).catch(() => null)
-      setMealPools(prev => stored ?? ({ ...prev, ...result.accepted }))
-      setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
-      const todayDate = getSessionDateContext(profile.id).date
-      await clearMealPick(profile.id, todayDate, slot)
-    } catch {
-      setMealRegenerateError(
-        hadExistingOptions
-          ? `${couldNot(`refresh ${MEAL_SLOT_LABEL[slot]}`)} I've kept your existing options.`
-          : `${couldNot(`generate ${MEAL_SLOT_LABEL[slot]}`)} Try again in a moment.`
-      )
-    } finally {
-      setIsGeneratingMeals(false)
-    }
-  }
+  // SWAP, REGENERATE ONE, REGENERATE ALL live in src/lib/meal-plan-actions.ts
+  // since 9 Oct 2026 (test log M22), behind a hook the browser harness shares
+  // — they sat here as three inline handlers that no driver could reach. This
+  // hands the hook what the screen holds; the hook hands back the handlers.
+  const mealActions = useMealPlanActions({
+    profileId: profile?.id,
+    today: () => getSessionDateContext(profile?.id).date,
+    pools: mealPools,
+    picks: manualMealPicks,
+    showingName: slot => chosenMeals[slot]?.name,
+    generation: profile?.id && macros ? {
+      profileId: profile.id,
+      targets: macros,
+      dietaryPreferences: profile.dietary_preferences,
+      mealsPerDay: profile.meals_per_day,
+      includeSnacks: profile.include_snacks,
+      cookingTimePreference: profile.cooking_time_preference,
+      favoriteCuisines: profile.favorite_cuisines,
+      dislikedFoods: effectiveDislikedFoods,
+      timingRules: compiledTimingRules,
+      breakfastStyle: profile.breakfast_style,
+      likedFoods: typedFoodLikes,
+      favouriteMeals: steerableFavouriteMeals,
+    } : null,
+    slotLabel: MEAL_SLOT_LABEL,
+    setPools: setMealPools,
+    setPicks: setManualMealPicks,
+    setGenerating: setIsGeneratingMeals,
+    setError: setMealRegenerateError,
+    setUnrecognised: setUnrecognisedDietaryRestrictions,
+  })
+  const handleSwapMealSlot = mealActions.swap
+  const handleRegenerateMealSlot = mealActions.regenerateSlot
 
   /**
    * SAME MEALS, NEW AMOUNTS — the confirm half of Ashley's 17 Sep ruling.
@@ -2158,103 +2177,7 @@ function App() {
     setMealRefitDeclineTick(t => t + 1)
   }
 
-  const handleRegenerateAllMeals = async () => {
-    if (!profile?.id || !macros) return
-    setIsGeneratingMeals(true)
-    setMealRegenerateError(null)
-    const priorPools = mealPools
-    try {
-      const result = await generateMealPools({
-        profileId: profile.id,
-        targets: macros,
-        dietaryPreferences: profile.dietary_preferences,
-        mealsPerDay: profile.meals_per_day,
-        includeSnacks: profile.include_snacks,
-        cookingTimePreference: profile.cooking_time_preference,
-        favoriteCuisines: profile.favorite_cuisines,
-        dislikedFoods: effectiveDislikedFoods,
-        timingRules: compiledTimingRules,
-        breakfastStyle: profile.breakfast_style,
-        likedFoods: typedFoodLikes,
-        favouriteMeals: steerableFavouriteMeals,
-      })
-      // Surfacing round — checked first and short-circuits, same reasoning
-      // as the single-slot handler above: an unrecognised restriction fails
-      // every slot identically, so there's nothing the failure-count logic
-      // below needs to run for.
-      if (result.unrecognisedPreferences.length > 0) {
-        setUnrecognisedDietaryRestrictions(result.unrecognisedPreferences)
-        return
-      }
-      setUnrecognisedDietaryRestrictions(null)
-
-      const requestedSlots = Object.keys(result.accepted) as MealSlotName[]
-      const failedSlots = requestedSlots.filter(s => (result.accepted[s]?.length ?? 0) === 0)
-
-      if (failedSlots.length === requestedSlots.length && requestedSlots.length > 0) {
-        // Total failure — every requested slot came back empty. Leave the
-        // existing plan and manual picks untouched entirely (persistPools
-        // already left the DB untouched too) rather than replacing a real
-        // plan with the cold-start empty state. generatorReached splits
-        // "the call worked, nothing fit your targets" (deterministic — name
-        // what'd help) from "the call itself failed" (transient — retrying
-        // is genuinely the right advice there).
-        setMealRegenerateError(
-          result.generatorReached
-            ? "Nothing fits your current targets right now. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot — then regenerate."
-            : `${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`
-        )
-        return
-      }
-
-      // Partial failure: keep the prior pool for any slot that came back
-      // empty instead of blanking it, matching persistPools' own per-slot
-      // skip-on-empty behavior at the DB layer.
-      setMealPools(prev => {
-        const next = { ...prev }
-        for (const [s, options] of Object.entries(result.accepted) as [MealSlotName, PoolOption[]][]) {
-          if (options.length > 0) next[s] = options
-        }
-        return next
-      })
-      // PICKS ARE CLEARED ONLY WHERE THE MEALS ACTUALLY CHANGED, which is the
-      // half the block above already got right and this line did not. It used
-      // to clear every pick unconditionally, so a slot whose regeneration
-      // FAILED kept its old meals — carefully, deliberately — and then lost
-      // the pick that made one of them hers anyway. The meal survived and
-      // stopped being her choice, for no reason anyone could see.
-      const regeneratedSlots = (Object.entries(result.accepted) as [MealSlotName, PoolOption[]][])
-        .filter(([, options]) => options.length > 0)
-        .map(([slot]) => slot)
-      setManualMealPicks(prev => {
-        const next = { ...prev }
-        for (const slot of regeneratedSlots) delete next[slot]
-        return next
-      })
-      const todayDate = getSessionDateContext(profile.id).date
-      for (const slot of regeneratedSlots) await clearMealPick(profile.id, todayDate, slot)
-
-      if (failedSlots.length > 0) {
-        // Split by whether each failed slot actually had prior options to
-        // "keep" — a fresh plan whose lunch pool has always been empty gets
-        // an honest "couldn't generate" message, not a false "kept" claim.
-        // Reaching this branch at all means at least one other slot DID
-        // fill, which is positive proof the generator was reached this run
-        // — so a failed slot here is provably the "nothing fit" case, not
-        // "the call failed" (that's the total-failure branch above).
-        const keptSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) > 0)
-        const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
-        const parts: string[] = []
-        if (keptSlots.length > 0) parts.push(`${couldNot(`fit new options for ${keptSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')}`)} I've kept what you had.`)
-        if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => MEAL_SLOT_LABEL[s]).join(', ')} don't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off a slot.`)
-        setMealRegenerateError(parts.join(' '))
-      }
-    } catch {
-      setMealRegenerateError(`${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`)
-    } finally {
-      setIsGeneratingMeals(false)
-    }
-  }
+  const handleRegenerateAllMeals = mealActions.regenerateAll
 
   // Vision Step 6 — the one message in adaptationMessages that's an action
   // rather than a fact, so it needs real handlers instead of a plain
@@ -2308,6 +2231,7 @@ function App() {
         planCreatedAt: mesocycleCreatedAt ?? profile.created_at ?? new Date().toISOString(),
         mesocycleCreatedAt: mesocycleCreatedAt ?? profile.created_at,
         now: getAppNow(profile.id),
+        context: await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at),
       })
       if (!rebuilt) {
         // confirmWeightBasisOffer returns null when it did NOT rebuild — the
@@ -2422,76 +2346,35 @@ function App() {
       })
       if (r.applied.length === 0 || r.nextWeekNumber == null) return
       setMesocycle(r.next)
-      setAdaptationMessages(prev => [...prev, { text: calibrationAnchorMessage(r.nextWeekNumber!, r.applied) }])
+      // Null when next week's own number did not move (a later week of the
+      // block did): the plan is adopted either way, and nothing is announced
+      // that the person could not go and see.
+      const said = calibrationAnchorMessage(r.nextWeekNumber!, r.applied)
+      if (said) setAdaptationMessages(prev => [...prev, { text: said }])
     } catch (err) {
       console.error('[calibration-anchor] failed to re-anchor the program:', err)
     }
   }
 
-  const handleBanExercise = async (exerciseName: string) => {
-    if (!profile?.id) return
-    // Fix — food/exercise preferences have two competing stores: this used
-    // to read-modify-write `fitness_profiles.exercise_exclusions` (with a
-    // fresh-read-before-append dance specifically to avoid clobbering a
-    // concurrent chat-side write to the SAME column, per fix 4's original
-    // comment). Writing a user_facts row instead makes that whole race
-    // structurally impossible — each ban is an independent INSERT, not a
-    // read-modify-write of a shared array cell, so there's nothing left to
-    // clobber and nothing to read fresh before appending to.
-    if (compiledExerciseExclusions.includes(exerciseName)) return
-    // Audit §3.2 — this write had NO error handling at all. Offline it threw,
-    // the handler stopped here before changing anything, and the rejection
-    // went nowhere: no ban, no error, no visual change whatsoever. The user
-    // tapped "never show me this again" and the app simply ignored them,
-    // which is the worst of the three possible outcomes because it gives
-    // them nothing to react to.
-    try {
-      await createFact({
-        profileId: profile.id,
-        kind: 'exercise_preference',
-        source: 'manual',
-        rawPhrase: exerciseName,
-        displayText: `won't eat/do ${exerciseName}`,
-        polarity: 'dislike',
-        hardness: 'hard',
-        resolvedRefs: [exerciseName],
-      })
-      await reloadMemory(profile.id)
-    } catch (err) {
-      console.error('Recording the ban failed:', err)
-      setWriteError(`${couldNot('save that')} ${exerciseName} hasn't been removed — check your connection and try again.`)
-      return
-    }
-    setWriteError(null)
-    const updated = [...new Set([...compiledExerciseExclusions, exerciseName])]
-
-    // Single source of truth is the mesocycle — exercisePlan (the flat,
-    // non-periodized base plan) is display-only fallback for when no
-    // mesocycle exists yet and is never mutated by swap/ban directly.
-    if (mesocycle.length === 0) return
-    const updatedMesocycle = await banExerciseFromMesocycle({
-      mesocycle,
-      profile,
-      bannedName: exerciseName,
-      exclusions: updated,
+  /**
+   * The write behind a ban — recording the preference, rewriting the plan,
+   * and handing back an Undo that reverses both (screen-ban.ts, shared with
+   * the browser harness). Reached only AFTER the Exercise tab's confirm sheet
+   * (M10, 9 Oct 2026): until then this ran on one tap of a menu item, with no
+   * question before it and no word after it. The sheet shows the result, so
+   * a failure is said where the tap was rather than at the top of the page.
+   */
+  const handleBanExercise = async (exerciseName: string): Promise<BanOutcome> => {
+    if (!profile?.id) return { error: null, banned: false, undo: null }
+    const profileId = profile.id
+    return banOnScreen({
+      // The replacement must not be something a running adaptation rules out.
+      profile: poolProfile ?? profile, mesocycle, exerciseName,
+      exclusions: compiledExerciseExclusions,
+      planCreatedAt: mesocycleCreatedAt,
+      show: setMesocycle,
+      reloadMemory: () => reloadMemory(profileId),
     })
-    setMesocycle(updatedMesocycle)
-    if (profile.id) {
-      try {
-        // Preserve the plan's original creation time — this is an EDIT of the
-        // live plan, not a new plan; without it the resave would rewind
-        // live-week detection to week 1.
-        await saveMesocycle(profile.id, updatedMesocycle, mesocycleCreatedAt ?? profile.created_at)
-      } catch (err) {
-        // The preference row above DID land, so the ban itself is real and
-        // survives — it is only this plan's rewrite that failed. Say exactly
-        // that rather than the generic "didn't save", which would send
-        // someone off to re-tap a button that already worked.
-        console.error('Persisting ban failed:', err)
-        setMesocycle(mesocycle)
-        setWriteError(`${exerciseName} won't be picked again, but this plan couldn't be updated — reopen the app to retry.`)
-      }
-    }
   }
 
   const handleSwapExercise = async (
@@ -2502,44 +2385,13 @@ function App() {
     scope: SwapScope
   ) => {
     if (!profile || mesocycle.length === 0) return
-
-    const updatedMesocycle = await swapExerciseInMesocycle({
-      mesocycle,
-      profile,
-      currentWeekNumber: weekNumber,
-      dayName,
-      exIndex,
-      newExercise,
-      scope,
-    })
-    setMesocycle(updatedMesocycle)
-
-    if (!profile.id) return
-    try {
-      // THE THIRD COPY OF THIS BRANCH, removed 15 Sep 2026. saveScopedEdit
-      // was extracted to own it precisely so the screen's swap and the
-      // coach's could not disagree about which weeks reached the database —
-      // and then both kept their own copy anyway, the executor's under a
-      // comment promising it "mirrors handleSwapExercise exactly". This was
-      // the original the other two claimed to mirror. Identical behaviour:
-      // 'today' is one week, 'permanent' is the rest of that week's block.
-      await saveScopedEdit(profile.id, updatedMesocycle, weekNumber, scope)
-      // VISION-ARCHITECTURE.md §2.3 — "after any tap mutation, sweep pending
-      // proposals on the same target and mark them stale immediately, so
-      // the user never taps Confirm on a card invalidated by their own tap
-      // a second earlier." Same scope_key prefix the chat swap proposal
-      // uses (buildExerciseSwapProposal, ChatAssistant.tsx).
-      await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
-      setWriteError(null)
-    } catch (err) {
-      // Audit §3.1 — this used to be console.error alone, so a swap that
-      // never reached the database looked identical to one that did until
-      // the next reload put the old exercise back. Put the screen back to
-      // the truth AND say so: a silent revert is its own small betrayal.
-      console.error('Persisting swap failed:', err)
-      setMesocycle(mesocycle)
-      setWriteError("That swap didn't save — check your connection and try again.")
-    }
+    // ONE FUNCTION, shared with the browser harness (screen-swap.ts) so a
+    // driver taps the same swap this screen runs. It says when nothing
+    // changed, and puts the plan back when the write fails.
+    setWriteError(await swapOnScreen({
+      profile, mesocycle, weekNumber, dayName, exIndex, newExercise, scope,
+      show: setMesocycle,
+    }))
   }
 
   /**
@@ -2594,6 +2446,40 @@ function App() {
     if (text) setAdaptationMessages(prev => [...prev, { text }])
   }
 
+  /**
+   * "END NOW" — Profile's line, the Exercise tab's line and the coach's
+   * "recovered" card all land here. The coach has always said "tell me anytime
+   * to end it early"; until 9 Oct 2026 nothing could.
+   *
+   * Puts back what the adaptation itself changed, on days not yet trained,
+   * and keeps anything the person has edited on those days since
+   * (revertAdaptationChanges). Returns a sentence when it could not, so the
+   * caller says so instead of the line quietly staying put.
+   */
+  const handleEndAdaptation = async (adaptationId: string): Promise<string | null> => {
+    if (!profile?.id || endingAdaptationId) return null
+    setEndingAdaptationId(adaptationId)
+    try {
+      const context = await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at)
+      const result = await endAdaptationEarly(profile.id, adaptationId, {
+        mesocycle, isProtected: context.isProtected, profile, exclusions: effectiveExclusions,
+      })
+      if (!result.mesocycle) {
+        refreshAdaptations()
+        return "That didn't end just now — try again in a moment."
+      }
+      setMesocycle(result.mesocycle)
+      setActiveAdaptations(prev => prev.filter(a => a.id !== adaptationId))
+      setLogsVersion(v => v + 1)
+      return null
+    } catch (err) {
+      console.error('Ending an adaptation early failed:', err)
+      return "That didn't end just now — try again in a moment."
+    } finally {
+      setEndingAdaptationId(null)
+    }
+  }
+
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
     setRebuilding(true)
@@ -2601,7 +2487,10 @@ function App() {
       const currentWeek = getActiveMesocycleWeek(
         mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4,
       )
-      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek)
+      // Which days are already trained, read at the moment of the tap: the
+      // rebuild leaves every one of them exactly as it is.
+      const context = await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at)
+      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context)
       if (!result.ok || !result.mesocycle) {
         setWriteError(result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`)
         return
@@ -2730,6 +2619,10 @@ function App() {
       // not plan data, and queued sets carry their own profile id so they can
       // still sync). `test:reset-clears-draft` holds the whole list.
       clearOnboardingDraft()
+      // A question parked during the OLD plan's setup ("I'll answer that once
+      // you're set up") is owed to that setup's first chat, not the next
+      // one's. test:reset-clears-draft caught this key the day it was added.
+      localStorage.removeItem('fitplan_parked_questions')
       // Found by that same audit: the tab the OLD profile was last on would
       // otherwise greet the new one after onboarding.
       localStorage.removeItem(LAST_TAB_KEY)
@@ -2825,17 +2718,14 @@ function App() {
   /** Re-derives targets after a new weigh-in lands (Part 5's capture calls this). */
   const handleWeightLogged = async () => {
     if (!profile?.id) return
-    const weight = await getLatestWeightKg(profile.id).catch(() => null)
-    setLatestWeightKg(weight)
-    // A fresh weigh-in is exactly the case the anchor threshold exists for —
-    // recompute it (it may or may not actually move, see
-    // getEffectiveTargetWeightKg's doc comment) rather than assuming this
-    // new reading itself is the new anchor.
-    const effectiveTargetWeight = await getEffectiveTargetWeightKg(profile.id, weight ?? profile.weight_kg)
-    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
-    const targets = computeTargets(profile, { latestWeightKg: effectiveTargetWeight.weightKg, exercisePlan })
+    // One function for the whole chain (nutrition-targets.ts), so the 7-day /
+    // 1 kg ruling it carries is run by a gate rather than read off this file.
+    const retarget = await retargetAfterWeighIn(profile.id, profile, exercisePlan)
+    const targets = retarget.targets
+    setLatestWeightKg(retarget.latestWeightKg)
+    setTargetWeightAnchorKg(retarget.anchorKg)
     setMacros(targets)
-    snapshotTargetsIfChanged(profile.id, profile, targets, effectiveTargetWeight.weightKg).then(result => {
+    retarget.recorded.then(result => {
       const moved = result.previous && targets ? targetsMoved(result.previous, targets, 'weigh_in') : null
       if (result.changedFromPrior && moved) {
         setAdaptationMessages(prev => [...prev, { text: moved }])
@@ -2848,15 +2738,16 @@ function App() {
     // deliberately-light plan forever. Ashley's ruling was to ask rather than
     // rebuild silently, so this only ever surfaces an offer.
     if (mesocycle.length > 0 && planHasAssumedBodyLoads(mesocycle)) {
-      checkForWeightBasisOffer({
-        profileId: profile.id,
+      loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at).then(context => checkForWeightBasisOffer({
+        profileId: profile.id!,
         profile,
         mesocycle,
-        basisWeightKg: effectiveTargetWeight.weightKg,
+        basisWeightKg: retarget.anchorKg,
         exclusions: compiledExerciseExclusions,
         planCreatedAt: mesocycleCreatedAt ?? profile.created_at ?? new Date().toISOString(),
         now: getAppNow(profile.id),
-      })
+        context,
+      }))
         .then(offer => {
           // Never stacks: checkForWeightBasisOffer returns the SAME row while
           // one is outstanding, so a second weigh-in re-surfaces the existing
@@ -2875,7 +2766,7 @@ function App() {
     const goals = await getActiveGoals(profile.id).catch(() => [])
     const weightGoal = goals.find(g => g.metric === 'body_weight_kg')
     if (weightGoal) {
-      const info = effectiveTargetWeight.weightKg == null ? null : describeGoalProximity(effectiveTargetWeight.weightKg, weightGoal)
+      const info = retarget.anchorKg == null ? null : describeGoalProximity(retarget.anchorKg, weightGoal)
       if (info && !isGoalProximityDismissed(info.goalId)) {
         setAdaptationMessages(prev => prev.some(m => m.goalId === info.goalId) ? prev : [...prev, { text: info.message, goalId: info.goalId }])
       }
@@ -3093,7 +2984,22 @@ function App() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+        {/* M29, 9 Oct 2026. This sat in the page's flow ABOVE the tabs, so a
+            failed swap mid-session printed its sentence a screen and a half
+            above the tap and the person saw nothing happen; it then followed
+            them from tab to tab until dismissed. It is now pinned to the top of
+            the VIEWPORT, under the offline pill, so it is on screen wherever
+            the page is scrolled, and it is cleared when the tab changes (the
+            effect beside `writeError`). Still one slot, still not a queue. */}
         {writeError && (
+          // Opaque underneath: the warning tint is translucent, and a
+          // message floating over a set grid has to be readable against it.
+          <div
+            role="alert"
+            data-testid="write-error"
+            className="fixed left-3 right-3 z-40 rounded-2xl bg-background shadow-lg"
+            style={{ top: 'calc(3.25rem + env(safe-area-inset-top))' }}
+          >
           <InsightBanner tone="warning" className="items-start justify-between">
             <span>{writeError}</span>
             <button
@@ -3104,6 +3010,7 @@ function App() {
               Dismiss
             </button>
           </InsightBanner>
+          </div>
         )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsContent value="dashboard">
@@ -3146,6 +3053,7 @@ function App() {
               onMacroSplitChange={handleMacroSplitChange}
               profileId={profile.id}
               date={getSessionDateContext(profile.id).date}
+              planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
               pools={mealPools}
               chosen={chosenMeals}
               mealTotals={mealTotals}
@@ -3160,6 +3068,7 @@ function App() {
               onRegenerateMealSlot={handleRegenerateMealSlot}
               onFindMoreOptions={handleFindMoreMealOptions}
               onRegenerateAllMeals={handleRegenerateAllMeals}
+              mealsRegeneratingAll={mealActions.regeneratingAll}
               mealRefit={mealRefitOffer}
               mealRefitBusy={mealRefitBusy}
               mealRefitError={mealRefitError}
@@ -3174,6 +3083,8 @@ function App() {
               mealStrip={mealDays.strip}
               upcomingDay={mealDays.openDay}
               dayMove={mealDays.dayMove}
+              heldAround={mealDays.today?.day.heldAround}
+              onKeepHeldSizes={mealDays.keepHeldSizes}
             />
             )}
           </TabsContent>
@@ -3184,7 +3095,12 @@ function App() {
               mesocycle={mesocycle}
               exclusions={effectiveExclusions}
               softExercisePreferences={compiledSoftExercisePreferences}
-              profile={profile ?? undefined}
+              profile={poolProfile ?? profile ?? undefined}
+              storedProfile={profile ?? undefined}
+              activeAdaptations={activeAdaptations}
+              endingAdaptationId={endingAdaptationId}
+              onEndAdaptation={handleEndAdaptation}
+              onAdaptationsChanged={refreshAdaptations}
               profileId={profile?.id}
               planCreatedAt={mesocycleCreatedAt ?? profile?.created_at}
               devOverrideWeek={devOverrideWeek}
@@ -3206,7 +3122,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} planCreatedAt={mesocycleCreatedAt ?? profile.created_at} logsVersion={logsVersion} onLogsUpdated={() => setLogsVersion(v => v + 1)} />
+            <ToolsTab profileId={profile.id} equipmentAccess={profile.equipment_access} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} planCreatedAt={mesocycleCreatedAt ?? profile.created_at} logsVersion={logsVersion} onLogsUpdated={() => setLogsVersion(v => v + 1)} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">
@@ -3216,6 +3132,11 @@ function App() {
             <Suspense fallback={<ScreenLoading />}>
             <ChatAssistant
               profile={profile}
+              poolProfile={poolProfile ?? profile}
+              activeAdaptations={activeAdaptations}
+              onAdaptationsChanged={refreshAdaptations}
+              onEndAdaptation={handleEndAdaptation}
+              onPlanInvalidated={setPlanInvalidation}
               macros={macros}
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
@@ -3240,6 +3161,7 @@ function App() {
               onMealDayMovePlan={mealDays.dayMove.plan}
               onMealDayMoveConfirm={mealDays.dayMove.confirm}
               onMealDayMoveUndo={mealDays.dayMove.undo}
+              onMealKnockOn={mealDays.dayMove.knockOn}
               mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}
@@ -3302,11 +3224,16 @@ function App() {
         latestWeightKg={latestWeightKg}
         onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
         onPlanInvalidated={setPlanInvalidation}
+        activeAdaptations={activeAdaptations}
+        endingAdaptationId={endingAdaptationId}
+        onEndAdaptation={handleEndAdaptation}
         onCeilingsCorrected={handleCeilingsCorrected}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
+        backLabel={activeTab === 'chat' ? 'Chat' : activeTab[0].toUpperCase() + activeTab.slice(1)}
+        calorieTarget={macros?.calories ?? null}
         onNewPlan={() => {
           setActiveAdaptationsForReset([])
           if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)

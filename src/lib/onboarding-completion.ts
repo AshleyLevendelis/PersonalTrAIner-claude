@@ -76,7 +76,7 @@ export function closeOutOpenQuestions<T extends CompletableMessage>(messages: T[
     if (m.role !== 'assistant' || m.isReceipt) { out.push(m); continue }
     // A card is an invitation to answer something. Nothing is owed now.
     const cleaned = m.slotCard || m.slotCardEditing || m.asksSlot
-      ? { ...m, slotCard: undefined, slotCardEditing: undefined, asksSlot: undefined }
+      ? { ...m, slotCard: undefined, slotCardSuperseded: undefined, slotCardEditing: undefined, asksSlot: undefined }
       : m
     if (!cleaned.content.includes('?')) { out.push(cleaned); continue }
     // The first question becomes the app's closing line. Any further one is

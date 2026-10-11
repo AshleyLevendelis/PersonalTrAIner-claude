@@ -1,8 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
-import { computeMealMacros, type MealIngredientLine } from "../_shared/food-db.ts";
+import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
 import { readIngredientText } from "../_shared/ingredient-units.ts";
+import { weighInQuestion } from "../_shared/weigh-in-check.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
@@ -1224,14 +1225,14 @@ const toolDeclarations = [
   {
     name: "propose_style_change",
     description:
-      "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / combat / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
+      "PROPOSES changing HOW the user trains — their training style (functional / bodybuilding / hybrid) — then rebuilding the plan from the live week forward. This does NOT apply anything: the app shows a before/after card and the user taps Confirm. Weeks already underway or finished are never rewritten; anything logged stays exactly as it is. The style changes the exercises chosen AND the rep ranges, not just a label — say so. ONLY for a LASTING change to how they train. 'Make today harder', 'give me a bodybuilding session today', 'I want a different workout' are NOT style changes — nothing about them asks to retrain for the rest of the plan; answer those in text or with a swap, never with this.",
     parameters: {
       type: "object",
       properties: {
         training_style: {
           type: "string",
-          enum: ["functional", "bodybuilding", "combat", "hybrid"],
-          description: "The style they want from now on. functional = athletic/explosive; bodybuilding = aesthetics/symmetry, higher reps; combat = fight-ready conditioning, heavy main lifts; hybrid = a balance of all three.",
+          enum: ["functional", "bodybuilding", "hybrid"],
+          description: "The style they want from now on. functional = athletic/explosive; bodybuilding = aesthetics/symmetry, higher reps; hybrid = a balance of the two.",
         },
         reason: {
           type: "string",
@@ -1502,7 +1503,7 @@ const toolDeclarations = [
   {
     name: "log_weight",
     description:
-      "Records the user's body-weight for today. Call whenever the user reports a weigh-in (e.g. 'I weighed 86.4 this morning', 'scale said 190 lbs today'). Convert pounds to kilograms before calling (1 lb = 0.453592 kg). One entry per day — a second weigh-in today overwrites the first.",
+      "Records the user's body-weight for today. Call whenever the user reports a weigh-in (e.g. 'I weighed 86.4 this morning', 'scale said 190 lbs today'). Convert pounds to kilograms before calling (1 lb = 0.453592 kg). One entry per day — a second weigh-in today overwrites the first. A weight far from their last weigh-in is NOT saved by this call: the app shows them a card asking whether it is right, and saves it when they tap yes — so on that turn nothing has been logged and you must not say it has.",
     parameters: {
       type: "object",
       properties: {
@@ -1564,7 +1565,7 @@ const toolDeclarations = [
         assumptions: {
           type: "array",
           items: { type: "string" },
-          description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. A short phrase each, e.g. 'assumed 0% fat greek yoghurt' — never your reasoning about what tool to call or why, that is not an assumption and must never appear here. Empty array if you made none.",
+          description: "Plain-English notes on any assumption you made — an ambiguous variant you picked, or a portion size you guessed because none was given. A short phrase each, naming only the thing you assumed, e.g. '0% fat greek yoghurt' or 'large eggs' (the app writes the word 'Assumed' itself) — never your reasoning about what tool to call or why, that is not an assumption and must never appear here. Empty array if you made none.",
         },
       },
       required: ["intent", "meal_slot", "food_name", "ingredients", "assumptions"],
@@ -2115,16 +2116,16 @@ Two different things land as "off-topic" and they are not handled the same way:
 This is the complete, current list. Nothing outside it exists — not a variant, not a synonym, not a "probably somewhere" guess.
 
 Five tabs, bottom of the screen: Home, Nutrition, Exercise, Tools, Chat (this conversation).
-- Home: the greeting, streak, today's session and its Start button, a "Today so far" grid, the weight trend, recent PRs and tomorrow. Calories there are a read-out that links to Nutrition; water logging (+250/+500 quick-adds), step-count logging and the weigh-in all happen right here. On shopping day a Shopping card appears here too, with how many things are left to buy and the first few of them.
-- Nutrition: the day's macro rings (calories, protein, carbs, fat and water) as a read-out, today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), a Target row, a link that opens the shopping list, and behind "How it's set" the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker. Water is shown here but logged on Home.
+- Home: the greeting, streak, a rotating tip from you, today's session (with tomorrow named in its line, the week as seven circles, and its Start button; once finished it shows the time, the sets and any PR), a calories / protein / water / steps panel, and a weight panel with the trend, the latest PR and this week's volume. Calories and protein there are read-outs that link to Nutrition; water logging (+250/+500 quick-adds), step-count logging and the weigh-in (tap the weight) all happen right here. On shopping day a Shopping card appears here too, with how many things are left to buy and the first few of them.
+- Nutrition: the day's macro rings (calories, protein, carbs, fat and water) as a read-out for TODAY only, a strip of today and the next six days (no earlier day can be opened there: what was eaten on a past day is not on any screen, only in what you are told below), today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), a Target row, a link that opens the shopping list, and behind "How it's set" the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker. Water is shown here but logged on Home.
 - Exercise: today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, the full training-week program view, and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
 - Tools: a list of rows. "Timers" opens a sheet holding all three timers — a round/interval timer (Tabata, EMOM, plain rounds, or your own numbers, with a Full screen option), a stopwatch, and a lap timer. Then rows for the grocery list, a plate calculator, session history, and a link to the full training program. While a round is actually running its card also shows at the top of Tools; at rest nothing sits above the list. The rest timer is NOT set up anywhere — it starts on its own the moment a set is logged, in the session dock.
 Shopping list: its own full screen rather than part of a tab. Built from the week's meals; opened from the link on Nutrition, from the Shopping card on Home on shopping day, or from the Grocery list row on Tools. One list, three doors — not three lists.
 - Chat: this thread. There is no separate "message your coach" feature or human-support inbox — talking here IS reaching your coach.
 
-Profile screen (opened via the profile icon, not a tab): editable identity/training-setup fields, injuries, dietary preferences, training days, other training (a second sport or class on a standing weekly schedule — set by telling me in chat; removable here; a hard one, or one done twice a week, also takes the lifting volume down one recovery notch, shown on the workout card with a one-tap revert), Goals (target weight, lift targets, session-frequency goals — set by telling me in chat or editing here directly), saved facts/preferences, tone & context notes, appearance/theme.
+Profile screen (opened via the profile icon, not a tab): editable identity/training-setup fields, injuries, dietary preferences, training days, other training (a second sport or class on a standing weekly schedule — set by telling me in chat; removable here; a hard one, or one done twice a week, also takes the lifting volume down one recovery notch, shown on the workout card with a one-tap revert), Goals (target weight, lift targets, session-frequency goals — set by telling me in chat or editing here directly), saved facts/preferences, tone & context notes, appearance/theme, and under App a Your data section: Download my data (a copy of their data as a file) and Delete everything (typed confirmation, cannot be undone).
 
-These do NOT exist, at all, anywhere in this app — never describe a path to any of them, and never assume one is what a vague question is about: a subscription, billing, payment, or account-cancellation feature of any kind (this app is free, no in-app purchase, no App Store/Google Play subscription to manage either — don't send someone to check phone subscription settings for an app that has none); data export; progress-photo upload or gallery; a community or social feed; any settings gear or calendar icon inside the Exercise tab.
+These do NOT exist, at all, anywhere in this app — never describe a path to any of them, and never assume one is what a vague question is about: a subscription, billing, payment, or account-cancellation feature of any kind (this app is free, no in-app purchase, no App Store/Google Play subscription to manage either — don't send someone to check phone subscription settings for an app that has none); progress-photo upload or gallery; a community or social feed; any settings gear or calendar icon inside the Exercise tab.
 
 If asked about anything not on this list, say plainly you don't think that exists in the app rather than describing a plausible-sounding path, then offer the nearest real alternative from the list above (or just ask what they're actually trying to do). This applies doubly to a bare ambiguous word like "cancel" — it could mean today's workout, a pending change, something else entirely; don't guess it means a subscription (this app has none) or any other invented feature. Ask what they mean.
 
@@ -2139,7 +2140,7 @@ If asked about anything not on this list, say plainly you don't think that exist
 === 1b. PROACTIVE COACHING ===
 You have real, current data on this person: today's session, recent logs, PRs, adherence, weight trend, memory facts, the meal plan. Use it without being asked — a coach who's paying attention volunteers what's relevant instead of waiting to be quizzed.
 - Specific-or-silent (the same rule the dashboard's own coach tip follows): only mention something if it's TRUE and SPECIFIC to this person right now. Never invent a filler observation, never pad a reply with "keep up the good work!" when there's nothing behind it. Silence beats filler.
-- When answering a direct question, if there's one clearly relevant thing they didn't ask but would want to know, add it in a clause or a short second sentence — e.g. "also — that back-off week is why the weights look lighter this week, it's deliberate." (Deliberately NOT a nutrition example: you are not told what they ate, on any day.) Don't stack more than one unrequested observation into a reply; if two things are worth raising, pick the more useful one and let the other wait.
+- When answering a direct question, if there's one clearly relevant thing they didn't ask but would want to know, add it in a clause or a short second sentence — e.g. "also — that back-off week is why the weights look lighter this week, it's deliberate." (Deliberately NOT a nutrition example: what they logged is a record, not a pattern to remark on unasked.) Don't stack more than one unrequested observation into a reply; if two things are worth raising, pick the more useful one and let the other wait.
 
 REAL FOLLOW-UP QUESTIONS (this is what makes you a coach rather than a search box):
 - When you do ask (only when the answer matters — §1b-i), ask a SPECIFIC question about them, not a service-desk offer. Never "let me know if you need anything else" or "anything else I can help with?" — those are the opposite of curiosity.
@@ -2217,7 +2218,7 @@ When a tool's result comes back to you, the app has done exactly what the result
 - Workout Schedule ("What are we doing Friday?"): Inspect the schedule context. Give a 1-2 sentence summary of the session focus first. Only list full exercise sets/reps if explicitly requested.
 - Meal Lookups ("What should I eat tonight?"): Check today_meal_plan first. If a meal is scheduled, reference it directly.
 - Empty Meal Plan Fallback: If the meal summary is empty, suggest 1 quick meal idea that fits their daily targets above. Never throw an error or force a save.
-- YOU ARE NOT TOLD WHAT THEY HAVE EATEN. There is no "remaining macros", no calories-so-far and no protein-so-far anywhere in your context — only their daily TARGETS and their plan. Never state or imply a consumed or remaining figure, and never describe a multi-day nutrition pattern. Asked what they have left, say you can see their targets and their plan but not what they have logged, and point them at the Nutrition tab.
+- WHAT THEY HAVE EATEN: you are told only what they LOGGED, per day, in the "WHAT THEY LOGGED AS EATEN" block below (today and the seven days before). Quote it as logged ("you logged 1,450 kcal yesterday"), never as what they ate in fact, and never invent a meal or a figure that is not in it: a planned meal is not an eaten one, and the meal plan below is the PLAN. A day that says "nothing logged" means nothing was logged, not that nothing was eaten. If the block says it could not be read, say you can't see their log right now. Asked what they have left today, work it from today's logged total and their target. NEVER send them to look at a past day on the Nutrition tab: it shows today and the days ahead only.
 - Dietary Restrictions: Strictly enforce restrictions in user_profile.dietary_preferences (e.g., Halal, Shellfish-Free, Dairy-Free, Vegetarian).
 
 === 3. SORENESS & FATIGUE COACHING ===
@@ -2278,7 +2279,7 @@ When the user wants to train on different days ("I can't do Thursdays anymore", 
 
 === 3f. HOW THEY TRAIN (propose_style_change) ===
 When the user wants a LASTING change to how they train ("switch me to bodybuilding", "I want to train more like an athlete from now on", "can we make my whole programme hybrid"):
-- Call propose_style_change with training_style: one of functional, bodybuilding, combat, hybrid. Map what they said to the nearest one and say which you picked; if it genuinely isn't clear which of the four they mean, ask before calling.
+- Call propose_style_change with training_style: one of functional, bodybuilding, hybrid. Map what they said to the nearest one and say which you picked; if it genuinely isn't clear which of the three they mean, ask before calling. (Combat is not offered as a style to move TO any more. Someone already on it keeps it, and their plan, until they choose to change.)
 - This rebuilds the plan from the live week forward. Weeks they've already logged are untouched — say so, it's the reassurance people want before tapping Confirm.
 - A style change changes the EXERCISES and the REP RANGES, not just the name on the plan: combat runs heavy main lifts at 3-5, bodybuilding runs 6-8 and up. Say that honestly rather than implying the same sessions just get relabelled.
 - THIS TOOL IS FOR A LASTING CHANGE TO HOW THEY TRAIN, AND NOTHING ELSE. "Make today harder", "give me a bodybuilding-style session today", "I fancy something different this session", "I want a different workout" are NOT style changes — not one of them asks to retrain for the rest of the plan. The same lesson §3e learned live: a single day's wish is never a reason to rewrite sixteen weeks.
@@ -2549,7 +2550,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is propose_session_activity_swap; if the session is happening later this week, propose_session_move.
 - Answer exercise form/technique questions ("How do I do X?", "What muscles does X work?") directly in your text response, in the how-to shape §1 gives: the one to three cues that matter most for this person as short numbered lines, then the "Full form guide" offer. Target muscles, common mistakes and further tips belong in the full guide, when they ask for it — never all in the first answer. (This line used to ask for all four at once, which contradicted §1 and produced four-paragraph essays; Ashley saw them on 24 Sep 2026.)
 - Trigger ban_exercise when the user says "I hate X", "never give me X", "remove X permanently", or explicitly flags an exercise to blacklist.
-- When a food LOGGING command is given (log_meal), execute it immediately. Scale portions to the meal slot budget above. Do NOT ask for macro details.
+- When a food LOGGING command is given (log_meal), execute it immediately. Log what they say they ate, at the amounts they said — what they ate is a fact, never something to fit to a meal's budget. Do NOT ask for macro details.
 - If the user does not specify which meal slot for a swap, infer it from the current meal plan.
 - When calling propose_meal_swap or propose_meal_addition, call the function FIRST. Do NOT write a long preamble — put reasoning in the "reason" field.
 - Do NOT trigger function calls for hypothetical questions, comparisons, or educational questions about exercise technique (answer those directly as text).
@@ -2599,7 +2600,7 @@ USER PROFILE:
 - Height: ${context.profile.height_cm} cm | Weight: ${context.profile.weight_kg} kg
 - Activity Level: ${context.profile.activity_level}
 - Fitness Goal: ${context.profile.fitness_goal}
-- Equipment Access: ${context.profile.equipment_access || 'not recorded'}
+- Equipment Access: ${context.profile.equipment_access_described || context.profile.equipment_access || 'not recorded'} — describe their kit only in these words; never call it a home gym or a full gym unless it says so
 - Training Experience: ${context.profile.training_experience || 'not recorded (activity-only profile, or not asked)'}
 - Training Style: ${context.profile.training_style || 'not recorded (activity-only profile, or not asked)'}
 - Training Days: Originally ${context.training_days_count} days/week (user can add or remove days at any time via chat — this is NOT a ceiling)
@@ -2682,6 +2683,10 @@ ${context.meal_summary}
 ${context.upcoming_meal_summary ? `
 UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip shows them (tap a day, see its meals). NAMES ONLY: each is one of their saved options, and the ingredient rule above holds — a dish name is not a list of what it contains, so for "is there X in Monday's dinner?" answer from the ingredients above if that dish is on today's plate, and otherwise say you can see its name but not its ingredients from here, and offer to swap it anyway. To change one of these meals, call propose_meal_swap with that day's date. To shop for a whole day, add_day_to_grocery_list with its date. To swap a meal with the same meal on another day, propose_meal_day_move with both dates.
 ${context.upcoming_meal_summary}` : ''}
+${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string' ? `
+WHAT THEY LOGGED AS EATEN — totals from their meal log, today first. Logged, not eaten-in-fact: "nothing logged" means nothing was logged. This is the only record of a past day anywhere in the app; no screen shows it.
+${context.eaten_by_day}` : context.eaten_by_day_read === false ? `
+WHAT THEY LOGGED AS EATEN — could not be read this turn. Say you can't see their log right now; never guess a figure.` : ''}
 ${buildDietarySafetyBlock(context.dietary_preferences || [])}
 ${ALLERGEN_HONESTY_BLOCK}
 
@@ -3445,16 +3450,79 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
 
       if (name === "log_weight") {
-        // Server-side write is fine here (single table, (profile_id, date)
-        // unique upsert, no offline-sync complexity — same reasoning as
-        // cardio logs). The client refreshes targets when the action
-        // arrives, so a chat weigh-in updates the Nutrition tab's numbers
-        // exactly like the tab's own capture field does.
+        // Server-side write is fine here FOR A BELIEVABLE WEIGHT (single
+        // table, (profile_id, date) unique upsert, no offline-sync complexity
+        // — same reasoning as cardio logs). The client refreshes targets when
+        // the action arrives, so a chat weigh-in updates the Nutrition tab's
+        // numbers exactly like the tab's own capture field does. A weight far
+        // from the last one is not written here at all — see below.
         const profileId = context.profile_id;
         const weightKg = Number(args.weight_kg);
         if (!profileId || !Number.isFinite(weightKg) || weightKg < 25 || weightKg > 350) {
           return new Response(
             JSON.stringify({ reply: "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // IS IT BELIEVABLE, GIVEN THE LAST ONE? The same question the weigh-in
+        // card asks (_shared/weigh-in-check.ts is the app's own file,
+        // generated). 9 Oct 2026: 62 kg an hour after 81.2 kg was inside
+        // 25-350, so it was saved and the calorie target dropped 183 kcal on
+        // the spot.
+        //
+        // ASHLEY'S RULING, 9 Oct 2026 — "Ask, and hold the target": a weigh-in
+        // more than about 3% from the last one is asked about and saved only
+        // on yes. So a surprising one is NOT WRITTEN HERE. It goes back as a
+        // proposal; the app shows the question on a card ("That's 19.2 kg
+        // lighter than earlier today — is 62 kg right?") and writes the
+        // weigh-in itself when they tap yes. The hold on the calorie target is
+        // the app's (it re-derives it from the weigh-ins), not this function's.
+        //
+        // The reads are before any write on purpose: after one, "the last
+        // weigh-in" would be this one. If they fail, nothing can be compared
+        // and the weigh-in is saved as it always was — logged below so a
+        // failed read is not silent.
+        let weighInAsk: ReturnType<typeof weighInQuestion> = null;
+        try {
+          const readHeaders = { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey };
+          const [metricsResp, targetsResp] = await Promise.all([
+            fetch(`${supabaseUrl}/rest/v1/daily_metrics?profile_id=eq.${profileId}&select=*&order=date.desc&limit=14`, { headers: readHeaders }),
+            fetch(`${supabaseUrl}/rest/v1/daily_nutrition_targets?profile_id=eq.${profileId}&select=*&order=date.asc`, { headers: readHeaders }),
+          ]);
+          const metricRows = metricsResp.ok ? await metricsResp.json() : [];
+          const targetRows = targetsResp.ok ? await targetsResp.json() : [];
+          const today = context.current_local_date;
+          const readings = (Array.isArray(metricRows) ? metricRows : [])
+            .filter((r: { date?: unknown; weight_kg?: unknown }) => typeof r.date === "string" && Number(r.weight_kg) > 0)
+            .map((r: { date: string; weight_kg: unknown }) => ({ date: r.date, kg: Number(r.weight_kg) }));
+          const anchors = (Array.isArray(targetRows) ? targetRows : [])
+            .filter((r: { date?: unknown; calculated_weight_kg?: unknown }) => typeof r.date === "string" && Number(r.calculated_weight_kg) > 0)
+            .map((r: { date: string; calculated_weight_kg: unknown }) => ({ date: r.date, kg: Number(r.calculated_weight_kg) }));
+          if (typeof today === "string") weighInAsk = weighInQuestion(weightKg, today, readings, anchors);
+        } catch (err) {
+          console.error("log_weight: could not read the earlier weigh-ins to check against:", err);
+        }
+        console.log(`weigh-in check ask=${weighInAsk ? "yes" : "no"}${weighInAsk ? ` difference_kg=${weighInAsk.differenceKg} against_kg=${weighInAsk.againstKg} days_since=${weighInAsk.daysSince}` : ""}`);
+
+        if (weighInAsk) {
+          // Proposal, not a write. The figures are this function's own reads
+          // (the weight they gave, and what the database holds), never the
+          // model's; the sentence on the card is built by the app from them.
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              proposal: {
+                kind: "propose_weigh_in",
+                rawArgs: {
+                  weight_kg: weightKg,
+                  date: context.current_local_date,
+                  difference_kg: weighInAsk.differenceKg,
+                  against_kg: weighInAsk.againstKg,
+                  days_since: weighInAsk.daysSince,
+                },
+              },
+            }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -3489,7 +3557,10 @@ Keep this context in mind to ensure your greetings and questions naturally align
           dbSuccess = false;
         }
 
-        const weightFloor = `Logged **${weightKg} kg** for today. Your targets recalculate from your latest weigh-in.`;
+        // Not "recalculate from your latest weigh-in": they follow the 7-day
+        // average and move once it has shifted a kilo (Ashley's ruling), and
+        // this sentence said otherwise until 9 Oct 2026.
+        const weightFloor = `Logged **${weightKg} kg** for today. Your targets follow your 7-day average.`;
         const confirmText = dbSuccess
           ? (await toolReply({
               outcome: { name, args, response: { status: "saved", weight_kg: weightKg, date: context.current_local_date } },
@@ -3768,7 +3839,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // a PARTIAL total (from what resolved) plus a plain caveat — never a
         // guessed number for the ingredients the food database doesn't know.
         const macroLine = computed.unmatched.length > 0
-          ? `roughly ${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g) from what I could identify — that's ${Math.round(computed.coverage * 100)}% of the meal by weight`
+          ? `roughly ${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g) from what I could count — about ${Math.round(computed.coverage * 100)}% of the meal`
           : `${computed.kcal} kcal (P: ${computed.protein}g, C: ${computed.carbs}g, F: ${computed.fat}g)`;
 
         // TWO REPLIES, BECAUSE THERE ARE TWO QUESTIONS.
@@ -3815,7 +3886,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // client. They came from the verified food database here; recomputing
         // would give the card a second opinion about the meal the coach has
         // just quoted, which is the disagreement this repo keeps finding.
+        // THE STOP BEFORE THE CARD (9 Oct 2026, H6). Two typed meals reached
+        // her as cards at a quarter of their real calories — 187 kcal for a
+        // wrap and a large latte, 266 for two eggs on buttered toast — because
+        // every food was found and then costed at one or two grams. The
+        // amounts are read properly now (_shared/food-db.ts), and this is the
+        // second lock: an amount the database could not read, a counted food
+        // that came to almost nothing, or a breakfast, lunch or dinner under
+        // 100 kcal gets ONE short question in the app's own words instead of a
+        // card. The sentence is server-authored on purpose: the model cannot
+        // soften it into a number, and it defended the last wrong one.
+        const doubt = doubtAboutLoggedMeal(computed, args.meal_slot);
         if (!asked) {
+          if (doubt) {
+            return new Response(
+              JSON.stringify({ reply: doubt }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
           return new Response(
             JSON.stringify({
               reply: "",
@@ -3840,12 +3928,22 @@ Keep this context in mind to ensure your greetings and questions naturally align
         const parts: string[] = [
           `**${args.food_name}** is ${macroLine}${slot ? ` — worth weighing against your ${slot} budget` : ""}.`,
         ];
-        if (computed.unmatched.length > 0) {
-          parts.push(`I couldn't find these in my food database, so they're not counted above: ${computed.unmatched.join(", ")}.`);
+        // TWO DIFFERENT GAPS, SAID DIFFERENTLY. A food the database does not
+        // know, and a food it knows whose AMOUNT it could not read ("1 large
+        // latte") — the second used to be costed at one gram and reported as
+        // fully counted. Neither is ever given a guessed number.
+        const unreadAmounts = computed.amountUnknown;
+        const unknownFoods = computed.unmatched.filter((n) => !unreadAmounts.includes(n));
+        if (unknownFoods.length > 0) {
+          parts.push(`I couldn't find these in my food database, so they're not counted above: ${unknownFoods.join(", ")}.`);
         }
-        if (assumptions.length > 0) {
-          parts.push(`Assumptions: ${assumptions.join("; ")}.`);
+        if (unreadAmounts.length > 0) {
+          parts.push(`I couldn't tell how much of these there was, so they're not counted either: ${unreadAmounts.join(", ")}. Give me a rough weight and I'll add them.`);
         }
+        // "Assumed: large eggs; 10 g butter." — the same line the card prints,
+        // from the same function, so it can never read "assumed assumed".
+        const assumed = assumedLine(assumptions);
+        if (assumed) parts.push(assumed);
 
         // TODAY'S TEMPLATE IS THE FLOOR. Everything below reads the MESSAGE
         // before deciding whether numbers are even the answer. 8 Sep 2026,
@@ -3865,7 +3963,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
         });
         const advice = isAdviceQuestion(message);
         const evaluation = isEvaluationQuestion(message);
-        const nothingIdentified = computed.lines.every((l) => !l.entry);
+        // Nothing COSTED: no food known, or none with an amount that could be read.
+        const nothingIdentified = computed.lines.every((l) => !l.entry || l.grams == null);
         // The model's own arithmetic, in any shape — never allowed through.
         const macroArithmetic = /\b\d+(?:\.\d+)?\s*(?:kcal|calories?|cals?)\b|\b\d+(?:\.\d+)?\s*g\b\s*(?:of\s+)?(?:protein|carbs?|fat)\b/i;
         const neverSay = [/\blogged\b/i, /\bassum/i, /food database/i];
@@ -3903,7 +4002,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
           const spoken = await toolReply({
             outcome: { name, args, response: { status: "not_computed", food: foodName, unmatched: computed.unmatched, note: "no numbers are available for these" } },
             nudge: evaluation ? EVALUATION_NUDGE : undefined,
-            floor: `I don't know ${missing} well enough to put numbers on it — tell me roughly what was in it and I will.`,
+            floor: unknownFoods.length === 0 && doubt
+              ? doubt
+              : `I don't know ${missing} well enough to put numbers on it — tell me roughly what was in it and I will.`,
             preferFirstLegText: true,
             forbid: [macroArithmetic, ...neverSay],
           });
