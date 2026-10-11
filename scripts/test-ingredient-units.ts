@@ -261,12 +261,13 @@ async function main() {
   const chat = stripComments(text('supabase/functions/chat-gemini/index.ts'))
   const writer = stripComments(text('supabase/functions/generate-meals/index.ts'))
   const handler = chat.slice(chat.indexOf('if (name === "log_meal") {'), chat.indexOf('if (name === "log_meal") {') + 9000)
-  const iRead = handler.indexOf('readIngredientText(')
+  // Called or passed (".map(readIngredientText)" after a two-food line is split, 11 Oct 2026): either is a read.
+  const iRead = [handler.indexOf('readIngredientText('), handler.indexOf('map(readIngredientText)')].filter(i => i > -1).sort((a, b) => a - b)[0] ?? -1
   const iCompute = handler.indexOf('computeMealMacros(ingredients)')
   const iAsk = handler.indexOf('!computed.amountsUnderstood')
   const iTotal = handler.indexOf('computed.kcal')
   check('the coach reads each logged line through the shared reader BEFORE it adds anything up, asks if one cannot be read, and only then quotes a total', handler.length > 100 && iRead > -1 && iCompute > iRead && iAsk > iCompute && iTotal > iAsk && /how many grams/i.test(handler.slice(iAsk, iTotal)), { iRead, iCompute, iAsk, iTotal })
-  check('the coach imports that reader from the shared copy, not a private one', /import \{ readIngredientText \} from "\.\.\/_shared\/ingredient-units\.ts"/.test(chat))
+  check('the coach imports that reader from the shared copy, not a private one', /import \{ readIngredientText(?:, [A-Za-z]+)* \} from "\.\.\/_shared\/ingredient-units\.ts"/.test(chat))
   check('the coach\'s log_meal schema no longer invites ounces, pounds or cups ("Never oz, lb or cup")', /unit: \{ type: "string", description: "[^"]*Never oz, lb or cup/.test(chat) && !/"Xg ingredient" or "X tbsp ingredient" or "X cup ingredient"/.test(chat))
   check('the meal writer is told never to use ounces, pounds, cups, tins or pinches, and that a line the app cannot read drops its dish', /NEVER ounces, pounds, kilograms, cups, tins, cans, pinches or handfuls/.test(writer) && /a line the app cannot read is dropped with its whole dish/.test(writer))
 
