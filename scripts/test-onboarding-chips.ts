@@ -126,8 +126,14 @@ console.log('\n3. Options are offered on the FIRST asking, not as a rescue')
 
   // The client renders on SlotChipsCard, and only single/multi reach it.
   const card = readFileSync(join(ROOT, 'src/components/onboarding/SlotChipsCard.tsx'), 'utf8')
-  check('the pill is the chat quick-reply shape', /rounded-full/.test(card) && /text-xs/.test(card))
-  check('...and keeps a 44px tap target', /min-h-\[44px\]/.test(card))
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2e): the card's own ghost decline
+  // moved to the header's Skip, and it was the card's only pill-shaped
+  // control. The pills are OptionPill, in OptionRow.tsx; they are asked there.
+  const pills = readFileSync(join(ROOT, 'src/components/onboarding/OptionRow.tsx'), 'utf8')
+  const pillAt = pills.indexOf('export function OptionPill')
+  const pill = pillAt < 0 ? '' : pills.slice(pillAt, pills.indexOf('\n}\n', pillAt))
+  check('the pill is the chat quick-reply shape', /rounded-full/.test(pill) && /<OptionPill/.test(card))
+  check('...and keeps a 44px tap target', /min-h-\[44px\]/.test(pill))
   check('the shape switch reads the options, not a list of slot names',
     /options\.some\(o => o\.description\)/.test(card))
   // Comments are STRIPPED before this runs. The rule being asserted is that no
@@ -290,10 +296,13 @@ console.log('\n6. Nothing is asked twice, and nothing decorative costs height')
   // The footer still matches the options above it: a full-width bar under a
   // card that already spans the column, inline under a strip or pills so the
   // lightest question doesn't get the heaviest control hung under it.
-  check('the footer button follows the option shape',
-    /shape === 'rows'\s*\n?\s*\?\s*'w-full min-h-\[44px\]/.test(card))
-  check('...and a multi-select footer reads the picks back in words',
-    /\.map\(o => o\.label\)\.join\(' · '\)/.test(card))
+  // 2e (10 Oct 2026): ONE footer for a multi-select, whatever the shape —
+  // the brief's full-width "Next →" — and a single-choice question has none,
+  // because its one tap is the answer and Skip lives in the header.
+  check('a multi-select ends in one full-width Next, 54px',
+    /def\.control === 'multi' && \(\s*<Button\s*className="h-\[54px\] w-full/.test(card) && /'Next →'/.test(card))
+  check('...and under pills or a strip it reads the picks back in words',
+    /shape !== 'rows' && selectedMulti\.length > 0 && \([\s\S]{0,300}\.map\(o => o\.label\)\.join\(' · '\)/.test(card))
 
   // Units belong on the field, not only in a sentence that has scrolled — and
   // the grouped cards put three fields under one question, so at most one of

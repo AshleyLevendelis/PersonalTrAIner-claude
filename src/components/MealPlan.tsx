@@ -15,6 +15,7 @@ import {
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
+import { mealSections } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import { methodSafeToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
 import { formatKitchenQuantity } from '@/lib/portion-scaler'
@@ -471,9 +472,12 @@ export function MealPlan({
   )
   // Which meal is up next: the first of today, in slot order, not yet logged
   // and with a dish to serve. Logged meals are "Eaten"; the rest are "Later".
-  const eatenSlots = upcoming ? [] : activeSlots.filter(sl => (loggedBySlot[sl] ?? []).length > 0)
-  const upNextSlot = upcoming ? null : activeSlots.find(sl => !eatenSlots.includes(sl) && !!shownOption(sl)) ?? null
-  const laterSlots = upcoming ? activeSlots : activeSlots.filter(sl => !eatenSlots.includes(sl) && sl !== upNextSlot)
+  const { eaten: eatenSlots, upNext: upNextSlot, later: laterSlots } = mealSections({
+    slots: activeSlots,
+    eaten: sl => (loggedBySlot[sl] ?? []).length > 0,
+    hasDish: sl => !!shownOption(sl),
+    upcoming: !!upcoming,
+  })
 
   return (
     <div data-tour="meals" className="space-y-4">

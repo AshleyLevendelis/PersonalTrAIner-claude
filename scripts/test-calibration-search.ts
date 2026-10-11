@@ -180,25 +180,18 @@ const save = grid.slice(grid.indexOf('const handleSaveSet = '), grid.indexOf('co
 // build-up became real rows, and a check naming the exact conjunction failed
 // on a correct change. The property is the shape — probe, past set 1, blank
 // box, error and return — not the list of terms.
+// RE-ANCHORED 10 Oct 2026: the condition became ONE predicate, probeNeedsWeight,
+// read by the save AND by the tick's data-next-weight (the Exercise tab's
+// "Log set" button must not offer a one-tap log the save would refuse). The
+// properties are unchanged; they are read off the predicate's body now.
+const predAt = grid.indexOf('const probeNeedsWeight = ')
+const pred = predAt < 0 ? '' : grid.slice(predAt, grid.indexOf('\n  }', predAt))
 check('the confirm path refuses an empty box in a calibration week instead of writing the guess',
-  /if \(calibrationProbe && [^\n]*setNumber > 1 && [^\n]*!input\.weight\.trim\(\)[^\n]*\) \{\s*\n\s*setRowErrors\([^\n]*\)\s*\n\s*return\s*\n\s*\}/.test(save))
-// AND NEVER ON A BUILD-UP ROW. Its number comes from the prescription, so a
-// blank box there is not a missing probe — refusing it would block the warm-up
-// of every calibration-week lift.
-// RE-ANCHORED 19 Sep 2026, and widened at the same time. This pinned the
-// guard's exact text and went red when it gained a third exemption (drop
-// rows), which is the same shape as the delete-call pin two gates over. The
-// PROPERTY is "the probe refusal applies to working sets only", so both
-// exemptions are now named and the condition's spelling is not.
-check('...and a build-up row is exempt: its weight was never the guess being replaced',
-  /if \(calibrationProbe &&[^)]*!warm[^)]*setNumber > 1/.test(save))
-// AND A DROP ROW TOO, for a different reason worth having written down: a
-// drop's box is filled from the set ABOVE IT, which is a weight actually
-// lifted rather than the week's guess. Refusing it would block the one row
-// whose default was never a guess at all.
-check('...and so is a drop, whose weight comes from a set that really happened',
-  /if \(calibrationProbe &&[^)]*!drop[^)]*setNumber > 1/.test(save))
-check('...before the weight is derived, so the fallback never runs', save.length > 0 && /!input\.weight\.trim\(\)/.test(save))
+  /calibrationProbe/.test(pred) && /\.setNumber > 1/.test(pred) && /!input\.weight\.trim\(\)/.test(pred)
+  && /if \(probeNeedsWeight\(ref\)\) \{\s*\n\s*setRowErrors\([^\n]*\)\s*\n\s*return\s*\n\s*\}/.test(save))
+check('...and a build-up row is exempt: its weight was never the guess being replaced', /!isWarm\(ref\)/.test(pred))
+check('...and so is a drop, whose weight comes from a set that really happened', /!isDrop\(ref\)/.test(pred))
+check('...before the weight is derived, so the fallback never runs', save.length > 0 && /probeNeedsWeight\(ref\)/.test(save))
 check('...and the refusal names the probe, so it reads as the design', /set 1 was the probe/.test(save))
 check('the empty box asks to be typed into', /const d = defaultWeightFor\(\w+\)\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
 

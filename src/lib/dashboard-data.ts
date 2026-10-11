@@ -21,6 +21,7 @@ import { getActiveGoals } from './memory-store'
 import { computeStreak, buildStreakDays, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
 import { selectCoachTipWithKey, eligibleCoachTips, type CoachTipContext, type SelectedCoachTip } from './coach-tips'
+import { weekVolume } from './week-volume'
 import { expectedByNow, paceClock } from './pace'
 import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
@@ -669,14 +670,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // ---- Phase context --------------------------------------------------------
   // THIS WEEK'S VOLUME against last week's SAME days. Calendar weeks, Monday
   // first, the same week the Home strip draws.
-  const mondayOf = (d: string) => addDays(d, -((new Date(`${d}T12:00:00`).getDay() + 6) % 7))
-  const thisMonday = mondayOf(todayStr)
-  const lastMonday = addDays(thisMonday, -7)
-  const lastSameDay = addDays(todayStr, -7)
-  const volume = {
-    thisWeek: workingLogs.filter(l => l.date >= thisMonday && l.date <= todayStr).length,
-    lastWeekSoFar: workingLogs.filter(l => l.date >= lastMonday && l.date <= lastSameDay).length,
-  }
+  const volume = weekVolume(workingLogs, todayStr)
 
   const phase: PhaseContext | null = liveWeekData
     ? {

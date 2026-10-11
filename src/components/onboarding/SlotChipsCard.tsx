@@ -199,6 +199,13 @@ export function SlotChipsCard({
           (canDeclineSlot) — moved, not copied. */}
       {/* NEXT, FULL WIDTH, for a question that takes more than one tap. A
           single-choice question is still answered by its one tap. */}
+      {/* THE PICKS, READ BACK IN WORDS, under pills or a day strip, where a
+          filled chip is the only other sign of what was chosen. */}
+      {def.control === 'multi' && shape !== 'rows' && selectedMulti.length > 0 && (
+        <p className="truncate text-[0.71875rem] text-muted-foreground" data-slot-picks>
+          {options.filter(o => selectedMulti.includes(String(o.value))).map(o => o.label).join(' · ')}
+        </p>
+      )}
       {def.control === 'multi' && (
         <Button
           className="h-[54px] w-full text-[0.9375rem] font-semibold glow-mint-box"

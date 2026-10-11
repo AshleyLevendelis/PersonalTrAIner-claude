@@ -150,6 +150,8 @@ console.log('\n1. The libraries are cached separately from the app')
   // Home is the default tab, so its new panels and the rotating note are first-paint code by nature.
   // Room is left for Nutrition and Exercise, the other two first-paint screens in the same pass; each
   // re-measures this as it lands.
+  //     after all six (Home, Nutrition, Exercise, Profile, setup, round timer), measured 10 Oct 2026:
+  //                   deploy 308 gz   paint 464 gz   app 1065 raw   (10, 10 and 25 kB of room left)
   headroom('a deploy re-downloads', appGzip, 318, 'kB gzipped')
   check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 318, appGzip)
 }
@@ -540,7 +542,11 @@ console.log('\n3. Nothing has crept back up')
   // its own lazy chunk (8 kB) and the card row moved inside it, so the app chunk went DOWN by 1; the
   // three figures a person waits for did not move. 2,245 is 16 above the 2,229 measured, on her 15 Sep
   // ruling ("raise it with room to grow"); the other five screens re-measure it as they land.
-  const TOTAL_BUDGET_KB = 2245
+  // MOVED 10 Oct 2026: 2,245 -> 2,275, the rest of the layout pass (Home, Nutrition, Exercise,
+  // Profile, setup). MEASURED both ends through this gate: before (fc516ab4, clean worktree) total
+  // 2229; after all six, 2257 (+28, spread over the five screens' markup and four small modules).
+  // 2,275 is 18 above the 2,257 measured, on her 15 Sep ruling ("raise it with room to grow").
+  const TOTAL_BUDGET_KB = 2275
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

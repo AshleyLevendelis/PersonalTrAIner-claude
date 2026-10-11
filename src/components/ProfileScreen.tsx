@@ -1736,7 +1736,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 {(profile.display_name?.trim()?.[0] ?? '·').toUpperCase()}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-[1.5rem] font-bold tracking-[-.02em] glow-text">
+                <p className="break-words text-[1.5rem] font-bold leading-tight tracking-[-.02em] glow-text">
                   {profile.display_name?.trim() || 'Your profile'}
                 </p>
                 <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">{identitySummary}</p>
