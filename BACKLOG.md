@@ -30,6 +30,10 @@ Newest first. One line each.
     and `test:onboarding-style` rewritten for the new screens; 23 browser drivers re-anchored and green;
     screenshots read in four themes; `test:bundle` measured both ends (2,229 kB before, 2,257 after).
   - **Needs:** the `chat-gemini` deploy (the coach's description of Home changed). Frontend on merge.
+  - **Full sweep, 11 Oct 2026, on a frozen copy of 30dabf86:** 373 of 377 passed. The four that did not:
+    `test:meal-quality`, `test:schema-parity` and `verify:rls` (no database reachable from a cloud
+    session, each saying so), and `test:coach-exam-fresh` (the coach's prompt changed; the exam must be
+    re-run). The one later app change (setup receipts) re-ran its gate and the four setup drivers: green.
   - **Not done:** the coach exam was not re-run (the coach's prompt changed, so its scores are stale
     until it is); the Home harness has no fixture with a rest timer running, so the Log-set button
     riding above the rest dock is proven by construction only.
