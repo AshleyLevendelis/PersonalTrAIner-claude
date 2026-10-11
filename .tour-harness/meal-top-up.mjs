@@ -89,7 +89,15 @@ const readWeek = async () => {
   await tapDay(days[0])
   return out
 }
-const offerText = () => ev(`document.querySelector('[data-testid="meal-top-up-offer"]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null`)
+// The offer is a TrainerNudge, which carries a "Trainer" label since the 2a
+// restyle (10 Oct 2026); the offer's words are everything but that label.
+const offerText = () => ev(`(() => {
+  const n = document.querySelector('[data-testid="meal-top-up-offer"]')
+  if (!n) return null
+  const c = n.cloneNode(true)
+  c.querySelector('[data-nudge-tag]')?.remove()
+  return c.textContent.replace(/\\s+/g, ' ').trim()
+})()`)
 const note = () => ev(`(() => {
   const n = document.querySelector('[data-testid="meal-top-up-note"]')
   if (!n) return null
@@ -193,7 +201,8 @@ const newDay = after.findIndex(d => Object.values(d.names).some(n => /^Fresh /.t
 const newSlot = newDay >= 0 ? Object.entries(after[newDay].names).find(([, n]) => /^Fresh /.test(n))?.[0] : null
 if (newDay >= 0) await tapDay(days[newDay])
 if (newSlot) { await ev(`document.querySelector('[data-meal-name="${newSlot}"]')?.closest('button')?.click()`); await wait(400) }
-const openCard = await ev(`document.querySelector('[data-meal-name="${newSlot}"]')?.closest('.py-4')?.innerText ?? ''`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): a meal row is found by its own data-meal-row, not by the .py-4 spacing it no longer has.
+const openCard = await ev(`document.querySelector('[data-meal-name="${newSlot}"]')?.closest('[data-meal-row]')?.innerText ?? ''`)
 check('a new meal, opened, never shows the app\'s bookkeeping as a label', !!newSlot && openCard.length > 0 && !/new-from/.test(openCard) && !(await ev(`document.body.innerText.includes('new-from')`)), openCard.slice(0, 200))
 if (newSlot) { await ev(`document.querySelector('[data-meal-name="${newSlot}"]')?.closest('button')?.click()`); await wait(300) }
 await tapDay(days[0])
@@ -302,7 +311,7 @@ check('a library dish is served from the first new day on, and on no earlier day
 const libSlot = libDay >= 0 ? Object.entries(after8[libDay].names).find(([, n]) => libNames8.includes(n))?.[0] : null
 if (libDay >= 0) await tapDay(days8[libDay])
 if (libSlot) { await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('button')?.click()`); await wait(400) }
-const libCard = await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('.py-4')?.innerText ?? ''`)
+const libCard = await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('[data-meal-row]')?.innerText ?? ''`)
 const method = await ev(`document.querySelector('[data-meal-method]')?.innerText ?? ''`)
 check('opened, a library dish shows how to cook it', !!libSlot && method.length > 20, { libSlot, method })
 check('...names its cuisine, and shows none of the app\'s bookkeeping', libCard.length > 0 && !/new-from/.test(libCard), libCard.slice(0, 200))

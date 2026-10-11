@@ -28,38 +28,41 @@ interface OptionRowProps {
   onClick: () => void
   /** 'radio' for a single-select group, 'pressed' for a multi-select toggle. */
   selectionRole: 'radio' | 'pressed'
-  /** Rows 2..n carry a hairline divider; the first must not. */
-  divided?: boolean
   /** Full day name for a strip cell showing only its initial — the accessible name must stay complete. */
   accessibleLabel?: string
   className?: string
 }
 
-/** The 18px indicator. Square-ish for a multi-select, round for a single — the shape says which kind of question this is before anything is picked. */
+/**
+ * The 24px indicator (design handoff 2e). Round for a single-select, square-ish
+ * for a multi-select — the shape says which kind of question this is before
+ * anything is picked. Selected, it is the brief's accent check circle.
+ */
 function Indicator({ selected, multi }: { selected: boolean; multi: boolean }) {
   return (
     <span
       aria-hidden
       className={cn(
-        'grid size-[18px] shrink-0 place-items-center border-[1.5px] box-border transition-colors duration-150',
-        multi ? 'rounded-[6px]' : 'rounded-full',
-        selected
-          ? 'border-primary bg-primary'
-          : 'border-[color:var(--border)] bg-transparent',
+        'grid size-6 shrink-0 place-items-center box-border transition-colors duration-150',
+        multi ? 'rounded-[7px]' : 'rounded-full',
+        selected ? 'bg-primary' : 'border-[1.5px] border-[color:var(--text-dim)] bg-transparent',
       )}
       style={selected
-        // Halo scales with --glow-strength like every other glow in the app, so
-        // Settings → glow "Off" reduces it to 0 with no conditional rule here.
         ? { boxShadow: '0 0 calc(12px * var(--glow-strength)) rgba(var(--glow-rgb), calc(.8 * var(--glow-strength)))' }
         : undefined}
     >
-      {selected && <Check className="size-[11px] text-primary-foreground" strokeWidth={3.4} />}
+      {selected && <Check className="size-[14px] text-primary-foreground" strokeWidth={3.2} />}
     </span>
   )
 }
 
+/**
+ * ONE ANSWER, ONE CARD (design handoff 2e, 10 Oct 2026): 60px tall, radius 16,
+ * on the raised surface, 8px apart. Selected, the card takes the accent wash
+ * and a 1.5px accent edge with a soft glow, and its label lights up.
+ */
 export function OptionRow({
-  label, description, selected, onClick, selectionRole, divided, accessibleLabel, className,
+  label, description, selected, onClick, selectionRole, accessibleLabel, className,
 }: OptionRowProps) {
   const multi = selectionRole === 'pressed'
   const a11y = multi ? { 'aria-pressed': selected } : { role: 'radio' as const, 'aria-checked': selected }
@@ -71,27 +74,17 @@ export function OptionRow({
       aria-label={accessibleLabel}
       {...a11y}
       className={cn(
-        // min-h-[44px] is the tap target and is not negotiable. The two-line
-        // rows land near 62px; a label-only row would sit at 40 without this.
-        'flex w-full min-h-[44px] items-center gap-3 px-3.5 py-[13px] text-left transition-colors duration-150',
-        // No scale on select or press. The old scale-[1.02] / active:scale-[0.97]
-        // made a chat transcript twitch every time an answer landed.
-        divided && 'border-t border-[color:var(--hairline)]',
-        selected
-          ? 'bg-[color:rgba(var(--glow-rgb),.10)] shadow-[inset_2px_0_0_var(--primary)]'
-          : 'hover:bg-[color:var(--surface-raised)]',
+        'flex w-full min-h-[60px] items-center gap-3 rounded-2xl px-4 py-3 text-left transition-[background-color,box-shadow] duration-150',
         className,
       )}
+      style={selected
+        ? { background: 'rgba(var(--glow-rgb), .10)', boxShadow: 'inset 0 0 0 1.5px var(--primary), 0 0 calc(18px * var(--glow-strength, 1)) rgba(var(--glow-rgb), .22)' }
+        : { background: 'var(--surface-raised)' }}
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-foreground">{label}</span>
+        <span className={cn('block text-[0.9375rem] font-semibold', selected ? 'text-primary-text glow-mint' : 'text-foreground')}>{label}</span>
         {description && (
-          <span className={cn(
-            'mt-0.5 block text-[0.71875rem] leading-[1.4]',
-            // The selected row's description brightens rather than staying
-            // muted — on a tinted background muted-foreground loses contrast.
-            selected ? 'text-[color:var(--text-tertiary)]' : 'text-muted-foreground',
-          )}>
+          <span className="mt-0.5 block text-[0.78125rem] leading-[1.4] text-[color:var(--text-tertiary)]">
             {description}
           </span>
         )}

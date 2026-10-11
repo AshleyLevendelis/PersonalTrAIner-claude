@@ -193,13 +193,13 @@ function SheetRow({ label, value, onOpen }: { label: string; value: string; onOp
 
 type ProfileSheet =
   | 'body' | 'goal' | 'injuries'
-  | 'schedule' | 'equipment' | 'lifts' | 'style'
+  | 'schedule' | 'equipment' | 'lifts' | 'style' | 'exavoid'
   | 'diet' | 'likes' | 'avoid' | 'meals'
   | 'tone' | 'remembers' | 'appearance' | 'reminders'
 
 const SHEET_TITLE: Record<ProfileSheet, string> = {
   body: 'Height & weight', goal: 'Goal', injuries: 'Injuries',
-  schedule: 'Schedule', equipment: 'Equipment', lifts: 'Known lifts', style: 'Style & recovery',
+  schedule: 'Schedule', equipment: 'Equipment', lifts: 'Known lifts', style: 'Style & recovery', exavoid: 'Exercises to avoid',
   diet: 'Diet', likes: 'Foods you like', avoid: 'Foods to avoid', meals: 'Meals & shopping',
   tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders',
 }
@@ -1385,6 +1385,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </Row>
             <Row label="Recovery capacity"><EditableSelectField value={profile.recovery_capacity} options={RECOVERY_OPTIONS} onSave={v => savePatch({ recovery_capacity: v })} /></Row>
             <Row label="Conditioning"><EditableSelectField value={profile.conditioning_preference} options={CONDITIONING_PREF_OPTIONS} onSave={v => savePatch({ conditioning_preference: v })} /></Row>
+        </div>
+      )
+      case 'exavoid': return (
+        <div className="space-y-3 text-sm">
             {/* EXERCISES TO AVOID — the same control, the other side of the
                 app. These become the same user_facts rows a "never give me
                 burpees" chat turn produces, so the coach and the screen are
@@ -1768,6 +1772,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               {(profile.skip_calibration_week || knownLiftsAnswered) && (
                 <SheetRow label="Known lifts" value={knownLift} onOpen={() => setSheet('lifts')} />
               )}
+              {/* ITS OWN ROW, in Training (2d): it is a training answer, and
+                  inside "Style & recovery" it would be one more thing a person
+                  has to guess the location of. */}
+              <SheetRow label="Exercises to avoid" value={listOrNone(exerciseDislikeValues, 'None')} onOpen={() => setSheet('exavoid')} />
               <SheetRow label="Style & recovery" value={styleOptionsFor(profile.training_style).find(o => o.value === profile.training_style)?.label ?? 'Not set'} onOpen={() => setSheet('style')} />
             </ProfileGroup>
 

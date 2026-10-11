@@ -28,11 +28,9 @@ const until = async (fn, pred, tries = 40) => { let v = await fn(); for (let i =
 async function openProfile(query) {
   await send('Page.navigate', { url: `${origin}/${query}` })
   await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`), v => v)
-  // "You" is collapsed by default, so its rows are not in the DOM until opened.
-  await ev(`(() => {
-    const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^You$/i.test((x.textContent || '').trim()))
-    if (b && b.getAttribute('aria-expanded') !== 'true') b.click()
-  })()`)
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2d): the Style row is on the
+  // "Style & recovery" sheet, absent from the DOM until that sheet is open.
+  await ev(`document.querySelector('[data-profile-row="Style & recovery"]')?.click()`)
   await wait(500)
 }
 /** The Style row's select trigger, found by the row's own label. */

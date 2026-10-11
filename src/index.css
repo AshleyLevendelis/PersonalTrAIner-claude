@@ -761,15 +761,17 @@ html body[data-scroll-locked] {
     background: linear-gradient(135deg, var(--primary), var(--primary-2));
     animation: obCoachPulse 3s ease infinite;
   }
+  /* Setup's answer bubble (design handoff 2e, 10 Oct 2026): what she said,
+     on the right, small and quiet — the question is what the screen is for.
+     The violet wash is the AI-role accent, so it follows the theme. */
   .ob-user-bubble {
-    background: linear-gradient(135deg,
-      color-mix(in oklab, var(--secondary) 72%, var(--border)),
-      var(--secondary));
-    border: 1px solid rgba(var(--glow-rgb), .18);
+    border-radius: 16px 16px 4px 16px;
+    padding: 10px 16px;
+    font-size: 0.84375rem;
+    line-height: 1.45;
+    color: var(--text-tertiary);
+    background: color-mix(in srgb, var(--role-ai-accent) 22%, transparent);
   }
-  .ob-tick { width: 16px; height: 4px; border-radius: 2px; transition: background .3s; }
-  .ob-tick-on { background: var(--primary); }
-  .ob-tick-off { background: color-mix(in oklab, var(--border) 60%, transparent); }
   .ob-input {
     background: color-mix(in oklab, var(--input) 70%, transparent);
     border: 1.5px solid var(--border);
@@ -1168,3 +1170,4 @@ html body[data-scroll-locked] {
     opacity: 0;
   }
 }
+

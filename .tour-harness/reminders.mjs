@@ -94,7 +94,8 @@ const navigate = async (path, stub) => {
   if (stub) stubId = (await stubPush(stub)).result?.identifier ?? null
   await send('Page.navigate', { url: `http://127.0.0.1:${port}${path}` })
   await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`), v => v)
-  await ev(`(() => { const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^App$/i.test((x.textContent || '').trim())); if (b && b.getAttribute('aria-expanded') !== 'true') b.click() })()`)
+  await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Reminders"]')?.click(), 200) })()`)
+  await wait(300)
   await wait(300)
 }
 const SECTION = '[data-testid="reminders-section"]'
@@ -144,7 +145,8 @@ await ev(`document.querySelector('[data-slot="dialog-close"], button[aria-label=
 await wait(400)
 await ev(`document.querySelector('[data-testid="open-profile"]')?.click()`)
 await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`), v => v)
-await ev(`(() => { const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^App$/i.test((x.textContent || '').trim())); if (b && b.getAttribute('aria-expanded') !== 'true') b.click() })()`)
+await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Reminders"]')?.click(), 200) })()`)
+  await wait(300)
 const reread = await until(switches, v => Array.isArray(v) && v.length >= 8)
 check('2i. closing and reopening Profile reads it back off', reread?.find(s => s.id === 'reminder-missed_yesterday')?.on === false && reread.filter(s => s.id.startsWith('reminder-')).length === 7, reread)
 

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dumbbell, Send, Check, AlertTriangle } from 'lucide-react'
+import { MessageCircle, Send, Check, AlertTriangle, Mic } from 'lucide-react'
+import { splitQuestion } from '@/lib/onboarding-question'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import { keepsComposerFocus, refocusComposer } from '@/lib/composer-focus'
 import { SlotChipsCard } from './SlotChipsCard'
@@ -356,7 +357,36 @@ const STALL_TURN_LIMIT = 4
 
 /** Ticks in the header's progress row. Four, per the v2 design — enough to
  *  show movement, too few to count against. */
-const PROGRESS_TICKS = 4
+const PROGRESS_TICKS = 6
+
+/** The browser's speech recogniser, where there is one (Chrome and Safari prefix it). */
+interface SpeechRecognitionLike {
+  lang: string
+  interimResults: boolean
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start: () => void
+}
+function speechRecognizer(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
+}
+
+/**
+ * Which part of setup a question belongs to, for "{Section} · n of N" (2e).
+ * Read off the slot order: the training questions, then the body, then food.
+ */
+const BODY_SLOTS: string[] = ['age', 'heightCm', 'weightKg', 'gender']
+const FOOD_SLOTS: string[] = ['mealsPerDay', 'dietaryPreferences', 'dislikedFoods', 'cookingTime', 'includeSnacks', 'favoriteCuisines', 'breakfastStyle']
+function setupSectionOf(key: string | null): string {
+  if (!key) return 'Review'
+  if (key === 'displayName') return 'About you'
+  if (BODY_SLOTS.includes(key)) return 'Body'
+  if (FOOD_SLOTS.includes(key)) return 'Food'
+  return 'Training'
+}
 
 
 
@@ -588,6 +618,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     return buildOnboardingIntro().map(m => ({ role: 'assistant' as const, content: m.content, asksSlot: m.asksSlot }))
   })
   const [input, setInput] = useState('')
+  // THE MIC (design handoff 2e): speech goes into the same box, so it goes
+  // through the same parser as typing. Offered only where the browser can
+  // actually listen — nothing is drawn that would do nothing.
+  const [listening, setListening] = useState(false)
   const [busy, setBusy] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   // The summary row being changed right now, if any. While it is set the
@@ -1751,6 +1785,47 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   // resumed draft counts as "already started" without anything extra stored.
   const hasSpoken = messages.some(m => m.role === 'user')
 
+  // THE TURN ON SCREEN (design handoff 2e). Everything after the last thing
+  // she said is the coach's current turn; its last spoken line is the
+  // question. The card is the newest one still open in that turn.
+  //
+  // A CARD STILL WAITING FOR AN ANSWER HOLDS THE SCREEN OPEN. Somebody who
+  // asks a question of their own mid-setup ("what's a deload?") has not
+  // answered the card above it, and that card must not vanish with the turn:
+  // the screen then starts at the oldest card still open, and what was said
+  // since is drawn under it, her lines as bubbles.
+  const liveCard = (m: (typeof messages)[number]) =>
+    !!m.slotCard && !m.slotCardSuperseded && !m.slotCardResolved && cardStillApplies(m.slotCard)
+  let lastUserIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === 'user') { lastUserIdx = i; break }
+  const oldestLiveCard = messages.findIndex(liveCard)
+  const turnStart = oldestLiveCard >= 0 && oldestLiveCard <= lastUserIdx ? oldestLiveCard : lastUserIdx + 1
+  let prevUserIdx = -1
+  for (let i = turnStart - 1; i >= 0; i--) if (messages[i].role === 'user') { prevUserIdx = i; break }
+  let questionIdx = -1
+  for (let i = messages.length - 1; i >= turnStart; i--) {
+    const m = messages[i]
+    if (m.role === 'assistant' && !m.isReceipt) { questionIdx = i; break }
+  }
+  let cardOnScreen: SlotKey | null = null
+  for (let i = messages.length - 1; i >= turnStart; i--) {
+    if (liveCard(messages[i])) { cardOnScreen = messages[i].slotCard as SlotKey; break }
+  }
+  // SKIP, EXACTLY WHERE "PREFER NOT TO SAY" WAS: a single-choice or number
+  // question the plan does not need. Never a multi-select — injuries and diet
+  // record "none" through their own Next, and a skip there would assemble
+  // into the same empty list while meaning "not given".
+  const skipKeys: SlotKey[] = (() => {
+    const def = cardOnScreen ? getSlotDef(cardOnScreen) : undefined
+    if (!def || (def.control !== 'single' && def.control !== 'numeric')) return []
+    const keys = def.control === 'numeric'
+      ? (numericGroupFor(def.key) as SlotKey[]).filter(k => !confirmed.has(k))
+      : [def.key]
+    return keys.length > 0 && keys.every(k => { const d = getSlotDef(k); return !!d && canDeclineSlot(d, values) }) ? keys : []
+  })()
+  const sectionLabel = setupSectionOf(cardOnScreen ?? (questionIdx >= 0 ? messages[questionIdx].asksSlot : undefined) ?? openSlotsInOrder(confirmed, values)[0] ?? null)
+  const stepNow = Math.max(1, Math.min(requiredCount, answeredCount + 1))
+
   const composerBottomStyle = isKeyboardOpen
     ? { bottom: insetPx }
     : { bottom: 'env(safe-area-inset-bottom)' }
@@ -1764,32 +1839,37 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
        controls and which parks the newest message under the fixed composer.
        overflow-hidden keeps that page-level scroll from coming back. */
     <div className="h-[100dvh] overflow-hidden flex flex-col ob-canvas">
-      {/* v2 COACH HEADER. The conversation now has someone at the top of it:
-          an avatar with a slow pulse, a name, and what it is currently doing.
-          This is also what let the per-message COACH label go — identity is
-          stated once, persistently, instead of being restamped above every
-          line the coach says. */}
-      <div className="flex items-center gap-3 px-5 pt-5 pb-3.5 max-w-md w-full mx-auto border-b border-[color:color-mix(in_oklab,var(--border)_35%,transparent)]">
-        <div className="ob-coach-avatar size-10 shrink-0 rounded-full flex items-center justify-center text-primary-foreground">
-          <Dumbbell className="size-5" strokeWidth={2.2} />
+      {/* THE COACH HEADER (design handoff 2e, 10 Oct 2026): who is asking,
+          which part of setup this is and how far through, and Skip wherever
+          the question on screen can already be declined (canDeclineSlot) —
+          never on a required question. Her ruling names it "Your Personal
+          TrAIner", not the brief's "Your coach". */}
+      <div className="max-w-md w-full mx-auto px-[22px] pt-5">
+        <div className="flex items-center gap-3">
+          <div className="ob-coach-avatar size-[34px] shrink-0 rounded-full flex items-center justify-center text-primary-foreground">
+            <MessageCircle className="size-[17px]" strokeWidth={2.2} />
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col">
+            <span className="text-[0.875rem] font-semibold text-foreground">Your Personal TrAIner</span>
+            <span className="text-[0.6875rem] text-muted-foreground" data-onboarding-step>
+              {sectionLabel} · {stepNow} of {requiredCount}
+            </span>
+          </div>
+          {skipKeys.length > 0 && !busy && (
+            <button
+              type="button"
+              className="hit-slop-44 shrink-0 text-[0.75rem] text-muted-foreground"
+              onClick={() => handleDecline(skipKeys)}
+              data-onboarding-skip
+            >
+              Skip
+            </button>
+          )}
         </div>
-        <div className="flex-1 min-w-0 flex flex-col gap-px">
-          <span className="text-base font-semibold text-foreground">Personal TrAIner</span>
-          <span className="text-xs text-primary-text flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-primary shrink-0" />
-            Building your plan
-          </span>
-        </div>
-        {/* PROGRESS TICKS, and they are deliberately NOT a step counter.
-            "12 of 18 answered" tells you you are working through a list,
-            which is the exact feel this redesign removes — but no progress at
-            all leaves an open-ended chat with no sense of how long it runs.
-            Four ticks give the shape of the thing without the scorekeeping.
-            Wordless to the eye, but not to a screen reader: the real counts
-            stay on the progressbar role, which is how this was already fixed
-            once when the bar was invisible to one entirely. */}
+        {/* SIX TICKS, done / now / to come. The real counts stay on the
+            progressbar role for a screen reader. */}
         <div
-          className="flex gap-1 shrink-0"
+          className="mt-3.5 grid grid-cols-6 gap-1"
           role="progressbar"
           aria-label="Setup progress"
           aria-valuemin={0}
@@ -1797,8 +1877,16 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           aria-valuenow={answeredCount}
         >
           {Array.from({ length: PROGRESS_TICKS }, (_, i) => {
-            const filled = requiredCount > 0 && (i + 1) / PROGRESS_TICKS <= answeredCount / requiredCount
-            return <span key={i} className={`ob-tick ${filled ? 'ob-tick-on' : 'ob-tick-off'}`} />
+            const doneTicks = requiredCount > 0 ? Math.floor((answeredCount / requiredCount) * PROGRESS_TICKS) : 0
+            const look = i < doneTicks ? 'done' : i === doneTicks ? 'now' : 'next'
+            return (
+              <span
+                key={i}
+                data-tick={look}
+                className={`h-[3px] rounded-full ${look === 'done' ? 'bg-primary glow-mint-box' : ''}`}
+                style={look === 'now' ? { background: 'rgba(var(--glow-rgb), .45)' } : look === 'next' ? { background: 'color-mix(in srgb, var(--role-ai-accent) 30%, transparent)' } : undefined}
+              />
+            )
           })}
         </div>
       </div>
@@ -1816,11 +1904,21 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
            min-height:auto, which refuses to shrink below its content — so
            `flex-1 overflow-y-auto` alone grows the box instead of scrolling
            inside it, which is exactly what was measured. */
-        className="flex-1 min-h-0 overflow-y-auto px-4 pb-28"
+        className="flex-1 min-h-0 overflow-y-auto px-[22px] pb-28"
         style={isKeyboardOpen ? { paddingBottom: insetPx + 112 } : undefined}
       >
-        <div ref={contentRef} className="max-w-md w-full mx-auto flex flex-col gap-[22px]">
-          {messages.map((msg, i) =>
+        <div ref={contentRef} className="max-w-md w-full mx-auto flex flex-col gap-4 pt-6">
+          {/* ONE QUESTION PER SCREEN (2e). What she said last, as a bubble on
+              the right; then the coach's turn since — its lead-in small, its
+              question large — and the card that answers it. Earlier turns are
+              not drawn; nothing in them is lost (the review shows every
+              answer, and every one can be changed there). */}
+          {prevUserIdx >= 0 && (
+            <div className="ob-message-in ob-user-bubble ml-auto w-fit max-w-[78%]" data-onboarding-previous>
+              {messages[prevUserIdx].content}
+            </div>
+          )}
+          {messages.map((msg, i) => i < turnStart ? null :
             msg.isReceipt ? (
               <div key={i} data-testid="onboarding-tick" className="flex items-center gap-1.5 pl-1">
                 <Check className="size-3 shrink-0 text-primary-text" />
@@ -1828,29 +1926,30 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
               </div>
             ) : (
               <div key={i}>
-                {/* TEXT-ONLY CONVERSATION, v2. The coach speaks as plain
-                    text on the canvas at 19px — no bubble, because two
-                    bubbles facing each other read as messaging furniture and
-                    the point of this screen is a person talking. Only the
-                    user gets a fill, kept compact at 17px, and that
-                    difference is what makes the two read as different kinds
-                    of speech rather than a transcript.
-
-                    v2 DROPPED THE PER-MESSAGE "COACH" LABEL. v1 stamped it
-                    above every coach line; the header now states who is
-                    talking once and permanently, so repeating it above each
-                    line was saying the same thing twice. (It also retires the
-                    run-suppression this file used to need — with no label
-                    there is no repetition to suppress.) */}
-                <div
-                  className={
-                    msg.role === 'user'
-                      ? 'ob-message-in ob-user-bubble ml-auto w-fit max-w-[80%] rounded-[20px_20px_4px_20px] px-[18px] py-3 text-[1.0625rem]/[1.5] text-foreground'
-                      : 'ob-message-in max-w-[88%] text-[1.1875rem]/[1.6] text-foreground [text-wrap:pretty]'
-                  }
-                >
-                  {msg.content}
-                </div>
+                {msg.role === 'user' ? (
+                  <div className="ob-message-in ob-user-bubble ml-auto w-fit max-w-[78%]">{msg.content}</div>
+                ) : i === questionIdx ? (() => {
+                  // THE QUESTION IS THE LAST SENTENCE THAT ASKS. A turn often
+                  // opens with a sentence or two ("Nice — four days works.")
+                  // before it; those read as the lead-in, small, and only the
+                  // question itself is set large.
+                  const [lead, ask] = splitQuestion(msg.content)
+                  // ONE CONTAINER for both halves: the card under it belongs to
+                  // the whole message, and reads as answering it.
+                  return (
+                    <div>
+                      {lead && <div className="ob-message-in mb-2 text-[0.875rem]/[1.5] text-muted-foreground [text-wrap:pretty]">{lead} </div>}
+                      <div
+                        className={`ob-message-in font-bold tracking-[-.03em] text-foreground glow-text [text-wrap:pretty] ${ask.length > 120 ? 'text-[1.25rem]/[1.3]' : 'text-[1.75rem]/[1.12]'}`}
+                        data-onboarding-question
+                      >
+                        {ask}
+                      </div>
+                    </div>
+                  )
+                })() : (
+                  <div className="ob-message-in text-[0.875rem]/[1.5] text-muted-foreground [text-wrap:pretty]">{msg.content}</div>
+                )}
                 {msg.slotCard && !msg.slotCardSuperseded && getSlotDef(msg.slotCard)?.control === 'numeric' && (
                   <SlotNumericCard
                     slotKey={msg.slotCard}
@@ -1860,7 +1959,6 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     busy={busy}
                     editing={!!msg.slotCardEditing}
                     onResolve={handleResolveNumeric}
-                    onDecline={handleDecline}
                   />
                 )}
                 {msg.slotCard && !msg.slotCardSuperseded && (
@@ -1872,7 +1970,6 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     onToggleMulti={handleToggleMulti}
                     onResolveSingle={handleResolveSingle}
                     onResolveMulti={handleResolveMulti}
-                    onDecline={handleDecline}
                   />
                 )}
               </div>
@@ -2085,6 +2182,34 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             // now marks the field you are IN, so it means something.
             className={`ob-input h-auto rounded-full px-5 py-[15px] text-[1rem] text-foreground placeholder:text-muted-foreground focus-visible:ring-0 ${busy ? 'opacity-60' : ''}`}
           />
+          {speechRecognizer() && !input.trim() && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className={`size-[52px] shrink-0 rounded-full ${listening ? 'text-primary-text glow-mint' : 'text-muted-foreground'}`}
+              aria-label={listening ? 'Listening…' : 'Say it instead'}
+              aria-pressed={listening}
+              data-onboarding-mic
+              onClick={() => {
+                const Rec = speechRecognizer()
+                if (!Rec || listening) return
+                const rec = new Rec()
+                rec.lang = navigator.language || 'en-GB'
+                rec.interimResults = false
+                rec.onresult = e => {
+                  const said = e.results[0]?.[0]?.transcript?.trim()
+                  if (said) setInput(prev => (prev ? `${prev} ${said}` : said))
+                }
+                rec.onend = () => setListening(false)
+                rec.onerror = () => setListening(false)
+                setListening(true)
+                try { rec.start() } catch { setListening(false) }
+              }}
+            >
+              <Mic className="size-[22px]" />
+            </Button>
+          )}
           <Button
             size="icon"
             // v2: a 52px CIRCLE that stays dim until there is something to

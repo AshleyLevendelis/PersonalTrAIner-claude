@@ -61,60 +61,55 @@ function renderedPx(classes: string): number | null {
   return m[2] === 'rem' ? Number(m[1]) * 16 : Number(m[1])
 }
 
-console.log('\n2. The coach is not in a bubble')
+console.log('\n2. One question per screen (design handoff 2e, 10 Oct 2026)')
 {
-  const row = ui.slice(ui.indexOf('TEXT-ONLY CONVERSATION, v2.'), ui.indexOf('{msg.slotCard'))
-  check('the coach line exists', row.length > 100)
-  const coach = /max-w-\[88%\] text-\[[0-9.]+(?:px|rem)\]\/\[1\.6\] text-foreground \[text-wrap:pretty\]/.exec(row)
-  check('coach text is 19px / 1.6, foreground, pretty-wrapped',
-    coach !== null && renderedPx(coach[0]) === 19, coach?.[0])
-  // The actual regression to fear: someone "tidies up" by giving the coach a
-  // surface again, and the design quietly reverts to a messaging UI.
-  const coachClasses = coach ? coach[0] : ''
-  check('...with NO background', !/\bbg-/.test(coachClasses), coachClasses)
-  check('...and NO border or radius', !/\bborder|\brounded/.test(coachClasses), coachClasses)
-  // v2 moved the fill into a class so the gradient could be token-derived.
-  // Still --secondary underneath, which is what keeps it right in all four
-  // themes rather than only in the one it was drawn in.
-  check('the user reply keeps its fill', /ob-user-bubble/.test(row))
-  check('...still built from --secondary, not a pasted gradient',
-    /\.ob-user-bubble\s*\{[^}]*var\(--secondary\)/s.test(css))
-  check('...with the mint hairline derived from the accent',
-    /\.ob-user-bubble\s*\{[^}]*rgba\(var\(--glow-rgb\), \.18\)/s.test(css))
-  const userSize = /text-\[[0-9.]+(?:px|rem)\]\/\[1\.5\]/.exec(row)
-  check('...at 17px / 1.5, one step down from the coach',
-    userSize !== null && renderedPx(userSize[0]) === 17, userSize?.[0])
-  check('...with the asymmetric corner', /rounded-\[20px_20px_4px_20px\]/.test(row))
-  check('...and capped at 80%', /max-w-\[80%\]/.test(row))
+  // The question is the screen: the last sentence that asks, set large, with
+  // what came before it small above. Earlier turns are not drawn — except a
+  // card still waiting for an answer, which holds the screen open.
+  const q = /data-onboarding-question/.test(ui) ? ui.slice(ui.lastIndexOf('className={`ob-message-in font-bold', ui.indexOf('data-onboarding-question')), ui.indexOf('data-onboarding-question') + 40) : ''
+  check('the question exists', q.length > 40)
+  check('...set at 28px / 1.12, bold, tight, glowing, pretty-wrapped',
+    /font-bold tracking-\[-\.03em\] text-foreground glow-text \[text-wrap:pretty\]/.test(q) && /text-\[1\.75rem\]\/\[1\.12\]/.test(q))
+  check('...stepping down to 20px for a long one rather than filling the screen', /\.length > 120 \? 'text-\[1\.25rem\]\/\[1\.3\]'/.test(q))
+  check('...and still no surface: the coach is not in a bubble', !/\bbg-|\bborder|\brounded/.test(q))
+  check('the question is the LAST SENTENCE THAT ASKS, from one shared splitter', /splitQuestion\(msg\.content\)/.test(ui))
+  check('earlier turns are not drawn', /messages\.map\(\(msg, i\) => i < turnStart \? null :/.test(ui))
+  check('...but an open card holds the screen open', /const turnStart = oldestLiveCard >= 0 && oldestLiveCard <= lastUserIdx \? oldestLiveCard : lastUserIdx \+ 1/.test(ui))
+
+  // Her reply: on the right, small and quiet, in the AI-role violet (a token,
+  // so it follows the theme), with the asymmetric corner and a 78% cap.
+  check('her reply is the answer bubble', /ob-user-bubble ml-auto w-fit max-w-\[78%\]/.test(ui))
+  check('...from the AI-role accent token, not a pasted colour',
+    /\.ob-user-bubble\s*\{[^}]*color-mix\(in srgb, var\(--role-ai-accent\) 22%, transparent\)/s.test(css))
+  check('...with the asymmetric corner', /\.ob-user-bubble\s*\{[^}]*border-radius:\s*16px 16px 4px 16px/s.test(css))
+  check('...at 13.5px in the tertiary ink', /\.ob-user-bubble\s*\{[^}]*font-size:\s*0\.84375rem[^}]*color:\s*var\(--text-tertiary\)/s.test(css))
 }
 
-console.log('\n3. v2 — a header says who is talking, once and permanently')
+console.log('\n3. The header says who is asking, where she is, and offers Skip only where it may')
 {
-  // v1 stamped a COACH label above every coach line, and the run-suppression
-  // that needed was itself a workaround. v2 states identity once in a header,
-  // so the label is gone entirely — asserted, because re-adding it would put
-  // the same words on screen twice.
   check('no per-message COACH label remains', !/ds-label mb-1\.5">Coach</.test(ui))
   check('...and its run-suppression helper went with it', !/isCoachContinuation/.test(ui))
-
-  const header = ui.slice(ui.indexOf('v2 COACH HEADER'), ui.indexOf('The base pb-28'))
+  const header = ui.slice(ui.lastIndexOf('{/*', ui.indexOf('THE COACH HEADER (design handoff 2e')), ui.indexOf('The base pb-28'))
   check('the header exists', header.length > 200)
-  check('...with the pulsing avatar', /ob-coach-avatar/.test(header))
-  check('...carrying the brand name', /Personal TrAIner/.test(header))
-  check('...and what it is currently doing', /Building your plan/.test(header))
-
-  // Progress ticks, NOT a step counter — "12 of 18" is the scorekeeping this
-  // whole redesign removes. But a screen reader still needs the real numbers,
-  // which is how the old invisible bar was fixed once already.
-  check('progress is ticks', /ob-tick/.test(header))
-  check('...four of them', /const PROGRESS_TICKS = 4/.test(ui))
-  // Scoped to RENDERED text: the progressbar's aria-valuenow legitimately
-  // carries answeredCount, and matching the bare word flagged that. What must
-  // not appear is a count the eye can read.
-  check('...with no visible count',
-    !/>\s*\{answeredCount\}|\{answeredCount\}\s*(of|\/)|of \{requiredCount\}/.test(header))
-  check('...but the real numbers still reach a screen reader',
+  check('...with the 34px gradient disc', /ob-coach-avatar size-\[34px\]/.test(header))
+  // Her ruling: "Personal TrAIner" everywhere, over the brief's "Your coach".
+  check('...named "Your Personal TrAIner", her ruling over the brief\'s "Your coach"', /Your Personal TrAIner/.test(header) && !/Your coach/.test(header.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')))
+  // 2e DRAWS A COUNT ("Training · 3 of 17"), reversing v2's no-visible-count
+  // choice; the brief is hers. The count is the tracked set readyToGenerate
+  // waits on, so it ends where setup ends.
+  check('...and where she is: "{Section} · n of N"', /\{sectionLabel\} · \{stepNow\} of \{requiredCount\}/.test(header))
+  check('six ticks', /const PROGRESS_TICKS = 6/.test(ui) && /grid grid-cols-6/.test(header))
+  check('...done, now and to come', /'done' : i === doneTicks \? 'now' : 'next'/.test(header))
+  check('...and the real numbers still reach a screen reader',
     /role="progressbar"/.test(header) && /aria-valuenow=\{answeredCount\}/.test(header))
+  // SKIP IS THE OLD "PREFER NOT TO SAY", MOVED: only a single-choice or number
+  // question the plan does not need. Never a multi-select (injuries and diet
+  // record "none" through their own Next).
+  check('Skip shows only when there is something it may skip', /\{skipKeys\.length > 0 && !busy && \(/.test(header) && /onClick=\{\(\) => handleDecline\(skipKeys\)\}/.test(header))
+  check('...decided by canDeclineSlot', /canDeclineSlot\(d, values\)/.test(ui))
+  check('...for single-choice and number questions only', /def\.control !== 'single' && def\.control !== 'numeric'\)\) return \[\]/.test(ui))
+  const cards = readFileSync(join(ROOT, 'src/components/onboarding/SlotChipsCard.tsx'), 'utf8') + readFileSync(join(ROOT, 'src/components/onboarding/SlotNumericCard.tsx'), 'utf8')
+  check('...moved, not copied: the cards no longer carry their own decline', !/Prefer not to say<\/|onDecline\(/.test(cards.replace(/\/\/.*$/gm, '')))
 }
 
 console.log('\n4. The typing indicator is someone typing, not a spinner')
@@ -203,7 +198,7 @@ console.log('\n6. Regression: the behaviour this design depends on is still ther
   // test:onboarding-conversational; this only checks the two things that
   // would make the SCREEN wrong if they regressed.
   check('"Say anything…" survives as the honest fallback', /\?\? 'Say anything…'/.test(ui))
-  check('messages are still gapped as a conversation, not a list', /flex flex-col gap-\[22px\]/.test(ui))
+  check('the turn is gapped, not a run-on list', /max-w-md w-full mx-auto flex flex-col gap-4 pt-6/.test(ui))
   check('v2 — messages animate in', /ob-message-in/.test(ui) && /@keyframes obMessageIn/.test(css))
   check('...and reduced motion turns that off too',
     /prefers-reduced-motion[\s\S]{0,200}\.ob-message-in\s*\{\s*animation:\s*none/.test(css))

@@ -91,8 +91,9 @@ const wait2 = ms => new Promise(r => setTimeout(r, ms))
 /** Every meal name the list is showing, so "the names did not change" is measured rather than assumed. */
 const mealNames = () => ev(`[...document.querySelectorAll('[data-meal-name]')].map(n => n.textContent.trim())`)
 const dayCalories = () => ev(`(() => {
-  const m = document.body.innerText.match(/([\\d,]+)\\s*\\n?\\s*kcal planned/)
-  return m ? Number(m[1].replace(/,/g, '')) : null
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2b): "Planned N kcal", by its testid.
+  const el = document.querySelector('[data-testid="day-kcal"]')
+  return el ? Number(el.textContent.replace(/[^\\d]/g, '')) : null
 })()`)
 
 let ok0 = null

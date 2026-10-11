@@ -82,7 +82,8 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&week=1&bi
 for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-testid="meal-day-strip"]')`)) break; await wait(200) }
 await wait(600)
 const MEALS = `Object.fromEntries([...document.querySelectorAll('[data-meal-name]')].map(e => {
-  const k = e.closest('.py-4')?.querySelector('[data-testid="meal-row-kcal"]')?.textContent.trim() ?? ''
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): a meal row is found by its own data-meal-row, not by the .py-4 spacing it no longer has.
+  const k = e.closest('[data-meal-row]')?.querySelector('[data-testid="meal-row-kcal"]')?.textContent.trim() ?? ''
   return [e.dataset.mealName, { name: e.textContent.trim(), kcal: k }]
 }))`
 const HELD = `(() => { const p = document.querySelector('[data-testid="held-around"]'); return p ? { kind: p.dataset.kind, text: p.querySelector('span')?.textContent.trim() ?? '' } : null })()`
@@ -107,12 +108,12 @@ for (const date of (days ?? []).slice(1)) {
       await openDay(date)
       const before = await ev(MEALS)
       if (!before[slot]) continue
-      const opened = await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]')?.closest('.py-4'); const head = r?.querySelector('button'); if (!head) return false; head.click(); return true })()`)
+      const opened = await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]')?.closest('[data-meal-row]'); const head = r?.querySelector('button'); if (!head) return false; head.click(); return true })()`)
       await wait(350)
-      const swapBtn = await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]').closest('.py-4'); const b = [...r.querySelectorAll('button')].find(x => /^Swap/.test(x.textContent.trim())); if (!b) return false; b.click(); return true })()`)
+      const swapBtn = await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]').closest('[data-meal-row]'); const b = [...r.querySelectorAll('button')].find(x => /^Swap/.test(x.textContent.trim())); if (!b) return false; b.click(); return true })()`)
       if (!opened || !swapBtn) break
       await wait(300)
-      const picked = await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]').closest('.py-4'); const bs = [...r.querySelectorAll('button')].filter(x => x.querySelector('p.line-clamp-2') && !x.disabled); const big = bs.find(x => x.querySelector('p').textContent.trim() === 'Big rice bowl'); const b = ${opt} === 0 && big ? big : bs[${opt}]; if (!b) return null; const t = b.querySelector('p').textContent.trim(); b.click(); return t })()`)
+      const picked = await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]').closest('[data-meal-row]'); const bs = [...r.querySelectorAll('button')].filter(x => x.querySelector('p.line-clamp-2') && !x.disabled); const big = bs.find(x => x.querySelector('p').textContent.trim() === 'Big rice bowl'); const b = ${opt} === 0 && big ? big : bs[${opt}]; if (!b) return null; const t = b.querySelector('p').textContent.trim(); b.click(); return t })()`)
       if (!picked) break
       await wait(1200)
       swaps++

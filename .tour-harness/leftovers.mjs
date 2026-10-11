@@ -157,7 +157,8 @@ check('2c. no dish appears twice in the same day', new Set(names).size === names
 // --- 3. the numbers still add up ------------------------------------------
 console.log('\n  3. The day still adds up')
 const text = await ev(`document.body.innerText`)
-const planned = (text || '').match(/([\d,]+)\s*\n?\s*kcal planned/)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): the planned day reads "Planned N kcal".
+const planned = (text || '').match(/Planned\s*([\d,]+)\s*kcal/)
 check('3a. the day states a planned calorie total', planned !== null, (text || '').slice(0, 120))
 check('3b. ...and it is a real number, not zero — nothing was double counted into nonsense',
   planned !== null && Number(planned[1].replace(/,/g, '')) > 500 && Number(planned[1].replace(/,/g, '')) < 6000,

@@ -56,8 +56,10 @@ const until = async (fn, pred, tries = 25) => { let v = await fn(); for (let i =
 // regex inside the evaluated string and the escaping ate it, so the header
 // read as empty and three checks failed against the driver, not the app.
 const headerMinutes = async () => {
-  const texts = await ev(`[...document.querySelectorAll('button')].map(b => (b.textContent ?? '').trim())`)
-  const header = (texts ?? []).find(t => /~\s*\d+\s*min/.test(t)) ?? ''
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2c): the length left the week row
+  // for the hero's meta line ("7 exercises · ~48 min"). "The first button with
+  // a ~N min" became the warm-up row and read its 7 minutes.
+  const header = await text('[data-testid="hero-meta"]')
   const m = /~\s*(\d+)\s*min/.exec(header)
   return { note: await text('[data-testid="session-length-note"]'), header, mins: m ? Number(m[1]) : NaN }
 }

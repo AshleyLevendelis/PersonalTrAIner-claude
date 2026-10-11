@@ -107,10 +107,13 @@ check('...so nothing says the day no longer fits: something else can be served',
 // ruling asked ("stays ... marked as clashing"), rather than hiding it.
 await ev(`document.querySelector('[data-meal-name="dinner"]').closest('button').click()`)
 await wait(400)
-await ev(`[...document.querySelectorAll('button')].find(b => /^Swap/.test(b.textContent.trim()))?.click()`)
+// The dinner row's own Swap: since 2b the "Up next" card carries a Swap of its
+// own higher on the page, so "the first Swap on the page" is another meal's.
+await ev(`[...document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]').querySelectorAll('button')].find(b => /^Swap/.test(b.textContent.trim()))?.click()`)
 await wait(400)
 const listed = await ev(`(() => {
-  const row = document.querySelector('[data-meal-name="dinner"]').closest('.py-4')
+// RE-ANCHORED 10 Oct 2026 (design handoff 2b): a meal row is found by its own data-meal-row, not by the .py-4 spacing it no longer has.
+  const row = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]')
   const b = [...row.querySelectorAll('button')].find(x => (x.querySelector('p.line-clamp-2')?.textContent || '').trim() === ${JSON.stringify(RISOTTO)})
   return b ? { disabled: b.disabled, reason: [...b.querySelectorAll('p')].map(p => p.textContent.trim()).join(' | ') } : null
 })()`)
@@ -138,7 +141,9 @@ page = '/.tour-harness/profile.html'
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?likes=1&keptclash=1` })
 for (let i = 0; i < 60; i++) { if (await has('[data-slot="dialog-content"]')) break; await wait(200) }
 await wait(800)
-await ev(`(() => { const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^Nutrition$/i.test((x.textContent || '').trim())); if (b && b.getAttribute('aria-expanded') !== 'true') b.click() })()`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2d): Profile is a page of rows; this opens the sheet that holds it.
+await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Foods you like"]')?.click(), 200) })()`)
+await wait(300)
 for (let i = 0; i < 40; i++) { if (await has('[data-testid="profile-hearts-clash"]')) break; await wait(150) }
 const hearts = await ev(`[...document.querySelectorAll('[data-hearted-meal]')].map(li => [li.dataset.heartedMeal, li.dataset.clashes])`)
 check('the hearted risotto is still listed', hearts.some(([n]) => n === RISOTTO), hearts)

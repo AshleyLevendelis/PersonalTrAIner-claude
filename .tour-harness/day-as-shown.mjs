@@ -84,7 +84,11 @@ const READ = `(() => {
   const header = Number((document.querySelector('[data-testid="day-kcal"]')?.textContent || '').trim())
   const rows = [...document.querySelectorAll('[data-testid="meal-row-kcal"]')].map(e => ({ slot: e.getAttribute('data-slot'), kcal: Number((e.textContent.match(/\\d+/) || [NaN])[0]) }))
   const line = document.querySelector('[data-testid="around-eaten"]')
-  const left = document.querySelector('[data-testid="kcal-left"]')?.textContent?.trim() ?? null
+  // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the number is the big figure
+  // and the word beside it says left or over ("kcal over"); read as one.
+  const num = document.querySelector('[data-testid="kcal-left-number"]')?.textContent?.trim().replace(/,/g, '') ?? null
+  const word = document.querySelector('[data-testid="kcal-left"]')?.textContent?.trim().replace(/^kcal\\s*/, '') ?? null
+  const left = num != null && word != null ? num + ' ' + word : null
   return { header, rows, sum: rows.reduce((s, r) => s + r.kcal, 0), line: line ? { kind: line.getAttribute('data-kind'), text: line.querySelector('span')?.textContent?.trim() } : null, left }
 })()`
 // A row's figure is rounded on screen; four of them can differ from the

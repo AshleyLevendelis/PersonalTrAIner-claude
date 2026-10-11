@@ -79,7 +79,6 @@ export function SlotNumericCard({
   busy,
   editing = false,
   onResolve,
-  onDecline,
 }: {
   slotKey: string
   values: OnboardingSlotValues
@@ -93,8 +92,6 @@ export function SlotNumericCard({
    */
   editing?: boolean
   onResolve: (entries: { key: SlotKey; raw: string }[]) => void
-  /** Record these as answered with NO value — see canDeclineSlot. */
-  onDecline: (keys: SlotKey[]) => void
 }) {
   const def = getSlotDef(slotKey)
   const fields = (editing ? (def ? [def] : []) : (def ? numericGroupFor(def.key) : []).map(k => getSlotDef(k)!))
@@ -202,19 +199,9 @@ export function SlotNumericCard({
       {showErrors && allBlank && (
         <p className="text-[0.6875rem] text-muted-foreground">
           {declinable
-            ? 'Fill in what you can, or tap “Prefer not to say”.'
+            ? 'Fill in what you can, or tap Skip at the top.'
             : 'Fill these in to carry on.'}
         </p>
-      )}
-      {declinable && (
-        <Button
-          variant="ghost"
-          className="w-full min-h-[44px] text-sm text-muted-foreground"
-          disabled={busy}
-          onClick={() => onDecline(fields.map(d => d.key))}
-        >
-          Prefer not to say
-        </Button>
       )}
     </div>
   )

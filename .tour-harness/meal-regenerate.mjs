@@ -40,6 +40,10 @@ const working = () => ev(`(() => {
   const r = panel ? panel.getBoundingClientRect() : null
   // What a thumb landing on the first meal row would hit.
   const row = list.querySelector('button')
+  // On screen first (10 Oct 2026, design handoff 2b): the rings above the list
+  // grew and the first row sits below the fold, where elementFromPoint finds
+  // nothing at all and every reading said "not reachable".
+  row?.scrollIntoView({ block: 'center' })
   const rr = row ? row.getBoundingClientRect() : null
   const hit = rr ? document.elementFromPoint(rr.left + rr.width / 2, rr.top + rr.height / 2) : null
   return {

@@ -45,7 +45,9 @@ const until = async (read, ok, ms = 6000) => { const t0 = Date.now(); let v; whi
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?likes=1` })
 await until(() => has('[data-slot="dialog-content"]'), v => v)
 await wait(800)
-await ev(`(() => { const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /^Nutrition$/i.test((x.textContent || '').trim())); if (b && b.getAttribute('aria-expanded') !== 'true') b.click() })()`)
+// RE-ANCHORED 10 Oct 2026 (design handoff 2d): Profile is a page of rows; this opens the sheet that holds it.
+await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Foods you like"]')?.click(), 200) })()`)
+await wait(300)
 await until(() => has('[data-testid="profile-food-likes"]'), v => v)
 await wait(400)
 
@@ -63,7 +65,18 @@ const table = name => ev(`window.__fakeDb[${JSON.stringify(name)}].map(r => ({ .
 console.log('\n[1] The list, where she will look for it')
 const b0 = await box()
 check('Profile has "Foods and meals I like"', b0?.label === 'Foods and meals I like', b0)
-check('...right beside "Foods to avoid"', b0?.next === 'Foods to avoid', b0?.next)
+// HER 27 SEP RULING, ON A PAGE OF ROWS (2d, 10 Oct 2026): the likes row sits
+// directly above "Foods to avoid" in the Food group. Read off the rows, then
+// back into the sheet for everything below.
+await ev(`document.querySelector('[data-profile-back]')?.click()`)
+await wait(300)
+const order = await ev(`(() => {
+  const likes = document.querySelector('[data-profile-row="Foods you like"]')
+  return likes ? { next: likes.nextElementSibling?.getAttribute('data-profile-row') ?? null, group: likes.closest('[data-profile-group]')?.getAttribute('data-profile-group') ?? null } : null
+})()`)
+check('...right above "Foods to avoid", in Food', order?.next === 'Foods to avoid' && order?.group === 'Food', order)
+await ev(`document.querySelector('[data-profile-row="Foods you like"]')?.click()`)
+await wait(400)
 check('...saying what a like does, and that it never overrides what she avoids', /made with these in mind/.test(b0?.hint ?? '') && /never override/.test(b0?.hint ?? ''), b0?.hint)
 check('...with somewhere to type one', !!b0?.hasInput)
 check('a like the coach recorded is on it', (b0?.likes ?? []).includes('curry'), b0?.likes)

@@ -114,47 +114,26 @@ await wait(5000)
 // person reaches it: expand the exercise, open its menu, choose History.
 // Walking the real controls rather than deep-linking a state, because a
 // route nobody can tap is not a route.
+// RE-ANCHORED 10 Oct 2026 (design handoff 2c). A collapsed row starts with
+// its number ("02 Pull-Ups") and carries no menu until it is opened, so the
+// walk up from the name's text landed on another row's menu. The row is found
+// by its own data-exercise-name, opened by its own toggle, and its menu is
+// brought on screen before the tap — a mouse event at off-screen coordinates
+// lands on nothing.
+const ROW = `[...document.querySelectorAll('[data-exercise-name]')].find(e => /^Pull-?Ups?$/i.test(e.getAttribute('data-exercise-name') ?? ''))`
 const opened = await ev(`(() => {
-  const leaf = [...document.querySelectorAll('*')]
-    .find(n => n.children.length === 0 && /^Pull-?Ups?$/i.test((n.textContent ?? '').trim()))
-  if (!leaf) return 'no leaf'
-  // WALK UP TO THIS EXERCISE'S ROW, NOT JUST TO SOMETHING WITH A BUTTON.
-  // The first version stopped at the first ancestor holding any button and
-  // landed on a CONTAINER — so the menu it opened belonged to Band
-  // Pull-Aparts, the row above, and the dialog that appeared was that
-  // exercise's. It looked like a failure of the feature and was a failure of
-  // the selector. The row is the smallest ancestor that has a menu button
-  // AND whose own text still starts with this exercise's name.
-  let row = leaf
-  for (let i = 0; i < 8 && row; i++) {
-    const own = (row.innerText ?? '').trim()
-    if (row.querySelector?.('[aria-haspopup="menu"]') && /^Pull-?Ups?/i.test(own)) break
-    row = row.parentElement
-  }
-  if (!row || !row.querySelector?.('[aria-haspopup="menu"]')) return 'no row'
-  const header = [...row.querySelectorAll('button')].find(b => /Pull-?Ups?/i.test(b.textContent ?? ''))
-  ;(header ?? leaf).click()
+  const row = ${ROW}
+  if (!row) return 'no row'
+  row.scrollIntoView({ block: 'center' })
+  const toggle = row.querySelector('[role="button"]')
+  if (!toggle) return 'no toggle'
+  toggle.click()
   return 'expanded'
 })()`)
 await wait(900)
-// RE-QUERY AFTER THE EXPANSION, never cache the node across it. Expanding
-// re-renders the row, so a reference taken beforehand can be detached from
-// the document — and a detached node still answers getBoundingClientRect
-// with a plausible box, so the tap "succeeded" at coordinates belonging to
-// nothing. That is why this reported an open menu with no items in it.
-const menuOpened = await tapCentre(`(() => {
-  const leaf = [...document.querySelectorAll('*')]
-    .find(n => n.children.length === 0 && /^Pull-?Ups?$/i.test((n.textContent ?? '').trim()))
-  if (!leaf) return null
-  let row = leaf
-  for (let i = 0; i < 8 && row; i++) {
-    if (row.querySelector?.('[aria-haspopup="menu"]') && /^Pull-?Ups?/i.test((row.innerText ?? '').trim())) {
-      return row.querySelector('[aria-haspopup="menu"]')
-    }
-    row = row.parentElement
-  }
-  return null
-})()`)
+await ev(`(${ROW})?.querySelector('[aria-haspopup="menu"]')?.scrollIntoView({ block: 'center' })`)
+await wait(300)
+const menuOpened = await tapCentre(`(${ROW})?.querySelector('[aria-haspopup="menu"]')`)
 await wait(800)
 const clickedHistory = await tapCentre(`[...document.querySelectorAll('[role="menuitem"]')]
   .find(n => /^History$/i.test((n.textContent ?? '').trim()))`)

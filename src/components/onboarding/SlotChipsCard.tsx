@@ -1,6 +1,6 @@
 import { OptionRow, OptionPill, OptionCell } from './OptionRow'
 import { Button } from '@/components/ui/button'
-import { getSlotDef, offeredOptionsFor, canDeclineSlot, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
+import { getSlotDef, offeredOptionsFor, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 import { dietTargetCaveat } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,6 @@ export function SlotChipsCard({
   onToggleMulti,
   onResolveSingle,
   onResolveMulti,
-  onDecline,
 }: {
   slotKey: string
   values: OnboardingSlotValues
@@ -55,8 +54,6 @@ export function SlotChipsCard({
   onToggleMulti: (key: SlotKey, value: string) => void
   onResolveSingle: (key: SlotKey, value: string) => void
   onResolveMulti: (key: SlotKey) => void
-  /** Record this slot as answered with NO value — see canDeclineSlot. */
-  onDecline: (keys: SlotKey[]) => void
 }) {
   const def = getSlotDef(slotKey)
   // Via offeredOptionsFor so any future "hidden until the engine can honour
@@ -119,16 +116,15 @@ export function SlotChipsCard({
       {shape === 'rows' && (
         <div
           {...groupRole}
-          className="overflow-hidden rounded-[14px] border border-[color:var(--hairline)] bg-card"
+          className="flex flex-col gap-2"
         >
-          {options.map((opt, i) => (
+          {options.map(opt => (
             <OptionRow
               key={String(opt.value)}
               label={opt.label}
               description={opt.description}
               selected={isSelected(opt.value)}
               selectionRole={selectionRole}
-              divided={i > 0}
               onClick={() => choose(opt.value)}
             />
           ))}
@@ -198,51 +194,20 @@ export function SlotChipsCard({
           already spans the column; under a strip or pills it stays inline, so
           a tidy one-line question doesn't get the heaviest control on screen
           hung underneath it. All resolve/decline behaviour is untouched. */}
-      {def.control === 'single' && canDeclineSlot(def, values) && (
-        <Button
-          variant="ghost"
-          className={shape === 'rows'
-            ? 'w-full min-h-[44px] text-sm text-muted-foreground'
-            : 'min-h-[44px] rounded-full px-3 text-xs text-muted-foreground'}
-          disabled={busy}
-          onClick={() => onDecline([def.key])}
-        >
-          Prefer not to say
-        </Button>
-      )}
+      {/* THE SKIP MOVED TO THE HEADER (design handoff 2e, 10 Oct 2026): one
+          "Skip", top right, wherever the question can already be declined
+          (canDeclineSlot) — moved, not copied. */}
+      {/* NEXT, FULL WIDTH, for a question that takes more than one tap. A
+          single-choice question is still answered by its one tap. */}
       {def.control === 'multi' && (
-        shape === 'rows' ? (
-          <Button
-            variant="outline"
-            className="w-full min-h-[44px] text-sm"
-            // A REQUIRED multi with nothing selected must not offer a skip
-            // that would silently fail validation downstream — the button says
-            // what's needed and stays disabled until then.
-            disabled={busy || (def.required && selectedMulti.length === 0)}
-            onClick={() => onResolveMulti(def.key)}
-          >
-            {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — skip') : 'Done'}
-          </Button>
-        ) : (
-          // Strip and pills share a footer: the picks read back on the left,
-          // the Done button on the right. The read-back matters most on the
-          // strip, where the answer is seven single letters — "Mon · Wed · Fri"
-          // is the only place the choice is stated in words.
-          <div className="mt-2.5 flex items-center justify-between gap-3">
-            <p className="min-w-0 flex-1 truncate text-[0.71875rem] text-muted-foreground">
-              {selectedMulti.length > 0
-                ? options.filter(o => selectedMulti.includes(String(o.value))).map(o => o.label).join(' · ')
-                : ''}
-            </p>
-            <Button
-              className="h-[38px] shrink-0 rounded-[11px] px-[18px] text-[0.8125rem] font-semibold glow-mint-box"
-              disabled={busy || (def.required && selectedMulti.length === 0)}
-              onClick={() => onResolveMulti(def.key)}
-            >
-              {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — skip') : 'Done'}
-            </Button>
-          </div>
-        )
+        <Button
+          className="h-[54px] w-full text-[0.9375rem] font-semibold glow-mint-box"
+          disabled={busy || (def.required && selectedMulti.length === 0)}
+          onClick={() => onResolveMulti(def.key)}
+          data-slot-next
+        >
+          {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — next →') : 'Next →'}
+        </Button>
       )}
     </div>
   )
