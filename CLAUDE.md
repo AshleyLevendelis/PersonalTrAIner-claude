@@ -1406,6 +1406,18 @@ menu" stays true when a copy is also left outside it.
 - **Home's coach note rotates, and stops**: held while touched or focused, never moving under
   reduced motion; an adaptation question is never rotated away. `test:layout-revamp`
 
+### Her rulings of 11 Oct 2026, from run 5 of the live-app test
+- **Every rebuild honours the date asked for, never touches a day already trained or a session in
+  progress, carries bans, swaps, active temporary changes and logged weights through, and its card
+  lists everything else it will change.** Every rebuild path, both surfaces. Built through the one
+  function every rebuild goes through; the card is read off a seeded trial of the rebuild confirm
+  runs, never written from what a rebuild usually does. A swap is replayed only onto a lift that is
+  still a valid replacement; an earned weight is carried only at the same reps, never into a deload,
+  never past a stated limit. Undo says what it put back. `test:rebuild-honours`, `verify:rebuild-card`
+- **Ending a temporary injury change early works by asking and by the button**, and a request the
+  app understands is never answered with "I couldn't find that on your current plan".
+  `test:rebuild-honours`, `verify:rebuild-card` §3
+
 ### The rules that make the list bite
 1. **A grain is whole or it is named as not.** A feature touching an
    exercise, a workout, a meal or the plan supports every operation listed
