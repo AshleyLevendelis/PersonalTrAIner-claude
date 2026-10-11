@@ -546,7 +546,13 @@ console.log('\n3. Nothing has crept back up')
   // Profile, setup). MEASURED both ends through this gate: before (fc516ab4, clean worktree) total
   // 2229; after all six, 2257 (+28, spread over the five screens' markup and four small modules).
   // 2,275 is 18 above the 2,257 measured, on her 15 Sep ruling ("raise it with room to grow").
-  const TOTAL_BUDGET_KB = 2275
+  // MOVED 11 Oct 2026: 2,275 -> 2,295, the kit list (her 9 Oct ruling, "Remember what they say";
+  // docs/plans/kit-list.md). MEASURED both ends through this gate the same hour, the base on a clean
+  // worktree of 3fdaa11d: before total 2257 app 1065 paint 464 deploy 308; after total 2276 app 1078
+  // paint 468 deploy 312. +19 kB of real code: the kit model and its own-words guard (pure, read by the
+  // engine, so in the main chunk), the doors' one function, the coach's card, the setup slot; the ticks
+  // live in the lazy Profile chunk. 2,295 is 19 above the 2,276 measured, on her 15 Sep ruling.
+  const TOTAL_BUDGET_KB = 2295
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
