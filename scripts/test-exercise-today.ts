@@ -125,7 +125,7 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // The cue is ONE string with two renderers, not two copies that drift.
   check('the calibration copy has a single source', /export function calibrationCueText/.test(cue))
   check('...and the row renders that, not its own copy',
-    /<span>\{calibrationCueText\(hasLoad\)\}<\/span>/.test(cue))
+    /<span>\{calibrationCueText\(hasLoad, atStatedLimit\)\}<\/span>/.test(cue))
   check('...and TodayPanel reads the same one', /calibrationCueText\(/.test(today))
 
   // THE CUE MUST NOT ARGUE WITH THE NUMBER ABOVE IT. Ashley, 7 Sep 2026:

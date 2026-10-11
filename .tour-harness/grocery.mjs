@@ -479,6 +479,22 @@ const FB2 = await page(`
 check('ticking the eggs says "Egg — in the trolley", on screen (no "is")', /^Egg — in the trolley\s*Undo$/.test(FB2.toast || '') && FB2.onScreen === true, FB2)
 await send('Page.captureScreenshot', { format: 'png' }).then(s => writeFileSync(new URL('./grocery-first-build.png', import.meta.url).pathname, Buffer.from(s.result.data, 'base64')))
 
+// [13] RUN 5 OF THE LIVE TEST (11 Oct 2026, L-a): "toilet roll", typed with no
+// amount, was stored as ONE GRAM and its row read "~0g". It is one of it now.
+console.log('\n[13] A thing typed with no amount is one of it, never "~0g"')
+const TR = await page(`
+  const input = q('[data-testid="grocery-addbar"] input')
+  if (input) { setVal(input, 'toilet roll'); await new Promise(r => setTimeout(r, 100)); enter(input) }
+  await new Promise(r => setTimeout(r, 700))
+  const hit = qa('[data-testid="grocery-row"]').find(r => /toilet roll/i.test(r.dataset.item || ''))
+  hit?.scrollIntoView({ block: 'center' })
+  const stored = (window.__fakeDb?.grocery_items ?? []).find(r => /toilet roll/i.test(r.display_name))
+  return { qty: hit?.querySelector('[data-testid="grocery-qty"]')?.textContent.trim() ?? null, quantity: stored?.quantity ?? null, unit: stored?.unit ?? null }
+`)
+check('"toilet roll" is stored as one, counted (not 1 g)', TR.quantity === 1 && TR.unit === 'item', TR)
+check('...and its row reads "1", with no "0g" anywhere on it', TR.qty === '1', TR)
+await shoot('grocery-typed-item')
+
 const errs = await call(() => window.__errs ?? [])
 check('nothing on the page threw', errs.length === 0, errs)
 

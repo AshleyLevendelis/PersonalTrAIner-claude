@@ -58,8 +58,29 @@ export function buildListLabel(items: Pick<GroceryItemRow, 'source'>[]): 'Build 
  */
 export const MAX_GROCERY_QUANTITY = 100_000
 
+/**
+ * A COUNTED THING WITH NO UNIT OF ITS OWN — "toilet roll", "bin bags" — typed
+ * on the list with no amount. Run 5 of the live test (11 Oct 2026): an
+ * unreadable typed line was stored as ONE GRAM and shown "~0g". It is a count
+ * now, and a count of one reads "1".
+ */
+const COUNT_UNIT = 'item'
+
+/**
+ * What a line typed into the list's add bar is stored as. A line the reader
+ * understood keeps its amount ("200g chicken", "3 bananas"); a line whose
+ * amount could not be read ("toilet roll", "milk") is ONE of the thing, never
+ * a gram — the reader's own fallback for an unread line is 1 g, which is right
+ * for costing a recipe and wrong for a shopping list.
+ */
+export function typedGroceryAmount(parsed: { name: string; quantity: number; unit: string; unread?: string }): { name: string; quantity: number; unit: string } {
+  if (parsed.unread || !(parsed.quantity > 0)) return { name: parsed.name, quantity: 1, unit: COUNT_UNIT }
+  return { name: parsed.name, quantity: parsed.quantity, unit: parsed.unit }
+}
+
 export function formatQuantity(item: Pick<GroceryItemRow, 'quantity' | 'unit'>): string {
   const qty = Number.isInteger(item.quantity) ? item.quantity : Math.round(item.quantity * 10) / 10
+  if (item.unit === COUNT_UNIT) return `${qty}`
   return item.unit === 'g' || item.unit === 'ml' ? `${qty}${item.unit}` : `${qty} ${item.unit}`
 }
 
@@ -90,6 +111,10 @@ export function formatShoppingQuantity(item: Pick<GroceryItemRow, 'display_name'
 
   const grams = item.quantity
   const step = gramStep(grams)
+  // NEVER "~0g" FOR SOMETHING ON THE LIST (run 5, 11 Oct 2026): a few grams
+  // round to nothing at a 5 g step, and a line saying to buy none of a thing
+  // is not a line. Under one step, the exact figure is the honest one.
+  if (grams > 0 && Math.round(grams / step) * step <= 0) return { primary: exact, exact }
   const rounded = Math.round(grams / step) * step
   const approx = rounded !== grams ? '~' : ''
   const primary = rounded >= 1000
@@ -111,6 +136,7 @@ export function stepperReadout(item: Pick<GroceryItemRow, 'display_name' | 'quan
 export function exactLabel(item: Pick<GroceryItemRow, 'quantity' | 'unit'>): string {
   const qty = Number.isInteger(item.quantity) ? item.quantity : Math.round(item.quantity * 10) / 10
   const n = qty.toLocaleString('en-GB')
+  if (item.unit === COUNT_UNIT) return `exact ${n}`
   return item.unit === 'g' || item.unit === 'ml' ? `exact ${n}${item.unit}` : `exact ${n} ${item.unit}`
 }
 

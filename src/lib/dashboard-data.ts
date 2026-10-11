@@ -32,6 +32,8 @@ import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
 import { dayLengthParts, formatDayLength } from './session-duration'
+import { readBorrowedDay } from './borrowed-day'
+import { honestSessionMinutes } from './session-derive'
 import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
 
 /**
@@ -140,6 +142,26 @@ export const LIFT_SHORT_NAME: Record<string, string> = {
  *   did not happen.
  * - No "next": the app knows the heaviest lift, not the running order.
  */
+/**
+ * WHAT TO CALL A SESSION THE PLAN DID NOT HAVE — work logged on a rest day
+ * with no borrowed session behind it: its first lift, and how many more.
+ */
+function loggedSessionFocus(exerciseNames: string[]): string {
+  if (exerciseNames.length === 0) return 'Extra session'
+  return exerciseNames.length === 1 ? exerciseNames[0] : `${exerciseNames[0]} + ${exerciseNames.length - 1} more`
+}
+
+/**
+ * HOME'S GREETING, by the app's own clock. Run 5 of the live test (11 Oct
+ * 2026): at 00:13 Home said "Morning, Sam". Midnight to five is nobody's
+ * morning, so those hours get a neutral "Hi". The words are Ashley's to
+ * change (recorded in BACKLOG); the hour bands are what this pins.
+ */
+export function homeGreeting(hour: number, firstName: string): string {
+  const period = hour < 5 ? 'Hi' : hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening'
+  return firstName ? `${period}, ${firstName}` : period
+}
+
 export function leadLiftPhrase(lead: LeadLift, status: TodaySession['status']): string | null {
   const name = LIFT_SHORT_NAME[lead.name] ?? lead.name
   if (lead.loggedKg != null) return `${name} ${formatLoad(lead.loggedKg, lead.labelMode).replace(/^~/, '')} today`
@@ -379,16 +401,26 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     ? (await getCardioLogsForDateMerged(profileId, todayStr).catch(() => [])).length > 0
     : false
 
+  // A REST DAY SHE TRAINED ON IS A SESSION (run 5, M46): "Rest day · 0 of 4
+  // done" under a session she had just finished. Working sets logged on a day
+  // the plan left empty — a borrowed session, or work of her own — make it one.
+  const trainedOnRestDay = isRestDay && !todayResolved.movedTo && nonWarmupToday.length > 0
+  const borrowedName = trainedOnRestDay ? readBorrowedDay(profileId, todayStr) : null
+  const borrowedDay = borrowedName ? activeWeekDays.find(d => d.day === borrowedName && d.exercises.length > 0) ?? null : null
+
   let explicitlyCompleted = false
   let sessionMinutes: number | null = null
-  if (!isRestDay) {
+  if (!isRestDay || trainedOnRestDay) {
     // select('*') and read defensively: a named column is a parse-time
     // dependency (CLAUDE.md), and this row now also gives the Done panel its time.
     const { data } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).eq('date', todayStr).maybeSingle()
-    const row = data as { is_completed?: boolean; finished_at?: string | null; duration_minutes?: number | null } | null
+    const row = data as { is_completed?: boolean; started_at?: string | null; finished_at?: string | null; duration_minutes?: number | null } | null
     explicitlyCompleted = !!row?.is_completed
-    // ONLY A FINISHED SESSION HAS A REAL DURATION: the column defaults to 45.
-    if (row?.is_completed && row.finished_at && typeof row.duration_minutes === 'number' && row.duration_minutes > 0) sessionMinutes = row.duration_minutes
+    // ONLY A FINISHED SESSION HAS A DURATION, and the column's 45 is a
+    // placeholder until a finish measures it: the sets decide, or nobody knows.
+    if (row?.is_completed && row.finished_at) {
+      sessionMinutes = honestSessionMinutes(row.duration_minutes, row.started_at, row.finished_at, nonWarmupToday.map(l => l.completed_at))
+    }
   }
 
   // The glance line's three facts, derived here rather than in the component:
@@ -435,6 +467,21 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     ? { status: 'moved', focus: movedAwayFocus, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null,
         movedTo: todayResolved.movedTo }
+    : trainedOnRestDay
+    ? (() => {
+        const names = [...new Set(nonWarmupToday.map(l => l.exercise_name))]
+        const planned = borrowedDay ? borrowedDay.exercises.reduce((n, ex) => n + ex.sets, 0) : nonWarmupToday.length
+        const done = (explicitlyCompleted) || (!!borrowedDay && planned > 0 && nonWarmupToday.length >= planned)
+        return {
+          status: done ? 'done' as const : 'in_progress' as const,
+          focus: borrowedDay?.focus ?? loggedSessionFocus(names),
+          exerciseNames: borrowedDay ? borrowedDay.exercises.map(e => e.name) : names,
+          setsLogged: nonWarmupToday.length,
+          setsPlanned: planned,
+          exerciseCount: borrowedDay ? borrowedDay.exercises.length : names.length,
+          estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null,
+        }
+      })()
     : isRestDay
     ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
         exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null }

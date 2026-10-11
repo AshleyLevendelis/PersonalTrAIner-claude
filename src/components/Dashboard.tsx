@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
-import { loadDashboardData, leadLiftPhrase, LIFT_SHORT_NAME, type DashboardData } from '@/lib/dashboard-data'
+import { loadDashboardData, leadLiftPhrase, homeGreeting, LIFT_SHORT_NAME, type DashboardData } from '@/lib/dashboard-data'
 import { changeSinceStart } from '@/lib/weight-trend'
 import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
 import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
@@ -29,7 +29,9 @@ import { readSessionSummary } from '@/lib/session-summary-store'
 import { readingFor } from '@/lib/pr-engine'
 import { dayNameOf } from '@/lib/session-move'
 const SessionSummaryDialog = lazy(() => import('@/components/exercise/SessionSummaryDialog').then(m => ({ default: m.SessionSummaryDialog })))
-import { ShopDayCard } from '@/components/ShopDayCard'
+// ITS OWN CHUNK (run 5, 11 Oct 2026): the card reads the list's dates and the
+// meals now, and is up one day a week; first paint does not wait for it.
+const ShopDayCard = lazy(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })))
 import { personalBest, bestReadingOf, streakLabel } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
 import { cardioLine } from '@/lib/cardio-lines'
@@ -399,10 +401,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // The greeting's period comes from the app's own clock (dev-clock), the
   // same one every date on this screen already uses, so a shifted dev day
   // greets you for the day it is pretending to be.
-  const greetingHour = getAppNow(profile.id).getHours()
-  const greetingPeriod = greetingHour < 12 ? 'Morning' : greetingHour < 18 ? 'Afternoon' : 'Evening'
   const firstName = (profile.display_name ?? '').trim().split(/\s+/)[0]
-  const greeting = firstName ? `${greetingPeriod}, ${firstName}` : greetingPeriod
+  const greeting = homeGreeting(getAppNow(profile.id).getHours(), firstName)
   const dateLabel = data.phase
     ? `${data.dayName} · Week ${data.phase.weekNumber} of ${data.phase.totalWeeks}`
     : data.dayName
@@ -502,12 +502,15 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           : plainTips.length > 0 && <HomeCoachNote tips={plainTips} />}
 
         {/* SHOPPING, ON THE DAY SHE SHOPS — between the note and the hero. */}
-        <ShopDayCard
-          profileId={profile.id}
-          exercisePlan={exercisePlan}
-          todayName={activeSession.dayName}
-          nowMs={Date.now()}
-        />
+        <Suspense fallback={null}>
+          <ShopDayCard
+            profileId={profile.id}
+            exercisePlan={exercisePlan}
+            todayName={activeSession.dayName}
+            today={activeSession.date}
+            nowMs={Date.now()}
+          />
+        </Suspense>
 
         {/* 3. TODAY'S SESSION */}
         {done ? (

@@ -28,7 +28,7 @@ import {
 import {
   GROCERY_AISLE_LABEL, trolleyToast, buildListLabel,
   MAX_GROCERY_QUANTITY, formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines,
-  coverageSentence, readGroceryBuildMemo, writeGroceryBuildMemo, type GroceryBuildMemo,
+  coverageSentence, readGroceryBuildMemo, writeGroceryBuildMemo, typedGroceryAmount, type GroceryBuildMemo,
 } from '@/lib/grocery-display'
 import { parseIngredientLine } from '@/lib/portion-scaler'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -147,8 +147,8 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
 
   const handleQuickAdd = () => {
     if (!profileId || !quickAdd.trim()) return
-    const parsed = parseIngredientLine(quickAdd.trim())
-    const { row } = addItemLocal({ profileId, name: parsed.name, quantity: parsed.quantity, unit: parsed.unit, source: 'manual', currentItems: items })
+    const typed = typedGroceryAmount(parseIngredientLine(quickAdd.trim()))
+    const { row } = addItemLocal({ profileId, name: typed.name, quantity: typed.quantity, unit: typed.unit, source: 'manual', currentItems: items })
     setItems(prev => (prev.some(i => i.id === row.id) ? prev.map(i => (i.id === row.id ? row : i)) : [...prev, row]))
     setQuickAdd('')
   }

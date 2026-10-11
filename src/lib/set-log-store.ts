@@ -6,6 +6,15 @@ import { isLoggableSetWeight, MAX_LOGGABLE_SET_KG } from './set-plausibility'
 import { isMissingColumnError } from './missing-column'
 import { isConnectionFailure } from './connection-error'
 
+/**
+ * THE COLUMN'S PLACEHOLDER, not a measurement: a session row is created with
+ * this before anything is known about how long it ran, and it stays unless a
+ * finish writes a real figure. Readers treat it as unknown until the sets say
+ * otherwise (session-derive's honestSessionMinutes; run 5, 11 Oct 2026, where
+ * history showed "45m" for a session nobody had timed).
+ */
+export const SESSION_ROW_DEFAULT_MINUTES = 45
+
 // ---------------------------------------------------------------------------
 // set-log-store — THE single write path for logged sets (C0 Part 3).
 //
@@ -739,7 +748,7 @@ export async function ensureSessionSynced(
         profile_id: userId,
         date,
         split_type: splitType,
-        duration_minutes: 45,
+        duration_minutes: SESSION_ROW_DEFAULT_MINUTES,
         is_completed: false,
         started_at: entry?.startedAt ?? new Date().toISOString(),
         week_number: entry?.weekNumber ?? null,
