@@ -342,7 +342,7 @@ console.log('\n8. The five found by the whole-app audit, 5 Sep 2026')
   check('...says plainly that the food is NOT being avoided', /it is NOT being avoided yet/.test(profile))
   check('...and rethrows so the typed word stays in the box', /throw err/.test(profile))
   check('the tag list awaits its save before clearing the input',
-    /await onSave\(\[\.\.\.values, v\]\)[\s\S]{0,80}setInput\(''\)/.test(profile))
+    /await onSave\(\[\.\.\.values, \.\.\.fresh\]\)[\s\S]{0,80}setInput\(''\)/.test(profile))
 }
 
 // ---------------------------------------------------------------------------

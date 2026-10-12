@@ -26,7 +26,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { FOOD_DB, computeMealMacros, resolveGrams, lookupIngredient } from '../src/lib/food-db'
+import { FOOD_DB, computeMealMacros, unitToGrams, lookupIngredient } from '../src/lib/food-db'
 import { parseIngredientLine, withQuantity, withParsedQuantity } from '../src/lib/portion-scaler'
 import { resizeMealTo } from '../src/lib/meal-move'
 import { readIngredientText } from '../src/lib/ingredient-units'
@@ -165,7 +165,7 @@ async function main() {
     if (one.understood !== three.understood) nonlinear.push(`${u} ${food} (understood differs)`)
   }
   check('the weight is linear in the amount, and an amount is understood or not whatever the number is', nonlinear.length === 0, nonlinear.slice(0, 5))
-  const staleDefault = FOOD_DB.filter(f => lookupIngredient(f.name) === f && resolveGrams(f as never, 'cup', 1).understood && (f as never as { units?: Record<string, number> }).units?.cup === 240 && f.category === 'veg')
+  const staleDefault = FOOD_DB.filter(f => lookupIngredient(f.name) === f && unitToGrams(f as never, 'cup', 1) != null && (f as never as { units?: Record<string, number> }).units?.cup === 240 && f.category === 'veg')
   check('a cup is not 240 g of everything: no vegetable carries the old water-density cup', staleDefault.length === 0, staleDefault.map(f => f.name))
   const reread = ['1 1/2 cups white rice cooked', '2 tbsp olive oil', '½ cup oats', '150g chicken breast']
   check('withQuantity changes a mixed fraction as a whole ("1 1/2 cups" set to 2 is "2 cups", not "2 1/2 cups")', withQuantity('1 1/2 cups oats', 2) === '2 cups oats' && withQuantity('1/2 tsp cumin', 3) === '3 tsp cumin' && withQuantity('150g chicken', 90) === '90g chicken' && reread.length === 4)

@@ -218,6 +218,17 @@ export function containsPhrase(name: string, ingredientNames: string[], phrase: 
   return false
 }
 
+/**
+ * Is this a word the avoid filter understands as a KIND of food ("pork",
+ * "dairy", "seafood", "red meat") rather than one food? Read by the setup and
+ * chat backstops (food-exclusions.ts) to decide whether "I don't eat X" named
+ * a food at all — the same vocabulary the filter will then enforce.
+ */
+export function isAvoidCategoryWord(phrase: string): boolean {
+  const needle = phrase.trim().toLowerCase()
+  return !!(CATEGORY_TAGS[needle] ?? CATEGORY_TAGS[normaliseWords(needle)] ?? WORD_EXPANSIONS[needle] ?? WORD_EXPANSIONS[normaliseWords(needle)])
+}
+
 /** The meal slots on this plan that contain `phrase`, in plan order. */
 export function mealsContaining(mealPlan: MealPlanDay[], phrase: string): MealPlanDay[] {
   const needle = phrase.trim().toLowerCase()

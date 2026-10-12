@@ -10,6 +10,7 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
+import { splitFoodList } from '@/lib/food-list'
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -334,18 +335,23 @@ function EditableSelectField<T extends string | number>({
  * both put one in this screen's existing error banner.
  */
 function EditableTagList({
-  values, onSave, placeholder, resetKey = 0, inputTestId,
-}: { values: string[]; onSave: (next: string[]) => void | Promise<void>; placeholder: string; resetKey?: number; inputTestId?: string }) {
+  values, onSave, placeholder, resetKey = 0, inputTestId, split,
+}: {
+  values: string[]; onSave: (next: string[]) => void | Promise<void>; placeholder: string; resetKey?: number; inputTestId?: string
+  /** How one typed entry becomes several (Foods to avoid: "mushrooms and pork" is two foods, test log H12). Absent: the entry is one tag. */
+  split?: (typed: string) => string[]
+}) {
   const [input, setInput] = useState('')
   // Cleared from outside when the caller finished the add another way (a picked name).
   useEffect(() => { if (resetKey > 0) setInput('') }, [resetKey])
   const [saving, setSaving] = useState(false)
   const add = async () => {
-    const v = input.trim()
-    if (!v || values.includes(v)) { setInput(''); return }
+    const typed = input.trim()
+    const fresh = (split ? split(typed) : [typed]).filter((v, i, all) => v && !values.includes(v) && all.indexOf(v) === i)
+    if (fresh.length === 0) { setInput(''); return }
     setSaving(true)
     try {
-      await onSave([...values, v])
+      await onSave([...values, ...fresh])
       setInput('')
     } catch {
       // Left in the box on purpose. The caller has shown the error; retyping
@@ -1546,7 +1552,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
-              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" />
+              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" split={splitFoodList} />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
                 canonical picker's tag-based checks AND the free-text

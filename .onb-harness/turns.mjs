@@ -543,6 +543,59 @@ await section(16, 'M1 — a parked question is kept, counted, and handed over wh
   check('...and the plan is built from the answers as usual', !!(await evj(`window.__onbCompleted`))?.fitness_goal)
 })
 
+// ---------------------------------------------------------------------------
+// H12 / H13 (11 Oct 2026, her 9 Oct ruling "Build all four", items 1 and 2):
+// "I don't eat pork" said in passing goes into Foods to avoid with a tick, and
+// the allergy tick says what was done, not what every meal will be.
+await section(18, 'H12/H13 — "I don\'t eat pork" said in passing is ticked into Foods to avoid; the allergy tick promises nothing', async () => {
+  await open('h14')
+  // The model files the pork as a memory note, the way it did on 9 Oct. The
+  // app must not depend on it.
+  await queue({ reply: 'Noted on both. How are you sleeping at the moment?', actions: [{ name: 'record_context_fact', args: { fact: 'Does not eat pork' } }] })
+  await say("I'm allergic to tree nuts, and I don't eat pork")
+  const ticks = await evj(`__ticks()`)
+  check('a tick names pork under Foods to avoid', ticks.some(t => /Foods to avoid — pork/.test(t)), ticks)
+  check('the allergy tick says the filter is on, in the meal screens\' own words',
+    ticks.some(t => t.includes('Nut-free filter on. Ingredients are filtered, not verified. Check labels if you have an allergy.')), ticks)
+  check('...and no tick promises anything about every meal', ticks.length >= 2 && !ticks.some(t => /kept out of every meal|entirely|absolutely/i.test(t)), ticks)
+  const sent = await lastRequest()
+  check('pork was saved BEFORE the coach was asked (the coach is told it is already on the list)', /pork/.test(sent?.state?.filled?.dislikedFoods ?? ''), sent?.state?.filled)
+  check('...and so was the nut-free filter', /nut-free/i.test(JSON.stringify(sent?.state?.filled?.dietaryPreferences ?? '')), sent?.state?.filled?.dietaryPreferences)
+  check('the saved answers still hold pork after the coach\'s turn', /pork/.test((await evj(`__draft()`))?.values?.dislikedFoods ?? ''), (await evj(`__draft()`))?.values)
+  await shot('h12-said-in-passing')
+
+  // The coach's own set_slot resends the list from memory and leaves pork off.
+  await queue({ reply: 'Got it, no olives either.', actions: [{ name: 'set_slot', args: { slot_key: 'dislikedFoods', value: 'olives' } }] })
+  await say("I can't stand olives")
+  const after = (await evj(`__draft()`))?.values?.dislikedFoods ?? ''
+  check('the coach cannot take pork off by resending a shorter list', /pork/.test(after) && /olives/.test(after), after)
+  check('a sentence that is a habit, not a ban, adds nothing', await (async () => {
+    await queue({ reply: 'Fair enough.', actions: [] })
+    await say("I don't eat much fish")
+    return !/fish/.test((await evj(`__draft()`))?.values?.dislikedFoods ?? '')
+  })(), (await evj(`__draft()`))?.values?.dislikedFoods)
+})
+
+await section(19, 'H12 — changing Foods to avoid from the summary is saved in code, split into foods', async () => {
+  await open('review')
+  const before = await review()
+  check('harness: the summary is open with Foods to avoid reading "mushrooms"', before.open && /mushrooms/.test(before.rows.dislikedFoods ?? ''), before.rows)
+  await tapRow('dislikedFoods')
+  await tapEl(`document.querySelector(${JSON.stringify(INPUT)})`, 'the composer')
+  await send('Input.insertText', { text: 'mushrooms and pork' })
+  await wait(120)
+  await tapEl(`document.querySelector(${JSON.stringify(SENDBTN)})`, 'the send button')
+  await wait(900)
+  const now = await review()
+  check('no request went to the coach for it (settled in code, not left to the model)', now.requests === before.requests, { before: before.requests, after: now.requests })
+  check('the summary is back, and its row reads both foods', now.open && /mushrooms, pork/.test(now.rows.dislikedFoods ?? ''), now.rows.dislikedFoods)
+  check('...on screen where she can see it', await rowInView('dislikedFoods'))
+  await shot('h12-summary-edit')
+  await tapButton('Generate My Plan')
+  const built = await evj(`window.__onbCompleted`)
+  check('the plan is built with TWO foods to avoid, not one that matches nothing', JSON.stringify(built?.disliked_foods) === JSON.stringify(['mushrooms', 'pork']), built?.disliked_foods)
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }

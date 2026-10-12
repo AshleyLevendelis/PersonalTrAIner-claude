@@ -28,6 +28,7 @@
 // shortfall; it is never padded with a placeholder claiming false macros.
 // ---------------------------------------------------------------------------
 
+import { checkMethod, type MethodRules } from './meal-method-check'
 import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, lookupIngredient, type Macros100g } from './food-db'
 import { validateMealAgainstDiet } from './diet-rules'
@@ -456,6 +457,20 @@ export function methodSafeToShow(prep: string | undefined): string {
 }
 
 /**
+ * The method as it may be shown to THIS person: the amount rule above, then
+ * the check on what the steps name (meal-method-check.ts, 11 Oct 2026): a
+ * method naming a food she must not eat, or a food the dish does not have, is
+ * not shown, and the meal stays. Called at verification and again at display,
+ * the way the dietary re-check runs twice, so a restriction added after a meal
+ * was made hides its steps at once.
+ */
+export function methodToShow(prep: string | undefined, ingredients: readonly (string | { name: string })[], rules: MethodRules = {}): string {
+  const safe = methodSafeToShow(prep)
+  if (!safe) return ''
+  return checkMethod(safe, ingredients.map(i => (typeof i === 'string' ? i : i.name)), rules).text
+}
+
+/**
  * Runs one proposal through the full verification pipeline. Returns the
  * accepted PoolOption, or null with a logged reason if it fails any stage.
  */
@@ -620,7 +635,9 @@ export function verifyProposal(
     // Technique only. A method naming an amount is dropped rather than shown
     // next to the rescaled ingredients it would contradict — see
     // methodSafeToShow.
-    prep: methodSafeToShow(proposal.prep),
+    // ...and a method naming a food she must not eat, or a food this dish
+    // does not have, is not shown either (methodToShow).
+    prep: methodToShow(proposal.prep, scaled.ingredients, { dietaryPreferences, avoidFoods: dislikedFoods }),
   }
 }
 

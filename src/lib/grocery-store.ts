@@ -299,7 +299,7 @@ function categoryForEntry(entry: { name: string; category: FoodCategory; tags: {
  * name must still resolve to the same food, because the display layer looks a
  * row's purchase unit up by its name — test:grocery-shopping holds both.
  */
-export const AS_BOUGHT: Record<string, { name: string; perCooked: number }> = {
+export const AS_BOUGHT: Record<string, { name: string; perCooked: number; key?: string }> = {
   'white rice cooked': { name: 'white rice', perCooked: 0.36 },
   'brown rice cooked': { name: 'brown rice', perCooked: 0.34 },
   'basmati rice cooked': { name: 'basmati rice', perCooked: 0.34 },
@@ -315,6 +315,29 @@ export const AS_BOUGHT: Record<string, { name: string; perCooked: number }> = {
   'millet cooked': { name: 'millet', perCooked: 0.31 },
   'buckwheat cooked': { name: 'buckwheat', perCooked: 0.27 },
   'barley': { name: 'pearl barley', perCooked: 0.35 },
+  // THE SAME FOOD WEIGHED ANOTHER WAY (11 Oct 2026). A recipe line that says
+  // "75g dry pasta" or "150g raw chicken breast" now reaches its own entry
+  // (food-db.ts STATE_TWINS). It is already the bag or pack weight, so it is
+  // bought as written, ON THE SAME ROW as its cooked twin (`key`): one "pasta"
+  // row, never two.
+  'pasta dry': { name: 'pasta', perCooked: 1, key: 'pasta cooked' },
+  'wholewheat pasta dry': { name: 'wholewheat pasta', perCooked: 1, key: 'wholewheat pasta cooked' },
+  'white rice dry': { name: 'white rice', perCooked: 1, key: 'white rice cooked' },
+  'brown rice dry': { name: 'brown rice', perCooked: 1, key: 'brown rice cooked' },
+  'basmati rice dry': { name: 'basmati rice', perCooked: 1, key: 'basmati rice cooked' },
+  'couscous dry': { name: 'couscous', perCooked: 1, key: 'couscous cooked' },
+  'quinoa dry': { name: 'quinoa', perCooked: 1, key: 'quinoa cooked' },
+  'egg noodles dry': { name: 'egg noodles', perCooked: 1, key: 'egg noodles cooked' },
+  'rice noodles dry': { name: 'rice noodles', perCooked: 1, key: 'rice noodles cooked' },
+  'red lentils dry': { name: 'lentils red', perCooked: 1, key: 'lentils red' },
+  'green lentils dry': { name: 'lentils green', perCooked: 1, key: 'lentils green' },
+  'chicken breast raw': { name: 'chicken breast', perCooked: 1, key: 'chicken breast' },
+  'chicken thigh raw': { name: 'chicken thigh', perCooked: 1, key: 'chicken thigh' },
+  'turkey breast raw': { name: 'turkey breast', perCooked: 1, key: 'turkey breast' },
+  'pork loin raw': { name: 'pork loin', perCooked: 1, key: 'pork loin' },
+  'cod raw': { name: 'cod', perCooked: 1, key: 'cod' },
+  'haddock raw': { name: 'haddock', perCooked: 1, key: 'haddock' },
+  'prawns raw': { name: 'prawns', perCooked: 1, key: 'prawns' },
 }
 
 export function resolveGroceryTarget(name: string): {
@@ -337,7 +360,7 @@ export function resolveGroceryTarget(name: string): {
   if (entry) {
     const shop = AS_BOUGHT[entry.name]
     return {
-      canonicalKey: entry.name.toLowerCase(),
+      canonicalKey: (shop?.key ?? entry.name).toLowerCase(),
       displayName: shop?.name ?? entry.name,
       category: categoryForEntry(entry),
       needsReview: false,

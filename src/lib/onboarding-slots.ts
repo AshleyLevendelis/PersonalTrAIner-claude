@@ -1,3 +1,5 @@
+import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
+import { splitFoodList } from './food-list'
 import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
 import { GOALS_THAT_MEAN_TRAIN } from '@/lib/starting-out'
 import type {
@@ -304,23 +306,8 @@ export const DIETARY_OPTIONS: { value: DietaryPreference; icon: string; label: s
 // food-allergy phrasings rather than a loosening of the word "reaction".
 const ALLERGEN_SIGNAL = /allerg|intoleran|anaphyla|can'?t (eat|have)|cannot (eat|have)|reaction to|gives? me a reaction|\breacts? to\b|brings? me out in|sensitive to|makes? me (sick|ill)|gets? me sick/i
 
-const ALLERGEN_FOOD_PATTERNS: Partial<Record<DietaryPreference, RegExp>> = {
-  'nut-free': /\b(peanuts?|tree nuts?|almonds?|cashews?|walnuts?|pistachios?|hazelnuts?|pecans?|macadamia|nuts?)\b/i,
-  'dairy-free': /\b(dairy|milk|lactose|cheese)\b/i,
-  'gluten-free': /\b(gluten|wheat|celiac|coeliac)\b/i,
-  'egg-free': /\beggs?\b/i,
-  'soy-free': /\b(soy|soya|soybeans?)\b/i,
-  'shellfish-free': /\b(shellfish|shrimp|prawns?|crab|lobster|crustaceans?|mollus[ck]s?|clams?|mussels?|oysters?|scallops?)\b/i,
-  'fish-free': /\bfish\b/i,
-  // The five that used to have no tag to become. Same conservative shape as
-  // the seven above: naming the food is not enough on its own — ALLERGEN_SIGNAL
-  // must also fire — so "I love sesame prawn toast" never tags anything.
-  'celery-free': /\b(celery|celeriac)\b/i,
-  'sesame-free': /\b(sesame|tahini|hummus|houmous)\b/i,
-  'mustard-free': /\bmustard\b/i,
-  'lupin-free': /\blupins?\b/i,
-  'sulphite-free': /\b(sulphites?|sulfites?|sulphur dioxide|sulfur dioxide)\b/i,
-}
+// The food words themselves live in allergen-words.ts since 11 Oct 2026: the
+// check on a recipe's cooking steps reads the same list.
 
 /**
  * Deterministic safety backstop, independent of the model: free text that
@@ -1175,7 +1162,9 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     include_snacks: data.includeSnacks,
     cooking_time_preference: data.cookingTime ?? 'moderate',
     favorite_cuisines: data.favoriteCuisines,
-    disliked_foods: data.dislikedFoods.split(',').map(f => f.trim()).filter(Boolean),
+    // "mushrooms and pork" is two foods (test log H12, 11 Oct 2026): split on
+    // commas only, it was ONE avoid that matched no food at all.
+    disliked_foods: splitFoodList(data.dislikedFoods),
     disliked_exercises: data.dislikedExercises.split(',').map(f => f.trim()).filter(Boolean),
     breakfast_style: data.breakfastStyle ?? undefined,
     fitness_goal: data.fitnessGoal!,

@@ -17,7 +17,8 @@ import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { mealSections } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
-import { methodSafeToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
+import { methodToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
+import type { MethodRules } from '@/lib/meal-method-check'
 import { formatKitchenQuantity } from '@/lib/portion-scaler'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
@@ -394,6 +395,8 @@ export function MealPlan({
     )
   }
 
+  // The same two lists the display-time restriction re-check reads (restrictionBySlot above).
+  const methodRules: MethodRules = { dietaryPreferences, avoidFoods }
   const rowFor = (slot: MealSlotName, variant: 'upnext' | 'later' | 'eaten') => (
     <MealSlotRow
             key={slot}
@@ -404,6 +407,7 @@ export function MealPlan({
             slot={slot}
             isFirst={false}
             option={shownOption(slot)}
+            methodRules={methodRules}
             alternatives={pools[slot] ?? []}
             expanded={expandedSlot === slot}
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
@@ -786,6 +790,7 @@ function MealSlotRow({
   slot,
   isFirst,
   option,
+  methodRules,
   alternatives,
   expanded,
   onToggle,
@@ -823,6 +828,13 @@ function MealSlotRow({
   slot: MealSlotName
   isFirst: boolean
   option: PoolOption | null
+  /**
+   * Her restrictions TODAY, for the cooking steps (11 Oct 2026): a method
+   * naming a food she must not eat, or one the dish does not have, is not
+   * drawn — re-checked here, not trusted from verification, so a restriction
+   * added after the meal was made hides its steps at once.
+   */
+  methodRules: MethodRules
   alternatives: PoolOption[]
   expanded: boolean
   onToggle: () => void
@@ -986,7 +998,8 @@ function MealSlotRow({
     }
   }
 
-  const hasMethod = !!option && methodSafeToShow(option.prep).length > 0
+  const method = option ? methodToShow(option.prep, option.ingredients, methodRules) : ''
+  const hasMethod = method.length > 0
   const canSwap = otherOptions.length > 0 || !!onFindMore
   const kcalShown = Math.round(isLogged ? loggedKcal : (option?.macros.calories ?? 0))
   const kcalText = (
@@ -1088,7 +1101,7 @@ function MealSlotRow({
       )}
       {variant === 'upnext' && option && !expanded && methodOpen && hasMethod && (
         <p className="mt-3 whitespace-pre-line text-xs leading-relaxed text-[color:var(--text-tertiary)]" data-meal-method={option.name}>
-          {methodSafeToShow(option.prep)}
+          {method}
         </p>
       )}
 
@@ -1203,11 +1216,11 @@ function MealSlotRow({
               unverified number on the screen.
               Absent on every pool generated before the column existed, and on
               custom meals and edited meals, which genuinely have no method. */}
-          {methodSafeToShow(option.prep).length > 0 && (
+          {hasMethod && (
             <div className="flex flex-col gap-1.5" data-meal-method={option.name}>
               <span className="ds-label-compact">Method</span>
               <p className="whitespace-pre-line text-xs leading-relaxed text-[color:var(--text-tertiary)]">
-                {methodSafeToShow(option.prep)}
+                {method}
               </p>
             </div>
           )}

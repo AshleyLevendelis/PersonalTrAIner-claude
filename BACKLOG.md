@@ -2,6 +2,105 @@
 
 Newest first. One line each.
 
+- [x] **THE ALLERGY AND DIET PATH, ALL FOUR (11 Oct 2026). Her ruling of 9 Oct, "Build all four",
+  told to build on 11 Oct.** Test log H12, H13, M19, M20, M23 (oat flour), the seitan finding; tracers D
+  and G. Safety-adjacent, so each part had a plan first: `docs/plans/food-exclusions-said-in-passing.md`
+  (1 and 2), `docs/plans/ingredient-lookup-truth.md` section 10 (3), and
+  `docs/plans/recipe-steps-checked-against-restrictions.md` (4). Not on `main`, nothing deployed, no
+  migration.
+  - **(1) "I don't eat pork" said in passing goes into Foods to avoid, with a tick.** It had no route but
+    the model, which filed it as a memory note that never reaches the plan; and "mushrooms and pork" typed
+    in was ONE avoid that matched no food. Now: a code backstop on every typed setup message (the
+    allergen backstop's shape, her August ruling), a code backstop in the main chat when the coach did
+    not record it itself (same write as Profile's box, receipt with Undo), the summary edit of Foods to
+    avoid settled in code when the reply is a list of foods, and every place a list is typed (setup,
+    summary, Profile) splits on "and", "or", commas and slashes. Conservative: plain statements only,
+    each word checked to be a food, and a habit or time ("much", "on weekdays", "after 8pm") is not a
+    ban. **Decided here, mechanical/safety:** during setup the coach can ADD to Foods to avoid but never
+    take one off (its set_slot sometimes resent the list from memory, dropping a food); taking one off is
+    the summary edit or Profile. Prompts: setup's coach records a food they don't eat with set_slot,
+    never a memory note; the main coach no longer says "you cannot set those" and records it.
+  - **(2) Setup stops promising.** The app's own tick said "Nut-free will be kept out of every meal";
+    it now says "Nut-free filter on. Ingredients are filtered, not verified. Check labels if you have an
+    allergy." (the meal screens' sentence, word for word, held together by a gate). The shared honesty
+    block bans a promise about the plan ("I'll keep your meals entirely nut-free") with a wrong/right
+    pair, and its stale lines are corrected: the five newer allergens DO have tags now (thinly, on ten
+    foods), and a dish name is no longer read as one of its ingredients. Setup's prompt loses "actually
+    keeps that food out" and "enforced".
+  - **(3) The food lookup never throws a word away.** "chicken caesar wrap" was an empty tortilla (186
+    kcal, passing vegetarian), bare "chicken" was SEITAN (passing vegetarian and vegan), "dry penne"
+    was cooked pasta (M20), "oat flour" was wheat flour (M23). Now a known name inside a longer line
+    counts only if every other word is on a reviewed list of harmless words; dry/raw lines reach new dry
+    and raw entries (pasta, rice, couscous, quinoa, noodles, lentils; chicken, turkey, pork loin, cod,
+    haddock, prawns); new oat/almond/coconut/rice flour, coconut water, water chestnuts, five light
+    variants, chocolate rice cakes, chilli flakes; the diet check reads the one lookup again. Bare words
+    keep today's answer for a reviewed tag-safe list (milk, rice, tuna, mince, oil, whey, and chicken,
+    which now means chicken breast); the rest (fish, cheese, cream, nuts, beans, sausage, yoghurt) are a
+    miss. A dry line shops on its cooked twin's grocery row. Measured (plan 10d): 1,578 library lines
+    unchanged; of 270,424 diet verdicts 1,719 moved to "passes", every one a singular of the same food
+    or a correction, none a dish. **Found and fixed: chicken and beef stock carried no meat tag.**
+    **Found, NOT changed:** "greek yogurt" is full fat and "greek yoghurt" 0% (two spellings, two foods;
+    folding them would re-cost every Greek yoghurt), and the chat's sesame/celery/mustard receipt still
+    says "no tag in the food data" (now an understatement).
+  - **(4) Recipe steps are checked.** The method was checked for amounts only, so tracer G's "fry the
+    mushrooms in butter, scatter over toasted walnuts" was shown to a nut-free person avoiding mushrooms.
+    Now a method is shown only if it names nothing she must not eat (tags, allergen and diet words, her
+    avoids) and nothing the dish does not have (salt, pepper, water and ice excepted); otherwise the whole
+    method goes and the meal stays. Checked at verification and again on the meal card with today's
+    restrictions. 11 library methods named a food not in the dish (tracer G found 8) and were reworded,
+    no numbers changed. The writer's prompt now says one food per line, name the state, and name only
+    listed foods in the method. The coach is never handed a method, so nothing changed there.
+  - **Questions that are hers, safe version built (asked in the report, one at a time):** may unlisted
+    seasonings (chilli flakes, dried herbs) appear in steps (built: no); a step naming an avoided food
+    (built: hide the steps, keep the dish; or rewrite, or refuse the dish); say why steps are missing
+    (built: silent); after a food edit keep matching steps (built: hidden, as before; M17); bare "chicken",
+    "mince" etc: assume and say so, or ask (built: assume as before, silently, reviewed list); the two
+    Greek yoghurts; oats and gluten-free (untouched).
+  - **Checked:** new `test:ingredient-lookup` (29 checks; 18 mutations, 18 caught after two rounds:
+    the first found a dead tie-break key, deleted, and two branches with no binding case), new
+    `test:meal-method-check` (38, 13 of 13), new `test:food-exclusions` (27, 18 of 18 after two binding
+    cases were added: the habit rule and the summary-edit guard); new driver `verify:chat-food-avoid`
+    (10), and new sections in `verify:onboarding-turns` (18, 19; 6 mutations, 5 caught, the sixth an
+    equivalent mutant held by test:food-exclusions) and `verify:meal-method` (section 4; 2 of 2). The
+    setup driver FOUND a defect: "actually leave that as it is" was saved as the avoid list; the summary
+    capture now only settles a reply that is a list of foods. Re-anchored with reasons: meal-amounts (the
+    wrap now says it is unknown; two chicken breasts are 240 g), food-db-parity section 6 (one lookup),
+    meal-log (chocolate rice cakes), grocery-shopping (one name per ROW), the shared meal fixture (names
+    the foods it was measured with). Drivers run green after the last change: `verify:chat-food-avoid`,
+    `onboarding-turns`, `meal-method`, `onboarding-walk`, `grocery`, `kept-meal`, `meal-food-edit`, `meal-days`,
+    `meal-log-card`, `unit-ask`, `chat-top-up`, `meal-top-up`, `swap-knock-on`, `meal-likes`, `day-as-shown`,
+    `meal-refit`, `meal-day-move`, `chat-day-move`, `meal-move`.
+  - **Found by the drivers after the sweep, and fixed:** a latte was read as whole milk by the old
+    lookup (it threw "latte" away), so the stricter one left the coach not knowing a latte at all
+    (`verify:meal-log-card`). It has its own row now, DERIVED from the table's whole milk (85% milk,
+    52 kcal per 100 g, dairy-tagged, no size, so "a large latte" is asked about as before); an oat,
+    soy or skimmed latte stays a miss. 3 checks in `test:ingredient-lookup`, 4 mutations, 3 caught,
+    the fourth an equivalent mutant that showed one alias was redundant (deleted).
+  - **Re-anchored after the sweep, each on its property and mutation-tested:** `test:coach-voice`
+    (the limit sentence is the phrasebook's own, read back through the receipt; plus a check it is not
+    empty, 1 of 1), `test:coach-sees-ingredients` (the five are still named as barely covered, 1 of 1),
+    `test:silent-writes` (the save is awaited before the box clears, 1 of 1), `test:meal-method` (one
+    method value per card, from the amount rule then the restriction check, every render; 4 of 4),
+    `test:food-db-parity` (latte is a food; an oat latte is not).
+  - **Bundle, on her 15 Sep ruling ("raise it with room to grow").** Measured both ends on a clean
+    worktree of 58fbc675: deploy 316 -> 320 gz, first paint 472 -> 476, app chunk 1,091 -> 1,106 raw,
+    total 2,317 -> 2,335 (the base was ALREADY over on the app chunk by 1 and the total by 42). The
+    said-in-passing detector was moved off first paint first (1 kB gz): only the list splitter, now
+    its own file, stays there. The rest is the food table, the one lookup and the step check, which
+    the Nutrition screen reads as it draws. Budgets 328 / 484 / 1,131 / 2,360.
+  - **Red before this work, measured on a clean worktree of 58fbc675, unchanged by it:**
+    `test:meal-amounts` (2), `test:dashboard`, `test:cardio-presets`, `test:load-ceilings`,
+    `test:frozen-weeks`, `test:bounds-and-boundaries`, `test:week-boundaries`, `test:coach-exam-fresh`
+    (the coach had already changed), and `test:ingredient-units`, which crashed at import (`resolveGrams`
+    is gone): re-anchored to `unitToGrams` so it runs, and then 6 of 42 fail identically on the base,
+    all of them amount reconciliation between two amount fixes, plus a byte-for-byte copy check the
+    sync header can never pass. `verify:setup-answers` 7f-7i fail identically on the base: after the
+    10 Oct layout pass the driver opens the Dietary group, and Exercises to avoid is in Training.
+  - **Needs:** `chat-gemini` (shared food database, honesty block, the dislike line), `onboarding-chat`
+    (prompt), `generate-meals` (prompt). Frontend on merge. No migration. **Before release, plan section 5
+    steps 2-3 on her machine:** her real stored pools through old and new lookup on TEST, and
+    `test:meal-quality`; a pool falling under three servable options is a blocker.
+
 - [x] **LAYOUT PASS, SIX SCREENS (10-11 Oct 2026): MERGED to `main` 11 Oct 2026 on her word ("Merge").**
   That merge also brings in `claude/test-log-fixes-oct9`, which the layout branch was cut from.
   `claude/coach-empty-text-fix-2c4bzv` is NOT in it and is still to merge.

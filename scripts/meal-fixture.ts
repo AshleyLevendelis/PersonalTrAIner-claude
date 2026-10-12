@@ -24,7 +24,12 @@ export function mulberry32(seed: number): () => number {
 
 type Food = readonly [name: string, lo: number, hi: number, unit?: string]
 export const PROTEIN: Food[] = [['chicken breast', 100, 200], ['salmon', 100, 180], ['tuna', 80, 160], ['beef mince', 100, 180], ['greek yogurt', 150, 300], ['eggs', 2, 4, 'whole'], ['tofu', 120, 220], ['turkey breast', 100, 200], ['cottage cheese', 100, 250]]
-export const CARB: Food[] = [['white rice', 60, 150], ['oats', 40, 100], ['pasta', 60, 140], ['sweet potato', 150, 300], ['wholemeal bread', 2, 3, 'slice'], ['potatoes', 150, 350], ['quinoa', 50, 120], ['banana', 1, 2, 'medium'], ['lentils', 50, 120]]
+// "mashed potato" and "red lentils" are what "potatoes" and "lentils" resolved
+// to when these pools were measured. On 11 Oct 2026 the lookup stopped
+// guessing ("potatoes" is boiled potato now, and a bare "lentils" names no one
+// food), so the fixture names the foods it was built from and every number
+// measured on it stays comparable.
+export const CARB: Food[] = [['white rice', 60, 150], ['oats', 40, 100], ['pasta', 60, 140], ['sweet potato', 150, 300], ['wholemeal bread', 2, 3, 'slice'], ['mashed potato', 150, 350], ['quinoa', 50, 120], ['banana', 1, 2, 'medium'], ['red lentils', 50, 120]]
 export const FAT: Food[] = [['olive oil', 5, 15], ['peanut butter', 10, 30], ['avocado', 50, 120], ['cheddar', 15, 40], ['almonds', 10, 30]]
 export const VEG: Food[] = [['broccoli', 60, 150], ['spinach', 30, 80], ['peppers', 50, 120], ['mixed berries', 50, 120], ['tomatoes', 60, 150]]
 

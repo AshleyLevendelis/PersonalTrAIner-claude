@@ -33,24 +33,24 @@
  */
 export const SWAP_GROUPS: Record<string, readonly string[]> = {
   // --- protein ---
-  'lean meat': ['chicken breast', 'turkey breast', 'pork loin', 'venison', 'beef rump steak', 'beef steak sirloin', 'chicken drumstick'],
-  'richer meat': ['chicken thigh', 'duck breast', 'lamb chop', 'pork chop', 'beef brisket', 'pork belly'],
+  'lean meat': ['chicken breast', 'turkey breast', 'pork loin', 'venison', 'beef rump steak', 'beef steak sirloin', 'chicken drumstick', 'chicken breast raw', 'turkey breast raw', 'pork loin raw'],
+  'richer meat': ['chicken thigh', 'duck breast', 'lamb chop', 'pork chop', 'beef brisket', 'pork belly', 'chicken thigh raw'],
   'mince': ['chicken mince', 'turkey mince', 'beef mince 5% fat', 'beef mince 20% fat', 'lamb mince', 'pork mince', 'soy mince', 'quorn mince', 'vegan mince'],
   'cured meat and sausages': ['bacon', 'ham', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage'],
-  'white fish': ['cod', 'haddock', 'tilapia', 'sea bass', 'red snapper', 'tuna steak fresh'],
+  'white fish': ['cod', 'haddock', 'tilapia', 'sea bass', 'red snapper', 'tuna steak fresh', 'cod raw', 'haddock raw'],
   'oily fish': ['salmon', 'mackerel', 'trout'],
   'tinned and smoked fish': ['tuna canned in water', 'sardines canned', 'smoked salmon'],
-  'shellfish': ['prawns', 'crab meat', 'mussels', 'squid', 'scallops', 'lobster', 'oysters'],
+  'shellfish': ['prawns', 'crab meat', 'mussels', 'squid', 'scallops', 'lobster', 'oysters', 'prawns raw'],
   'eggs': ['egg', 'egg white'],
   'protein powder': ['whey protein powder', 'vegan protein powder'],
   'tofu and meat-free pieces': ['tofu firm', 'tofu silken', 'tempeh', 'seitan', 'seitan strips', 'quorn fillet', 'falafel'],
-  'beans and pulses': ['chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'split peas', 'edamame'],
+  'beans and pulses': ['chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'red lentils dry', 'green lentils dry', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'split peas', 'edamame'],
   // --- dairy and its stand-ins ---
-  'yoghurt': ['greek yoghurt 0%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'soy yoghurt', 'coconut yoghurt'],
-  'soft cheese': ['ricotta cheese', 'cream cheese'],
-  'cheese': ['cheddar cheese', 'mozzarella', 'feta cheese', 'halloumi', 'parmesan', 'paneer', 'sulguni cheese'],
+  'yoghurt': ['greek yoghurt 0%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'cottage cheese low fat', 'soy yoghurt', 'coconut yoghurt'],
+  'soft cheese': ['ricotta cheese', 'cream cheese', 'cream cheese light'],
+  'cheese': ['cheddar cheese', 'mozzarella', 'mozzarella light', 'feta cheese', 'halloumi', 'parmesan', 'paneer', 'sulguni cheese'],
   'milk': ['milk whole', 'milk semi skimmed', 'milk skimmed', 'soy milk', 'almond milk', 'oat milk'],
-  'cream': ['double cream', 'single cream', 'sour cream', 'creme fraiche', 'coconut cream', 'coconut milk canned'],
+  'cream': ['double cream', 'single cream', 'sour cream', 'creme fraiche', 'coconut cream', 'coconut milk canned', 'coconut milk light'],
   // --- fats ---
   'cooking fat': ['olive oil', 'vegetable oil', 'coconut oil', 'sesame oil', 'peanut oil', 'safflower oil', 'ghee', 'butter'],
   'nut butter': ['peanut butter', 'almond butter', 'tahini'],
@@ -58,14 +58,16 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'seeds': ['chia seeds', 'flaxseed', 'sunflower seeds', 'pumpkin seeds', 'sesame seeds', 'hemp seeds'],
   'avocado and olives': ['avocado', 'guacamole', 'olives'],
   // --- starches ---
-  'rice and grains': ['white rice cooked', 'brown rice cooked', 'basmati rice cooked', 'couscous cooked', 'quinoa cooked', 'bulgur wheat cooked', 'millet cooked', 'buckwheat cooked', 'barley', 'polenta cooked'],
-  'pasta and noodles': ['pasta cooked', 'wholewheat pasta cooked', 'gluten free pasta', 'protein pasta', 'egg noodles cooked', 'rice noodles cooked', 'gnocchi'],
+  'rice and grains': ['white rice cooked', 'brown rice cooked', 'basmati rice cooked', 'couscous cooked', 'quinoa cooked', 'bulgur wheat cooked', 'millet cooked', 'buckwheat cooked', 'barley', 'polenta cooked',
+    'white rice dry', 'brown rice dry', 'basmati rice dry', 'couscous dry', 'quinoa dry'],
+  'pasta and noodles': ['pasta cooked', 'wholewheat pasta cooked', 'gluten free pasta', 'protein pasta', 'egg noodles cooked', 'rice noodles cooked', 'gnocchi',
+    'pasta dry', 'wholewheat pasta dry', 'egg noodles dry', 'rice noodles dry'],
   'bread': ['white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant', 'french toast'],
   'wraps and flatbreads': ['tortilla wrap', 'corn tortilla', 'pitta bread', 'naan bread', 'chapati', 'injera flatbread'],
   'starchy veg': ['potato boiled', 'potato baked', 'mashed potato', 'sweet potato baked', 'sweet potato raw', 'taro root', 'yellow yam', 'plantain', 'parsnip', 'butternut squash'],
   'breakfast cereal': ['oats', 'granola', 'muesli', 'cornflakes', 'weetabix'],
-  'crackers and crisp snacks': ['rice cakes', 'crackers', 'rye crispbread', 'popcorn', 'tortilla chips'],
-  'flour': ['plain flour', 'cornmeal', 'lupin flour'],
+  'crackers and crisp snacks': ['rice cakes', 'chocolate rice cakes', 'crackers', 'rye crispbread', 'popcorn', 'tortilla chips'],
+  'flour': ['plain flour', 'cornmeal', 'lupin flour', 'oat flour', 'almond flour', 'coconut flour', 'rice flour'],
   // --- fruit ---
   'berries': ['strawberries', 'blueberries', 'raspberries', 'blackberries', 'mixed berries', 'cherries'],
   'sweet fruit': ['banana', 'apple', 'orange', 'grapes', 'mango', 'pineapple', 'kiwi', 'watermelon', 'pear', 'peach', 'plum', 'grapefruit', 'passion fruit', 'papaya', 'pomegranate', 'figs'],
@@ -73,7 +75,7 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   // --- vegetables ---
   'leafy veg': ['spinach', 'kale', 'mixed salad leaves', 'rocket', 'watercress', 'bok choy', 'cabbage'],
   'salad veg': ['tomato', 'cherry tomatoes', 'cucumber', 'bell pepper', 'radish', 'celery', 'bean sprouts'],
-  'cooked veg': ['broccoli', 'cauliflower', 'green beans', 'peas', 'asparagus', 'brussels sprouts', 'courgette', 'aubergine', 'mushroom', 'carrot', 'leek', 'fennel', 'artichoke', 'okra', 'turnip', 'celeriac', 'pumpkin', 'bamboo shoots', 'sweetcorn', 'beetroot'],
+  'cooked veg': ['broccoli', 'cauliflower', 'green beans', 'peas', 'asparagus', 'brussels sprouts', 'courgette', 'aubergine', 'mushroom', 'carrot', 'leek', 'fennel', 'artichoke', 'okra', 'turnip', 'celeriac', 'pumpkin', 'bamboo shoots', 'sweetcorn', 'beetroot', 'water chestnuts'],
   // --- the few sauces and extras that do have a like-for-like ---
   'sweetener': ['honey', 'maple syrup', 'sugar white', 'brown sugar', 'jam'],
   'soy sauce': ['soy sauce', 'tamari'],
@@ -92,7 +94,7 @@ export const NO_SWAP: readonly string[] = [
   // citrus used as seasoning, and aromatics
   'lemon', 'lime', 'calamansi juice', 'onion', 'garlic', 'spring onion', 'shallots',
   // sauces, pastes and dressings
-  'mayonnaise', 'ketchup', 'mustard', 'bbq sauce', 'sriracha', 'balsamic vinegar', 'pesto', 'curry paste',
+  'mayonnaise', 'mayonnaise light', 'ketchup', 'mustard', 'bbq sauce', 'sriracha', 'balsamic vinegar', 'pesto', 'curry paste',
   'gravy granules made', 'worcestershire sauce', 'teriyaki sauce', 'vegetable stock cube', 'rice vinegar', 'fish sauce',
   'miso paste', 'gochujang', 'harissa', 'coleslaw', 'vinaigrette dressing', 'ranch dressing', 'apple cider vinegar',
   'oyster sauce', 'hoisin sauce', 'sweet chili sauce', 'tamarind paste', 'white vinegar', 'jerk seasoning paste',
@@ -100,10 +102,10 @@ export const NO_SWAP: readonly string[] = [
   'cornflour', 'curry powder', 'paprika', 'cinnamon', 'cumin', 'black pepper', 'vanilla extract', 'coriander', 'dill',
   'basil', 'lemongrass', 'turmeric powder', 'bay leaves', 'star anise', 'curry leaves', 'garam masala',
   'chana masala spice mix', 'chaat masala', 'berbere spice mix', 'cajun seasoning', 'suya spice rub', 'chili powder',
-  'cayenne pepper', 'tajin seasoning', 'capers', 'nutritional yeast', 'anchovies', 'breadcrumbs', 'pancake mix',
+  'cayenne pepper', 'chilli flakes', 'tajin seasoning', 'capers', 'nutritional yeast', 'anchovies', 'breadcrumbs', 'pancake mix',
   // one-offs: nothing else does their job
   'egg yolk', 'chicken liver', 'beef jerky', 'coconut flakes', 'coconut flesh', 'ackee', 'rice paper wrappers',
-  'water', 'black coffee',
+  'water', 'black coffee', 'coconut water', 'latte whole milk',
 ]
 
 const GROUP_OF: ReadonlyMap<string, string> = new Map(
