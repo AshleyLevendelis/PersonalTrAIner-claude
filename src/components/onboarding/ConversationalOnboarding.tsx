@@ -39,6 +39,7 @@ import { splitFoodList, isPlainNone } from '@/lib/food-list'
 import { allergenFilterReceipt } from '@/lib/coach-voice'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
+import { parseKitSlot, kitStatementInUserWords } from '@/lib/kit-list'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
 import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn } from '@/lib/onboarding-capture'
@@ -927,6 +928,17 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         if (isCeilingSlot(key) && !ceilingIsInUserWords(key, coerced, userText)) {
           console.warn('onboarding: refused a load ceiling that was not in the user\'s own words', key, coerced)
           continue
+        }
+        // THE KIT LIST, the same rule: only the kit they named, the right way
+        // round ("dumbbells at home" is not a kettlebell and bands too; "no
+        // bench" is not a bench). Refusing costs nothing — the equipment
+        // choice decides, exactly as before.
+        if (key === 'kitList') {
+          const said = parseKitSlot(coerced)
+          if (!said || !kitStatementInUserWords(said, userText)) {
+            console.warn('onboarding: refused a kit statement that was not in the user\'s own words', coerced)
+            continue
+          }
         }
         // Compare against ws.values, not the outer (pre-turn) values: a slot
         // can already be recorded THIS turn — by the exact-label backstop's

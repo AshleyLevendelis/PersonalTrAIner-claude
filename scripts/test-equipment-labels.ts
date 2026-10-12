@@ -172,8 +172,17 @@ const onbSrc = fs.readFileSync('supabase/functions/onboarding-chat/index.ts', 'u
 const chatSrc = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
 check('setup prompt no longer says home_gym MEANS barbell+dumbbells+bench',
   !/home_gym means barbell\+dumbbells\+bench/i.test(onbSrc), null)
-check('setup prompt maps "just some dumbbells" to minimalist, not home_gym',
-  /just some dumbbells at home"?\s*→\s*equipment=minimalist/i.test(onbSrc), null)
+// RE-ANCHORED 11 Oct 2026 (the kit list, Ashley's 9 Oct ruling). This used to
+// pin the worked example "just some dumbbells at home → equipment=minimalist"
+// as a CERTAIN mapping — the example the test log found teaching the model to
+// hand a dumbbell-and-bench trainee kettlebells, bands and a backpack. The
+// property is unchanged (never home_gym for dumbbells); what is new is that
+// the example no longer calls a guess certain, and the kit they name is kept.
+check('setup prompt never maps "just some dumbbells" to home_gym, no longer calls minimalist a CERTAIN fit for it, and keeps the kit they name',
+  !/dumbbells at home"?\s*→\s*equipment=home_gym/i.test(onbSrc)
+  && !/just some dumbbells at home"?\s*→\s*equipment=minimalist/i.test(onbSrc)
+  && /"just some dumbbells at home" is NOT a certain mapping/i.test(onbSrc)
+  && /set_slot\(kitList=/.test(onbSrc), null)
 check('coach tool description admits bodyweight assumes a pull-up bar',
   /bodyweight[^"]{0,80}pull-up bar/i.test(chatSrc), null)
 check('coach §3b names what minimalist actually assumes',
@@ -186,7 +195,7 @@ console.log('\n9. The swap warning asks the generator, it does not re-implement 
 // EVERY missing implement, so an `equipment_alternatives` entry (one of the
 // two is enough) was reported unavailable to someone who owned the other.
 check('getExerciseCompatibilityWarnings calls isEquipmentAllowed',
-  /isEquipmentAllowed\(exercise, tier\)/.test(planSrc), null)
+  /isEquipmentAllowed\(exercise, (tier|profile)\)/.test(planSrc), null)
 // Real catalogue entries, not stubs: a stub that forgets `loads_joints` sends
 // the injury half of this function down a different path, and the point is to
 // exercise the code exactly as the swap dialog calls it.

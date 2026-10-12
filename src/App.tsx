@@ -150,7 +150,9 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import type { TrainerNudgeProps } from '@/components/TrainerNudge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, createContextFact, createGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
-import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, compileKitStatements, kitFactsIn, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
+import { profileWithKit, kitStatementFact, describeKitStatement } from '@/lib/kit-list'
+import { makeKitController, clearKitStatements, type KitController } from '@/lib/kit-change'
 import { favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { useServablePools } from '@/hooks/useServablePools'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
@@ -174,7 +176,32 @@ function App() {
   // Nutrition tab, because that is what it is built from — it stopped being a
   // section of Tools on 12 Sep 2026.
   const groceryFullScreen = route.kind === 'grocery'
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
+  // current profile, loaded once alongside it. fact-compiler.ts's pure
+  // functions turn these into the exact arguments generateExercisePlan/
+  // generateMealPools already accept; nothing here writes plan state.
+  // (Declared up here because the profile below is derived from them.)
+  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
+  /**
+   * THE PROFILE AS SAVED, and beside it THE PROFILE EVERYTHING IS HANDED.
+   *
+   * `storedProfile` is the row. `profile` is that row plus the kit the person
+   * has said they have ("I've got dumbbells and a bench", "I don't own bands"
+   * — Ashley's ruling of 9 Oct 2026, docs/plans/kit-list.md), compiled from
+   * their remembered facts. ONE derivation, here, so every tab, swap, added
+   * exercise, adaptation, rebuild and the coach's cards see the same kit: they
+   * all receive `profile`, and none of them can forget to ask.
+   *
+   * Nothing is stored by this. `kit_statements` is not a column, every profile
+   * write is a named patch, and a copy that reaches `storedProfile` through a
+   * spread is overwritten (or cleared) from the facts on the next pass. With
+   * no kit rows `profileWithKit` returns the very object it was given.
+   */
+  const [storedProfile, setProfile] = useState<UserProfile | null>(null)
+  const profile = useMemo(
+    () => (storedProfile ? profileWithKit(storedProfile, compileKitStatements(memoryFacts)) : null),
+    [storedProfile, memoryFacts],
+  )
   // WARM THE GROCERY CHUNK once there is a profile to shop for, while the
   // browser is idle, so the service worker has it before the shop (see
   // loadGroceryScreen). A failure here is harmless: opening the list fetches
@@ -321,11 +348,7 @@ function App() {
    * regenerating makes the banner go away on its own.
    */
   const [unrecognisedDietaryRestrictions, setUnrecognisedDietaryRestrictions] = useState<string[] | null>(null)
-  // Memory & goals (VISION-ARCHITECTURE.md §1) — active facts/goals for the
-  // current profile, loaded once alongside it. fact-compiler.ts's pure
-  // functions turn these into the exact arguments generateExercisePlan/
-  // generateMealPools already accept; nothing here writes plan state.
-  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
+  // (memoryFacts is declared with the profile, which is derived from it.)
   const [memoryGoals, setMemoryGoals] = useState<UserGoalRow[]>([])
   const [memoryContextFacts, setMemoryContextFacts] = useState<UserContextFactRow[]>([])
   /** Slot -> pool-option name the user explicitly picked this session, overriding assembleDay's automatic choice for that slot until the next regenerate. */
@@ -699,6 +722,31 @@ function App() {
   // and still read straight off the profile.
   const effectiveExclusions = compiledExerciseExclusions
   const effectiveDislikedFoods = compiledFoodDislikes
+  /**
+   * THE KIT LIST'S ONE CONTROLLER (kit-change.ts). Profile's ticks and the
+   * coach's card both receive this object, so the same change is priced
+   * against the same plan, exclusions and rows on file whichever door it came
+   * through.
+   */
+  const kitFactsOnFile = kitFactsIn(memoryFacts).map(k => ({ id: k.fact.id, statement: k.statement }))
+  const kitController: KitController | null = profile?.id ? makeKitController({
+    profile, mesocycle, planCreatedAt: mesocycleCreatedAt ?? profile.created_at,
+    exclusions: effectiveExclusions, onFile: kitFactsOnFile,
+    onSaved: async result => {
+      if (result.mesocycle !== mesocycle) setMesocycle(result.mesocycle)
+      await reloadMemory(profile.id!)
+    },
+  }) : null
+  /**
+   * A NEW EQUIPMENT CHOICE STARTS THE LIST AGAIN (kit-change.ts
+   * `clearKitStatements`). Awaited by Profile before it offers the rebuild, so
+   * the plan is never rebuilt around the old choice's list.
+   */
+  const handleEquipmentChoiceChanged = async (): Promise<void> => {
+    if (!profile?.id || kitFactsOnFile.length === 0) return
+    await clearKitStatements(kitFactsOnFile)
+    await reloadMemory(profile.id)
+  }
   const [devOverrideWeek, setDevOverrideWeek] = useState<number | null>(null)
   const [devOverrideDay, setDevOverrideDay] = useState<string | null>(null)
   const [devBypassLocks, setDevBypassLocks] = useState(false)
@@ -903,7 +951,7 @@ function App() {
     // walled behind a login screen mid-training-block.
     void shouldAskForEmail().then(setAskForEmail)
 
-    const restoredProfile: UserProfile = {
+    const savedProfile: UserProfile = {
       id: profileRow.id,
       // Number(null) is 0, not undefined — that silently turned "never given"
       // back into a fabricated measurement right at the restore boundary,
@@ -993,11 +1041,22 @@ function App() {
     const restoredExclusions: string[] = profileRow.exercise_exclusions || []
     setExerciseExclusions(restoredExclusions)
 
-    const [restoredPools, { data: exerciseRows }, fullMesocycle] = await Promise.all([
+    const [restoredPools, { data: exerciseRows }, fullMesocycle, restoredFacts] = await Promise.all([
       readPools(ownedId),
       supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
       restoreMesocycle(ownedId),
+      // What the person has said, read WITH the plan rather than after it:
+      // the block checks further down can rebuild weeks, and they run before
+      // React has any state to derive a kit from. A failed read falls back to
+      // the tier alone, as before any of this existed, and says so.
+      getActiveFacts(ownedId).catch(err => {
+        console.error('Could not read what you have told the app, so your kit is being read from your equipment setting alone:', err)
+        return [] as UserFactRow[]
+      }),
     ])
+    // The same two functions as the derivation at the top of this component,
+    // so the cold-load chain and every tab read the same kit.
+    const restoredProfile: UserProfile = profileWithKit(savedProfile, compileKitStatements(restoredFacts))
 
     let restoredExercises: WorkoutDay[] = []
     let restoredMesocycle: MesocycleWeek[] = []
@@ -1123,7 +1182,9 @@ function App() {
       exercisePlan: restoredExercises,
     })
 
-    setProfile(restoredProfile)
+    // Both in one batch, so no render sees the saved profile without its kit.
+    setMemoryFacts(restoredFacts)
+    setProfile(savedProfile)
     setLatestWeightKg(restoredWeight)
     setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
     setMacros(liveTargets)
@@ -1915,6 +1976,20 @@ function App() {
           console.error('Recording onboarding food dislikes failed:', err)
         }
       }
+      // THE KIT THEY SAID THEY HAVE (the kitList slot). The first plan above
+      // was already built from it — assembleProfile attached it — and this
+      // row is what keeps it for every later plan, swap and rebuild: the same
+      // shape Profile's ticks and the coach's card write (kitStatementFact).
+      if ((enrichedProfile.kit_statements ?? []).length > 0) {
+        try {
+          for (const statement of enrichedProfile.kit_statements ?? []) {
+            await createFact({ profileId: data.id, ...kitStatementFact(statement, { source: 'onboarding', rawPhrase: describeKitStatement(statement) }) })
+          }
+          await reloadMemory(data.id)
+        } catch (err) {
+          console.error('Recording the kit said in setup failed:', err)
+        }
+      }
       try {
         await persistLegacyExercisePlan(data.id, workout)
       } catch (err) {
@@ -2666,6 +2741,10 @@ function App() {
       setMealPools({})
       setManualMealPicks({})
       setExerciseExclusions([])
+      // The remembered facts belong to the profile being left. The profile
+      // handed to every tab is derived from them (the kit list), so a new
+      // profile must not start life wearing the old one's kit.
+      setMemoryFacts([])
       setLogsVersion(0)
       setNewPlanResetting(false)
       setNewPlanConfirmOpen(false)
@@ -3161,6 +3240,7 @@ function App() {
               onAdaptationsChanged={refreshAdaptations}
               onEndAdaptation={handleEndAdaptation}
               onPlanInvalidated={setPlanInvalidation}
+              kitController={kitController}
               macros={macros}
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
@@ -3252,6 +3332,8 @@ function App() {
         endingAdaptationId={endingAdaptationId}
         onEndAdaptation={handleEndAdaptation}
         onCeilingsCorrected={handleCeilingsCorrected}
+        kit={kitController}
+        onEquipmentChoiceChanged={handleEquipmentChoiceChanged}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}

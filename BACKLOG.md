@@ -2,6 +2,67 @@
 
 Newest first. One line each.
 
+- [~] **THE KIT LIST (11 Oct 2026): BUILT, all three doors, on a worktree branch, not merged.**
+  Her ruling of 9 Oct 2026, from three options, "How should someone tell the app what kit they
+  have?": **"Remember what they say"** — keep the four choices, also remember the specifics said in
+  setup or to the coach, shown as ticks on Profile; no new setup question; nobody's plan changes
+  unless they say something. It revisits her 9 Sep "fix the words". **"Build it", 11 Oct 2026.**
+  Plan: `docs/plans/kit-list.md` (replaces the lead branch's `wip/k3-kit-list` plan, whose code was
+  reviewed and reused in part; that branch is not merged).
+  - **What was wrong (test log H1-H3):** the four equipment choices were the only record of kit.
+    The tester (dumbbells and a flat bench) was "Minimalist", which assumes kettlebells, bands, a
+    pull-up bar and a bag and no bench, so he was given band and backpack work and denied his own
+    dumbbell row; nothing on any screen or in the coach could say "I don't own bands"; the coach's
+    equipment notes (`record_fact`) were saved and read by nothing; and setup's own worked example
+    taught the model "dumbbells at home → Minimalist" as a CERTAIN mapping.
+  - **What changed:** a per-person list of statements (has / hasn't / only, nine items), stored as
+    existing `user_facts` rows (no migration), read through ONE function each — the pool's
+    `allowedEquipmentFor` (so generation, swaps, add, every rebuild and substitution, rotation and
+    the scorer), `equipmentTierFor` for every engine read of the tier, the warm-up's drills, and the
+    ceilings (never the answer or the question for an implement they lack). A travel week is that
+    tier's plain set, minus bands or a bag they lack. App derives the profile every tab and the
+    coach receive from the stored one plus the facts, and the cold-load chain does the same from
+    its own read. Doors: **Profile → Equipment → "What you have"** (nine ticks; the change, by date,
+    is shown before Save), **the coach's `propose_kit_change`** card, and **setup's never-asked
+    `kitList` slot** (first plan built from it). One `makeKitController` handed to Profile and the
+    coach. The coach and setup record only kit that is in her own words, the right way round.
+  - **Decided without asking (reversible, she should be told):** changing the equipment choice
+    retires the list and the ticks show the new choice's assumption (a whole-kit list would
+    otherwise silently cancel a move to a gym); a tick change that alters nothing is not saved;
+    earlier rows a new one makes redundant are retired (provably the same kit); a warm-up asking for
+    kit now missing is re-made; the wording on the ticks and card. **CSCS (mine):** a cap is the
+    heaviest thing they HAVE that can do the lift.
+  - **Not built, and why:** the dumbbell pack and E2's two fixes (a catalogue change moves every
+    plan, which would make "nobody's plan changes" unmeasurable here — its own job, next); her two
+    questions — the swap sheet's "I don't own it" vs "not this week", and asking "new dumbbells?"
+    after a log above a stated limit — neutral version built (the sheet and logging are unchanged).
+  - **Cost, measured (CSCS question 2):** the tester's honest kit with his shoulder flag loses the
+    chest-and-triceps day (no triceps isolation survives without bands), pressing falls to one
+    press, and Tuesday's back day is led by a Towel Row (the dumbbell row is on two other days).
+    Every kit plan in the gate's 25-plan grid clears the 7.2 floor. Separately, a "no bands" swap
+    offers Scapular Pull-Ups ahead of Pull-Ups for a lat pulldown (the swap ranker prefers lower
+    joint stress) — pre-existing, applies to every swap, lead only.
+  - **Verified:** the 9,216-plan quality grid run on clean HEAD and on this change on one machine:
+    **identical report** (11.64 / 12, every dimension and count; only runtime differs). Seeded
+    plans with no kit rows, an empty list, or non-kit facts are byte-identical (`test:kit-list` §2).
+    New `test:kit-list` (153 checks; 28 mutations, 28 caught — two only after a no-comma clause case
+    and a tighter anchor were added), `verify:kit-ticks` (Profile, 25 checks at 390x844, screenshots
+    read; 9 mutations, 9 caught) and `verify:chat-kit` (the coach's card in the real chat, model
+    stubbed at the fetch boundary, 14 checks; 7 mutations, 6 caught, the seventh equivalent: moving
+    the card's question from its lead to its rationale prints the same sentence). Re-anchored:
+    `test:equipment-labels` (it pinned the worked example the test log asked to fix, and one call
+    shape). `test:bundle` total budget 2,275 -> 2,295, measured both ends (2,257 -> 2,276).
+    Full sweep (every `test:` and `verify:` but the quality grid, run separately) on a frozen copy
+    of 4f9a967c: 372 of 378 passed. The six: `test:meal-quality`, `test:schema-parity`, `verify:rls`
+    (no database from a cloud session, each saying so); `test:coach-exam-fresh` (the coach's prompt
+    changed, so the exam must be re-run on her machine); `test:bundle` (1 kB over; budget moved,
+    measured both ends); `test:onboarding-chip-match` (the new slot's own question did not match its
+    pattern; fixed). The fixes' gates re-run on the final tree: 20 of 20 green, including both new
+    drivers, `verify:setup-answers`, every `test:onboarding-*`, `test:bundle`, `test:no-dead-code`.
+  - **Not verified:** whether the model obeys the new coach and setup rules (coach exam, her
+    machine); App's own wiring is held by source checks (the harness reproduces App's two lines).
+  - **Needs:** frontend on merge; `chat-gemini` (the tool, prompt and context line) and
+    `onboarding-chat` (the corrected example and the kitList rule) deploys. No migration.
 - [x] **THE ALLERGY AND DIET PATH, ALL FOUR (11 Oct 2026). Her ruling of 9 Oct, "Build all four",
   told to build on 11 Oct.** Test log H12, H13, M19, M20, M23 (oat flour), the seitan finding; tracers D
   and G. Safety-adjacent, so each part had a plan first: `docs/plans/food-exclusions-said-in-passing.md`

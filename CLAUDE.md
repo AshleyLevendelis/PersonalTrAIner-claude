@@ -1350,7 +1350,20 @@ menu" stays true when a copy is also left outside it.
   (revisiting her 9 Sep "fix the words"), from options: keep the four equipment choices AND remember
   the specifics people say in setup or to the coach ("I've got dumbbells and a bench", "I don't own
   bands"), shown as ticks on Profile. No new setup question; nobody's plan changes unless they say
-  something. `MISSING` (lead: `wip/k3-kit-list`, design in `tracer-reports/A-equipment.md`)
+  something. **BUILT, all three doors, since 11 Oct 2026 (her "Build it")**: Profile → Equipment →
+  "What you have" (nine ticks; a change is priced and shown before Save), the coach's
+  `propose_kit_change` card, and setup's never-asked `kitList` slot. Stored as existing `user_facts`
+  rows, no migration; one controller (`makeKitController`) handed to Profile and the coach. Read
+  through ONE function each: `allowedEquipmentFor` (the pool, so every swap, add, rebuild and
+  substitution), `equipmentTierFor` (every engine read of the tier), the warm-up's drills and the
+  ceilings. Setup and the coach record a statement only when every item is in her own words, the
+  right way round (`kitStatementInUserWords`). Changing the equipment choice starts the list again.
+  MEASURED: the 9,216-plan quality grid is identical before and after (11.64), and seeded plans with
+  no kit rows are byte-identical. NOT in it: the dumbbell pack (an honest dumbbells-and-bench kit
+  with a shoulder flag loses its triceps work and most of its pressing — every grid plan still clears
+  7.2, and the pack is the fix), and her two open questions (the swap sheet's "I don't own it" vs
+  "not this week"; asking "new dumbbells?" after a log above a stated limit). `test:kit-list`, `verify:chat-kit`,
+  `verify:kit-ticks`, `docs/plans/kit-list.md`. Needs the `chat-gemini` and `onboarding-chat` deploys
 - **A surprising weigh-in: "Ask, and hold the target."** More than about 3% from the last one is
   asked about ("That's 19 kg lighter than this morning — is 62 right?") and saved only on yes; even
   then the calorie target waits for a second day that agrees. BUILT on the branch (N1), unverified

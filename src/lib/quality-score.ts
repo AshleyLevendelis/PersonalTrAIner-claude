@@ -8,6 +8,7 @@ import { seededRngFromKey } from './seeded-random'
 import { DURATION_BUDGET_SECONDS, getSessionMinimumSeconds, getSessionMaximumSeconds, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds } from './session-duration'
 import { getEquipmentFloorKg, labelModeForEntry, isExternallyLoaded, categorize } from './load-prescription'
 import { effectiveRecoveryCapacity } from './concurrent-activity'
+import { equipmentTierFor } from './kit-list'
 
 // ---------------------------------------------------------------------------
 // PLAN QUALITY SCORING
@@ -961,7 +962,7 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
   // omitted equipment tier means the factor is OFF, not that the trainee is
   // assumed to own everything. A missing tier now skips this rule exactly
   // the way generation skips its own equipment_fit factor for one.
-  const equipmentTier = profile.equipment_access
+  const equipmentTier = equipmentTierFor(profile)
   if (equipmentTier && EQUIPMENT_QUALITY_TIERS.has(equipmentTier)) {
     // CLOSED 22 Sep 2026: this pool now takes the trainee's REAL exclusions,
     // threaded through scorePlan's ScoreOptions rather than hardcoded to

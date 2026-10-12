@@ -8,6 +8,7 @@ import {
 import { getExerciseEntry } from './exercise-db'
 import { getDurationBudgetSeconds } from './session-duration'
 import type { UserProfile, WorkoutDay } from './types'
+import { kitOf, equipmentTierFor, kitItemForEquipment, type ResolvedKit } from './kit-list'
 
 // ---------------------------------------------------------------------------
 // WARM-UPS
@@ -309,6 +310,39 @@ const EQUIPMENT_AVAILABLE: Record<EquipmentAccess, string[]> = {
   minimalist: ['resistance band'],
   bodyweight: [],
 }
+/** Every piece of kit any warm-up drill asks for; `test:kit-list` holds it to MOBILITY_DRILLS. */
+const EVERY_DRILL_KIT = ['resistance band', 'pull-up bar']
+
+/**
+ * THE KIT A WARM-UP DRILL MAY ASK FOR. This map is narrower than the sets
+ * exercises are filtered by (a Minimalist is not assumed to have a bar to hang
+ * from), so it stays the base. With a kit list (kit-list.ts) a drill also
+ * needs the item to be OWNED — a man who has said he has no bands is not
+ * warmed up with Band Pull-Aparts — and a positive statement ("I've got a
+ * pull-up bar") widens it. With no list, the map decides exactly as it always
+ * has.
+ */
+function drillKitAvailable(equipment: EquipmentAccess, kit: ResolvedKit | null): Set<string> {
+  if (!kit) return new Set(EQUIPMENT_AVAILABLE[equipment] ?? [])
+  return new Set(EVERY_DRILL_KIT.filter(eq => {
+    const item = kitItemForEquipment(eq)
+    if (!item || !kit.items.has(item)) return false
+    return (EQUIPMENT_AVAILABLE[kit.baseTier] ?? []).includes(eq) || kit.affirmed.has(item)
+  }))
+}
+
+/**
+ * The drills in this day's warm-up that ask for kit this person does not
+ * have — so a kit change can rebuild the warm-up of a day whose exercises it
+ * did not otherwise touch. Empty when nothing is wrong.
+ */
+export function warmupDrillsNeedingMissingKit(day: WorkoutDay, profile: UserProfile): string[] {
+  const have = drillKitAvailable(equipmentTierFor(profile) || 'full_gym', kitOf(profile))
+  const needs = new Map(MOBILITY_DRILLS.map(d => [d.name, d.needs_equipment]))
+  return (day.warmup?.mobility ?? [])
+    .filter(item => (needs.get(item.name) ?? []).some(eq => !have.has(eq)))
+    .map(item => item.name)
+}
 
 // ---------------------------------------------------------------------------
 // Ramp-up sets
@@ -516,6 +550,12 @@ export interface WarmupContext {
    */
   compounds: { entry: ExerciseEntry; suggestedLoadKg: number | null; loadSource?: PrescribedLoadSource }[]
   equipment: EquipmentAccess
+  /**
+   * What the person has said about their kit, resolved (kit-list.ts), or
+   * null/absent when they have said nothing. When present it answers "do they
+   * have bands / a bar to hang from" together with the tier map below.
+   */
+  kit?: ResolvedKit | null
   injuries: string[]
   experience: TrainingExperience
   /** Hard ceiling. Warm-up must fit inside the session, not extend it. */
@@ -557,7 +597,7 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
     for (const j of PATTERN_JOINTS[p] ?? []) targetJoints.add(j)
   }
 
-  const haveEquipment = new Set(EQUIPMENT_AVAILABLE[ctx.equipment] ?? [])
+  const haveEquipment = drillKitAvailable(ctx.equipment, ctx.kit ?? null)
 
   const candidates = MOBILITY_DRILLS.filter(d =>
     d.prepares_joints.some(j => targetJoints.has(j)) &&
@@ -669,7 +709,8 @@ export function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay
         suggestedLoadKg: p.ex.suggested_load_kg ?? null,
         loadSource: p.ex.load_source,
       })),
-      equipment: profile.equipment_access || 'full_gym',
+      equipment: equipmentTierFor(profile) || 'full_gym',
+      kit: kitOf(profile),
       injuries: profile.injuries || [],
       experience: profile.training_experience || 'novice',
       budgetSeconds: getWarmupReserveSeconds(budgetSeconds),
