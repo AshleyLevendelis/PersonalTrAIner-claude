@@ -1282,7 +1282,7 @@ menu" stays true when a copy is also left outside it.
   no kit rows are byte-identical. NOT in it: the dumbbell pack (an honest dumbbells-and-bench kit
   with a shoulder flag loses its triceps work and most of its pressing — every grid plan still clears
   7.2, and the pack is the fix), and her two open questions (the swap sheet's "I don't own it" vs
-  "not this week"; asking "new dumbbells?" after a log above a stated limit). `test:kit-list`,
+  "not this week"; asking "new dumbbells?" after a log above a stated limit). `test:kit-list`, `verify:chat-kit`,
   `verify:kit-ticks`, `docs/plans/kit-list.md`. Needs the `chat-gemini` and `onboarding-chat` deploys
 - **A surprising weigh-in: "Ask, and hold the target."** More than about 3% from the last one is
   asked about ("That's 19 kg lighter than this morning — is 62 right?") and saved only on yes; even

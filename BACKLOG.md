@@ -45,9 +45,20 @@ Newest first. One line each.
   - **Verified:** the 9,216-plan quality grid run on clean HEAD and on this change on one machine:
     **identical report** (11.64 / 12, every dimension and count; only runtime differs). Seeded
     plans with no kit rows, an empty list, or non-kit facts are byte-identical (`test:kit-list` §2).
-    New `test:kit-list` (KITLIST_CHECKS checks; KITLIST_MUTATIONS) and `verify:kit-ticks` (KITTICKS_CHECKS checks at
-    390x844, screenshots read; KITTICKS_MUTATIONS). Re-anchored: `test:equipment-labels` (the worked example it
-    pinned is the one the test log asked to fix). Derived sweep: SWEEP_RESULT.
+    New `test:kit-list` (153 checks; 28 mutations, 28 caught — two only after a no-comma clause case
+    and a tighter anchor were added), `verify:kit-ticks` (Profile, 25 checks at 390x844, screenshots
+    read; 9 mutations, 9 caught) and `verify:chat-kit` (the coach's card in the real chat, model
+    stubbed at the fetch boundary, 14 checks; 7 mutations, 6 caught, the seventh equivalent: moving
+    the card's question from its lead to its rationale prints the same sentence). Re-anchored:
+    `test:equipment-labels` (it pinned the worked example the test log asked to fix, and one call
+    shape). `test:bundle` total budget 2,275 -> 2,295, measured both ends (2,257 -> 2,276).
+    Full sweep (every `test:` and `verify:` but the quality grid, run separately) on a frozen copy
+    of 4f9a967c: 372 of 378 passed. The six: `test:meal-quality`, `test:schema-parity`, `verify:rls`
+    (no database from a cloud session, each saying so); `test:coach-exam-fresh` (the coach's prompt
+    changed, so the exam must be re-run on her machine); `test:bundle` (1 kB over; budget moved,
+    measured both ends); `test:onboarding-chip-match` (the new slot's own question did not match its
+    pattern; fixed). The fixes' gates re-run on the final tree: 20 of 20 green, including both new
+    drivers, `verify:setup-answers`, every `test:onboarding-*`, `test:bundle`, `test:no-dead-code`.
   - **Not verified:** whether the model obeys the new coach and setup rules (coach exam, her
     machine); App's own wiring is held by source checks (the harness reproduces App's two lines).
   - **Needs:** frontend on merge; `chat-gemini` (the tool, prompt and context line) and

@@ -88,8 +88,9 @@ const ASKS: Record<SlotKey, Asks> = {
   maxDumbbellKg: /heaviest dumbbell|dumbbells? go (up )?to/i,
   maxSingleImplementKg: /heaviest kettlebell/i,
   maxImprovisedKg: /bag\b.{0,20}\bhold/i,
-  // Never asked (no new setup question, 9 Oct 2026), so no message asks it.
-  kitList: /(?!)/,
+  // Never asked (no new setup question, 9 Oct 2026); the pattern matches its own
+  // catalogue question so the chip matcher stays honest if a model ever asks it.
+  kitList: /what kit do you (actually )?(have|own)/i,
 }
 
 /**
