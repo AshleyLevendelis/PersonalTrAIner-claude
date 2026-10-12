@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **RELEASE SWEEP, 12 Oct 2026, on the merged tree (run 5, the allergy path, the kit list): 387 of 397, then the 6 drivers fixed.**
+  Frozen copy of 50d8955a, every `test:` and `verify:` gate including `test:quality` and `test:audit`.
+  - **Environmental, as always:** `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database
+    from a cloud session, each saying so). **`test:coach-exam-fresh`**: the coach changed; the exam must
+    be re-run on her machine.
+  - **Six drivers red, all stale against the 10 Oct layout pass, none an app defect:** `verify:round-presets`
+    and `verify:tools-timer` (the timer's shortest round is now 10s/5s, and the block sheet asks with chips
+    and says the run under its title); `verify:planned-activity` (a finished day is its own "DONE" panel);
+    `verify:layoff` (the header says "Week 1 of 16", and check 17 had been passing vacuously on the old
+    "Wk 1/" label); `verify:setup-answers` 7f-7i (Exercises to avoid is its own row now).
+    **`verify:home-weight` was REPLACED, not re-anchored**: the redesigned panel shows the figure and
+    "since you started" and no recency word, so it now holds what is drawn (the latest figure, never a
+    stored date, the change measured from the setup weight rather than a pre-plan weigh-in).
+    Each fix mutation-tested: 7 mutations, 7 caught.
+  - **Not done, found on the way:** on a walk-only day Home's Done panel reads "time —, 0/0 sets"
+    above the logged walk. Harmless, unhelpful; not changed in this release.
+
 - [~] **THE KIT LIST (11 Oct 2026): BUILT, all three doors, on a worktree branch, not merged.**
   Her ruling of 9 Oct 2026, from three options, "How should someone tell the app what kit they
   have?": **"Remember what they say"** — keep the four choices, also remember the specifics said in

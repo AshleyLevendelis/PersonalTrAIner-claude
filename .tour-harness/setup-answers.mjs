@@ -558,7 +558,8 @@ await shoot('setup-answers-6-exercises-to-avoid')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?avoidask=1` })
 await wait(3000)
 await dialogReady()
-await openDietaryGroup()
+// Its own row since the 10 Oct layout pass (7d), not the Diet sheet it once sat in.
+await openSheet('Exercises to avoid')
 // Typed the way a person types: tap the box, type, tap +.
 await tap('[data-testid="exercise-avoid-input"]')
 await send('Input.insertText', { text: 'squats' })

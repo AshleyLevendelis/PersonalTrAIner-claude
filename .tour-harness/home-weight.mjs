@@ -1,5 +1,10 @@
 // ---------------------------------------------------------------------------
-// HOME'S WEIGHT TILE SAYS WHEN, IN WORDS, AND COUNTS "SINCE WEEK 1" FROM INSIDE THE PLAN.
+// HOME'S WEIGHT PANEL SHOWS THE LATEST WEIGH-IN, NEVER A STORED DATE, AND MEASURES THE CHANGE FROM WHERE
+// SHE STARTED, NOT FROM A WEIGH-IN MADE BEFORE THE PLAN.
+//
+// REPLACED 12 Oct 2026, not re-anchored: the 10 Oct layout pass (design 2a, shown to her and merged on her
+// "Merge") redrew the tile as a Weight panel with the figure and "+x.x since you started", and no recency
+// word or "since week 1" line. The two user-test findings it held still apply to what is drawn now.
 //
 // User test, 8 Oct 2026: #22 the tile printed the stored date ("80.0 kg · 2026-09-16") whenever
 // the last weigh-in was not today; #23 "-0.6 kg since week 1" was measured from a weigh-in made
@@ -65,10 +70,10 @@ const open = async query => {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&${query}&n=${loads}#/tab/dashboard` })
   await wait(2500); await ev(`location.hash = '#/tab/dashboard'`); await wait(1500)
 }
-/** The weight tile's text, found by its own "kg" figure button, plus the "since week 1" line if any. */
+/** The weight panel's header (figure and change) and the whole panel's text. */
 const readTile = () => ev(`(() => {
-  const btn = [...document.querySelectorAll('button[aria-expanded]')].find(b => /kg ·|log one/.test(b.textContent || ''))
-  const box = btn ? btn.parentElement : null
+  const box = document.querySelector('[data-home-weight]')
+  const btn = box ? box.querySelector('button[aria-expanded]') : null
   return { figure: btn ? btn.textContent.replace(/\\s+/g, ' ').trim() : null, box: box ? box.innerText.replace(/\\s+/g, ' ').trim() : null }
 })()`)
 const tileReady = async () => { let t = await readTile(); for (let i = 0; i < 20 && !t.figure; i++) { await wait(500); t = await readTile() } return t }
@@ -80,37 +85,29 @@ const a = await tileReady()
 // The weigh-in's own date, read off the page (test:harness-clock): every other day is counted from it.
 const weighInDate = await ev('window.__weighInTarget?.date ?? null')
 check('0. the page names the weigh-in date it was seeded with', /^\d{4}-\d{2}-\d{2}$/.test(weighInDate ?? ''), weighInDate)
-check('1. the tile reads "today" on the day of the weigh-in', /80\.0 ?kg · today/.test(a.figure ?? ''), a)
-check('2. one in-plan weigh-in: no "since week 1" line (the 21 Aug one predates the plan)', !!a.box && !/since week 1/.test(a.box), a.box)
+check('1. the panel shows the latest weigh-in, 80.0 kg', /^Weight 80\.0 ?kg\b/.test(a.box ?? ''), a)
+check('2. ...and never the stored date', !!a.box && !/\d{4}-\d{2}-\d{2}/.test(a.box), a.box)
 
-console.log('\nB. The day after')
-await open(`today=${plusDays(weighInDate, 1)}`)
-const b = await tileReady()
-check('3. the day after, it says "yesterday"', /80\.0 ?kg · yesterday$/.test(b.figure ?? ''), b)
-check('4. ...and never the stored date', !/\d{4}-\d{2}-\d{2}/.test(b.box ?? ''), b.box)
-
-console.log('\nC. Two days after')
-await open(`today=${plusDays(weighInDate, 2)}`)
-const c = await tileReady()
-check('5. two days after, it names the weekday', c.figure === `80.0kg · ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(`${weighInDate}T12:00:00Z`).getUTCDay()]}`, c)
-check('6. ...and never the stored date', !/\d{4}-\d{2}-\d{2}/.test(c.box ?? ''), c.box)
+console.log('\nB. Days and a week later: still the latest figure, still no stored date')
+for (const [n, label] of [[1, '3'], [2, '4'], [9, '5']]) {
+  await open(`today=${plusDays(weighInDate, n)}`)
+  const t = await tileReady()
+  check(`${label}. ${n} day(s) after: 80.0 kg, and no stored date anywhere on the panel`, /^Weight 80\.0 ?kg\b/.test(t.box ?? '') && !!t.box && !/\d{4}-\d{2}-\d{2}/.test(t.box), t)
+}
 await shoot('home-weight-dated')
 
-console.log('\nC2. Over a week after')
-await open(`today=${plusDays(weighInDate, 9)}`)
-const c2 = await tileReady()
-check('5b. over a week after, it names the date', c2.figure === `80.0kg · ${Number(weighInDate.slice(8))} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(weighInDate.slice(5, 7)) - 1]}`, c2)
-
-console.log('\nD. With a weigh-in inside the plan')
+console.log('\nC. With a weigh-in inside the plan, and one weeks before it')
 await open('weighins=1')
 const d = await tileReady()
-check('7. "since week 1" counts from the first weigh-in since the plan began: -0.4, not -0.6', /-0\.4 kg since week 1/.test(d.box ?? ''), d.box)
+// Started at 80 (setup), weighs 80.0 now; the 21 Aug weigh-in (80.6) predates the plan. "Since you started" is
+// measured from the setup weight, so the change is 0.0, never the -0.6 the old "since week 1" line printed (#23).
+check('6. the change is measured from where she started (0.0), not from a weigh-in before the plan (-0.6)', /\b0\.0 kg since you started/.test(d.box ?? '') && !/-0\.6/.test(d.box ?? ''), d)
 await shoot('home-weight-since')
 
 const err = await ev('window.__err ?? null')
-check('8. no uncaught error on the page', err === null, err)
+check('7. no uncaught error on the page', err === null, err)
 
 console.log(`\n${ran} checks ran`)
-console.log(failures === 0 ? '\nThe weight tile says when in words and counts from inside the plan.\n' : `\n${failures} check(s) FAILED.\n`)
+console.log(failures === 0 ? '\nThe weight panel shows the latest figure, no stored date, and the change from where she started.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

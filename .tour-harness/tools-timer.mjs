@@ -329,14 +329,16 @@ const sheet = await ev(`(() => {
     hitIsInside: !!hit && el.contains(hit),
     hitTag: hit ? (hit.tagName + '.' + (hit.className || '').toString().slice(0, 40)) : null,
     // The duration the timer just ran, carried in rather than retyped.
-    prefilled: [...el.querySelectorAll('input')].map(i => i.value).filter(Boolean),
+    // Since the circuit log (8 Oct 2026) the sheet asks "What was this block?" with chips: what ran is said
+    // under the title ("3 × 10s, 5s rest") and each chip carries the timer's minutes, not a typed box.
+    prefilled: [...(el.innerText.match(/\\d+ × \\d+s, \\d+s rest/) ?? []), ...(/\\b1 min\\b/.test(el.innerText) ? ['1 min'] : []), ...[...el.querySelectorAll('input')].map(i => i.value).filter(Boolean)],
   }
 })()`)
 check('8c. the log sheet is really on screen', sheet.found === true && sheet.visible === true && sheet.h > 100, sheet)
 check('8d. ...and a tap in the middle of it lands ON it, not on the field behind',
   sheet.hitIsInside === true, sheet)
-check('8e. ...with what the timer just ran already filled in',
-  (sheet.prefilled || []).length > 0, sheet.prefilled)
+check('8e. ...with what the timer just ran already filled in: the rounds and times, and the minutes on the chips',
+  (sheet.prefilled || []).length >= 2 && /^3 × 10s, 5s rest$/.test(sheet.prefilled[0] ?? ''), sheet.prefilled)
 
 const err = await ev('window.__err ?? null')
 check('6. no uncaught error on the page', err === null, err)

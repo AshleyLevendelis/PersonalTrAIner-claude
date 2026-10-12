@@ -283,7 +283,7 @@ check('28. once the effort is answered the ✓ lights, and is pressed', saveClic
 await wait(1500)
 const storedRound = await ev(`(window.__fakeDb?.cardio_logs ?? []).map(r => ({ a: r.activity_name, m: r.duration_minutes, rpe: r.intensity_rpe, notes: r.notes }))`)
 check('28b. ...and the store holds the round at the effort she chose, with what the timer ran',
-  storedRound.length === 1 && storedRound[0].rpe === 7 && storedRound[0].a === 'Skipping rope' && /^2 × 1s, 1s rest$/.test(storedRound[0].notes ?? ''), storedRound)
+  storedRound.length === 1 && storedRound[0].rpe === 7 && storedRound[0].a === 'Skipping rope' && /^2 × 10s, 5s rest$/.test(storedRound[0].notes ?? ''), storedRound)
 const logged = await ev(`document.body.innerText`)
 check('29. the app says it was logged, rather than going quiet',
   /Logged ·/.test(logged), logged.slice(0, 200))
@@ -301,7 +301,7 @@ const toolsOffer = await ev(`(() => {
   return o ? o.innerText.replace(/\\s+/g, ' ').trim() : null
 })()`)
 check('31. Tools offers to count the logged block as today\'s workout',
-  !!toolsOffer && /Skipping rope · 2 × 1s, 1s rest/.test(toolsOffer) && /instead of /.test(toolsOffer), toolsOffer)
+  !!toolsOffer && /Skipping rope · 2 × 10s, 5s rest/.test(toolsOffer) && /instead of /.test(toolsOffer), toolsOffer)
 await shoot('round-circuit-offer')
 check('32. counting it', await ev(`(() => { const b = document.querySelector('[data-testid="circuit-offer-yes"]'); if (!b) return false; b.click(); return true })()`))
 await wait(1500)
