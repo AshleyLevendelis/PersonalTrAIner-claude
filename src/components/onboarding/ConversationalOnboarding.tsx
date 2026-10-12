@@ -34,6 +34,9 @@ import {
   type SlotDef,
 } from '@/lib/onboarding-slots'
 import { measureParserFor } from '@/lib/body-units'
+import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
+import { splitFoodList, isPlainNone } from '@/lib/food-list'
+import { allergenFilterReceipt } from '@/lib/coach-voice'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
@@ -1075,6 +1078,20 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   const sendMessage = async (text: string, preRecorded?: WorkingState) => {
     const trimmed = text.trim()
     if (!trimmed || busy) return
+    // CHANGING "FOODS TO AVOID" FROM THE SUMMARY IS SETTLED HERE, NOT BY THE
+    // MODEL (test log H12, 11 Oct 2026). A typed answer to a text slot's edit
+    // prompt used to go to the coach as an ordinary message, and was saved only
+    // if the model called set_slot with the whole list. "mushrooms and pork"
+    // was answered in prose ("no mushrooms, no pork") and the list stayed
+    // "mushrooms". Taps and chips were already captured in code; this text
+    // slot now is too: the words, split into foods, are the new list.
+    // Only a reply that IS a list of foods (or a plain "none") is settled
+    // here; "actually leave it as it is" still goes to the coach.
+    const typedFoods = splitFoodList(trimmed)
+    if (!preRecorded && editingKey === 'dislikedFoods' && (isPlainNone(trimmed) || (typedFoods.length > 0 && typedFoods.every(isFoodToAvoid)))) {
+      const edit = makeWorkingState()
+      if (applySlot(edit, 'dislikedFoods', typedFoods.join(', '), values) && settleEdit(edit, trimmed)) return
+    }
     setBusy(true)
     // FORCED, overriding the near-bottom guard. The guard exists so someone
     // re-reading an earlier answer isn't yanked away — but they have just
@@ -1169,14 +1186,28 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     if (allergenTags.length > 0) {
       const merged = [...ws.values.dietaryPreferences, ...allergenTags]
       if (applySlot(ws, 'dietaryPreferences', merged, ws.values, false)) {
-        const labels = allergenTags.map(t => DIETARY_OPTIONS.find(o => o.value === t)?.label ?? t).join(', ')
-        ws.newMessages.push({
-          role: 'assistant',
-          content: `✓ Flagged as a hard restriction, not just a preference — ${labels} will be kept out of every meal.`,
-          isReceipt: true,
-        })
+        const labels = allergenTags.map(t => DIETARY_OPTIONS.find(o => o.value === t)?.label ?? t)
+        // THE APP'S OWN WORDS MAY NOT PROMISE WHAT IT CANNOT CHECK (H13, her
+        // 9 Oct ruling): this said "Nut-free will be kept out of every meal".
+        // It now says what the app did, in the meal screens' own sentence.
+        ws.newMessages.push({ role: 'assistant', content: `${RECEIPT_PREFIX}${allergenFilterReceipt(labels)}`, isReceipt: true })
         immediateCommit = true
       }
+    }
+
+    // "I DON'T EAT PORK", SAID IN PASSING (test log H12; her 9 Oct ruling:
+    // save it straight away, with a visible tick). The allergen backstop above
+    // only knows the twelve allergens; every other food someone says they do
+    // not eat had no route but the model, which filed "I don't eat pork" as a
+    // memory note that never reaches the plan. Same shape, same guarantee:
+    // read in code on every typed message, added to Foods to avoid, ticked.
+    // A food the allergen line above has just turned into a filter is left to
+    // that filter, so nothing is ticked twice.
+    const filtered = (food: string) => detectAllergenTags(`allergic to ${food}`).some(t => ws.values.dietaryPreferences.includes(t))
+    const saidNotToEat = preRecorded ? [] : detectFoodExclusions(trimmed).filter(f => !filtered(f))
+    const capturedFoods = mergeFoodsToAvoid(splitFoodList(ws.values.dislikedFoods), saidNotToEat)
+    if (capturedFoods.added.length > 0 && applySlot(ws, 'dislikedFoods', capturedFoods.list.join(', '), ws.values)) {
+      immediateCommit = true
     }
 
     // SNACKS, SAID IN PASSING (test log L5). "3 meals and one snack" was
@@ -1267,6 +1298,14 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // words is decided in there, and a re-asked question brings its card
       // along whether or not the model asked for one.
       executeActions(responseWs, Array.isArray(result.actions) ? result.actions : [], trimmed)
+      // THE COACH CAN ADD TO FOODS TO AVOID, NEVER TAKE ONE OFF. Its set_slot
+      // sometimes resends the list from memory and leaves a food out (this
+      // turn's catch above, or an earlier one), which would quietly serve her
+      // something she said she does not eat. So whatever was on the list when
+      // the turn began is put back. Taking a food off is still one tap away:
+      // the summary edit above (settled in code), or Profile later.
+      const keptFoods = mergeFoodsToAvoid(splitFoodList(responseWs.values.dislikedFoods), splitFoodList(ws.values.dislikedFoods))
+      if (keptFoods.added.length > 0) applySlot(responseWs, 'dislikedFoods', keptFoods.list.join(', '), responseWs.values, false)
       // NEVER A LIVE QUESTION BESIDE THE GENERATE BUTTON.
       //
       // Ashley photographed the coach asking "how much time do you want to

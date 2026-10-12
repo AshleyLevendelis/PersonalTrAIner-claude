@@ -196,7 +196,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   mutations), `coach-parity`. Needs the `chat-gemini` deploy for chat
 - Meals hit targets from real foods, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
-  `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`
+  `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`, and since 11 Oct 2026 an ingredient line is costed and tagged only when
+  every word in it is accounted for (a dish is a miss, never one of its
+  ingredients) — `ingredient-lookup`
 - **And a different day tomorrow** — since 19 Sep 2026, on Ashley's "fix the
   variety". CORRECTED, measured: this line said "varied" and nothing had ever
   counted. **1.11 distinct days in a seven-day week; 89.4% of profiles ate the
@@ -413,7 +415,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   again at display time for the same reason the dietary re-check does.
   `meal-method` (31 checks, 19 mutations), `verify:meal-method`. Needs the
   `generate-meals` deploy; until then new meals arrive with no method, which is
-  the honest empty state
+  the honest empty state. **And since 11 Oct 2026 the steps are checked like the
+  ingredients**: a method naming a food she must not eat, or a food the dish
+  does not have, is not shown (the whole method, never one sentence), at
+  verification and again on the card — `meal-method-check`, `verify:meal-method` §4
 - **A diet that filters food but not the numbers SAYS SO where it is picked** —
   since 20 Sep 2026. Keto and Low-carb are real food filters (bread, pasta,
   rice, potatoes, oats, beans and added sugar are refused, probed one by one)
@@ -1354,8 +1359,20 @@ menu" stays true when a copy is also left outside it.
   Foods to avoid with a visible tick; (2) setup stops promising "entirely nut-free" and uses the
   honest wording the meal screens already use; (3) food matching gets stricter (a "chicken caesar
   wrap" is not an empty tortilla; bare "chicken" must not match a meat-free product); (4) recipe
-  steps are checked against allergies and avoids. `MISSING`, all four; safety-adjacent, so each gets
-  a plan before a build (`docs/plans/ingredient-lookup-truth.md` exists for (3))
+  steps are checked against allergies and avoids. **BUILT 11 Oct 2026, all four, not yet on `main`
+  or deployed** (plans: `food-exclusions-said-in-passing.md`, `ingredient-lookup-truth.md` §10,
+  `recipe-steps-checked-against-restrictions.md`). (1) both surfaces: a code backstop in setup and in
+  the chat, the summary edit and Profile's box split on "and"; in setup the coach can add to Foods to
+  avoid and never take one off — `test:food-exclusions`, `verify:onboarding-turns` §18-19,
+  `verify:chat-food-avoid`. (2) the tick is the meal screens' sentence, the honesty block bans a
+  promise about the plan — `test:food-exclusions` §4/§7. (3) every word in an ingredient line is
+  accounted for or it is a miss; dry/raw lines reach their own entries; bare words keep today's answer
+  only for a reviewed tag-safe list; a latte has its own dairy row, and an oat latte is a miss — `test:ingredient-lookup`, `test:food-db-parity` §6. (4) a method
+  naming a food she must not eat, or one the dish lacks, is not shown, at verification and on the
+  card — `test:meal-method-check`, `verify:meal-method` §4. NOT proven: her real stored pools through
+  the new lookup (plan §5 steps 2-3, her machine) and whether the deployed coaches obey their new lines
+  (the exam). Open questions of hers: unlisted seasonings in steps, what an avoided food in a step does,
+  M17 steps after an edit, bare "chicken" assume-or-ask, the two Greek yoghurts, oats and gluten-free
 
 ### Her rulings of 10 Oct 2026, from runs 3-4 of the live-app test (`docs/test-log-2026-10-09/runs-3-4-trace.md`)
 - **A logged meal stays as eaten; the rest of the day fits around it: "A, with two

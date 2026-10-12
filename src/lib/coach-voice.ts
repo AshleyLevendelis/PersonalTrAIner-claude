@@ -1193,3 +1193,21 @@ export const PLAN_RESTART = {
     ? `Starting over is for coming back after twelve weeks or more — it's been ${breakLength(daysAway)}, and today's weights are already eased for that. They climb back from your next session.`
     : "Starting over is for coming back after a long break, and you're training regularly — your plan carries on as it is.",
 }
+
+// ---------------------------------------------------------------------------
+// WHAT THE APP SAYS WHEN AN ALLERGY IS SWITCHED ON (11 Oct 2026)
+// ---------------------------------------------------------------------------
+// Test log H13: setup's own tick said "Nut-free will be kept out of every
+// meal", directly above the app's line that it cannot check brands or
+// cross-contamination. Ashley's 9 Oct ruling: setup uses the honest wording
+// the meal screens already use. That sentence is here once, word for word as
+// MealPlan and GroceryList print it, so a gate can hold the two together.
+
+/** The meal screens' own sentence (MealPlan.tsx, GroceryList.tsx). */
+const ALLERGEN_FILTER_LIMIT = 'Ingredients are filtered, not verified. Check labels if you have an allergy.'
+
+/** "Nut-free filter on. Ingredients are filtered, not verified. ..." — what was done, never a promise about every meal. */
+export function allergenFilterReceipt(labels: readonly string[]): string {
+  const names = labels.length <= 1 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+  return `${names} filter${labels.length === 1 ? '' : 's'} on. ${ALLERGEN_FILTER_LIMIT}`
+}

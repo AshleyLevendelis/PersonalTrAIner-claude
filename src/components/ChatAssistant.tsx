@@ -57,6 +57,7 @@ import { isHedged } from '@/lib/definite-mention'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
+import { detectFoodExclusions, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
@@ -4291,6 +4292,43 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * once it has the number), or a reconciliation conflict (asks instead of
    * guessing which fact is current).
    */
+  /**
+   * "I DON'T EAT PORK", SAID TO THE COACH IN PASSING (test log H12; Ashley's
+   * 9 Oct 2026 ruling: save it straight away, with a visible tick). The coach
+   * is told to record_fact it; this is the half that does not depend on the
+   * model, the same shape as setup's backstop (food-exclusions.ts). It runs
+   * only when the coach did NOT record a food dislike this turn, so nothing is
+   * saved twice, and each food is saved through the same write as Profile's
+   * "Foods to avoid" box, with the receipt the record_fact path already uses.
+   */
+  const saveFoodsSaidInPassing = async (userText: string): Promise<ChatReceiptView[]> => {
+    const profileId = profile.id
+    if (!profileId) return []
+    const already = memoryFacts.filter(f => f.kind === 'food_preference' && f.polarity === 'dislike').map(f => f.resolved_refs?.[0] ?? f.display_text)
+    const { added } = mergeFoodsToAvoid(already, detectFoodExclusions(userText))
+    const receipts: ChatReceiptView[] = []
+    for (const food of added) {
+      const displayText = `won't eat/do ${food}`
+      try {
+        const row = await createFact({
+          profileId, kind: 'food_preference', source: 'chat', rawPhrase: userText, displayText,
+          polarity: 'dislike', hardness: 'hard', resolvedRefs: resolveFoodTarget(food),
+        })
+        const rows: ChatReceiptView['rows'] = [{ label: displayText, detail: "recorded — excluded starting your next meal regenerate, doesn't touch today's plan" }]
+        const stillPresent = mealsContaining(mealPlan, food)
+        if (stillPresent.length > 0) {
+          rows.push({ label: `Today's ${stillPresent.map(m => m.meal).join(', ')}`, detail: "still has it — swap from the Nutrition tab if you don't want it today" })
+        }
+        receipts.push({ kind: 'memory_fact_saved', title: 'Added to Foods to avoid', rows, status: 'done', undoToken: row.id, resolvedAt: new Date().toISOString() })
+      } catch (err) {
+        console.error('Saving a food said in passing failed:', err)
+        receipts.push({ kind: 'memory_fact_saved', title: "Didn't save", rows: [{ label: food, detail: 'it is NOT being avoided yet — say it again, or add it on Profile under Foods to avoid' }], status: 'failed' })
+      }
+    }
+    if (added.length > 0) await Promise.resolve(onMemoryChanged()).catch(() => {})
+    return receipts
+  }
+
   const resolveAndSaveMemory = async (intent: { tool: 'record_fact' | 'record_goal' | 'record_context_fact' | 'set_display_name'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
     const args = intent.rawArgs
     const profileId = profile.id
@@ -5758,8 +5796,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     let clarification: ChatClarificationView | undefined
     let failed = false
 
+    let coachSavedAFoodDislike = false
     try {
       const result = await callGemini(userText)
+      coachSavedAFoodDislike = result.memoryIntent?.tool === 'record_fact'
+        && result.memoryIntent.rawArgs?.kind === 'food_preference' && result.memoryIntent.rawArgs?.polarity !== 'like'
       const processed = await processResponse(result, userText)
       responseText = processed.text
       action = processed.action
@@ -5869,6 +5910,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     setQuickRepliesDismissed(false)
 
     finalizePlaceholder(placeholderId, cleanedText, finalStatus, action)
+
+    // The food backstop, after the coach's own turn has landed: its tick sits
+    // under the reply, one per food, each with Undo like any saved fact.
+    if (!failed && !coachSavedAFoodDislike) {
+      const ticks = await saveFoodsSaidInPassing(userText)
+      if (ticks.length > 0) {
+        setMessages(prev => [...prev, ...ticks.map(r => ({ role: 'assistant' as const, content: r.title, status: 'complete' as const, receipt: r }))])
+      }
+    }
   }
 
   // Resets to a single fresh greeting: clears the in-memory list, the

@@ -125,12 +125,31 @@ async function main() {
   check('"500g rice" added by hand is 500g, not 180g', typed.row.quantity === 500 && typed.row.display_name === 'white rice' && typed.row.canonical_key === 'white rice cooked', typed.row)
 
   // Every entry in the table: a real food, a name that still finds that same food, a sane factor, no two rows with one name.
-  const names = FOOD_DB.map(f => resolveGroceryTarget(f.name).displayName)
-  check('no two foods share a shopping name', new Set(names).size === names.length, names.filter((n, i) => names.indexOf(n) !== i))
+  // ONE NAME PER ROW. Since 11 Oct 2026 a dry or raw line ("75g dry pasta")
+  // has its own food entry and joins its cooked twin's row (AS_BOUGHT `key`),
+  // so two FOODS can share a name exactly when they share a ROW; two rows never do.
+  const rowTargets = FOOD_DB.map(f => resolveGroceryTarget(f.name))
+  const nameOfRow = new Map<string, string>()
+  const clash: string[] = []
+  for (const t of rowTargets) {
+    const seen = [...nameOfRow].find(([key, name]) => name === t.displayName && key !== t.canonicalKey)
+    if (seen) clash.push(`${t.displayName} (${seen[0]} / ${t.canonicalKey})`)
+    nameOfRow.set(t.canonicalKey, t.displayName)
+  }
+  const names = rowTargets.map(t => t.displayName)
+  check('no two rows share a shopping name', clash.length === 0, clash)
   const entries = Object.entries(AS_BOUGHT)
+  const cookedBasis = entries.filter(([, v]) => !v.key)
+  const twins = entries.filter(([, v]) => !!v.key)
   check('every as-bought entry is a food in the database', entries.length >= 12 && entries.every(([k]) => FOOD_DB.some(f => f.name === k)), entries.filter(([k]) => !FOOD_DB.some(f => f.name === k)).map(([k]) => k))
-  check('...whose shopping name still finds the same food (the row looks its food up by that name)', entries.every(([k, v]) => lookupIngredient(v.name)?.name === k), entries.filter(([k, v]) => lookupIngredient(v.name)?.name !== k).map(([k]) => k))
-  check('...with a dry-per-cooked factor a cook would recognise (between a fifth and a half)', entries.every(([, v]) => v.perCooked >= 0.2 && v.perCooked <= 0.5), entries.filter(([, v]) => !(v.perCooked >= 0.2 && v.perCooked <= 0.5)))
+  check('...whose shopping name still finds the food of its ROW (the row looks its food up by that name)', entries.every(([k, v]) => lookupIngredient(v.name)?.name === (v.key ?? k)), entries.filter(([k, v]) => lookupIngredient(v.name)?.name !== (v.key ?? k)).map(([k]) => k))
+  check('...with a dry-per-cooked factor a cook would recognise (between a fifth and a half)', cookedBasis.length >= 12 && cookedBasis.every(([, v]) => v.perCooked >= 0.2 && v.perCooked <= 0.5), cookedBasis.filter(([, v]) => !(v.perCooked >= 0.2 && v.perCooked <= 0.5)))
+  check('a dry or raw twin is bought as written (factor 1) on a row that exists, under that row\'s own name',
+    twins.length >= 11 && twins.every(([, v]) => v.perCooked === 1 && FOOD_DB.some(f => f.name === v.key) && resolveGroceryTarget(v.key!).displayName === v.name),
+    twins.filter(([, v]) => !(v.perCooked === 1 && FOOD_DB.some(f => f.name === v.key) && resolveGroceryTarget(v.key!).displayName === v.name)))
+  check('"75g dry pasta" is on the pasta row at 75 g; cooked pasta on the same row at its bag weight',
+    resolveGroceryTarget('dry pasta').canonicalKey === resolveGroceryTarget('pasta').canonicalKey && resolveGroceryTarget('dry pasta').asBoughtPerRecipeGram === 1 && resolveGroceryTarget('pasta').asBoughtPerRecipeGram < 0.5,
+    [resolveGroceryTarget('dry pasta').canonicalKey, resolveGroceryTarget('pasta').canonicalKey])
   check('every food whose database name says "cooked" has an as-bought entry', FOOD_DB.filter(f => /\bcooked\b/.test(f.name)).every(f => !!AS_BOUGHT[f.name]), FOOD_DB.filter(f => /\bcooked\b/.test(f.name) && !AS_BOUGHT[f.name]).map(f => f.name))
   check('no shopping name anywhere says "cooked"', !names.some(n => /\bcooked\b/.test(n)), names.filter(n => /\bcooked\b/.test(n)))
 

@@ -133,21 +133,26 @@ console.log('\n4. The same words resolve to the same food')
     ['cannellini beans', 'cannellini beans'],
     ['brown lentils', 'brown lentils'],
     ['pancake mix', 'pancake mix'],
-    ['chocolate rice cake', 'rice cakes'],       // stored plural: only the coach's copy folded it
+    // Its own entry since 11 Oct 2026; it was costed as a PLAIN rice cake.
+    ['chocolate rice cake', 'chocolate rice cakes'], // stored plural: only the coach's copy folded it
     ['rice cake', 'rice cakes'],
-    // AGREEMENT ONLY (undefined = "the same in both, whatever it is"). These
-    // three disagreed on 9 Oct, and what they resolve to today is not right
-    // either — "potatoes" reaches mashed potato through an alias. That is the
-    // name matcher's problem (docs/plans/ingredient-lookup-truth.md), and
-    // pinning today's answer here would enforce it.
-    ['potatoes', undefined],                     // -oes plural: only the app copy had the rule
-    ['seitan-based strips', undefined],          // punctuation to a space: only the app copy
-    ['blueberry pancakes with berries', undefined],
+    // These three were "agreement only" until 11 Oct 2026, because what they
+    // resolved to was wrong ("potatoes" was mashed potato, with its dairy).
+    // The lookup plan is built (docs/plans/ingredient-lookup-truth.md), so
+    // they are pinned answers now.
+    ['potatoes', 'potato boiled'],               // -oes plural: only the app copy had the rule
+    ['seitan-based strips', 'seitan strips'],    // punctuation to a space: only the app copy
+    ['blueberry pancakes with berries', null],   // "with" joins two foods: a dish, so a miss
     // ...and everyday names, so a regression in either pass shows here.
     ['eggs', 'egg'], ['scrambled egg', 'egg'], ['bread', 'white bread'], ['whole milk', 'milk whole'],
     ['grilled chicken breast fillet', 'chicken breast'], ['cooked white rice', 'white rice cooked'],
     ['scallions', 'spring onion'], ['greek yoghurt 0%', 'greek yoghurt 0%'], ['butter', 'butter'],
-    ['sausage', 'pork sausage'], ['xyzzy powder', null], ['latte', null], ['', null],
+    // Bare "sausage" is a miss since 11 Oct 2026: pork and vegan sausage differ
+    // on meat, so the app does not guess which (plan, rule 5).
+    ['sausage', null], ['xyzzy powder', null], ['', null],
+    // A latte has its own row since 11 Oct 2026 (it was a miss once the stricter lookup stopped
+    // reading it as milk); a latte made with another milk is still a miss, never the dairy row.
+    ['latte', 'latte whole milk'], ['oat milk latte', null],
   ]
   for (const [phrase, expected] of PHRASES) {
     const a = app.lookupIngredient(phrase)?.name ?? null
@@ -192,31 +197,39 @@ console.log('\n5. The same meal comes to the same numbers')
   check('the app\'s and coach\'s 2 rice cakes are counted at all', cake.kcal > 40 && cake.unmatched.length === 0 && app.computeMealMacros([{ name: 'chocolate rice cake', quantity: 2, unit: 'whole' }]).kcal === cake.kcal, cake)
 }
 
-console.log('\n6. Merging the two files did not loosen the diet check')
+console.log('\n6. One lookup, and a dish is a miss for the diet check too')
 {
-  // The merge brought the coach's extra singular keys into the app ("prawn"
-  // for "prawns"), which is what lets "chocolate rice cake" be costed. On the
-  // DIET check a new match is a weaker answer — unresolved is refused for
-  // every restriction, resolved is judged by one entry's tags — so that check
-  // keeps reading the names exactly as stored. Measured on the day: 238,194
-  // verdicts (10,827 phrases x 22 restrictions), none changed.
-  const DISHES: [string, string, string][] = [
-    ['prawn cocktail', 'prawns', 'egg-free'],        // mayonnaise is egg; plain prawns are not
-    ['sausage roll', 'pork sausage', 'dairy-free'],  // pastry is butter; a plain sausage is not
-    ['peanut sauce', 'peanuts', 'gluten-free'],      // soy sauce is wheat; plain peanuts are not
-    ['date syrup', 'dates', 'low-carb'],
+  // From 9 to 11 Oct 2026 the diet check read the names "exactly as stored",
+  // because the costing lookup's extra singular keys turned dishes into one
+  // of their ingredients ("prawn cocktail" became plain prawns, judged by its
+  // tags, where the diet check had refused it as unresolved). The lookup now
+  // refuses any line with a word it cannot account for, so the dish is a miss
+  // in the ONE lookup, refused for every restriction, and the diet check reads
+  // that lookup again (docs/plans/ingredient-lookup-truth.md, 10b).
+  const DISHES: [string, string][] = [
+    ['prawn cocktail', 'egg-free'],        // mayonnaise is egg; plain prawns are not
+    ['sausage roll', 'dairy-free'],        // pastry is butter; a plain sausage is not
+    ['peanut sauce', 'gluten-free'],       // soy sauce is wheat; plain peanuts are not
+    ['date syrup', 'low-carb'],
+    ['chicken caesar wrap', 'vegetarian'], // was an empty tortilla, which PASSED vegetarian
+    ['almond-crusted cod', 'nut-free'],    // was plain cod, which PASSED nut-free
   ]
-  for (const [dish, widerReading, restriction] of DISHES) {
-    check(`the costing lookup reads "${dish}" as ${widerReading} (the wider reading exists)`, app.lookupIngredient(dish)?.name === widerReading, app.lookupIngredient(dish)?.name)
-    check(`...the diet check's lookup does not resolve it`, app.lookupIngredientAsStored(dish) === null, app.lookupIngredientAsStored(dish)?.name)
+  for (const [dish, restriction] of DISHES) {
+    check(`"${dish}" is a miss in the one lookup (app and coach)`, app.lookupIngredient(dish) === null && coach.lookupIngredient(dish) === null, app.lookupIngredient(dish)?.name)
     const verdict = validateMealAgainstDiet([{ name: dish, quantity: 100, unit: 'g' }], [restriction])
-    check(`...so "${dish}" is still refused for ${restriction}, as it was before the merge`, verdict.ok === false && /could not be resolved/.test(verdict.violations[0]?.reason ?? ''), verdict)
+    check(`...so "${dish}" is refused for ${restriction} as unresolved`, verdict.ok === false && /could not be resolved/.test(verdict.violations[0]?.reason ?? ''), verdict)
   }
-  check('the as-stored lookup still finds what is stored: "prawns", "rice cakes", "grilled chicken breast fillet"',
-    app.lookupIngredientAsStored('prawns')?.name === 'prawns' && app.lookupIngredientAsStored('rice cakes')?.name === 'rice cakes' && app.lookupIngredientAsStored('grilled chicken breast fillet')?.name === 'chicken breast')
+  // The seitan finding (tracer D): bare "chicken" resolved to seitan strips,
+  // so an ingredient line "chicken" PASSED vegetarian and vegan.
+  for (const pref of ['vegetarian', 'vegan']) {
+    const v = validateMealAgainstDiet([{ name: 'chicken', quantity: 100, unit: 'g' }], [pref])
+    check(`a line saying just "chicken" is refused for ${pref}`, v.ok === false, v)
+  }
+  check('"vegan sausages" is the vegan sausage, not pork', app.lookupIngredient('vegan sausages')?.name === 'vegan sausage', app.lookupIngredient('vegan sausages')?.name)
+  check('the one lookup still finds what is stored: "prawns", "rice cakes", "grilled chicken breast fillet"',
+    app.lookupIngredient('prawns')?.name === 'prawns' && app.lookupIngredient('rice cakes')?.name === 'rice cakes' && app.lookupIngredient('grilled chicken breast fillet')?.name === 'chicken breast')
   const dietSrc = readFileSync(join(ROOT, 'src/lib/diet-rules.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-  check('the diet rules call the as-stored lookup, and only that one',
-    /\blookupIngredientAsStored\(/.test(dietSrc) && !/\blookupIngredient\(/.test(dietSrc))
+  check('the diet rules call the one lookup, and there is no second "as stored" one', /\blookupIngredient\(/.test(dietSrc) && !/AsStored/.test(dietSrc) && typeof (app as Record<string, unknown>).lookupIngredientAsStored === 'undefined')
 }
 
 console.log(`\n${ran} checks ran.`)

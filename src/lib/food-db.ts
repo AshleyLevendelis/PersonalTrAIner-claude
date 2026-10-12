@@ -137,16 +137,16 @@ export const FOOD_DB: FoodEntry[] = [
   f('pork chop', ['pork chops', 'pork loin chop'], { kcal: 231, protein: 27, carbs: 0, fat: 13 }, 'protein', { contains_meat: true, contains_pork: true }),
   f('pork loin', ['pork tenderloin', 'pork fillet'], { kcal: 143, protein: 26, carbs: 0, fat: 3.5 }, 'protein', { contains_meat: true, contains_pork: true }),
   f('pork mince', ['ground pork', 'minced pork'], { kcal: 200, protein: 20, carbs: 0, fat: 13 }, 'protein', { contains_meat: true, contains_pork: true }),
-  f('bacon', ['bacon rashers', 'streaky bacon', 'back bacon'], { kcal: 337, protein: 25, carbs: 0.5, fat: 26 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
+  f('bacon', ['bacon rashers', 'streaky bacon', 'back bacon', 'bacon medallions'], { kcal: 337, protein: 25, carbs: 0.5, fat: 26 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('gammon', ['gammon steak', 'ham steak'], { kcal: 145, protein: 24, carbs: 0.5, fat: 5 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('ham', ['sliced ham', 'deli ham'], { kcal: 107, protein: 18, carbs: 1.5, fat: 3 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('chorizo', ['chorizo sausage'], { kcal: 455, protein: 24, carbs: 1.9, fat: 38 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
-  f('pork sausage', ['sausages', 'pork sausages', 'breakfast sausage'], { kcal: 296, protein: 13, carbs: 8, fat: 24 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, contains_gluten: true }),
+  f('pork sausage', ['pork sausages', 'breakfast sausage'], { kcal: 296, protein: 13, carbs: 8, fat: 24 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, contains_gluten: true }),
 
   // ===== PROTEIN: fish & seafood ======================================
   f('salmon', ['salmon fillet', 'baked salmon', 'grilled salmon'], { kcal: 208, protein: 20, carbs: 0, fat: 13 }, 'protein', { contains_fish: true }),
   f('smoked salmon', [], { kcal: 142, protein: 18, carbs: 0, fat: 4.5 }, 'protein', { contains_fish: true, is_processed_meat: false }),
-  f('tuna canned in water', ['canned tuna', 'tuna in water', 'tinned tuna'], { kcal: 116, protein: 26, carbs: 0, fat: 0.8 }, 'protein', { contains_fish: true }),
+  f('tuna canned in water', ['canned tuna', 'tuna in water', 'tinned tuna', 'tuna in spring water'], { kcal: 116, protein: 26, carbs: 0, fat: 0.8 }, 'protein', { contains_fish: true }),
   f('tuna steak fresh', ['fresh tuna', 'tuna steak', 'seared tuna'], { kcal: 144, protein: 23.3, carbs: 0, fat: 5 }, 'protein', { contains_fish: true }),
   f('cod', ['cod fillet', 'baked cod'], { kcal: 105, protein: 23, carbs: 0, fat: 0.9 }, 'protein', { contains_fish: true }),
   f('haddock', ['haddock fillet'], { kcal: 99, protein: 22.8, carbs: 0, fat: 0.7 }, 'protein', { contains_fish: true }),
@@ -160,16 +160,21 @@ export const FOOD_DB: FoodEntry[] = [
   f('squid', ['calamari'], { kcal: 92, protein: 15.6, carbs: 3.1, fat: 1.4 }, 'protein', { contains_shellfish: true }),
 
   // ===== PROTEIN: eggs & dairy protein ================================
-  f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }, { avgGrams: 58, label: 'egg' }),
-  f('egg white', ['egg whites'], { kcal: 52, protein: 11, carbs: 0.7, fat: 0.2 }, 'protein', { contains_egg: true }, { medium: 33, large: 38 }),
+  f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg', 'hard boiled egg', 'soft boiled egg', 'poached egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }, { avgGrams: 58, label: 'egg' }),
+  f('egg white', ['egg whites', 'liquid egg whites', 'liquid egg white'], { kcal: 52, protein: 11, carbs: 0.7, fat: 0.2 }, 'protein', { contains_egg: true }, { medium: 33, large: 38 }),
   f('egg yolk', ['egg yolks'], { kcal: 322, protein: 16, carbs: 3.6, fat: 27 }, 'protein', { contains_egg: true }, { medium: 17, large: 20 }),
-  f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
+  f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt', 'greek yoghurt', 'fat free greek yoghurt', '0% greek yoghurt'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
   f('greek yoghurt full fat', ['greek yogurt', 'full fat greek yoghurt', 'greek style yoghurt'], { kcal: 97, protein: 9, carbs: 4, fat: 5 }, 'dairy', { contains_dairy: true }),
   f('natural yoghurt', ['plain yoghurt', 'natural yogurt', 'low fat yogurt', 'low fat yoghurt'], { kcal: 61, protein: 4.3, carbs: 4.7, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('cottage cheese', [], { kcal: 98, protein: 11, carbs: 3.4, fat: 4.3 }, 'dairy', { contains_dairy: true }),
   f('ricotta cheese', ['ricotta', 'light ricotta cheese', 'light ricotta'], { kcal: 174, protein: 11, carbs: 3, fat: 13 }, 'dairy', { contains_dairy: true }),
-  f('whey protein powder', ['protein powder', 'whey protein', 'whey isolate'], { kcal: 380, protein: 80, carbs: 8, fat: 5 }, 'protein', { contains_dairy: true }, { scoop: 30 }),
+  f('whey protein powder', ['protein powder', 'whey protein', 'whey isolate', 'vanilla whey protein', 'chocolate whey protein'], { kcal: 380, protein: 80, carbs: 8, fat: 5 }, 'protein', { contains_dairy: true }, { scoop: 30 }),
   f('milk whole', ['whole milk', 'full fat milk'], { kcal: 61, protein: 3.2, carbs: 4.8, fat: 3.3 }, 'dairy', { contains_dairy: true }),
+  // 11 Oct 2026: a latte was read as whole milk by the old lookup, which threw "latte" away; the stricter
+  // one refuses the word, so "a large latte" in chat became "I don't know it". DERIVED from the row above,
+  // not looked up: about 85% whole milk by weight, the rest espresso (near 0 kcal). No size of its own, so
+  // "a large latte" is asked about. "oat milk latte" is NOT this (oat is not a harmless word) and stays a miss.
+  f('latte whole milk', ['latte', 'cafe latte', 'caffe latte'], { kcal: 52, protein: 2.7, carbs: 4.1, fat: 2.8 }, 'dairy', { contains_dairy: true }),
   f('milk skimmed', ['skimmed milk', 'skim milk', 'fat free milk'], { kcal: 34, protein: 3.4, carbs: 5, fat: 0.1 }, 'dairy', { contains_dairy: true }),
   f('milk semi skimmed', ['semi skimmed milk', 'semi-skimmed milk', '2% milk'], { kcal: 46, protein: 3.4, carbs: 4.7, fat: 1.7 }, 'dairy', { contains_dairy: true }),
   f('cheddar cheese', ['cheddar', 'grated cheddar'], { kcal: 404, protein: 25, carbs: 0.1, fat: 34 }, 'dairy', { contains_dairy: true }),
@@ -229,7 +234,7 @@ export const FOOD_DB: FoodEntry[] = [
   // recipe). Here so "french toast" never resolves to plain bread above.
   f('french toast', ['eggy bread'], { kcal: 229, protein: 7.7, carbs: 25, fat: 10.8 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true, contains_egg: true, contains_dairy: true }, { slice: 65 }),
   f('bagel', ['plain bagel'], { kcal: 257, protein: 10, carbs: 50, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 95 }, { avgGrams: 95, label: 'bagel' }),
-  f('tortilla wrap', ['flour tortilla', 'wrap', 'tortilla'], { kcal: 310, protein: 8.4, carbs: 50, fat: 8 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
+  f('tortilla wrap', ['flour tortilla', 'wrap', 'tortilla', 'wholemeal wrap', 'wholemeal tortilla', 'whole wheat tortilla'], { kcal: 310, protein: 8.4, carbs: 50, fat: 8 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
   f('corn tortilla', [], { kcal: 218, protein: 5.7, carbs: 44, fat: 2.8 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 26 }),
   f('pitta bread', ['pita bread', 'pitta'], { kcal: 275, protein: 9.1, carbs: 56, fat: 1.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
   f('couscous cooked', ['couscous'], { kcal: 112, protein: 3.8, carbs: 23, fat: 0.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
@@ -244,7 +249,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('bulgur wheat cooked', ['bulgur wheat', 'bulgur'], { kcal: 83, protein: 3.1, carbs: 18.6, fat: 0.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('polenta cooked', ['polenta'], { kcal: 85, protein: 2, carbs: 18, fat: 0.5 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('breadcrumbs', ['panko breadcrumbs'], { kcal: 395, protein: 13, carbs: 72, fat: 5.3 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
-  f('plain flour', ['flour', 'all purpose flour'], { kcal: 364, protein: 10, carbs: 76, fat: 1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
+  f('plain flour', ['flour', 'all purpose flour', 'wholemeal flour', 'whole wheat flour', 'self raising flour'], { kcal: 364, protein: 10, carbs: 76, fat: 1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('rice cakes', [], { kcal: 387, protein: 8.2, carbs: 81, fat: 2.8 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 9 }),
   f('crackers', ['water crackers', 'wheat crackers'], { kcal: 421, protein: 9, carbs: 71, fat: 11 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('rye crispbread', ['rye crispbreads', 'crispbread', 'crispbreads'], { kcal: 321, protein: 9.9, carbs: 71, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
@@ -259,7 +264,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('avocado', [], { kcal: 160, protein: 2, carbs: 8.5, fat: 14.7 }, 'fruit', {}, { whole: 150, half: 75 }, { avgGrams: 150, label: 'avocado' }),
   f('almonds', ['almond'], { kcal: 579, protein: 21.2, carbs: 22, fat: 49.9 }, 'fat', { contains_nuts: true }),
   f('walnuts', ['walnut', 'walnut halves'], { kcal: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, 'fat', { contains_nuts: true }),
-  f('cashews', ['cashew nuts'], { kcal: 553, protein: 18.2, carbs: 30.2, fat: 43.9 }, 'fat', { contains_nuts: true }),
+  f('cashews', ['cashew nuts', 'cashew nut'], { kcal: 553, protein: 18.2, carbs: 30.2, fat: 43.9 }, 'fat', { contains_nuts: true }),
   f('peanuts', [], { kcal: 567, protein: 25.8, carbs: 16.1, fat: 49.2 }, 'fat', { contains_nuts: true }), // see 'peanut butter' above for why this is true, not false
   f('mixed nuts', [], { kcal: 607, protein: 20, carbs: 19, fat: 54 }, 'fat', { contains_nuts: true }),
   f('pistachios', [], { kcal: 560, protein: 20.6, carbs: 27.2, fat: 45.3 }, 'fat', { contains_nuts: true }),
@@ -279,8 +284,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('tomato', ['tomatoes', 'fresh tomato'], { kcal: 18, protein: 0.9, carbs: 3.9, fat: 0.2 }, 'veg', {}),
   f('cherry tomatoes', [], { kcal: 18, protein: 0.9, carbs: 3.9, fat: 0.2 }, 'veg', {}),
   f('cucumber', [], { kcal: 15, protein: 0.7, carbs: 3.6, fat: 0.1 }, 'veg', {}),
-  f('bell pepper', ['pepper', 'red pepper', 'bell peppers', 'capsicum'], { kcal: 31, protein: 1, carbs: 6, fat: 0.3 }, 'veg', {}),
-  f('onion', ['onions', 'red onion', 'white onion'], { kcal: 40, protein: 1.1, carbs: 9.3, fat: 0.1 }, 'veg', { is_high_fodmap: true }),
+  f('bell pepper', ['pepper', 'red pepper', 'bell peppers', 'capsicum', 'green pepper', 'yellow pepper', 'orange pepper'], { kcal: 31, protein: 1, carbs: 6, fat: 0.3 }, 'veg', {}),
+  f('onion', ['onions', 'red onion', 'white onion', 'brown onion', 'yellow onion'], { kcal: 40, protein: 1.1, carbs: 9.3, fat: 0.1 }, 'veg', { is_high_fodmap: true }),
   f('garlic', ['garlic clove', 'garlic cloves'], { kcal: 149, protein: 6.4, carbs: 33, fat: 0.5 }, 'veg', { is_high_fodmap: true }, { clove: 3 }),
   f('carrot', ['carrots'], { kcal: 41, protein: 0.9, carbs: 9.6, fat: 0.2 }, 'veg', {}),
   f('courgette', ['zucchini'], { kcal: 17, protein: 1.2, carbs: 3.1, fat: 0.3 }, 'veg', {}),
@@ -321,11 +326,11 @@ export const FOOD_DB: FoodEntry[] = [
   f('lime', ['lime juice'], { kcal: 30, protein: 0.7, carbs: 10.5, fat: 0.2 }, 'fruit', {}),
 
   // ===== CONDIMENTS / SAUCES / MISC ===================================
-  f('soy sauce', [], { kcal: 53, protein: 8, carbs: 4.9, fat: 0.6 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 18 }),
+  f('soy sauce', ['light soy sauce', 'dark soy sauce', 'reduced salt soy sauce', 'low sodium soy sauce'], { kcal: 53, protein: 8, carbs: 4.9, fat: 0.6 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 18 }),
   f('tamari', ['gluten free soy sauce'], { kcal: 60, protein: 10, carbs: 5.6, fat: 0 }, 'condiment', { contains_soy: true }, { tbsp: 18 }),
   f('mayonnaise', ['mayo'], { kcal: 680, protein: 1, carbs: 1.3, fat: 75 }, 'condiment', { contains_egg: true }, { tbsp: 14 }),
   f('ketchup', ['tomato ketchup'], { kcal: 101, protein: 1.2, carbs: 24, fat: 0.1 }, 'condiment', { is_refined_sugar: true }, { tbsp: 17 }),
-  f('mustard', ['dijon mustard', 'english mustard'], { kcal: 66, protein: 4.4, carbs: 5, fat: 3.3 }, 'condiment', { contains_mustard: true }, { tbsp: 16 }),
+  f('mustard', ['dijon mustard', 'english mustard', 'wholegrain mustard'], { kcal: 66, protein: 4.4, carbs: 5, fat: 3.3 }, 'condiment', { contains_mustard: true }, { tbsp: 16 }),
   f('bbq sauce', ['barbecue sauce'], { kcal: 172, protein: 1, carbs: 40, fat: 0.5 }, 'condiment', { is_refined_sugar: true }, { tbsp: 17 }),
   f('sriracha', ['hot sauce'], { kcal: 93, protein: 1.9, carbs: 19, fat: 0.9 }, 'condiment', {}, { tbsp: 17 }),
   f('honey', [], { kcal: 304, protein: 0.3, carbs: 82, fat: 0 }, 'condiment', { contains_honey: true, is_refined_sugar: true }, { tbsp: 21, tsp: 7 }),
@@ -336,7 +341,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('salsa', [], { kcal: 36, protein: 1.3, carbs: 7, fat: 0.3 }, 'condiment', { is_high_fodmap: true }),
   f('pesto', ['basil pesto'], { kcal: 303, protein: 4, carbs: 4, fat: 30 }, 'condiment', { contains_dairy: true, contains_nuts: true }, { tbsp: 16 }),
   f('tomato passata', ['passata'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
-  f('chopped tomatoes canned', ['tinned tomatoes', 'canned tomatoes'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
+  f('chopped tomatoes canned', ['tinned tomatoes', 'canned tomatoes', 'chopped tomatoes', 'tinned chopped tomatoes'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
   f('marinara sauce', ['marinara'], { kcal: 42, protein: 1.5, carbs: 7, fat: 1 }, 'condiment', {}),
   f('curry paste', ['thai curry paste', 'tikka paste'], { kcal: 168, protein: 3, carbs: 12, fat: 12 }, 'condiment', { is_high_fodmap: true }, { tbsp: 20 }),
   f('coconut cream', [], { kcal: 330, protein: 3.6, carbs: 6.7, fat: 34 }, 'fat', {}),
@@ -464,9 +469,9 @@ export const FOOD_DB: FoodEntry[] = [
   f('apple cider vinegar', [], { kcal: 22, protein: 0, carbs: 0.9, fat: 0 }, 'condiment', {}, { tbsp: 15 }),
   f('cornflour', ['cornstarch'], { kcal: 381, protein: 0.3, carbs: 91, fat: 0.1 }, 'condiment', { is_high_carb: true }),
   f('curry powder', [], { kcal: 325, protein: 14, carbs: 55, fat: 14 }, 'condiment', {}),
-  f('paprika', [], { kcal: 282, protein: 14, carbs: 54, fat: 13 }, 'condiment', {}),
-  f('cinnamon', [], { kcal: 247, protein: 4, carbs: 81, fat: 1.2 }, 'condiment', {}),
-  f('cumin', [], { kcal: 375, protein: 18, carbs: 44, fat: 22 }, 'condiment', {}),
+  f('paprika', ['smoked paprika', 'sweet paprika'], { kcal: 282, protein: 14, carbs: 54, fat: 13 }, 'condiment', {}),
+  f('cinnamon', ['ground cinnamon'], { kcal: 247, protein: 4, carbs: 81, fat: 1.2 }, 'condiment', {}),
+  f('cumin', ['ground cumin'], { kcal: 375, protein: 18, carbs: 44, fat: 22 }, 'condiment', {}),
   f('black pepper', [], { kcal: 251, protein: 10, carbs: 64, fat: 3.3 }, 'condiment', {}),
   f('vanilla extract', [], { kcal: 288, protein: 0.1, carbs: 12.7, fat: 0.1 }, 'condiment', { contains_alcohol: true }, { tsp: 4 }),
 
@@ -533,13 +538,75 @@ export const FOOD_DB: FoodEntry[] = [
   f('peanut oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', { contains_nuts: true }, { tbsp: 14, tsp: 4.5 }),
   f('safflower oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', {}, { tbsp: 14, tsp: 4.5 }),
   f('red snapper', ['red snapper fillet'], { kcal: 100, protein: 20.5, carbs: 0, fat: 1.3 }, 'protein', { contains_fish: true }),
-  f('beef broth', ['beef bone broth', 'beef stock'], { kcal: 15, protein: 2.5, carbs: 0.5, fat: 0.3 }, 'condiment', {}),
-  f('chicken broth', ['chicken stock'], { kcal: 12, protein: 1.5, carbs: 0.9, fat: 0.3 }, 'condiment', {}),
+  f('beef broth', ['beef bone broth', 'beef stock'], { kcal: 15, protein: 2.5, carbs: 0.5, fat: 0.3 }, 'condiment', { contains_meat: true }),
+  // MEAT STOCK IS MEAT (11 Oct 2026). Both broths carried no tag at all, so a
+  // vegetarian or vegan meal with chicken stock in it passed the diet check.
+  // Found by the lookup change's own measurement (the plan's section 10d).
+  f('chicken broth', ['chicken stock'], { kcal: 12, protein: 1.5, carbs: 0.9, fat: 0.3 }, 'condiment', { contains_meat: true }),
   f('rice paper wrappers', ['rice paper'], { kcal: 333, protein: 0.7, carbs: 82, fat: 0.2 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 10 }),
   f('injera flatbread', ['injera'], { kcal: 220, protein: 7, carbs: 45, fat: 1.5 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('calamansi juice', ['calamansi'], { kcal: 29, protein: 0.5, carbs: 9.5, fat: 0.2 }, 'fruit', {}),
   f('water', ['warm water', 'cold water', 'boiling water'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'other', {}),
   f('black coffee', ['coffee', 'cold brew coffee', 'brewed coffee', 'filter coffee'], { kcal: 1, protein: 0.1, carbs: 0, fat: 0 }, 'other', {}),
+
+  // ===== THE SAME FOOD IN ANOTHER STATE (11 Oct 2026) =====================
+  // docs/plans/ingredient-lookup-truth.md, rule 6. "37g dry penne pasta" was
+  // costed as 37 g of COOKED pasta (11.5 g of carbs where dry pasta has about
+  // 28), and "raw chicken breast" as cooked breast (31 g protein per 100 g
+  // where raw has 22.5), because the lookup threw the word "dry" or "raw" away.
+  // A line that names a state now reaches that state's own entry or nothing
+  // (STATE_TWINS below). Figures per 100 g as recalled from USDA FoodData
+  // Central (SR Legacy), cited by food so a wrong one is a one-line change;
+  // the dry grain kcal are the same ones AS_BOUGHT (grocery-store.ts) already
+  // uses to turn cooked grams into bag grams, so the two cannot disagree.
+  f('pasta dry', ['dry pasta', 'dried pasta', 'uncooked pasta'], { kcal: 371, protein: 13, carbs: 74.7, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }), // USDA 20120 pasta, dry, unenriched
+  f('wholewheat pasta dry', ['dry wholewheat pasta', 'dry whole wheat pasta'], { kcal: 348, protein: 14.6, carbs: 75, fat: 1.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }), // USDA 20124 spaghetti, whole-wheat, uncooked
+  f('white rice dry', ['dry white rice', 'uncooked white rice', 'uncooked rice', 'dry rice'], { kcal: 365, protein: 7.1, carbs: 80, fat: 0.7 }, 'carb', { is_grain: true, is_high_carb: true }), // USDA 20444 rice, white, long-grain, raw
+  f('brown rice dry', ['dry brown rice', 'uncooked brown rice'], { kcal: 367, protein: 7.5, carbs: 76.2, fat: 3.2 }, 'carb', { is_grain: true, is_high_carb: true }), // USDA 20036 rice, brown, long-grain, raw
+  f('basmati rice dry', ['dry basmati rice', 'uncooked basmati rice'], { kcal: 356, protein: 8.1, carbs: 78, fat: 0.6 }, 'carb', { is_grain: true, is_high_carb: true }), // UK pack, basmati, dry (Tilda) as recalled
+  f('couscous dry', ['dry couscous', 'uncooked couscous'], { kcal: 376, protein: 12.8, carbs: 77.4, fat: 0.6 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }), // USDA 20028 couscous, dry
+  f('quinoa dry', ['dry quinoa', 'uncooked quinoa'], { kcal: 368, protein: 14.1, carbs: 64.2, fat: 6.1 }, 'carb', { is_grain: true, is_high_carb: true }), // USDA 20035 quinoa, uncooked
+  f('egg noodles dry', ['dry egg noodles', 'dried egg noodles'], { kcal: 384, protein: 14.2, carbs: 71.3, fat: 4.4 }, 'carb', { is_grain: true, contains_egg: true, contains_gluten: true, is_high_carb: true }), // USDA 20109 noodles, egg, dry
+  f('rice noodles dry', ['dry rice noodles', 'dried rice noodles'], { kcal: 364, protein: 6, carbs: 80.2, fat: 0.6 }, 'carb', { is_grain: true, is_high_carb: true }), // USDA 20133 rice noodles, dry
+  f('red lentils dry', ['dry red lentils', 'dried red lentils'], { kcal: 352, protein: 24.6, carbs: 63.4, fat: 1.1 }, 'protein', { is_legume: true, is_high_carb: true }), // USDA 16069 lentils, raw
+  f('green lentils dry', ['dry green lentils', 'dried green lentils'], { kcal: 352, protein: 24.6, carbs: 63.4, fat: 1.1 }, 'protein', { is_legume: true, is_high_carb: true }), // USDA 16069 lentils, raw
+  f('chicken breast raw', ['raw chicken breast'], { kcal: 120, protein: 22.5, carbs: 0, fat: 2.6 }, 'protein', { contains_meat: true }), // USDA 05062 chicken breast, meat only, raw
+  f('chicken thigh raw', ['raw chicken thigh'], { kcal: 121, protein: 19.7, carbs: 0, fat: 4.1 }, 'protein', { contains_meat: true }), // USDA 05096 chicken thigh, meat only, raw
+  f('cod raw', ['raw cod'], { kcal: 82, protein: 17.8, carbs: 0, fat: 0.7 }, 'protein', { contains_fish: true }), // USDA 15015 cod, Atlantic, raw
+  f('prawns raw', ['raw prawns', 'raw king prawns', 'raw shrimp'], { kcal: 85, protein: 20.1, carbs: 0, fat: 0.5 }, 'protein', { contains_shellfish: true }), // USDA 15270 shrimp, raw
+  f('turkey breast raw', ['raw turkey breast'], { kcal: 114, protein: 23.7, carbs: 0, fat: 1.5 }, 'protein', { contains_meat: true }), // USDA turkey, breast, meat only, raw
+  f('pork loin raw', ['raw pork loin', 'raw pork tenderloin'], { kcal: 120, protein: 21, carbs: 0, fat: 3.5 }, 'protein', { contains_meat: true, contains_pork: true }), // USDA 10060 pork tenderloin, raw
+  f('haddock raw', ['raw haddock'], { kcal: 74, protein: 16.3, carbs: 0, fat: 0.5 }, 'protein', { contains_fish: true }), // USDA 15033 haddock, raw
+  // ===== A LIGHTER VERSION IS ANOTHER FOOD (11 Oct 2026) ====================
+  // "light mayonnaise" was costed as full mayonnaise (680 kcal per 100 g where
+  // light is about 240) because "light" was thrown away. A fat level now has to
+  // be named by an entry or the line is a miss; these are the ones a meal
+  // writer uses most.
+  f('mayonnaise light', ['light mayonnaise', 'reduced fat mayonnaise', 'low fat mayonnaise', 'light mayo'], { kcal: 238, protein: 0.4, carbs: 9.2, fat: 22.2 }, 'condiment', { contains_egg: true }, { tbsp: 15 }), // USDA salad dressing, mayonnaise, light
+  f('cottage cheese low fat', ['low fat cottage cheese', 'reduced fat cottage cheese', 'light cottage cheese'], { kcal: 72, protein: 12.4, carbs: 2.7, fat: 1 }, 'dairy', { contains_dairy: true }), // USDA cheese, cottage, lowfat, 1% milkfat
+  f('cream cheese light', ['light cream cheese', 'low fat cream cheese', 'reduced fat cream cheese'], { kcal: 201, protein: 7.9, carbs: 8.1, fat: 15.3 }, 'dairy', { contains_dairy: true }), // USDA cheese, cream, low fat
+  f('mozzarella light', ['light mozzarella', 'reduced fat mozzarella', 'part skim mozzarella'], { kcal: 254, protein: 24.3, carbs: 2.8, fat: 15.9 }, 'dairy', { contains_dairy: true }), // USDA cheese, mozzarella, part skim milk
+  f('coconut milk light', ['light coconut milk', 'reduced fat coconut milk'], { kcal: 73, protein: 0.7, carbs: 1.7, fat: 7 }, 'fat', {}), // pack: typical light coconut milk label, as recalled
+  // "chocolate rice cake" is the snack the 8 Sep plural fix was written for; it
+  // used to be costed as a PLAIN rice cake. Milk chocolate is assumed (dairy,
+  // fail-safe) since the line rarely says which.
+  f('chocolate rice cakes', ['milk chocolate rice cakes', 'dark chocolate rice cakes'], { kcal: 480, protein: 7, carbs: 63, fat: 22 }, 'carb', { is_grain: true, is_high_carb: true, is_refined_sugar: true, contains_dairy: true, contains_soy: true }, { whole: 16 }), // pack: typical chocolate-topped rice cake label, as recalled
+  // ===== THE QUALIFIER IS THE FOOD (11 Oct 2026) ============================
+  // "oat flour" used to resolve to plain (wheat) flour and "coconut water" to
+  // water, because the first word was thrown away (M23; the plan's section D).
+  // Oat flour is tagged gluten ON PURPOSE (fail-safe): oats are milled beside
+  // wheat unless certified, and "oat flour" was refused for gluten-free before
+  // (as plain flour), so no verdict moves. Whether OATS pass gluten-free is
+  // Ashley's open question and is not touched here.
+  f('oat flour', [], { kcal: 404, protein: 14.7, carbs: 65.7, fat: 9.1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }), // USDA 20033 oat flour, partially debranned
+  f('almond flour', ['ground almonds', 'almond meal'], { kcal: 571, protein: 21.4, carbs: 21.4, fat: 50 }, 'fat', { contains_nuts: true }), // USDA 12061 (blanched almond flour, label figures)
+  f('coconut flour', [], { kcal: 400, protein: 19, carbs: 60, fat: 13 }, 'carb', {}), // pack: typical coconut flour label, as recalled
+  f('rice flour', ['white rice flour'], { kcal: 366, protein: 6, carbs: 80.1, fat: 1.4 }, 'carb', { is_grain: true, is_high_carb: true }), // USDA 20061 rice flour, white
+  f('coconut water', [], { kcal: 19, protein: 0.7, carbs: 3.7, fat: 0.2 }, 'other', {}), // USDA 12119 coconut water
+  f('water chestnuts', ['canned water chestnuts'], { kcal: 50, protein: 1.1, carbs: 12.3, fat: 0.1 }, 'veg', {}), // USDA 11591 water chestnuts, canned, solids
+  // A seasoning a method names had no entry at all, so the check on recipe
+  // steps could not see it (M19: the prawn salad's "chilli flakes").
+  f('chilli flakes', ['chili flakes', 'red pepper flakes', 'crushed chillies', 'crushed red pepper', 'dried chilli flakes'], { kcal: 314, protein: 12, carbs: 50, fat: 17 }, 'condiment', {}, { tsp: 1.5 }), // USDA 02031 pepper, red or cayenne
 ]
 
 // ---------------------------------------------------------------------------
@@ -560,8 +627,22 @@ function normalize(s: string): string {
   // adjacent words into unmatchable tokens ("seitan-based" -> "seitanbased",
   // "boiled/instant" -> "boiledinstant"), which made every hyphenated or
   // slash-separated ingredient name an automatic lookup miss.
+  //
+  // ONE SPELLING PER WORD (11 Oct 2026): "chilli" and "chili" are one word
+  // (chilli flakes, chili powder, sweet chili sauce). Both sides of every
+  // comparison go through here, so folding the word once is enough.
+  // "yogurt"/"yoghurt" is deliberately NOT folded: in this table "greek
+  // yogurt" is the FULL-FAT entry and "greek yoghurt" has always reached the
+  // 0% one, so folding them would re-cost every Greek yoghurt in every meal.
+  // That disagreement is recorded in BACKLOG (11 Oct) rather than settled here.
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+    .split(' ').map(w => SPELLINGS[w] ?? w).join(' ')
+}
+
+/** British and American spellings of one word -> the one this table uses. */
+const SPELLINGS: Record<string, string> = {
+  chili: 'chilli', chilis: 'chillies', chilies: 'chillies', chiles: 'chillies',
 }
 
 // ---------------------------------------------------------------------------
@@ -674,34 +755,138 @@ for (const entry of FOOD_DB) {
 // 2026, while the count fix and nine foods lived only in this one. The two
 // are now one file (see the header), so a fix cannot land on one side again.
 //
-// AND IT IS KEPT OFF THE DIET CHECK, ON PURPOSE. A food the diet check cannot
-// resolve is refused for every restriction (diet-rules.ts fails closed); a
-// food it CAN resolve is judged by that one entry's tags. Measured the day
-// the files were merged: with these extra keys 88 phrases in a 10,827-phrase
-// corpus stop being a miss, and some of them are dishes — "prawn cocktail"
-// becomes prawns, "sausage roll" becomes pork sausage, "peanut sauce" becomes
-// peanuts. For costing a meal that is the 9 Sep fix working. For an allergy it
-// would turn "refused" into "judged as plain prawns", which is weaker, and
-// dietary enforcement does not change without a written plan
-// (docs/plans/ingredient-lookup-truth.md). So the names exactly as stored are
-// kept too, and the diet check reads those: lookupIngredientAsStored.
-const LOOKUP_AS_STORED = new Map(LOOKUP)
+// THE DIET CHECK READS THIS TOO, SINCE 11 OCT 2026. From 9 Oct it read the
+// names exactly as stored (a separate "as stored" lookup), because with these
+// extra keys "prawn cocktail" became plain prawns and "sausage roll" pork
+// sausage — a dish judged as one ingredient, which is weaker than "cannot be
+// resolved, refused". The lookup below no longer lets a dish stand for one of
+// its ingredients (every word must be accounted for), so that reason is gone
+// and there is one lookup again (docs/plans/ingredient-lookup-truth.md, 10b).
+// (This block appeared twice after the 11 Oct merge; the second copy did
+// nothing and is gone.)
 for (const [key, entry] of [...LOOKUP]) {
   const folded = key.split(' ').map(depluralizeToken).join(' ')
   if (folded !== key && !LOOKUP.has(folded)) LOOKUP.set(folded, entry)
 }
 
-// PLURALS ON THE STORED SIDE TOO. lookupIngredient de-pluralises the QUERY as
-// a last resort, so "scallions" reaches "scallion" — but "rice cakes" is
-// stored plural, and "chocolate rice cake" never reached it: 8 Sep 2026,
-// every ingredient in a real snack came back unmatched in the coach and the
-// reply printed "roughly 0 kcal ... 0% of the meal by weight". Each key is also
-// indexed under its de-pluralised form when that form is free, so the
-// token-overlap pass can see it. (This fix lived only in the coach's copy until
-// the two files were made one, 1 Oct 2026.)
-for (const [key, entry] of [...LOOKUP]) {
-  const folded = key.split(' ').map(depluralizeToken).join(' ')
-  if (folded !== key && !LOOKUP.has(folded)) LOOKUP.set(folded, entry)
+// ---------------------------------------------------------------------------
+// ONE WORD THAT NAMES A KIND OF FOOD (11 Oct 2026; plan rule 5)
+// ---------------------------------------------------------------------------
+// Until today a bare "chicken", "rice" or "milk" was matched to whichever
+// LONGER name happened to contain it — luck, by insertion order, and once
+// dangerous: "chicken" was seitan ("meat free chicken pieces"), so a line
+// saying "chicken" passed the vegetarian and vegan checks. That pass is gone.
+//
+// A bare word now means a food only if it is listed here, and only where every
+// food it could plausibly mean carries the same allergen and diet tags, so
+// the guess can move the numbers a little and never a verdict. The target is
+// what the app already assumed before today, except "chicken" (seitan was the
+// unsafe answer; every chicken entry is meat). Deliberately NOT here, because
+// the foods a word covers differ on a tag: cheese and yoghurt (vegan versions
+// exist), sausage (pork or vegan), fish (fish sauce was the old answer),
+// cream, nuts, beans, burger, turkey/beef/pork/lamb on their own. Those are a
+// miss, which the coach asks about. Whether the app should assume the
+// commonest kind and SAY so, or ask, is Ashley's open question (plan, 10c).
+const GENERIC_NAMES: Record<string, string> = {
+  chicken: 'chicken breast', rice: 'white rice cooked', milk: 'milk whole', tuna: 'tuna canned in water',
+  mince: 'beef mince 5% fat', oil: 'olive oil', whey: 'whey protein powder',
+}
+for (const [word, target] of Object.entries(GENERIC_NAMES)) {
+  const entry = FOOD_DB.find(f => f.name === target)
+  if (entry && !LOOKUP.has(word)) LOOKUP.set(word, entry)
+}
+
+// ---------------------------------------------------------------------------
+// EVERY WORD MUST BE ACCOUNTED FOR (11 Oct 2026)
+// ---------------------------------------------------------------------------
+// The lookup used to keep the words it knew and throw the rest away, so a
+// DISH was costed and tagged as one of its ingredients ("chicken caesar wrap"
+// was an empty tortilla, 186 kcal; "almond-crusted cod" was cod, no nut tag),
+// a DRY food as its cooked form (M20), and a SHORT name as whichever longer
+// name contained it — bare "chicken" was seitan, so an ingredient line saying
+// "chicken" passed the vegetarian and vegan checks. Ashley's ruling, 9 Oct
+// 2026: "Build all four" (item 3). Plan: docs/plans/ingredient-lookup-truth.md.
+//
+// Now a known name found inside a longer phrase only counts when every word
+// left over is one of these: words that say how a food was prepared, cut or
+// sized, never which food it is. Anything else is a MISS, and a miss is the
+// safe answer: not counted in a meal's numbers, refused by the diet check for
+// every restriction, asked about by the coach. Kept short on purpose ("crusted"
+// must never be here, nor "with", "in" or "on", which join two foods); the
+// gate reads this list from the source, so nothing is added unseen.
+export const HARMLESS_WORDS: ReadonlySet<string> = new Set([
+  // how it was cooked or prepared
+  'grilled', 'baked', 'roasted', 'roast', 'steamed', 'boiled', 'poached', 'fried', 'pan', 'stir', 'seared', 'toasted',
+  'chopped', 'finely', 'roughly', 'diced', 'sliced', 'thinly', 'grated', 'shredded', 'crushed', 'cubed', 'halved',
+  'quartered', 'peeled', 'trimmed', 'drained', 'rinsed', 'beaten', 'melted', 'softened', 'chilled', 'cold', 'warm',
+  'shelled', 'deseeded', 'pitted', 'torn', 'flaked', 'heaped', 'level',
+  // which one, never what it is
+  'fresh', 'frozen', 'lean', 'extra', 'skinless', 'boneless', 'plain', 'ripe', 'large', 'medium', 'small', 'baby',
+  'whole', 'organic', 'free', 'range', 'unsalted', 'salted', 'unsweetened', 'smooth', 'crunchy', 'thick', 'thin', 'mini',
+  'minced', 'tinned', 'canned', 'mature', 'mild', 'tenderstem', 'sourdough', 'wholemeal', 'wholegrain',
+  // a cut or a piece of the same food
+  'fillet', 'strip', 'piece', 'chunk', 'floret', 'leaf', 'leaves', 'half', 'halves', 'slice', 'rasher', 'cube', 'wedge',
+  'segment', 'clove', 'sprig', 'stick', 'stalk', 'spear', 'ring', 'loin',
+  // glue and serving words
+  'of', 'the', 'a', 'an', 'some', 'into', 'to', 'for', 'garnish', 'serve', 'serving', 'optional', 'based',
+])
+
+/** "and" is harmless only BETWEEN two harmless words ("chopped and drained"); between two foods it means two foods. */
+const JOINING_WORD = 'and'
+
+export type FoodState = 'cooked' | 'dry' | 'raw'
+
+/**
+ * The state each entry's figures describe, where it matters. Only foods whose
+ * numbers change a lot between states are listed: a cooked grain, pasta or
+ * pulse against its dry weight (2.5-3x) and a cooked lean meat or fish against
+ * its raw weight (about 1.35x). Read off this table's own figures, `salmon`
+ * and both beef mince entries are RAW figures already, so they are not here
+ * and "raw salmon" was right all along. An entry with no state takes any state
+ * word ("cooked spinach", "raw honey") — except that DRIED fruit or veg is a
+ * different food (dried mango is five times the calories of fresh), so "dried"
+ * against fresh produce is a miss.
+ */
+const ENTRY_STATE: Record<string, FoodState> = {
+  'chicken breast': 'cooked', 'chicken thigh': 'cooked', 'chicken drumstick': 'cooked', 'turkey breast': 'cooked',
+  'beef steak sirloin': 'cooked', 'beef rump steak': 'cooked', 'lamb chop': 'cooked', 'pork chop': 'cooked', 'pork loin': 'cooked',
+  'cod': 'cooked', 'haddock': 'cooked', 'tilapia': 'cooked', 'sea bass': 'cooked', 'mackerel': 'cooked', 'prawns': 'cooked', 'mussels': 'cooked',
+  'chickpeas': 'cooked', 'lentils red': 'cooked', 'lentils green': 'cooked', 'brown lentils': 'cooked', 'black beans': 'cooked',
+  'kidney beans': 'cooked', 'pinto beans': 'cooked', 'butter beans': 'cooked', 'cannellini beans': 'cooked', 'haricot beans': 'cooked',
+  'gluten free pasta': 'cooked', 'oats': 'dry',
+}
+
+/** cooked entry -> its dry and raw twins. The twins' own state is set from this table when the module loads. */
+const STATE_TWINS: Record<string, { dry?: string; raw?: string }> = {
+  'pasta cooked': { dry: 'pasta dry' }, 'wholewheat pasta cooked': { dry: 'wholewheat pasta dry' },
+  'white rice cooked': { dry: 'white rice dry' }, 'brown rice cooked': { dry: 'brown rice dry' }, 'basmati rice cooked': { dry: 'basmati rice dry' },
+  'couscous cooked': { dry: 'couscous dry' }, 'quinoa cooked': { dry: 'quinoa dry' },
+  'egg noodles cooked': { dry: 'egg noodles dry' }, 'rice noodles cooked': { dry: 'rice noodles dry' },
+  'lentils red': { dry: 'red lentils dry' }, 'lentils green': { dry: 'green lentils dry' },
+  'chicken breast': { raw: 'chicken breast raw' }, 'chicken thigh': { raw: 'chicken thigh raw' }, 'turkey breast': { raw: 'turkey breast raw' },
+  'pork loin': { raw: 'pork loin raw' }, 'cod': { raw: 'cod raw' }, 'haddock': { raw: 'haddock raw' }, 'prawns': { raw: 'prawns raw' },
+}
+const COOKED_TWIN_OF: Record<string, string> = {}
+for (const [cooked, twins] of Object.entries(STATE_TWINS)) {
+  if (twins.dry) { ENTRY_STATE[twins.dry] = 'dry'; COOKED_TWIN_OF[twins.dry] = cooked }
+  if (twins.raw) { ENTRY_STATE[twins.raw] = 'raw'; COOKED_TWIN_OF[twins.raw] = cooked }
+}
+for (const entry of FOOD_DB) if (/\bcooked\b/.test(entry.name) && !ENTRY_STATE[entry.name]) ENTRY_STATE[entry.name] = 'cooked'
+
+/** The state an entry's figures describe, or undefined when the state word does not change its numbers much. */
+export function stateOf(entry: FoodEntry): FoodState | undefined {
+  return ENTRY_STATE[entry.name]
+}
+
+/** A state word in a line, and what it asks for. "uncooked" is dry for a grain and raw for a meat. */
+const STATE_WORDS: Record<string, 'dry' | 'raw' | 'uncooked' | 'cooked'> = { dry: 'dry', dried: 'dry', uncooked: 'uncooked', raw: 'raw', cooked: 'cooked' }
+
+/** Every word an entry's own name and aliases use: "penne pasta" is pasta, because "penne" is one of pasta's own names. */
+const OWN_WORDS = new Map<FoodEntry, Set<string>>()
+for (const entry of FOOD_DB) {
+  const words = new Set<string>()
+  for (const n of [entry.name, ...entry.aliases]) for (const w of normalize(n).split(' ')) if (w) { words.add(w); words.add(depluralizeToken(w)) }
+  OWN_WORDS.set(entry, words)
 }
 
 // ---------------------------------------------------------------------------
@@ -907,15 +1092,6 @@ function resolveAmount(entry: FoodEntry | null, unit: string, quantity: number, 
   return unknown
 }
 
-/** True when `needle` (word tokens) appears as a contiguous run inside `haystack` (word tokens) — word-boundary-safe, unlike a raw character substring check (which would wrongly match "corn" inside "unicorn"). */
-function containsWordSequence(haystack: string[], needle: string[]): boolean {
-  if (needle.length === 0 || needle.length > haystack.length) return false
-  for (let i = 0; i <= haystack.length - needle.length; i++) {
-    if (needle.every((w, j) => haystack[i + j] === w)) return true
-  }
-  return false
-}
-
 /** Strips a trailing plural suffix from tokens long enough that it's almost certainly a plural, not part of the word itself (avoids "hummus" -> "hummu", "asparagus" -> "asparagu"). Handles "-oes"/"-ies" specially ("potatoes" -> "potato", not the naive slice(-1) result "potatoe"; "berries" -> "berry") since a naive trailing-'s' strip never converges on the singular DB entry for these. Deliberately conservative: only used as a last-resort fallback below, never in the primary matching passes. */
 function depluralizeToken(token: string): string {
   if (token.length > 5 && token.endsWith('ies')) return token.slice(0, -3) + 'y'
@@ -944,78 +1120,183 @@ function depluralizeToken(token: string): string {
 const LOOKUP_MEMO = new Map<string, FoodEntry | null>()
 const LOOKUP_MEMO_CAP = 5000
 
-export function lookupIngredient(name: string, _isPluralRetry = false): FoodEntry | null {
-  if (!_isPluralRetry) {
-    const known = LOOKUP_MEMO.get(name)
-    if (known !== undefined) return known
-    const found = lookupIngredientUncached(name, false, LOOKUP)
-    if (LOOKUP_MEMO.size >= LOOKUP_MEMO_CAP) LOOKUP_MEMO.clear()
-    LOOKUP_MEMO.set(name, found)
-    return found
-  }
-  return lookupIngredientUncached(name, true, LOOKUP)
-}
-
-/**
- * The same lookup over the names EXACTLY AS STORED — without the extra
- * singular keys lookupIngredient gained on 9 Oct 2026. This is what the app's
- * lookup was before that day, kept for the one caller where a new match is a
- * LOOSER answer: the diet check, which refuses what it cannot resolve. See
- * the note where LOOKUP_AS_STORED is built.
- */
-const AS_STORED_MEMO = new Map<string, FoodEntry | null>()
-export function lookupIngredientAsStored(name: string): FoodEntry | null {
-  const known = AS_STORED_MEMO.get(name)
+export function lookupIngredient(name: string): FoodEntry | null {
+  const known = LOOKUP_MEMO.get(name)
   if (known !== undefined) return known
-  const found = lookupIngredientUncached(name, false, LOOKUP_AS_STORED)
-  if (AS_STORED_MEMO.size >= LOOKUP_MEMO_CAP) AS_STORED_MEMO.clear()
-  AS_STORED_MEMO.set(name, found)
+  const found = lookupIngredientUncached(name)
+  if (LOOKUP_MEMO.size >= LOOKUP_MEMO_CAP) LOOKUP_MEMO.clear()
+  LOOKUP_MEMO.set(name, found)
   return found
 }
 
-function lookupIngredientUncached(name: string, _isPluralRetry: boolean, index: Map<string, FoodEntry>): FoodEntry | null {
+/** The index keys as word lists, built once: the scan below runs over every one of them per uncached name. */
+const INDEX_TOKENS: { tokens: string[]; entry: FoodEntry }[] = [...LOOKUP].map(([known, entry]) => ({ tokens: known.split(' ').filter(Boolean), entry }))
+
+/**
+ * A word that says HOW MUCH, not which food: "a pot of natural yoghurt", "a
+ * glass of whole milk", "1 pint milk". The name is resolved here; whether the
+ * amount can be read is resolveAmount's question, and it still asks it ("a
+ * bowl of pasta" is pasta, of an amount nobody can read).
+ */
+const AMOUNT_WORDS = new Set(['bowl', 'glass', 'pot', 'pint', 'knob', 'handful', 'bunch', 'head', 'jar', 'packet', 'pack', 'bag', 'punnet', 'portion', 'serving', 'scoop', 'sachet', 'carton', 'bottle', 'dollop', 'drizzle', 'squeeze', 'can'])
+function isAmountWord(w: string, entry: FoodEntry): boolean {
+  const u = normaliseUnit(w)
+  return AMOUNT_WORDS.has(u) || MEASURE_GRAMS[u] != null || (COUNT_UNITS.has(u) && u !== '') || SIZE_OF_MEDIUM[u] != null || entry.units?.[u] != null
+}
+
+/** True when every leftover word is harmless — "and" only between two harmless words. */
+function residueIsHarmless(query: string[], used: boolean[], entry: FoodEntry): boolean {
+  const own = OWN_WORDS.get(entry)
+  const ok = (w: string | undefined) => !!w && (HARMLESS_WORDS.has(w) || HARMLESS_WORDS.has(depluralizeToken(w)) || !!own?.has(w) || isAmountWord(w, entry))
+  for (let i = 0; i < query.length; i++) {
+    if (used[i]) continue
+    const w = query[i]
+    if (w === JOINING_WORD) {
+      if (!(ok(query[i - 1]) && !used[i - 1] && ok(query[i + 1]) && !used[i + 1])) return false
+      continue
+    }
+    if (!ok(w)) return false
+  }
+  return true
+}
+
+type Candidate = { entry: FoodEntry; len: number; folded: boolean }
+
+/** Better first: a longer known name, then the words as written over their folded plurals, then the name (never insertion order). */
+function better(a: Candidate, b: Candidate | null): boolean {
+  if (!b) return true
+  if (a.len !== b.len) return a.len > b.len
+  if (a.folded !== b.folded) return !a.folded
+  return a.entry.name < b.entry.name
+}
+
+/** A known name inside the query (as a run, then in any order), with nothing left over that could be another food. */
+function findAccountedFor(query: string[], folded: boolean): FoodEntry | null {
+  let best: Candidate | null = null
+  // In order: "grilled chicken breast fillet" -> chicken breast.
+  for (const { tokens, entry } of INDEX_TOKENS) {
+    if (tokens.length > query.length) continue
+    for (let i = 0; i <= query.length - tokens.length; i++) {
+      if (!tokens.every((w, j) => query[i + j] === w)) continue
+      const used = query.map((_, k) => k >= i && k < i + tokens.length)
+      if (residueIsHarmless(query, used, entry)) {
+        const cand = { entry, len: tokens.length, folded }
+        if (better(cand, best)) best = cand
+      }
+    }
+  }
+  // Any order: "cooked white rice" -> white rice cooked. Pooled with the runs
+  // above, so the longer name wins either way ("seitan-based strips" is seitan
+  // strips, not seitan with "strips" left over).
+  for (const { tokens, entry } of INDEX_TOKENS) {
+    if (tokens.length < 2 || tokens.length > query.length) continue
+    const used = query.map(() => false)
+    let all = true
+    for (const w of tokens) {
+      const k = query.findIndex((q, idx) => q === w && !used[idx])
+      if (k < 0) { all = false; break }
+      used[k] = true
+    }
+    if (all && residueIsHarmless(query, used, entry)) {
+      const cand = { entry, len: tokens.length, folded }
+      if (better(cand, best)) best = cand
+    }
+  }
+  return best?.entry ?? null
+}
+
+/** The entry for a set of words with no state word in them: exact, exact once plurals are folded, then accounted-for. */
+function resolveWords(tokens: string[]): FoodEntry | null {
+  if (tokens.length === 0) return null
+  const key = tokens.join(' ')
+  const exact = LOOKUP.get(key)
+  if (exact) return exact
+  const foldedTokens = tokens.map(depluralizeToken)
+  const foldedKey = foldedTokens.join(' ')
+  const exactFolded = LOOKUP.get(foldedKey)
+  if (exactFolded) return exactFolded
+  return findAccountedFor(tokens, false) ?? (foldedKey !== key ? findAccountedFor(foldedTokens, true) : null)
+}
+
+/** Apply a state word to the food it was said of: its twin in that state, the food itself, or nothing. */
+function inState(entry: FoodEntry, asked: 'dry' | 'raw' | 'uncooked' | 'cooked'): FoodEntry | null {
+  const state = ENTRY_STATE[entry.name]
+  const byName = (n: string | undefined) => (n ? FOOD_DB.find(f => f.name === n) ?? null : null)
+  if (asked === 'cooked') return state === 'dry' || state === 'raw' ? byName(COOKED_TWIN_OF[entry.name]) : entry
+  if (state === 'cooked') {
+    const twins = STATE_TWINS[entry.name] ?? {}
+    if (asked === 'dry') return byName(twins.dry)
+    if (asked === 'raw') return byName(twins.raw)
+    return byName(twins.dry ?? twins.raw)
+  }
+  if (state) return asked === 'dry' && state === 'raw' ? null : entry
+  // No state on the entry: any state word is fine, except dried produce, which is a different food.
+  if (asked === 'dry' && (entry.category === 'fruit' || entry.category === 'veg')) return null
+  return entry
+}
+
+/**
+ * Alias-tolerant lookup that never throws a word away. In order:
+ *   1. the name or an alias, exactly (also with plurals folded on both sides);
+ *   2. a known name inside the line, when every other word is harmless
+ *      ("grilled chicken breast fillet" is chicken breast; "chicken caesar
+ *      wrap" is NOT a tortilla wrap: "chicken" and "caesar" are left over);
+ *   3. with a state word ("dry", "raw", "cooked") set aside, the same two
+ *      steps, then the food in that state (STATE_TWINS) or nothing.
+ * A line that is SHORTER than a known name is no longer matched to it: bare
+ * "chicken" is not "meat free chicken pieces", it is a miss. Returns null on a
+ * miss — callers must NOT guess a profile for an unresolved ingredient (see
+ * diet-rules.ts's fail-closed handling).
+ */
+function lookupIngredientUncached(name: string): FoodEntry | null {
   const key = normalize(name)
   if (!key) return null
+  const tokens = key.split(' ').filter(Boolean)
+  const whole = resolveWords(tokens)
+  if (whole) return whole
+  const states = [...new Set(tokens.map(t => STATE_WORDS[t]).filter(Boolean))]
+  if (states.length !== 1) return null // none, or two that disagree ("cooked dry pasta")
+  const core = tokens.filter(t => !STATE_WORDS[t])
+  const food = resolveWords(core)
+  return food ? inState(food, states[0]) : null
+}
 
-  const exact = index.get(key)
-  if (exact) return exact
-
-  const keyTokens = key.split(' ').filter(Boolean)
-
-  // Word-sequence match: does a known name/alias's exact word run appear
-  // inside the query's words, or vice versa? Longest (by word count) wins so
-  // "chicken breast" beats "chicken".
-  let best: { entry: FoodEntry; len: number } | null = null
-  for (const [known, entry] of index) {
-    const knownTokens = known.split(' ').filter(Boolean)
-    if (knownTokens.length === 0) continue
-    if (containsWordSequence(keyTokens, knownTokens) || containsWordSequence(knownTokens, keyTokens)) {
-      if (!best || knownTokens.length > best.len) best = { entry, len: knownTokens.length }
+/**
+ * The foods a piece of PROSE names — a recipe's cooking method, not an
+ * ingredient line. Whole words only, the longest name first, never two foods
+ * from the same words; plurals and spellings fold the way the lookup's do.
+ * Each hit carries the words as written so a caller can ask whether those
+ * words are on the ingredient list. (11 Oct 2026, for the check on recipe
+ * steps: docs/plans/recipe-steps-checked-against-restrictions.md.)
+ *
+ * "toast" is skipped: in a method it is nearly always the verb ("toast the
+ * seeds"), and reading it as bread would hide good steps.
+ */
+const PROSE_VERBS = new Set(['toast'])
+export function findFoodsNamedIn(text: string): { entry: FoodEntry; words: string[]; from: number; to: number }[] {
+  const tokens = normalize(text).split(' ').filter(Boolean)
+  const folded = tokens.map(depluralizeToken)
+  const taken = tokens.map(() => false)
+  const hits: { entry: FoodEntry; words: string[]; from: number; to: number }[] = []
+  const longest = Math.min(6, tokens.length)
+  for (let len = longest; len >= 1; len--) {
+    for (let i = 0; i + len <= tokens.length; i++) {
+      if (taken.slice(i, i + len).some(Boolean)) continue
+      const words = tokens.slice(i, i + len)
+      if (len === 1 && PROSE_VERBS.has(words[0])) continue
+      const entry = LOOKUP.get(words.join(' ')) ?? LOOKUP.get(folded.slice(i, i + len).join(' '))
+      if (!entry) continue
+      for (let k = i; k < i + len; k++) taken[k] = true
+      hits.push({ entry, words, from: i, to: i + len })
     }
   }
-  if (best) return best.entry
+  return hits.sort((a, b) => a.from - b.from)
+}
 
-  // Token overlap: every significant word in the known name must appear in
-  // the query (order-independent) — catches "cooked white rice" matching
-  // "white rice cooked". Still whole-word (split on spaces), so no substring
-  // false-positives.
-  const keyTokenSet = new Set(keyTokens.filter(t => t.length > 2))
-  let bestOverlap: { entry: FoodEntry; score: number } | null = null
-  for (const [known, entry] of index) {
-    const knownTokens = known.split(' ').filter(t => t.length > 2)
-    if (knownTokens.length === 0) continue
-    const overlap = knownTokens.filter(t => keyTokenSet.has(t)).length
-    if (overlap === knownTokens.length && overlap > 0) {
-      if (!bestOverlap || overlap > bestOverlap.score) bestOverlap = { entry, score: overlap }
-    }
-  }
-  if (bestOverlap) return bestOverlap.entry
-
-  if (!_isPluralRetry) {
-    const depluralized = keyTokens.map(depluralizeToken).join(' ')
-    if (depluralized !== key) return lookupIngredientUncached(depluralized, true, index)
-  }
-  return null
+/** The same words the scanner reads, for a caller that needs the parts it did NOT match. `folded`: plurals folded the lookup's way ("tomatoes" -> "tomato", "berries" -> "berry"). */
+export function foodTextWords(text: string, folded = false): string[] {
+  const words = normalize(text).split(' ').filter(Boolean)
+  return folded ? words.map(depluralizeToken) : words
 }
 
 export interface MealIngredientLine {

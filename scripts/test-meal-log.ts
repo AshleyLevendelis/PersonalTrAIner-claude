@@ -158,7 +158,9 @@ console.log('\n5. The food database folds plurals on the stored side too\n')
   // "chocolate rice cake", the database key is "rice cakes", and only the
   // QUERY was ever de-pluralised. Every ingredient came back unmatched and the
   // reply printed "roughly 0 kcal … 0% of the meal by weight".
-  check('"chocolate rice cake" reaches the rice cakes entry', lookupIngredient('chocolate rice cake')?.name === 'rice cakes', lookupIngredient('chocolate rice cake')?.name)
+  // Since 11 Oct 2026 it reaches its OWN entry: costed as a plain rice cake
+  // it was a third of its real calories (docs/plans/ingredient-lookup-truth.md).
+  check('"chocolate rice cake" reaches a rice cake entry (its own, chocolate one)', lookupIngredient('chocolate rice cake')?.name === 'chocolate rice cakes', lookupIngredient('chocolate rice cake')?.name)
   check('...and the plural itself still does', lookupIngredient('rice cakes')?.name === 'rice cakes')
   check('...while nonsense still misses — the fold widens matching, it does not invent it', lookupIngredient('xyzzy powder') === null)
 }

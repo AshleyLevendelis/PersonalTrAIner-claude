@@ -152,8 +152,20 @@ console.log('\n1. The libraries are cached separately from the app')
   // re-measures this as it lands.
   //     after all six (Home, Nutrition, Exercise, Profile, setup, round timer), measured 10 Oct 2026:
   //                   deploy 308 gz   paint 464 gz   app 1065 raw   (10, 10 and 25 kB of room left)
-  headroom('a deploy re-downloads', appGzip, 318, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 318, appGzip)
+  // MOVED 11 Oct 2026 for her 9 Oct allergy ruling ("Build all four": foods said in passing, the honest
+  // setup tick, stricter food matching, recipe steps checked). MEASURED BOTH ENDS through THIS gate, the
+  // base on a clean worktree of 58fbc675:
+  //     before   deploy 316 gz   paint 472 gz   app 1091 raw   total 2317 raw   (app and total ALREADY red)
+  //     after    deploy 320 gz   paint 476 gz   app 1106 raw   total 2335 raw
+  // The growth is the food table (about 30 dry, raw and light foods, so "100g dry pasta" stops being costed
+  // as cooked), the one stricter lookup that replaced two, and the recipe-step check; all three are read by
+  // the Nutrition screen as it draws, so they are first-paint code by nature. The said-in-passing detector
+  // was moved OFF first paint in the same change (1 kB gz): only the list splitter stays on it. On her
+  // 15 Sep ruling ("raise it with room to grow"): 8 kB gz and 25 kB raw of room over today's numbers,
+  // the shape of every move above. The base was already over on the app chunk and the total; this
+  // raise covers that too, and says so rather than leaving it red.
+  headroom('a deploy re-downloads', appGzip, 328, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 328, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -231,9 +243,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
   // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
   // MOVED 10 Oct 2026: 461 -> 474, the layout pass — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 474, 'kB gzipped')
+  // MOVED 11 Oct 2026: 474 -> 484, the allergy ruling — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 484, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 474, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 484, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -336,7 +349,8 @@ console.log('\n3. Nothing has crept back up')
   // logic every screen uses (exercise-plan +5.8 kB raw, plan-adaptations +4.4, food-swap-groups +4.3,
   // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
   // MOVED 10 Oct 2026: 1,052 -> 1,090 raw, the layout pass — see the deploy figure above for both ends.
-  const APP_CHUNK_BUDGET_KB = 1090
+  // MOVED 11 Oct 2026: 1,090 -> 1,131 raw, the allergy ruling — see the deploy figure above for both ends.
+  const APP_CHUNK_BUDGET_KB = 1131
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -551,7 +565,9 @@ console.log('\n3. Nothing has crept back up')
   // Profile, setup). MEASURED both ends through this gate: before (fc516ab4, clean worktree) total
   // 2229; after all six, 2257 (+28, spread over the five screens' markup and four small modules).
   // 2,275 is 18 above the 2,257 measured, on her 15 Sep ruling ("raise it with room to grow").
-  const TOTAL_BUDGET_KB = 2275
+  // MOVED 11 Oct 2026: 2,275 -> 2,360, the allergy ruling (18 kB of it; the base was 42 over) — see the
+  // deploy figure above for both ends. 2,360 is 25 above the 2,335 measured.
+  const TOTAL_BUDGET_KB = 2360
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

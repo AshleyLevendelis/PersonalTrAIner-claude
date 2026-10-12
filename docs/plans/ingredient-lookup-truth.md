@@ -1,6 +1,11 @@
 # Plan: the ingredient lookup must not throw words away
 
-**Status: PLAN ONLY. Nothing here is built.** Written 9 Oct 2026 by the builder of the H6
+**Status: BUILT 11 Oct 2026** on Ashley's "Build all four" (her 9 Oct ruling, item 3). Section
+10 at the end is the review of this plan against the 11 Oct tree, the decisions taken while
+building, what was left for her, and the measured before/after. Sections 1-9 are the plan as
+written on 9 Oct and are kept as written.
+
+**Original status: PLAN ONLY.** Written 9 Oct 2026 by the builder of the H6
 "typed meals logged far too low" fix, on the instruction to stop at the plan: the function
 this changes (`lookupIngredient`, `src/lib/food-db.ts`) also decides which allergen and diet
 tags an ingredient carries, so it is safety-adjacent and gets a plan before a build.
@@ -32,7 +37,7 @@ egg fried rice         -> egg             (155 kcal; egg)
 peanut butter cookie   -> peanut butter   (588 kcal; nuts)           no gluten, egg or dairy
 almond croissant       -> almonds         (579 kcal; nuts)           no gluten, no dairy
 salmon sushi roll      -> salmon          (208 kcal; fish)
-whole milk latte       -> milk whole      (61 kcal; dairy)
+whole milk latte       -> milk whole      (61 kcal; dairy)        [11 Oct: now its own row, see 10b]
 egg mayonnaise         -> egg
 avocado toast          -> avocado         (160 kcal; no tags)        no gluten
 almond-crusted cod     -> cod             (105 kcal; fish)           NOT nuts
@@ -293,3 +298,116 @@ after this plan is built the diet check goes back to the one lookup.
 5. Rule 6 and the new entries (states). Carries M20 and the dry/raw convention on cards.
 6. Point the diet check back at the one lookup; delete `lookupIngredientAsStored`.
 7. Re-measure everything in section 5; BACKLOG; `chat-gemini` and `generate-meals` deploys.
+
+---
+
+## 10. Review against the 11 Oct tree, and the build
+
+### 10a. What changed under this plan since it was written
+
+- The amount reader (`ingredient-units.ts`) and the piece-weight resolver (`resolveAmount` in
+  `food-db.ts`) were merged on 11 Oct. Neither touches name resolution: `computeMealMacros`
+  calls `lookupForLine` → `lookupIngredient` exactly as this plan assumed. The merge left two
+  gates red before this work started (`test:ingredient-units` 6 of 42, `test:meal-amounts` 2 of
+  264; both about amounts, both reconciling the two amount fixes, neither about names). This
+  build holds their failure lists constant and does not try to reconcile them.
+- `toast` / `white toast` → white bread and a separate `french toast` entry landed on 10 Oct
+  (her ruling "toast counts as bread"), so rule 7's toast half is already done.
+- The grocery half of M23 (shopping names and the cooked-to-bag factor, `AS_BOUGHT`) and the
+  crispbread piece weight are already built. What remains of M23 here is oat flour.
+- The stored-plural index block in `food-db.ts` is present twice (a merge artifact; the second
+  copy is a no-op). Removed with this change.
+
+### 10b. Decisions taken while building (mechanical or under the CSCS/nutrition delegation)
+
+1. **Rules 1-4 and the tie-break are built as written.** The residue list is a constant in
+   `food-db.ts` (`HARMLESS_WORDS`), read by the gate from the source.
+2. **Rule 5: the query-inside-a-longer-name pass is removed. NO generics are added.** The
+   generics are a product choice (owner question 2 below); the safe default is that a bare
+   "chicken", "fish", "cheese", "mince" is a miss: not counted in a meal's numbers, and refused
+   for anyone with a restriction. Bare words that were already an exact name or alias ("pasta",
+   "bread", "milk"...) are unaffected.
+3. **Rule 6, states, built narrowly where the numbers are badly wrong**: a "dry"/"dried"/
+   "uncooked" line against a cooked grain, pasta or pulse, and a "raw"/"uncooked" line against a
+   cooked lean meat or fish. Each goes to a new sibling entry of that state, or is a miss. Read
+   off this table's own figures, two staples the plan listed are NOT cooked figures: `salmon`
+   (208 kcal, 20 g protein) and both `beef mince` entries are RAW figures already, so "raw
+   salmon fillet" and "raw beef mince" were right all along and are left alone. "Cooked" against
+   a raw-figure entry is not enforced (fat fish and mince change little per 100 g; the aliases
+   "baked salmon", "grilled salmon" already say so). Dried FRUIT is a different food from fresh,
+   so "dried mango" against `mango` is a miss, never fresh mango.
+4. **New entries** (per 100 g, as recalled from USDA FoodData Central and cited in the file so
+   they can be checked): dry pasta, wholewheat pasta, white, brown and basmati rice, couscous,
+   quinoa, red and green lentils, egg and rice noodles; raw chicken breast, chicken thigh, cod
+   and prawns; oat flour, almond flour, coconut flour, rice flour, coconut water, water
+   chestnuts. The dry figures are the ones `AS_BOUGHT` already uses for the shopping list, so
+   the two cannot disagree. A dry line goes on the shopping list under the same row as its
+   cooked twin ("pasta"), at its own weight.
+5. **Oat flour is tagged gluten** (fail-safe), as the plan said. This changes no gluten-free
+   verdict: "oat flour" resolved to plain flour (gluten) before and is refused either way. Plain
+   `oats` are untouched: whether oats pass the gluten-free filter is her open question.
+6. **The diet check goes back to the one lookup** (rule 9.6) once the measurement showed no
+   phrase moving from refused to passes that was not reviewed (10d).
+
+- **A latte has its own row (found by `verify:meal-log-card`, after the sweep).** Table A's
+  "whole milk latte -> milk whole" was a silent read the old lookup got roughly right by accident;
+  the stricter one refused "latte", so "a large latte" in chat became "I don't know it". Added
+  `latte whole milk`, DERIVED from this table's own whole milk (about 85% milk by weight, espresso
+  near 0 kcal): 52 kcal, 2.7 g protein, 4.1 g carbs, 2.8 g fat per 100 g, dairy-tagged, no size of
+  its own (so "a large latte" is asked about, as before). An oat, soy, almond or skimmed latte is a
+  MISS, never this row. `test:ingredient-lookup` §8 (3 checks; 4 mutations, 3 caught, the fourth an
+  equivalent mutant that showed a "whole milk latte" alias was redundant, so it was deleted).
+
+### 10c. Owner questions (not decided here; the safe version is built)
+
+1. Bought or restaurant food with no recipe (H6): unchanged, and now more often reached — a
+   dish name is a miss, so the coach can only say it does not know it.
+2. A bare "chicken", "mince", "milk" in a recipe or a log: assume the commonest kind and say so,
+   or ask? Built: neither is assumed (a miss). Recommendation unchanged: assume and say so, for
+   a reviewed short list.
+3. Oats and oat flour and the gluten-free filter (from N2): left as they were.
+
+### 10d. Measured before and after (same process: the 58fbc675 lookup frozen beside the new one)
+
+Section 5 step 1, run in this cloud session. Steps 2 and 3 (her real stored pools on the TEST
+project, and live generation) need her machine and have NOT been run: they are the stop point
+before release.
+
+- **The library: 1,578 ingredient lines (219 distinct names) in 290 dishes. 0 change food,
+  0 newly miss.**
+- **Corpus, 12,292 phrases** (every stored name and alias, its plural or singular, 11
+  preparation prefixes, 3 form suffixes, every single word, the plan's tables, the library
+  names): 11,475 the same, **703 now a miss** (dishes, bare words, wrong-state lines, corpus
+  nonsense like "dry chicken breast"), 1 newly a match ("chilli flakes", a new entry), **113 a
+  different food**, of which 12 lost a tag, every one read by eye and each a correction ("almond
+  flour" is no longer WHEAT flour; "vegan sausages" were costed as PORK sausage; "potatoes" were
+  mashed potato, with dairy; "spring onions" were onion).
+- **Diet verdicts, 270,424** (the corpus x 22 restrictions): **1,719 moved from refused to
+  passes, across 100 phrases: 85 are the singular of a stored food** ("chickpea", "prawn", "red
+  lentil": the 9 Oct plan's "harmless singulars") **and 15 are the right food at last**
+  ("chicken" was seitan, so it now passes gluten-free and FAILS vegetarian; "rice flour" no
+  longer carries wheat's gluten tag). None is a dish. 14,029 moved the safe way (passes to
+  refused): the newly-missed phrases, refused for every restriction.
+- **Writer-style and fixture lines** (610 strings from every script and driver, plus about 200
+  lines a meal writer commonly uses): 49 change. 15 newly miss and each is meant to: bare words
+  with no single meaning ("sausages", "fillets"), dishes ("eggs and toast", "rice cakes with dark
+  chocolate"), and fat-level or product variants with no entry yet ("reduced fat feta", "low fat
+  greek yoghurt", "red thai curry paste", "tomato puree"). The first cut missed 64; the other 49
+  were ordinary lines that missed only for a gap ("light soy sauce", "brown onion", "tinned
+  chickpeas", "a pot of natural yoghurt") and were closed with reviewed aliases, the amount
+  words, five light entries and a chilli/chili fold, never by loosening the rule.
+- **Bare words (rule 5), built as the neutral version.** Making every bare word a miss would have
+  changed what the app does today for "milk", "rice", "tuna" (fixtures across four gates use
+  them, and so, presumably, do real meals), which is a decision, not a fix. So the app keeps
+  assuming what it assumed before for a reviewed list where every candidate shares the allergen
+  tags (`GENERIC_NAMES`: chicken, rice, milk, tuna, mince, oil, whey), changes only "chicken"
+  (seitan was the unsafe answer), and makes the rest a miss (fish, cheese, cream, nuts, beans,
+  sausage, yoghurt, burger).
+- **Found by the measurement, fixed:** chicken and beef broth carried NO tag, so meat stock
+  passed vegetarian (now `contains_meat`).
+- **Found, NOT changed, recorded:** "greek yogurt" (US spelling) is the FULL-FAT entry while
+  "greek yoghurt" has always reached the 0% one. Folding the spellings would re-cost every Greek
+  yoghurt in every meal by about 40 kcal per 100 g, so both answers are kept as they were and the
+  disagreement is left for a decision. The chat's receipt for sesame, celery and mustard still
+  says "there's no tag for it in the food data" (now an understatement: those tags exist on a
+  few foods); its wording is hers.

@@ -153,7 +153,9 @@ check('and it must OFFER the swap rather than leave her to find it',
 // The edit must not have weakened what was already there.
 check('the original allergen rule is intact',
   /Never state or imply that a specific food or meal "is safe,"/.test(prompt)
-  && /Celery, sesame, mustard, lupin, and sulphites have NO tag mechanism at all/.test(prompt))
+  // The five are still named as the ones the data barely covers. Since 11 Oct 2026 they carry a
+  // THIN filter (ten tagged foods) rather than none; the property is the warning, not its wording.
+  && /Celery, sesame, mustard, lupin, and sulphites[^\n]*(?:THIN|NO tag mechanism)[^\n]*(?:barely|not marked)/.test(prompt))
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

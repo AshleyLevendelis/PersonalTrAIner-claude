@@ -230,16 +230,21 @@ console.log('\n5. It reaches the screen, and only when there is one')
 {
   const card = read('src/components/MealPlan.tsx')
   check('the meal card renders the method',
-    /data-meal-method=/.test(card) && /\{methodSafeToShow\(option\.prep\)\}/.test(card))
+    // Since 11 Oct 2026 the card renders ONE value, worked out once per row by
+    // methodToShow (the amount rule, then the restriction and truth check).
+    /data-meal-method=/.test(card) && (card.match(/\{method\}/g) ?? []).length === (card.match(/data-meal-method=/g) ?? []).length
+    && !/\{option\.prep\}/.test(card)
+    && /const method = option \? methodToShow\(option\.prep, option\.ingredients, methodRules\) : ''/.test(card))
   check('...only when the meal actually has one',
-    /methodSafeToShow\(option\.prep\)\.length > 0 &&/.test(card))
+    /const hasMethod = method\.length > 0/.test(card) && /\{hasMethod && \(/.test(card))
   // DEFENCE IN DEPTH, and the same reasoning as the dietary re-check that
   // already runs on this screen: verification is where a method naming an
   // amount is dropped, but this is where being wrong costs something. A row
   // written by a future path, or by hand, must not be able to put an
   // unverified number in front of somebody.
   check('...and the amount rule is re-applied on display rather than trusting what was stored',
-    /import \{ methodSafeToShow/.test(card) && !/option\.prep \?\? ''/.test(card))
+    /import \{ methodToShow/.test(card) && !/option\.prep \?\? ''/.test(card)
+    && /export function methodToShow\([\s\S]{0,200}?\): string \{\s*const safe = methodSafeToShow\(prep\)\s*if \(!safe\) return ''/.test(strip(read('src/lib/meal-generation.ts'))))
   check('...labelled, so it is not mistaken for another list of ingredients',
     />Method</.test(card))
   // BOTH ANCHORS MUST EXIST BEFORE THEY ARE COMPARED. The first version of
@@ -254,7 +259,7 @@ console.log('\n5. It reaches the screen, and only when there is one')
   const iMethod = card.lastIndexOf('data-meal-method=')
   check('the card\'s method shows only with the row closed, and only when there is one',
     /variant === 'upnext' && option && !expanded && methodOpen && hasMethod && \(/.test(card)
-    && /const hasMethod = !!option && methodSafeToShow\(option\.prep\)\.length > 0/.test(card))
+    && /const hasMethod = method\.length > 0/.test(card))
   check('...and below the ingredients, which are where the amounts live',
     iIngredients >= 0 && iMethod >= 0 && iIngredients < iMethod, { iIngredients, iMethod })
   check('the legacy chat shape stops hardcoding an empty method',

@@ -154,6 +154,26 @@ check('3b. the meal is open, so 3a is a real absence rather than a closed card',
   /Salmon, new potatoes and green beans/.test(dinnerText || ''))
 await shoot('meal-method-absent')
 
+// --- 4. a method naming a food she avoids is not drawn (11 Oct 2026) --------
+// Her 9 Oct ruling, item 4: recipe steps are checked against allergies and
+// foods to avoid. Same stored meal as section 1, whose method says "rice";
+// the only change is rice going on Foods to avoid (the harness's ?avoid=,
+// which feeds the real avoid list to the real MealPlan). Nothing is
+// regenerated: the display-time check is what hides it.
+console.log('\n  4. Breakfast again, with rice on Foods to avoid')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&avoid=rice#/tab/nutrition` })
+await wait(2500)
+await openMeal('Breakfast')
+const avoided = await methodFor()
+check('4a. the method that says "rice" is not drawn once rice is avoided', avoided === null, avoided)
+const avoidedText = await ev(`document.body.innerText`)
+check('4b. ...and none of its words are on the screen', !/while the rice steams/.test(avoidedText || ''))
+check('4c. the meal itself is still there (the steps go, never the food)', /Greek yoghurt, berries and honey/.test(avoidedText || ''))
+const openRows = await ingredientRows()
+check('4d. the card IS open (its ingredients are listed), so 4a is a real absence, not a closed card', Array.isArray(openRows) && openRows.length >= 2, openRows)
+await scrollTo('[data-ingredient-row]')
+await shoot('meal-method-avoided')
+
 console.log(failures === 0 ? '\nAll meal-method screen checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 try { chrome.kill() } catch {}
 server.close()

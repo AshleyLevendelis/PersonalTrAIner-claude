@@ -124,7 +124,10 @@ console.log('\n1. Everyday counted foods come to a sensible weight (both copies)
     ['2 cod fillets', { name: 'cod', quantity: 2, unit: 'fillets' }, 180, 300],
     ['1 chicken breast', { name: 'chicken breast', quantity: 1, unit: 'whole' }, 100, 180],
     ['1 pot of natural yoghurt', { name: 'natural yoghurt', quantity: 1, unit: 'pot' }, 100, 180],
-    ['2 chicken breasts (unit: breasts)', { name: 'chicken', quantity: 2, unit: 'breasts' }, 0, 0], // see below: bare "chicken" is not chicken breast
+    // Bare "chicken" WAS seitan until 11 Oct 2026 (a longer name containing it
+    // won); it is now chicken breast on purpose (food-db.ts GENERIC_NAMES), so
+    // two of them are two breasts.
+    ['2 chicken breasts (unit: breasts)', { name: 'chicken', quantity: 2, unit: 'breasts' }, 200, 300],
     ['3 rashers of bacon', { name: 'bacon', quantity: 3, unit: 'rashers' }, 45, 100],
     ['3 bacon rashers (by count)', { name: 'bacon rashers', quantity: 3, unit: 'whole' }, 45, 100],
     ['2 sausages', { name: 'pork sausages', quantity: 2, unit: 'whole' }, 60, 130],
@@ -175,7 +178,7 @@ console.log('\n3. An amount that cannot be read is UNKNOWN — never the bare nu
     ['3 "portions" of quark', { name: 'quark', quantity: 3, unit: 'portions' }],
     ['2 of a food with no piece weight (hummus)', { name: 'hummus', quantity: 2, unit: 'whole' }],
     ['a made-up unit', { name: 'oats', quantity: 4, unit: 'xyzzy' }],
-    ['2 chicken "breasts" when the food resolved is not chicken breast', { name: 'chicken', quantity: 2, unit: 'breasts' }],
+    ['2 "breasts" of a food that has no breast (tofu)', { name: 'tofu', quantity: 2, unit: 'breasts' }],
     ['a count of a food the table does not know', { name: 'flargle root', quantity: 2, unit: 'whole' }],
     ['a size of a food the table does not know', { name: 'latte', quantity: 1, unit: 'large' }],
   ]
@@ -241,9 +244,15 @@ console.log('\n4. The two meals from the test log\n')
       check(`...it is a question or a refusal, or a card of 350+ (${copy})`,
         out.kind === 'question' || out.kind === 'refused' || (out.kind === 'card' && out.kcal >= 350), out)
     }
+    // Until 11 Oct 2026 the wrap was costed as an EMPTY TORTILLA (the lookup
+    // kept "wrap" and threw "chicken caesar" away), so the only thing left to
+    // ask about was the latte. A dish name is now a miss
+    // (docs/plans/ingredient-lookup-truth.md), so the honest answer is that
+    // the app does not know the wrap: it says so by name and logs nothing.
     const asSent = logOutcome(db, WRAP_AND_LATTE[0][1], 'lunch', 'chicken caesar wrap and a large latte')
-    check(`...and for the meal as sent, the app ASKS how big the latte was (${copy})`,
-      asSent.kind === 'question' && /How big/.test(asSent.text) && /latte/.test(asSent.text), asSent)
+    check(`...and for the meal as sent, the app says it does not know the wrap, by name, and logs nothing (${copy})`,
+      asSent.kind === 'refused' && /don't know chicken caesar wrap/.test(asSent.text), asSent)
+    check(`...and the wrap is not a tortilla any more (${copy})`, db.lookupIngredient('chicken caesar wrap') === null, db.lookupIngredient('chicken caesar wrap')?.name)
   }
 }
 
