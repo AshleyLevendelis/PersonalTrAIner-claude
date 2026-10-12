@@ -250,8 +250,14 @@ console.log('\n4. The two meals from the test log\n')
     // (docs/plans/ingredient-lookup-truth.md), so the honest answer is that
     // the app does not know the wrap: it says so by name and logs nothing.
     const asSent = logOutcome(db, WRAP_AND_LATTE[0][1], 'lunch', 'chicken caesar wrap and a large latte')
-    check(`...and for the meal as sent, the app says it does not know the wrap, by name, and logs nothing (${copy})`,
-      asSent.kind === 'refused' && /don't know chicken caesar wrap/.test(asSent.text), asSent)
+    // It asks the latte's size first (a known food, an unknown amount), and once that is answered it names the
+    // wrap it does not know and logs nothing. Neither turn is a card. (Asking about the wrap first was tried on
+    // 11 Oct and made the refusal say "I don't know whole milk latte", which is false.)
+    check(`...and for the meal as sent, the app asks how big the latte was and logs nothing (${copy})`,
+      asSent.kind === 'question' && /latte/.test(asSent.text) && !/wrap/.test(asSent.text), asSent)
+    const answered = logOutcome(db, [WRAP_AND_LATTE[0][1][0], { name: 'whole milk latte', quantity: 350, unit: 'ml' }], 'lunch', 'chicken caesar wrap and a large latte')
+    check(`...and once the latte's size is given, it says it does not know the wrap, by name, and logs nothing (${copy})`,
+      answered.kind === 'refused' && /don't know chicken caesar wrap/.test(answered.text) && !/don't know[^.]*latte/.test(answered.text), answered)
     check(`...and the wrap is not a tortilla any more (${copy})`, db.lookupIngredient('chicken caesar wrap') === null, db.lookupIngredient('chicken caesar wrap')?.name)
   }
 }

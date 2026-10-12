@@ -1371,7 +1371,15 @@ function lookupForLine(line: MealIngredientLine): FoodEntry | null {
   const found = lookupIngredient(line.name)
   if (found) return found
   const u = normaliseUnit(line.unit)
-  return u === 'can' || u === 'jar' ? lookupIngredient(`canned ${line.name}`) : null
+  if (u === 'can' || u === 'jar') return lookupIngredient(`canned ${line.name}`)
+  // An unread line keeps its whole text as the name ("1 knob butter"), and the strict matcher (every word must be
+  // a food word) misses it. Look the FOOD up past the amount and the measure word the reader could not weigh, so
+  // the line says what it is: a known food with an unknown amount, never an unknown food. It stays unweighed.
+  if (line.unread) {
+    const food = line.name.replace(/^\s*(?:[\d½¼¾⅓⅔.\/-]+\s*)*/, '').replace(/^\S+\s+(?:of\s+)?/, '')
+    if (food && food !== line.name) return lookupIngredient(food)
+  }
+  return null
 }
 
 /**
