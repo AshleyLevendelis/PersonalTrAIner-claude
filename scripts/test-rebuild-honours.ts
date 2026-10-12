@@ -192,7 +192,10 @@ async function main() {
     const runs = (exec.match(/rebuildFromCurrentWeek\(updated, exclusions, mesocycle, payload\.fromWeek, context, \{ fromDate: payload\.fromDate, seedKey: payload\.seedKey \}\)/g) ?? []).length
     check('every rebuild executor passes the start and the seed (6)', runs === 6, runs)
     const adapt = code('src/lib/plan-adaptations.ts')
-    check('a temporary KIT change is carried through a rebuild, not dropped', /constraintProfile\(clone, context\.constraints\)/.test(adapt) && !/temporaryEquipment: null/.test(adapt))
+    // Read inside the rebuild only: a TRAVEL substitution replaces the running travel kit on purpose, and the
+    // kit list's own substitution sits beside it in the same file (11 Oct 2026, the kit-list merge).
+    const rebuildBody = /export (?:async )?function rebuildAgainstProfile[\s\S]*?\n}\n/.exec(adapt)?.[0] ?? ''
+    check('a temporary KIT change is carried through a rebuild, not dropped', rebuildBody.length > 0 && /constraintProfile\(clone, context\.constraints\)/.test(rebuildBody) && !/temporaryEquipment: null/.test(rebuildBody), rebuildBody.length)
     check('...for as long as any temporary change runs', /const injuryEnds = live\.map\(/.test(code('src/lib/plan-edit-context.ts')))
     check('the Profile rebuild offer lists the changes too, from the same seeded trial', /describeRebuild\(mesocycle, trial\.mesocycle/.test(code('src/App.tsx')) && /seedKey: rebuildPreview\?\.seedKey/.test(code('src/App.tsx')))
     const fn = code('supabase/functions/chat-gemini/index.ts')
