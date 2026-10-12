@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [~] **LIVE, 12 Oct 2026: `main` at 2b096a93, on her 11 Oct "put the app live" with conditions.**
+  Fast-forwarded from 3fdaa11d. Both Vercel projects built 2b096a93 for production (READY); the live site
+  loads `index-Dxc5dV-b.js` (was `index-BScgizUj.js`; her `index-B4tuvUmK.js` was older still).
+  No migration. **Still needed, on her machine** (`docs/handoff-2026-10-12.md`): the `chat-gemini`,
+  `onboarding-chat` and `generate-meals` deploys (she named two; the meal writer changed too, for the
+  stricter food matching and the recipe-step check), the three live checks (eggs and toast, cardio in
+  a finished session's summary, editing a moved session), and the coach exam. **Not proven live from
+  here:** the three checks need a logged-in account and the deployed coach; this session has neither.
+  Eggs and toast on the harness: 417 kcal with butter, 346 plain with medium eggs, so her "above 350"
+  holds only with large eggs or butter; under 300 is what would be wrong.
+
 - [x] **RELEASE SWEEP, 12 Oct 2026, on the merged tree (run 5, the allergy path, the kit list): 387 of 397, then the 6 drivers fixed.**
   Frozen copy of 50d8955a, every `test:` and `verify:` gate including `test:quality` and `test:audit`.
   - **Environmental, as always:** `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database
