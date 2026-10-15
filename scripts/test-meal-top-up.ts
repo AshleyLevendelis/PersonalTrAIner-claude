@@ -597,6 +597,16 @@ async function main() {
       && topUpOffer(plan0)?.text === `None of your 7 dinners fit your targets right now, so your dinners keep repeating. I can add some that do. ${S}`)
     const both: TopUpPlan = { needs: { lunch: 3, dinner: 3 }, short: {}, have: { lunch: 7, dinner: 7 }, fewFit: { lunch: 2, dinner: 1 }, crowded: [] }
     check('several meals: names them and no ratios', topUpOffer(both)?.text === `Very few of your lunches and dinners fit your targets right now, so they keep repeating. I can add some that do. ${S}`, topUpOffer(both))
+    // RUN 7, L47: "Only 2 of your 2 lunches fit your targets right now". Every one fits; there are just few.
+    const allFit: TopUpPlan = { needs: { lunch: 3 }, short: { lunch: 5 }, have: { lunch: 2 }, fewFit: { lunch: 2 }, crowded: [] }
+    check('every one fits but there are few: her wording, "You only have 2 lunches"', topUpOffer(allFit)?.text === `You only have 2 lunches, so they keep repeating. I can add more. ${S}`, topUpOffer(allFit))
+    const oneFits: TopUpPlan = { needs: { lunch: 4 }, short: { lunch: 6 }, have: { lunch: 1 }, fewFit: { lunch: 1 }, crowded: [] }
+    check('...one lunch is "1 lunch, so it keeps"', topUpOffer(oneFits)?.text === `You only have 1 lunch, so it keeps repeating. I can add more. ${S}`, topUpOffer(oneFits))
+    const bothAllFit: TopUpPlan = { needs: { lunch: 3, dinner: 3 }, short: { lunch: 5, dinner: 5 }, have: { lunch: 2, dinner: 2 }, fewFit: { lunch: 2, dinner: 2 }, crowded: [] }
+    check('...several meals that all fit: "a few", never "very few fit"', topUpOffer(bothAllFit)?.text === `You only have a few lunches and dinners, so they keep repeating. I can add more. ${S}`, topUpOffer(bothAllFit))
+    const mixed: TopUpPlan = { needs: { lunch: 3, dinner: 3 }, short: { lunch: 5 }, have: { lunch: 2, dinner: 7 }, fewFit: { lunch: 2, dinner: 1 }, crowded: [] }
+    check('...but one meal with few that fit keeps the fit wording for the pair', /^Very few of your lunches and dinners fit your targets/.test(topUpOffer(mixed)?.text ?? ''), topUpOffer(mixed))
+    check('...and the fit wording stays when some do not fit (2 of 7)', /^Only 2 of your 7 dinners fit/.test(offer2?.text ?? '') && /^Very few of your lunches and dinners fit/.test(topUpOffer(both)?.text ?? ''))
     check('...and it promises what the button promises: today and the shopping-list days stay', /Today, and any day on your shopping list, stay exactly as they are\.$/.test(offer2?.text ?? ''))
     const countAndFit: TopUpPlan = { needs: { dinner: 4, lunch: 2 }, short: { lunch: 2, dinner: 4 }, have: { lunch: 5, dinner: 3 }, fewFit: { dinner: 2 }, crowded: [] }
     check('when both are true the fit offer comes first', topUpOffer(countAndFit)?.kind === 'fit')
