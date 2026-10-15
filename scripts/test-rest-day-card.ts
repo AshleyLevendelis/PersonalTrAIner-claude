@@ -119,7 +119,7 @@ const recoveryBody = cardBare.slice(cardBare.indexOf('export function ActiveReco
 check('the rest day owns the trigger itself', /startOpen/.test(restBody))
 check('...and active recovery deliberately does not', !/startOpen/.test(recoveryBody))
 check('the sheet is still lazily loaded on both, so its weight stays off first paint',
-  (cardBare.match(/<Suspense/g) ?? []).length >= 2 && /lazy\(\(\) => import\('\.\/AddCardioSessionSheet'\)/.test(cardBare))
+  (cardBare.match(/<Suspense/g) ?? []).length >= 2 && /(?:lazy|lazyWithReload)\(\(\) => import\('\.\/AddCardioSessionSheet'\)/.test(cardBare))
 // The form itself is UNCHANGED — the handoff moved the trigger, not the form.
 check('the form still says what it reaches, before the tap',
   /rest of this block — not just today/.test(sheet))
