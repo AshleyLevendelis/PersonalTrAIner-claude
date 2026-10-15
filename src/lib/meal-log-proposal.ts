@@ -18,7 +18,7 @@
 // that a server-side insert would have thrown away.
 // ---------------------------------------------------------------------------
 
-import { MIN_COVERAGE } from './meal-generation'
+import { MIN_COVERAGE } from './meal-costing'
 import { MAIN_MEAL_MIN_KCAL, assumedLine, tooSmallForMainMeal } from './food-db'
 import type { MealMacros, MealSlotName } from './meal-store'
 

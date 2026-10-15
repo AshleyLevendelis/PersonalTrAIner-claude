@@ -22,7 +22,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { buildMealLogProposal, normaliseSlot, LOGGABLE_SLOTS } from '../src/lib/meal-log-proposal'
-import { MIN_COVERAGE } from '../src/lib/meal-generation'
+import { MIN_COVERAGE } from '../src/lib/meal-costing'
 import { lookupIngredient } from '../supabase/functions/_shared/food-db.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')

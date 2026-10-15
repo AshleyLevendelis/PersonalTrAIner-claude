@@ -441,6 +441,9 @@
     "test:round-setup": "tsx scripts/test-round-setup.ts",
     "test:rebuild-honours": "tsx scripts/test-rebuild-honours.ts",
     "test:ingredient-lookup": "tsx scripts/test-ingredient-lookup.ts",
+    "test:meals-costed-as-weighed": "tsx scripts/test-meals-costed-as-weighed.ts",
+    "measure:meals-costed-as-weighed": "tsx scripts/measure-meals-costed-as-weighed.ts",
+    "verify:meal-costed": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-costed.mjs",
     "test:meal-method-check": "tsx scripts/test-meal-method-check.ts",
     "test:food-exclusions": "tsx scripts/test-food-exclusions.ts",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs"

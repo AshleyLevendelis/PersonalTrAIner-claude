@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **H32 (run 7, 14 Oct 2026): A MEAL IS COSTED IN THE STATE ITS CARD TELLS HER TO WEIGH IT. Built
+  15 Oct 2026 on a worktree branch, not merged.** Plan first, as asked (it touches calorie numbers):
+  `docs/plans/meals-costed-as-weighed.md`.
+  - **What was wrong (confirmed, measured):** a dinner card listed "177g raw chicken breast, 53g dry
+    couscous" over 459 kcal · 64P · 20C · 13F. The lookup has been right since 11 Oct; the CARD read
+    the numbers stored when the meal was made, and stored numbers were only ever recomputed on a
+    resize. The real pre-fix code (git 45264e98) gives those two lines 351 kcal / 56.9 P / 12.2 C;
+    today's gives 412 / 46.6 / 41.0. The day totals, the day search, refit, top-up and the coach all
+    read the same stored numbers. **CORRECTED:** the 11 Oct plan's section 7 said "stored meals are
+    re-costed when read (refit, day assembly)"; only a RESIZED dish ever was. It read like a fact
+    because it sat under "Risks" and nobody measured it.
+  - **What changed:** `readPools` (the one read of stored meals) costs each meal from its own lines
+    with today's table (`costStoredMeal`, `src/lib/meal-costing.ts`), keeping the stored numbers
+    WHOLE when the lines cannot be costed as well as a new meal (an amount unread, or under the same
+    80% floor `verifyProposal` uses; that constant now lives in one place). Never a line-by-line
+    mix. **The inverse gap, closed:** 16 entries whose figures describe one state with no twin
+    (raw: salmon, both beef minces, chicken mince, tuna steak, trout, red snapper, squid, scallops,
+    oysters, chicken liver, taro; cooked: duck breast, venison, split peas, barley) now treat a line
+    naming the OTHER state as a miss, never the wrong state ("cooked salmon" was costed raw,
+    "dried split peas" at a third of their energy). Placed by their own figures against USDA SR
+    Legacy (CSCS delegation, population nutrition); entries whose state could not be read off their
+    figures were left alone. A miss is fail-closed under all 22 diets, so no verdict moved toward
+    permissive (checked).
+  - **Measured:** the library as written, **0 of 290 affected** (188 + 102; no raw/dry line in
+    it). The same dishes written raw/dry the way the meal writer is told to: **149 of 290 affected**,
+    median 83 kcal (15%) off, 120 beyond a meal's 7% band, carbs under-stated by a median 19 g,
+    protein off by a median 5 g (worst 21 g over), worst dish 919 vs 646 kcal; all 149 re-costed by
+    the read. A whole H32-like dish: 482 → 543 kcal, 61 → 51 P, 23 → 52 C (her estimate ~540/53/45).
+    **Her own stored pools: not measured** (no database from a cloud session).
+  - **CSCS review:** intake is now compared against what the food delivers; a day that read on
+    target may read off it and the day search may serve another dish (honest, nothing removed); no
+    floor or target changes; not clinical.
+  - **Questions for Ashley (built neutral, no new words):** (1) should the card say when a meal's
+    numbers were worked out again? (2) an unmarked line ("170g chicken breast", "150g salmon") does
+    not say which state to weigh, and the figures assume cooked for chicken, fish fillets, rice and
+    pasta but raw for salmon and mince (library: 147 cooked, 19 raw, 14 dry). Say "cooked"/"raw" on
+    every such line?
+  - **Not done:** a stored line misread before 1 Oct (an ounce stored as a gram) cannot be repaired
+    from the line; what she has already LOGGED keeps the number she logged (history is permanent).
+  - **Verified:** `test:meals-costed-as-weighed` (20 checks; 17 mutations, 17 caught, every check
+    seen failing), `verify:meal-costed` (8 checks at 390x844; 8 mutations, 8 caught; screenshots
+    read), `measure:meals-costed-as-weighed`. Derived gates (every `test:` reading the changed
+    files, plus diet-rules, portion-scaler, rotation, grocery, library and custom-meal readers,
+    `test:bundle`, `test:no-dead-code`): 57 of 57; gates reading the harness, CLAUDE.md and
+    package.json: 23 of 24, the one being `test:coach-exam-fresh`, red before this change (the coach
+    changed after the last exam; nothing here touches it). All 25 nutrition drivers green, one at a
+    time. `tsc` clean. Bundle headroom 8 / 8 / 22 / 25 kB, no budget moved. No full sweep run.
+  - **Deploys:** frontend on merge (the fix itself); **`chat-gemini`** (the only function importing
+    `_shared/food-db.ts`) for the coach's own costing of "cooked salmon" and the rest of the 16.
+
 - [x] **RELEASE SWEEP, 12 Oct 2026, on the merged tree (run 5, the allergy path, the kit list): 387 of 397, then the 6 drivers fixed.**
   Frozen copy of 50d8955a, every `test:` and `verify:` gate including `test:quality` and `test:audit`.
   - **Environmental, as always:** `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database

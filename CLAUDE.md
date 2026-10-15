@@ -198,7 +198,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`, and since 11 Oct 2026 an ingredient line is costed and tagged only when
   every word in it is accounted for (a dish is a miss, never one of its
-  ingredients) — `ingredient-lookup`
+  ingredients) — `ingredient-lookup`. **And counted in the state the card
+  tells her to weigh it, since 15 Oct 2026 (H32)**: a STORED meal's numbers are
+  worked out again from its own lines on every read, because the card, the day
+  and the day search had been reading numbers stored before the table knew
+  "raw" and "dry" ("177g raw chicken breast" costed as cooked breast). Kept
+  whole when the lines cannot be costed as well as a new meal, never mixed; a
+  line naming a state the food has no figures for is a miss, never the wrong
+  state. Library as written: 0 of 290 affected; written raw/dry the way the
+  meal writer is told to, 149 of 290, median 15% off. Her own pools are
+  unmeasured (no database here). `meals-costed-as-weighed` (20 checks, 17
+  mutations), `verify:meal-costed` (8 checks, 8 mutations),
+  `measure:meals-costed-as-weighed`
 - **And a different day tomorrow** — since 19 Sep 2026, on Ashley's "fix the
   variety". CORRECTED, measured: this line said "varied" and nothing had ever
   counted. **1.11 distinct days in a seven-day week; 89.4% of profiles ate the
