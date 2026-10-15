@@ -8,8 +8,10 @@
 // she SEES, on the real chat at phone size:
 //   1. eggs on toast is a card of 350+ kcal, with "Assumed: …" written once;
 //   2. the wrap and the latte is a QUESTION about the latte, and no card;
-//   3. a meal with one food the app does not know says "Not counted: …" on
-//      the card, before the tap;
+//   3. a meal with one food the app does not know is ASKED about, and no card
+//      with a total is shown (run 7, M51: her "if a food can't be counted, ask
+//      before showing the card; never show a total that quietly leaves it
+//      out"; it used to be a card with "Not counted: …");
 //   4. the tap writes the number the card showed.
 //
 // THE COACH'S HALF IS NOT STUBBED BY HAND. The server's log_meal handler is a
@@ -191,6 +193,8 @@ check('1d. the card says 350 kcal or more — it was 266', Number(eggKcal) >= 35
 check('1e. no figure under 300 kcal is anywhere in the conversation', kcals(t1.slice(t1.indexOf(TURNS.eggs.said))).every(k => k >= 300), kcals(t1.slice(t1.indexOf(TURNS.eggs.said))))
 check('1f. assumptions are written once: "Assumed: large eggs; white toast; 10 g butter."', /Assumed: large eggs; white toast; 10 g butter\./.test(t1), t1.slice(-400))
 check('1g. ...and never "Assuming assumed"', !/assum\w*\s+assum/i.test(t1), t1.slice(-400))
+// RUN 7, M51: "breakfast" was drawn struck through, as if the meal replaced it.
+check('1g2. the slot is not struck through: nothing on the card is crossed out', await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] .line-through')].filter(e => (e.textContent || '').trim()).length`) === 0, await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] .line-through')].map(e => e.textContent)`))
 check('1h. nothing is written before the tap', (await logged()).length === 0, await logged())
 check('1i. one card is waiting for her tap', (await applyButtons()) === 1, await applyButtons())
 await shoot('meal-log-card-eggs')
@@ -222,17 +226,21 @@ const qBox = await ev(`(() => {
 check('3h. the question is inside the screen, not a scroll away', !!qBox && qBox.top >= 0 && qBox.bottom <= qBox.h, qBox)
 await shoot('meal-log-card-question')
 
-console.log('\n4. A food the app does not know is named on the card\n')
-check('4a. the sanity of the fixture: the handler produced a card with one food left out', RESPONSES.bowl.proposal?.computed?.unmatched?.join() === 'flargle sauce' && RESPONSES.bowl.proposal.computed.coverage >= 0.8, RESPONSES.bowl)
+console.log('\n4. A food the app does not know is ASKED about, and there is no card\n')
+check('4a. the sanity of the fixture: the handler computed the meal with one food left out', RESPONSES.bowl.proposal?.computed?.unmatched?.join() === 'flargle sauce' && RESPONSES.bowl.proposal.computed.coverage >= 0.8, RESPONSES.bowl)
+const cardsBefore4 = await applyButtons()
+const loggedBefore4 = (await logged()).length
 check('4b. the message is sent', await say(TURNS.bowl.said))
-const t4 = await text()
+let t4 = await text()
+// The reply types itself out: wait for its LAST words, not its first.
+for (let i = 0; i < 40 && !/leave it out\?/.test(t4.slice(t4.lastIndexOf(TURNS.bowl.said))); i++) { await wait(400); t4 = await text() }
 const after4 = t4.slice(t4.lastIndexOf(TURNS.bowl.said))
-check('4c. it asks to log it to dinner', /Log this to your dinner\?/.test(after4), after4.slice(0, 400))
-check('4d. the card says "Not counted: flargle sauce."', /Not counted: flargle sauce\./.test(after4), after4.slice(0, 500))
-const warn = await ev(`(() => { const p = [...document.querySelectorAll('p[data-severity]')].filter(e => /Not counted/.test(e.textContent || '')).pop(); if (!p) return null; const r = p.getBoundingClientRect(); return { severity: p.getAttribute('data-severity'), top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } })()`)
-check('4e. ...as the card\'s own warning line', warn?.severity === 'warn', warn)
-check('4f. ...on screen, above the Apply button she would tap', !!warn && warn.top >= 0 && warn.bottom <= warn.h, warn)
-check('4g. no "Assumed" line when nothing was assumed', !/Assumed:/.test(after4), after4.slice(0, 400))
+check('4c. IT ASKS: names the food it could not count, asks how much, offers to leave it out', /I couldn't count flargle sauce in .+, so I haven't put a total on it yet\. How much was it .*\? Or shall I leave it out\?/.test(after4), after4.slice(0, 500))
+check('4d. NO CARD: no "Log this to your dinner?", no new Apply', !/Log this to your dinner\?/.test(after4) && (await applyButtons()) === cardsBefore4, { after: after4.slice(0, 300), apply: await applyButtons() })
+check('4e. ...no total is shown for the meal, and no "Not counted" line', !/kcal/.test(after4) && !/Not counted/.test(after4), after4.slice(0, 400))
+check('4f. ...and nothing was written', (await logged()).length === loggedBefore4, await logged())
+const q4 = await ev(`(() => { const els = [...document.querySelectorAll('p, div, span')].filter(e => e.children.length <= 2 && /I couldn't count/.test(e.textContent || '')); const r = els.length ? els[els.length - 1].getBoundingClientRect() : null; return r ? { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } : null })()`)
+check('4g. the question is on screen', !!q4 && q4.top >= 0 && q4.bottom <= q4.h, q4)
 await shoot('meal-log-card-not-counted')
 
 console.log(`\n${ran} checks ran.`)

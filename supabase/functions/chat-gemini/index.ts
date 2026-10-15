@@ -3959,6 +3959,17 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // soften it into a number, and it defended the last wrong one.
         const doubt = doubtAboutLoggedMeal(computed, args.meal_slot);
         if (!asked) {
+          // A FOOD THAT CANNOT BE COUNTED IS ASKED ABOUT FIRST (run 7, M51): never a card whose total quietly
+          // leaves it out. The same sentence the client refuses with (meal-log-proposal.ts), so the two agree.
+          const notCounted = computed.unmatched.map((u: string) => String(u).trim()).filter(Boolean);
+          if (notCounted.length > 0) {
+            const one = notCounted.length === 1;
+            const list = one ? `**${notCounted[0]}**` : `${notCounted.slice(0, -1).map((u: string) => `**${u}**`).join(", ")} and **${notCounted[notCounted.length - 1]}**`;
+            return new Response(
+              JSON.stringify({ reply: `I couldn't count ${list} in **${args.food_name}**, so I haven't put a total on it yet. How much ${one ? "was it" : "were they"} (grams, or slices, cups and so on)? Or shall I leave ${one ? "it" : "them"} out?` }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
           if (doubt) {
             return new Response(
               JSON.stringify({ reply: doubt }),

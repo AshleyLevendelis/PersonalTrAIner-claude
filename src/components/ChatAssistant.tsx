@@ -2202,7 +2202,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_meal_food_resize') return `I can make that **${rows[0].after}**:`
     // Asks; never announces. The write happens on the tap, so the wording has
     // to be a question right up until it does.
-    if (pendingAction.kind === 'propose_meal_log') return `Log this to your ${rows[0].before}?`
+    if (pendingAction.kind === 'propose_meal_log') return `Log this to your ${rows[0].field}?`
     // The rationale IS the offer here ("that's all five I've got — want me to
     // find new ones?"), so repeating a headline above it would say it twice.
     if (pendingAction.kind === 'propose_meal_pool_refresh') return pendingAction.diff.rationale ?? 'Want me to find you some new options?'

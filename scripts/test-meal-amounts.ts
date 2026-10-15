@@ -257,7 +257,7 @@ console.log('\n4. The two meals from the test log\n')
       asSent.kind === 'question' && /latte/.test(asSent.text) && !/wrap/.test(asSent.text), asSent)
     const answered = logOutcome(db, [WRAP_AND_LATTE[0][1][0], { name: 'whole milk latte', quantity: 350, unit: 'ml' }], 'lunch', 'chicken caesar wrap and a large latte')
     check(`...and once the latte's size is given, it says it does not know the wrap, by name, and logs nothing (${copy})`,
-      answered.kind === 'refused' && /don't know chicken caesar wrap/.test(answered.text) && !/don't know[^.]*latte/.test(answered.text), answered)
+      answered.kind === 'refused' && /couldn't count \*\*chicken caesar wrap\*\*/.test(answered.text) && !/couldn't count (\*\*[^*]*\*\*(, | and ))*\*\*[^*]*latte/.test(answered.text), answered)
     check(`...and the wrap is not a tortilla any more (${copy})`, db.lookupIngredient('chicken caesar wrap') === null, db.lookupIngredient('chicken caesar wrap')?.name)
   }
 }
@@ -321,8 +321,15 @@ console.log('\n6. What the card says\n')
   check('no assumptions, no "Assumed" line', none.ok && !/Assumed/.test(JSON.stringify(none.diff)), none)
   const partial = buildMealLogProposal({ ...base, computed: { ...base.computed, unmatched: ['mystery sauce'], coverage: 0.9 }, assumptions: [] })
   const ptext = partial.ok ? JSON.stringify(partial.diff) : ''
-  check('a food left out of the numbers is named on the card: "Not counted: mystery sauce"', /Not counted: mystery sauce/.test(ptext), ptext || partial)
-  check('...as a warning line, not buried in the quote', partial.ok && (partial.diff as { implications?: { severity: string; text: string }[] }).implications?.some(i => i.severity === 'warn' && /Not counted/.test(i.text)) === true, partial)
+  // RUN 7, M51 (her words: "if a food can't be counted, ask before showing the card; never show a total that
+  // quietly leaves it out"). This used to be a card with "Not counted: mystery sauce" under a total without it.
+  check('a food that cannot be counted is ASKED ABOUT, and no card with a total is built', partial.ok === false && ptext === '', partial)
+  check('...naming it, asking how much, and offering to leave it out', !partial.ok && /^I couldn't count \*\*mystery sauce\*\* in \*\*Eggs on toast\*\*, so I haven't put a total on it yet\. How much was it .*\? Or shall I leave it out\?$/.test(partial.reason), partial)
+  const two = buildMealLogProposal({ ...base, computed: { ...base.computed, unmatched: ['mystery sauce', 'flargle'], coverage: 0.95 }, assumptions: [] })
+  check('...two are named together, "were they" / "them"', !two.ok && /\*\*mystery sauce\*\* and \*\*flargle\*\*/.test(two.reason) && /How much were they/.test(two.reason) && /leave them out\?$/.test(two.reason), two)
+  check('a card never carries a food it left out, and never the slot struck through as a "before"', none.ok && (none.payload as { unmatched: string[] }).unmatched.length === 0 && (none.diff as { rows: { field: string; before: string }[] }).rows[0].before === '' && (none.diff as { rows: { field: string }[] }).rows[0].field === 'breakfast', none.ok ? none.diff : none)
+  const fnSrc = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+  check('the coach asks the same question before it sends any card (same words)', /if \(notCounted\.length > 0\) \{[\s\S]{0,600}I couldn't count \$\{list\} in \*\*\$\{args\.food_name\}\*\*, so I haven't put a total on it yet\.[\s\S]{0,400}\}\s*if \(doubt\) \{/.test(fnSrc))
   const small = buildMealLogProposal({ ...base, rawArgs: { food_name: 'Coffee', meal_slot: 'lunch' }, computed: { ...base.computed, kcal: 40 }, assumptions: [] })
   check('the card\'s own verifier also refuses a 40 kcal lunch', small.ok === false && /40 kcal/.test(small.ok ? '' : small.reason), small)
   const snack = buildMealLogProposal({ ...base, rawArgs: { food_name: 'Coffee', meal_slot: 'snack' }, computed: { ...base.computed, kcal: 40 }, assumptions: [] })
