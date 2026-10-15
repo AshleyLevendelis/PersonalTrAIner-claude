@@ -1021,6 +1021,12 @@ export const RECEIPTS_UNDONE = {
   title: 'Put back',
   label: 'Undone',
   detail: (was: string) => `${was.replace(/[.!]+$/, '')} was taken back. Everything is as it was before.`,
+  // AN UNDO THAT DID NOT HAPPEN SAYS SO ON THE CARD (run 7, 15 Oct 2026, M53). Each is a statement of fact: nothing
+  // was changed, and whether a second tap can work.
+  refusedLabel: "Couldn't undo",
+  tooLate: 'Undo only lasts 10 minutes, so nothing was changed.',
+  cannot: "This one can't be undone from here, so nothing was changed.",
+  failed: "That didn't undo, so nothing was changed. Try again in a moment.",
 } as const
 
 export const RECEIPTS: Record<string, ReceiptTitles> = {

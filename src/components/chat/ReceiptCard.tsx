@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
 import type { PendingActionReceipt } from '@/lib/pending-actions-store'
@@ -23,6 +23,7 @@ export function ReceiptCard({
   status,
   receipt,
   undoAvailable,
+  undoUntil,
   onUndo,
   onRetryFailed,
   onViewProfile,
@@ -36,6 +37,8 @@ export function ReceiptCard({
   status: 'done' | 'partial' | 'failed'
   receipt?: PendingActionReceipt
   undoAvailable?: boolean
+  /** When Undo stops working (ms). The button goes at that moment, so an old card cannot offer an Undo that does nothing (run 7, M53). */
+  undoUntil?: number
   onUndo?: () => Promise<void>
   onRetryFailed?: (op: string) => Promise<void>
   /** VISION-ARCHITECTURE.md §1 Part 4 — "linkable from chat receipts": present only for memory_*_saved receipts, deep-links to the Profile screen (Memory merged in) scrolled to the relevant section. */
@@ -48,6 +51,15 @@ export function ReceiptCard({
   onViewExercise?: () => void
 }) {
   const [busy, setBusy] = useState<'undo' | string | null>(null)
+  const [undoExpired, setUndoExpired] = useState(false)
+  useEffect(() => {
+    if (undoUntil == null) return
+    const left = undoUntil - Date.now()
+    if (left <= 0) { setUndoExpired(true); return }
+    setUndoExpired(false)
+    const t = setTimeout(() => setUndoExpired(true), left)
+    return () => clearTimeout(t)
+  }, [undoUntil])
 
   const handleUndo = async () => {
     if (!onUndo) return
@@ -145,7 +157,7 @@ export function ReceiptCard({
               View
             </Button>
           )}
-          {undoAvailable && onUndo && (
+          {undoAvailable && !undoExpired && onUndo && (
             <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" disabled={busy != null} onClick={handleUndo}>
               {busy === 'undo' ? 'Undoing…' : 'Undo'}
             </Button>

@@ -222,6 +222,24 @@ async function main() {
     const fn = code('supabase/functions/chat-gemini/index.ts')
     check('the coach is told its tool ends a temporary change early', /'end the two-week knee adjustment early'\) is ENDED TODAY/.test(fn) && /Never answer "I couldn't find that" for this/.test(fn))
     check('an undone card says so, not the old title', /title: RECEIPTS_UNDONE\.title, rows: \[\{ label: RECEIPTS_UNDONE\.label, detail: RECEIPTS_UNDONE\.detail\(m\.receipt\.title\) \}\]/.test(chat) && RECEIPTS_UNDONE.detail('Rescheduled') === 'Rescheduled was taken back. Everything is as it was before.')
+    // RUN 7, M53: an old card's Undo was tapped after its ten minutes; the handler returned with nothing on screen
+    // and the card went on reading "Rescheduled". Every way out of the undo now names its outcome.
+    const coreAt = chat.indexOf('const undoReceiptCore = async')
+    const core = coreAt >= 0 ? chat.slice(coreAt, chat.indexOf('const handleUndoReceipt = async', coreAt)) : ''
+    const bare = core.match(/\breturn\s*(?:\n|\/\/|\}|$)/g) ?? []
+    check('every way out of an undo names its outcome (no bare return)', core.length > 3000 && bare.length === 0, bare)
+    // The detector, on something that should fail it, so it cannot go vacuous.
+    // 'handled' means "this branch wrote its own card": only the day swap does, plus the no-token guard (no button).
+    check('...and only the day swap, which writes its own card, ends as "handled" (plus the no-Undo guard)', (core.match(/return 'handled'/g) ?? []).length === 2 && /return \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'|if \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'/.test(core) && /setMessages\([\s\S]{0,900}\)\)\s*\n\s*return 'handled'/.test(core), (core.match(/return 'handled'/g) ?? []).length)
+    check('...the bare-return detector fires on a bare return', (/\breturn\s*(?:\n|\/\/|\}|$)/.test('if (x) return\n')))
+    check('...a window that has passed is said, not swallowed', (core.match(/if \(!isWithinUndoWindow\([^)]*\)\) return \{ refused: RECEIPTS_UNDONE\.tooLate, keep: false \}/g) ?? []).length === 7)
+    const wrapAt = chat.indexOf('const handleUndoReceipt = async')
+    const wrap = wrapAt >= 0 ? chat.slice(wrapAt, chat.indexOf('const isInterrupted', wrapAt)) : ''
+    check('the wrapper catches a throw and says the undo failed', /catch \(err\) \{[\s\S]{0,120}out = \{ refused: RECEIPTS_UNDONE\.failed, keep: true \}/.test(wrap))
+    check('...and puts a refusal on the card, keeping Undo only when a second tap can work', /label: RECEIPTS_UNDONE\.refusedLabel, detail: out\.refused \}\], undoToken: out\.keep \? m\.receipt\.undoToken : undefined/.test(wrap))
+    check('the refusal sentences say nothing was changed', [RECEIPTS_UNDONE.tooLate, RECEIPTS_UNDONE.cannot, RECEIPTS_UNDONE.failed].every(t => /nothing was changed/.test(t)) && /10 minutes/.test(RECEIPTS_UNDONE.tooLate))
+    const card = code('src/components/chat/ReceiptCard.tsx')
+    check('the card takes its Undo away when the ten minutes end, not at its next re-render', /setTimeout\(\(\) => setUndoExpired\(true\), left\)/.test(card) && /\{undoAvailable && !undoExpired && onUndo && \(/.test(card) && /undoUntil=\{undoWindowEndsAt\(msg\.receipt\.resolvedAt\)\}/.test(chat))
   }
 
   console.log(`\n${checks} checks ran.`)

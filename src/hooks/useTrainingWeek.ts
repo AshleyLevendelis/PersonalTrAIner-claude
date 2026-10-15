@@ -251,11 +251,11 @@ interface BuildTrainingWeekInput {
  * point: a Monday-to-Sunday window of a plan begun on a Thursday holds two plan weeks, and the
  * days of the other one used to be shown with this week's sessions.
  *
- * Pure. Exported since run 7 (15 Oct 2026): Home's trainer note and the coach's week review read the
- * SAME days the strip draws (readTrainingWeeks below), so "0 of 4 done" and "7th session this week"
- * can no longer come from two counts.
+ * Pure. Since run 7 (15 Oct 2026) Home's trainer note and the coach's week review read the SAME days the
+ * strip draws, through readTrainingWeeks below, so "0 of 4 done" and "7th session this week" can no
+ * longer come from two counts.
  */
-export function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[] {
+function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[] {
   const { monday, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading } = input
   const planStartStr = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : undefined
   return Array.from({ length: 7 }, (_, i) => {

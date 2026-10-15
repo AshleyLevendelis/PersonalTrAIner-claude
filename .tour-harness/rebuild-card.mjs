@@ -7,7 +7,8 @@
 //
 //   1  the card names the start date she asked for and each day of the first week it changes, and the old
 //      "Rebuilds N weeks from week 1" line is gone
-//   2  nothing is written before the tap; Apply rebuilds; Undo retitles the card "Put back"
+//   2  nothing is written before the tap; Apply rebuilds; Undo retitles the card "Put back"; an Undo tapped after
+//      its ten minutes says so on the card and goes (run 7, M53)
 //   3  H27: "end the knee adjustment early" with nothing running gets a reason in words, never "I couldn't find
 //      that on your current plan"
 //
@@ -126,6 +127,26 @@ for (let i = 0; i < 40 && !/was taken back/.test(undone.text); i++) { await wait
 check('2c. THE CARD SAYS IT WAS UNDONE: "Put back", and what was taken back', /Put back/.test(undone.text) && /was taken back\. Everything is as it was before\./.test(undone.text), undone.text.slice(-800))
 check('2d. ...and no Undo is left to tap twice', !undone.btns.includes('Undo'), undone.btns)
 await shoot('rebuild-card-undone')
+
+// M53 (run 7): an OLD card's Undo. Apply again, then move the page's clock past the ten minutes without a re-render
+// (the button is still drawn, as it was on her phone) and tap it. It must say it could not undo, keep the title,
+// and take the dead button away. Date.now is what the window is measured on, so that is what moves.
+check('2e. the same request again, applied', await say(`Can we change to ${NEW_DAYS.join(', ')} from next week?`))
+let again = await ev(READ)
+for (let i = 0; i < 60 && !again.hasCard; i++) { await wait(500); again = await ev(READ) }
+await ev(`(() => { const b = [...document.querySelectorAll('button')].filter(x => /^Apply/.test((x.textContent || '').trim())).pop(); if (!b || b.disabled) return false; b.click(); return true })()`)
+for (let i = 0; i < 60 && (again.btns.filter(b => b === 'Undo').length < 1 || !/Rescheduled/.test(again.text.slice(again.text.lastIndexOf('from next week?')))); i++) { await wait(500); again = await ev(READ) }
+check('2f. a fresh receipt with its Undo', again.btns.includes('Undo') && /Rescheduled/.test(again.text.slice(again.text.lastIndexOf('from next week?'))), again.btns)
+await ev(`(() => { window.__realNow = Date.now; Date.now = () => window.__realNow.call(Date) + 11 * 60_000; return true })()`)
+check('2g. eleven minutes later, the Undo still drawn is tapped', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === 'Undo'); if (!b) return false; b.click(); return true })()`))
+let late = await ev(READ)
+for (let i = 0; i < 40 && !/Undo only lasts/.test(late.text); i++) { await wait(500); late = await ev(READ) }
+const lastCard = late.text.slice(late.text.lastIndexOf('from next week?'))
+check('2h. THE CARD SAYS IT COULD NOT UNDO, and why', /Couldn't undo\s*Undo only lasts 10 minutes, so nothing was changed\./.test(lastCard), lastCard.slice(-600))
+check('2i. ...keeps saying what did happen ("Rescheduled", not "Put back")', /Rescheduled/.test(lastCard) && !/was taken back/.test(lastCard), lastCard.slice(-600))
+check('2j. ...and the dead Undo is gone', !late.btns.includes('Undo'), late.btns)
+await shoot('rebuild-card-undo-too-late')
+await ev(`(() => { Date.now = window.__realNow; return true })()`)
 
 check('3. "end the knee adjustment early", with nothing running', await say('Please end the two-week knee adjustment early'))
 let knee = await ev(READ)
