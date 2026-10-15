@@ -23,6 +23,7 @@
 // ---------------------------------------------------------------------------
 
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { isChunkLoadError, reloadOnce } from '@/lib/chunk-reload'
 
 interface Props {
   children: ReactNode
@@ -43,6 +44,10 @@ export class AppErrorBoundary extends Component<Props, State> {
     // The stack is the only record of what happened — there is no error
     // reporting service wired up, so the console is where a bug report starts.
     console.error('The app hit an unrecoverable render error:', error, info.componentStack)
+    // A screen's file gone because a new version went live (run 7, H30): the page is out of date, so load it
+    // again, once. The lazies already try this; this catches anything that reached here another way. A
+    // reload refused by the loop guard leaves this screen up, which is the honest end of a broken deploy.
+    if (isChunkLoadError(error)) reloadOnce()
   }
 
   private handleRetry = (): void => {
@@ -83,7 +88,8 @@ export class AppErrorBoundary extends Component<Props, State> {
           Anything you logged is saved — this is the display, not your data.
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <button
+          {/* A missing file stays missing (React keeps the failed load), so "Try again" could never work there. */}
+          {!isChunkLoadError(error) && <button
             type="button"
             onClick={this.handleRetry}
             style={{
@@ -99,7 +105,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             }}
           >
             Try again
-          </button>
+          </button>}
           <button
             type="button"
             onClick={this.handleReload}

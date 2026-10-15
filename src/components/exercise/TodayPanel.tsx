@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -44,7 +45,7 @@ import { NextSetButton } from './NextSetButton'
 // nobody has opened yet has no business in the chunk that has to arrive before
 // the first pixel. It costs one extra chunk header in the total and takes its
 // whole weight off first paint.
-const TightnessSheet = lazy(() => import('./TightnessSheet').then(m => ({ default: m.TightnessSheet })))
+const TightnessSheet = lazyWithReload(() => import('./TightnessSheet').then(m => ({ default: m.TightnessSheet })))
 import type { TightnessAnswer } from './TightnessSheet'
 import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
@@ -76,12 +77,12 @@ import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
 // opened from a menu item, by a person who has something to explain about a
 // day — not a screen every load pays for. test:bundle holds the budget.
-const WhatHappenedSheet = lazy(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
-const RemoveExerciseSheet = lazy(() => import('./RemoveExerciseSheet').then(m => ({ default: m.RemoveExerciseSheet })))
+const WhatHappenedSheet = lazyWithReload(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
+const RemoveExerciseSheet = lazyWithReload(() => import('./RemoveExerciseSheet').then(m => ({ default: m.RemoveExerciseSheet })))
 // Same bargain as the two above: a sheet reached from one button at the foot
 // of the list, carrying the whole exercise catalogue's search with it.
-const AddExerciseSheet = lazy(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
-const FinishCheckSheet = lazy(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
+const AddExerciseSheet = lazyWithReload(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
+const FinishCheckSheet = lazyWithReload(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove } from '@/lib/daily-tracking'
 import { readSessionSummary, saveSessionSummary } from '@/lib/session-summary-store'

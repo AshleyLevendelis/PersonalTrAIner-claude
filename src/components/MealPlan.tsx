@@ -1,4 +1,5 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,8 +35,8 @@ import { dayAsShown } from '@/lib/day-as-shown'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
-const MealMoveSheet = lazy(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
-const MealFoodAddSheet = lazy(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
+const MealMoveSheet = lazyWithReload(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
+const MealFoodAddSheet = lazyWithReload(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
 /** Exported so NutritionDisplay's shortfall nudge names slots in the same order this list renders them, rather than keeping a second copy that can drift. */
 export const SLOT_ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']

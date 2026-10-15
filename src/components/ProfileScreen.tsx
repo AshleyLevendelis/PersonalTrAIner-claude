@@ -11,7 +11,8 @@
 // ---------------------------------------------------------------------------
 
 import { splitFoodList } from '@/lib/food-list'
-import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -65,7 +66,7 @@ import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_L
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
 // push plumbing are needed by nobody on first paint (test:bundle holds the
 // main chunk to a budget, and this was the kilobyte that crossed it).
-const RemindersSection = lazy(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
+const RemindersSection = lazyWithReload(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
 

@@ -5,7 +5,8 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
-import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react'
+import { Suspense, useEffect, useState, type CSSProperties } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
@@ -28,10 +29,10 @@ import { sessionSetCount } from '@/lib/session-count'
 import { readSessionSummary } from '@/lib/session-summary-store'
 import { readingFor } from '@/lib/pr-engine'
 import { dayNameOf } from '@/lib/session-move'
-const SessionSummaryDialog = lazy(() => import('@/components/exercise/SessionSummaryDialog').then(m => ({ default: m.SessionSummaryDialog })))
+const SessionSummaryDialog = lazyWithReload(() => import('@/components/exercise/SessionSummaryDialog').then(m => ({ default: m.SessionSummaryDialog })))
 // ITS OWN CHUNK (run 5, 11 Oct 2026): the card reads the list's dates and the
 // meals now, and is up one day a week; first paint does not wait for it.
-const ShopDayCard = lazy(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })))
+const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })))
 import { personalBest, bestReadingOf, streakLabel } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
 import { cardioLine } from '@/lib/cardio-lines'

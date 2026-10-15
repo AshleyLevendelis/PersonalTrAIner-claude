@@ -1,5 +1,6 @@
 import { couldNot, targetsMoved, mealsDrifted, type TargetMoveCause } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
+import { lazyWithReload, isChunkLoadError, reloadOnce } from '@/lib/chunk-reload'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
@@ -77,9 +78,9 @@ import { SignInScreen } from '@/components/SignInScreen'
 // same spinner the restore path already shows, so the transition looks like
 // nothing new rather than like a second kind of loading.
 // ---------------------------------------------------------------------------
-const ConversationalOnboarding = lazy(() =>
+const ConversationalOnboarding = lazyWithReload(() =>
   import('@/components/onboarding/ConversationalOnboarding').then(m => ({ default: m.ConversationalOnboarding })))
-const DevTestPage = lazy(() =>
+const DevTestPage = lazyWithReload(() =>
   import('@/components/DevTestPage').then(m => ({ default: m.DevTestPage })))
 
 // THE COACH, OFF THE CRITICAL PATH — Ashley's ruling, 14 Sep 2026, from three
@@ -99,7 +100,7 @@ const DevTestPage = lazy(() =>
 // HER RULING NAMED THE COST and it is stated rather than buried: the opener and
 // the dot land a fraction of a second later than they used to, and a tap on the
 // chat inside that first instant sees the app's own loading spinner briefly.
-const ChatAssistant = lazy(() =>
+const ChatAssistant = lazyWithReload(() =>
   import('@/components/ChatAssistant').then(m => ({ default: m.ChatAssistant })))
 
 // THE GROCERY SCREEN, OFF THE MAIN BUNDLE AND STILL THERE OFFLINE (design 3a,
@@ -111,7 +112,7 @@ const ChatAssistant = lazy(() =>
 // fetched at start by being mounted, and is in the cache before anyone needs
 // it. The first open then costs nothing, online or off.
 const loadGroceryScreen = () => import('@/components/GroceryScreen')
-const GroceryScreen = lazy(() => loadGroceryScreen().then(m => ({ default: m.GroceryScreen })))
+const GroceryScreen = lazyWithReload(() => loadGroceryScreen().then(m => ({ default: m.GroceryScreen })))
 
 // THE PROFILE SCREEN, OFF THE MAIN BUNDLE (27 Sep 2026). "Foods and meals I
 // like" took the app chunk 2 kB over a budget with none left, and the house
@@ -130,6 +131,8 @@ const ProfileScreen = lazy(() =>
   import('@/components/ProfileScreen')
     .then(m => ({ default: m.ProfileScreen }))
     .catch(err => {
+      // A file renamed by a deploy: reload once (run 7, H30), and keep the null sheet meanwhile.
+      if (isChunkLoadError(err) && reloadOnce()) return new Promise<never>(() => {})
       console.error("Profile's code didn't load — the rest of the app carries on; a reload will fetch it again:", err)
       return { default: (() => null) as unknown as typeof import('@/components/ProfileScreen').ProfileScreen }
     }))

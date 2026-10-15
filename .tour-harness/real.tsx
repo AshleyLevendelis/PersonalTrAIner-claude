@@ -90,6 +90,8 @@ import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
 import { computeSlotBudgets } from '@/lib/meal-generation'
 import { topUpPlan, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
 import { MEAL_LIBRARY } from '@/lib/meal-library-data'
+// The app's own root boundary, as main.tsx mounts it (verify:chunk-reload reads what it shows).
+import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
 
@@ -1627,4 +1629,4 @@ function Harness() {
 ;(window as unknown as { __TOUR_STEPS__: unknown }).__TOUR_STEPS__ = TOUR_STEPS
 
 if (!window.location.hash) window.location.hash = tabHash('dashboard')
-createRoot(document.getElementById('root')!).render(<StrictMode><Harness /></StrictMode>)
+createRoot(document.getElementById('root')!).render(<StrictMode><AppErrorBoundary><Harness /></AppErrorBoundary></StrictMode>)
