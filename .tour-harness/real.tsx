@@ -1129,10 +1129,29 @@ if (TOPUP || REGEN) {
   }) as typeof fetch
 }
 
+// ?stale=1 — H32 (run 7, 14 Oct 2026): A DINNER STORED BEFORE THE FOOD TABLE
+// READ "RAW" AND "DRY". The fixture chooses only what is STORED: the dish's
+// lines as the meal writer wrote them, and the numbers the pre-11-Oct table
+// (git 45264e98) made of those lines, measured on 14 Oct by running that code:
+// the raw breast costed as cooked breast, the dry couscous as cooked couscous.
+// What the card shows is the app's, through the real read (readPools), below.
+const STALE = new URLSearchParams(location.search).get('stale') === '1'
+const staleDinner = {
+  slot: 'dinner', name: 'Greek Chicken Souvlaki with Herbed Couscous',
+  ingredients: [
+    { name: 'raw chicken breast', quantity: 177, unit: 'g' }, { name: 'dry couscous', quantity: 53, unit: 'g' },
+    { name: 'tzatziki', quantity: 60, unit: 'g' }, { name: 'cucumber', quantity: 80, unit: 'g' },
+    { name: 'cherry tomatoes', quantity: 80, unit: 'g' }, { name: 'olive oil', quantity: 1, unit: 'tsp' },
+    { name: 'red onion', quantity: 30, unit: 'g' },
+  ],
+  macros: { calories: 482, protein: 60.8, carbs: 23.1, fat: 15.3 },
+  tags: [], prep: '',
+}
+
 const chosen = (REFIT ? refitChosen : {
   breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
   lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720, METHOD_WITH_AN_AMOUNT),
-  dinner: meal('dinner', 'Salmon, new potatoes and green beans', 780),
+  dinner: STALE ? staleDinner : meal('dinner', 'Salmon, new potatoes and green beans', 780),
 }) as never
 const pools = (REFIT
   ? { breakfast: [refitChosen.breakfast], lunch: [refitChosen.lunch], dinner: [refitChosen.dinner], snack: [refitChosen.snack] }
@@ -1281,6 +1300,24 @@ function Harness() {
   const [livePools, setLivePools] = useState((TOPUP || DAYMOVE ? topUpPools : LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
   // ?daymove=1: today's saved picks, as App holds them (manualMealPicks).
   const [dayMovePicks, setDayMovePicks] = useState<Record<string, string>>({})
+  // ?stale=1: the pools as App restores them on load, through readPools, and
+  // the same dishes on screen read back from that read. Flagged when done so a
+  // driver reads the settled screen, never the moment before the read.
+  useEffect(() => {
+    if (!STALE) return
+    void getPools(PROFILE_ID).then(fresh => {
+      setLivePools(prev => ({ ...prev, ...(fresh as Record<string, PoolOption[]>) }))
+      setLiveChosen(prev => {
+        const next = { ...prev }
+        for (const [slot, options] of Object.entries(fresh as Record<string, PoolOption[]>)) {
+          const same = options.find(o => o.name === prev[slot]?.name)
+          if (same) next[slot] = same
+        }
+        return next
+      })
+      ;(window as unknown as { __poolsRead: boolean }).__poolsRead = true
+    })
+  }, [])
   // THE APP'S OWN HOOK for the strip, not a copy of its wiring: the rotation
   // the app would build from these pools, and the fake database underneath.
   const mealShape = useMemo(() => ({ mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS || TOPUP || DAYMOVE }), [])

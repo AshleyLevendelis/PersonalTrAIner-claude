@@ -21,6 +21,7 @@
 import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
 import type { MacroTargets } from './types'
+import { costStoredMeal } from './meal-costing'
 // Type-only import — meal-generation.ts only imports MealSlotName (a type)
 // from this module, so this doesn't create a real circular dependency.
 import type { PoolOption } from './meal-generation'
@@ -606,14 +607,25 @@ export async function readPools(profileId: string): Promise<{ pools: Partial<Rec
   }
 
   const grouped: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  const keptAsStored: string[] = []
   for (const row of data) {
     const slot = row.slot as MealSlotName
     const macros = row.macros ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    // COSTED AS IT IS WEIGHED (15 Oct 2026, H32): the stored numbers are what
+    // the food table said when the meal was made. A meal made before it read
+    // "raw" and "dry" kept costing raw chicken as cooked and dry couscous as
+    // cooked, on the card, in the day's totals and in what the day search
+    // served. This is the one read of stored meals, so every reader gets the
+    // meal's own lines costed today, or, when today's table cannot cost them
+    // as well as it would a new meal, the stored numbers whole.
+    const stored = { calories: macros.kcal ?? 0, protein: macros.protein ?? 0, carbs: macros.carbs ?? 0, fat: macros.fat ?? 0 }
+    const costing = costStoredMeal(row.ingredients, stored)
+    if (!costing.recosted) keptAsStored.push(`${slot}: ${row.name}`)
     const option: PoolOption = {
       slot,
       name: row.name,
       ingredients: row.ingredients ?? [],
-      macros: { calories: macros.kcal ?? 0, protein: macros.protein ?? 0, carbs: macros.carbs ?? 0, fat: macros.fat ?? 0 },
+      macros: costing.macros,
       tags: row.tags ?? [],
       // Empty for every pool stored before the column existed, which renders
       // as no method rather than as a wrong one.
@@ -622,6 +634,7 @@ export async function readPools(profileId: string): Promise<{ pools: Partial<Rec
     if (!grouped[slot]) grouped[slot] = []
     grouped[slot]!.push(option)
   }
+  if (keptAsStored.length > 0) console.warn(`Kept the stored numbers for ${keptAsStored.length} meal(s) whose lines today's food table cannot fully cost:`, keptAsStored)
   return { pools: grouped, failed: false }
 }
 
