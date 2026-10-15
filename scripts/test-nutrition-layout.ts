@@ -134,6 +134,13 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
   const midday = macroShortfallLine({ ...base, clock: paceClock(new Date('2026-03-11T15:00:00'), ['2026-02-01T09:00:00']),
     eaten: { protein: 0, carbs: 0, fat: 0 }, meals: four([false, false, false, false]) })
   check('...and a meal whose time has not come is not counted (15:00, two due)', midday !== null && midday !== loggingGapLine(4) && midday !== loggingGapLine(2) && /behind/.test(midday), midday)
+  // RUN 7, L48: 18:00, all four unlogged, three of them due. The line said "3 of today's meals still to log".
+  const evening = macroShortfallLine({ ...base, clock: paceClock(new Date('2026-03-11T18:00:00'), ['2026-02-01T09:00:00']),
+    eaten: { protein: 0, carbs: 0, fat: 0 }, meals: four([false, false, false, false]) })
+  check('...and the number said is every meal still to log, not only the due ones (18:00, four unlogged: "4")', evening === loggingGapLine(4), evening)
+  const eveningTwoDue = macroShortfallLine({ ...base, clock: paceClock(new Date('2026-03-11T18:00:00'), ['2026-02-01T09:00:00']),
+    eaten: { protein: 40, carbs: 60, fat: 18 }, meals: four([true, false, false, false]) })
+  check('...while speaking still waits for three DUE (18:00, breakfast logged: two due, no logging line)', eveningTwoDue !== loggingGapLine(3) && eveningTwoDue !== loggingGapLine(2), eveningTwoDue)
   check('...and water alone never becomes a logging line',
     macroShortfallLine({ ...base, eaten: { protein: 180, carbs: 240, fat: 70 }, waterMl: 0, meals: four([false, false, false, false]) }) === 'Water is behind — 2000ml to go.')
 
