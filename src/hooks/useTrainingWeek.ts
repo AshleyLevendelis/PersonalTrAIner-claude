@@ -251,11 +251,11 @@ interface BuildTrainingWeekInput {
  * point: a Monday-to-Sunday window of a plan begun on a Thursday holds two plan weeks, and the
  * days of the other one used to be shown with this week's sessions.
  *
- * Pure. Not exported: the dead-code budget counts an export with no caller outside its file, and the
- * per-date lookup it rests on (planDaysForDate) is what the unit gate holds; the glue is driven in a
- * browser (verify:week-boundary).
+ * Pure. Exported since run 7 (15 Oct 2026): Home's trainer note and the coach's week review read the
+ * SAME days the strip draws (readTrainingWeeks below), so "0 of 4 done" and "7th session this week"
+ * can no longer come from two counts.
  */
-function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[] {
+export function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[] {
   const { monday, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading } = input
   const planStartStr = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : undefined
   return Array.from({ length: 7 }, (_, i) => {
@@ -375,15 +375,53 @@ export function useTrainingWeek(
   const monday = sessionDate ? mondayOf(new Date(sessionDate + 'T12:00:00')) : new Date(getAppNow(profileId))
   const days = buildTrainingWeekDays({ monday, today: sessionDate, plan, mesocycle, planCreatedAt, dashboard, moves, loading })
 
-  const trainingDays = days.filter(d => countsTowardWeekTally(d.state))
-  const sessionsPlanned = trainingDays.length
-  const sessionsDone = trainingDays.filter(d => d.state === 'done').length
-  // STILL AHEAD, not "planned minus done" (user test 8 Oct 2026, finding 18: "0 of 4 done · 4 to
-  // go" on a Thursday with Monday and Wednesday already missed). A missed day is not to go; it is
-  // gone. What is left is today's unfinished session and the days after it.
-  const sessionsLeft = trainingDays.filter(d => d.state === 'due' || (d.state === 'partial' && d.date === sessionDate)).length
-
+  const { sessionsDone, sessionsPlanned, sessionsLeft } = tallyWeek(days, sessionDate)
   return { days, sessionsDone, sessionsPlanned, sessionsLeft, loading, refresh, moves }
+}
+
+/** The week's "N of M done · K to go", from its days. One function, so no screen counts a second way. */
+export function tallyWeek(days: TrainingWeekDay[], today: string): { sessionsDone: number; sessionsPlanned: number; sessionsLeft: number } {
+  const trainingDays = days.filter(d => countsTowardWeekTally(d.state))
+  return {
+    sessionsPlanned: trainingDays.length,
+    sessionsDone: trainingDays.filter(d => d.state === 'done').length,
+    // STILL AHEAD, not "planned minus done" (user test 8 Oct 2026, finding 18: "0 of 4 done · 4 to
+    // go" on a Thursday with Monday and Wednesday already missed). A missed day is not to go; it is
+    // gone. What is left is today's unfinished session and the days after it.
+    sessionsLeft: trainingDays.filter(d => d.state === 'due' || (d.state === 'partial' && d.date === today)).length,
+  }
+}
+
+/**
+ * THIS WEEK AND LAST WEEK, MONDAY TO SUNDAY, AS THE STRIP DRAWS THEM — her ruling, 15 Oct 2026 (run 7,
+ * M54), from three options: every count of "this week" runs Monday to Sunday, the strip's own week. The
+ * plan's "Week N of M" header and its blocks still turn on the day she began: that is where she is in the
+ * plan, not a count. Read for Home's trainer note (H31) and the coach's week review (M50) so neither can
+ * call a week anything the strip does not. One read covers both weeks.
+ */
+export async function readTrainingWeeks(
+  profileId: string,
+  today: string,
+  plan: WorkoutDay[],
+  mesocycle: MesocycleWeek[] | undefined,
+  planCreatedAt: string | undefined,
+  /** Moves the caller already holds (the screen's own week hook read them): never lost to a read that lags. */
+  knownMoves: SessionMove[] = [],
+): Promise<{ thisWeek: TrainingWeekDay[]; lastWeek: TrainingWeekDay[] }> {
+  const monday = mondayOf(new Date(today + 'T12:00:00'))
+  const lastMonday = new Date(monday)
+  lastMonday.setDate(lastMonday.getDate() - 7)
+  const sunday = new Date(monday)
+  sunday.setDate(sunday.getDate() + 6)
+  const from = getLocalDateString(lastMonday)
+  const to = getLocalDateString(sunday)
+  const [dashboard, readMoves] = await Promise.all([
+    getWeeklyDashboard(profileId, from, to),
+    getSessionMovesInRange(profileId, from, to).catch(() => [] as SessionMove[]),
+  ])
+  const moves = [...readMoves, ...knownMoves.filter(m => !readMoves.some(r => r.fromDate === m.fromDate))]
+  const build = (m: Date) => buildTrainingWeekDays({ monday: m, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading: false })
+  return { thisWeek: build(monday), lastWeek: build(lastMonday) }
 }
 
 function classifyLoadingSafe(

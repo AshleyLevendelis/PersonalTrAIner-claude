@@ -442,6 +442,7 @@
     "test:rebuild-honours": "tsx scripts/test-rebuild-honours.ts",
     "verify:chunk-reload": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chunk-reload.mjs",
     "test:chunk-reload": "tsx scripts/test-chunk-reload.ts",
+    "test:coach-week-review": "tsx scripts/test-coach-week-review.ts",
     "test:ingredient-lookup": "tsx scripts/test-ingredient-lookup.ts",
     "test:meal-method-check": "tsx scripts/test-meal-method-check.ts",
     "test:food-exclusions": "tsx scripts/test-food-exclusions.ts",

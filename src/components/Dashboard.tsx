@@ -257,7 +257,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // on "Rest day" beside its own week strip showing four sessions. Both are
     // App.tsx useState arrays, so the identity is stable and this re-runs when
     // the plan actually changes, not on every render.
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion, exercisePlan, mesocycle, movesKey])
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, weighInVersion, macros, retryVersion, exercisePlan, mesocycle, planCreatedAt, movesKey])
 
   // THE CALORIE CELL FOLLOWS THE MEAL LIST ON THE OTHER TAB.
   //

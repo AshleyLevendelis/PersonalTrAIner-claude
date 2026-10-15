@@ -20,6 +20,7 @@ import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
+import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
@@ -121,7 +122,7 @@ import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
-import { useTrainingWeek } from '@/hooks/useTrainingWeek'
+import { useTrainingWeek, readTrainingWeeks } from '@/hooks/useTrainingWeek'
 import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
@@ -1580,7 +1581,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   // eatenByDay: read fresh by callGemini for this turn (H26); null = the log could not be read.
-  const buildContext = (eatenByDay: string | null = null) => {
+  // weekReview: this week and last, Monday to Sunday, as the strip counts them (run 7, M50); null = unread.
+  const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null) => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     // Split out from `.days` (not just `?.days || exercisePlan` inline) so
     // the week's own coach_note is still reachable below — that's where a
@@ -1826,6 +1828,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // "could not see".
       eaten_by_day: eatenByDay,
       eaten_by_day_read: eatenByDay != null,
+      week_review: weekReview,
+      week_review_read: weekReview != null,
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
       cardio_log_history: cardioLogHistory,
@@ -2053,6 +2057,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const eatenByDay = profile.id
       ? buildCoachEatenSummary(await getEatenByDate(profile.id, eatenWindow(eatenToday)).catch(() => null), eatenToday)
       : null
+    // THE WEEK AS THE SCREENS COUNT IT (run 7, M50): this week and last, Monday to Sunday, each day in the
+    // strip's own words, with that day's logged meals, read now for this turn.
+    const reviewWeeks = profile.id
+      ? await readTrainingWeeks(profile.id, eatenToday, liveWeekDays, mesocycle, planCreatedAt ?? profile.created_at, trainingWeek.moves).catch(() => null)
+      : null
+    const weekReview = reviewWeeks && profile.id
+      ? buildCoachWeekReview(reviewWeeks, await getEatenByDate(profile.id, weekReviewDates(reviewWeeks.lastWeek, eatenToday)).catch(() => null), eatenToday)
+      : null
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -2066,7 +2078,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       body: JSON.stringify({
         message: userMessage,
         history,
-        context: buildContext(eatenByDay),
+        context: buildContext(eatenByDay, weekReview),
       }),
       signal: controller.signal,
     })

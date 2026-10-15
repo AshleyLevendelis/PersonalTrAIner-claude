@@ -35,6 +35,7 @@ import { dayLengthParts, formatDayLength } from './session-duration'
 import { readBorrowedDay } from './borrowed-day'
 import { honestSessionMinutes } from './session-derive'
 import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
+import { readTrainingWeeks, countsTowardWeekTally } from '@/hooks/useTrainingWeek'
 
 /**
  * 'unknown' IS NOT 'rest', and conflating them is the defect this value
@@ -619,50 +620,32 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   }
   const streakResult = computeStreak(streakDays)
 
-  // DAYS BEFORE THE PLAN EXISTED ARE NOT PLAN WEEK 1.
-  //
-  // getActiveMesocycleWeek clamps with Math.max(0, elapsedDays), so every date
-  // earlier than planCreatedAt comes back as week 1. The lookback above is 35
-  // days, so on a plan created today all 35 landed in "this plan week" — and
-  // every aggregate below counted five weeks of history that predate the plan
-  // as though it were the current week. Caught by the consistency score
-  // reading "0/19 planned sessions" for a single week; it also made
-  // coach-tips' perfect_adherence able to announce "Every planned session
-  // this week, done — 19 for 19", and skewed session_pace's comparison.
-  //
-  // Related but not the same as the earlier "stop marking pre-plan days as
-  // missed" fix: that one taught the STREAK to ignore them, and these
-  // plan-week aggregates were never taught the same thing.
-  // planCreatedAt is a UTC timestamp; this is compared against local
-  // calendar dates, so it has to be converted to one. Reading the UTC date
-  // off it made the plan look a day older than it was for anyone west of
-  // UTC (and a day younger east of it) whenever the plan was created near
-  // a midnight — which pulled one extra day of pre-plan history into "this
-  // plan week", the exact class of mistake the comment above describes.
+  // The plan's first day, as a LOCAL date (planCreatedAt is a UTC timestamp; reading the UTC date off it made
+  // the plan a day older or younger near midnight). Days before it are never part of a week's "usual".
   const planStartStr = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null
-  const sincePlanStart = (d: { date: string }) => planStartStr == null || d.date >= planStartStr
 
-  // Session pace: distinct trained dates in the current plan week so far vs the same span last plan week.
-  const currentPlanWeek = getActiveMesocycleWeek(planCreatedAt, now, totalWeeks)
-  const inCurrentPlanWeek = (d: { date: string; planWeek: number }) =>
-    d.planWeek === currentPlanWeek && sincePlanStart(d)
-  const daysIntoCurrentWeek = streakDays.filter(inCurrentPlanWeek).length
-  // Distinct trained dates, counted the SAME way in both weeks (a lift or an
-  // activity). This week used to add every cardio log on top of the lifting
-  // dates while last week counted lifting dates only, so one walk could put
-  // a week "ahead". And there is no "usual" without a whole previous plan
-  // week to compare with: in week 1, or when last week's span starts before
-  // the plan, the comparison is null and the tip stays quiet (user test
-  // 8 Oct 2026, #21).
-  const sessionsThisWeekSoFar = streakDays.filter(d => inCurrentPlanWeek(d) && loggedDates.has(d.date)).length
-  const lastPlanWeek = currentPlanWeek - 1
-  const lastWeekDatesSameSpan = streakDays.filter(d => d.planWeek === lastPlanWeek && sincePlanStart(d)).slice(0, daysIntoCurrentWeek).map(d => d.date)
-  const sessionsLastWeekSameSpan = lastPlanWeek >= 1 && daysIntoCurrentWeek > 0 && lastWeekDatesSameSpan.length === daysIntoCurrentWeek
-    ? lastWeekDatesSameSpan.filter(date => loggedDates.has(date)).length
+  // SESSION PACE AND THE WEEK'S COUNTS, MONDAY TO SUNDAY, FROM THE STRIP'S OWN DAYS (run 7, 15 Oct 2026).
+  // Her ruling (M54), from three options: every "this week" count runs Monday to Sunday. And H31: the trainer
+  // note said "7th session this week" while the strip said 0 of 4 done, because it counted distinct DATES with
+  // any set or cardio log in the PLAN week (a session last Thursday counted "this week" on Wednesday) while
+  // the strip counts finished sessions Monday to Sunday. Both now read the days the strip draws
+  // (readTrainingWeeks): a session counts once it is 'done' there, and nothing else is a session. There is no
+  // "usual" without a whole previous week inside the plan, and a failed read says nothing at all.
+  const weeks = await readTrainingWeeks(profileId, todayStr, activeWeekDays, mesocycle, planCreatedAt ?? undefined, windowMoves)
+    .catch(err => { console.error('Home could not read the training week; the pace note stays quiet:', err); return null })
+  // So far: the days before today, and today once its session is done (today is not missed yet).
+  const thisWeekSoFar = weeks ? weeks.thisWeek.filter(d => d.date < todayStr || (d.date === todayStr && d.state === 'done')) : []
+  // The same span of last week: Monday up to the same weekday as today, today included.
+  const span = weeks ? weeks.thisWeek.filter(d => d.date <= todayStr).length : 0
+  const lastWeekSameSpan = weeks ? weeks.lastWeek.slice(0, span) : []
+  const isDone = (d: { state: string }) => d.state === 'done'
+  const sessionsThisWeekSoFar = thisWeekSoFar.filter(isDone).length
+  const sessionsLastWeekSameSpan = weeks && lastWeekSameSpan.length > 0 && (planStartStr == null || lastWeekSameSpan[0].date >= planStartStr)
+    ? lastWeekSameSpan.filter(isDone).length
     : null
 
-  const scheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled).length
-  const loggedOfScheduledSoFarThisWeek = streakDays.filter(d => inCurrentPlanWeek(d) && d.scheduled && sessionDoneByDate.get(d.date)).length
+  const scheduledSoFarThisWeek = thisWeekSoFar.filter(d => countsTowardWeekTally(d.state)).length
+  const loggedOfScheduledSoFarThisWeek = thisWeekSoFar.filter(d => countsTowardWeekTally(d.state) && isDone(d)).length
 
   // Protein adherence: consecutive PRIOR days (not including in-progress
   // today) hitting >=95% of target, over a 14-day window.
@@ -702,10 +685,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   let proteinStreak = 0
   for (const day of proteinDays) { if (!day.hit) break; proteinStreak++ }
 
-  // Consistency — sessions and protein over the CURRENT PLAN WEEK, which is
-  // the window the user is actually living in. Water is left out on purpose;
-  // see consistency-score.ts for why.
-  const weekDates = new Set(streakDays.filter(inCurrentPlanWeek).map(d => d.date))
+  // Consistency — sessions and protein over THIS WEEK, Monday to Sunday (her 15 Oct ruling), the week the
+  // strip shows. Water is left out on purpose; see consistency-score.ts for why.
+  const weekDates = new Set(thisWeekSoFar.map(d => d.date))
   const proteinDaysThisWeek = proteinDays.filter(d => weekDates.has(d.date))
   const consistency = computeConsistency([
     { label: 'planned sessions', done: loggedOfScheduledSoFarThisWeek, outOf: scheduledSoFarThisWeek },
