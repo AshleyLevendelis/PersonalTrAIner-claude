@@ -2,8 +2,51 @@
 
 Newest first. One line each.
 
+- [x] **RUN 7 (Sam's live test, 14 Oct 2026), fixed 15 Oct 2026 on `claude/run-7-fixes`, not merged to `main`,
+  nothing deployed.** Each symptom traced to its cause in the code before fixing; each reproduced red first.
+  - **H30 "Failed to fetch dynamically imported module" after a deploy.** React.lazy caches a failed import, so
+    "Try again" could never work. Every lazily loaded screen (20) now reloads the app once when its file is gone,
+    guarded against a loop (20 s), plus Vite's preload event and the root error screen. `verify:chunk-reload`
+    serves a missing file and watches it recover (and stop at one reload on a broken deploy); `test:chunk-reload`.
+  - **H31 "7th session this week — ahead of your usual pace" at 0 of 4.** The pace tip counted plan-week days
+    (from the start weekday) with no "done" test of its own. It now reads the strip's own days and counts only
+    "done". The exact "7" on the live build was not reproduced (her data is unreadable from here); the old code
+    gave "4th" on Sam's week, which is the same defect.
+  - **M54 two "weeks" on one card. HER RULING, 15 Oct 2026, from three options: "Monday to Sunday"** — every
+    "this week" count, on every screen and in the coach, over "the training week from the start day" (my
+    recommendation) and "a strip that follows the training week". It partially reverses her 6 Oct ruling, which
+    the option named. "Week N of 16", blocks and phases still turn on the start day: that is where she is in
+    the plan, not a count.
+  - **M50 the coach's week review got facts wrong.** It had raw set rows and meal totals and built its own week.
+    Every turn now carries this week and last, Monday to Sunday, one line per day in the strip's words with that
+    day's logged meals, and the prompt says to answer from those lines alone in three short lines at most.
+    Whether the deployed coach obeys is the exam's to judge. `test:coach-week-review` (24 checks, 16 mutations).
+  - **M53 an old card still said "Rescheduled" after Undo.** Undo stayed drawn past its ten minutes and a tap then
+    returned silently. The button now goes when the window ends, and every way out of an undo says how it ended
+    ("Couldn't undo — Undo only lasts 10 minutes, so nothing was changed."). `verify:rebuild-card` §2e-2j.
+  - **M52 missed days looked like planned ones.** A tapped missed day keeps its warning dot, the plan is dimmed,
+    and a banner offers the coach's three: Do it today / Mark it missed / It was a rest day, through the existing
+    writers. Decided as a CSCS coach: when today has its own session, "Do it today" becomes the next free day by
+    name ("Do it Thursday") — two full sessions in one day is not catching up. `verify:missed-day` (16, 10 caught).
+  - **M51 a breakfast card that both left out and assumed the toast.** HER RULE, in her words: "if a food can't
+    be counted, ask before showing the card; never show a total that quietly leaves it out." Any food the
+    database cannot count now stops the card on both halves; the coach asks how much or whether to leave it out.
+    The struck-through "breakfast" was the slot drawn as a "before"; it is the row's label now. The toast miss on
+    her phone is most likely the deployed coach predating the 11 Oct lookup fixes — not provable from here.
+  - **L47** "Only 2 of your 2 lunches fit": now her wording, "You only have 2 lunches, so they keep repeating."
+  - **L48** "3 of today's meals still to log" with 4 unlogged: it counted only meals past their usual time; the
+    number is now every meal still to log (when to say it is unchanged).
+  - **L49 −1.4 kg on Home, −1.0 kg elsewhere.** Traced every weight figure: only Home prints a since-start
+    total. The coach had only a weekly rate and the latest weight, so it could state its own; it is now handed
+    Home's figure and told to say exactly that. A second, unused "since week 1" figure was deleted. Which screen
+    showed −1.0 could not be confirmed from here.
+  - **Wording I wrote that is hers to change:** the undo refusals, "Do it Thursday", the missed-day banner lead,
+    the M51 question. Each states a fact and offers nothing the app cannot do.
+  - **Deploys needed:** frontend (on merge); `chat-gemini` (M50 week lines, M51 ask, L49 figure, and H32's food
+    table). `test:coach-exam-fresh` is red because the coach changed and the exam has not been re-run.
+  - **Not proven:** anything on her live data or the deployed coach.
 - [x] **H32 (run 7, 14 Oct 2026): A MEAL IS COSTED IN THE STATE ITS CARD TELLS HER TO WEIGH IT. Built
-  15 Oct 2026 on a worktree branch, not merged.** Plan first, as asked (it touches calorie numbers):
+  15 Oct 2026 on a worktree branch, merged into `claude/run-7-fixes` the same day (not `main`).** Plan first, as asked (it touches calorie numbers):
   `docs/plans/meals-costed-as-weighed.md`.
   - **What was wrong (confirmed, measured):** a dinner card listed "177g raw chicken breast, 53g dry
     couscous" over 459 kcal · 64P · 20C · 13F. The lookup has been right since 11 Oct; the CARD read

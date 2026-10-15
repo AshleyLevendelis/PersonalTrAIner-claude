@@ -31,6 +31,16 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Blocks and phases; a calibration week when weights are unknown; a deload
   lighter than the week before — `block-phases`, `frozen-weeks`,
   `calibration-search`, `starting-out`
+- **EVERY "THIS WEEK" COUNT IS MONDAY TO SUNDAY — her ruling 15 Oct 2026 (run 7, M54)**, from three options,
+  over the training week from the start day and over a strip that follows it. It PARTIALLY REVERSES the line
+  below: the tally on Home, the Exercise strip, the pace tip and the coach's week review all count Monday to
+  Sunday (one reader, `readTrainingWeeks`). What still turns on the start day is the PLAN's position — "Week N
+  of 16", blocks, phases and the calibration week — and the "Week 2 starts Thursday" mark that says so.
+  `test:dashboard` §8, `test:coach-week-review`
+- **A food that can't be counted is asked about before any card — her rule, 15 Oct 2026 (run 7, M51)**, in her
+  words: "if a food can't be counted, ask before showing the card; never show a total that quietly leaves it
+  out." Both halves: the card builder refuses, the coach's log_meal asks in the same words. `test:meal-amounts`,
+  `verify:meal-log-card` §4
 - **A training week runs from the day the plan began, and every screen agrees
   where it changes** — since 6 Oct 2026, on Ashley's "make sure the app knows
   where one week ends and the other begins". Her ruling, from three options: **the
