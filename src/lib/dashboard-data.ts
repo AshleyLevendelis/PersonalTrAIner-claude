@@ -280,14 +280,6 @@ export interface DashboardData {
   weightTrend: WeightTrendResult | null
   /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getRecentWeighIns), just re-mapped/re-ordered for charting rather than averaging. */
   weightSeries: WeightSeriesPoint[]
-  /**
-   * Latest weigh-in minus the FIRST one made since the plan began. Null when
-   * there is no plan date, no weigh-in since it began, or only one. It used to
-   * be latest minus the oldest in the series, so a weigh-in from weeks before
-   * the plan was printed as "since week 1", even in week 1 (user test 8 Oct
-   * 2026, #23).
-   */
-  weightSinceWeekOneKg: number | null
   /** The active body_weight_kg goal's target, if one exists — drawn as a reference line on the Home trend chart. Null when no goal has been set (no UI existed to set one before this; chat's record_goal was the only path). */
   weightGoalKg: number | null
   /** Where she started: the weight given at sign-up, or the first weigh-in ever when none was given. What "since you started" is measured from — never the first row of the 14 the chart happens to hold. */
@@ -790,10 +782,6 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     hasNutritionTargets,
     weightTrend,
     weightSeries,
-    weightSinceWeekOneKg: (() => {
-      const since = planStartStr == null ? [] : weightSeries.filter(p => p.date >= planStartStr)
-      return since.length > 1 ? Math.round((since[since.length - 1].kg - since[0].kg) * 10) / 10 : null
-    })(),
     weightGoalKg: weightGoal?.target_value ?? null,
     startingWeightKg,
     recentPRs,

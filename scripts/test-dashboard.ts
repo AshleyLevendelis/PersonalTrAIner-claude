@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs'
 /**
  * Dashboard regression suite (VISION-ARCHITECTURE.md §5 Part 5 verification).
  *
@@ -703,7 +704,8 @@ async function main() {
     check('RUN 7 H31: nothing finished Monday to Wednesday, so NO pace note (it said "7th session this week")', !/session this week/.test(e2.coachTip ?? '') && !(e2.coachTips ?? []).some(t => /session this week/.test(t.text)), { tip: e2.coachTip, tips: (e2.coachTips ?? []).map(t => t.text) })
     check('...and the week\'s planned-session count is Monday to Wednesday, not the plan week from last Thursday', sessions(e2)?.done === 0, sessions(e2))
 
-    // (f) #23: "since week 1" is measured from the first weigh-in SINCE the plan began.
+    // (f) RUN 7, L49: ONE "since you started" figure. A second one ("since week 1") was computed here, shown
+    // nowhere, and could disagree with Home's; it is gone, and the coach is handed Home's own.
     const weighed = fresh()
     db.daily_metrics.push(
       { id: crypto.randomUUID(), profile_id: weighed, date: '2026-08-21', weight_kg: 80.6 },
@@ -711,14 +713,11 @@ async function main() {
       { id: crypto.randomUUID(), profile_id: weighed, date: '2026-09-24', weight_kg: 80.0 },
     )
     const f = await load(weighed, '2026-09-21', '2026-09-24')
-    check('"since week 1" starts at the first weigh-in inside the plan, not one from before it', f.weightSinceWeekOneKg === -0.4, f.weightSinceWeekOneKg)
-    const only = fresh()
-    db.daily_metrics.push(
-      { id: crypto.randomUUID(), profile_id: only, date: '2026-08-21', weight_kg: 80.6 },
-      { id: crypto.randomUUID(), profile_id: only, date: '2026-09-24', weight_kg: 80.0 },
-    )
-    const g = await load(only, '2026-09-21', '2026-09-24')
-    check('...and with one weigh-in inside the plan there is no "since week 1" at all', g.weightSinceWeekOneKg === null, g.weightSinceWeekOneKg)
+    check('L49: the loader computes no second weight-change figure', !('weightSinceWeekOneKg' in f), Object.keys(f).filter(k => /weight/i.test(k)))
+    const chatSrc = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
+    check('...and the coach is handed Home\'s own: changeSinceStart over the same start and series', /weight_change_since_start:[\s\S]{0,200}changeSinceStart\(proactiveData\.startingWeightKg, proactiveData\.weightSeries\)/.test(chatSrc))
+    const fnSrc = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+    check('...and told to say exactly that for any overall loss or gain, the trend being a rate', /WEIGHT SINCE THEY STARTED: \$\{context\.weight_change_since_start\}/.test(fnSrc) && /say exactly this one\. The trend above is a rate per week, never a total\./.test(fnSrc))
   }
 
   // ---- 9. HOME'S TWO PACE LINES READ A CLOCK, AND IT IS THE APP'S ----------

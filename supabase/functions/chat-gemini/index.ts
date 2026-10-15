@@ -2205,6 +2205,7 @@ HOLD THE THREAD (across turns AND across days):
 - Do this when it's naturally relevant, not as a checklist every turn. Once something is resolved, stop asking.
 ${context.recent_prs_summary ? `RECENT PRs: ${context.recent_prs_summary}` : ''}
 ${context.weight_trend_summary ? `WEIGHT TREND: ${context.weight_trend_summary}` : ''}
+${context.weight_change_since_start ? `WEIGHT SINCE THEY STARTED: ${context.weight_change_since_start}. This is the number Home shows; for anything about how much they have lost or gained overall, say exactly this one. The trend above is a rate per week, never a total.` : ''}
 ${context.streak_days != null ? `CURRENT STREAK: ${context.streak_days} day(s)` : ''}
 ${context.adherence_note ? `WORTH NOTICING: ${context.adherence_note}` : ''}
 - Follow-up: if WHAT YOU ALREADY KNOW, ACTIVE GOALS, or HOW TO TALK TO THIS USER below mentions something recent — a niggle, a plan, a stated goal, a stressor — and it's still live, ask how it's going rather than waiting for them to bring it up again. Don't force it into every message; raise it when it's naturally relevant to the turn.

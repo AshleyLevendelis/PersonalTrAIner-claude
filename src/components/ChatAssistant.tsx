@@ -21,6 +21,7 @@ import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoach
 import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
+import { changeSinceStart } from '@/lib/weight-trend'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
@@ -1841,6 +1842,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       weight_trend_summary: proactiveData?.weightTrend && proactiveData.weightTrend.ratePerWeekKg != null
         ? `rolling average ${proactiveData.weightTrend.rollingAvgKg.toFixed(1)}kg, trending ${proactiveData.weightTrend.ratePerWeekKg >= 0 ? '+' : ''}${proactiveData.weightTrend.ratePerWeekKg.toFixed(2)}kg/week (${proactiveData.weightTrend.sampleCount} weigh-ins)${proactiveData.weightTrend.onTrackForGoal === false ? ', off track for their stated goal' : ''}`
         : null,
+      // THE ONE "SINCE YOU STARTED" FIGURE (run 7, L49): Home said -1.4 kg and the coach worked out its own from a
+      // weekly rate and the latest weight. It is now handed Home's number, from Home's function and inputs.
+      weight_change_since_start: (() => {
+        const kg = proactiveData ? changeSinceStart(proactiveData.startingWeightKg, proactiveData.weightSeries) : null
+        return kg == null || proactiveData?.startingWeightKg == null ? null
+          : `${kg > 0 ? '+' : ''}${kg.toFixed(1)} kg since they started (from ${proactiveData.startingWeightKg} kg to their latest weigh-in)`
+      })(),
       recent_prs_summary: proactiveData && proactiveData.recentPRs.length > 0
         ? proactiveData.recentPRs.slice(0, 3).map(pr => `${recordPhrase(pr)} (${pr.date})`).join('; ')
         : null,
