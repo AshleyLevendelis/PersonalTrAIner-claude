@@ -100,8 +100,9 @@ console.log('\n[3] The two strips use the one rule for today')
   // 2c: Exercise's strip marks the day ON SCREEN (today, or a peek) with the
   // hollow accent dot; every other day gets its state's dot, and a due day's
   // is plain — the accent belongs to the day being looked at, never to "due".
-  check('src/components/exercise/WeekContextRow.tsx gives the accent dot only to the day on screen, and a due day a plain one',
-    /\{isSelected \? \(\s*<span aria-hidden className="size-\[5px\] rounded-full" style=\{\{ boxShadow: 'inset 0 0 0 1px var\(--primary\)' \}\}/.test(ex)
+  // RUN 7 (M52): a tapped MISSED day keeps its warning dot rather than the ring, so the ring is now "unless missed".
+  check('src/components/exercise/WeekContextRow.tsx gives the accent dot only to the day on screen (unless it was missed), and a due day a plain one',
+    /\{isSelected \? \(\s*<span aria-hidden className="size-\[5px\] rounded-full"[^>]*style=\{dot === 'missed' \? DOT_STYLE\.missed! : \{ boxShadow: 'inset 0 0 0 1px var\(--primary\)' \}\}/.test(ex)
     && /due: \{ background: 'var\(--text-dim\)' \}/.test(ex))
   check('...and never the bare today test the old Home strip had', !/\{isToday \? \(/.test(ex))
 }

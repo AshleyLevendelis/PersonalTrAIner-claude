@@ -257,7 +257,9 @@ export function WeekContextRow({
                 {DAY3[d.dayName] ?? d.dayName.slice(0, 3)}
               </span>
               {isSelected ? (
-                <span aria-hidden className="size-[5px] rounded-full" style={{ boxShadow: 'inset 0 0 0 1px var(--primary)' }} />
+                // A SELECTED MISSED DAY STAYS MISSED (run 7, M52): the ring took the warning dot's place, so tapping
+                // Monday made it look like any planned day.
+                <span aria-hidden className="size-[5px] rounded-full" data-selected-dot={dot === 'missed' ? 'missed' : 'plain'} style={dot === 'missed' ? DOT_STYLE.missed! : { boxShadow: 'inset 0 0 0 1px var(--primary)' }} />
               ) : DOT_STYLE[dot] ? (
                 <span aria-hidden className={`size-[5px] rounded-full ${dot === 'done' ? 'glow-mint-box' : ''}`} style={DOT_STYLE[dot]!} />
               ) : (
