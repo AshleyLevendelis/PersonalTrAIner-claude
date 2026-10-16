@@ -1328,7 +1328,13 @@ menu" stays true when a copy is also left outside it.
   (avatar, "Coach", "Personal TrAIner", clear, the gear, with App's floating
   gear hidden meanwhile) replaces the per-group name. The composer is the
   page's last row on the tab bar, and the tab bar's chat button lies flat on
-  that tab only. **Coach bubbles are the flat main colour** — Ashley's ruling,
+  that tab only. **Coach bubbles are a SOFT TINT — her ruling 16 Oct 2026**, "the chat bubbles
+  colour is too bright", from three options (over a muted mint and over plain like yours): the
+  card colour with 14% of the main colour, the card's own text and a mint hairline. Text reads
+  10:1 or better in all 81 theme x accent pairs, so the coral/rose shortfall named below is GONE;
+  the tint sits close to your panel by design (1.1:1 at closest, gold on Linen), and the hairline,
+  side and avatar say who spoke. It REPLACES the next sentence. `verify:chat-bubbles` (64 checks).
+  WAS: **Coach bubbles are the flat main colour** — Ashley's ruling,
   27 Sep 2026, from three options. Her brief first gave them the avatar's mint
   fade; measured, the fade's lighter top and darker bottom put long messages
   under 4.5:1 in Graphite, Midnight and Frost, and she chose one solid colour

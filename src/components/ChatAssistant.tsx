@@ -7131,7 +7131,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const normalized = normalizeExternalUrl(href)
       if (!normalized) return <>{children}</>
       return (
-        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-foreground underline hover:opacity-80">{children}</a>
+        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-text underline hover:opacity-80">{children}</a>
       )
     },
   }
@@ -7292,11 +7292,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                           stripStreamingTags(msg.content)
                         ) : isInterrupted(msg) && !msg.content ? (
                           /* Pending placeholder — show loading dots */
-                          <div className="flex items-center gap-2 text-primary-foreground/70">
+                          <div className="flex items-center gap-2 text-muted-foreground">
                             <div className="flex gap-1">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce" />
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce [animation-delay:150ms]" />
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce [animation-delay:300ms]" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
                             </div>
                             {isRecalibrating ? (
                               <span className="text-xs">Recalibrating your schedule...</span>
@@ -7311,7 +7311,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               {stripStreamingTags(msg.content)}
                             </ReactMarkdown>
                             <button
-                              className="mt-2 flex items-center gap-1.5 text-xs text-primary-foreground font-medium hover:underline"
+                              className="mt-2 flex items-center gap-1.5 text-xs text-primary-text font-medium hover:underline"
                               onClick={() => retryMessage(i)}
                               disabled={isLoading}
                             >
@@ -7344,9 +7344,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
                                   msg.role === 'user'
                                     ? 'whitespace-pre-wrap border border-border bg-card text-card-foreground'
-                                    : 'bg-primary text-primary-foreground'
+                                    : 'border border-[color:color-mix(in_oklab,var(--primary)_40%,var(--card))] bg-[color:color-mix(in_oklab,var(--primary)_14%,var(--card))] text-card-foreground'
                                 }`}
-                                // THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR (Ashley,
+                                // A SOFT TINT, NOT THE BRIGHT MINT (Ashley, 16 Oct 2026, "the chat
+                                // bubbles colour is too bright"; from three options, "soft tint" over a
+                                // muted mint and over plain like yours): the card colour with a hint of
+                                // the main colour, the card's own text, and a mint hairline. It replaces
+                                // the 27 Sep flat main colour below; the avatar keeps the fade.
+                                // WAS: THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR (Ashley,
                                 // 27 Sep 2026). Her brief first gave it the avatar's
                                 // fade; measured, the fade's darker bottom and lighter
                                 // top left long messages under 4.5:1 in Graphite,

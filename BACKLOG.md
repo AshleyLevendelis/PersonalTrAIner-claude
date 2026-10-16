@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **The coach's chat bubbles are a soft tint, not the bright mint (16 Oct 2026, her "the chat bubbles
+  colour is too bright").** HER RULING, from three options: **"Soft tint"** (my recommendation), over a muted
+  mint and over plain like yours. It replaces her 27 Sep "flat main colour". Now: the card colour with 14% of
+  the main colour, the card's own text, a mint hairline; links and "tap to retry" in the accent text; the
+  typing dots in the quiet text colour. The avatar keeps its fade. MEASURED in all 81 theme x accent pairs:
+  coach text 10:1 or better (the bright mint had six pairs at 3.4-3.9:1, now gone); the coach's fill is never
+  yours, 1.1:1 apart at closest (gold on Linen); its hairline stands 1.22:1 or more off the page. Found on
+  the way: the driver's sample reader parsed an oklab() colour's digits as 0-255 and called the tint
+  near-black; it now reads through a canvas like the rest of the file. `verify:chat-bubbles` re-anchored (64
+  checks; 5 mutations, 5 caught); the 91 gates and chat drivers reading the chat all pass. Frontend only.
 - [x] **RUN 7 (Sam's live test, 14 Oct 2026), fixed 15 Oct 2026 on `claude/run-7-fixes`, not merged to `main`,
   nothing deployed.** Each symptom traced to its cause in the code before fixing; each reproduced red first.
   - **H30 "Failed to fetch dynamically imported module" after a deploy.** React.lazy caches a failed import, so
