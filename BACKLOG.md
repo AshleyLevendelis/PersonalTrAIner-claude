@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [ ] **`verify:history-streak` FLIPS WITH THE CALENDAR (found 16 Oct 2026, release sweep for run 7).** Three
+  checks ("FOUR … sessions in a row" got 2; "FIVE" got 3) fail on `main` at 2b096a93 exactly as on the branch,
+  and passed in earlier sweeps with no code change, so something on the streak path reads the real date rather
+  than the app's clock (CLAUDE.md "a check must give the same answer on a Tuesday"). A bisect over the branch
+  blamed a docs-only commit, which is what a calendar-dependent check does. NOT caused by run 7; not fixed.
+  Lead: the streak window in `dashboard-data.ts` (`buildStreakDays`, the 35-day note read), `streak.ts`, and
+  the cardio and set readers feeding it. Prove it by running the driver at two machine dates first.
 - [x] **The coach's chat bubbles are a soft tint, not the bright mint (16 Oct 2026, her "the chat bubbles
   colour is too bright").** HER RULING, from three options: **"Soft tint"** (my recommendation), over a muted
   mint and over plain like yours. It replaces her 27 Sep "flat main colour". Now: the card colour with 14% of
