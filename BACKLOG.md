@@ -12,6 +12,9 @@ Newest first. One line each.
   the way: the driver's sample reader parsed an oklab() colour's digits as 0-255 and called the tint
   near-black; it now reads through a canvas like the rest of the file. `verify:chat-bubbles` re-anchored (64
   checks; 5 mutations, 5 caught); the 91 gates and chat drivers reading the chat all pass. Frontend only.
+  **Her follow-up the same day**: "the mint colour is good for the rest of the app but not the chat". Asked
+  about the mint left on the chat page, from two options she chose **keep them mint** (the coach's avatar, the
+  send button and the chat tab button), over toning them down too: only the bubbles are soft.
 - [x] **RUN 7 (Sam's live test, 14 Oct 2026), fixed 15 Oct 2026 on `claude/run-7-fixes`, not merged to `main`,
   nothing deployed.** Each symptom traced to its cause in the code before fixing; each reproduced red first.
   - **H30 "Failed to fetch dynamically imported module" after a deploy.** React.lazy caches a failed import, so
