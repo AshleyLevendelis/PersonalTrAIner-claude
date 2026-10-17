@@ -31,6 +31,16 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Blocks and phases; a calibration week when weights are unknown; a deload
   lighter than the week before — `block-phases`, `frozen-weeks`,
   `calibration-search`, `starting-out`
+- **EVERY "THIS WEEK" COUNT IS MONDAY TO SUNDAY — her ruling 15 Oct 2026 (run 7, M54)**, from three options,
+  over the training week from the start day and over a strip that follows it. It PARTIALLY REVERSES the line
+  below: the tally on Home, the Exercise strip, the pace tip and the coach's week review all count Monday to
+  Sunday (one reader, `readTrainingWeeks`). What still turns on the start day is the PLAN's position — "Week N
+  of 16", blocks, phases and the calibration week — and the "Week 2 starts Thursday" mark that says so.
+  `test:dashboard` §8, `test:coach-week-review`
+- **A food that can't be counted is asked about before any card — her rule, 15 Oct 2026 (run 7, M51)**, in her
+  words: "if a food can't be counted, ask before showing the card; never show a total that quietly leaves it
+  out." Both halves: the card builder refuses, the coach's log_meal asks in the same words. `test:meal-amounts`,
+  `verify:meal-log-card` §4
 - **A training week runs from the day the plan began, and every screen agrees
   where it changes** — since 6 Oct 2026, on Ashley's "make sure the app knows
   where one week ends and the other begins". Her ruling, from three options: **the
@@ -198,7 +208,18 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`, and since 11 Oct 2026 an ingredient line is costed and tagged only when
   every word in it is accounted for (a dish is a miss, never one of its
-  ingredients) — `ingredient-lookup`
+  ingredients) — `ingredient-lookup`. **And counted in the state the card
+  tells her to weigh it, since 15 Oct 2026 (H32)**: a STORED meal's numbers are
+  worked out again from its own lines on every read, because the card, the day
+  and the day search had been reading numbers stored before the table knew
+  "raw" and "dry" ("177g raw chicken breast" costed as cooked breast). Kept
+  whole when the lines cannot be costed as well as a new meal, never mixed; a
+  line naming a state the food has no figures for is a miss, never the wrong
+  state. Library as written: 0 of 290 affected; written raw/dry the way the
+  meal writer is told to, 149 of 290, median 15% off. Her own pools are
+  unmeasured (no database here). `meals-costed-as-weighed` (20 checks, 17
+  mutations), `verify:meal-costed` (8 checks, 8 mutations),
+  `measure:meals-costed-as-weighed`
 - **And a different day tomorrow** — since 19 Sep 2026, on Ashley's "fix the
   variety". CORRECTED, measured: this line said "varied" and nothing had ever
   counted. **1.11 distinct days in a seven-day week; 89.4% of profiles ate the
@@ -1307,7 +1328,13 @@ menu" stays true when a copy is also left outside it.
   (avatar, "Coach", "Personal TrAIner", clear, the gear, with App's floating
   gear hidden meanwhile) replaces the per-group name. The composer is the
   page's last row on the tab bar, and the tab bar's chat button lies flat on
-  that tab only. **Coach bubbles are the flat main colour** — Ashley's ruling,
+  that tab only. **Coach bubbles are a SOFT TINT — her ruling 16 Oct 2026**, "the chat bubbles
+  colour is too bright", from three options (over a muted mint and over plain like yours): the
+  card colour with 14% of the main colour, the card's own text and a mint hairline. Text reads
+  10:1 or better in all 81 theme x accent pairs, so the coral/rose shortfall named below is GONE;
+  the tint sits close to your panel by design (1.1:1 at closest, gold on Linen), and the hairline,
+  side and avatar say who spoke. It REPLACES the next sentence. `verify:chat-bubbles` (64 checks).
+  WAS: **Coach bubbles are the flat main colour** — Ashley's ruling,
   27 Sep 2026, from three options. Her brief first gave them the avatar's mint
   fade; measured, the fade's lighter top and darker bottom put long messages
   under 4.5:1 in Graphite, Midnight and Frost, and she chose one solid colour

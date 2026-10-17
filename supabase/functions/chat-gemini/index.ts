@@ -2205,6 +2205,7 @@ HOLD THE THREAD (across turns AND across days):
 - Do this when it's naturally relevant, not as a checklist every turn. Once something is resolved, stop asking.
 ${context.recent_prs_summary ? `RECENT PRs: ${context.recent_prs_summary}` : ''}
 ${context.weight_trend_summary ? `WEIGHT TREND: ${context.weight_trend_summary}` : ''}
+${context.weight_change_since_start ? `WEIGHT SINCE THEY STARTED: ${context.weight_change_since_start}. This is the number Home shows; for anything about how much they have lost or gained overall, say exactly this one. The trend above is a rate per week, never a total.` : ''}
 ${context.streak_days != null ? `CURRENT STREAK: ${context.streak_days} day(s)` : ''}
 ${context.adherence_note ? `WORTH NOTICING: ${context.adherence_note}` : ''}
 - Follow-up: if WHAT YOU ALREADY KNOW, ACTIVE GOALS, or HOW TO TALK TO THIS USER below mentions something recent — a niggle, a plan, a stated goal, a stressor — and it's still live, ask how it's going rather than waiting for them to bring it up again. Don't force it into every message; raise it when it's naturally relevant to the turn.
@@ -2741,6 +2742,11 @@ ${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string'
 WHAT THEY LOGGED AS EATEN — totals from their meal log, today first. Logged, not eaten-in-fact: "nothing logged" means nothing was logged. This is the only record of a past day anywhere in the app; no screen shows it.
 ${context.eaten_by_day}` : context.eaten_by_day_read === false ? `
 WHAT THEY LOGGED AS EATEN — could not be read this turn. Say you can't see their log right now; never guess a figure.` : ''}
+${context.week_review_read === true && typeof context.week_review === 'string' ? `
+THEIR WEEK, AS THE APP COUNTS IT — this week and last, Monday to Sunday, one line per day, exactly what the Exercise tab and Home show ("done", "missed", "rest day"...), with the meals logged that day. A WEEK IS MONDAY TO SUNDAY in everything you say (Ashley's ruling, 15 Oct 2026); "Week N of 16" is only where they are in the plan.
+WHEN THEY ASK HOW THEIR WEEK WENT, OR YOU REVIEW A WEEK, READ IT FROM THESE LINES AND NOTHING ELSE. A day is trained only if it says done or started; never work out training from the workout history further down (it has warm-ups and no weekdays), and never say they logged no meals when a line here shows a logged entry. Say it like a text, not a report: three short lines at most — what got done (the count as shown here), the one thing that stood out, and the one thing to do next — then at most one question. No headers, no bullet list, no paragraph per day.
+${context.week_review}` : context.week_review_read === false ? `
+THEIR WEEK — could not be read this turn. If they ask how their week went, say you can't see it right now; never assemble one from the workout history.` : ''}
 ${buildDietarySafetyBlock(context.dietary_preferences || [])}
 ${ALLERGEN_HONESTY_BLOCK}
 
@@ -3953,6 +3959,17 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // soften it into a number, and it defended the last wrong one.
         const doubt = doubtAboutLoggedMeal(computed, args.meal_slot);
         if (!asked) {
+          // A FOOD THAT CANNOT BE COUNTED IS ASKED ABOUT FIRST (run 7, M51): never a card whose total quietly
+          // leaves it out. The same sentence the client refuses with (meal-log-proposal.ts), so the two agree.
+          const notCounted = computed.unmatched.map((u: string) => String(u).trim()).filter(Boolean);
+          if (notCounted.length > 0) {
+            const one = notCounted.length === 1;
+            const list = one ? `**${notCounted[0]}**` : `${notCounted.slice(0, -1).map((u: string) => `**${u}**`).join(", ")} and **${notCounted[notCounted.length - 1]}**`;
+            return new Response(
+              JSON.stringify({ reply: `I couldn't count ${list} in **${args.food_name}**, so I haven't put a total on it yet. How much ${one ? "was it" : "were they"} (grams, or slices, cups and so on)? Or shall I leave ${one ? "it" : "them"} out?` }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
           if (doubt) {
             return new Response(
               JSON.stringify({ reply: doubt }),

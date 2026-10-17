@@ -198,12 +198,16 @@ export function moreMealFitOffer(items: { slot: string; fitting: number; have: n
   if (items.length === 1) {
     const { slot, fitting, have } = items[0]
     const plural = MEAL_PLURAL[slot] ?? `${slot}s`
+    // EVERY ONE FITS, THERE ARE JUST FEW (run 7, L47): "Only 2 of your 2 lunches fit" read as a complaint about
+    // dishes that are fine. Her wording: "You only have 2 lunches, so they keep repeating."
+    if (fitting >= have && have > 0) return `You only have ${have} ${have === 1 ? slot : plural}, so ${have === 1 ? 'it keeps' : 'they keep'} repeating. I can add more. ${promise}`
     const lead = fitting === 0
       ? `None of your ${have} ${plural} fit your targets right now, so your ${plural} keep repeating.`
       : `Only ${fitting} of your ${have} ${plural} ${fitting === 1 ? 'fits' : 'fit'} your targets right now, so your ${plural} keep repeating.`
     return `${lead} I can add some that do. ${promise}`
   }
   const names = joinPlain(items.map(i => MEAL_PLURAL[i.slot] ?? `${i.slot}s`))
+  if (items.every(i => i.have > 0 && i.fitting >= i.have)) return `You only have a few ${names}, so they keep repeating. I can add more. ${promise}`
   return `Very few of your ${names} fit your targets right now, so they keep repeating. I can add some that do. ${promise}`
 }
 
@@ -1021,6 +1025,12 @@ export const RECEIPTS_UNDONE = {
   title: 'Put back',
   label: 'Undone',
   detail: (was: string) => `${was.replace(/[.!]+$/, '')} was taken back. Everything is as it was before.`,
+  // AN UNDO THAT DID NOT HAPPEN SAYS SO ON THE CARD (run 7, 15 Oct 2026, M53). Each is a statement of fact: nothing
+  // was changed, and whether a second tap can work.
+  refusedLabel: "Couldn't undo",
+  tooLate: 'Undo only lasts 10 minutes, so nothing was changed.',
+  cannot: "This one can't be undone from here, so nothing was changed.",
+  failed: "That didn't undo, so nothing was changed. Try again in a moment.",
 } as const
 
 export const RECEIPTS: Record<string, ReceiptTitles> = {

@@ -22,7 +22,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { buildMealLogProposal, normaliseSlot, LOGGABLE_SLOTS } from '../src/lib/meal-log-proposal'
-import { MIN_COVERAGE } from '../src/lib/meal-generation'
+import { MIN_COVERAGE } from '../src/lib/meal-costing'
 import { lookupIngredient } from '../supabase/functions/_shared/food-db.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -94,7 +94,7 @@ console.log('\n3. What the tap writes, and where\n')
   check('the client builds the proposal through the verifier',
     /result\.proposal\.kind === 'propose_meal_log'[\s\S]{0,600}buildMealLogProposal\(/.test(ui))
   check('...and the card asks rather than announces',
-    /kind === 'propose_meal_log'\) return `Log this to your \$\{rows\[0\]\.before\}\?`/.test(ui))
+    /kind === 'propose_meal_log'\) return `Log this to your \$\{rows\[0\]\.field\}\?`/.test(ui))
   // THE WRITE. Through the store, not a bare table call: recordMealEvent is
   // what carries the offline queue, the client_id idempotency, the synchronous
   // listener notify and the void-based undo.

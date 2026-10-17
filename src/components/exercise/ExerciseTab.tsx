@@ -2,6 +2,7 @@ import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
 import { blockSwapEndsOn } from '@/lib/block-swap-until'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useCallback, useState } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { useAppRoute, programHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { ProgramBrowse } from './ProgramBrowse'
@@ -15,8 +16,8 @@ import { TodayPanel } from './TodayPanel'
 // rather than assumed: this is what took it back under.
 import { lazy, Suspense } from 'react'
 import type { SwapTarget } from './SwapDialog'
-const SwapDialog = lazy(() => import('./SwapDialog').then(m => ({ default: m.SwapDialog })))
-const BanExerciseSheet = lazy(() => import('./BanExerciseSheet').then(m => ({ default: m.BanExerciseSheet })))
+const SwapDialog = lazyWithReload(() => import('./SwapDialog').then(m => ({ default: m.SwapDialog })))
+const BanExerciseSheet = lazyWithReload(() => import('./BanExerciseSheet').then(m => ({ default: m.BanExerciseSheet })))
 import { ExerciseDetailDialog, type ExerciseDetailTab } from './ExerciseDetailDialog'
 import { SessionHistoryDialog } from './SessionHistoryDialog'
 import type { ExerciseEntry } from '@/lib/exercise-db'

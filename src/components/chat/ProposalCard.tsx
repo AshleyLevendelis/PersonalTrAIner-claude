@@ -112,7 +112,7 @@ export function ProposalCard({
         {diff.rows.map((row, i) => (
           <div key={i} className="flex flex-col gap-0.5">
             <span className="text-[0.625rem] text-muted-foreground">{row.field}</span>
-            <span className="text-[0.84375rem] line-through text-muted-foreground/70">{row.before}</span>
+            {row.before && <span className="text-[0.84375rem] line-through text-muted-foreground/70">{row.before}</span>}
             <span className="text-[0.90625rem] font-semibold">{row.after}</span>
             {row.note && <span className="text-[0.625rem] text-muted-foreground/80">{row.note}</span>}
           </div>

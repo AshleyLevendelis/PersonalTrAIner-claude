@@ -5,10 +5,14 @@ import App from './App'
 import { getAppearance, applyAppearance } from '@/lib/appearance-store'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
+import { installChunkReload } from '@/lib/chunk-reload'
 
 // Stamp the appearance attributes onto <html> BEFORE the first render, so a
 // non-default theme/accent never flashes the default one on a cold load.
 applyAppearance(getAppearance())
+
+// A plain import() whose file a deploy took away reloads the page once (run 7, H30; lib/chunk-reload.ts).
+installChunkReload()
 
 // AppearanceProvider wraps <App/> rather than living inside it, so it sits
 // above App's early-return paths (onboarding, loading) and is available to

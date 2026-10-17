@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
 import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -44,7 +45,7 @@ import { NextSetButton } from './NextSetButton'
 // nobody has opened yet has no business in the chunk that has to arrive before
 // the first pixel. It costs one extra chunk header in the total and takes its
 // whole weight off first paint.
-const TightnessSheet = lazy(() => import('./TightnessSheet').then(m => ({ default: m.TightnessSheet })))
+const TightnessSheet = lazyWithReload(() => import('./TightnessSheet').then(m => ({ default: m.TightnessSheet })))
 import type { TightnessAnswer } from './TightnessSheet'
 import { tightnessWarmup, uncoveredNote } from '@/lib/tightness'
 import { ExerciseRow } from './ExerciseRow'
@@ -76,14 +77,15 @@ import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
 // opened from a menu item, by a person who has something to explain about a
 // day — not a screen every load pays for. test:bundle holds the budget.
-const WhatHappenedSheet = lazy(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
-const RemoveExerciseSheet = lazy(() => import('./RemoveExerciseSheet').then(m => ({ default: m.RemoveExerciseSheet })))
+const WhatHappenedSheet = lazyWithReload(() => import('./WhatHappenedSheet').then(m => ({ default: m.WhatHappenedSheet })))
+const RemoveExerciseSheet = lazyWithReload(() => import('./RemoveExerciseSheet').then(m => ({ default: m.RemoveExerciseSheet })))
 // Same bargain as the two above: a sheet reached from one button at the foot
 // of the list, carrying the whole exercise catalogue's search with it.
-const AddExerciseSheet = lazy(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
-const FinishCheckSheet = lazy(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
+const AddExerciseSheet = lazyWithReload(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
+const FinishCheckSheet = lazyWithReload(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { setSessionMove } from '@/lib/daily-tracking'
+import { setSessionMove, setMarkedMissed, setDeliberateRest } from '@/lib/daily-tracking'
+import { missedDayView, runItLabel } from '@/lib/missed-day'
 import { readSessionSummary, saveSessionSummary } from '@/lib/session-summary-store'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
@@ -968,6 +970,23 @@ export function TodayPanel({
   // The working sets logged on the peeked day (the week hook already holds
   // them) — "What you did" leads when there are any (run 5, M47).
   const peekDidLogs = peekCell?.workingLogs ?? []
+  // A MISSED DAY SAYS SO, with the coach's three choices (run 7, M52). Each writes through the same function the
+  // coach's card and the What happened sheet call; a write that does not land says so here.
+  const peekWeekOf = (d: string) => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)
+  const peekMissed = peekCell && profileId
+    ? missedDayView({ cell: peekCell, today, plan: liveWeekPlan, weekOf: peekWeekOf, moves: weekTrain.moves })
+    : null
+  const [missedBusy, setMissedBusy] = useState(false)
+  const [missedError, setMissedError] = useState<string | null>(null)
+  useEffect(() => { setMissedError(null) }, [peekDay])
+  const runMissed = async (write: () => Promise<boolean>) => {
+    setMissedBusy(true); setMissedError(null)
+    let ok = false
+    try { ok = await write() } catch (e) { console.error('[missed-day]', e) }
+    setMissedBusy(false)
+    if (!ok) { setMissedError("That didn't save, so nothing changed. Try again in a moment."); return }
+    weekTrain.refresh(); onLogsUpdated?.()
+  }
 
   // Turn 5: session-progress 2px line — total sets logged today across every
   // exercise on the live day, over total sets planned. Only meaningful (and
@@ -1166,6 +1185,36 @@ export function TodayPanel({
                 60 min, Hard" on Tuesday left a ⇄ on the strip and a Back &
                 Biceps card that had never heard of it. The planned list stays,
                 dimmed: it is what the plan had, not what happened. */}
+            {peekMissed && peekCell && (
+              <InsightBanner tone="warning" data-testid="peek-missed">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">{peekMissed.lead}</p>
+                  {peekMissed.runIt.kind === 'none' && <p className="text-[0.8125rem] text-muted-foreground" data-testid="peek-missed-no-day">{peekMissed.runIt.message}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    {peekMissed.runIt.kind === 'move' && (() => {
+                      const runIt = peekMissed.runIt
+                      return (
+                        <Button size="sm" className="min-h-11" disabled={missedBusy} data-testid="peek-missed-run"
+                          onClick={() => { void runMissed(() => setSessionMove(profileId!, runIt.remapFrom ?? peekCell.date, runIt.date)) }}>
+                          {runItLabel(runIt)}
+                        </Button>
+                      )
+                    })()}
+                    {peekMissed.canMark && (
+                      <Button size="sm" variant="outline" className="min-h-11" disabled={missedBusy} data-testid="peek-missed-mark"
+                        onClick={() => { void runMissed(() => setMarkedMissed(profileId!, peekCell.date, true)) }}>
+                        Mark it missed
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="min-h-11" disabled={missedBusy} data-testid="peek-missed-rest"
+                      onClick={() => { void runMissed(() => setDeliberateRest(profileId!, peekCell.date, true)) }}>
+                      It was a rest day
+                    </Button>
+                  </div>
+                  {missedError && <p className="text-[0.8125rem] text-destructive" role="alert">{missedError}</p>}
+                </div>
+              </InsightBanner>
+            )}
             {peekCell?.state === 'swapped' && peekCell.swappedLine && (
               <InsightBanner tone="ai" data-testid="peek-swapped">
                 <span className="text-sm">
@@ -1177,7 +1226,7 @@ export function TodayPanel({
             {peekDidLogs.length > 0 && (
               <p className="px-1 text-[0.65625rem] uppercase tracking-[.2em] text-muted-foreground" data-testid="peek-planned-label">Planned</p>
             )}
-            <div className={peekCell?.state === 'swapped' || peekDidLogs.length > 0 ? 'opacity-60' : undefined} data-testid="peek-plan">
+            <div className={peekCell?.state === 'swapped' || peekCell?.state === 'missed' || peekDidLogs.length > 0 ? 'opacity-60' : undefined} data-testid="peek-plan">
               <PeekPanel
                 workout={peekWorkout}
                 dayLabel={peekDay}

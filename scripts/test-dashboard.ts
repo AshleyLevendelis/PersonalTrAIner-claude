@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs'
 /**
  * Dashboard regression suite (VISION-ARCHITECTURE.md §5 Part 5 verification).
  *
@@ -626,6 +627,13 @@ async function main() {
     const fresh = () => `tips-${++n}`
     const walk = (user: string, date: string) =>
       db.cardio_logs.push({ id: crypto.randomUUID(), user_id: user, date, activity: 'Walk', duration_minutes: 30, completed_at: `${date}T09:00:00` })
+    // A FINISHED session, the strip's 'done': a completed session row with a working set hanging off it.
+    const done = (user: string, date: string) => {
+      const id = crypto.randomUUID()
+      db.workout_sessions.push({ id, profile_id: user, date, is_completed: true })
+      db.exercise_set_logs.push({ id: crypto.randomUUID(), user_id: user, session_id: id, date, completed_at: `${date}T09:00:00`,
+        exercise_name: 'Goblet Squat', set_number: 1, reps: 10, weight_kg: 20, is_warmup: false, drop_index: 0 })
+    }
     const lift = (user: string, date: string) =>
       db.exercise_set_logs.push({ id: crypto.randomUUID(), user_id: user, date, completed_at: `${date}T09:00:00`,
         exercise_name: 'Goblet Squat', set_number: 1, reps: 10, weight_kg: 20, is_warmup: false, drop_index: 0 })
@@ -643,14 +651,14 @@ async function main() {
     // (a) #20 as found: Monday lifted, Wednesday's session moved to Thursday
     // (today), a walk logged on Wednesday. Owed: Thursday. Done: Monday only.
     const moved = fresh()
-    lift(moved, '2026-09-21'); walk(moved, '2026-09-23')
+    done(moved, '2026-09-21'); walk(moved, '2026-09-23')
     const a = await load(moved, '2026-09-21', '2026-09-24', [{ fromDate: '2026-09-23', toDate: '2026-09-24' }])
     check('a day whose session moved away is not a planned session on that date', sessions(a)?.outOf === 1, sessions(a))
     check('...so the week reads 1 of 1, never "2 for 2"', sessions(a)?.done === 1 && !/2 for 2/.test(a.coachTip ?? ''), { s: sessions(a), tip: a.coachTip })
 
     // (b) No move: a walk on a LIFTING day keeps the streak but is not the session.
     const walked = fresh()
-    lift(walked, '2026-09-21'); walk(walked, '2026-09-23')
+    done(walked, '2026-09-21'); walk(walked, '2026-09-23')
     const b = await load(walked, '2026-09-21', '2026-09-24')
     check('an optional walk on a lifting day does not count as that day\'s session', sessions(b)?.outOf === 2 && sessions(b)?.done === 1, sessions(b))
     check('...and still counts toward the activity streak', b.streak >= 1, b.streak)
@@ -661,20 +669,43 @@ async function main() {
     const c = await load(week1, '2026-09-21', '2026-09-23')
     check('in week 1 the pace tip never claims a "usual pace"', !/usual pace/.test(c.coachTip ?? ''), c.coachTip)
 
+    // (c2) A finished session in week 1 still has no "usual" (no whole week before it inside the plan).
+    const firstWeek = fresh()
+    done(firstWeek, '2026-09-21'); done(firstWeek, '2026-09-23')
+    const c2 = await load(firstWeek, '2026-09-21', '2026-09-23')
+    check('...nor with real sessions in week 1: there is no whole week before it', !(c2.coachTips ?? []).some(t => /usual pace/.test(t.text)), (c2.coachTips ?? []).map(t => t.text))
+
     // (d) #21: two walks on one day are one trained day, in both weeks.
     const twice = fresh()
     walk(twice, '2026-09-21'); walk(twice, '2026-09-28'); walk(twice, '2026-09-28')
     const d = await load(twice, '2026-09-21', '2026-09-30')
     check('two logs on one day are not "ahead" of one log on the same day last week', !/usual pace/.test(d.coachTip ?? ''), d.coachTip)
 
-    // (e) The contrast, so (c) and (d) cannot pass by the rule never firing:
-    // two trained days this week against one at the same point last week.
+    // (e) The contrast, so (c) and (d) cannot pass by the rule never firing: two FINISHED sessions this
+    // week (Mon and Wed) against one at the same point last week. Since run 7 (H31) the note counts finished
+    // sessions, Monday to Sunday, the strip's 'done'; a walk is not a session, so these are real sessions.
+    // Friday 2 Oct: Monday and today done, Wednesday missed (so it is not "every session"), against Monday
+    // only at the same point last week. The pace note is among the eligible notes whichever one leads.
     const ahead = fresh()
-    walk(ahead, '2026-09-21'); walk(ahead, '2026-09-28'); walk(ahead, '2026-09-29')
-    const e = await load(ahead, '2026-09-21', '2026-09-30')
-    check('...while a genuinely busier week still says so', /2nd session this week — you're ahead of your usual pace/.test(e.coachTip ?? ''), e.coachTip)
+    done(ahead, '2026-09-21'); done(ahead, '2026-09-28'); done(ahead, '2026-10-02')
+    const e = await load(ahead, '2026-09-21', '2026-10-02')
+    check('...while a genuinely busier week still says so', (e.coachTips ?? []).some(t => /^2nd session this week — you're ahead of your usual pace/.test(t.text)), (e.coachTips ?? []).map(t => t.text))
 
-    // (f) #23: "since week 1" is measured from the first weigh-in SINCE the plan began.
+    // (e2) RUN 7, H31, AS FOUND: "7th session this week — you're ahead of your usual pace" while the strip said
+    // 0 of 4 done. The plan began on a Thursday, so its week ran Thursday to Wednesday; she trained and walked
+    // Thursday to Saturday and nothing since Monday. The old count read distinct dates with ANY log in the plan
+    // week (cardio included) and called last Thursday "this week" on Wednesday. Her ruling the same day: every
+    // "this week" runs Monday to Sunday, the strip's own week.
+    const sam = fresh()
+    done(sam, '2026-10-01')                                   // last plan week: one session
+    for (const d of ['2026-10-08', '2026-10-09', '2026-10-10']) { done(sam, d); walk(sam, d) }
+    walk(sam, '2026-10-11')
+    const e2 = await load(sam, '2026-10-01', '2026-10-14')
+    check('RUN 7 H31: nothing finished Monday to Wednesday, so NO pace note (it said "7th session this week")', !/session this week/.test(e2.coachTip ?? '') && !(e2.coachTips ?? []).some(t => /session this week/.test(t.text)), { tip: e2.coachTip, tips: (e2.coachTips ?? []).map(t => t.text) })
+    check('...and the week\'s planned-session count is Monday to Wednesday, not the plan week from last Thursday', sessions(e2)?.done === 0, sessions(e2))
+
+    // (f) RUN 7, L49: ONE "since you started" figure. A second one ("since week 1") was computed here, shown
+    // nowhere, and could disagree with Home's; it is gone, and the coach is handed Home's own.
     const weighed = fresh()
     db.daily_metrics.push(
       { id: crypto.randomUUID(), profile_id: weighed, date: '2026-08-21', weight_kg: 80.6 },
@@ -682,14 +713,11 @@ async function main() {
       { id: crypto.randomUUID(), profile_id: weighed, date: '2026-09-24', weight_kg: 80.0 },
     )
     const f = await load(weighed, '2026-09-21', '2026-09-24')
-    check('"since week 1" starts at the first weigh-in inside the plan, not one from before it', f.weightSinceWeekOneKg === -0.4, f.weightSinceWeekOneKg)
-    const only = fresh()
-    db.daily_metrics.push(
-      { id: crypto.randomUUID(), profile_id: only, date: '2026-08-21', weight_kg: 80.6 },
-      { id: crypto.randomUUID(), profile_id: only, date: '2026-09-24', weight_kg: 80.0 },
-    )
-    const g = await load(only, '2026-09-21', '2026-09-24')
-    check('...and with one weigh-in inside the plan there is no "since week 1" at all', g.weightSinceWeekOneKg === null, g.weightSinceWeekOneKg)
+    check('L49: the loader computes no second weight-change figure', !('weightSinceWeekOneKg' in f), Object.keys(f).filter(k => /weight/i.test(k)))
+    const chatSrc = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
+    check('...and the coach is handed Home\'s own: changeSinceStart over the same start and series', /weight_change_since_start:[\s\S]{0,200}changeSinceStart\(proactiveData\.startingWeightKg, proactiveData\.weightSeries\)/.test(chatSrc))
+    const fnSrc = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+    check('...and told to say exactly that for any overall loss or gain, the trend being a rate', /WEIGHT SINCE THEY STARTED: \$\{context\.weight_change_since_start\}/.test(fnSrc) && /say exactly this one\. The trend above is a rate per week, never a total\./.test(fnSrc))
   }
 
   // ---- 9. HOME'S TWO PACE LINES READ A CLOCK, AND IT IS THE APP'S ----------

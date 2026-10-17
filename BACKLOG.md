@@ -2,6 +2,137 @@
 
 Newest first. One line each.
 
+- [x] **A running timer keeps the phone screen awake (17 Oct 2026, her "build it").** She reported the screen
+  timing out mid-training on the round timer. Cause: the app asked the phone to stay awake only while a workout
+  session ran on Exercise; the round timer, stopwatch and lap timer live on Tools. Now the same request is held
+  while any of them runs (a round's lead-in included) and released the moment it pauses, resets or finishes.
+  `verify:timer-wake` (12 checks, the phone's API stubbed and counted at the boundary; 5 mutations, 4 caught —
+  the fifth removes a guard against asking twice, which this flow never does, so the screen behaves the same:
+  an equivalent mutant on this path). The 13 timer, bubble and bundle checks pass. NOT PROVEN: that a given phone
+  honours the request (iOS 16.4+; a home-screen app on iPhone needs a newer iOS). Frontend only.
+- [ ] **`verify:history-streak` FLIPS WITH THE CALENDAR (found 16 Oct 2026, release sweep for run 7).** Three
+  checks ("FOUR … sessions in a row" got 2; "FIVE" got 3) fail on `main` at 2b096a93 exactly as on the branch,
+  and passed in earlier sweeps with no code change, so something on the streak path reads the real date rather
+  than the app's clock (CLAUDE.md "a check must give the same answer on a Tuesday"). A bisect over the branch
+  blamed a docs-only commit, which is what a calendar-dependent check does. NOT caused by run 7; not fixed.
+  Lead: the streak window in `dashboard-data.ts` (`buildStreakDays`, the 35-day note read), `streak.ts`, and
+  the cardio and set readers feeding it. Prove it by running the driver at two machine dates first.
+- [x] **The coach's chat bubbles are a soft tint, not the bright mint (16 Oct 2026, her "the chat bubbles
+  colour is too bright").** HER RULING, from three options: **"Soft tint"** (my recommendation), over a muted
+  mint and over plain like yours. It replaces her 27 Sep "flat main colour". Now: the card colour with 14% of
+  the main colour, the card's own text, a mint hairline; links and "tap to retry" in the accent text; the
+  typing dots in the quiet text colour. The avatar keeps its fade. MEASURED in all 81 theme x accent pairs:
+  coach text 10:1 or better (the bright mint had six pairs at 3.4-3.9:1, now gone); the coach's fill is never
+  yours, 1.1:1 apart at closest (gold on Linen); its hairline stands 1.22:1 or more off the page. Found on
+  the way: the driver's sample reader parsed an oklab() colour's digits as 0-255 and called the tint
+  near-black; it now reads through a canvas like the rest of the file. `verify:chat-bubbles` re-anchored (64
+  checks; 5 mutations, 5 caught); the 91 gates and chat drivers reading the chat all pass. Frontend only.
+  **Her follow-up the same day**: "the mint colour is good for the rest of the app but not the chat". Asked
+  about the mint left on the chat page, from two options she chose **keep them mint** (the coach's avatar, the
+  send button and the chat tab button), over toning them down too: only the bubbles are soft.
+- [x] **RUN 7 (Sam's live test, 14 Oct 2026), fixed 15 Oct 2026 on `claude/run-7-fixes`, not merged to `main`,
+  nothing deployed.** Each symptom traced to its cause in the code before fixing; each reproduced red first.
+  - **H30 "Failed to fetch dynamically imported module" after a deploy.** React.lazy caches a failed import, so
+    "Try again" could never work. Every lazily loaded screen (20) now reloads the app once when its file is gone,
+    guarded against a loop (20 s), plus Vite's preload event and the root error screen. `verify:chunk-reload`
+    serves a missing file and watches it recover (and stop at one reload on a broken deploy); `test:chunk-reload`.
+  - **H31 "7th session this week — ahead of your usual pace" at 0 of 4.** The pace tip counted plan-week days
+    (from the start weekday) with no "done" test of its own. It now reads the strip's own days and counts only
+    "done". The exact "7" on the live build was not reproduced (her data is unreadable from here); the old code
+    gave "4th" on Sam's week, which is the same defect.
+  - **M54 two "weeks" on one card. HER RULING, 15 Oct 2026, from three options: "Monday to Sunday"** — every
+    "this week" count, on every screen and in the coach, over "the training week from the start day" (my
+    recommendation) and "a strip that follows the training week". It partially reverses her 6 Oct ruling, which
+    the option named. "Week N of 16", blocks and phases still turn on the start day: that is where she is in
+    the plan, not a count.
+  - **M50 the coach's week review got facts wrong.** It had raw set rows and meal totals and built its own week.
+    Every turn now carries this week and last, Monday to Sunday, one line per day in the strip's words with that
+    day's logged meals, and the prompt says to answer from those lines alone in three short lines at most.
+    Whether the deployed coach obeys is the exam's to judge. `test:coach-week-review` (24 checks, 16 mutations).
+  - **M53 an old card still said "Rescheduled" after Undo.** Undo stayed drawn past its ten minutes and a tap then
+    returned silently. The button now goes when the window ends, and every way out of an undo says how it ended
+    ("Couldn't undo — Undo only lasts 10 minutes, so nothing was changed."). `verify:rebuild-card` §2e-2j.
+  - **M52 missed days looked like planned ones.** A tapped missed day keeps its warning dot, the plan is dimmed,
+    and a banner offers the coach's three: Do it today / Mark it missed / It was a rest day, through the existing
+    writers. Decided as a CSCS coach: when today has its own session, "Do it today" becomes the next free day by
+    name ("Do it Thursday") — two full sessions in one day is not catching up. `verify:missed-day` (16, 10 caught).
+  - **M51 a breakfast card that both left out and assumed the toast.** HER RULE, in her words: "if a food can't
+    be counted, ask before showing the card; never show a total that quietly leaves it out." Any food the
+    database cannot count now stops the card on both halves; the coach asks how much or whether to leave it out.
+    The struck-through "breakfast" was the slot drawn as a "before"; it is the row's label now. The toast miss on
+    her phone is most likely the deployed coach predating the 11 Oct lookup fixes — not provable from here.
+  - **L47** "Only 2 of your 2 lunches fit": now her wording, "You only have 2 lunches, so they keep repeating."
+  - **L48** "3 of today's meals still to log" with 4 unlogged: it counted only meals past their usual time; the
+    number is now every meal still to log (when to say it is unchanged).
+  - **L49 −1.4 kg on Home, −1.0 kg elsewhere.** Traced every weight figure: only Home prints a since-start
+    total. The coach had only a weekly rate and the latest weight, so it could state its own; it is now handed
+    Home's figure and told to say exactly that. A second, unused "since week 1" figure was deleted. Which screen
+    showed −1.0 could not be confirmed from here.
+  - **Wording I wrote that is hers to change:** the undo refusals, "Do it Thursday", the missed-day banner lead,
+    the M51 question. Each states a fact and offers nothing the app cannot do.
+  - **Deploys needed:** frontend (on merge); `chat-gemini` (M50 week lines, M51 ask, L49 figure, and H32's food
+    table). `test:coach-exam-fresh` is red because the coach changed and the exam has not been re-run.
+  - **Not proven:** anything on her live data or the deployed coach.
+- [x] **H32 (run 7, 14 Oct 2026): A MEAL IS COSTED IN THE STATE ITS CARD TELLS HER TO WEIGH IT. Built
+  15 Oct 2026 on a worktree branch, merged into `claude/run-7-fixes` the same day (not `main`).** Plan first, as asked (it touches calorie numbers):
+  `docs/plans/meals-costed-as-weighed.md`.
+  - **What was wrong (confirmed, measured):** a dinner card listed "177g raw chicken breast, 53g dry
+    couscous" over 459 kcal · 64P · 20C · 13F. The lookup has been right since 11 Oct; the CARD read
+    the numbers stored when the meal was made, and stored numbers were only ever recomputed on a
+    resize. The real pre-fix code (git 45264e98) gives those two lines 351 kcal / 56.9 P / 12.2 C;
+    today's gives 412 / 46.6 / 41.0. The day totals, the day search, refit, top-up and the coach all
+    read the same stored numbers. **CORRECTED:** the 11 Oct plan's section 7 said "stored meals are
+    re-costed when read (refit, day assembly)"; only a RESIZED dish ever was. It read like a fact
+    because it sat under "Risks" and nobody measured it.
+  - **What changed:** `readPools` (the one read of stored meals) costs each meal from its own lines
+    with today's table (`costStoredMeal`, `src/lib/meal-costing.ts`), keeping the stored numbers
+    WHOLE when the lines cannot be costed as well as a new meal (an amount unread, or under the same
+    80% floor `verifyProposal` uses; that constant now lives in one place). Never a line-by-line
+    mix. **The inverse gap, closed:** 16 entries whose figures describe one state with no twin
+    (raw: salmon, both beef minces, chicken mince, tuna steak, trout, red snapper, squid, scallops,
+    oysters, chicken liver, taro; cooked: duck breast, venison, split peas, barley) now treat a line
+    naming the OTHER state as a miss, never the wrong state ("cooked salmon" was costed raw,
+    "dried split peas" at a third of their energy). Placed by their own figures against USDA SR
+    Legacy (CSCS delegation, population nutrition); entries whose state could not be read off their
+    figures were left alone. A miss is fail-closed under all 22 diets, so no verdict moved toward
+    permissive (checked).
+  - **Measured:** the library as written, **0 of 290 affected** (188 + 102; no raw/dry line in
+    it). The same dishes written raw/dry the way the meal writer is told to: **149 of 290 affected**,
+    median 83 kcal (15%) off, 120 beyond a meal's 7% band, carbs under-stated by a median 19 g,
+    protein off by a median 5 g (worst 21 g over), worst dish 919 vs 646 kcal; all 149 re-costed by
+    the read. A whole H32-like dish: 482 → 543 kcal, 61 → 51 P, 23 → 52 C (her estimate ~540/53/45).
+    **Her own stored pools: not measured** (no database from a cloud session).
+  - **CSCS review:** intake is now compared against what the food delivers; a day that read on
+    target may read off it and the day search may serve another dish (honest, nothing removed); no
+    floor or target changes; not clinical.
+  - **Questions for Ashley (built neutral, no new words):** (1) should the card say when a meal's
+    numbers were worked out again? (2) an unmarked line ("170g chicken breast", "150g salmon") does
+    not say which state to weigh, and the figures assume cooked for chicken, fish fillets, rice and
+    pasta but raw for salmon and mince (library: 147 cooked, 19 raw, 14 dry). Say "cooked"/"raw" on
+    every such line?
+  - **Not done:** a stored line misread before 1 Oct (an ounce stored as a gram) cannot be repaired
+    from the line; what she has already LOGGED keeps the number she logged (history is permanent).
+  - **Verified:** `test:meals-costed-as-weighed` (20 checks; 17 mutations, 17 caught, every check
+    seen failing), `verify:meal-costed` (8 checks at 390x844; 8 mutations, 8 caught; screenshots
+    read), `measure:meals-costed-as-weighed`. Derived gates (every `test:` reading the changed
+    files, plus diet-rules, portion-scaler, rotation, grocery, library and custom-meal readers,
+    `test:bundle`, `test:no-dead-code`): 57 of 57; gates reading the harness, CLAUDE.md and
+    package.json: 23 of 24, the one being `test:coach-exam-fresh`, red before this change (the coach
+    changed after the last exam; nothing here touches it). All 25 nutrition drivers green, one at a
+    time. `tsc` clean. Bundle headroom 8 / 8 / 22 / 25 kB, no budget moved. No full sweep run.
+  - **Deploys:** frontend on merge (the fix itself); **`chat-gemini`** (the only function importing
+    `_shared/food-db.ts`) for the coach's own costing of "cooked salmon" and the rest of the 16.
+- [~] **LIVE, 12 Oct 2026: `main` at 2b096a93, on her 11 Oct "put the app live" with conditions.**
+  Fast-forwarded from 3fdaa11d. Both Vercel projects built 2b096a93 for production (READY); the live site
+  loads `index-Dxc5dV-b.js` (was `index-BScgizUj.js`; her `index-B4tuvUmK.js` was older still).
+  No migration. **Still needed, on her machine** (`docs/handoff-2026-10-12.md`): the `chat-gemini`,
+  `onboarding-chat` and `generate-meals` deploys (she named two; the meal writer changed too, for the
+  stricter food matching and the recipe-step check), the three live checks (eggs and toast, cardio in
+  a finished session's summary, editing a moved session), and the coach exam. **Not proven live from
+  here:** the three checks need a logged-in account and the deployed coach; this session has neither.
+  Eggs and toast on the harness: 417 kcal with butter, 346 plain with medium eggs, so her "above 350"
+  holds only with large eggs or butter; under 300 is what would be wrong.
+
 - [x] **RELEASE SWEEP, 12 Oct 2026, on the merged tree (run 5, the allergy path, the kit list): 387 of 397, then the 6 drivers fixed.**
   Frozen copy of 50d8955a, every `test:` and `verify:` gate including `test:quality` and `test:audit`.
   - **Environmental, as always:** `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database

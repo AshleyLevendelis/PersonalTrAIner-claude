@@ -854,8 +854,9 @@ export type FoodState = 'cooked' | 'dry' | 'raw'
  * numbers change a lot between states are listed: a cooked grain, pasta or
  * pulse against its dry weight (2.5-3x) and a cooked lean meat or fish against
  * its raw weight (about 1.35x). Read off this table's own figures, `salmon`
- * and both beef mince entries are RAW figures already, so they are not here
- * and "raw salmon" was right all along. An entry with no state takes any state
+ * and both beef mince entries are RAW figures already, so "raw salmon" was
+ * right all along; since 15 Oct they are listed as raw, so "cooked salmon" is
+ * a miss rather than raw salmon's numbers. An entry with no state takes any state
  * word ("cooked spinach", "raw honey") — except that DRIED fruit or veg is a
  * different food (dried mango is five times the calories of fresh), so "dried"
  * against fresh produce is a miss.
@@ -867,6 +868,23 @@ const ENTRY_STATE: Record<string, FoodState> = {
   'chickpeas': 'cooked', 'lentils red': 'cooked', 'lentils green': 'cooked', 'brown lentils': 'cooked', 'black beans': 'cooked',
   'kidney beans': 'cooked', 'pinto beans': 'cooked', 'butter beans': 'cooked', 'cannellini beans': 'cooked', 'haricot beans': 'cooked',
   'gluten free pasta': 'cooked', 'oats': 'dry',
+  // THE OTHER HALF OF RULE 6 (15 Oct 2026, H32; docs/plans/meals-costed-as-weighed.md):
+  // entries whose figures describe ONE state and have no twin for the other.
+  // "cooked salmon" was costed with raw salmon's figures and "dried split peas"
+  // with cooked split peas' (a third of the energy). Placed by their own
+  // figures against USDA SR Legacy: RAW salmon (15236), beef mince 5% (23557)
+  // and 20% (23572), chicken mince (05332), tuna steak (15117), trout (15240),
+  // red snapper (15101), squid (15175), scallops (15172), oysters (eastern,
+  // wild), chicken liver (05027), taro (11518); COOKED duck breast (05141,
+  // roasted), venison (roasted), split peas (16086, boiled), barley (pearled,
+  // cooked). A line naming the state these figures do not describe is now a
+  // miss (asked about), never costed in the wrong state. Left out: entries
+  // whose state cannot be read off their figures with confidence (turkey,
+  // lamb and pork mince, brisket, pork belly, lobster), and foods whose state
+  // moves their numbers by under about 10% (yam, plantain, potato).
+  'salmon': 'raw', 'beef mince 5% fat': 'raw', 'beef mince 20% fat': 'raw', 'chicken mince': 'raw', 'tuna steak fresh': 'raw',
+  'trout': 'raw', 'red snapper': 'raw', 'squid': 'raw', 'scallops': 'raw', 'oysters': 'raw', 'chicken liver': 'raw', 'taro root': 'raw',
+  'duck breast': 'cooked', 'venison': 'cooked', 'split peas': 'cooked', 'barley': 'cooked',
 }
 
 /** cooked entry -> its dry and raw twins. The twins' own state is set from this table when the module loads. */

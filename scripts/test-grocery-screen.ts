@@ -44,7 +44,7 @@ check('...and still hides for the chat', /activeTab\s*===\s*'chat'/.test(hideCon
 check('...and "the grocery screen is open" means the grocery route, the same flag that mounts it', /const groceryFullScreen = route\.kind === 'grocery'/.test(app) && /\{groceryFullScreen \? \(\s*(?:<Suspense[\s\S]*?\}>\s*)?<GroceryScreen/.test(app))
 
 console.log('\n[1b] Off the main bundle, and still there offline')
-check('the screen loads as its own chunk', /const GroceryScreen = lazy\(/.test(app) && !/import \{ GroceryScreen \} from/.test(app))
+check('the screen loads as its own chunk', /const GroceryScreen = (?:lazy|lazyWithReload)\(/.test(app) && !/import \{ GroceryScreen \} from/.test(app))
 check('...and that chunk is fetched soon after start, so the offline cache has it before the shop', /useEffect\(\(\) => \{[\s\S]{0,200}?loadGroceryScreen\(\)/.test(app) && /const loadGroceryScreen = \(\) => import\('@\/components\/GroceryScreen'\)/.test(app))
 
 console.log('\n[2] The top bar carries the real menu')
