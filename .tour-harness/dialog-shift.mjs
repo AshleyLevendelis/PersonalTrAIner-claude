@@ -32,7 +32,7 @@ const measure = () => ev(`(() => {
   const tab = [...document.querySelectorAll('nav button, nav a')].find(b => /Nutrition/.test(b.textContent || ''))
   const gear = document.querySelector('[data-tour="settings"]')
   const main = document.querySelector('main')
-  const heading = [...document.querySelectorAll('main button, main a')].find(e => /How it.s set/.test(e.textContent || ''))
+  const heading = [...document.querySelectorAll('main button, main a')].find(e => /How it.s set|Targets & plan settings/.test(e.textContent || ''))
   return {
     scrollbar: innerWidth - document.documentElement.clientWidth,
     scrolls: document.documentElement.scrollHeight > innerHeight,
@@ -55,7 +55,7 @@ check('1b. its scrollbar takes up room (about 15px), as on desktop Chrome', befo
 check('1c. the tab bar, the Nutrition tab, the gear and the page were all found', [before?.barLeft, before?.tabLeft, before?.gearLeft, before?.mainLeft, before?.linkLeft].every(v => typeof v === 'number'), before)
 
 console.log('\n2. Open a dialog: nothing moves sideways\n')
-const opened = await clickAt(`[...document.querySelectorAll('main button, main a')].find(b => /How it.s set/.test(b.textContent || ''))`)
+const opened = await clickAt(`[...document.querySelectorAll('main button, main a')].find(b => /How it.s set|Targets & plan settings/.test(b.textContent || ''))`)
 await until(() => ev(`!!document.querySelector('[role="dialog"]')`), v => v === true, 20)
 await wait(500)
 const open = await measure()

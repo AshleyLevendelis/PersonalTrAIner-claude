@@ -129,15 +129,17 @@ console.log('\n  HOME — the session block, same window')
 // ---------------------------------------------------------------------------
 page = '/.tour-harness/real.html'
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?planDelay=${PLAN_DELAY}` })
-const homeFirst = await firstPaintOf(/TODAY'S SESSION/)
+// One-page Home (17 Oct 2026): the session is the first row under UP NEXT.
+const homeFirst = await firstPaintOf(/UP NEXT/)
 const homeEarly = homeFirst.text
 check('Home draws its session block before the plan is in',
-  /TODAY'S SESSION/.test(homeEarly) && homeFirst.planArrived === false, { planArrived: homeFirst.planArrived })
+  /UP NEXT/.test(homeEarly) && homeFirst.planArrived === false, { planArrived: homeFirst.planArrived })
 check('Home says it is still checking, in Ashley\'s words',
   /Checking your plan…/.test(homeEarly), homeEarly.slice(0, 200))
 check('and it does NOT say rest day', !/Rest day/.test(homeEarly), homeEarly.slice(0, 200))
-check('no Start session button over a session it cannot name',
-  !/Start session/.test(homeEarly), homeEarly.slice(0, 200))
+// One-page Home (17 Oct 2026): the docked button names the session, "Start Upper Pull & Core".
+check('no Start button over a session it cannot name',
+  !/(^|\n)Start \S/.test(homeEarly) && !/Continue session/.test(homeEarly), homeEarly.slice(0, 200))
 check('no Tomorrow row guessed from the same empty plan',
   !/\nTomorrow\n/.test(homeEarly), homeEarly.slice(0, 400))
 check('the rest of Home is still on screen — this is a block waiting, not a blank page',
@@ -150,7 +152,7 @@ const homeLate = await text()
 // Same property, same reason as the chat check above: a named session with a
 // real exercise count where "Checking your plan…" was, whichever day it is.
 check('the block fills in once the plan arrives',
-  !/Checking your plan/.test(homeLate) && /TODAY'S SESSION[\s\S]{0,200}\d+ exercises/.test(homeLate), homeLate.slice(0, 240))
+  !/Checking your plan/.test(homeLate) && /UP NEXT[\s\S]{0,200}\d+ exercises/.test(homeLate), homeLate.slice(0, 240))
 // EACH SURFACE AGREES WITH THE PLAN IT IS RENDERING.
 //
 // This used to say "the coach named the same session Home shows", comparing
@@ -165,13 +167,13 @@ check('the block fills in once the plan arrives',
 // The promise underneath is "the coach never contradicts the app's numbers",
 // which is a claim WITHIN one universe. So each page publishes the focus its
 // own plan holds for today, and each surface is held to its own.
-const homeFocus = /TODAY'S SESSION\s+~\d+ min\s+([^\n]+)/.exec(homeLate)?.[1]?.trim() ?? null
+const homeFocus = /UP NEXT\s+([^\n]+)/.exec(homeLate)?.[1]?.trim() ?? null
 const homePlanFocus = await ev(`window.__todayFocus`)
 check('...and Home named the session its own plan holds for today',
   !!homeFocus && homeFocus === homePlanFocus, { homeFocus, homePlanFocus })
 check('...and the coach named the session ITS plan holds for today',
   !!chatPlanFocus && chatLate.includes(chatPlanFocus), { chatPlanFocus, chat: chatLate.slice(0, 300) })
-check('...with the button to start it', /Start session/.test(homeLate), homeLate.slice(0, 240))
+check('...with the button to start it, by name', !!homePlanFocus && homeLate.includes(`Start ${homePlanFocus}`), homeLate.slice(-240))
 check('...and it no longer says it is checking', !/Checking your plan…/.test(homeLate))
 check('the week header knows which week it is', /WEEK 2 OF 16/.test(homeLate), homeLate.slice(0, 80))
 await shoot('rest-day-race-home-settled')

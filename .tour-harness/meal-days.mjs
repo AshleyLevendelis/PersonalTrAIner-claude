@@ -74,6 +74,7 @@ const strip = () => ev(`[...document.querySelectorAll('[data-meal-day]')].map(b 
 })`)
 /** Which meal is in which slot, off the rows' own test hooks. */
 const meals = () => ev(`Object.fromEntries([...document.querySelectorAll('[data-meal-name]')].map(e => [e.dataset.mealName, e.textContent.trim()]))`)
+// The heading is the day's name over "Nutrition" since the one-page layout (17 Oct 2026).
 const heading = () => ev(`document.querySelector('[data-testid="meal-day-heading"]')?.textContent.trim() ?? null`)
 const has = sel => ev(`!!document.querySelector(${JSON.stringify(sel)})`)
 const tapDay = async date => { await ev(`document.querySelector('[data-meal-day="${date}"]').click()`); await wait(500) }
@@ -90,7 +91,7 @@ check('...consecutive calendar dates', days.every((d, i) => i === 0 || new Date(
 // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the heading is "Nutrition · {day}"
 // now, the strip below it saying which of them is today.
 const todayName = new Date(days[0].date + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
-check('the heading is today\'s', (await heading()) === `Nutrition · ${todayName}`, await heading())
+check('the heading is today\'s', (await heading()) === todayName, await heading())
 check('today\'s rings are there', await has('[data-tour="rings"]'))
 const todayMeals = await meals()
 check('today has its three meals', Object.keys(todayMeals).length === 3, todayMeals)
@@ -114,7 +115,7 @@ const after = await strip()
 check('the tapped day is the open one', after.find(d => d.date === d2)?.selected === true && !after[0].selected, after.map(d => d.selected))
 check('...and "Today" is still named, so the way back is not a guess', after[0].text.startsWith('Today'), after[0].text)
 const dayName = new Date(d2 + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
-check('the heading names the day', (await heading()) === `Nutrition · ${dayName}`, { heading: await heading(), dayName })
+check('the heading names the day', (await heading()) === dayName, { heading: await heading(), dayName })
 check('today\'s rings step aside', !(await has('[data-tour="rings"]')))
 check('the day has an add-to-list button, in its own words',
   (await ev(`document.querySelector('[data-testid="meal-day-add-grocery"]')?.textContent.trim()`)) === `Add ${dayName} to the shopping list`,
@@ -208,7 +209,7 @@ check('a day already on the list when it opens offers no Undo — this visit did
 
 console.log('\n[5] Back to today')
 await tapDay(days[0].date)
-check('the heading is today\'s again', (await heading()) === `Nutrition · ${todayName}`, await heading())
+check('the heading is today\'s again', (await heading()) === todayName, await heading())
 check('...the rings are back', await has('[data-tour="rings"]'))
 await openSlot('breakfast')
 check('...and today\'s meals can be logged, as before', (await buttonTexts()).some(t => /Log this meal/.test(t)))
