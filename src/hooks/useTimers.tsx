@@ -9,6 +9,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useDeadlineTick } from './useDeadlineTick'
+import { useWakeLock } from './useWakeLock'
 // ---------------------------------------------------------------------------
 // A TIMER MEASURES ELAPSED TIME, SO IT READS THE WALL CLOCK — NOT getAppNow.
 //
@@ -195,6 +196,11 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   // second countdown and derives transitions from elapsed time, so a faster
   // tick would buy nothing but battery drain.
   const tick = useDeadlineTick(record.running, record.mode === 'round' ? 1000 : 100)
+  // THE SCREEN STAYS AWAKE WHILE A TIMER RUNS (Ashley, 17 Oct 2026: "when I use the round timer the phone
+  // screen times out and turns off while I'm in the middle of training"). The lock was only taken for a running
+  // workout session on Exercise; the round timer, stopwatch and lap timer live on Tools, outside it. Held while
+  // any of them runs (a round's lead-in included) and let go the moment it stops, pauses or finishes.
+  useWakeLock(record.running)
 
   const setMode = useCallback((mode: TimerMode) => {
     persist(defaultTimerRecord(mode))

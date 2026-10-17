@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **A running timer keeps the phone screen awake (17 Oct 2026, her "build it").** She reported the screen
+  timing out mid-training on the round timer. Cause: the app asked the phone to stay awake only while a workout
+  session ran on Exercise; the round timer, stopwatch and lap timer live on Tools. Now the same request is held
+  while any of them runs (a round's lead-in included) and released the moment it pauses, resets or finishes.
+  `verify:timer-wake` (12 checks, the phone's API stubbed and counted at the boundary; 5 mutations, 4 caught —
+  the fifth removes a guard against asking twice, which this flow never does, so the screen behaves the same:
+  an equivalent mutant on this path). The 13 timer, bubble and bundle checks pass. NOT PROVEN: that a given phone
+  honours the request (iOS 16.4+; a home-screen app on iPhone needs a newer iOS). Frontend only.
 - [ ] **`verify:history-streak` FLIPS WITH THE CALENDAR (found 16 Oct 2026, release sweep for run 7).** Three
   checks ("FOUR … sessions in a row" got 2; "FIVE" got 3) fail on `main` at 2b096a93 exactly as on the branch,
   and passed in earlier sweeps with no code change, so something on the streak path reads the real date rather
