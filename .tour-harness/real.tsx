@@ -1574,6 +1574,9 @@ function Harness() {
           <Dashboard profile={profile} macros={homeMacros} exercisePlan={livePlan}
             mesocycle={liveMeso} planCreatedAt={profile.created_at}
             onWeightLogged={handleWeightLogged}
+            // As App passes them: today's chosen meals and their pools, so the Next meal row is the app's.
+            todaysMeals={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never}
+            mealPools={servablePools as never}
 />
         )}
         {activeTab === 'nutrition' && (

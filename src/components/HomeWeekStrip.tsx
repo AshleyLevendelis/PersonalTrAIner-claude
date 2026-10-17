@@ -89,3 +89,43 @@ export function HomeWeekBoundaryNote({ days, todayDate }: { days: TrainingWeekDa
   const note = todayDate ? weekBoundaryNote(days, todayDate) : null
   return note ? <p className="mt-1 text-center text-[0.625rem] text-muted-foreground" data-testid="home-week-boundary-note">{note}</p> : null
 }
+
+/**
+ * THE WEEK AS SEVEN DOTS on Home's session row (one-page Home, 17 Oct 2026, design 5c·5): 7px, gap 5.
+ * Done is accent with glow, missed is warn, today a hollow accent ring, a training day still ahead a dim
+ * ring, rest dim. The same looks as the strip above (weekCircleLook), so the two cannot disagree, and every
+ * dot keeps its spoken sentence; the count is spoken with the group.
+ */
+const DOT_LOOK: Record<WeekCircleLook, CSSProperties> = {
+  done: { background: 'var(--primary)' },
+  partial: { background: 'color-mix(in srgb, var(--primary) 50%, transparent)' },
+  missed: { background: 'color-mix(in srgb, var(--role-warn) 70%, transparent)' },
+  today: { boxShadow: 'inset 0 0 0 1.5px var(--primary)' },
+  due: { boxShadow: 'inset 0 0 0 1.5px var(--text-dim)' },
+  rest: { background: 'var(--text-dim)' },
+  away: { background: 'var(--text-dim)' },
+}
+export function HomeWeekDots({ days, todayName, done, planned }: { days: TrainingWeekDay[]; todayName: string; done: number; planned: number }) {
+  const boundary = weekBoundaryIndex(days)
+  return (
+    <span className="flex items-center gap-[5px]" data-home-week role="group" aria-label={`${done} of ${planned} sessions done this week`}>
+      {days.map((d, i) => {
+        const look = weekCircleLook(d, d.dayName === todayName)
+        return (
+          <span
+            key={d.date}
+            role="img"
+            aria-label={dayLabel(d)}
+            data-look={look}
+            data-week-boundary={i === boundary ? 'start' : undefined}
+            className={`relative block size-[7px] shrink-0 rounded-full ${look === 'done' ? 'glow-mint-box' : ''}`}
+            style={DOT_LOOK[look]}
+          >
+            {i === boundary && <span aria-hidden className="absolute -left-[3px] -top-0.5 -bottom-0.5 w-px bg-border" data-testid="home-week-boundary-mark" />}
+          </span>
+        )
+      })}
+      <span className="sr-only" data-home-week-count>{done}/{planned}</span>
+    </span>
+  )
+}

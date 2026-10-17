@@ -3131,6 +3131,8 @@ function App() {
               planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
               onWeightLogged={handleWeightLogged}
               logsVersion={logsVersion}
+              todaysMeals={chosenMeals}
+              mealPools={mealPools}
             />
           </TabsContent>
 

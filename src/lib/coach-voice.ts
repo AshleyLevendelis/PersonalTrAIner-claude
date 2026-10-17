@@ -879,6 +879,13 @@ export function streakLabel(count: number): string {
 }
 
 /**
+ * HOME'S PILL SAYS "12 in a row" — her ruling 17 Oct 2026, from options, over the one-page design's
+ * "12 days": the streak counts sessions, so "days" would be untrue, and the pill has no room for
+ * "sessions". The full sentence (streakLabel) is what a screen reader hears.
+ */
+export const STREAK_PILL_WORDS = 'in a row'
+
+/**
  * THE QUESTION BEFORE FINISHING WITH SETS STILL TO DO (M12, 9 Oct 2026).
  *
  * One tap on Finish ended a session at 9 of 24 sets with nothing asked. The

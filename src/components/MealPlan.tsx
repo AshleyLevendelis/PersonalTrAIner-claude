@@ -21,7 +21,8 @@ import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestr
 import { methodToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
 import type { MethodRules } from '@/lib/meal-method-check'
 import { formatKitchenQuantity } from '@/lib/portion-scaler'
-import { groceryHash } from '@/lib/app-route'
+import { groceryHash, tabHash } from '@/lib/app-route'
+import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
 // Add food, so paying for them on first paint is paying for a screen most
@@ -31,7 +32,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
 import { COOK_ONCE, didNotSave, aroundEatenLine, heldAroundLine, swapKnockOnLine } from '@/lib/coach-voice'
-import { dayAsShown } from '@/lib/day-as-shown'
+import { dayAsShown, eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept } from '@/lib/day-as-shown'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
@@ -263,13 +264,9 @@ export function MealPlan({
   // header and every row, so they cannot disagree, and the un-eaten meals fit
   // around what was eaten within about 25% (Ashley's ruling A, 10 Oct 2026).
   // Undo keeps today's plan as planned; it is remembered for this date only.
-  const keptKey = profileId && date ? `fitplan_around_eaten_kept_${profileId}_${date}` : null
-  const [keepAsPlanned, setKeepAsPlanned] = useState<boolean>(() => {
-    try { return !!keptKey && localStorage.getItem(keptKey) === '1' } catch { return false }
-  })
-  useEffect(() => {
-    try { setKeepAsPlanned(!!keptKey && localStorage.getItem(keptKey) === '1') } catch { setKeepAsPlanned(false) }
-  }, [keptKey])
+  const keptKey = aroundEatenKeptKey(profileId, date)
+  const [keepAsPlanned, setKeepAsPlanned] = useState<boolean>(() => readAroundEatenKept(keptKey))
+  useEffect(() => { setKeepAsPlanned(readAroundEatenKept(keptKey)) }, [keptKey])
   const setKept = (next: boolean) => {
     setKeepAsPlanned(next)
     try { if (keptKey) { if (next) localStorage.setItem(keptKey, '1'); else localStorage.removeItem(keptKey) } } catch { /* the choice still holds for this visit */ }
@@ -277,11 +274,7 @@ export function MealPlan({
   const shown = dayAsShown({
     slots: SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0),
     chosen,
-    eatenBySlot: Object.fromEntries(Object.entries(loggedBySlot)
-      .filter(([, evs]) => (evs?.length ?? 0) > 0)
-      .map(([slot, evs]) => [slot, (evs ?? []).reduce(
-        (acc, e) => ({ kcal: acc.kcal + (e.macros?.kcal ?? 0), protein: acc.protein + (e.macros?.protein ?? 0), carbs: acc.carbs + (e.macros?.carbs ?? 0), fat: acc.fat + (e.macros?.fat ?? 0) }),
-        { kcal: 0, protein: 0, carbs: 0, fat: 0 })])),
+    eatenBySlot: eatenMacrosBySlot(loggedBySlot),
     targets: targets ?? null,
     keepAsPlanned,
   })
@@ -578,10 +571,23 @@ export function MealPlan({
             {laterSlots.map(slot => rowFor(slot, 'later'))}
           </section>
         )}
-        {!upcoming && eatenSlots.length > 0 && (
+        {!upcoming && (
           <section className="mb-[18px]" data-meal-section="eaten">
-            <p className="ds-label flex items-baseline justify-between">Eaten <span className="tabular-mono">{eatenSlots.length}</span></p>
+            {/* THE EATEN TOTAL IN KCAL (5c·6), summed off the same day-as-shown rows the header reads. */}
+            <p className="ds-label flex items-baseline justify-between">
+              Eaten <span className="tabular-mono normal-case tracking-normal" data-testid="eaten-kcal">{Math.round(shown.slots.reduce((sum, r) => sum + (r.eaten ? r.eaten.kcal : 0), 0)).toLocaleString()} kcal</span>
+            </p>
             {eatenSlots.map(slot => rowFor(slot, 'eaten'))}
+            {/* SOMETHING OFF THE PLAN goes through the coach, which costs it and asks before a food it
+                cannot count (her M51 rule). The screen has no free-text food log of its own. */}
+            <button
+              type="button"
+              onClick={() => { setChatPrefill('I also ate '); window.location.hash = tabHash('chat') }}
+              className="flex min-h-[50px] w-full items-center gap-3 border-b border-[color:var(--hairline)] text-left text-[0.875rem] text-muted-foreground"
+              data-log-something-else
+            >
+              <Plus aria-hidden className="size-4" /> Log something else
+            </button>
           </section>
         )}
         {/* Surfacing round — a per-slot Retry is a dead end while a

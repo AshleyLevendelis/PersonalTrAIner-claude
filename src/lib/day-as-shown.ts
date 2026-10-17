@@ -149,3 +149,25 @@ export function dayAsShown(input: {
     },
   }
 }
+
+/**
+ * WHAT WAS EATEN, PER SLOT, from the logged events — the input `dayAsShown` needs. One helper so Nutrition
+ * and Home's "next meal" row (one-page Home, 17 Oct 2026) cannot sum a slot two ways.
+ */
+export function eatenMacrosBySlot(
+  loggedBySlot: Partial<Record<MealSlotName, { macros?: Partial<EatenMacros> | null }[] | undefined>>,
+): Partial<Record<MealSlotName, EatenMacros>> {
+  return Object.fromEntries(Object.entries(loggedBySlot)
+    .filter(([, evs]) => (evs?.length ?? 0) > 0)
+    .map(([slot, evs]) => [slot, (evs ?? []).reduce<EatenMacros>(
+      (acc, e) => ({ kcal: acc.kcal + (e.macros?.kcal ?? 0), protein: acc.protein + (e.macros?.protein ?? 0), carbs: acc.carbs + (e.macros?.carbs ?? 0), fat: acc.fat + (e.macros?.fat ?? 0) }),
+      { kcal: 0, protein: 0, carbs: 0, fat: 0 })]))
+}
+
+/** Where "Undo" on the fit-around line is remembered, for one date (her ruling A, condition 1). */
+export function aroundEatenKeptKey(profileId: string | undefined, date: string | undefined): string | null {
+  return profileId && date ? `fitplan_around_eaten_kept_${profileId}_${date}` : null
+}
+export function readAroundEatenKept(key: string | null): boolean {
+  try { return !!key && localStorage.getItem(key) === '1' } catch { return false }
+}

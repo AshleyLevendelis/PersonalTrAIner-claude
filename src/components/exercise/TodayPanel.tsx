@@ -36,7 +36,8 @@ import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
 import { LoadCeilingPrompt } from './LoadCeilingPrompt'
-import { WeekContextRow } from './WeekContextRow'
+import { WeekContextRow, ProgramRow } from './WeekContextRow'
+import { SectionLabel as PageSectionLabel, PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
 import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
@@ -1080,6 +1081,34 @@ export function TodayPanel({
     })
   })()
 
+  // TODAY'S SESSION, IN THE HERO'S LEFT HALF (one-page Exercise, 5c·4) — only on the day's own session;
+  // a peek, a rest day, a moved day or recovery has its own card below, and the hero then says the week.
+  const showsTodaysSession = !peekDay && !(isMovedAway && movedAwayTo) && !isRestDay && !isActiveRecovery && !!workout
+  const heroLeft = showsTodaysSession ? (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[0.65625rem] uppercase tracking-[.2em] text-primary-text glow-mint">
+          {/* TODAY IS TODAY'S NAME even when another day's session is borrowed onto it (user
+              test 8 Oct 2026, finding 16). */}
+          Today · {todayName}
+        </span>
+        {devOverrideDay && (
+          <span className="text-[0.625rem] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
+            DEV · {devOverrideDay}
+          </span>
+        )}
+        {borrowedDayName && (
+          <span className="text-[0.625rem] text-muted-foreground italic" data-testid="borrowed-from">{borrowedDayName}&apos;s session</span>
+        )}
+      </div>
+      <p className="mt-1.5 break-words text-[1.875rem] font-bold leading-[1.02] tracking-[-.035em] glow-text" data-testid="hero-focus">{workout!.focus}</p>
+      {/* THE META LINE: what is in it and how long. */}
+      <p className="mt-2 text-[0.75rem] text-muted-foreground" data-testid="hero-meta">
+        {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}
+      </p>
+    </div>
+  ) : undefined
+
   return (
     <div className="space-y-3">
       <WeekContextRow
@@ -1102,6 +1131,7 @@ export function TodayPanel({
         coachNoteShownBelow={todayNudge?.source === 'week-note'}
         expanded={weekNotesOpen}
         onToggleExpanded={setWeekNotesOpen}
+        hero={heroLeft}
       />
       <Suspense fallback={null}>
       <WhatHappenedSheet
@@ -1343,37 +1373,9 @@ export function TodayPanel({
           )}
           {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
           {rebuildNote && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{rebuildNote}</p>}
-          {/* Turn 5 hero block — supersedes IdentityLine's old day/focus text
-              (now deleted; its timers entry point moved into WeekContextRow's
-              "⋮" menu above). New: a 2px session-progress line under the
-              title. */}
+          {/* THE SESSION'S NAME MOVED INTO THE HERO above (one-page Exercise, 17 Oct 2026); the sets count
+              is on "Today's lifts" below. What stays here belongs to running the session. */}
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[0.65625rem] uppercase tracking-[.2em] text-primary-text glow-mint">
-                {/* TODAY IS TODAY'S NAME even when another day's session is borrowed onto it (user
-                    test 8 Oct 2026, finding 16: it read "TODAY · WEDNESDAY — borrowed from
-                    Thursday" on a Thursday, the two days the wrong way round). */}
-                Today · {todayName}
-              </span>
-              {devOverrideDay && (
-                <span className="text-[0.625rem] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
-                  DEV · {devOverrideDay}
-                </span>
-              )}
-              {borrowedDayName && (
-                <span className="text-[0.625rem] text-muted-foreground italic" data-testid="borrowed-from">{borrowedDayName}&apos;s session</span>
-              )}
-            </div>
-            <p className="mt-1.5 text-[2.25rem] font-bold leading-[1.02] tracking-[-.035em] glow-text">{workout!.focus}</p>
-            {/* THE META LINE (2c): what is in it and how long, then the sets —
-                the SHARED capped count (her M39 "one count"), so this, Home
-                and the finished bar cannot say different fractions. */}
-            <div className="mt-2 flex items-baseline justify-between gap-3 text-[0.75rem] text-muted-foreground">
-              <span data-testid="hero-meta">
-                {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}
-              </span>
-              {heroCount && <span className="tabular-mono" data-testid="hero-sets">{heroCount.logged}/{heroCount.planned} sets</span>}
-            </div>
             {/* THE REASON BESIDE THE NUMBER (audit §6.5). The length moved
                 from the week row to this line in 2c, so the "why is it shorter
                 than I asked for" line moved with it: always visible, never
@@ -1381,12 +1383,6 @@ export function TodayPanel({
             {sessionEstimate.note && (
               <p className="mt-1 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{sessionEstimate.note}</p>
             )}
-            <div className="mt-2 h-[2px] rounded-full" style={{ background: 'var(--hairline)' }}>
-              <div
-                className="h-[2px] rounded-full bg-primary glow-mint-box"
-                style={{ width: `${heroCount && heroCount.planned > 0 ? Math.min(100, (heroCount.logged / heroCount.planned) * 100) : 0}%` }}
-              />
-            </div>
             {/* START MOVED OUT OF THE HERO on 6 Sep 2026 — it is the fixed
                 bar above the tab bar now (see the end of this branch), where
                 it stays reachable after scrolling into the list. FINISH did
@@ -1394,7 +1390,7 @@ export function TodayPanel({
                 already declines to carry a second entry point for it. */}
             {status === 'running' && (
               <>
-                <Button size="sm" className="mt-3" onClick={requestFinish}>Finish session</Button>
+                <Button size="sm" onClick={requestFinish}>Finish session</Button>
                 {/* The line between a look and a workout, said before Finish
                     is tapped rather than after: with nothing logged, Finish
                     closes the screen and counts nothing (useActiveSession).
@@ -1520,6 +1516,9 @@ export function TodayPanel({
             </Suspense>
           )}
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
+          {/* TODAY'S LIFTS (5c·4), with the session's sets — the SHARED capped count (her M39 "one
+              count"), so this, Home and the finished bar cannot say different fractions. */}
+          <PageSectionLabel right={heroCount ? <span data-testid="hero-sets">{heroCount.logged}/{heroCount.planned} sets</span> : undefined}>Today&apos;s lifts</PageSectionLabel>
           <div ref={setListEl} data-today-exercises>
           <ExerciseList
             workout={workout!}
@@ -1599,11 +1598,17 @@ export function TodayPanel({
             hideTrigger
             equipmentAccess={profile?.equipment_access}
           />
-          {/* Clears the fixed CTA bar below, so the last row is never sitting
-              underneath it. Matches the bar's own height plus its fade. */}
-          {(status === 'idle' || status === 'running' || status === 'finished') && <div aria-hidden className="h-[100px]" />}
         </div>
       )}
+
+      {/* THE PROGRAM ROW (5c·4) — the whole programme one tap away, with the plan's own blocks as a bar.
+          Replaces "See the whole program ›" under the strip. On every day, not only a training day. */}
+      {mesocycle && mesocycle.length > 0 && (
+        <ProgramRow mesocycle={mesocycle} liveWeek={liveWeek} onOpenProgram={onOpenProgram} />
+      )}
+      {/* Clears the fixed CTA bar below, so the last row is never sitting
+          underneath it. Matches the bar's own height plus its fade. */}
+      {showsTodaysSession && (status === 'idle' || status === 'running' || status === 'finished') && <div aria-hidden className="h-[100px]" />}
 
       {/* THE PRIMARY ACTION, fixed above the tab bar. It used to be a small
           button in the hero, which scrolled away the moment anyone read past
@@ -1658,11 +1663,12 @@ export function TodayPanel({
               "Start workout" on a session she has already replaced is the
               app telling her it did not hear. Same handler, honest label. */}
           <Button
-            className="h-[52px] w-full text-[0.9375rem] font-semibold"
+            className={swappedToday ? 'h-[52px] w-full text-[0.9375rem] font-semibold' : PRIMARY_CTA_CLASS}
+            style={swappedToday ? undefined : PRIMARY_CTA_STYLE}
             variant={swappedToday ? 'outline' : 'default'}
             onClick={startSession}
           >
-            {swappedToday ? 'Train it anyway' : 'Start workout'}
+            {swappedToday ? 'Train it anyway' : 'Start session'}
           </Button>
         </div>
       )}
