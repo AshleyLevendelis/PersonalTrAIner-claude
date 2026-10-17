@@ -438,6 +438,8 @@
     "test:layoff": "tsx scripts/test-layoff.ts",
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
     "test:layout-revamp": "tsx scripts/test-layout-revamp.ts",
+    "test:one-page": "tsx scripts/test-one-page.ts",
+    "verify:one-page": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-page.mjs",
     "test:exercise-layout": "tsx scripts/test-exercise-layout.ts",
     "test:round-setup": "tsx scripts/test-round-setup.ts",
     "test:rebuild-honours": "tsx scripts/test-rebuild-honours.ts",

@@ -751,9 +751,10 @@ function SessionRow({ status, data, week, sessionGlance, done, minutes, setsLogg
     title = data.session.focus
     sub = (
       <>
+        {/* The length only before a session starts (never while the plan is unknown: that branch is above). */}
+        {status === 'not_started' && data.session.sessionLength && <><span data-testid="home-session-length">{data.session.sessionLength}</span> · </>}
         <span data-testid="home-session-glance">{sessionGlance}</span>
         {data.session.movedFrom && <> · {data.session.movedFrom.dayName}&apos;s session, moved here</>}
-        {status === 'not_started' && data.session.sessionLength && <span className="sr-only" data-testid="home-session-length"> · {data.session.sessionLength}</span>}
       </>
     )
   }

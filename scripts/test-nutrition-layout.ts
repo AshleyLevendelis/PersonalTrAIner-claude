@@ -55,10 +55,11 @@ console.log('\n1. The scroll is the day; the set-once numbers are behind one lin
 // ---------------------------------------------------------------------------
 check('the sheet exists at all (sanity check on every check below)', sheetStart !== -1)
 check('no Card survives on this tab', !/<Card[ >]/.test(nutrition))
-check('the Target row is in the scroll', /className="ds-label">Target</.test(scroll))
+// RE-ANCHORED 17 Oct 2026 (one-page Nutrition, 5c·6): the Target row is one raised row now,
+// "Targets & plan settings", with the day's calorie target on it.
+check('the Target row is in the scroll', /data-targets-row/.test(scroll) && /Targets &amp; plan settings/.test(scroll))
 check('...with the link that opens the sheet', /setHowItsSetOpen\(true\)/.test(scroll))
-check('...on a 44px target', /hit-slop-44[^"]*"\s*\n?\s*>\s*\n?\s*How it's set/.test(scroll)
-  || /How it's set/.test(scroll) && /hit-slop-44/.test(scroll))
+check('...on a 44px target (the row is 52px tall)', /className="flex h-\[52px\] w-full items-center[^"]*"[\s\S]{0,120}data-targets-row/.test(scroll))
 // THE OTHER HALF. Each of these left the scroll; none of them may have left
 // the app. A "cleaner tab" that dropped the method picker would be a feature
 // deletion wearing a design change's clothes.
@@ -179,8 +180,9 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
   // nothing renders — the failure this repo has already shipped twice.
   check('NutritionDisplay calls the rule rather than keeping a copy',
     /macroShortfallLine\(/.test(nutrition) && !/const gaps = \[/.test(nutrition))
+  // ...one coach voice (17 Oct 2026): a resize or top-up offer showing takes the line's place.
   check('...and renders the result through the shared nudge',
-    /\{macroNudge && <TrainerNudge/.test(nutrition))
+    /\{macroNudge && !mealRefit && !\(mealTopUp && !mealTopUpNote\) && <TrainerNudge/.test(nutrition))
 }
 
 // ---------------------------------------------------------------------------
@@ -189,13 +191,16 @@ console.log('\n3. The legend is four rows in two columns, beside the rings')
 // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the legend became the RING
 // KEY — four rows in a 2x2 grid, named in full, in the order the rings sit —
 // and fat, which lost its ring, is a muted line under it so its number stays.
-check('a 2-column grid holds it', /grid grid-cols-2 gap-x-\[22px\] gap-y-2\.5" data-ring-key/.test(nutrition))
-for (const label of ["label: 'Calories'", "label: 'Protein'", "label: 'Carbs'", "label: 'Water'"]) {
-  check(`the key carries ${label}`, nutrition.includes(label))
+// RE-ANCHORED 17 Oct 2026 (one-page Nutrition, 5c·6): NO RINGS on this screen. The calories are a bar
+// under the number left, and the four macros sit in a 2x2 grid, each with its own bar — fat included, so
+// fat has its own cell again rather than a muted line.
+check('a 2-column grid holds it', /grid grid-cols-2 border-y border-\[color:var\(--hairline\)\]" data-ring-key/.test(nutrition))
+for (const label of ['label="Protein"', 'label="Carbs"', 'label="Fat"', 'label="Water"']) {
+  check(`the grid carries ${label}`, nutrition.includes(label))
 }
-check('the rings are those four, in that order, outermost first',
-  /key: 'calories', r: 58[\s\S]{0,120}key: 'protein', r: 46[\s\S]{0,120}key: 'carbs', r: 34[\s\S]{0,120}key: 'water', r: 22/.test(nutrition))
-check('fat is still on the screen, as a line', /data-ring-key-fat>\s*Fat/.test(nutrition) && /ringValues\.fat\.eaten/.test(nutrition))
+check('the cells are those four, in that order (protein, carbs / fat, water)',
+  /k="protein"[\s\S]{0,400}k="carbs"[\s\S]{0,400}k="fat"[\s\S]{0,400}k="water"/.test(nutrition))
+check('the calories are a bar, not a ring', /testid="kcal-bar"/.test(nutrition) && !/<circle/.test(nutrition))
 check('the hero is what is LEFT (2b), the eaten figure under it', /data-testid="kcal-left-number"/.test(nutrition) && /data-testid="kcal-eaten"/.test(nutrition) && /ds-num-mega/.test(nutrition))
 check('the caption says left or over, from the phrasebook', /kcalLeftOrOver\(macros\.calories - eaten\.kcal\)/.test(nutrition) && /data-testid="kcal-left">kcal \{word\}/.test(nutrition))
 
@@ -205,7 +210,8 @@ console.log('\n4. The meal list points at the list it fills')
 // RE-ANCHORED 10 Oct 2026 (2b): the link is the "Grocery" pill in the
 // Nutrition header now, there even before any meals are; the day-added row's
 // "Open list ›" in MealPlan still goes to the same route.
-check('the header links to the grocery list', /data-grocery-pill/.test(nutrition) && /<ShoppingBasket[^>]*\/> Grocery/.test(nutrition))
+// 17 Oct 2026 (5c·6): a 40px round basket button, named for a screen reader.
+check('the header links to the grocery list', /aria-label="Grocery list"\s*data-grocery-pill/.test(nutrition) && /<ShoppingBasket /.test(nutrition))
 // THE LIST MOVED OFF TOOLS, 12 Sep 2026 (design handoff 2b ›). It has a
 // screen of its own under Nutrition — where it is built from — so the link
 // goes there and the sanity check follows it. The property is unchanged: the

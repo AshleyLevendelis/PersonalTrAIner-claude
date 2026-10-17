@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [x] **Home, Nutrition and Exercise are one page each (17 Oct 2026, design 5c·5 / 5c·6 / 5c·4, her "Build this
+  one").** Layout only; every control kept, moved or one tap deeper. `docs/plans/one-page-tabs.md`.
+  HER THREE RULINGS that day, each from options: **"Keep it on top"** (Nutrition's day strip stays, as a row
+  under the header; the design had none), **"12 in a row"** (the streak pill; the design's "12 days" would be
+  false, the streak counts sessions), **"Tap the steps ring"** (Home's water and steps pills go; Steps in the
+  key opens the steps entry, the other rows and the rings open Nutrition; water is logged from Nutrition's
+  water cell, which opens the old +250/+500/Undo).
+  DECIDED HERE, layout calls: "Week N of M" is the plan's week (as Home and every card say), not the design's
+  block week; the Program row's phase bar is the plan's own blocks named by their own phases (the plan has no
+  Base/Build/Peak), with "deload in N wks" from its deload weeks, and **"Calibration week" first** in a
+  calibration week (found by `verify:layoff`: the deload line had pushed the only visible "Calibration" off the
+  screen); the resize and top-up offers keep their rulings and take the coach-note slot when showing; Nutrition
+  keeps Later and the planned-day line (Next and Eaten only would have removed meals); "Log something else"
+  opens the coach with "I also ate" typed (the screen has no free-text food log; the coach costs it and asks
+  about a food it cannot count, her M51 rule); the Exercise button says "Start session" (the design's word, and
+  Home's); the coach note stays the existing TrainerNudge with its Ask and rotation.
+  FOUND ON THE WAY: the coach's map of the app said water is logged on Home, which this made false; fixed
+  (`test:chat-app-reality` caught it), so **chat-gemini needs a deploy** for the coach to say it. The tour's
+  five stops named rings and a water log that moved; reworded to what each tab now does (`test:app-tour` §9).
+  Home's next-meal row reads the same day-as-shown sizes as Nutrition (one helper, `eatenMacrosBySlot`), proved
+  by a logged-over breakfast: both say 374 kcal where the stored dish is 456; the harness had been giving Home
+  different targets from Nutrition, which the app never does, and now matches App.
+  CHECKS: `test:one-page` (53 checks; 31 mutations, all caught, two only after cases were added where they
+  bind: the last week of a block, and a deload in a LATER block), `verify:one-page` (26 checks at 390px; 15
+  mutations, all caught, one only after the calorie-bar check moved to a day with food eaten, where a wrong
+  formula shows). Re-anchored to the new layout, each mutation-tested: `chat-app-reality`, `tab-ownership`,
+  `app-tour`, `hero-surface`, `plan-unknown`, `session-move`, `session-shortfall`, `one-today`,
+  `exercise-today`, `nutrition-layout`, and the drivers `cardio-shows`, `what-a-pr-is`, `session-start`,
+  `finish-check`, `session-move`, `swapped-day`, `layoff`, `modal-close`. NOT PROVEN: App.tsx's own wiring of
+  Home's meals (no harness page boots it; the harness passes them the way App does). Frontend, plus the
+  chat-gemini deploy for the coach's app map; the coach exam is stale (it was before this too).
 - [x] **A running timer keeps the phone screen awake (17 Oct 2026, her "build it").** She reported the screen
   timing out mid-training on the round timer. Cause: the app asked the phone to stay awake only while a workout
   session ran on Exercise; the round timer, stopwatch and lap timer live on Tools. Now the same request is held

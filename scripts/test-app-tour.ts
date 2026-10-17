@@ -501,12 +501,15 @@ console.log('\n7. The copy still describes the app it is pointing at')
   // Nutrition step promised "+250 / +500 log water in one tap" for as long as
   // that row was there and would have kept promising it afterwards; §1-2
   // cannot see copy, only targets.
-  const homeLogsWater = /logWater\b/.test(dash)
-  check('Home owns water logging (the fact the copy depends on)', homeLogsWater)
-  check('...so the tiles step says water is logged there',
-    !homeLogsWater || /water/i.test(tiles), tiles)
-  check('...and the Nutrition step no longer promises the quick-adds',
-    !/logWater\b/.test(nutri) && !/\+250|one tap/i.test(copyOf('nutrition')), copyOf('nutrition'))
+  // AND BACK, 17 Oct 2026 (one-page Nutrition, her ruling): the water cell on Nutrition opens the quick-add
+  // and Home no longer logs water. The property is unchanged — the step on the tab that logs water says so,
+  // and the other one does not promise it.
+  const nutriLogsWater = /logWater\b/.test(nutri)
+  check('Nutrition owns water logging (the fact the copy depends on)', nutriLogsWater && !/logWater\b/.test(dash))
+  check('...so the Nutrition step says water is logged there',
+    !nutriLogsWater || /water/i.test(copyOf('nutrition')) && /log/i.test(copyOf('nutrition')), copyOf('nutrition'))
+  check('...and the Home tiles step no longer promises water logging',
+    !/water[^.]*logged right here|logged right here[^.]*water/i.test(tiles) && !/\+250|one tap/i.test(tiles), tiles)
 
   const gearHasAppearance = /<AppearanceSection/.test(prof)
   check('the gear carries Appearance (the fact the copy depends on)', gearHasAppearance)

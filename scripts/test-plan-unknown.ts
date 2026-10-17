@@ -194,9 +194,10 @@ console.log('\n[5] Home draws the wait, and never remembers it')
 const homeUi = readFileSync('src/components/Dashboard.tsx', 'utf8')
 const homeCode = stripComments(homeUi)
 
+// RE-ANCHORED 17 Oct 2026 (one-page Home): the session is a row now, and its states are an if-chain.
 check('the unknown state has its own branch, ahead of the rest-day one',
-  homeCode.indexOf("data.session.status === 'unknown' ?") >= 0
-  && homeCode.indexOf("data.session.status === 'unknown' ?") < homeCode.indexOf("data.session.status === 'rest' ?"))
+  homeCode.indexOf("if (status === 'unknown')") >= 0
+  && homeCode.indexOf("if (status === 'unknown')") < homeCode.indexOf("if (status === 'rest')"))
 check('...and it says what Ashley chose on 8 Sep', /Checking your plan…/.test(homeCode))
 check('...with no Start button under it — there is nothing to start yet',
   !/Checking your plan…[\s\S]{0,400}Start session/.test(homeCode))
@@ -204,7 +205,8 @@ check('...with no Start button under it — there is nothing to start yet',
 // before a session starts (so never while unknown), and "Tomorrow" moved from
 // its own row into the glance line, read from data.tomorrow — which the loader
 // leaves null while the plan is unknown.
-check('the estimate chip is withheld too', /: status === 'not_started' && data\.session\.sessionLength && \(/.test(homeCode))
+check('the estimate chip is withheld too', /\{status === 'not_started' && data\.session\.sessionLength && </.test(homeCode)
+  && /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(homeCode))
 check('the Tomorrow line is dropped rather than guessed',
   /const tomorrow = data\.tomorrow \?\? null\s*if \(tomorrow\)/.test(homeCode)
   && /tomorrow: !planKnown \? null/.test(stripComments(readFileSync('src/lib/dashboard-data.ts', 'utf8'))))

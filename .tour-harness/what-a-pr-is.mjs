@@ -124,7 +124,7 @@ await goto('home')
 await until(`!!document.querySelector('[data-home-pr]')`, 8000)
 const recent = await homePrs()
 check('2h. Home shows that lift and its weight — on the Done panel and as the latest PR',
-  (recent?.row ?? '').includes(X) && /25kg/.test(recent?.row ?? '') && (recent?.latest ?? '').startsWith(`${X} PR`) && /25kg/.test(recent?.latest ?? ''), recent)
+  (recent?.row ?? '').includes(X) && /25kg/.test(recent?.row ?? '') && (recent?.latest ?? '').startsWith(`${X} · new PR`) && /25kg/.test(recent?.latest ?? ''), recent)
 check('2i. ...and not the warm-up move', !(recent?.row ?? '').includes(P) && !(recent?.latest ?? '').includes(P), recent)
 await ev(`document.querySelector('[data-home-pr]')?.scrollIntoView({ block: 'center' })`); await wait(300)
 await shoot('what-a-pr-is-home')

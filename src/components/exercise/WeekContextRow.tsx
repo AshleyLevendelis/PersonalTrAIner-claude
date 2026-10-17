@@ -337,8 +337,10 @@ export function ProgramRow({ mesocycle, liveWeek, onOpenProgram }: { mesocycle: 
   const p = programSummary(mesocycle, liveWeek)
   if (p.segments.length === 0) return null
   // The current block is named, accent, under its own segment, so the line beside "Program" says what
-  // is next: the deload when one is ahead in this block, else the block itself.
-  const subline = p.deload ?? p.title ?? ''
+  // is next: the deload when one is ahead in this block, else the block itself. A CALIBRATION WEEK SAYS SO
+  // FIRST: it changes how she should lift this week (find the weights), which a deload count does not.
+  const calibrating = p.title === 'Calibration week'
+  const subline = (calibrating ? p.title : p.deload ?? p.title) ?? ''
   return (
     <button
       type="button"

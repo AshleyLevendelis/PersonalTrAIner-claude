@@ -1571,7 +1571,7 @@ function Harness() {
 
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
-          <Dashboard profile={profile} macros={homeMacros} exercisePlan={livePlan}
+          <Dashboard profile={profile} macros={REFIT ? driftedMacros : homeMacros} exercisePlan={livePlan}
             mesocycle={liveMeso} planCreatedAt={profile.created_at}
             onWeightLogged={handleWeightLogged}
             // As App passes them: today's chosen meals and their pools, so the Next meal row is the app's.

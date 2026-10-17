@@ -1372,6 +1372,13 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### Her rulings of 17 Oct 2026, the one-page Home, Nutrition and Exercise (`docs/plans/one-page-tabs.md`)
+- **"Build this one"**: design 5c·5 / 5c·6 / 5c·4, layout only, nothing removed. Rings live on Home only.
+- **Nutrition's day strip: "Keep it on top."** **The streak pill: "12 in a row"** (never "days": it counts
+  sessions). **Logging: "Tap the steps ring"** — steps from Home's key, water from Nutrition's water cell;
+  Home logs no water any more. `test:one-page`, `verify:one-page`, `test:tab-ownership`, `test:app-tour`,
+  `test:chat-app-reality` (the coach's app map; needs the `chat-gemini` deploy)
+
 ### Her rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
 - **Kit: "Remember what they say."** Asked how someone should tell the app what kit they have
   (revisiting her 9 Sep "fix the words"), from options: keep the four equipment choices AND remember

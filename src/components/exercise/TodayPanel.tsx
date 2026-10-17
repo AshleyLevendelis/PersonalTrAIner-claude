@@ -1106,6 +1106,11 @@ export function TodayPanel({
       <p className="mt-2 text-[0.75rem] text-muted-foreground" data-testid="hero-meta">
         {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}
       </p>
+      {/* THE REASON BESIDE THE NUMBER (audit §6.5): "why is it shorter than I asked for", always visible,
+          never behind an expander, under the length it explains. */}
+      {sessionEstimate.note && (
+        <p className="mt-1 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{sessionEstimate.note}</p>
+      )}
     </div>
   ) : undefined
 
@@ -1376,13 +1381,6 @@ export function TodayPanel({
           {/* THE SESSION'S NAME MOVED INTO THE HERO above (one-page Exercise, 17 Oct 2026); the sets count
               is on "Today's lifts" below. What stays here belongs to running the session. */}
           <div>
-            {/* THE REASON BESIDE THE NUMBER (audit §6.5). The length moved
-                from the week row to this line in 2c, so the "why is it shorter
-                than I asked for" line moved with it: always visible, never
-                behind an expander. */}
-            {sessionEstimate.note && (
-              <p className="mt-1 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{sessionEstimate.note}</p>
-            )}
             {/* START MOVED OUT OF THE HERO on 6 Sep 2026 — it is the fixed
                 bar above the tab bar now (see the end of this branch), where
                 it stays reachable after scrolling into the list. FINISH did

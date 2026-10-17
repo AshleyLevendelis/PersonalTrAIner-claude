@@ -94,8 +94,8 @@ console.log('\nTHE ✕ STAYS IN THE CORNER\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/nutrition` })
 await wait(3500); await ev(`location.hash = '#/tab/nutrition'`); await wait(1500)
 check('0. the sheet trigger is on screen',
-  await ev(`[...document.querySelectorAll('button')].some(b => /How it's set|How your targets/i.test(b.textContent||''))`))
-await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>/How it's set|How your targets/i.test(x.textContent||'')); if(b) b.click() })()`)
+  await ev(`[...document.querySelectorAll('button')].some(b => /How it's set|How your targets|Targets & plan settings/i.test(b.textContent||''))`))
+await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>/How it's set|How your targets|Targets & plan settings/i.test(x.textContent||'')); if(b) b.click() })()`)
 await wait(900)
 
 let top = await measure()

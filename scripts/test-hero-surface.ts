@@ -56,8 +56,11 @@ console.log('\n1. A glow is never clipped by its own box')
   check('no element both glows and clips', offenders.length === 0, offenders)
   // Proof the scan can see the thing it is looking for.
   const dash = readFileSync(join(ROOT, 'src/components/Dashboard.tsx'), 'utf8')
+  // The session's name moved from Home's hero to Exercise's (one-page layout, 17 Oct 2026): Home shows the
+  // session as a row now, and the glowing, unclipped name lives in TodayPanel's hero.
+  const panel = readFileSync(join(ROOT, 'src/components/exercise/TodayPanel.tsx'), 'utf8')
   check('...and the scan is looking at real files (glow-text is still used somewhere)',
-    /glow-text/.test(dash))
+    /glow-text/.test(panel))
   // FLIPPED 6 Sep 2026 by design_handoff_app_polish, which specifies the
   // focus name WITH the glow and explicitly NOT truncated. That resolves the
   // conflict this check recorded — the old fix dropped the glow to keep the
@@ -65,7 +68,7 @@ console.log('\n1. A glow is never clipped by its own box')
   // wraps instead of being cut. §1's generic scan above is what now protects
   // it: glow + clip on one element still fails.
   check('the session name glows and does NOT clip it',
-    /glow-text[^"]*">\{data\.session\.focus\}/.test(dash) && !/truncate[^"]*">\{data\.session\.focus\}/.test(dash))
+    /className="[^"]*glow-text"[^>]*>\{workout!\.focus\}/.test(panel) && !/className="[^"]*(truncate|line-clamp)[^"]*glow-text[^"]*"[^>]*>\{workout!\.focus\}/.test(panel))
 }
 
 console.log('\n2. The ambient surface is gone with the cards')
@@ -84,13 +87,13 @@ console.log('\n2. The ambient surface is gone with the cards')
   // hero is a PANEL again, and its wash is the panel's own background — a
   // radial over --surface-raised, clipped by the panel's corners — never a
   // layer pulled past the gutter (the next two checks still hold that).
-  check('the hero wash is back, as the hero panel\'s own background only',
-    (dash.match(/var\(--hero-wash\)/g) ?? []).length === 1
-    && /radial-gradient\(120% 90% at 100% 0%, var\(--hero-wash\), transparent 60%\), var\(--surface-raised\)/.test(dash))
+  // ONE-PAGE HOME (17 Oct 2026): no hero panel at all — the rings are the hero — so no wash on Home.
+  check('Home carries no hero wash (the one-page hero is the rings, not a panel)',
+    !/var\(--hero-wash\)/.test(dash))
   check('...and so is the grain', !/grain-overlay/.test(dash))
   check('...and nothing replaced them with a full-bleed layer', !/pointer-events-none absolute inset-x-0/.test(dash))
   check('the page gutter is still px-4', /max-w-6xl mx-auto px-4/.test(app))
-  check('...and the wrapper still -mx-1 px-1', /className="relative -mx-1 px-1"/.test(dash))
+  check('...and nothing on Home is pulled past the gutter', !/-mx-\d/.test(dash))
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

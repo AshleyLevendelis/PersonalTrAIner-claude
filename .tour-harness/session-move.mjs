@@ -72,7 +72,7 @@ const read = () => ev(`(() => {
   return {
     movedAway: away ? away.textContent.trim() : null,
     movedIn: inb ? inb.textContent.trim() : null,
-    saysStartWorkout: buttons.includes('Start workout'),
+    saysStartWorkout: buttons.includes('Start session'),
     saysTrainAnyway: buttons.includes('Train it anyway'),
     // RE-ANCHORED 20 Sep 2026: the arrow went when the moved card's way back
     // became a row in the "Change the plan" group rather than a dotted link —
@@ -105,7 +105,7 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exer
 await wait(2500); await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
 let plain = await read()
 for (let i = 0; i < 12 && !plain.saysStartWorkout; i++) { await wait(500); plain = await read() }
-check('an ordinary training day still offers Start workout', plain.saysStartWorkout, plain)
+check('an ordinary training day still offers Start session', plain.saysStartWorkout, plain)
 check('...and shows no move banner either way', plain.movedAway === null && plain.movedIn === null, plain)
 
 // --- the moved day ---------------------------------------------------------
@@ -161,7 +161,7 @@ for (let i = 0; i < 12 && !before.saysDoItToday; i++) { await wait(500); before 
 await ev(`(() => { const b = [...document.querySelectorAll('button')].find(b => /^Do it today instead/.test(b.textContent.trim())); if (b) b.click(); return !!b })()`)
 let back = await read()
 for (let i = 0; i < 20 && !back.saysStartWorkout; i++) { await wait(500); back = await read() }
-check('10. tapping it brings the session back — Start workout, the list, no moved card',
+check('10. tapping it brings the session back — Start session, the list, no moved card',
   back.saysStartWorkout && back.hasExerciseList && back.movedAway === null, back)
 check('11. ...and the strip no longer says moved: the move was unmade, not hidden',
   back.todayCell === null, back.todayCell)

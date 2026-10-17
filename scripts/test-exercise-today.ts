@@ -61,8 +61,8 @@ check('the CTA is fixed, not in the scroll', /className="fixed inset-x-0 z-40[^"
 // property was never "this exact markup"; it is that an ORDINARY training day
 // still offers Start workout, and that it is the default rather than the
 // special case.
-check('...and reads "Start workout" on an ordinary day',
-  /: 'Start workout'\}/.test(today) || />\s*Start workout\s*</.test(today))
+check('...and reads "Start session" on an ordinary day (the one-page design word, 17 Oct 2026)',
+  /: 'Start session'\}/.test(today) || />\s*Start session\s*</.test(today))
 check('...at 52px', /h-\[52px\]/.test(today))
 check('...clear of the tab bar and the home indicator',
   /TAB_BAR_HEIGHT_PX\}px \+ env\(safe-area-inset-bottom\)/.test(today))
@@ -261,12 +261,15 @@ console.log('\n4. The week context is context — no card, tertiary, strip under
 // ---------------------------------------------------------------------------
 // DESIGN HANDOFF 2c (10 Oct 2026): the raised fill is back, but ONLY on the
 // selected day of the strip — never as a panel around the row.
+// The row itself, up to the Program row (one-page Exercise, 17 Oct 2026), which is its own raised object.
+const rowOnly = contextRowCode.slice(0, contextRowCode.indexOf('export function ProgramRow') > 0 ? contextRowCode.indexOf('export function ProgramRow') : undefined)
 check('the --surface-raised box is gone — the fill is only the selected day\'s',
-  (contextRowCode.match(/var\(--surface-raised\)/g) ?? []).length === 1 && /isSelected \? \{ background: 'var\(--surface-raised\)'/.test(contextRowCode))
+  (rowOnly.match(/var\(--surface-raised\)/g) ?? []).length === 1 && /isSelected \? \{ background: 'var\(--surface-raised\)'/.test(rowOnly))
 check('...and so is the rounded panel it sat in', !/rounded-2xl/.test(contextRowCode))
-check('the context line is a quiet label, not foreground (2c: .ds-label)', /className="ds-label min-w-0 flex-1 truncate text-left"/.test(contextRow))
+// One-page Exercise (5c·4, 17 Oct 2026): the page is titled "Exercise"; the plan position is the quiet line.
+check('the plan position is a quiet line, not foreground', /className="hit-slop-44 min-w-0 truncate text-\[0\.75rem\] text-muted-foreground"[\s\S]{0,120}data-testid="week-context-header"/.test(contextRow))
 check('the tour anchor survived the restyle', /data-tour="extoday"/.test(contextRow))
-check('the strip sits 12px under the line, seven equal columns (2c)', /className="mt-3 grid grid-cols-7 gap-1" data-exercise-strip/.test(contextRow))
+check('the strip sits 18px under the key, seven equal columns (5c·4)', /className="mt-\[18px\] grid grid-cols-7 gap-1" data-exercise-strip/.test(contextRow))
 // The assistant has one name in UI text.
 check('nothing on this screen calls it "Coach"',
   !/Coach:/.test(contextRowCode) && !/Coach:/.test(todayCode), 'Coach: found')
@@ -356,7 +359,7 @@ console.log('\n5. A swapped day says so')
   // hold is that a swapped day is IN that condition and that the true branch is
   // the honest label — which is exactly what a mutation dropping swappedToday,
   // or restoring a bare 'Start workout', still breaks.
-  const ctaLabel = todayPanel.match(/\{[^{}]*\? 'Train it anyway' : 'Start workout'\}/)?.[0] ?? ''
+  const ctaLabel = todayPanel.match(/\{[^{}]*\? 'Train it anyway' : 'Start session'\}/)?.[0] ?? ''
   check('the button stops saying "Start workout" on a day already swapped',
     ctaLabel.length > 0 && /swappedToday/.test(ctaLabel), ctaLabel)
   const ctaVariant = todayPanel.match(/variant=\{[^{}]*\? 'outline' : 'default'\}/)?.[0] ?? ''
