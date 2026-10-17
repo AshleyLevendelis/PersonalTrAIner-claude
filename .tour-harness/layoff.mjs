@@ -88,7 +88,9 @@ const openLift = name => ev(`(()=>{const n=[...document.querySelectorAll('*')].f
  if(!n) return false; let p=n; for(let i=0;i<6&&p.parentElement;i++){p=p.parentElement; if(p.tagName==='BUTTON'||p.getAttribute('role')==='button'){p.click();return true}} return false})()`)
 const text = sel => ev(`(document.querySelector('${sel}') || {}).innerText ?? null`)
 const has = sel => ev(`!!document.querySelector('${sel}')`)
-const headerText = () => ev(`document.body.innerText.slice(0, 400)`)
+// The plan position is the header's week number; the phase (and a calibration week) is on the Program row
+// since the one-page Exercise (17 Oct 2026), so both are read.
+const headerText = () => ev(`[document.querySelector('[data-testid="week-context-header"]')?.innerText ?? '', document.querySelector('[data-testid="program-row-sub"]')?.innerText ?? ''].join(' · ')`)
 const shootLift = async (name, file) => {
   await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${JSON.stringify(name)}); if(n) n.scrollIntoView({block:'center'})})()`)
   await wait(500); await shoot(file)

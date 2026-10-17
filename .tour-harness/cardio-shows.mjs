@@ -289,8 +289,9 @@ await until(`document.querySelector('[role="img"][aria-label^="${swapped.dayName
 check('8g. Home\'s strip says the same sentence', (await ev(`document.querySelector('[role="img"][aria-label^="${swapped.dayName}:"]')?.getAttribute('aria-label')`)) === `${swapped.dayName}: swapped for ${FOOTBALL}`)
 
 await ev(`window.location.hash = '#/tab/exercise'`)
-await until(`!!${byText('See the whole program ›')}`, 8000)
-await tapExpr(byText('See the whole program ›'))
+// The Program row replaced "See the whole program ›" (one-page Exercise, 17 Oct 2026); same route.
+await until(`!!${q('[data-program-row]')}`, 8000)
+await tapExpr(q('[data-program-row]'))
 await until(`!!${q('[data-testid="program-swapped"]')}`, 8000)
 const prog = await ev(`(() => { const n = ${q('[data-testid="program-swapped"]')}; if (!n) return null; n.scrollIntoView({ block: 'center' }); const row = n.closest('[role="button"]'); return { text: n.textContent.trim(), row: row ? row.innerText.replace(/\\s+/g, ' ').trim() : null, count: document.querySelectorAll('[data-testid="program-swapped"]').length } })()`)
 check('8h. THE PROGRAMME VIEW SAYS IT TOO, on that day\'s row', prog?.text === `You did something else instead: ${FOOTBALL}` && (prog?.row ?? '').toUpperCase().startsWith(swapped.dayName.slice(0, 3).toUpperCase()), prog)

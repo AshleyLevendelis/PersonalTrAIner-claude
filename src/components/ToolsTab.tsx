@@ -1,11 +1,12 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { Disc, History, BookOpen, Timer, ChevronRight, List, TimerReset, ArrowLeft } from 'lucide-react'
 // SPLIT OUT OF THE APP CHUNK. Neither of these is on screen when the tab
 // loads: the round setup unfolds only under the Custom chip and the stopwatch
 // opens from a row. Eagerly imported they pushed the app chunk 1 kB past its
 // budget (test:bundle, 13 Sep 2026) for two panels most sessions never open.
-const RoundTimerSheet = lazy(() => import('@/components/timers/RoundTimerSheet').then(m => ({ default: m.RoundTimerSheet })))
-const StopwatchPanel = lazy(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
+const RoundTimerSheet = lazyWithReload(() => import('@/components/timers/RoundTimerSheet').then(m => ({ default: m.RoundTimerSheet })))
+const StopwatchPanel = lazyWithReload(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { SessionHistoryDialog } from '@/components/exercise/SessionHistoryDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'

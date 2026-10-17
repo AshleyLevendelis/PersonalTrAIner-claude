@@ -45,7 +45,8 @@ console.log("\n1. Home is the day's quick log — and still owns no target\n")
 // third move steps have made and says why the destination changed and the
 // invariant did not.
 check('Home logs steps', /logStepsManual/.test(home))
-check('...and water', /logWater/.test(home))
+// WATER LEFT HOME, 17 Oct 2026 (one-page layout, her ruling): it is logged on Nutrition's water cell.
+check('...but no longer water', !/logWater/.test(home))
 check('...and the weigh-in', /WeighInCard/.test(home))
 check('...and still READS steps, or the cell would show nothing', /getStepsForDate/.test(home))
 // THE HALF THAT KEEPS IT AN OWNERSHIP RULE RATHER THAN A FREE-FOR-ALL. Home
@@ -84,7 +85,8 @@ check('...and no longer draws a step ring of its own', !/STEP_RING/.test(nutriti
   const callsIt = /onClick=\{\(\) => void handleLogSteps\(\)\}/.test(home)
     && /onKeyDown=\{e => \{ if \(e\.key === 'Enter'\) void handleLogSteps\(\) \}\}/.test(home)
   check('Home does not merely import the writer — a control calls it', callsIt)
-  check('...from an input the user can actually reach', /setStepsOpen\(true\)/.test(home) && /type="number"/.test(home))
+  // Since 17 Oct 2026 (one-page Home, her ruling) the Steps row of the key toggles the entry open.
+  check('...from an input the user can actually reach', /key: 'steps'[^\n]*onClick: \(\) => setStepsOpen\(o => !o\)/.test(home) && /type="number"/.test(home))
 }
 
 console.log('\n3. One glyph vocabulary, two strips\n')
@@ -127,8 +129,10 @@ for (const rel of ['src/components/exercise/WeekContextRow.tsx', 'src/components
 // Home logs it; this is the half that stops the row existing in two places,
 // which is the only way "one fact, one owner" can be broken by an addition.
 console.log('\n2b. Water is logged in exactly one place\n')
-check('Nutrition no longer logs water', !/logWater\b/.test(nutrition))
-check('...nor undoes a water log', !/undoWaterLog|undoLog\(/.test(nutrition))
+// MOVED BACK 17 Oct 2026 (one-page Nutrition, her ruling): the water cell opens the quick-add. §1 asserts
+// Home no longer logs it; this is the half that says where it went.
+check('Nutrition logs water', /logWater\(/.test(nutrition))
+check('...and undoes a water log', /undoLog\(/.test(nutrition))
 // AND STILL OWNS THE TARGET. Home logs the day; Nutrition sets what the day
 // is measured against. Losing this would make the move a deletion.
 check('...but still sets the water target', /setWaterTargetMl/.test(nutrition))
@@ -150,7 +154,7 @@ console.log('\n5. Home derives session state, never re-implements it\n')
 check('Home reads session.status rather than counting logs itself',
   /data\.session\.status/.test(home) && !/workout_sessions/.test(home))
 check('the CTA word is derived from that same status',
-  /status === 'not_started' \? 'Start session' : 'Continue session'/.test(home))
+  /status === 'not_started' \? \(data\.session\.focus \? `Start \$\{data\.session\.focus\}` : 'Start session'\) : 'Continue session'/.test(home))
 
 console.log('\n6. The rule is written down where the next person will look\n')
 check('§5.1a exists', /5\.1a Cross-tab ownership/.test(arch))

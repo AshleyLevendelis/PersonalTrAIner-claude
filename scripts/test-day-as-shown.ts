@@ -146,7 +146,7 @@ console.log('\n6. The screen asks this calculation')
   const nd = stripComments(readFileSync(join(ROOT, 'src/components/NutritionDisplay.tsx'), 'utf8'))
   check('the header is fed the shown totals', /<TotalsHero totals=\{shown\.totals\}/.test(mp) && !/<TotalsHero totals=\{totals\}/.test(mp))
   check('every row is fed the shown dish', /option=\{shownOption\(slot\)\}/.test(mp) && !/option=\{chosen\[slot\] \?\? null\}/.test(mp))
-  check('...from the slots on screen, with what was eaten', /slots: SLOT_ORDER\.filter\(s => \(pools\[s\]\?\.length \?\? 0\) > 0\)/.test(mp) && /eatenBySlot: Object\.fromEntries\(Object\.entries\(loggedBySlot\)/.test(mp))
+  check('...from the slots on screen, with what was eaten', /slots: SLOT_ORDER\.filter\(s => \(pools\[s\]\?\.length \?\? 0\) > 0\)/.test(mp) && /eatenBySlot: eatenMacrosBySlot\(loggedBySlot\)/.test(mp))
   check('the line and its Undo are drawn', /\{aroundLine\}/.test(mp) && /data-testid="around-eaten-undo" onClick=\{\(\) => setKept\(true\)\}/.test(mp))
   // RE-ANCHORED 10 Oct 2026 (2b): the phrase is split into the hero number
   // and its word, still read off the one phrasebook function.

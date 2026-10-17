@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calculator, Layers, ShoppingBasket } from 'lucide-react'
+import { Calculator, Layers, ShoppingBasket, Beef, Wheat, Droplet, Droplets, SlidersHorizontal, ChevronRight } from 'lucide-react'
+import type * as React from 'react'
 import { groceryHash } from '@/lib/app-route'
 import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/components/MealPlan'
 import { MealDayStrip } from '@/components/nutrition/MealDayStrip'
@@ -11,7 +12,8 @@ import { TrainerNudge } from '@/components/TrainerNudge'
 import { mealsDrifted, kcalLeftOrOver } from '@/lib/coach-voice'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
-import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, type WaterLogRow } from '@/lib/water-store'
+import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, logWater, undoLog, type WaterLogRow } from '@/lib/water-store'
+import { ringShare } from '@/lib/one-page'
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
@@ -24,50 +26,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { MissingBodyMetricsNotice } from '@/components/MissingBodyMetricsNotice'
 import { InsightBanner } from '@/components/ui/insight-banner'
 
-// Tab-restructure handoff — the ring meter moves here from Dashboard.tsx and
-// grows a 5th (outermost) water ring, each ring now its own colour instead
-// of one hue fading in opacity: water lives on the same tab as the ring
-// meter now, so it earns its own visual identity (--chart-3, matching the
-// water row/quick-adds below) rather than borrowing the mint accent.
-// Calories keeps the hero-number treatment (not a legend row); the other
-// three rings + water get a legend row each — four rows, not five, matching
-// the design reference's own rendered screen (its prose says "five legend
-// rows" but the reference screen itself shows four: water/protein/carbs/fat).
-// DESIGN HANDOFF 2b, 10 Oct 2026: four concentric rings at 132px, stroke 8,
-// calories outermost, then protein, carbs and water. Fat left the rings (the
-// brief's open question); it is a muted line under the key instead, so its
-// number is still on the screen.
-const NUTRITION_RINGS = [
-  { key: 'calories', r: 58, strokeWidth: 8, color: 'var(--primary)' },
-  { key: 'protein', r: 46, strokeWidth: 8, color: 'var(--chart-2)' },
-  { key: 'carbs', r: 34, strokeWidth: 8, color: 'var(--chart-4)' },
-  { key: 'water', r: 22, strokeWidth: 8, color: 'var(--chart-3)' },
-] as const
-const RING_BOX = 132
-const RING_C = RING_BOX / 2
-const NUTRITION_RING_CIRC: Record<string, number> = Object.fromEntries(NUTRITION_RINGS.map(r => [r.key, 2 * Math.PI * r.r]))
-
 // ---------------------------------------------------------------------------
 // Water-target sparkle
 // ---------------------------------------------------------------------------
-// Three stars placed ON the water ring's own arc (r=22, centre 66,66 since 2b) rather
-// than scattered around the meter, so the effect reads as "this ring
-// completed" and not "something happened near the rings". Angles are measured
-// the same way the ring fills — from 12 o'clock, clockwise — and spread across
-// the upper arc where the ring isn't overlapped by the legend column.
-//
-// The stagger is deliberately long (~1.45s between plays, ~4s total): three
-// quick pops in succession reads as a loading state, three slow ones read as
-// a small celebration and then stop.
-const WATER_RING_R = 22
+// THREE STARS AROUND THE WATER CELL'S BAR when the day's water target is crossed. They sat on the water
+// ring until the one-page layout (17 Oct 2026) took the rings off this screen; the moment still marks the
+// crossing and never the state. The stagger is deliberately long (~1.45s between plays, ~4s total): three
+// quick pops read as a loading state, three slow ones as a small celebration that then stops.
 const SPARKLES = [
-  { angleDeg: 312, size: 9, delayMs: 0 },
-  { angleDeg: 28, size: 6.5, delayMs: 1450 },
-  // Not pushed further clockwise than this: at ~3 o'clock the star's own
-  // drop-shadow reaches the 112-wide viewBox edge and gets clipped by the
-  // svg's default overflow, which reads as a rendering glitch rather than a
-  // sparkle. Verified numerically — bbox stays ~14px clear here.
-  { angleDeg: 140, size: 7.5, delayMs: 2900 },
+  { x: 10, y: 8, size: 9, delayMs: 0 },
+  { x: 26, y: 4, size: 6.5, delayMs: 1450 },
+  { x: 38, y: 11, size: 7.5, delayMs: 2900 },
 ] as const
 /** How long after the crossing the nodes are torn out — last delay + one play + a frame of slack. */
 const SPARKLE_TEARDOWN_MS = 4100
@@ -229,6 +198,30 @@ export function NutritionDisplay({
    * writes is how one failure comes to describe the other.
    */
   const [entryError, setEntryError] = useState<string | null>(null)
+  // WATER IS LOGGED HERE AGAIN (one-page Nutrition, her 17 Oct ruling): the water cell opens the
+  // quick-add Home used to carry. The store owns the number; its synchronous row is what moves the cell,
+  // so a tap never waits on the network. Undo for six seconds, as before.
+  const [waterOpen, setWaterOpen] = useState(false)
+  const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
+  const handleAddWater = (amountMl: number) => {
+    if (!profileId || !date) return
+    try {
+      const row = logWater({ profileId, date, amountMl, source: 'manual' })
+      setWaterLogs(logs => [...logs, row])
+      setLastWaterLog(row)
+      setEntryError(null)
+      window.setTimeout(() => setLastWaterLog(cur => (cur === row ? null : cur)), 6000)
+    } catch (err) {
+      console.error('Logging water failed:', err)
+      setEntryError("That didn't save — check your connection and tap again.")
+    }
+  }
+  const handleUndoWater = () => {
+    if (!lastWaterLog) return
+    undoLog(lastWaterLog)
+    setWaterLogs(logs => logs.filter(l => l !== lastWaterLog))
+    setLastWaterLog(null)
+  }
 
   /**
    * THE RINGS FOLLOW THE MEAL LIST BELOW THEM.
@@ -284,13 +277,7 @@ export function NutritionDisplay({
 
   useEffect(() => { setWaterTarget(profile.water_target_ml ?? 2000) }, [profile.water_target_ml])
 
-  // READ ONLY, since 6 Sep 2026. The quick-adds and the undo beside them
-  // moved to Home's "Today so far" grid with the rest of the day's logging
-  // (design_handoff_app_polish, "Home becomes the day"); water is the H2O
-  // ring and its legend entry here, and the TARGET is still set here, inside
-  // "How it's set". What is left is the total the ring is drawn from.
-  // Already bounded to `date` by the query above — the filter that used to
-  // stand here existed because the read returned every row ever logged.
+  // The day's water, from the logs read for `date` above plus anything logged here since.
   const todayWaterMl = waterLogs.reduce((s, l) => s + l.amount_ml, 0)
   const handleSaveWaterTarget = async () => {
     const n = Number(waterTargetInput)
@@ -362,134 +349,104 @@ export function NutritionDisplay({
 
   return (
     <div className="space-y-[18px]">
-      {/* HEADER (2b): which day, and the shopping list one tap away — a pill
-          here rather than a link inside the meal list, so it is there even
-          before the meals are. */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="ds-label" data-testid="meal-day-heading">Nutrition · {upcomingDay?.dayName ?? dayName}</p>
+      {/* HEADER (5c·6): the day over "Nutrition", and the shopping list one round tap away. */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="ds-label" data-testid="meal-day-heading">{upcomingDay?.dayName ?? dayName}</p>
+          <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">Nutrition</h2>
+        </div>
         <button
           type="button"
           onClick={() => { window.location.hash = groceryHash() }}
-          className="hit-slop-44 inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[0.75rem] font-medium"
+          className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full"
           style={{ background: 'var(--surface-raised)' }}
+          aria-label="Grocery list"
           data-grocery-pill
         >
-          <ShoppingBasket className="size-[13px]" aria-hidden /> Grocery
+          <ShoppingBasket className="size-[18px]" aria-hidden />
         </button>
       </div>
+      {/* THE DAY STRIP STAYS ON TOP — her 17 Oct ruling, over the one-page design, which had none. */}
       {mealStrip && (
         <MealDayStrip dates={mealStrip.dates} today={mealStrip.today} selected={mealStrip.selected} onSelect={mealStrip.onSelect} />
       )}
-      {/* TODAY'S PARTS ARE TODAY'S. The rings, the trainer's line and the
+      {/* TODAY'S PARTS ARE TODAY'S. The calories, the trainer's line and the
           resize offer are about what has been eaten today and today's meals,
           so with another day open they step aside rather than sit above a
           list they do not describe. */}
       {!upcomingDay && (<>
-      {/* data-tour: the app tour spotlights the rings AND the water row as one
-          unit — its copy names both, and water is the only quick-add the tour
-          promises ("+250 / +500 log water in one tap"). */}
-      <div data-tour="rings">
-        <div className="mt-3.5 flex items-center gap-5">
-          <svg width={RING_BOX} height={RING_BOX} viewBox={`0 0 ${RING_BOX} ${RING_BOX}`} className="shrink-0" aria-hidden>
-            {NUTRITION_RINGS.map(r => (
-              <circle key={`track-${r.key}`} cx={RING_C} cy={RING_C} r={r.r} fill="none" stroke="var(--surface-raised)" strokeWidth={r.strokeWidth} />
-            ))}
-            {NUTRITION_RINGS.map(r => {
-              const { eaten: e, target: t } = ringValues[r.key]
-              const circ = NUTRITION_RING_CIRC[r.key]
-              const frac = t > 0 ? Math.min(1, e / t) : 0
-              return (
-                <circle
-                  key={`fill-${r.key}`}
-                  cx={RING_C} cy={RING_C} r={r.r} fill="none" strokeWidth={r.strokeWidth} strokeLinecap="round"
-                  stroke={r.color}
-                  strokeDasharray={`${circ * frac} ${circ}`}
-                  transform={`rotate(-90 ${RING_C} ${RING_C})`}
-                  className={r.key === 'calories' ? 'glow-icon' : undefined}
-                  style={{ transition: 'stroke-dasharray 400ms ease' }}
-                />
-              )
-            })}
-            {waterJustCompleted && SPARKLES.map(s => {
-              // -90 puts 0deg at 12 o'clock, matching the ring fill's own
-              // rotate(-90) so an angle here means the same thing it does there.
-              const rad = ((s.angleDeg - 90) * Math.PI) / 180
-              return (
-                <path
-                  key={`sparkle-${s.angleDeg}`}
-                  className="ds-sparkle"
-                  d={starPath(RING_C + WATER_RING_R * Math.cos(rad), RING_C + WATER_RING_R * Math.sin(rad), s.size)}
-                  fill="var(--chart-3)"
-                  style={{
-                    animationDelay: `${s.delayMs}ms`,
-                    filter: 'drop-shadow(0 0 3px var(--chart-3))',
-                  }}
-                />
-              )
-            })}
-          </svg>
-          {/* THE HERO IS WHAT IS LEFT (2b), with what was eaten under it.
-              OVER IS SAID AS OVER (runs 3-4, M33): never "0 left" at 112 over. */}
-          <div className="min-w-0 flex-1" data-nutrition-hero>
-            {macros ? (() => {
-              // THE PHRASEBOOK DECIDES left or over (and the rounding), so the
-              // hero and every other "left" in the app say it one way.
-              const [amount, word] = kcalLeftOrOver(macros.calories - eaten.kcal).split(' ')
-              return (
-                <>
-                  <p className="ds-num-mega tabular-mono glow-mint-lg text-[2.875rem] leading-[0.92] tracking-[-.04em]" style={{ color: 'var(--num-hero)' }} data-testid="kcal-left-number">
-                    {Number(amount).toLocaleString()}
-                  </p>
-                  <p className="mt-1.5 text-[0.65625rem] uppercase tracking-[.16em] text-muted-foreground">
-                    <span data-testid="kcal-left">kcal {word}</span>
-                  </p>
-                  <p className="mt-1 text-[0.75rem] text-text-tertiary">
-                    <span className="tabular-mono" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> of <span className="tabular-mono">{Math.round(macros.calories).toLocaleString()}</span> eaten
-                  </p>
-                </>
-              )
-            })() : (
+      {/* CALORIES, THEN THE FOUR MACROS (5c·6): no rings on this screen. The tour spotlights the block. */}
+      <div data-tour="rings" className="flex flex-col gap-[18px]">
+        <div data-nutrition-hero>
+          {macros ? (() => {
+            // THE PHRASEBOOK DECIDES left or over (and the rounding), so the hero
+            // and every other "left" in the app say it one way. OVER IS SAID AS OVER (M33).
+            const [amount, word] = kcalLeftOrOver(macros.calories - eaten.kcal).split(' ')
+            return (
               <>
-                <p className="ds-num-mega tabular-mono text-[2.875rem] leading-[0.92]" style={{ color: 'var(--num-hero)' }}>—</p>
-                <p className="mt-1.5 text-[0.75rem] text-text-tertiary">
-                  <span className="tabular-mono" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> kcal eaten · add your weight for a target
-                </p>
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="ds-num-mega tabular-mono glow-mint-lg text-[3.75rem] font-bold leading-[.88] tracking-[-.045em]" style={{ color: 'var(--num-hero)' }} data-testid="kcal-left-number">
+                      {Number(amount).toLocaleString()}
+                    </p>
+                    <p className="mt-2 text-[0.75rem] font-semibold uppercase tracking-[.14em]" style={{ color: 'var(--role-ai-text)' }}>
+                      <span data-testid="kcal-left">kcal {word}</span>
+                    </p>
+                  </div>
+                  <p className="pb-0.5 text-[0.75rem] text-muted-foreground">
+                    <span className="tabular-mono text-foreground" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> of <span className="tabular-mono text-foreground">{Math.round(macros.calories).toLocaleString()}</span>
+                  </p>
+                </div>
+                <MacroBar share={ringShare(eaten.kcal, macros.calories)} color="var(--primary)" height={6} glow className="mt-3.5" testid="kcal-bar" />
               </>
+            )
+          })() : (
+            <>
+              <p className="ds-num-mega tabular-mono text-[3.75rem] leading-[.88]" style={{ color: 'var(--num-hero)' }}>—</p>
+              <p className="mt-2 text-[0.75rem] text-text-tertiary">
+                <span className="tabular-mono" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> kcal eaten · add your weight for a target
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* THE MACRO GRID: hairlines top and bottom and on the inner edges. Water's cell is the water log
+            (her 17 Oct ruling): tapping it opens the quick-add that used to sit on Home. */}
+        <div className="grid grid-cols-2 border-y border-[color:var(--hairline)]" data-ring-key>
+          <MacroCell k="protein" col={0} row={0} icon={Beef} label="Protein" color="var(--chart-2)" value={String(Math.round(eaten.protein))} target={macros?.protein} unit="g" share={ringShare(eaten.protein, macros?.protein)} />
+          <MacroCell k="carbs" col={1} row={0} icon={Wheat} label="Carbs" color="var(--chart-4)" value={String(Math.round(eaten.carbs))} target={macros?.carbs} unit="g" share={ringShare(eaten.carbs, macros?.carbs)} />
+          <MacroCell k="fat" col={0} row={1} icon={Droplet} label="Fat" color="var(--text-tertiary)" value={String(Math.round(eaten.fat))} target={macros?.fat} unit="g" share={ringShare(eaten.fat, macros?.fat)} />
+          <MacroCell
+            k="water" col={1} row={1} icon={Droplets} label="Water" color="var(--chart-3)"
+            value={(todayWaterMl / 1000).toFixed(1)} target={waterTarget / 1000} unit="L" fixed={1}
+            share={ringShare(todayWaterMl, waterTarget)}
+            onClick={() => setWaterOpen(o => !o)}
+            ariaLabel={`Water: ${(todayWaterMl / 1000).toFixed(1)} of ${(waterTarget / 1000).toFixed(1)} litres. Tap to log water.`}
+            expanded={waterOpen}
+            celebrate={waterJustCompleted}
+          />
+        </div>
+        {waterOpen && (
+          <div className="-mt-2 flex flex-wrap items-center gap-2" data-water-quick-add>
+            {[250, 500].map(ml => (
+              <button
+                key={ml}
+                type="button"
+                onClick={() => handleAddWater(ml)}
+                className="inline-flex h-10 items-center rounded-full px-4 text-[0.8125rem] font-semibold"
+                style={{ background: 'color-mix(in oklab, var(--chart-3) 15%, transparent)', color: 'var(--chart-3)' }}
+              >
+                +{ml} ml
+              </button>
+            ))}
+            {lastWaterLog && (
+              <button type="button" onClick={handleUndoWater} className="inline-flex h-10 items-center rounded-full px-3 text-[0.8125rem] text-muted-foreground" data-water-undo>
+                Undo
+              </button>
             )}
           </div>
-        </div>
+        )}
 
-        {/* THE RING KEY (2b) — four rows in the order the rings sit, each with
-            its swatch, name, and eaten/target. Then fat, which has no ring. */}
-        <div className="mt-4 grid grid-cols-2 gap-x-[22px] gap-y-2.5" data-ring-key>
-          {([
-            { key: 'calories', label: 'Calories', fmt: (n: number) => Math.round(n).toLocaleString(), unit: '' },
-            { key: 'protein', label: 'Protein', fmt: (n: number) => String(Math.round(n)), unit: 'g' },
-            { key: 'carbs', label: 'Carbs', fmt: (n: number) => String(Math.round(n)), unit: 'g' },
-            { key: 'water', label: 'Water', fmt: (n: number) => (n / 1000).toFixed(1), unit: 'L' },
-          ] as const).map(row => {
-            const ring = NUTRITION_RINGS.find(r => r.key === row.key)!
-            const { eaten: e, target: t } = ringValues[row.key]
-            return (
-              <div key={row.key} className="flex items-center gap-2" data-ring-key-row={row.key}>
-                <span className={`size-2.5 shrink-0 rounded-[3px] ${row.key === 'calories' ? 'glow-mint-box' : ''}`} style={{ background: ring.color }} />
-                <span className="flex-1 text-[0.75rem] text-muted-foreground">{row.label}</span>
-                <span className="tabular-mono text-[0.78125rem]">
-                  {row.fmt(e)}<span className="text-muted-foreground">/{t > 0 ? row.fmt(t) : '—'}{row.unit}</span>
-                </span>
-              </div>
-            )
-          })}
-        </div>
-        <p className="mt-2 text-[0.71875rem] text-muted-foreground" data-ring-key-fat>
-          Fat <span className="tabular-mono">{Math.round(ringValues.fat.eaten)}/{ringValues.fat.target > 0 ? Math.round(ringValues.fat.target) : '—'}g</span>
-        </p>
-
-        {/* THE WATER ROW LEFT THIS SCROLL, 6 Sep 2026. Water is the H2O ring
-            and its legend entry here; the quick-adds are on Home's "Today so
-            far" grid, which is the one screen that logs the day. The TARGET
-            editor is not gone — it moved into "How it's set", with the other
-            numbers that are set once and read rarely. */}
         {entryError && (
           <InsightBanner tone="warning" className="items-start justify-between">
             <span>{entryError}</span>
@@ -507,7 +464,7 @@ export function NutritionDisplay({
       {/* THE TRAINER'S LINE. One sentence about the macro furthest behind,
           and only when something is. Derived here from the same eaten/target
           pairs the rings are drawn from — no second source, no new call. */}
-      {macroNudge && <TrainerNudge text={macroNudge} tag="Nutrition" openChat askPrefill={`Tell me more about this: "${macroNudge}"`} />}
+      {macroNudge && !mealRefit && !(mealTopUp && !mealTopUpNote) && <TrainerNudge text={macroNudge} tag="Nutrition" openChat askPrefill={`Tell me more about this: "${macroNudge}"`} />}
 
       {/* THE DRIFT OFFER. Ashley's ruling, 17 Sep 2026: tell her, and offer to
           refit. It sits ABOVE the meal list because it is about that list, and
@@ -643,28 +600,21 @@ export function NutritionDisplay({
           answers "what am I aiming at, and why that number".
           (design_handoff_app_polish, Nutrition §5.) */}
       {derivation ? (
-        <div className="border-t border-[color:var(--hairline)] pt-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="ds-label">Target</p>
-            <button
-              type="button"
-              onClick={() => setHowItsSetOpen(true)}
-              className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold text-primary-text"
-            >
-              How it's set ›
-            </button>
-          </div>
-          <p className="mt-1 text-[0.8125rem]">
-            <span className="tabular-mono">{derivation.target.calories}</span> kcal
-            {' · '}
-            <span className="text-muted-foreground">
-              TDEE <span className="tabular-mono">{derivation.tdee}</span>
-              {' '}{derivation.surplusKcal === 0 ? 'held at' : derivation.surplusKcal > 0 ? '+' : '−'}
-              {derivation.surplusKcal !== 0 && <span className="tabular-mono">{Math.abs(derivation.surplusKcal)}</span>}
-              {' · '}{derivation.surplusLabel.toLowerCase()}
-            </span>
-          </p>
-        </div>
+        // TARGETS & PLAN SETTINGS (5c·6): one raised row, the day's calorie target on it, and everything
+        // that is set once and read rarely behind it — the derivation, the water target, the split, the
+        // weekly table and the method.
+        <button
+          type="button"
+          onClick={() => setHowItsSetOpen(true)}
+          className="flex h-[52px] w-full items-center gap-3 rounded-[14px] px-4 text-left"
+          style={{ background: 'var(--surface-raised)' }}
+          data-targets-row
+        >
+          <SlidersHorizontal aria-hidden className="size-4 shrink-0 text-text-tertiary" />
+          <span className="min-w-0 flex-1 truncate text-[0.875rem]">Targets &amp; plan settings</span>
+          <span className="tabular-mono shrink-0 text-[0.75rem] text-muted-foreground" data-testid="target-kcal">{derivation.target.calories} kcal</span>
+          <ChevronRight aria-hidden className="size-4 shrink-0" style={{ color: 'var(--text-dim)' }} />
+        </button>
       ) : (
         // No body metrics means no target to explain — and a Target row with
         // a blank number reads as a loading bug, not as a deliberate absence.
@@ -851,4 +801,79 @@ export function NutritionDisplay({
       </Dialog>
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// The one-page Nutrition blocks (design 5c·6, 17 Oct 2026).
+// ---------------------------------------------------------------------------
+
+/** A bar on a raised track, its fill glowing in its own colour. */
+function MacroBar({ share, color, height = 4, glow, className, testid }: { share: number | null; color: string; height?: number; glow?: boolean; className?: string; testid?: string }) {
+  const pctWidth = Math.round((share ?? 0) * 100)
+  return (
+    <span className={`block w-full rounded-full ${className ?? ''}`} style={{ height, background: 'var(--surface-raised)' }} data-testid={testid} data-share={share == null ? 'none' : share.toFixed(3)}>
+      <span
+        className={`block rounded-full ${glow ? 'glow-mint-box' : ''}`}
+        style={{ height, width: `${pctWidth}%`, background: color, boxShadow: glow ? undefined : `0 0 calc(6px * var(--glow-strength, 1)) color-mix(in srgb, ${color} 50%, transparent)`, transition: 'width 400ms ease' }}
+      />
+    </span>
+  )
+}
+
+/**
+ * One cell of the 2×2 grid: a 22px icon circle and the label, the value in mono with its target, the bar.
+ * Inner edges carry the hairlines; the outer edge has no padding. A button only where it does something
+ * (water), so nothing else looks tappable.
+ */
+function MacroCell({ k, col, row, icon: Icon, label, color, value, target, unit, fixed = 0, share, onClick, ariaLabel, expanded, celebrate }: {
+  k: string
+  col: 0 | 1
+  row: 0 | 1
+  icon: typeof Beef
+  label: string
+  color: string
+  value: string
+  target: number | null | undefined
+  unit: string
+  fixed?: number
+  share: number | null
+  onClick?: () => void
+  ariaLabel?: string
+  expanded?: boolean
+  celebrate?: boolean
+}) {
+  const style: React.CSSProperties = {
+    paddingTop: 12, paddingBottom: 12,
+    paddingLeft: col === 1 ? 14 : 0, paddingRight: col === 0 ? 14 : 0,
+    borderRight: col === 0 ? '1px solid var(--hairline)' : undefined,
+    borderBottom: row === 0 ? '1px solid var(--hairline)' : undefined,
+  }
+  const body = (
+    <>
+      <span className="flex items-center gap-2 text-[0.75rem] text-text-tertiary">
+        <span aria-hidden className="flex size-[22px] shrink-0 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color }}>
+          <Icon className="size-3" />
+        </span>
+        {label}
+      </span>
+      <span className="mt-2 block tabular-mono text-[1.25rem] font-bold leading-none">
+        {value}
+        <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">/ {target != null && target > 0 ? target.toFixed(fixed) : '—'} {unit}</span>
+      </span>
+      <span className="relative mt-2.5 block">
+        <MacroBar share={share} color={color} />
+        {celebrate && (
+          <svg aria-hidden width="48" height="16" viewBox="0 0 48 16" className="pointer-events-none absolute -top-3 right-0 overflow-visible">
+            {SPARKLES.map(sp => (
+              <path key={sp.delayMs} className="ds-sparkle" d={starPath(sp.x, sp.y, sp.size)} fill={color}
+                style={{ animationDelay: `${sp.delayMs}ms`, filter: `drop-shadow(0 0 3px ${color})` }} />
+            ))}
+          </svg>
+        )}
+      </span>
+    </>
+  )
+  return onClick
+    ? <button type="button" onClick={onClick} aria-label={ariaLabel} aria-expanded={expanded} className="block text-left" style={style} data-ring-key-row={k}>{body}</button>
+    : <div style={style} data-ring-key-row={k}>{body}</div>
 }

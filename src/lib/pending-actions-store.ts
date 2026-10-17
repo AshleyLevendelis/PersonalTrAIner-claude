@@ -280,6 +280,13 @@ export async function expireOldPendingActions(profileId: string): Promise<void> 
 }
 
 /** Whether the post-confirm [Undo] window is still open — resolved_at + 10min, no separate column needed. */
+/** When a receipt's Undo stops working, so the card can take its button away on time rather than at its next re-render (run 7, M53). */
+export function undoWindowEndsAt(resolvedAt: string | null | undefined): number | undefined {
+  if (!resolvedAt) return undefined
+  const t = new Date(resolvedAt).getTime()
+  return Number.isFinite(t) ? t + PENDING_WINDOW_MINUTES * 60_000 : undefined
+}
+
 export function isWithinUndoWindow(resolvedAt: string | null): boolean {
   if (!resolvedAt) return false
   return Date.now() - new Date(resolvedAt).getTime() < PENDING_WINDOW_MINUTES * 60_000

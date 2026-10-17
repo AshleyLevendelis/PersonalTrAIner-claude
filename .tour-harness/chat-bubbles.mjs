@@ -98,7 +98,7 @@ await wait(800)
 function read() {
   const px = v => parseFloat(v)
   const probe = (prop, token) => {
-    const d = document.createElement('div'); d.style[prop] = `var(${token})`; document.body.appendChild(d)
+    const d = document.createElement('div'); d.style[prop] = token.startsWith('--') ? `var(${token})` : token; document.body.appendChild(d)
     const v = getComputedStyle(d)[prop]; d.remove(); return v
   }
   const box = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right, width: b.width, height: b.height } }
@@ -107,7 +107,7 @@ function read() {
   const groups = [...document.querySelectorAll('[data-testid="chat-group"]')]
   return {
     thread: box(thread),
-    tokens: { primary: probe('backgroundColor', '--primary'), onPrimary: probe('color', '--primary-foreground'), card: probe('backgroundColor', '--card'), onCard: probe('color', '--card-foreground'), border: probe('borderTopColor', '--border'), secondary: probe('backgroundColor', '--secondary'), background: probe('backgroundColor', '--background'), deep: probe('backgroundColor', '--surface-deep'), muted: probe('color', '--muted-foreground') },
+    tokens: { primary: probe('backgroundColor', '--primary'), onPrimary: probe('color', '--primary-foreground'), card: probe('backgroundColor', '--card'), onCard: probe('color', '--card-foreground'), border: probe('borderTopColor', '--border'), secondary: probe('backgroundColor', '--secondary'), background: probe('backgroundColor', '--background'), deep: probe('backgroundColor', '--surface-deep'), muted: probe('color', '--muted-foreground'), primaryText: probe('color', '--primary-text'), coachFill: probe('backgroundColor', 'color-mix(in oklab, var(--primary) 14%, var(--card))'), coachEdge: probe('borderTopColor', 'color-mix(in oklab, var(--primary) 40%, var(--card))') },
     rows: rows.map(r => ({ kind: r.dataset.testid === 'chat-day' ? 'day' : r.dataset.testid === 'chat-group' ? 'group' : 'other', text: r.dataset.testid === 'chat-day' ? r.textContent.trim() : null, box: box(r) })),
     groups: groups.map(g => {
       const items = [...g.querySelectorAll('[data-testid="chat-bubble"], [data-testid="chat-cards"] > *')]
@@ -147,7 +147,7 @@ function read() {
 function readPage() {
   const px = v => parseFloat(v)
   const box = e => { if (!e) return null; const b = e.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right, width: b.width, height: b.height } }
-  const probe = (prop, token) => { const d = document.createElement('div'); d.style[prop] = `var(${token})`; document.body.appendChild(d); const v = getComputedStyle(d)[prop]; d.remove(); return v }
+  const probe = (prop, token) => { const d = document.createElement('div'); d.style[prop] = token.startsWith('--') ? `var(${token})` : token; document.body.appendChild(d); const v = getComputedStyle(d)[prop]; d.remove(); return v }
   const q = sel => document.querySelector(sel)
   const header = q('[data-testid="chat-header"]'), scroller = q('[data-testid="chat-scroller"]'), composer = q('[data-testid="chat-composer"]')
   const nav = q('nav[aria-label="Primary"]')
@@ -207,16 +207,18 @@ check('padding 10px 14px', all.every(b => b.pad.join() === '10,14,10,14'), all.m
 // its panels use. Compared against probes of the same tokens, so it follows
 // every theme.
 check('your bubbles are the plain panel colour with its own text and a 1px hairline', users.length >= 4 && users.every(b => b.bg === R.tokens.card && b.color === R.tokens.onCard && b.borderWidth === 1 && b.borderStyle === 'solid' && b.borderColor === R.tokens.border), { users: users.map(b => [b.bg, b.color, b.borderWidth, b.borderColor]), tokens: R.tokens })
-check('...so the two sides are different colours, not told apart by the side alone', users.every(b => b.bg !== R.tokens.primary) && coach.every(b => b.bg === R.tokens.primary), { users: users.map(b => b.bg), coach: coach.map(b => b.bg) })
-// THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR (Ashley's ruling, 27 Sep 2026,
-// over the avatar's fade, which measured under 4.5:1 in three themes). Compared
-// against a probe of the same token, so it follows every theme and accent.
-check('coach bubbles are the flat main colour with the theme\'s own ink — no fade', coach.length >= 5 && coach.every(b => b.bg === R.tokens.primary && b.bgImage === 'none' && b.color === R.tokens.onPrimary), { coach: coach.map(b => [b.bg, b.bgImage.slice(0, 40), b.color]), primary: R.tokens.primary, ink: R.tokens.onPrimary })
-check('...with no border, and none of the avatar\'s glow', coach.every(b => b.borderWidth === 0 && b.shadow === 'none'), coach.map(b => [b.borderWidth, b.shadow]))
+check('...so the two sides are different colours, not told apart by the side alone', users.every(b => b.bg !== R.tokens.coachFill) && coach.every(b => b.bg === R.tokens.coachFill && b.bg !== R.tokens.card), { users: users.map(b => b.bg), coach: coach.map(b => b.bg), card: R.tokens.card })
+// A SOFT TINT, NOT THE BRIGHT MINT (Ashley, 16 Oct 2026, "the chat bubbles colour
+// is too bright"; from three options, "soft tint"). It replaced her 27 Sep flat
+// main colour: the card colour with a hint of the main colour, the card's own
+// text, and a mint hairline. Compared against probes of the same mix, so it
+// follows every theme and accent.
+check('coach bubbles are the soft tint — not the bright main colour — with the card\'s own ink, no fade', coach.length >= 5 && coach.every(b => b.bg === R.tokens.coachFill && b.bg !== R.tokens.primary && b.bgImage === 'none' && b.color === R.tokens.onCard), { coach: coach.map(b => [b.bg, b.bgImage.slice(0, 40), b.color]), fill: R.tokens.coachFill, primary: R.tokens.primary, ink: R.tokens.onCard })
+check('...with a 1px mint hairline, and none of the avatar\'s glow', coach.every(b => b.borderWidth === 1 && b.borderStyle === 'solid' && b.borderColor === R.tokens.coachEdge && b.shadow === 'none'), coach.map(b => [b.borderWidth, b.borderColor, b.shadow]))
 check('...and your bubbles are flat, no gradient', users.every(b => b.bgImage === 'none'), users.map(b => b.bgImage))
 const coachLinks = coach.flatMap(b => b.links), coachRetry = coach.flatMap(b => b.retry)
-check('a link inside a coach bubble is the dark ink, underlined — not mint on mint', coachLinks.length >= 1 && coachLinks.every(l => l.color === R.tokens.onPrimary && /underline/.test(l.underline)), coachLinks)
-check('a "tap to retry" inside a coach bubble is the dark ink too, not amber on mint', coachRetry.length >= 1 && coachRetry.every(r => r.color === R.tokens.onPrimary && Number(r.weight) >= 500), coachRetry)
+check('a link inside a coach bubble is the accent text, underlined', coachLinks.length >= 1 && coachLinks.every(l => l.color === R.tokens.primaryText && /underline/.test(l.underline)), coachLinks)
+check('a "tap to retry" inside a coach bubble is the accent text, not amber', coachRetry.length >= 1 && coachRetry.every(r => r.color === R.tokens.primaryText && Number(r.weight) >= 500), coachRetry)
 
 console.log('\n[4] Corners: 18px all round, one 4px tail on the sender side of the last bubble')
 const expectRadius = (role, pos) => {
@@ -299,9 +301,9 @@ for (let i = 0; i < 20 && !typing; i++) {
       label: getComputedStyle(dots.parentElement.parentElement).color,
       want: (() => {
         const d = document.createElement('div'); document.body.appendChild(d)
-        d.style.backgroundColor = 'color-mix(in oklab, var(--primary-foreground) 50%, transparent)'
-        d.style.color = 'color-mix(in oklab, var(--primary-foreground) 70%, transparent)'
-        d.style.borderTopColor = 'var(--primary)'
+        d.style.backgroundColor = 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)'
+        d.style.color = 'var(--muted-foreground)'
+        d.style.borderTopColor = 'color-mix(in oklab, var(--primary) 14%, var(--card))'
         const cs = getComputedStyle(d), v = { dot: cs.backgroundColor, label: cs.color, primary: cs.borderTopColor }; d.remove(); return v
       })(),
     }
@@ -312,7 +314,7 @@ await wait(200)
 await shoot('chat-bubbles-typing')
 check('while the coach is typing, the dots are a bubble in a COACH group with its avatar', typing?.role === 'assistant' && typing?.names === 0 && typing?.avatars === 1, typing)
 check('...and the group shows no time until the reply lands', typing?.times === 0, typing)
-check('the typing bubble is the flat main colour too, its dots and "Thinking" in the dark ink', !!typing && typing.bubbleImage === 'none' && typing.bubbleBg === typing.want.primary && typing.dot === typing.want.dot && typing.label === typing.want.label, typing && { image: typing.bubbleImage?.slice(0, 50), bg: typing.bubbleBg, dot: typing.dot, label: typing.label, want: typing.want })
+check('the typing bubble is the soft tint too, its dots and "Thinking" in the quiet text colour', !!typing && typing.bubbleImage === 'none' && typing.bubbleBg === typing.want.primary && typing.dot === typing.want.dot && typing.label === typing.want.label, typing && { image: typing.bubbleImage?.slice(0, 50), bg: typing.bubbleBg, dot: typing.dot, label: typing.label, want: typing.want })
 check('...and what she just sent is in the user group before it', typing?.prevRole === 'user', typing)
 // "Jump to latest" appears when something new arrives while she is scrolled
 // UP — so scroll up while the coach is typing, then let the reply land.
@@ -390,8 +392,7 @@ console.log('\n[8] Readable in every kind of theme — the ink is the theme\'s o
 // app's OWN pair is white on a mid-tone fill (3.4-3.9:1) — the same pair every
 // main button uses there. That is a token decision outside a layout change and
 // is Ashley's to make; it is named here, not hidden, and held to the 3:1 floor
-// so it cannot quietly get worse.
-const KNOWN_SHORT = new Set(['daylight/coral', 'daylight/rose', 'linen/coral', 'linen/rose', 'frost/coral', 'frost/rose'])
+// so it cannot quietly get worse. GONE 16 Oct 2026 with the soft tint: the coach's text is the card's ink now.
 const THEMES = [['nightshift', 'theme', null], ['daylight', 'theme', 'light'], ['frost', 'sky', 'light'], ['linen', 'rose', 'light']]
 const contrasts = []
 for (const [theme, accent, canvas] of THEMES) {
@@ -399,8 +400,11 @@ for (const [theme, accent, canvas] of THEMES) {
     const el = document.documentElement
     el.setAttribute('data-theme', theme); el.setAttribute('data-accent', accent)
     if (canvas) el.setAttribute('data-canvas', canvas); else el.removeAttribute('data-canvas')
+    // THROUGH A CANVAS (16 Oct 2026): a colour-mix computes to an oklab() string, and reading its digits as
+    // 0-255 numbers called the soft tint near-black (1.2:1). The canvas gives sRGB whatever the browser reports.
+    const toRGB = css => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = css; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3) }
     const lum = str => {
-      const [r, g, b] = (str.match(/[\d.]+/g) || []).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 })
+      const [r, g, b] = toRGB(str).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 })
       return 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
     const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05) }
@@ -417,12 +421,13 @@ for (const [theme, accent, canvas] of THEMES) {
   contrasts.push(c)
   if (theme === 'daylight') { await wait(250); await shoot('chat-bubbles-light') }
 }
-console.log('      ' + contrasts.map(c => `${c.theme}: you ${c.user}:1, coach ${c.coach}:1${KNOWN_SHORT.has(c.theme) ? '  (coach: known, the app\'s own colour pair)' : ''}`).join('\n      '))
+console.log('      ' + contrasts.map(c => `${c.theme}: you ${c.user}:1, coach ${c.coach}:1`).join('\n      '))
 // YOURS IS PLAIN since 28 Sep 2026, so the accent no longer touches it and the
 // six named shortfalls below are the COACH's alone (its fill is the accent).
 check('your bubbles read at 4.5:1 or better in every sample, including rose on a light theme', contrasts.length === 4 && contrasts.every(c => c.user >= 4.5), contrasts)
-check('...where the app says white reads, the COACH\'s text is white on the main colour', contrasts[2]?.coachInk === 'rgb(255, 255, 255)' && contrasts[2]?.coach >= 4.5, contrasts[2])
-check('the named shortfall (rose on a light theme, the coach\'s bubble) is no worse than the 3:1 floor', contrasts[3] !== undefined && contrasts[3].coach >= 3, contrasts[3])
+// Since the soft tint (16 Oct 2026) the coach's text is the card's own ink on a card-like fill, so the six
+// named shortfalls of the bright mint (coral and rose on light themes) are gone: no exceptions.
+check('the COACH\'s text reads at 4.5:1 or better in every sample too — no named exceptions any more', contrasts.length === 4 && contrasts.every(c => c.coach >= 4.5), contrasts)
 
 // THE COACH'S BUBBLE, READ IN EVERY THEME (27 Sep 2026). The reader measures
 // whatever the bubble actually draws: a flat fill is one colour, and a fade —
@@ -477,6 +482,9 @@ function readCoachInk(theme, accent, light) {
     mine: ratio(toRGB(getComputedStyle(mine).color), toRGB(getComputedStyle(mine).backgroundColor)),
     mineBg: toRGB(getComputedStyle(mine).backgroundColor).join(), mineInk: toRGB(getComputedStyle(mine).color).join(),
     apart: ratio(fill, toRGB(getComputedStyle(mine).backgroundColor)),
+    // THE COACH'S MINT HAIRLINE (16 Oct 2026): against the page, and against your hairline.
+    coachEdge: ratio(toRGB(cs.borderTopColor), bg),
+    edgesApart: ratio(toRGB(cs.borderTopColor), toRGB(getComputedStyle(mine).borderTopColor)),
     edge: ratio(toRGB(getComputedStyle(mine).borderTopColor), bg),
     panel: ratio(toRGB(getComputedStyle(mine).backgroundColor), bg),
   }
@@ -495,14 +503,12 @@ check('every theme there is was measured (9 in the stylesheet today)', ownAccent
 check('in every theme the coach bubble is one flat colour, and NOT the same as yours', ownAccent.length >= 9 && ownAccent.every(x => x.flat && !x.sameAsYours), ownAccent.map(x => [x.theme, x.flat, x.sameAsYours]))
 console.log('      yours, each theme: ' + ownAccent.map(x => `${x.theme} text ${x.mine}:1, apart from the coach ${x.apart}:1, outline ${x.edge}:1, panel ${x.panel}:1 against the page`).join('\n        '))
 check('the coach\'s text reads at 4.5:1 or better in EVERY theme on its own colours — no named exceptions', ownAccent.length >= 9 && ownAccent.every(x => Math.min(x.top, x.bottom) >= 4.5), ownAccent.map(x => [x.theme, Math.min(x.top, x.bottom)]))
-// THE MINT STANDS CLEAR OF ITS PAGE, which settles the 26 Sep question about
-// faint light-theme bubbles (1.10:1 then). SEPARATION_FLOOR is set just under
-// the faintest measured on the day it was written (27 Sep 2026: Daylight
-// 2.27:1, Linen 2.33:1, every dark theme 7.9:1 or more), so a theme whose
-// bubble melts further into its page fails.
-const SEPARATION_FLOOR = 2.2
-console.log('      coach bubble against the page: ' + ownAccent.map(x => `${x.theme} ${Math.min(x.pageTop, x.pageBottom)}:1`).join(', '))
-check(`in every theme the coach bubble stands clear of the page, ${SEPARATION_FLOOR}:1 or more`, ownAccent.length >= 9 && ownAccent.every(x => Math.min(x.pageTop, x.pageBottom) >= SEPARATION_FLOOR), ownAccent.map(x => [x.theme, x.pageTop, x.pageBottom]))
+// THE SOFT TINT IS MEANT TO BE QUIET (her 16 Oct 2026 ruling replaced the bright mint, whose 2.2:1 separation
+// floor lived here). What says "the coach" now is the tint, its mint hairline, the side and the avatar. The
+// hairline is held instead: just under the faintest measured on the day (1.22:1 against the page, 16 Oct 2026).
+const COACH_EDGE_FLOOR = 1.2
+console.log('      coach bubble against the page: ' + ownAccent.map(x => `${x.theme} fill ${Math.min(x.pageTop, x.pageBottom)}:1, hairline ${x.coachEdge}:1`).join(', '))
+check(`in every theme the coach bubble's mint hairline stands off the page, ${COACH_EDGE_FLOOR}:1 or more`, ownAccent.length >= 9 && ownAccent.every(x => x.coachEdge >= COACH_EDGE_FLOOR), ownAccent.map(x => [x.theme, x.coachEdge]))
 // THE ACCENT OVERRIDE: every theme with every accent. The bubble must stay the
 // same flat colour as yours wherever she has taken the accent; the readability
 // of each pair is printed, and it is your bubble's own figure.
@@ -512,17 +518,20 @@ const pairsOk = everyPair.filter(x => Math.min(x.top, x.bottom) >= 4.5).length
 console.log(`      every theme x accent: ${pairsOk} of ${everyPair.length} reach 4.5:1; lowest ${Math.min(...everyPair.map(x => Math.min(x.top, x.bottom)))}:1`)
 check('every theme with every accent was tried (81 pairs today)', everyPair.length >= 81 && accentNames.length >= 9, [everyPair.length, accentNames])
 check('...and in every one of them the coach bubble is flat and NOT the same as yours', everyPair.length >= 81 && everyPair.every(x => x.flat && !x.sameAsYours), everyPair.filter(x => !(x.flat && !x.sameAsYours)).map(x => `${x.theme}/${x.accent}`))
+console.log(`      coach hairline across all ${everyPair.length} pairs: against the page lowest ${Math.min(...everyPair.map(x => x.coachEdge))}:1, against your hairline lowest ${Math.min(...everyPair.map(x => x.edgesApart))}:1 (${everyPair.slice().sort((a, b) => a.edgesApart - b.edgesApart).slice(0, 3).map(x => `${x.theme}/${x.accent} ${x.edgesApart}`).join(', ')})`)
 console.log(`      yours across all ${everyPair.length} pairs: text lowest ${Math.min(...everyPair.map(x => x.mine))}:1; apart from the coach lowest ${Math.min(...everyPair.map(x => x.apart))}:1 (${everyPair.slice().sort((a, b) => a.apart - b.apart).slice(0, 3).map(x => `${x.theme}/${x.accent} ${x.apart}`).join(', ')})`)
 // YOURS, IN EVERY PAIR (28 Sep 2026). Floors set just under the lowest measured
 // that day, the SEPARATION_FLOOR convention: your fill against the coach's
 // lowest 2.26:1 (gold on Linen; gold, a pale accent, on the three light
 // themes is the closest pair), your hairline against the page lowest 1.32:1
 // (Frost, the app's own panel hairline, as faint as every panel there).
-const APART_FLOOR = 2.2
+// 16 Oct 2026: the soft tint sits close to your panel by design. Floor just under the closest measured that
+// day (1.1:1, gold on Linen); the coach's fill is never your fill (checked above in every pair).
+const APART_FLOOR = 1.08
 const EDGE_FLOOR = 1.3
 check('your text reads at 4.5:1 or better in every theme with every accent', everyPair.length >= 81 && everyPair.every(x => x.mine >= 4.5), everyPair.filter(x => x.mine < 4.5).map(x => `${x.theme}/${x.accent} ${x.mine}`))
 check('...and the accent does not touch your bubble: one fill and one ink per theme', themeNames.every(t => new Set(everyPair.filter(x => x.theme === t).map(x => `${x.mineBg}|${x.mineInk}`)).size === 1), themeNames.map(t => [t, new Set(everyPair.filter(x => x.theme === t).map(x => x.mineBg)).size]))
-check(`...your bubble and the coach's are ${APART_FLOOR}:1 apart or more in every pair, so the colour says who spoke`, everyPair.length >= 81 && everyPair.every(x => x.apart >= APART_FLOOR), everyPair.filter(x => x.apart < APART_FLOOR).map(x => `${x.theme}/${x.accent} ${x.apart}`))
+check(`...your bubble and the coach's are never the same fill, ${APART_FLOOR}:1 apart or more in every pair`, everyPair.length >= 81 && everyPair.every(x => x.apart >= APART_FLOOR), everyPair.filter(x => x.apart < APART_FLOOR).map(x => `${x.theme}/${x.accent} ${x.apart}`))
 check(`...and its hairline stands off the page, ${EDGE_FLOOR}:1 or more, in every theme`, ownAccent.length >= 9 && ownAccent.every(x => x.edge >= EDGE_FLOOR), ownAccent.map(x => [x.theme, x.edge]))
 await call(() => { const el = document.documentElement; el.setAttribute('data-theme', 'nightshift'); el.setAttribute('data-accent', 'theme'); el.removeAttribute('data-canvas'); return true })
 

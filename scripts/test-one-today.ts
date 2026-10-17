@@ -45,7 +45,7 @@ console.log('\n1. A finished session is not offered a start button\n')
 {
   // THE THREE-STATE TRAP. `!== 'running'` reads as "not in progress" and means
   // "idle OR finished". Only one of those wants a Start button.
-  const cta = panel.slice(panel.indexOf('!peekWorkout && !isRestDay'), panel.indexOf('Start workout') + 40)
+  const cta = panel.slice(panel.indexOf('!peekWorkout && !isRestDay'), panel.indexOf('Start session') + 40)
   check('the Start-workout block was located (sanity check on this check)', cta.length > 80, cta.length)
   check('it is offered only from idle', /status === 'idle'/.test(cta), cta.slice(0, 200))
   check('...and never merely because a session is not running',

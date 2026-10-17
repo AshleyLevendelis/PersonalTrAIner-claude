@@ -36,7 +36,7 @@ if (!X) finish()
 
 // ---- 1. Started by ticking a set ------------------------------------------
 console.log('\n  1. STARTED BY TICKING A SET — Start workout is never pressed')
-check('1a. Start workout is on offer, and is left alone', (await ev(`!!${byText('Start workout')}`)) === true)
+check('1a. Start workout is on offer, and is left alone', (await ev(`!!${byText('Start session')}`)) === true)
 check('1b. a set is ticked', (await tick(X, 0)) === true)
 await skipRest()
 await until(`!!${q('[data-testid="session-running"]')}`, 4000)
@@ -54,9 +54,9 @@ const dayOfSet = rows1[0]?.day
 // ---- 2. Started with the button --------------------------------------------
 console.log('\n  2. STARTED WITH THE BUTTON')
 await load('dock=1')
-await until(`!!${byText('Start workout')}`, 12000)
+await until(`!!${byText('Start session')}`, 12000)
 await wait(800)
-check('2a. Start workout is tapped', await tapExpr(byText('Start workout')))
+check('2a. Start workout is tapped', await tapExpr(byText('Start session')))
 await until(`!!${q('[data-testid="session-running"]')}`, 4000)
 const d2 = await dock()
 check('2b. the dock knows when it started', !!d2?.startedAt && !isNaN(new Date(d2.startedAt).getTime()), d2)
@@ -86,7 +86,7 @@ check('3c. ...WITHOUT OPENING A SESSION — storage said "running" from that key
 await load('dock=1', { keep: true })
 await until(`document.querySelectorAll('[data-exercise-name]').length > 0`, 12000)
 await wait(800)
-check('3d. after a reload the screen still offers Start workout, not Finish', (await ev(`!!${byText('Start workout')} && !${byText('Finish session')}`)) === true)
+check('3d. after a reload the screen still offers Start workout, not Finish', (await ev(`!!${byText('Start session')} && !${byText('Finish session')}`)) === true)
 
 // ---- 4. The rest bar --------------------------------------------------------
 console.log('\n  4. "REST COMPLETE" READS WHOLE, AND GOES WHEN THE SESSION DOES')

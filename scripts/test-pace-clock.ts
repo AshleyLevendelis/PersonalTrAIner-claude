@@ -131,8 +131,10 @@ console.log('\n2. The Nutrition line: the same day at 07:00, 12:00 and 20:00')
   check('nothing logged, 12:00: breakfast\'s time has passed, so it may say behind', /^Protein is behind — 164g to go\./.test(none1200 ?? ''), none1200)
   // Re-anchored 10 Oct 2026 (runs 3-4, LOW): three meals past their time and
   // none logged is a LOGGING gap, and the line says so instead of a macro.
-  check('nothing logged, 20:00: three meals past their time, so it says what is unlogged',
-    none2000 === "3 of today's meals still to log, so these numbers are only what's logged so far.", none2000)
+  // Run 7 (L48): it says EVERY meal still to log (four here; dinner is not due until 21:00), not just the three
+  // past their time — "3 of today's meals still to log" with all four unlogged was the reported defect.
+  check('nothing logged, 20:00: three meals past their time, so it says what is unlogged — all four',
+    none2000 === "4 of today's meals still to log, so these numbers are only what's logged so far.", none2000)
 
   // (b) Breakfast logged at 07:00, then nothing else — the SAME inputs at three times.
   const b0700 = line(day(['breakfast'], '07:00'))

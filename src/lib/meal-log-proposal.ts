@@ -18,7 +18,7 @@
 // that a server-side insert would have thrown away.
 // ---------------------------------------------------------------------------
 
-import { MIN_COVERAGE } from './meal-generation'
+import { MIN_COVERAGE } from './meal-costing'
 import { MAIN_MEAL_MIN_KCAL, assumedLine, tooSmallForMainMeal } from './food-db'
 import type { MealMacros, MealSlotName } from './meal-store'
 
@@ -94,6 +94,21 @@ export function buildMealLogProposal(input: {
     return { ok: false, reason: `I couldn't work out the numbers for **${mealName}** — try telling me the amounts.` }
   }
 
+  // A FOOD THAT CANNOT BE COUNTED IS ASKED ABOUT BEFORE ANY CARD (run 7, 15 Oct 2026, M51; her words: "if a
+  // food can't be counted, ask before showing the card; never show a total that quietly leaves it out"). A
+  // breakfast card read 252 kcal over "Not counted: wholemeal toast" AND "Assumed: wholemeal toast", for a meal
+  // of about 430. So no card carries a total with a food missing from it: the coach asks how much, or whether to
+  // leave it out, and builds the card from the answer.
+  const notCounted = (computed.unmatched ?? []).map(u => String(u).trim()).filter(Boolean)
+  if (notCounted.length > 0) {
+    const list = notCounted.length === 1 ? `**${notCounted[0]}**` : `${notCounted.slice(0, -1).map(u => `**${u}**`).join(', ')} and **${notCounted[notCounted.length - 1]}**`
+    const one = notCounted.length === 1
+    return {
+      ok: false,
+      reason: `I couldn't count ${list} in **${mealName}**, so I haven't put a total on it yet. How much ${one ? 'was it' : 'were they'} (grams, or slices, cups and so on)? Or shall I leave ${one ? 'it' : 'them'} out?`,
+    }
+  }
+
   // THE SAME FLOOR EVERY GENERATED MEAL PASSES. An under-resolved meal's real
   // macros are unknowable, and logging 40 kcal for a proper dinner is worse
   // than logging nothing: it does not read as missing, it reads as a light
@@ -121,13 +136,10 @@ export function buildMealLogProposal(input: {
   }
 
   const macros: MealMacros = { kcal, protein, carbs, fat }
-  const unmatched = computed.unmatched ?? []
+  const unmatched: string[] = []
   const assumed = assumedLine(input.assumptions ?? [])
   const implications: { severity: 'info' | 'warn'; text: string }[] = []
-  // WHAT THE NUMBER LEAVES OUT, ON THE CARD. `unmatched` was documented as
-  // "shown on the card" for a month and rendered nowhere, so a meal could be
-  // confirmed at 80% of itself without a word.
-  if (unmatched.length > 0) implications.push({ severity: 'warn', text: `Not counted: ${unmatched.join(', ')}.` })
+  // Nothing is left out by the time a card is built (above), so the card's only note is what was assumed.
   if (assumed) implications.push({ severity: 'info', text: assumed })
 
   return {
@@ -146,7 +158,8 @@ export function buildMealLogProposal(input: {
       assumptions: input.assumptions ?? [],
     },
     diff: {
-      rows: [{ field: 'meal', before: slot, after: `${mealName} — ${kcal} kcal (P ${protein}g · C ${carbs}g · F ${fat}g)` }],
+      // THE SLOT IS WHERE IT GOES, NOT SOMETHING REPLACED (M51: "breakfast" was drawn struck through as a "before").
+      rows: [{ field: slot, before: '', after: `${mealName} — ${kcal} kcal (P ${protein}g · C ${carbs}g · F ${fat}g)` }],
       ...(implications.length > 0 ? { implications } : {}),
     },
   }

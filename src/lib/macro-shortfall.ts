@@ -141,7 +141,9 @@ export function macroShortfallLine(input: ShortfallInput): string | null {
   // "still to log"; dinner at 1pm is not due and never counts.
   const dueUnlogged = unlogged.filter(m => clock.hour >= MEAL_DUE_HOUR[m.slot])
   const foodBehind = behind.filter(g => g.key !== 'water')
-  if (foodBehind.length > 0 && dueUnlogged.length >= LOGGING_GAP_MEALS) return loggingGapLine(dueUnlogged.length)
+  // THE NUMBER SAID IS EVERY MEAL STILL TO LOG (run 7, L48): it said the DUE count, so at 6pm with all four
+  // unlogged it read "3 of today's meals still to log". Whether to speak is still decided by the due ones.
+  if (foodBehind.length > 0 && dueUnlogged.length >= LOGGING_GAP_MEALS) return loggingGapLine(unlogged.length)
   const pool = isBehind ? behind : uncovered
   if (pool.length === 0) return null
   // PROTEIN FIRST when it is one of the gaps: it is the macro a day is

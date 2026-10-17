@@ -62,7 +62,7 @@ console.log('\n2. The coach is handed it, read fresh for the turn')
   const store = strip(read('src/lib/meal-store.ts'))
   check('the message reads the eaten log as it is sent',
     /const eatenByDay = profile\.id\s*\?\s*buildCoachEatenSummary\(await getEatenByDate\(profile\.id, eatenWindow\(eatenToday\)\)/.test(chat))
-  check('...and builds this turn\'s context from it', /context: buildContext\(eatenByDay\)/.test(chat))
+  check('...and builds this turn\'s context from it', /context: buildContext\(eatenByDay[,)]/.test(chat))
   check('...as a block, and whether it could be read', /eaten_by_day: eatenByDay,/.test(chat) && /eaten_by_day_read: eatenByDay != null,/.test(chat))
   check('the streak and the coach count eaten food one way', /export async function getEatenProteinByDate\([^)]*\)[^{]*\{\s*const byDay = await getEatenByDate\(/.test(store))
 }

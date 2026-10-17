@@ -64,7 +64,7 @@ const read = () => ev(`(() => {
   const buttons = [...document.querySelectorAll('button')].map(b => b.textContent.trim())
   return {
     banner: banner ? banner.textContent.trim() : null,
-    saysStartWorkout: buttons.includes('Start workout'),
+    saysStartWorkout: buttons.includes('Start session'),
     saysTrainAnyway: buttons.includes('Train it anyway'),
     hasExerciseList: /MAIN LIFT|ACCESSORY|PRIMER/i.test(text),
     sample: text.replace(/\s+/g, ' ').slice(0, 220),
@@ -77,7 +77,7 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exer
 await wait(2500); await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
 let plain = await read()
 for (let i = 0; i < 12 && !plain.saysStartWorkout; i++) { await wait(500); plain = await read() }
-check('an ordinary training day still offers Start workout', plain.saysStartWorkout, plain)
+check('an ordinary training day still offers Start session', plain.saysStartWorkout, plain)
 check('...and shows no swap banner', plain.banner === null, plain.banner)
 
 // --- the swapped day -------------------------------------------------------

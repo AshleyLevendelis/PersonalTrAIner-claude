@@ -87,7 +87,9 @@ export const TOUR_STEPS: TourStep[] = [
     // 2026). What is still true is narrower: Home never logs a SET. The claim
     // is scoped to that rather than dropped, and test:app-tour §10 now holds
     // any "never logs" line to what that tab's own code does.
-    copy: "Home answers one question — what's next. Today's session sits up top, and Start session hands you to Exercise, where every set gets logged. Home shows your training; it never logs a set.",
+    // ONE-PAGE HOME (17 Oct 2026): the session is the first row under Up next, and the start button is
+    // docked at the foot of the screen.
+    copy: "Home answers one question — what's next. Today's session is the first thing under Up next, and the button at the bottom hands you to Exercise, where every set gets logged. Home shows your training; it never logs a set.",
   },
   {
     key: 'tiles', tab: 'dashboard', target: 'tiles',
@@ -96,7 +98,9 @@ export const TOUR_STEPS: TourStep[] = [
     // the one read-out here, owned by Nutrition. (This comment used to
     // describe the 5 Sep arrangement, when steps lived on Exercise — a day
     // out of date for a month. The copy below was right; the note was not.)
-    copy: 'Your day so far. Calories are a read-out — tap through to Nutrition, which owns them. Water, steps and your weigh-in are logged right here.',
+    // ONE-PAGE HOME (17 Oct 2026, her ruling "Tap the steps ring"): water left Home for Nutrition's water
+    // cell; steps are logged from the Steps row of this key. The weigh-in is lower down, under Progress.
+    copy: 'Your day so far, as four rings. Calories, protein and water are read-outs — tap them to go to Nutrition, which owns them. Steps are logged right here: tap Steps.',
   },
   {
     key: 'nutrition', tab: 'nutrition', target: 'rings',
@@ -107,11 +111,13 @@ export const TOUR_STEPS: TourStep[] = [
     // same way on 6 Sep (to Home, with the rest of the day's logging), so
     // this copy no longer promises a tap it cannot deliver on this tab; what
     // Nutrition owns is the read-out and the targets behind it.
-    copy: "Everything you eat and drink lives here. The rings are your day at a glance, and the targets behind them — calories, macros, water — are set from this tab.",
+    // ONE-PAGE NUTRITION (17 Oct 2026): no rings here any more — calories left with a bar, then a grid of
+    // macros and water — and the water quick-add is back on this tab, behind the water cell.
+    copy: "Everything you eat and drink lives here: what's left today, your macros, and your water — tap the water cell to log a glass. The targets behind them are one tap down, in Targets & plan settings.",
   },
   {
     key: 'meals', tab: 'nutrition', target: 'meals',
-    copy: 'Your meals for the day. Open one to log it, swap it, or regenerate it — every kcal here feeds the rings above.',
+    copy: 'Your meals for the day. Open one to log it, swap it, or regenerate it — every kcal here feeds the numbers above.',
     // Since 6 Sep 2026 the app hands over before the meals are built, so this
     // stop can be reached while they are still coming. `copy` promises three
     // things you can do to a meal; over an empty slot that is a promise the
@@ -126,7 +132,8 @@ export const TOUR_STEPS: TourStep[] = [
     // Steps MOVED here from Nutrition, and this is the one place the tour can
     // say so. Anyone who used the old Nutrition logger will otherwise go
     // looking for it on the tab it left.
-    copy: 'Your program lives here — the week at a glance, the phase you’re in, and my notes on the week right under the header (tap to read the whole thing). Today’s session sits right below.',
+    // ONE-PAGE EXERCISE (17 Oct 2026): the week is two rings and the strip; the phase is the Program row.
+    copy: 'Your program lives here — this week as two rings and a strip of days, and my notes on the week (tap to read the whole thing). Today’s session sits right below, and the Program row at the bottom shows the phase you’re in.',
   },
   {
     key: 'set', tab: 'exercise', target: 'setrow', gate: true,

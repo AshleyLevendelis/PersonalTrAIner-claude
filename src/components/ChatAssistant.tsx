@@ -20,8 +20,10 @@ import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
+import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
+import { changeSinceStart } from '@/lib/weight-trend'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, type WeighInPayload } from '@/lib/weigh-in-proposal'
 import { getWeighInPicture } from '@/lib/nutrition-targets'
@@ -121,7 +123,7 @@ import { DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store
 import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
-import { useTrainingWeek } from '@/hooks/useTrainingWeek'
+import { useTrainingWeek, readTrainingWeeks } from '@/hooks/useTrainingWeek'
 import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
@@ -1580,7 +1582,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   // eatenByDay: read fresh by callGemini for this turn (H26); null = the log could not be read.
-  const buildContext = (eatenByDay: string | null = null) => {
+  // weekReview: this week and last, Monday to Sunday, as the strip counts them (run 7, M50); null = unread.
+  const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null) => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     // Split out from `.days` (not just `?.days || exercisePlan` inline) so
     // the week's own coach_note is still reachable below — that's where a
@@ -1826,6 +1829,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // "could not see".
       eaten_by_day: eatenByDay,
       eaten_by_day_read: eatenByDay != null,
+      week_review: weekReview,
+      week_review_read: weekReview != null,
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
       cardio_log_history: cardioLogHistory,
@@ -1837,6 +1842,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       weight_trend_summary: proactiveData?.weightTrend && proactiveData.weightTrend.ratePerWeekKg != null
         ? `rolling average ${proactiveData.weightTrend.rollingAvgKg.toFixed(1)}kg, trending ${proactiveData.weightTrend.ratePerWeekKg >= 0 ? '+' : ''}${proactiveData.weightTrend.ratePerWeekKg.toFixed(2)}kg/week (${proactiveData.weightTrend.sampleCount} weigh-ins)${proactiveData.weightTrend.onTrackForGoal === false ? ', off track for their stated goal' : ''}`
         : null,
+      // THE ONE "SINCE YOU STARTED" FIGURE (run 7, L49): Home said -1.4 kg and the coach worked out its own from a
+      // weekly rate and the latest weight. It is now handed Home's number, from Home's function and inputs.
+      weight_change_since_start: (() => {
+        const kg = proactiveData ? changeSinceStart(proactiveData.startingWeightKg, proactiveData.weightSeries) : null
+        return kg == null || proactiveData?.startingWeightKg == null ? null
+          : `${kg > 0 ? '+' : ''}${kg.toFixed(1)} kg since they started (from ${proactiveData.startingWeightKg} kg to their latest weigh-in)`
+      })(),
       recent_prs_summary: proactiveData && proactiveData.recentPRs.length > 0
         ? proactiveData.recentPRs.slice(0, 3).map(pr => `${recordPhrase(pr)} (${pr.date})`).join('; ')
         : null,
@@ -2053,6 +2065,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const eatenByDay = profile.id
       ? buildCoachEatenSummary(await getEatenByDate(profile.id, eatenWindow(eatenToday)).catch(() => null), eatenToday)
       : null
+    // THE WEEK AS THE SCREENS COUNT IT (run 7, M50): this week and last, Monday to Sunday, each day in the
+    // strip's own words, with that day's logged meals, read now for this turn.
+    const reviewWeeks = profile.id
+      ? await readTrainingWeeks(profile.id, eatenToday, liveWeekDays, mesocycle, planCreatedAt ?? profile.created_at, trainingWeek.moves).catch(() => null)
+      : null
+    const weekReview = reviewWeeks && profile.id
+      ? buildCoachWeekReview(reviewWeeks, await getEatenByDate(profile.id, weekReviewDates(reviewWeeks.lastWeek, eatenToday)).catch(() => null), eatenToday)
+      : null
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -2066,7 +2086,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       body: JSON.stringify({
         message: userMessage,
         history,
-        context: buildContext(eatenByDay),
+        context: buildContext(eatenByDay, weekReview),
       }),
       signal: controller.signal,
     })
@@ -2182,7 +2202,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_meal_food_resize') return `I can make that **${rows[0].after}**:`
     // Asks; never announces. The write happens on the tap, so the wording has
     // to be a question right up until it does.
-    if (pendingAction.kind === 'propose_meal_log') return `Log this to your ${rows[0].before}?`
+    if (pendingAction.kind === 'propose_meal_log') return `Log this to your ${rows[0].field}?`
     // The rationale IS the offer here ("that's all five I've got — want me to
     // find new ones?"), so repeating a headline above it would say it twice.
     if (pendingAction.kind === 'propose_meal_pool_refresh') return pendingAction.diff.rationale ?? 'Want me to find you some new options?'
@@ -6785,13 +6805,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * the DB's own record of what happened. All three are only offered for
    * the 10-minute post-confirm window.
    */
-  const handleUndoReceipt = async (msgIndex: number) => {
+  type UndoOutcome = 'done' | 'handled' | { refused: string; keep: boolean }
+  // EVERY WAY OUT SAYS HOW IT ENDED (run 7, 15 Oct 2026, M53): an old card's Undo was tapped, the ten minutes had
+  // passed, and the handler returned with nothing on screen, so the card went on reading "Rescheduled". The core
+  // now answers 'done', 'handled' (it wrote its own card) or a refusal, and the wrapper below puts it on the card.
+  const undoReceiptCore = async (msgIndex: number): Promise<UndoOutcome> => {
     const msg = messages[msgIndex]
     const receipt = msg.receipt
-    if (!receipt?.undoToken || !profile.id) return
+    if (!receipt?.undoToken || !profile.id) return 'handled'
 
     if (receipt.kind === 'log_workout') {
-      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
       // TWO SHAPES, ON PURPOSE. Receipts written before 5 Sep 2026 carry a
       // bare array of keys; current ones carry { logged, replaced }. Chat
       // history is persisted, so a receipt from the old shape can still be
@@ -6810,7 +6834,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         else { keys = token.logged ?? []; replaced = token.replaced ?? []; cardio = token.cardio ?? [] }
       } catch (err) {
         console.error('Undoing a chat workout log failed to read its own token:', err)
-        return
+        return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       }
       // DELETE FIRST, THEN RESTORE — never the reverse. A correction usually
       // reuses the same set numbers it freed (that is the whole point of
@@ -6845,7 +6869,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // is the row's own id, and undo is a direct retire (soft delete,
       // same append-only-with-a-reverse convention meal_events.voided_at
       // uses), gated by the same 10-minute window every receipt honors.
-      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
       if (receipt.kind === 'memory_fact_saved') await retireFact(receipt.undoToken)
       else if (receipt.kind === 'memory_context_fact_saved') await retireContextFact(receipt.undoToken)
       else await abandonGoal(receipt.undoToken)
@@ -6853,22 +6877,22 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (receipt.kind === 'grocery_day_added') {
       // The strip's own undo: the list recomputed without that day, so an
       // ingredient another day needs keeps that day's amount.
-      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
-      if (!receipt.undoToken || !onRemoveMealDayFromGrocery) return
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
+      if (!receipt.undoToken || !onRemoveMealDayFromGrocery) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       const removed = await onRemoveMealDayFromGrocery(receipt.undoToken)
       await onGroceryChanged?.()
-      if (!removed) return // leave the Undo button so the user can retry
+      if (!removed) return { refused: RECEIPTS_UNDONE.failed, keep: true } // leave the Undo button so the user can retry
     } else if (receipt.kind === 'grocery_item_added') {
       // §5.4/§2.5 — undoToken is a JSON-encoded list of {id, addedQuantity,
       // created} (one per item added this turn), since undoing a merge onto
       // an existing line means subtracting back out, not deleting the row.
-      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
       let entries: { id: string; addedQuantity: number; created: boolean }[]
       try {
         entries = JSON.parse(receipt.undoToken)
       } catch (err) {
         console.error('Undoing a chat grocery add failed to read its own token:', err)
-        return
+        return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       }
       const current = await getAllGroceryItems(profile.id)
       for (const entry of entries) {
@@ -6881,8 +6905,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // water's own comment spells out: it has no row to merge onto, this has
       // exactly one per day. Deleting after a 6,240 -> 9,240 correction would
       // throw away the 6,240 the user never touched.
-      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
-      if (!receipt.undoToken || !profile.id) return
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
+      if (!receipt.undoToken || !profile.id) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       try {
         const { date, previous } = JSON.parse(receipt.undoToken) as { date: string; previous: number | null }
         await restoreStepsForDate(profile.id, date, previous)
@@ -6890,31 +6914,33 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         bumpOwnWrites()
       } catch (err) {
         console.error('Undoing a chat steps log failed:', err)
+        return { refused: RECEIPTS_UNDONE.failed, keep: true }
       }
     } else if (receipt.kind === 'water_logged') {
       // undoToken is just the row id — a fresh log has nothing to merge
       // onto (unlike grocery's canonical_key coalescing), so undo is
       // always a straight delete. undoLog only reads id/profile_id off
       // its argument, so a minimal object is safe here.
-      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
       undoWaterLog({ id: receipt.undoToken, profile_id: profile.id } as Parameters<typeof undoWaterLog>[0])
       await onWaterChanged?.()
       bumpOwnWrites()
     } else {
       const row = await getPendingAction(receipt.undoToken)
-      if (!row || !isWithinUndoWindow(row.resolved_at)) return
+      if (!row) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
+      if (!isWithinUndoWindow(row.resolved_at)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
 
       if (row.kind === 'propose_exercise_swap') {
         const payload = row.payload as unknown as ExerciseSwapPayload
         const preImage = row.pre_image as MesocycleWeek[] | null
-        if (!preImage || !planCreatedAt) return
+        if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_session_rebuild') {
         // ONE WEEK, same as shortening: a rebuild is today-only by definition.
         const payload = row.payload as unknown as SessionRebuildPayload
         const preImage = row.pre_image as MesocycleWeek[] | null
-        if (!preImage || !planCreatedAt) return
+        if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, 'today', planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_session_shorten') {
@@ -6923,7 +6949,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // swap's undo takes, not the week-range one below.
         const payload = row.payload as unknown as SessionShortenPayload
         const preImage = row.pre_image as MesocycleWeek[] | null
-        if (!preImage || !planCreatedAt) return
+        if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, 'today', planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_cardio_session') {
@@ -6931,7 +6957,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // wrote — the payload carries it rather than the live week guessing.
         const payload = row.payload as unknown as CardioSessionPayload
         const preImage = row.pre_image as MesocycleWeek[] | null
-        if (!preImage || !planCreatedAt) return
+        if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity') {
@@ -6940,7 +6966,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // payload, not off today's live week — undoing tomorrow must put
         // back what was there, not what is there now.
         const preImage = row.pre_image as MesocycleWeek[] | null
-        if (!preImage) return
+        if (!preImage) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         const fromWeek = row.kind === 'propose_volume_change'
           ? Math.min(...(row.payload as unknown as VolumeChangePayload).weekNumbers)
           : row.kind === 'propose_style_change'
@@ -7006,7 +7032,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       } else if (row.kind === 'propose_exercise_add' || row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
         const payload = row.payload as unknown as { weekNumber: number; scope: SwapScope }
         const preImage = row.pre_image as unknown as MesocycleWeek[] | null
-        if (!preImage) return
+        if (!preImage) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoSessionEdit(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt ?? profile.created_at ?? new Date().toISOString())
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_missed_session') {
@@ -7030,16 +7056,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           if (i !== msgIndex || !m.receipt) return m
           return backOk
             ? { ...m, receipt: { ...m.receipt, title: 'Put back', rows: [{ label: 'Swap', detail: DAY_MOVE.undo.asTheyWere(payload.legs[0].slot, dayLabel(payload.legs[0].date, today), payload.legs[1].slot, dayLabel(payload.legs[1].date, today)) }], undoToken: undefined } }
-            : { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== "Couldn't undo"), { label: "Couldn't undo", detail: back.failed[0].error }] } }
+            : { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: back.failed[0].error }] } }
         }))
-        return
+        return 'handled'
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
-        if (!payload.currentName) return
+        if (!payload.currentName) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         const persisted = payload.date
           ? (await onUpcomingMealPickApplied?.(payload.date, payload.slot, payload.currentName)) ?? false
           : await onMealSwapApplied(payload.slot, payload.currentName)
-        if (!persisted) return // leave the Undo button in place so the user can retry
+        if (!persisted) return { refused: RECEIPTS_UNDONE.failed, keep: true } // leave the Undo button in place so the user can retry
       } else if (row.kind === 'propose_meal_addition' || row.kind === 'propose_custom_meal' || row.kind === 'propose_meal_food_add'
                  || row.kind === 'propose_meal_food_remove' || row.kind === 'propose_meal_food_replace' || row.kind === 'propose_meal_food_resize') {
         // Removes the option from the pool AND clears the pick, both — an
@@ -7051,22 +7077,36 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // doesn't land, keep the Undo button so the user can try again,
         // exactly as the meal swap above does.
         const removed = await undoMealAddition(profile.id, payload)
-        if (!removed) return
+        if (!removed) return { refused: RECEIPTS_UNDONE.failed, keep: true }
         // Nothing to restore as the on-screen pick: the slot had whatever
         // assembleDay chose before this, and clearing the pick is what makes
         // the Nutrition tab fall back to it. onMealSwapApplied can't express
         // "no pick", so the reload does it.
         await onMealSwapApplied(payload.slot, '')
       } else {
-        return
+        return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       }
     }
 
+    return 'done'
+  }
+
+  const handleUndoReceipt = async (msgIndex: number) => {
+    let out: UndoOutcome
+    try {
+      out = await undoReceiptCore(msgIndex)
+    } catch (err) {
+      console.error('Undoing a coach card failed:', err)
+      out = { refused: RECEIPTS_UNDONE.failed, keep: true }
+    }
+    if (out === 'handled') return
     // AN UNDONE CARD SAYS SO (run 5, 11 Oct 2026: after Undo the card still read "Rescheduled", with only the button
-    // gone, so nothing on screen said the change had been taken back).
-    setMessages(prev => prev.map((m, i) => (i === msgIndex && m.receipt
-      ? { ...m, receipt: { ...m.receipt, title: RECEIPTS_UNDONE.title, rows: [{ label: RECEIPTS_UNDONE.label, detail: RECEIPTS_UNDONE.detail(m.receipt.title) }], undoToken: undefined } }
-      : m)))
+    // gone, so nothing on screen said the change had been taken back). And a refused one says why (run 7, M53).
+    setMessages(prev => prev.map((m, i) => {
+      if (i !== msgIndex || !m.receipt) return m
+      if (out === 'done') return { ...m, receipt: { ...m.receipt, title: RECEIPTS_UNDONE.title, rows: [{ label: RECEIPTS_UNDONE.label, detail: RECEIPTS_UNDONE.detail(m.receipt.title) }], undoToken: undefined } }
+      return { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: out.refused }], undoToken: out.keep ? m.receipt.undoToken : undefined } }
+    }))
   }
 
   const isInterrupted = (msg: ChatMessage) =>
@@ -7091,7 +7131,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const normalized = normalizeExternalUrl(href)
       if (!normalized) return <>{children}</>
       return (
-        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-foreground underline hover:opacity-80">{children}</a>
+        <a href={normalized} target="_blank" rel="noopener noreferrer" className="text-primary-text underline hover:opacity-80">{children}</a>
       )
     },
   }
@@ -7252,11 +7292,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                           stripStreamingTags(msg.content)
                         ) : isInterrupted(msg) && !msg.content ? (
                           /* Pending placeholder — show loading dots */
-                          <div className="flex items-center gap-2 text-primary-foreground/70">
+                          <div className="flex items-center gap-2 text-muted-foreground">
                             <div className="flex gap-1">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce" />
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce [animation-delay:150ms]" />
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-foreground/50 animate-bounce [animation-delay:300ms]" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
                             </div>
                             {isRecalibrating ? (
                               <span className="text-xs">Recalibrating your schedule...</span>
@@ -7271,7 +7311,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               {stripStreamingTags(msg.content)}
                             </ReactMarkdown>
                             <button
-                              className="mt-2 flex items-center gap-1.5 text-xs text-primary-foreground font-medium hover:underline"
+                              className="mt-2 flex items-center gap-1.5 text-xs text-primary-text font-medium hover:underline"
                               onClick={() => retryMessage(i)}
                               disabled={isLoading}
                             >
@@ -7304,9 +7344,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
                                   msg.role === 'user'
                                     ? 'whitespace-pre-wrap border border-border bg-card text-card-foreground'
-                                    : 'bg-primary text-primary-foreground'
+                                    : 'border border-[color:color-mix(in_oklab,var(--primary)_40%,var(--card))] bg-[color:color-mix(in_oklab,var(--primary)_14%,var(--card))] text-card-foreground'
                                 }`}
-                                // THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR (Ashley,
+                                // A SOFT TINT, NOT THE BRIGHT MINT (Ashley, 16 Oct 2026, "the chat
+                                // bubbles colour is too bright"; from three options, "soft tint" over a
+                                // muted mint and over plain like yours): the card colour with a hint of
+                                // the main colour, the card's own text, and a mint hairline. It replaces
+                                // the 27 Sep flat main colour below; the avatar keeps the fade.
+                                // WAS: THE COACH'S BUBBLE IS THE FLAT MAIN COLOUR (Ashley,
                                 // 27 Sep 2026). Her brief first gave it the avatar's
                                 // fade; measured, the fade's darker bottom and lighter
                                 // top left long messages under 4.5:1 in Graphite,
@@ -7345,6 +7390,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                   status={msg.receipt.status}
                                   receipt={msg.receipt.result}
                                   undoAvailable={!!msg.receipt.undoToken && isWithinUndoWindow(msg.receipt.resolvedAt ?? null)}
+                                  undoUntil={undoWindowEndsAt(msg.receipt.resolvedAt)}
                                   onUndo={msg.receipt.undoToken ? () => handleUndoReceipt(i) : undefined}
                                   onViewProfile={
                                     msg.receipt.kind === 'memory_goal_saved' ? () => onOpenProfile?.('goals')

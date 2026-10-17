@@ -516,11 +516,17 @@ One fact, one owner. The rule, in full:
 > **Exercise** owns the program and the session.
 > **Tools** owns nothing.
 > **Home** owns the progress facts — weight, streak, consistency, PRs — and
-> the day's QUICK LOG: water, steps and the weigh-in.
+> the day's QUICK LOG for steps and the weigh-in. Water is logged on Nutrition.
 > Home still owns no target and no plan: it points at the tab that does.
 
 Two consequences worth stating, because both were violations before this rule
 existed:
+
+- **Water's quick-add went back to Nutrition, 17 Oct 2026** — the one-page layout (design 5c·5 / 5c·6),
+  her ruling that day ("Tap the steps ring"): Home's water and steps pills went; Steps in Home's key opens the
+  steps entry in place; water is logged by tapping Nutrition's water cell. **Moved, not copied** — Home no
+  longer calls the water writer at all, the same discipline as every move below. Water's number, its target
+  and now its quick-add are all on the one tab that owns it.
 
 - **The quick log came back to Home, 6 Sep 2026** — `design_handoff_app_polish`
   ("Home becomes informative"). Home's "Today so far" grid logs water (+250 /

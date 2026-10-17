@@ -98,9 +98,11 @@ async function main() {
       // re-point the row, and the "no OTHER tab claims it" loop below turns
       // the leftover Nutrition claim into a failure instead of a second
       // truth. Nutrition still SETS the water target — it just doesn't log.
+      // MOVED BACK 17 Oct 2026, Home -> Nutrition: the one-page layout puts the quick-adds behind
+      // Nutrition's water cell (her ruling that day, "Tap the steps ring"; water on Nutrition).
       {
         label: 'water logging', claim: /water logging/i, writer: /logWater\b/,
-        file: 'src/components/Dashboard.tsx', tab: 'Home',
+        file: 'src/components/NutritionDisplay.tsx', tab: 'Nutrition',
       },
     ]
     for (const c of CAPABILITIES) {

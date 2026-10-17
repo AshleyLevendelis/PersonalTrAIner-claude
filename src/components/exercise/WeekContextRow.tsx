@@ -1,9 +1,13 @@
 import type * as React from 'react'
-import { ChevronDown, MoreHorizontal, History, CalendarDays } from 'lucide-react'
+import { ChevronDown, ChevronRight, MoreHorizontal, History, CalendarDays, CalendarRange } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import { dayLabel, weekBoundaryIndex, weekBoundaryNote } from '@/lib/week-glyphs'
+import { tallyWeek } from '@/hooks/useTrainingWeek'
+import { RingMeter, RingKey } from '@/components/OnePage'
+import { ringShare, weekSetCount, programSummary } from '@/lib/one-page'
+import type { MesocycleWeek } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // Turn 5 — merges what were three separate rows (WeekStrip, ContextLine,
@@ -82,6 +86,7 @@ export function WeekContextRow({
   coachNoteShownBelow,
   expanded,
   onToggleExpanded,
+  hero,
 }: {
   days: TrainingWeekDay[]
   todayName: string
@@ -112,10 +117,18 @@ export function WeekContextRow({
    */
   expanded: boolean
   onToggleExpanded: (next: boolean) => void
+  /**
+   * THE LEFT HALF OF THE HERO (one-page Exercise, 5c·4, 17 Oct 2026): today's session name and its meta
+   * line, from TodayPanel, which knows the day. Absent on a rest day, a peek or a moved day: the hero then
+   * says what the week has done, and the day's own card below says the rest.
+   */
+  hero?: React.ReactNode
 }) {
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
   const boundary = weekBoundaryIndex(days)
   const boundaryNote = todayDate ? weekBoundaryNote(days, todayDate) : null
+  const tally = tallyWeek(days, todayDate ?? '')
+  const sets = weekSetCount(days)
 
   // Tab-restructure handoff — "Wk 3/16 · B1 Hypertrophy · ~52 min" as one
   // line, block number included (blockNumber was accepted as a prop before
@@ -132,16 +145,20 @@ export function WeekContextRow({
     // the session underneath it. The week strip now sits directly under the
     // line it belongs to.
     <div data-tour="extoday">
+      {/* THE PAGE'S HEADER (5c·4): "Exercise", and where she is in the plan beside the notes and the menu.
+          The week number opens the programme, as the old label did. */}
       <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          className="ds-label min-w-0 flex-1 truncate text-left"
-          onClick={onOpenProgram}
-          data-testid="week-context-header"
-        >
-          {headerParts.join(' · ')}
-        </button>
-        <div className="flex shrink-0 items-center gap-1">
+        <h2 className="text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">Exercise</h2>
+        <div className="flex min-w-0 items-center gap-1">
+          <button
+            type="button"
+            className="hit-slop-44 min-w-0 truncate text-[0.75rem] text-muted-foreground"
+            onClick={onOpenProgram}
+            data-testid="week-context-header"
+            aria-label={`${headerParts.join(' · ')} — open the whole program`}
+          >
+            Week {weekNumber} of {totalWeeks}
+          </button>
           {(phaseFocus || coachNote) && (
             <button
               type="button"
@@ -187,6 +204,41 @@ export function WeekContextRow({
         </div>
       </div>
 
+      {/* THE WEEK, AS TWO RINGS (5c·4): sessions outside, sets inside, the count in the middle. The same
+          counts the strip and Home use (tallyWeek, weekSetCount), so no screen says a different fraction. */}
+      <div className="mt-[18px] grid grid-cols-2 items-center gap-x-[22px]" data-exercise-hero>
+        <div className="min-w-0">
+          {hero ?? (
+            <>
+              <p className="glow-mint text-[0.65625rem] font-semibold uppercase tracking-[.2em] text-primary-text">This week</p>
+              <p className="mt-1.5 text-[0.8125rem] text-muted-foreground">
+                {tally.sessionsDone} of {tally.sessionsPlanned} session{tally.sessionsPlanned === 1 ? '' : 's'} done{tally.sessionsLeft > 0 ? ` · ${tally.sessionsLeft} to go` : ''}
+              </p>
+            </>
+          )}
+        </div>
+        <RingMeter
+          className="justify-self-end"
+          data-testid="week-meter"
+          label={`${tally.sessionsDone} of ${tally.sessionsPlanned} sessions and ${sets.logged} of ${sets.planned} sets done this week`}
+          rings={[
+            { key: 'sessions', share: ringShare(tally.sessionsDone, tally.sessionsPlanned), color: 'var(--primary)', glow: true },
+            { key: 'sets', share: ringShare(sets.logged, sets.planned), color: 'var(--chart-2)' },
+          ]}
+        >
+          <span className="tabular-mono glow-mint-lg text-[2.125rem] font-bold leading-none" style={{ color: 'var(--num-hero)' }} data-testid="week-meter-count">{tally.sessionsDone}/{tally.sessionsPlanned}</span>
+          <span className="mt-1 text-[0.6875rem] font-semibold uppercase tracking-[.14em]" style={{ color: 'var(--role-ai-text)' }}>This week</span>
+        </RingMeter>
+      </div>
+      <div className="mt-[18px]">
+        <RingKey
+          data-testid="week-key"
+          items={[
+            { key: 'sessions', label: 'Sessions', color: 'var(--primary)', glow: true, value: String(tally.sessionsDone), target: `/${tally.sessionsPlanned}` },
+            { key: 'sets', label: 'Sets', color: 'var(--chart-2)', value: String(sets.logged), target: `/${sets.planned}` },
+          ]}
+        />
+      </div>
 
       {/* THE NOTES ARE ON SCREEN, NOT ONLY BEHIND THE CHEVRON. The tour
           promises "my notes on it" for this tab, and every week of every plan
@@ -229,7 +281,7 @@ export function WeekContextRow({
           lifted, its name in accent and its dot hollow. Tapping another day
           keeps the peek it always opened. A hairline before the first day of
           a new training week says where the week changes (week boundaries S5). */}
-      <div className="mt-3 grid grid-cols-7 gap-1" data-exercise-strip>
+      <div className="mt-[18px] grid grid-cols-7 gap-1" data-exercise-strip>
         {days.map((d, i) => {
           const isToday = d.dayName === todayName
           const isSelected = d.dayName === (selectedDay ?? todayName)
@@ -254,10 +306,12 @@ export function WeekContextRow({
             >
               {i === boundary && <span aria-hidden className="absolute -left-[3px] top-1 bottom-1 w-px bg-border" data-testid="week-boundary-mark" />}
               <span className={`text-[0.6875rem] ${isSelected ? 'font-semibold text-primary-text' : rest ? 'text-[color:var(--text-dim)]' : 'text-text-tertiary'}`}>
-                {DAY3[d.dayName] ?? d.dayName.slice(0, 3)}
+                {(DAY3[d.dayName] ?? d.dayName).slice(0, 1)}
               </span>
               {isSelected ? (
-                <span aria-hidden className="size-[5px] rounded-full" style={{ boxShadow: 'inset 0 0 0 1px var(--primary)' }} />
+                // A SELECTED MISSED DAY STAYS MISSED (run 7, M52): the ring took the warning dot's place, so tapping
+                // Monday made it look like any planned day.
+                <span aria-hidden className="size-[5px] rounded-full" data-selected-dot={dot === 'missed' ? 'missed' : 'plain'} style={dot === 'missed' ? DOT_STYLE.missed! : { boxShadow: 'inset 0 0 0 1px var(--primary)' }} />
               ) : DOT_STYLE[dot] ? (
                 <span aria-hidden className={`size-[5px] rounded-full ${dot === 'done' ? 'glow-mint-box' : ''}`} style={DOT_STYLE[dot]!} />
               ) : (
@@ -270,11 +324,53 @@ export function WeekContextRow({
 
       {boundaryNote && <p className="mt-1.5 text-center text-[0.6875rem] text-muted-foreground" data-testid="week-boundary-note">{boundaryNote}</p>}
 
-      {onOpenProgram && (
-        <button type="button" className="hit-slop-44 mt-3 text-[0.71875rem] font-semibold text-primary-text" onClick={onOpenProgram}>
-          See the whole program ›
-        </button>
-      )}
     </div>
+  )
+}
+
+/**
+ * THE PROGRAM ROW (5c·4): the programme one tap away, with where she is in it. One segment per block of
+ * HER plan, named by its own phase — the handoff's Base/Build/Peak/Deload are not phases this plan has.
+ * Finished blocks are accent, the current one fills to the weeks reached, later ones are dim.
+ */
+export function ProgramRow({ mesocycle, liveWeek, onOpenProgram }: { mesocycle: MesocycleWeek[]; liveWeek: number; onOpenProgram?: () => void }) {
+  const p = programSummary(mesocycle, liveWeek)
+  if (p.segments.length === 0) return null
+  // The current block is named, accent, under its own segment, so the line beside "Program" says what
+  // is next: the deload when one is ahead in this block, else the block itself. A CALIBRATION WEEK SAYS SO
+  // FIRST: it changes how she should lift this week (find the weights), which a deload count does not.
+  const calibrating = p.title === 'Calibration week'
+  const subline = (calibrating ? p.title : p.deload ?? p.title) ?? ''
+  return (
+    <button
+      type="button"
+      onClick={onOpenProgram}
+      className="flex w-full flex-col gap-2.5 rounded-[14px] p-3.5 text-left"
+      style={{ background: 'var(--surface-raised)' }}
+      data-program-row
+    >
+      <span className="flex w-full items-center gap-2.5">
+        <CalendarRange aria-hidden className="size-4 shrink-0 text-text-tertiary" />
+        <span className="text-[0.90625rem]">Program</span>
+        <span className="min-w-0 flex-1 truncate text-right text-[0.75rem] text-muted-foreground" data-testid="program-row-sub">{subline}</span>
+        <ChevronRight aria-hidden className="size-4 shrink-0" style={{ color: 'var(--text-dim)' }} />
+      </span>
+      <span className="grid w-full gap-1" style={{ gridTemplateColumns: `repeat(${p.segments.length}, minmax(0, 1fr))` }} data-phase-bar>
+        {p.segments.map(seg => (
+          <span key={seg.block} className="min-w-0" data-phase={seg.state} data-fill={seg.fill.toFixed(2)}>
+            <span className="block h-1 w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--background) 60%, transparent)' }}>
+              <span
+                className={`block h-1 rounded-full ${seg.state === 'current' ? 'glow-mint-box' : ''}`}
+                style={{
+                  width: `${Math.round(seg.fill * 100)}%`,
+                  background: seg.state === 'current' ? 'linear-gradient(90deg, var(--primary-2), var(--primary))' : 'var(--primary)',
+                }}
+              />
+            </span>
+            <span className={`mt-1 block truncate text-[0.65625rem] ${seg.state === 'current' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>{seg.label}</span>
+          </span>
+        ))}
+      </span>
+    </button>
   )
 }

@@ -40,8 +40,7 @@ import { isMissingColumnError } from './missing-column'
 import { tagsNewFrom } from './meal-new-from'
 import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
 import { chooseFromLibrary, loadMealLibrary } from './meal-library'
-
-export const MIN_COVERAGE = 0.8
+import { MIN_COVERAGE } from './meal-costing'
 /**
  * SEVEN OPTIONS A MEAL — Ashley's ruling, 28 Sep 2026, from three options
  * (keep five, seven, ten). At five, a week of 28 servings was 11 dishes and

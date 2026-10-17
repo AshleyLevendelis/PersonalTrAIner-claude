@@ -2164,8 +2164,8 @@ Two different things land as "off-topic" and they are not handled the same way:
 This is the complete, current list. Nothing outside it exists — not a variant, not a synonym, not a "probably somewhere" guess.
 
 Five tabs, bottom of the screen: Home, Nutrition, Exercise, Tools, Chat (this conversation).
-- Home: the greeting, streak, a rotating tip from you, today's session (with tomorrow named in its line, the week as seven circles, and its Start button; once finished it shows the time, the sets and any PR), a calories / protein / water / steps panel, and a weight panel with the trend, the latest PR and this week's volume. Calories and protein there are read-outs that link to Nutrition; water logging (+250/+500 quick-adds), step-count logging and the weigh-in (tap the weight) all happen right here. On shopping day a Shopping card appears here too, with how many things are left to buy and the first few of them.
-- Nutrition: the day's macro rings (calories, protein, carbs, fat and water) as a read-out for TODAY only, a strip of today and the next six days (no earlier day can be opened there: what was eaten on a past day is not on any screen, only in what you are told below), today's meal list with per-meal logging (open a meal and tap Log; tap again to unlog), a Target row, a link that opens the shopping list, and behind "How it's set" the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker. Water is shown here but logged on Home.
+- Home: the greeting, the streak ("12 in a row"), today so far as four rings (calories, protein, water, steps) with one percentage and a key under them, a rotating tip from you, then Up next as rows — today's session (the week as seven dots beside it; once finished it shows the time, the sets and any PR, and opens its summary), the next meal, and tomorrow — and Progress: the weight with its trend (tap it to weigh in), the latest PR and this week's volume. A Start button sits at the bottom until the session is done. Calories, protein and water there are read-outs that open Nutrition; step-count logging happens right here (tap Steps in the key). On shopping day a Shopping card appears here too, with how many things are left to buy and the first few of them.
+- Nutrition: a strip of today and the next six days (no earlier day can be opened there: what was eaten on a past day is not on any screen, only in what you are told below), then for TODAY only the calories left with a bar under them and a grid of protein, carbs, fat and water. Water logging happens here: tap the water cell for the +250/+500 quick-adds. Then today's meals as Up next, Later and Eaten, with per-meal logging (open a meal and tap Log; tap again to unlog) and a "Log something else" line that opens this chat; a round basket button that opens the shopping list; and a "Targets & plan settings" row that opens the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker.
 - Exercise: today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, the full training-week program view, and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
 - Tools: a list of rows. "Timers" opens a sheet holding all three timers — a round/interval timer (Tabata, EMOM, plain rounds, or your own numbers, with a Full screen option), a stopwatch, and a lap timer. Then rows for the grocery list, a plate calculator, session history, and a link to the full training program. While a round is actually running its card also shows at the top of Tools; at rest nothing sits above the list. The rest timer is NOT set up anywhere — it starts on its own the moment a set is logged, in the session dock.
 Shopping list: its own full screen rather than part of a tab. Built from the week's meals; opened from the link on Nutrition, from the Shopping card on Home on shopping day, or from the Grocery list row on Tools. One list, three doors — not three lists.
@@ -2205,6 +2205,7 @@ HOLD THE THREAD (across turns AND across days):
 - Do this when it's naturally relevant, not as a checklist every turn. Once something is resolved, stop asking.
 ${context.recent_prs_summary ? `RECENT PRs: ${context.recent_prs_summary}` : ''}
 ${context.weight_trend_summary ? `WEIGHT TREND: ${context.weight_trend_summary}` : ''}
+${context.weight_change_since_start ? `WEIGHT SINCE THEY STARTED: ${context.weight_change_since_start}. This is the number Home shows; for anything about how much they have lost or gained overall, say exactly this one. The trend above is a rate per week, never a total.` : ''}
 ${context.streak_days != null ? `CURRENT STREAK: ${context.streak_days} day(s)` : ''}
 ${context.adherence_note ? `WORTH NOTICING: ${context.adherence_note}` : ''}
 - Follow-up: if WHAT YOU ALREADY KNOW, ACTIVE GOALS, or HOW TO TALK TO THIS USER below mentions something recent — a niggle, a plan, a stated goal, a stressor — and it's still live, ask how it's going rather than waiting for them to bring it up again. Don't force it into every message; raise it when it's naturally relevant to the turn.
@@ -2741,6 +2742,11 @@ ${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string'
 WHAT THEY LOGGED AS EATEN — totals from their meal log, today first. Logged, not eaten-in-fact: "nothing logged" means nothing was logged. This is the only record of a past day anywhere in the app; no screen shows it.
 ${context.eaten_by_day}` : context.eaten_by_day_read === false ? `
 WHAT THEY LOGGED AS EATEN — could not be read this turn. Say you can't see their log right now; never guess a figure.` : ''}
+${context.week_review_read === true && typeof context.week_review === 'string' ? `
+THEIR WEEK, AS THE APP COUNTS IT — this week and last, Monday to Sunday, one line per day, exactly what the Exercise tab and Home show ("done", "missed", "rest day"...), with the meals logged that day. A WEEK IS MONDAY TO SUNDAY in everything you say (Ashley's ruling, 15 Oct 2026); "Week N of 16" is only where they are in the plan.
+WHEN THEY ASK HOW THEIR WEEK WENT, OR YOU REVIEW A WEEK, READ IT FROM THESE LINES AND NOTHING ELSE. A day is trained only if it says done or started; never work out training from the workout history further down (it has warm-ups and no weekdays), and never say they logged no meals when a line here shows a logged entry. Say it like a text, not a report: three short lines at most — what got done (the count as shown here), the one thing that stood out, and the one thing to do next — then at most one question. No headers, no bullet list, no paragraph per day.
+${context.week_review}` : context.week_review_read === false ? `
+THEIR WEEK — could not be read this turn. If they ask how their week went, say you can't see it right now; never assemble one from the workout history.` : ''}
 ${buildDietarySafetyBlock(context.dietary_preferences || [])}
 ${ALLERGEN_HONESTY_BLOCK}
 
@@ -3953,6 +3959,17 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // soften it into a number, and it defended the last wrong one.
         const doubt = doubtAboutLoggedMeal(computed, args.meal_slot);
         if (!asked) {
+          // A FOOD THAT CANNOT BE COUNTED IS ASKED ABOUT FIRST (run 7, M51): never a card whose total quietly
+          // leaves it out. The same sentence the client refuses with (meal-log-proposal.ts), so the two agree.
+          const notCounted = computed.unmatched.map((u: string) => String(u).trim()).filter(Boolean);
+          if (notCounted.length > 0) {
+            const one = notCounted.length === 1;
+            const list = one ? `**${notCounted[0]}**` : `${notCounted.slice(0, -1).map((u: string) => `**${u}**`).join(", ")} and **${notCounted[notCounted.length - 1]}**`;
+            return new Response(
+              JSON.stringify({ reply: `I couldn't count ${list} in **${args.food_name}**, so I haven't put a total on it yet. How much ${one ? "was it" : "were they"} (grams, or slices, cups and so on)? Or shall I leave ${one ? "it" : "them"} out?` }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
           if (doubt) {
             return new Response(
               JSON.stringify({ reply: doubt }),

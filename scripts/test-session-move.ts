@@ -286,14 +286,16 @@ check('...with its own status, ahead of rest',
   home.indexOf("status: 'moved'") >= 0 && home.indexOf("status: 'moved'") < home.indexOf("status: 'rest'"))
 
 const homeUi = strip(src('src/components/Dashboard.tsx'))
-const movedUiAt = homeUi.indexOf("data.session.status === 'moved'")
-const restUiAt = homeUi.indexOf("data.session.status === 'rest' ?")
+// RE-ANCHORED 17 Oct 2026 (one-page Home): the session is a row, its states an if-chain in SessionRow.
+const movedUiAt = homeUi.indexOf("status === 'moved' && data.session.movedTo")
+const restUiAt = homeUi.indexOf("else if (status === 'rest')")
 check('Home has a moved branch, ahead of the rest-day one',
   movedUiAt >= 0 && restUiAt > movedUiAt, { movedUiAt, restUiAt })
 const movedUi = homeUi.slice(Math.max(0, movedUiAt), Math.max(0, restUiAt))
-check('...that says where the session went', /Moved to \{data\.session\.movedTo\.dayName\}/.test(movedUi))
+check('...that says where the session went', /Moved to \$\{data\.session\.movedTo\.dayName\}/.test(movedUi))
 check('...and names what left', /data\.session\.focus/.test(movedUi))
-check('...and offers nothing to start', movedUi.length > 0 && !/Start session|Continue session/.test(movedUi))
+check('...and offers nothing to start', movedUi.length > 0 && !/Start session|Continue session/.test(movedUi)
+  && /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(homeUi))
 check('...and the old "still here if you want it today" is gone from Home too',
   !/still here if you want it today/.test(homeUi))
 

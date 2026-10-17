@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Heart, ChevronRight, ArrowRight, Footprints, Bike, Waves, Dumbbell, CalendarDays } from 'lucide-react'
@@ -6,7 +7,7 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES } from '@/lib/cardio-log-store'
 import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
-const AddCardioSession = lazy(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
+const AddCardioSession = lazyWithReload(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
 import type { WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
