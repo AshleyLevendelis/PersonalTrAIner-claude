@@ -30,7 +30,14 @@ Newest first. One line each.
   formula shows). Re-anchored to the new layout, each mutation-tested: `chat-app-reality`, `tab-ownership`,
   `app-tour`, `hero-surface`, `plan-unknown`, `session-move`, `session-shortfall`, `one-today`,
   `exercise-today`, `nutrition-layout`, `layout-revamp`, and the drivers `cardio-shows`, `what-a-pr-is`, `session-start`,
-  `finish-check`, `session-move`, `swapped-day`, `layoff`, `modal-close`. NOT PROVEN: App.tsx's own wiring of
+  `finish-check`, `session-move`, `swapped-day`, `layoff`, `modal-close`, `rest-day-race`, `meal-days`,
+  `dialog-shift`, `history-streak` 1b (the pill says "N in a row", a screen reader hears "N sessions in a row"),
+  and `test:day-as-shown`. SWEEP: all 399 checks on the first build (not the plan-quality grid or the audit: no
+  plan code changed), 372 passed; every one of the 27 that failed was re-run on the final tree and passes,
+  except `coach-exam-fresh` (stale before this work too: the coach exam needs a re-run on her machine) and the
+  two calendar checks of `verify:history-streak` (open item below, fails on `main` too). `verify:drop-sets`
+  failed once in the sweep with an unattributed "Uncaught (in promise)" and passed on both re-runs on a settled
+  tree; noted, not explained. NOT PROVEN: App.tsx's own wiring of
   Home's meals (no harness page boots it; the harness passes them the way App does). Frontend, plus the
   chat-gemini deploy for the coach's app map; the coach exam is stale (it was before this too).
 - [x] **A running timer keeps the phone screen awake (17 Oct 2026, her "build it").** She reported the screen

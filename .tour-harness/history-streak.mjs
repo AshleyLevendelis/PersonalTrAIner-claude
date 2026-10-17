@@ -70,7 +70,11 @@ check('0. eight rows are in the sessions table: four workouts and four day notes
 console.log('\n  1. HOME — the streak')
 const s1 = await streak()
 check('1a. FOUR: Monday, the two sessions done on the days they were moved to, the first Monday', /^4 /.test(s1 ?? ''), s1)
-check('1b. ...called what it counts: "sessions in a row", not "days streak"', s1 === '4 sessions in a row', s1)
+// HER 17 OCT RULING, "12 in a row": the pill shows the number and "in a row" (never "days"), and says the
+// whole thing, "N sessions in a row", to a screen reader. The number itself is 1a's to check.
+const s1Label = await ev(`${q('[data-testid="home-streak"]')}?.getAttribute('aria-label') ?? null`)
+check('1b. ...called what it counts: "in a row" on the pill, "sessions in a row" spoken, never "days"',
+  /^\d+ in a row$/.test(s1 ?? '') && s1Label === `${(s1 ?? '').split(' ')[0]} ${(s1 ?? '').startsWith('1 ') ? 'session' : 'sessions'} in a row` && !/day/i.test(s1 ?? ''), { s1, s1Label })
 const pill = await ev(`(() => { const n = ${q('[data-testid="home-streak"]')}; const r = n.getBoundingClientRect(); return { right: Math.round(r.right), vw: innerWidth, h: Math.round(r.height), wraps: n.scrollWidth > n.clientWidth + 1 } })()`)
 check('1c. the pill fits beside the greeting', !!pill && pill.right <= pill.vw && !pill.wraps && pill.h < 40, pill)
 await shoot('history-streak-home')
