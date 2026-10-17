@@ -24,12 +24,12 @@ Newest first. One line each.
   Home's next-meal row reads the same day-as-shown sizes as Nutrition (one helper, `eatenMacrosBySlot`), proved
   by a logged-over breakfast: both say 374 kcal where the stored dish is 456; the harness had been giving Home
   different targets from Nutrition, which the app never does, and now matches App.
-  CHECKS: `test:one-page` (53 checks; 31 mutations, all caught, two only after cases were added where they
-  bind: the last week of a block, and a deload in a LATER block), `verify:one-page` (26 checks at 390px; 15
+  CHECKS: `test:one-page` (53 checks; 25 mutations, all caught, two only after cases were added where they
+  bind: the last week of a block, and a deload in a LATER block), `verify:one-page` (26 checks at 390px; 14
   mutations, all caught, one only after the calorie-bar check moved to a day with food eaten, where a wrong
   formula shows). Re-anchored to the new layout, each mutation-tested: `chat-app-reality`, `tab-ownership`,
   `app-tour`, `hero-surface`, `plan-unknown`, `session-move`, `session-shortfall`, `one-today`,
-  `exercise-today`, `nutrition-layout`, and the drivers `cardio-shows`, `what-a-pr-is`, `session-start`,
+  `exercise-today`, `nutrition-layout`, `layout-revamp`, and the drivers `cardio-shows`, `what-a-pr-is`, `session-start`,
   `finish-check`, `session-move`, `swapped-day`, `layoff`, `modal-close`. NOT PROVEN: App.tsx's own wiring of
   Home's meals (no harness page boots it; the harness passes them the way App does). Frontend, plus the
   chat-gemini deploy for the coach's app map; the coach exam is stale (it was before this too).

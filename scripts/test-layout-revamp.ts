@@ -85,10 +85,14 @@ console.log('\n2. Home\'s week volume')
 console.log('\n3. Home\'s finished day')
 {
   const dash = code('src/components/Dashboard.tsx')
-  const doneAt = dash.indexOf('data-home-hero="done"')
-  const done = doneAt >= 0 ? dash.slice(doneAt, doneAt + 4000) : ''
-  check('the Done panel keeps the lift line (L9: what she lifted, today)', /\{sessionGlance && <p [^>]*data-testid="home-session-glance">\{sessionGlance\}/.test(done))
-  check('...and offers the summary only when there is one', /\{card && \(/.test(done) && /data-home-summary/.test(done))
+  // RE-ANCHORED 17 Oct 2026 (one-page Home, 5c·5): the session is a row; its done branch keeps the lift
+  // line and the summary, which is offered only when the finish card exists.
+  const doneAt = dash.indexOf('} else if (done) {')
+  // Up to the next branch, so the not-yet-done branch's own glance line cannot answer for it.
+  const done = doneAt >= 0 ? dash.slice(doneAt, dash.indexOf('} else {', doneAt + 1)) : ''
+  check('the Done panel keeps the lift line (L9: what she lifted, today)', /<span data-testid="home-session-glance">\{sessionGlance\}<\/span>/.test(done))
+  check('...and offers the summary only when there is one',
+    /onSummary=\{card \? \(\) => setSummaryOpen\(true\) : undefined\}/.test(dash) && /\{done && onSummary \? \([\s\S]{0,200}data-home-summary/.test(dash))
   const store = new Map<string, string>()
   ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
     getItem: k => store.get(k) ?? null, setItem: (k, v) => { store.set(k, String(v)) }, removeItem: k => { store.delete(k) },
