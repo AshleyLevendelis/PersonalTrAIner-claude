@@ -88,8 +88,11 @@ export interface BuildMealSwapInput {
  * BOTH channels have to be re-checked, because a restriction can arrive down
  * either and they do not overlap:
  *   - a stated dislike lands in the dislike list;
- *   - an ALLERGY disclosed in chat is tagged into dietary_preferences by
+ *   - an ALLERGY recorded at SETUP is tagged into dietary_preferences by
  *     detectAllergenTags and never appears in the dislike list at all.
+ *     (CORRECTED 18 Oct 2026: this said "disclosed in chat". detectAllergenTags
+ *     runs only in setup; an allergy told to the coach later reaches memory,
+ *     not the diet filter. Named in docs/plans/runs-7-10-batch-1-safety.md.)
  * Checking only dislikes would have left the allergen half of this hole open,
  * which is the half that can hurt someone.
  *
@@ -147,7 +150,15 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
   // over a restriction, though: naming a meal is not consent to be served
   // something they have told us they cannot eat, and saying why is more use
   // than silently rotating past it.
-  const requested = input.rawArgs.new_item ? byName(options, input.rawArgs.new_item) : undefined
+  const named = typeof input.rawArgs.new_item === 'string' ? input.rawArgs.new_item.trim() : ''
+  const requested = named ? byName(options, named) : undefined
+  // A NAMED DISH THAT IS NOT ONE OF HER OPTIONS IS NEVER SWAPPED FOR SOMETHING ELSE (runs 7-10, H41). This fell
+  // through to the rotation below, so "swap my snack for almond butter on toast" became a protein-shake card with
+  // nothing said. Asked for X, she is told X is not one of her options and offered the way to add it; the add path
+  // checks it against her restrictions and targets before any card exists.
+  if (named && !requested) {
+    return { ok: false, reason: `${named} isn't one of your saved ${slot} options. Want me to add it as a new ${slot}? I'll check it against your targets and what you can't eat first.` }
+  }
   if (requested) {
     const clash = optionBlockedBy(requested, disliked, prefs)
     if (clash) {

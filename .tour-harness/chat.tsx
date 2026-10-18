@@ -103,6 +103,10 @@ const iso = (offsetDays: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// ?diet=nut-free (comma-separated): the person's dietary restrictions, for verify:named-food-clash (runs 7-10, H41).
+// INPUT only: what the profile says she cannot eat; what the app does with it is the app's.
+const DIET = (new URLSearchParams(location.search).get('diet') ?? '').split(',').map(s => s.trim()).filter(Boolean)
+
 const profile: UserProfile = {
   id: PROFILE_ID,
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
@@ -111,7 +115,7 @@ const profile: UserProfile = {
   training_experience: 'intermediate', session_duration_preference: '45-60',
   workout_split_preference: 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
-  weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [],
+  weekly_schedule: {}, dietary_preferences: DIET, concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
   created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),

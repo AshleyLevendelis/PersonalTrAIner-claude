@@ -61,6 +61,7 @@ import type { KitController } from '@/lib/kit-change'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
+import { namedFoodClash, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
 import { detectFoodExclusions, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
@@ -460,6 +461,9 @@ const REBUILD_CARD_KINDS = new Set(['propose_schedule_change', 'propose_session_
  * to give, as if the plan had changed under her).
  */
 const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — it may have changed since you last looked."
+
+/** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
+const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
 export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
@@ -5134,7 +5138,27 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * rendered as if the write had already happened) — enforced here, not by
    * asking the model to behave, so no prompt-text discipline can regress it.
    */
-  const processResponse = async (result: ChatApiResponse, userSaid = ''): Promise<{
+  /**
+   * A FOOD SHE NAMES THAT HER RESTRICTIONS KEEP OUT (runs 7-10, H41; her 18 Oct rulings "Say 'nut-free'" and "Refuse
+   * and say if they dont have an allergy they should go to the settings"). Read off HER message, not the model's
+   * choice. No card that would put the food on her plate is built (swap, addition, custom meal, a food added to or put
+   * into a meal). On an allergen filter the reply IS the app's refusal, whatever the model said: the model's words are
+   * dropped on that turn, because "I can add it as a custom dish" after the refusal argues with it (what Sam saw). A
+   * log of something already eaten is a record, so its card stays, under the refusal. A diet or the avoid list
+   * refuses a card and leaves prose alone. docs/plans/runs-7-10-batch-1-safety.md.
+   */
+  const processResponse = async (result: ChatApiResponse, userSaid = ''): ReturnType<typeof processResponseInner> => {
+    const clash = namedFoodClash(userSaid, profile.dietary_preferences ?? [], [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
+    if (!clash) return processResponseInner(result, userSaid)
+    const refusal = allergyRefusal(clash) ?? clashSentence(clash)
+    if (result.proposal && FOOD_OFFER_KINDS.has(result.proposal.kind)) {
+      return { text: refusal, outcome: 'refused' }
+    }
+    const inner = await processResponseInner(result, userSaid)
+    return clash.allergen ? { ...inner, text: refusal } : inner
+  }
+
+  const processResponseInner = async (result: ChatApiResponse, userSaid = ''): Promise<{
     text: string
     action?: PlanAction
     pendingAction?: ChatPendingActionView

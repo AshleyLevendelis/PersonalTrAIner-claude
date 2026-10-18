@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **H41 (runs 7-10, 18 Oct 2026): a food his profile keeps out is refused, never carded, never offered.** Sam
+  (tree-nut allergy, stored as nut-free) asked to swap his snack for almond butter on toast and got a protein-shake
+  swap card with nothing said; asked why not, the coach offered it "as a custom dish". TRACED: nothing read the food
+  the person NAMED (every guard checks meals the app picks); the swap builder rotated past a named dish it could not
+  find instead of saying so; the prompt told the coach the app "will refuse it if it clashes". BUILT: one pure check
+  (`named-food-clash.ts`) reads the message through the food database's own tags, the allergen word list and the
+  avoid list's own matcher ("pork" catches bacon; "no nuts", "nut-free", "allergic to" are not asks; "why not the
+  almond butter?" is); ChatAssistant runs it on every reply: no swap/addition/custom/food-add card for a clash, and
+  on an ALLERGEN filter the reply IS the app's refusal, the coach's words dropped on that turn. The swap builder
+  refuses an unknown dish in plain words. Prompt told the same, plus L59's plain words.
+  HER TWO RULINGS: **"Say 'nut-free'"** (from three: over an allergy mark, a migration, and over "you're allergic"
+  for every nut-free profile) — *"Almond butter has tree nuts in it, and your profile says nut-free, so I won't
+  suggest it or add it to your meals."*; and, asked because the coach's words after it could still offer to add it,
+  *"Refuse and say if they dont have an allergy they should go to the settings and update the allergy"* → "...If you
+  don't have a nut allergy, change it on Profile, under Food, Diet." A diet or the avoid list is not an allergy: a
+  card is refused with the sentence, prose is left alone (mine, from her "allergy" wording). `test:named-food-clash`
+  (41 checks; 17 mutations on the check and the sentence, all caught after two binding cases were added and one dead
+  clause deleted), `verify:named-food-clash` (21 checks; 7 mutations on the chat wiring, all caught — two only after
+  the driver gained a fixture where a card CAN be drawn and a vegetarian case). NOT PROVEN: whether the deployed
+  coach obeys its new line (the exam's), and an allergy said to the coach AFTER setup goes to memory, not the diet
+  filter (named, not built). Needs the `chat-gemini` deploy for the prompt half; the enforced half is frontend.
+  `docs/plans/runs-7-10-batch-1-safety.md`.
 - [x] **Home, Nutrition and Exercise are one page each (17 Oct 2026, design 5c·5 / 5c·6 / 5c·4, her "Build this
   one").** Layout only; every control kept, moved or one tap deeper. `docs/plans/one-page-tabs.md`.
   HER THREE RULINGS that day, each from options: **"Keep it on top"** (Nutrition's day strip stays, as a row
