@@ -64,6 +64,7 @@ import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { namedFoodClash, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
 import { detectFoodExclusions, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
+import { swapNameFallback } from '@/lib/swap-name-fallback'
 import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { planDaysInWindow, describeDateSpan, dayAndMonth, shortDate, type PlanDayOnDate } from '@/lib/plan-guard'
@@ -2300,13 +2301,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // it arrives.
     const newResolved = resolveExerciseName(newItem, day.exercises.map(e => e.name))
     const newEntry = newResolved.resolution === 'resolved' ? getExerciseEntry(newResolved.exerciseName) : undefined
+    // A name the catalogue does not have is ANSWERED (runs 7-10, H33): the nearest names and the alternatives his
+    // kit and injuries allow, each a tap, and a tap to change the kit. Never "try another name".
     if (!newEntry) {
-      return {
-        ok: false,
-        reason: newResolved.resolution === 'ambiguous'
-          ? `Did you mean ${newResolved.candidates.slice(0, 3).map(c => c.name).join(', ')}?`
-          : `I don't have "${newItem}" in the exercise library — try another name for it.`,
-      }
+      return { ok: false, reason: swapNameFallback({ typed: newItem, oldExercise: oldEx.name, resolution: newResolved, profile: poolProfile, exclusions: exerciseExclusions }).text }
     }
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'

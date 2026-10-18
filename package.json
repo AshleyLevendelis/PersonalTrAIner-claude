@@ -439,6 +439,7 @@
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
     "test:layout-revamp": "tsx scripts/test-layout-revamp.ts",
     "test:one-page": "tsx scripts/test-one-page.ts",
+    "test:swap-name-fallback": "tsx scripts/test-swap-name-fallback.ts",
     "test:named-food-clash": "tsx scripts/test-named-food-clash.ts",
     "verify:one-page": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-page.mjs",
     "test:exercise-layout": "tsx scripts/test-exercise-layout.ts",
@@ -454,6 +455,7 @@
     "verify:meal-costed": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-costed.mjs",
     "test:meal-method-check": "tsx scripts/test-meal-method-check.ts",
     "test:food-exclusions": "tsx scripts/test-food-exclusions.ts",
+    "verify:swap-unknown-name": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/swap-unknown-name.mjs",
     "verify:named-food-clash": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/named-food-clash.mjs",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs"
   },

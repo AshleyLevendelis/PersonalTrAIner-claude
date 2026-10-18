@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **H33 (runs 7-10, 18 Oct 2026): a swap to a name the app does not have is answered, never a dead end.** Sam
+  asked to swap to "Dumbbell Step-Up" and the WHOLE reply was "I don't have 'Dumbbell Step-Up' in the exercise
+  library — try another name for it". TRACED: the catalogue calls it "Step-Ups"; the resolver's strict search misses
+  "dumbbell step-up" and the words search needs every word, so the client's refusal became the bubble. BUILT
+  (`swap-name-fallback.ts`, mine, no ruling needed: mechanical and inside her "never a dead end"): the implement word is
+  dropped to find the nearest catalogue name; one he CAN do is offered first (even a different movement: he asked
+  for it, and the swap card states the cost); a name he cannot have is said, with the true reason ("needs kit your
+  profile doesn't list", or injuries / exercises to avoid / experience); then the swap sheet's own shortlist for the
+  lift being swapped, on his kit and injuries; each a tap, plus "That's not the kit I have". A tap is sent back and
+  reaches a real card. FOUND ON THE WAY, by a screenshot: my first wording said "your kit or injuries rule it out"
+  of Step-Ups when the real reason was that it is a different movement; the reason is now read off the generator's
+  pool, and a lookalike he can do is never called ruled out. Sam's own symptom is pinned: on the minimalist guess a
+  kettlebell swing heads the Romanian deadlift list, on his kit it never appears. `test:swap-name-fallback` (29
+  checks, 9 mutations caught; a sanitiser for "]" and "|" was deleted after a MISSED mutation showed no catalogue
+  name holds them, now held over the whole catalogue instead), `verify:swap-unknown-name` (14 checks, 3 mutations
+  caught). 84 derived gates and `verify:swap-request`, `verify:coach-ban` green. Frontend only. NOT PROVEN: that the
+  live coach turns a tap into the right tool call (the driver's stub does; the exam's to grade).
+  NOTED, NOT FIXED (CSCS, for a later batch): on dumbbells and a bench only, the swap sheet offers Goblet Squats only
+  bodyweight squats (Air Squat, Box Squat, Tempo Air Squat) — no loaded squat alternative exists in his pool.
 - [x] **H41 (runs 7-10, 18 Oct 2026): a food his profile keeps out is refused, never carded, never offered.** Sam
   (tree-nut allergy, stored as nut-free) asked to swap his snack for almond butter on toast and got a protein-shake
   swap card with nothing said; asked why not, the coach offered it "as a custom dish". TRACED: nothing read the food
