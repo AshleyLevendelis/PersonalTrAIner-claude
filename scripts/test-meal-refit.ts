@@ -239,7 +239,9 @@ console.log('\n7b. A GOAL change is the wrong shape, not the wrong size — and 
   // A day built to fit fat loss, then asked to fit muscle growth.
   const bigger = {
     breakfast: [opt('breakfast', 'Porridge', [{ name: 'oats', quantity: 120, unit: 'g' }, { name: 'milk', quantity: 300, unit: 'ml' }])],
-    lunch: [opt('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 200, unit: 'g' }, { name: 'white rice', quantity: 200, unit: 'g' }])],
+    // RE-ANCHORED 18 Oct 2026 (M59): the day ran 18% under on fat, inside the old 25% band and outside the new 10%.
+    // A spoon of oil on the lunch makes it a day that genuinely fits fat loss again (INPUT only).
+    lunch: [opt('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 200, unit: 'g' }, { name: 'white rice', quantity: 200, unit: 'g' }, { name: 'olive oil', quantity: 10, unit: 'g' }])],
     dinner: [opt('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 180, unit: 'g' }, { name: 'potato', quantity: 300, unit: 'g' }])],
     snack: [opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 200, unit: 'g' }, { name: 'banana', quantity: 150, unit: 'g' }])],
   }

@@ -47,8 +47,8 @@ function macrosOf(ings: MealIngredientLine[]): MacroTargets {
 }
 
 /** One dish from real foods, sized the way verifyProposal accepts one, or null after enough tries. */
-export function makeDish(rnd: () => number, slot: MealSlotName, i: number, budget: MacroTargets): PoolOption | null {
-  for (let tries = 0; tries < 200; tries++) {
+export function makeDish(rnd: () => number, slot: MealSlotName, i: number, budget: MacroTargets, opts: { shape?: number } = {}): PoolOption | null {
+  for (let tries = 0; tries < (opts.shape != null ? 4000 : 200); tries++) {
     let ings = [line(rnd, pick(rnd, PROTEIN)), line(rnd, pick(rnd, CARB)), line(rnd, pick(rnd, FAT)), line(rnd, pick(rnd, VEG))]
     const first = macrosOf(ings)
     if (first.calories <= 0) continue
@@ -56,6 +56,10 @@ export function makeDish(rnd: () => number, slot: MealSlotName, i: number, budge
     const m = macrosOf(ings)
     if (Math.abs(m.calories - budget.calories) / budget.calories > CALORIE_TOLERANCE) continue
     if (m.protein < budget.protein) continue
+    // A SHAPED dish (18 Oct 2026, the 10% day bands): carbs and fat also within `shape` of the budget, so a fixture
+    // that needs dishes which FIT can have them. Without it a dish's carbs and fat are whatever the draw gave.
+    if (opts.shape != null && budget.carbs > 0 && budget.fat > 0
+      && (Math.abs(m.carbs - budget.carbs) / budget.carbs > opts.shape || Math.abs(m.fat - budget.fat) / budget.fat > opts.shape)) continue
     return { slot, name: `${slot}-${i}`, ingredients: ings, macros: m, tags: [] }
   }
   return null

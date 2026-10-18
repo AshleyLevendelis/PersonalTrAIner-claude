@@ -1,7 +1,7 @@
 import { serveMealWeek, pinsFromPicks, addDays, type ServedDay } from './meal-rotation'
 import { weekdayLong, dayLabel } from './day-labels'
 import { ask, DAY_MOVE } from './coach-voice'
-import { computeSlotBudgets, type PoolOption } from './meal-generation'
+import { computeSlotBudgets, namedMiss, type PoolOption } from './meal-generation'
 import { movedOptionFor } from './meal-move'
 import { tagsNewFrom } from './meal-new-from'
 import type { CurrentMealForSlot } from './meal-food-add'
@@ -316,7 +316,7 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   for (const d of newlyOff) {
     implications.push({
       severity: 'warn',
-      text: DAY_MOVE.offTarget(dayLabel(d.date, today), Math.round(d.day.totals.calories), Math.round(d.day.totals.calories - targets.calories)),
+      text: DAY_MOVE.offTarget(dayLabel(d.date, today), Math.round(d.day.totals.calories), Math.round(d.day.totals.calories - targets.calories), namedMiss(d.day.totals, targets) ?? undefined),
     })
   }
   if (afterA.day.withinTolerance && afterB.day.withinTolerance) {

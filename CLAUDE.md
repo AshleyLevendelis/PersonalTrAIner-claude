@@ -366,7 +366,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   writer asked only for the shortfall; every dish goes through the same
   `verifyProposal` for the person. **MEASURED, AND IT IS THE POINT: a dish the
   app ACCEPTS is not a dish it can SERVE.** Acceptance asks for the protein
-  floor; a day is on target at 0.95-1.15x. Raw dishes carried 1.2-2.1x a meal's
+  floor; a day is on target at 0.95-1.15x (0.95-1.10x since 18 Oct, M59). Raw dishes carried 1.2-2.1x a meal's
   protein, a top-up said "added 6" and the week showed none. So each dish is
   first re-portioned to the person's own meal (protein and carb foods only,
   within a cook's "same dish") and PROVED through the scaler, which took
@@ -1380,6 +1380,14 @@ menu" stays true when a copy is also left outside it.
   `test:chat-app-reality` (the coach's app map; needs the `chat-gemini` deploy)
 
 ### Her rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
+- **"On target" means every number inside its band, and the bands are tighter — her rulings 18 Oct 2026 (runs 7-10,
+  M59)**, "Tighter meals too" and then, with the measured cost in front of her, "Tighter meals, 10%": carbs and fat
+  ±10% (were ±25%), protein 0.95-1.10x (was 1.15x), calories ±5%; protein's floor kept at 0.95. Measured at 100%
+  pool: days on target 89% -> 52.5%, different days a week 4.45 -> 3.34. **Every on-target count and variety figure
+  in this file from before 18 Oct is NOT comparable.** A sentence about a day's miss names it through ONE function
+  (`namedMiss`): calories when they are off, else the macro furthest out. `test:day-verdict`, `test:meal-day-move`,
+  `test:meal-knock-on`
+  
 - **Kit in setup: "Show ticks once"** — her ruling 18 Oct 2026 (runs 7-10, H34), from three options, partly
   REVERSING the "no new setup question" below: every home equipment choice gets one setup screen of the nine kit
   ticks, pre-ticked with the choice's guess; what is left ticked is the first plan's kit. The swap and remove sheets'

@@ -127,6 +127,7 @@ async function main() {
   const { executeMealDayMove } = await import('../src/lib/pending-action-executor')
   const { setDevClockOverride } = await import('../src/lib/dev-clock')
   const { DAY_MOVE } = await import('../src/lib/coach-voice')
+  const { dayVerdict } = await import('../src/lib/meal-generation')
 
   console.log('meal day move — swapping a meal with another day\'s')
 
@@ -385,10 +386,29 @@ async function main() {
     const w = (oOff?.diff.implications ?? []).filter(i => i.severity === 'warn')
     check('a day already off target is not blamed on the move', !!oOff && w.length === 0, w)
     check('...and the card does not claim both days land on target', !!oOff && !(oOff.diff.implications ?? []).some(i => i.text === DAY_MOVE.stillOnTarget))
-    // And a swap that leaves both on target says so.
-    const ok = okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }))
+    // And a swap that leaves both on target says so. Its own dinners are one dish's shape at three sizes, because under
+    // the 10% bands (runs 7-10, M59) the main fixture's dinners differ in shape enough that a swap moves a day's protein
+    // out of its band, and that card rightly names the miss instead.
+    const evenPools = { ...pools, dinner: [dish('dinner', 'Tray bake', 170, 220, 14), dish('dinner', 'Rice pot', 166, 215, 14), dish('dinner', 'Baked chicken', 174, 225, 14)] } as typeof pools
+    const even = servingFor(shapeOff, { pools: evenPools, rotation: buildRotation(evenPools, targets, [], shapeOff) })
+    const evenWeek = serveMealWeek(even)
+    check('...the even fixture is a real swap: Monday and Tuesday serve different dinners before it', nameOf(evenWeek, 1, 'dinner') !== nameOf(evenWeek, 2, 'dinner') && !!nameOf(evenWeek, 1, 'dinner'),
+      [nameOf(evenWeek, 1, 'dinner'), nameOf(evenWeek, 2, 'dinner')])
+    const ok = okOf(build(even, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }))
     check('a swap that keeps both days on target says so, in the phrasebook\'s words',
       !!ok && (ok.diff.implications ?? []).some(i => i.text === DAY_MOVE.stillOnTarget), ok?.diff.implications)
+    // A DAY OFF ON A MACRO IS WARNED ABOUT BY THAT MACRO (runs 7-10, M59). The main
+    // fixture's Monday/Tuesday dinner swap lands Tuesday inside its calories and
+    // outside its protein band: the warning names protein, never "about N kcal under".
+    const macroOff = okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }))
+    const tue = macroOff?.after[2].day.totals
+    const tueVerdict = tue ? dayVerdict(tue, targets) : null
+    check('the fixture is under pressure: after that swap Tuesday is inside its calories and outside one macro band',
+      !!tueVerdict && !tueVerdict.onTarget && !tueVerdict.off.some(x => x.macro === 'calories'), tueVerdict)
+    const macroWarn = (macroOff?.diff.implications ?? []).find(i => i.severity === 'warn')?.text ?? ''
+    const worst = tueVerdict?.off[0]
+    check('...and its warning names that macro and how far, not a calorie gap',
+      !!worst && macroWarn.startsWith('Tuesday would come to ') && macroWarn.includes(`but ${worst.macro} ${Math.abs(Math.round(worst.delta))} g ${worst.delta > 0 ? 'over' : 'under'} your target.`) && !/about [\d,]+ (over|under)/.test(macroWarn), { macroWarn, worst })
   }
 
   // ---------------------------------------------------------------------------
@@ -628,6 +648,17 @@ async function main() {
       .map(sl => `${d.date}/${sl}`))
     check('no other meal on any day changes: the copies are invisible to every other day\'s search', afterWeek.length === 7 && moved.length === 0, moved)
     check('the two days serve the two copies', afterWeek[1]?.day.chosen.dinner?.name === a?.name && afterWeek[2]?.day.chosen.lunch?.name === b?.name)
+    // AND THE WEEK THE SCREEN SERVES AFTER THE TAP: the copies are then IN the
+    // pools (saved as options, held until the strip ends) and the two picks name
+    // them. That week must be the trial's, cell for cell, or the card described
+    // a different week from the one she gets (runs 7-10, M59, found by the driver).
+    const savedPools = { ...pools, dinner: [...pools.dinner, ...(a?.option ? [a.option] : [])], lunch: [...pools.lunch, ...(b?.option ? [b.option] : [])] } as typeof pools
+    const screenWeek = serveMealWeek({ ...serving, pools: savedPools, rotation: serving.rotation,
+      pinsByDate: { ...serving.pinsByDate, [dates[1]]: { dinner: a?.option }, [dates[2]]: { lunch: b?.option } } } as Parameters<typeof serveMealWeek>[0])
+    const differs = screenWeek.flatMap((d, i) => (['breakfast', 'lunch', 'dinner'] as Slot[])
+      .filter(sl => d.day.chosen[sl]?.name !== afterWeek[i]?.day.chosen[sl]?.name || Math.round(d.day.totals.calories) !== Math.round(afterWeek[i]?.day.totals.calories ?? -1))
+      .map(sl => `${d.date}/${sl}`))
+    check('the week served once the copies are saved is the week the card was read off', screenWeek.length === 7 && afterWeek.length === 7 && differs.length === 0, differs)
     check('scope: the key names both meals and both days, in an order that does not depend on which was asked first',
       (() => {
         const rev = build(serving, { meal_slot: 'lunch', from_date: dates[2], to_date: dates[1], to_slot: 'dinner' })

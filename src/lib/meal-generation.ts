@@ -1261,11 +1261,17 @@ export async function persistResizedPools(
 // every band, the closest combination ships as an honest miss
 // (withinTolerance: false) rather than silently accepting a wild overshoot.
 // ---------------------------------------------------------------------------
+// TIGHTENED 18 Oct 2026 (runs 7-10, M59), her ruling "Tighter meals too", from three options (over a tighter label
+// only, and over keeping them): days reading "on target" at 22% under on fat and 15% over on protein were inside the
+// old ±25% / 1.15x bands. Protein, carbs and fat are now within 10%; protein's floor stays at 0.95 (widening it to
+// 0.90 would loosen the one number a deficit must protect). Calories unchanged at ±5%. The day search, the label and
+// every reader of these bands move together. Shown the measured cost (days on target 89% -> 52.5%, different days a
+// week 4.45 -> 3.34), she confirmed it: "Tighter meals, 10%", over 15% and over going back.
 export const DAY_CALORIE_TOLERANCE = 0.05
 export const DAY_PROTEIN_LOWER_RATIO = 0.95
-export const DAY_PROTEIN_UPPER_RATIO = 1.15
-export const DAY_CARB_TOLERANCE = 0.25
-export const DAY_FAT_TOLERANCE = 0.25
+export const DAY_PROTEIN_UPPER_RATIO = 1.10
+export const DAY_CARB_TOLERANCE = 0.10
+export const DAY_FAT_TOLERANCE = 0.10
 /** @deprecated kept as an alias so any external reader of the old name still resolves — use DAY_PROTEIN_LOWER_RATIO. */
 export const DAY_PROTEIN_FLOOR_RATIO = DAY_PROTEIN_LOWER_RATIO
 
@@ -1381,6 +1387,17 @@ export function dayVerdict(totals: MacroTargets, targets: MacroTargets): DayVerd
 }
 
 /**
+ * The one miss a sentence names: calories when they are off, else the macro
+ * furthest outside its band; null on target. The Nutrition label and the day
+ * swap's warning both read it, so the two can never name different misses.
+ */
+export function namedMiss(totals: MacroTargets, targets: MacroTargets): { macro: DayMacro; delta: number } | null {
+  const verdict = dayVerdict(totals, targets)
+  if (verdict.onTarget) return null
+  return verdict.off.find(o => o.macro === 'calories') ?? verdict.off[0]
+}
+
+/**
  * The few words beside the day's calorie target on Nutrition: "on target", or
  * WHAT is off and by how much — "120 over", "protein 26 g over". Never "macros
  * off", which told nobody what to change.
@@ -1390,9 +1407,8 @@ export function dayVerdict(totals: MacroTargets, targets: MacroTargets): DayVerd
  * was. Otherwise the macro furthest outside its own band is named.
  */
 export function dayVerdictLabel(totals: MacroTargets, targets: MacroTargets): string {
-  const verdict = dayVerdict(totals, targets)
-  if (verdict.onTarget) return 'on target'
-  const named = verdict.off.find(o => o.macro === 'calories') ?? verdict.off[0]
+  const named = namedMiss(totals, targets)
+  if (!named) return 'on target'
   const amount = Math.abs(named.delta)
   const direction = named.delta > 0 ? 'over' : 'under'
   return named.macro === 'calories' ? `${amount} ${direction}` : `${named.macro} ${amount} g ${direction}`

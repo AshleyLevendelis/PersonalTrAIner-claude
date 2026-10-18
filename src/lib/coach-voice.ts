@@ -311,8 +311,14 @@ export const DAY_MOVE = {
   /** A card row's label: "Today's dinner", "Wednesday's dinner". */
   rowLabel: (day: string, slot: string) => `${cap(poss(day))} ${slot}`,
   stillOnTarget: 'Both days are re-fitted around the swap and still land on your target.',
-  offTarget: (day: string, kcal: number, offBy: number) =>
-    `${cap(day)} would come to ${grouped(kcal)} kcal, about ${grouped(Math.abs(offBy))} ${offBy > 0 ? 'over' : 'under'} your target.`,
+  /**
+   * NAMES WHAT IS OFF (runs 7-10, M59): calories when they are off; otherwise the macro furthest outside its band,
+   * so a day off on fat is never described as "about 12 under". `miss` is the engine's own verdict (dayVerdict).
+   */
+  offTarget: (day: string, kcal: number, offBy: number, miss?: { macro: string; delta: number }) =>
+    !miss || miss.macro === 'calories'
+      ? `${cap(day)} would come to ${grouped(kcal)} kcal, about ${grouped(Math.abs(offBy))} ${offBy > 0 ? 'over' : 'under'} your target.`
+      : `${cap(day)} would come to ${grouped(kcal)} kcal, but ${miss.macro} ${grouped(Math.abs(miss.delta))} g ${miss.delta > 0 ? 'over' : 'under'} your target.`,
   /** A meal OTHER than the two named that changes with the swap: a different dish. */
   alsoLeftover: (day: string, slot: string, to: string) =>
     `${cap(poss(day))} ${slot} becomes ${to}, the leftovers of the dinner the night before.`,

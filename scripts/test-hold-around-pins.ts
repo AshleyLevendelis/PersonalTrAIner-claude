@@ -53,7 +53,10 @@ const planned: AssembledDay = {
   alternatives: { breakfast: [porridge], lunch: [chickenRice], dinner: [salmon], snack: [yoghurt] },
 }
 // The swapped-in lunches, one a little bigger and one much bigger than planned.
-const tunaPasta = opt('lunch', 'Tuna pasta', [{ name: 'tuna', quantity: 140, unit: 'g' }, { name: 'pasta', quantity: 260, unit: 'g' }])
+// RE-ANCHORED 18 Oct 2026 (M59, the 10% bands): 260 g of pasta made a lunch carb-heavy enough that no single re-size of
+// the others could put carbs back within 10%, so the day could never land. This lunch has the plan's shape at a
+// different size, which is what a re-size can honestly fix (INPUT only: the dish, not the outcome).
+const tunaPasta = opt('lunch', 'Tuna pasta', [{ name: 'tuna', quantity: 140, unit: 'g' }, { name: 'pasta', quantity: 180, unit: 'g' }, { name: 'olive oil', quantity: 5, unit: 'g' }])
 const hugeLunch = opt('lunch', 'Big burrito bowl', [{ name: 'chicken breast', quantity: 300, unit: 'g' }, { name: 'white rice', quantity: 450, unit: 'g' }, { name: 'olive oil', quantity: 30, unit: 'g' }])
 
 console.log('\n0. The fixture is real food, and the swaps are what they say')

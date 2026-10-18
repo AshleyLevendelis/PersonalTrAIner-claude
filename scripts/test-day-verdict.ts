@@ -60,11 +60,14 @@ async function main() {
 
   console.log('\n1. The two readings from the test log now get the same answer\n')
   {
+    // RE-ANCHORED 18 Oct 2026 (M59, her "Tighter meals too"): protein's band is now 0.95-1.10x, so 181 g is past it.
+    // The property is unchanged: two readings either side of nothing get the same word.
     const at179 = say(T(1697, 179, 150, 49), SAM)
-    const at181 = say(T(1697, 181, 150, 49), SAM)
+    const at180 = say(T(1697, 180, 150, 49), SAM)
     check('179 g of protein against 164 g is on target', at179 === 'on target', at179)
-    check('...and so is 181 g: it was "macros off", two grams later', at181 === 'on target', at181)
-    check('...and the two say the same thing', at179 === at181, [at179, at181])
+    check('...and so is 180 g: one gram later is the same answer', at180 === 'on target', at180)
+    check('...and the two say the same thing', at179 === at180, [at179, at180])
+    check('...while 181 g is past the 10% band and says so', say(T(1697, 181, 150, 49), SAM) === 'protein 17 g over', say(T(1697, 181, 150, 49), SAM))
   }
 
   console.log('\n2. The header agrees with the engine about the day the engine serves\n')
@@ -72,11 +75,11 @@ async function main() {
     // One meal, one option: the engine has nothing to choose, so what it
     // reports is its verdict on exactly these numbers (after any resize it
     // makes to the dish, which is why the totals are read back from it).
-    const ratios = [0.7, 0.8, 0.94, 0.96, 1, 1.04, 1.06, 1.14, 1.16, 1.24, 1.26, 1.4]
+    const ratios = [0.7, 0.8, 0.94, 0.96, 1, 1.04, 1.06, 1.09, 1.11, 1.14, 1.24, 1.4]
     let cells = 0, engineOn = 0, engineOff = 0, disagree = 0
     const examples: unknown[] = []
     for (const targets of [SAM, T(2400, 150, 280, 75), T(3040, 190, 380, 85)]) {
-      for (const rc of ratios) for (const rp of ratios) for (const rcarb of [0.7, 0.76, 1, 1.24, 1.3]) for (const rf of [0.7, 0.76, 1, 1.24, 1.3]) {
+      for (const rc of ratios) for (const rp of ratios) for (const rcarb of [0.7, 0.92, 1, 1.08, 1.3]) for (const rf of [0.7, 0.92, 1, 1.08, 1.3]) {
         const macros = T(Math.round(targets.calories * rc), Math.round(targets.protein * rp), Math.round(targets.carbs * rcarb), Math.round(targets.fat * rf))
         const day = mg.assembleDay({ dinner: [{ slot: 'dinner', name: 'One dish', ingredients: [{ name: 'chicken breast', quantity: 100, unit: 'g' }], macros, tags: [] }] } as never, targets)
         cells++
@@ -91,18 +94,19 @@ async function main() {
 
   console.log('\n3. The bands are the ruling\'s own (written numbers, not the constants)\n')
   {
-    // Against 1,697 kcal / 164 g protein / 150 g carbs / 49 g fat:
+    // Against 1,697 kcal / 164 g protein / 150 g carbs / 49 g fat, her 18 Oct ruling "Tighter meals too" (M59):
     //   calories within 5%          -> 1,613 to 1,781
-    //   protein 5% under to 15% over -> 156 to 188
-    //   carbs within 25%             -> 113 to 187
-    //   fat within 25%               -> 37 to 61
+    //   protein 5% under to 10% over -> 156 to 180
+    //   carbs within 10%             -> 135 to 165
+    //   fat within 10%               -> 45 to 53
     const on = (t: MacroTargets) => say(t, SAM) === 'on target'
     check('calories: 1,613 and 1,781 are on target', on(T(1613, 164, 150, 49)) && on(T(1781, 164, 150, 49)))
     check('...1,611 and 1,783 are not', !on(T(1611, 164, 150, 49)) && !on(T(1783, 164, 150, 49)), [say(T(1611, 164, 150, 49), SAM), say(T(1783, 164, 150, 49), SAM)])
-    check('protein: 156 g and 188 g are on target', on(T(1697, 156, 150, 49)) && on(T(1697, 188, 150, 49)))
-    check('...155 g and 189 g are not — the band is lopsided on purpose, a little over is fine', !on(T(1697, 155, 150, 49)) && !on(T(1697, 189, 150, 49)), [say(T(1697, 155, 150, 49), SAM), say(T(1697, 189, 150, 49), SAM)])
-    check('carbs: 113 g and 187 g are on target, 112 g and 188 g are not', on(T(1697, 164, 113, 49)) && on(T(1697, 164, 187, 49)) && !on(T(1697, 164, 112, 49)) && !on(T(1697, 164, 188, 49)))
-    check('fat: 37 g and 61 g are on target, 36 g and 62 g are not — fat is looked at now', on(T(1697, 164, 150, 37)) && on(T(1697, 164, 150, 61)) && !on(T(1697, 164, 150, 36)) && !on(T(1697, 164, 150, 62)), [say(T(1697, 164, 150, 36), SAM), say(T(1697, 164, 150, 62), SAM)])
+    check('protein: 156 g and 180 g are on target', on(T(1697, 156, 150, 49)) && on(T(1697, 180, 150, 49)))
+    check('...155 g and 181 g are not — the band is lopsided on purpose, a little over is fine', !on(T(1697, 155, 150, 49)) && !on(T(1697, 181, 150, 49)), [say(T(1697, 155, 150, 49), SAM), say(T(1697, 181, 150, 49), SAM)])
+    check('carbs: 135 g and 165 g are on target, 134 g and 166 g are not', on(T(1697, 164, 135, 49)) && on(T(1697, 164, 165, 49)) && !on(T(1697, 164, 134, 49)) && !on(T(1697, 164, 166, 49)))
+    check('fat: 45 g and 53 g are on target, 44 g and 54 g are not — fat is looked at now', on(T(1697, 164, 150, 45)) && on(T(1697, 164, 150, 53)) && !on(T(1697, 164, 150, 44)) && !on(T(1697, 164, 150, 54)), [say(T(1697, 164, 150, 44), SAM), say(T(1697, 164, 150, 54), SAM)])
+    check("Sam's own days are no longer on target: fat 38 g against 49 g, and protein 186 g against 162 g", !on(T(1697, 164, 150, 38)) && say(T(1700, 186, 150, 49), T(1700, 162, 150, 49)) !== 'on target', [say(T(1697, 164, 150, 38), SAM), say(T(1700, 186, 150, 49), T(1700, 162, 150, 49))])
     check('a day with fat 40% out is not called on target (it could be, before)', !on(T(1697, 164, 150, 69)), say(T(1697, 164, 150, 69), SAM))
     check('no calorie target at all: nothing to be off', say(T(900, 80, 90, 30), T(0, 0, 0, 0)) === 'on target')
   }
@@ -124,18 +128,18 @@ async function main() {
     // Two macros off with calories fine: the one furthest outside its own band.
     // Protein 205 g is 25% over (10 points past its +15%); fat 62 g is 26.5%
     // over (1.5 points past its 25%). Protein is the worse miss.
-    check('protein and fat both off: the one further outside its band is named', say(T(1697, 205, 150, 62), SAM) === 'protein 41 g over', say(T(1697, 205, 150, 62), SAM))
+    check('protein and fat both off: the one further outside its band is named', say(T(1697, 205, 150, 58), SAM) === 'protein 41 g over', say(T(1697, 205, 150, 58), SAM))
     check('...whichever order they are in: carbs 30% under beats fat 26% over', say(T(1697, 164, 105, 62), SAM) === 'carbs 45 g under', say(T(1697, 164, 105, 62), SAM))
     // ...and when the worst is the LAST one looked at: protein a gram past its
     // band, fat 63% over. A label that named the first miss it found says protein.
-    check('...and it is the WORST that is named, not the first found: fat 63% over beats protein a gram out', say(T(1697, 189, 150, 80), SAM) === 'fat 31 g over', say(T(1697, 189, 150, 80), SAM))
+    check('...and it is the WORST that is named, not the first found: fat 63% over beats protein a gram out', say(T(1697, 181, 150, 80), SAM) === 'fat 31 g over', say(T(1697, 181, 150, 80), SAM))
     // The protein band is lopsided: 20% over is 5 points past it, 20% under is
     // 15 points past. Against carbs 35% over (10 points past):
-    check('...measured from the band\'s own edge: protein 20% over loses to carbs 35% over', say(T(1697, 197, 203, 49), SAM) === 'carbs 53 g over', say(T(1697, 197, 203, 49), SAM))
-    check('...and protein 20% UNDER beats the same carbs', say(T(1697, 131, 203, 49), SAM) === 'protein 33 g under', say(T(1697, 131, 203, 49), SAM))
+    check('...measured from the band\'s own edge: protein 20% over loses to carbs 23% over', say(T(1697, 197, 185, 49), SAM) === 'carbs 35 g over', say(T(1697, 197, 185, 49), SAM))
+    check('...and protein 20% UNDER beats the same carbs', say(T(1697, 131, 185, 49), SAM) === 'protein 33 g under', say(T(1697, 131, 185, 49), SAM))
     check('"macros off" is never said', ![T(1697, 190, 150, 49), T(1697, 164, 100, 49), T(1697, 205, 150, 62), T(1900, 200, 150, 49)].some(t => /macros off/i.test(say(t, SAM))))
-    const v = verdict ? verdict(T(1697, 205, 150, 62), SAM) : null
-    check('the verdict lists every macro that is off, worst first, with its signed difference', !!v && v.onTarget === false && v.off.map(o => o.macro).join() === 'protein,fat' && v.off[0].delta === 41 && v.off[1].delta === 13, v)
+    const v = verdict ? verdict(T(1697, 205, 150, 58), SAM) : null
+    check('the verdict lists every macro that is off, worst first, with its signed difference', !!v && v.onTarget === false && v.off.map(o => o.macro).join() === 'protein,fat' && v.off[0].delta === 41 && v.off[1].delta === 9, v)
     const vOn = verdict ? verdict(T(1697, 179, 150, 49), SAM) : null
     check('...and nothing when the day is on target', !!vOn && vOn.onTarget === true && vOn.off.length === 0, vOn)
   }

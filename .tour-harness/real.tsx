@@ -1317,6 +1317,18 @@ function Harness() {
   // ?stale=1: the pools as App restores them on load, through readPools, and
   // the same dishes on screen read back from that read. Flagged when done so a
   // driver reads the settled screen, never the moment before the read.
+  // ?daymove=1: the pools as App holds them from its first load, through the same
+  // read every later reload uses (readPools re-costs each stored meal from its
+  // lines). Starting from the in-memory dishes instead made the week before a swap
+  // and the week after it two different reads of the same meals, and under the 10%
+  // bands (runs 7-10, M59) that alone moved days nobody named. Input, not output.
+  useEffect(() => {
+    if (!DAYMOVE) return
+    void getPools(PROFILE_ID).then(fresh => {
+      setLivePools(fresh as never)
+      ;(window as unknown as { __poolsRead: boolean }).__poolsRead = true
+    })
+  }, [])
   useEffect(() => {
     if (!STALE) return
     void getPools(PROFILE_ID).then(fresh => {

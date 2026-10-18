@@ -68,6 +68,7 @@ async function main() {
   const { USER_REQUESTED_TAG } = await import('../src/lib/meal-store')
   const lib = await import('../src/lib/meal-knock-on').catch(() => null) as { knockOnOfPin?: (i: { serving: unknown; date: string; slot: Slot; option: Opt; listDates: string[] | null }) => KnockOn } | null
 
+  const { dayVerdict } = await import('../src/lib/meal-generation')
   console.log('meal knock-on — what else changes when a food is added to a meal')
 
   // Dishes whose stored macros ARE their ingredients', as every real option is.
@@ -187,9 +188,11 @@ async function main() {
     check('a different dish is named by the dish that will be served', !!dishChange && said.some(t => t.includes(dishChange.to) && /becomes/.test(t)), { dishChange, said })
     check('...and it really is a different dish from the one there now', !!dishChange && dishChange.from !== dishChange.to && dishChange.from !== null, dishChange)
     check('a meal on a day NOBODY NAMED changes too, and is named with its day', k.changes.some(c => c.date !== today) && k.changes.filter(c => c.date !== today).every(c => said.some(t => t.startsWith(`${dayLabel(c.date, today)[0].toUpperCase()}${dayLabel(c.date, today).slice(1)}'s ${c.slot}`))), { changes: k.changes, said })
-    // BOTH KINDS ON ONE CARD: a banana on Tuesday's breakfast moves Tuesday's
-    // lunch to a different dish and resizes Tuesday's dinner.
-    const mixedAdd = addFood(serving, dates[2], 'breakfast', ['100g banana'])
+    // BOTH KINDS ON ONE CARD: chicken added to Tuesday's breakfast moves one of
+    // Tuesday's meals to a different dish and resizes another. (A banana did this
+    // under the old 25% bands; under the 10% bands, runs 7-10 M59, it only
+    // resized, so the food was re-measured: the input changed, not the check.)
+    const mixedAdd = addFood(serving, dates[2], 'breakfast', ['100g chicken breast'])
     const mixed = mixedAdd.ok ? trial(serving, dates[2], 'breakfast', mixedAdd.payload.option) : { changes: [], lines: [] } as KnockOn
     const mixedReal = mixedAdd.ok ? reallyApply(serving, dates[2], 'breakfast', mixedAdd.payload.option) : { diff: [] as string[] }
     check('a second case holds both kinds at once: a different dish AND the same dish at a different size', mixed.changes.some(c => c.kind === 'dish') && mixed.changes.some(c => c.kind === 'size'), mixed.changes)
@@ -283,6 +286,16 @@ async function main() {
     check('900 g of banana is accepted, and the day cannot absorb it', big.ok && day?.day.withinTolerance === false, big.ok ? { within: day?.day.withinTolerance } : big)
     const warn = bk.lines.filter(l => l.severity === 'warn').map(l => l.text)
     check('the card warns, with the day\'s total from the trial and how far over', !!day && warn.includes(DAY_MOVE.offTarget('today', Math.round(day.day.totals.calories), Math.round(day.day.totals.calories - targets.calories))), warn)
+    // A DAY OFF ON A MACRO, NOT ITS CALORIES (runs 7-10, M59): 15 g of olive oil
+    // on today's lunch keeps the day's calories inside 5% and puts its fat over
+    // the 10% band (measured). The warning names the fat, never a calorie gap.
+    const oil = addFood(serving, today, 'lunch', ['15g olive oil'])
+    const ok2 = oil.ok ? trial(serving, today, 'lunch', oil.payload.option) : { changes: [], lines: [] } as KnockOn
+    const oilDay = ok2.after?.find(d => d.date === today)
+    const oilV = oilDay ? dayVerdict(oilDay.day.totals, targets) : null
+    check('the fixture is under pressure: 15 g of oil puts today off on fat alone, calories inside', !!oilV && !oilV.onTarget && oilV.off[0]?.macro === 'fat' && !oilV.off.some(x => x.macro === 'calories'), oilV)
+    const oilWarn = ok2.lines.filter(l => l.severity === 'warn').map(l => l.text)
+    check('...and the card says fat, by how much, not "about N under"', !!oilV && oilWarn.length === 1 && oilWarn[0].includes(`but fat ${oilV.off[0].delta} g over your target.`) && !/about [\d,]+ (over|under)/.test(oilWarn[0]), oilWarn)
     check('the ordinary banana, which the day absorbs, carries no warning', !k.lines.some(l => l.severity === 'warn') && k.after?.find(d => d.date === today)?.day.withinTolerance === true, k.lines.filter(l => l.severity === 'warn'))
   }
 

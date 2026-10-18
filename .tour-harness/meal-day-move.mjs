@@ -68,7 +68,8 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 let load = 0
 const open = async () => {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&daymove=1&load=${++load}#/tab/nutrition` })
-  for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-testid="meal-day-strip"]')`)) break; await wait(200) }
+  // The page re-reads the meals the way App does on load; read nothing before that has landed.
+  for (let i = 0; i < 60; i++) { if (await ev(`window.__poolsRead === true && !!document.querySelector('[data-testid="meal-day-strip"]')`)) break; await wait(200) }
   await wait(700)
 }
 await open()

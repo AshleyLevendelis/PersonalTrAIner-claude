@@ -31,7 +31,7 @@ import { dayLabel } from './day-labels'
 import { DAY_MOVE, KNOCK_ON } from './coach-voice'
 import { isNoticeableResize, type MealDayMoveServing } from './meal-day-move'
 import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
-import type { PoolOption } from './meal-generation'
+import { namedMiss, type PoolOption } from './meal-generation'
 import type { ProposalDiff } from './pending-actions-store'
 
 const SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -130,7 +130,7 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
   for (const served of after) {
     const was = before.find(b => b.date === served.date)
     if (was?.day.withinTolerance && !served.day.withinTolerance) {
-      lines.push({ severity: 'warn', text: DAY_MOVE.offTarget(dayLabel(served.date, today), Math.round(served.day.totals.calories), Math.round(served.day.totals.calories - targets.calories)) })
+      lines.push({ severity: 'warn', text: DAY_MOVE.offTarget(dayLabel(served.date, today), Math.round(served.day.totals.calories), Math.round(served.day.totals.calories - targets.calories), namedMiss(served.day.totals, targets) ?? undefined) })
     }
   }
 

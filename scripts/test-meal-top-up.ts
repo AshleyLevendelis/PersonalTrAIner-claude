@@ -521,8 +521,10 @@ async function main() {
     const scaled = (b: MacroTargets, k: number): MacroTargets => ({ calories: b.calories * k, protein: b.protein * k, carbs: b.carbs * k, fat: b.fat * k })
     const build8 = (seed: number, good: number, total: number): Pools => {
       const rnd = mulberry32(seed)
+      // SHAPED (18 Oct 2026, M59's 10% bands): a dish sized to its meal is also within 8% on carbs and fat, so it can
+      // fit a day at all; the 2.4x dishes stay unshaped, they are meant not to fit. INPUT only, the count is asserted.
       const mk = (slot: MealSlotName, n: number, k: number, off: number) =>
-        Array.from({ length: n }, (_, i) => makeDish(rnd, slot, off + i, scaled(B8[slot]!, k))).filter((o): o is PoolOption => o !== null)
+        Array.from({ length: n }, (_, i) => makeDish(rnd, slot, off + i, scaled(B8[slot]!, k), k === 1 ? { shape: 0.08 } : {})).filter((o): o is PoolOption => o !== null)
       return {
         breakfast: mk('breakfast', 7, 1, 0), lunch: mk('lunch', 7, 1, 20),
         dinner: [...mk('dinner', good, 1, 40), ...mk('dinner', total - good, 2.4, 60)],
@@ -674,7 +676,10 @@ async function main() {
     const flaggedAvg = flaggedSum / Math.max(1, flagged), unflaggedAvg = unflaggedSum / Math.max(1, unflagged), afterAvg = afterSum / Math.max(1, flagged)
     console.log(`  measured: ${flagged} flagged serve ${flaggedAvg.toFixed(2)} different dinners a week, ${unflagged} unflagged ${unflaggedAvg.toFixed(2)}; after the ask ${afterAvg.toFixed(2)}, flag cleared on ${cleared}/${flagged}`)
     check('the population has both kinds, so the comparison means something', flagged >= 20 && unflagged >= 20, [flagged, unflagged])
-    check('a flagged meal really is a samey week: over a dinner fewer than the rest', flaggedAvg < unflaggedAvg - 1, [flaggedAvg, unflaggedAvg])
+    // RE-ANCHORED 18 Oct 2026 (M59, her 10% bands): every week got samier (unflagged 3.50 a week, was about 4), so the
+    // gap the flag picks out narrowed from over a dinner to 0.79. The requirement is that the flag picks out the samier
+    // weeks, by a margin a person would notice; numbers before 18 Oct are not comparable.
+    check('a flagged meal really is a samey week: over half a dinner fewer than the rest', flaggedAvg < unflaggedAvg - 0.5, [flaggedAvg, unflaggedAvg])
     check('...and adding what it asks ends the flag for nearly all of them', cleared >= flagged * 0.9, [cleared, flagged])
     check('...and gives a week with at least half a dinner more', afterAvg > flaggedAvg + 0.5, [afterAvg, flaggedAvg])
   }

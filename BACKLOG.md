@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [~] **M59 (runs 7-10, 18 Oct 2026): "on target" only when every number is inside its band, tighter bands, and the
+  miss is named.** Sam's day read "On target" with fat 9 g and carbs 18 g away from target. TRACED: one shared rule
+  (`dayWithinTolerance`) decides "on target" for the label, the day search and every card, and its bands were
+  calories ±5%, protein 0.95-1.15x, carbs and fat ±25%; his days were genuinely inside those. The label was honest
+  about a loose rule. HER RULINGS, asked twice: **"Tighter meals too"** (from three: over tightening the words only
+  and over leaving it), then, after the measured cost, **"Tighter meals, 10%"** (from three: over 15% and over going
+  back). Carbs and fat are now ±10%, protein 0.95-1.10x, calories ±5% unchanged; protein's floor kept at 0.95. MEASURED
+  COST at 100% pool, 25% -> 10%: days on target 89.0% -> 52.5%, different days a week 4.45 -> 3.34, identical weeks
+  6% -> 19.5%, dishes a week 13.3 -> 10.8, next-day repeats 7.75 -> 9.89. **This changes what "on target" MEASURES:
+  every on-target count before 18 Oct is not comparable.** The label already named one miss ("fat 9 g over"); the
+  day swap's and the meal-add card's warning did not ("about 12 under" on a day off only on protein), so both now read
+  the same `namedMiss` the label reads: calories when they are off, else the macro furthest outside its band.
+  CSCS: population-level macro targets are mine; a tighter band holds the day closer to the protein and energy the
+  plan prescribes and costs variety, which she weighed. Protein's floor was not lowered, so no day passes with less
+  protein than before. Not clinical.
+  Re-anchored, not loosened (inputs only, each a measured fixture): `test:day-verdict` (edges at the new bands, 38
+  checks), `test:hold-around-pins`, `test:meal-refit`, `test:meal-top-up` (shaped extra dishes), `test:meal-day-move`
+  (the on-target swap has its own even dinners; new: a day off on protein is warned about by protein, 174 checks),
+  `test:meal-knock-on` (the both-kinds case is now 100 g chicken; new: 15 g oil warns by fat, 61 checks). The browser
+  page for the day swap now starts from the same pool read the app does on load: before, the week before a swap and
+  the week after it were two different reads of the same meals, and under the 10% bands that alone moved days nobody
+  named (`verify:meal-day-move` 76 checks green after; a logic check now serves the week WITH the saved copies and
+  holds it to the card's trial). Mutations: 6 band/miss mutations all caught by `test:day-verdict`, 3 on the warning
+  sentence, 2 on the day swap, 1 on the knock-on, all caught (the knock-on one only after the oil case was added).
+  STILL RED, BY DESIGN UNTIL H35: `test:meal-top-up` "gives a week with at least half a dinner more" (2.99 vs 2.71).
+  New dishes are not yet fitted to the meal's carbs and fat, so under 10% bands most of them do not fit; with shaped
+  extras it measures 4.10 and every flag clears. That is batch 3's variety work, not loosened here. Frontend only.
+  NOT PROVEN on her own plan (her meals are not readable from here).
 - [x] **M58 (runs 7-10, 18 Oct 2026): Nutrition prints ONE calorie target.** Sam saw 1,689 at the top and "1684 kcal ·
   TDEE 2105 −421" lower down. TRACED: the top is App's targets, worked out from the ANCHORED 7-day weight (it moves
   only when the average does); the "Targets & plan settings" row and the "how it's set" sheet re-derived the target
