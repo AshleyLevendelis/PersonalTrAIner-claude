@@ -66,6 +66,8 @@ const SAM_SO_FAR = {
   activityLevel: 'moderate', equipment: 'minimalist', injuries: [],
   trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '30-45',
   trainingStyle: 'functional', conditioningPreference: 'tolerate',
+  // His answer to the kit ticks (18 Oct 2026), shown once to every home trainer: dumbbells and a flat bench.
+  kitTicks: ['dumbbells', 'bench'],
 }
 
 if (state === 'h14') {
@@ -90,6 +92,22 @@ if (state === 'm2') {
       { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
       { role: 'user', content: 'Sam' },
       { role: 'assistant', content: 'Three days is plenty to work with. How long have you realistically got on those days?', slotCard: 'sessionDuration' },
+    ],
+    before,
+    Object.keys(before),
+  ))
+}
+
+if (state === 'kit') {
+  // THE KIT TICKS (runs 7-10, H34, 18 Oct 2026): Sam has just picked "no barbell or bench" and said nothing more
+  // about his kit; the app's own next question is the ticks. Equipment answered, the ticks not yet.
+  const { trainingDays: _a, sessionDuration: _b, trainingStyle: _c, conditioningPreference: _d, kitTicks: _e, ...before } = SAM_SO_FAR
+  void _a; void _b; void _c; void _d; void _e
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'Which of these do you have?', slotCard: 'kitTicks' },
     ],
     before,
     Object.keys(before),

@@ -84,7 +84,10 @@ import { useMealPlanActions } from '@/hooks/useMealPlanActions'
 import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { useServablePools } from '@/hooks/useServablePools'
 import { markRestrictionBreakers } from '@/lib/meal-restriction-check'
-import { compileFoodDislikes } from '@/lib/fact-compiler'
+import { compileFoodDislikes, compileKitStatements, kitFactsIn } from '@/lib/fact-compiler'
+import { makeKitController } from '@/lib/kit-change'
+import { profileWithKit } from '@/lib/kit-list'
+import { planDaysInWindow } from '@/lib/plan-guard'
 import type { UserFactRow } from '@/lib/memory-store'
 import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
 import { computeSlotBudgets } from '@/lib/meal-generation'
@@ -223,6 +226,11 @@ const MOBILITY = new URLSearchParams(location.search).get('mobility') === '1'
 // carried "not a bug, just a real gap". The plan is generated, never
 // hand-built: the driver asks the page which day holds what.
 const SAM = new URLSearchParams(location.search).get('sam') === '1'
+// ?kit=1 — THE KIT LIST ON THE EXERCISE TAB (runs 7-10, H34). The tab is handed the app's own kit controller
+// (kit-change.ts makeKitController) over this page's plan and fake database, and the SAVED profile is derived from
+// the remembered facts with the app's own functions — App's two lines, reproduced, nothing else. With ?sam=1 it is
+// Sam's own setup: the minimalist guess, nothing said about the kit.
+const KIT = new URLSearchParams(location.search).get('kit') === '1'
 // ?walker=1 — THE BEGINNER'S WALKING PLAN, the only plan the app generates
 // whose days hold a prescribed ACTIVITY instead of exercises.
 //
@@ -1476,6 +1484,25 @@ function Harness() {
   // The app was wired correctly and the harness could not show it. App.tsx
   // owns this state and hands setMesocycle down (App.tsx:2547); so does this.
   const [editedMeso, setEditedMeso] = useState(mesocycle)
+  const readKitFacts = () => ((db.user_facts ?? []) as unknown as UserFactRow[]).filter(f => f.status === 'active')
+  const [kitFacts, setKitFacts] = useState<UserFactRow[]>(readKitFacts)
+  const kitProfile = KIT ? profileWithKit(profile, compileKitStatements(kitFacts)) : profile
+  const kitController = KIT ? makeKitController({
+    profile: kitProfile, mesocycle: editedMeso, planCreatedAt: profile.created_at as string, exclusions: [],
+    onFile: kitFactsIn(kitFacts).map(k => ({ id: k.fact.id, statement: k.statement })),
+    onSaved: result => { setEditedMeso(result.mesocycle); setKitFacts(readKitFacts()) },
+  }) : null
+  useEffect(() => {
+    if (!KIT) return
+    const w = window as unknown as Record<string, unknown>
+    // What the save WROTE, and which exercises from today on need kit he said he lacks: read off the app's
+    // catalogue and calendar.
+    w.__kitRows = () => ((db.user_facts ?? []) as Record<string, unknown>[]).filter(f => f.kind === 'hard_constraint' && f.constraint_kind === 'equipment').map(f => ({ status: f.status, polarity: f.polarity, refs: f.resolved_refs, source: f.source }))
+    const ahead = new Set(planDaysInWindow(editedMeso, { planCreatedAt: profile.created_at as string, today: isoOf(anchorDate()), moves: [] }).map(r => `${r.weekNumber}|${r.dayName}`))
+    w.__needsFromToday = (eqs: string[]) => [...new Set(editedMeso.flatMap(wk => wk.days.filter(d => ahead.has(`${wk.week_number}|${d.day}`)).flatMap(d => d.exercises
+      .filter(e => { const x = EXERCISE_DATABASE.find(c => c.name === e.name); return !!x && (x.equipment_alternatives ? x.equipment.every(q => eqs.includes(q)) : x.equipment.some(q => eqs.includes(q))) })
+      .map(e => e.name))))]
+  })
   // When the plan is started again (the restart offer), the plan's birth moves to today, as
   // App's handler moves it. The plan itself comes from buildRestartedPlan, the function App
   // calls; only the saving is App's own (this page has no plan table to write to).
@@ -1605,7 +1632,8 @@ function Harness() {
         )}
         {activeTab === 'exercise' && (
           <ExerciseTab plan={planBornAt === profile.created_at ? exercisePlan : editedMeso[0]?.days ?? exercisePlan} mesocycle={editedMeso} exclusions={[]}
-            profile={profile} profileId={PROFILE_ID} planCreatedAt={planBornAt}
+            profile={kitProfile} profileId={PROFILE_ID} planCreatedAt={planBornAt}
+            storedProfile={KIT ? kitProfile : undefined} kitController={kitController}
             onRestartPlan={restartPlan}
             activeAdaptations={activeAdaptations}
             endingAdaptationId={endingAdaptationId}

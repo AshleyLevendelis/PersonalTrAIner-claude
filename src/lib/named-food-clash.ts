@@ -17,7 +17,7 @@ import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
 import { containsPhrase } from './meal-ingredients'
 
 /** The allergen filters: the restrictions whose clash opens the reply with her sentence (the allergen band). */
-export const ALLERGEN_RESTRICTIONS: DietaryPreference[] = [
+const ALLERGEN_RESTRICTIONS: DietaryPreference[] = [
   'nut-free', 'dairy-free', 'gluten-free', 'egg-free', 'soy-free', 'shellfish-free', 'fish-free',
   'celery-free', 'sesame-free', 'mustard-free', 'lupin-free', 'sulphite-free',
 ]

@@ -1,6 +1,6 @@
 import { OptionRow, OptionPill, OptionCell } from './OptionRow'
 import { Button } from '@/components/ui/button'
-import { getSlotDef, offeredOptionsFor, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
+import { getSlotDef, offeredOptionsFor, multiSelection, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 import { dietTargetCaveat } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,8 @@ export function SlotChipsCard({
   if (!def || !options || (def.control !== 'single' && def.control !== 'multi')) return null
 
   const current = values[def.key]
-  const selectedMulti: string[] = Array.isArray(current) ? (current as string[]) : []
+  // The kit ticks start pre-ticked (multiSelection); every other multi from its value.
+  const selectedMulti: string[] = multiSelection(def.key, values)
   const isSelected = (value: string | number) =>
     def.control === 'multi'
       ? selectedMulti.includes(String(value))

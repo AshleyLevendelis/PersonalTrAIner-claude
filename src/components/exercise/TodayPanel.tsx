@@ -129,6 +129,7 @@ export function TodayPanel({
   onOpenSessionHistory,
   onCalibrationSessionFinished,
   onRestartPlan,
+  kit,
 }: {
   plan: WorkoutDay[]
   mesocycle?: MesocycleWeek[]
@@ -173,6 +174,8 @@ export function TodayPanel({
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
   /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
   onRestartPlan?: () => Promise<string | null>
+  /** The kit, for good, from the remove sheet's "I haven't got the kit" (H34). */
+  kit?: import('./EditReasonStep').EditReasonKit
 }) {
   const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas, loadState, setsKnown } = useActiveSession()
 
@@ -1174,6 +1177,7 @@ export function TodayPanel({
         balanceCost={scope => (removeTarget ? removalBalanceCost(removeTarget.exIndex, scope) : { cost: null, balancing: null })}
         onReason={handleRemoveReason}
         onDislike={() => removeTarget && void onBanExercise(removeTarget.exerciseName)}
+        kit={kit}
       />
       </Suspense>
 

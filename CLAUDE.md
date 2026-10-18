@@ -1380,6 +1380,16 @@ menu" stays true when a copy is also left outside it.
   `test:chat-app-reality` (the coach's app map; needs the `chat-gemini` deploy)
 
 ### Her rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
+- **Kit in setup: "Show ticks once"** — her ruling 18 Oct 2026 (runs 7-10, H34), from three options, partly
+  REVERSING the "no new setup question" below: every home equipment choice gets one setup screen of the nine kit
+  ticks, pre-ticked with the choice's guess; what is left ticked is the first plan's kit. The swap and remove sheets'
+  "I haven't got the kit" also opens the same ticks, for good. `test:setup-kit-ticks`, `verify:setup-kit`,
+  `verify:kit-for-good`
+- **An allergen named to the coach is refused in her words** — her rulings 18 Oct 2026 (H41): "Say 'nut-free'" and
+  "Refuse and say if they dont have an allergy they should go to the settings": *"Almond butter has tree nuts in it,
+  and your profile says nut-free, so I won't suggest it or add it to your meals. If you don't have a nut allergy,
+  change it on Profile, under Food, Diet."* That turn's reply is the app's, never the coach's; no card puts it on the
+  plate. `test:named-food-clash`, `verify:named-food-clash`. Needs the `chat-gemini` deploy for the prompt half
 - **Kit: "Remember what they say."** Asked how someone should tell the app what kit they have
   (revisiting her 9 Sep "fix the words"), from options: keep the four equipment choices AND remember
   the specifics people say in setup or to the coach ("I've got dumbbells and a bench", "I don't own

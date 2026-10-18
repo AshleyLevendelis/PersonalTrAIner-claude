@@ -57,8 +57,11 @@ export function SwapDialog({
   onDislike,
   blockEndsOn,
   today,
+  kit,
 }: {
   target: SwapTarget | null
+  /** The kit, for good, from "I haven't got the kit" (H34): the saved profile and the one kit controller. */
+  kit?: import('./EditReasonStep').EditReasonKit
   onClose: () => void
   profile?: UserProfile
   exclusions: string[]
@@ -223,6 +226,7 @@ export function SwapDialog({
               // under the reasons, and under whatever was tapped next.
               onStepChange={() => setReasonError(null)}
               currentEquipment={profile?.equipment_access}
+              kit={kit}
             />
             {/* "NOTHING TO CHANGE" IS NOT AN ERROR. onReason hands back one
                 string for both a failure and a deliberate no-op, and drawing

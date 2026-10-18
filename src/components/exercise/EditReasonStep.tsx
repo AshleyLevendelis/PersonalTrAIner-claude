@@ -32,9 +32,13 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   reasonsFor, HURT_KINDS, RED_FLAG_ADVICE,
+  EQUIPMENT_SWITCH_DAYS,
   type EditReason, type ReasonedEditKind, type HurtKind,
 } from '@/lib/edit-reason'
 import { INJURY_OPTIONS, EQUIPMENT_OPTIONS } from '@/lib/picker-options'
+import { KitTicks } from '@/components/KitTicks'
+import type { KitController } from '@/lib/kit-change'
+import type { UserProfile } from '@/lib/types'
 
 export type ReasonAnswer =
   | { type: 'reason'; reason: Exclude<EditReason, 'hurts'> }
@@ -44,6 +48,9 @@ export type ReasonAnswer =
   | { type: 'red_flag' }
   /** "I haven't got the kit" — which kit, so the plan can be rebuilt around it. */
   | { type: 'equipment'; tier: string }
+
+/** The kit, for good: the SAVED profile and the one kit controller (kit-change.ts). */
+export type EditReasonKit = { profile: UserProfile; controller: KitController } | null
 
 interface EditReasonStepProps {
   kind: ReasonedEditKind
@@ -66,14 +73,22 @@ interface EditReasonStepProps {
    * a question should not offer an answer that is guaranteed to do nothing.
    */
   currentEquipment?: string
+  /**
+   * THE KIT, FOR GOOD (runs 7-10, H34, 18 Oct 2026). Sam said "I haven't got the kit" and was offered only the
+   * four equipment choices, which change the next week and never what the app thinks he owns. With this, the kit
+   * step also opens Profile's own ticks (the one kit controller: worked out and shown before Save). The SAVED
+   * profile, not the pool one: a temporary change must not be ticked in as what he owns.
+   */
+  kit?: EditReasonKit
 }
 
 /** 44px minimum, the same as the nutrition sheet's verb chips — a gym floor, one hand. */
 const CHIP = 'w-full min-h-[44px] justify-start text-left'
 
-export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepChange, busy, currentEquipment }: EditReasonStepProps) {
+export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepChange, busy, currentEquipment, kit }: EditReasonStepProps) {
   const [hurting, setHurtingRaw] = useState(false)
   const [kitting, setKittingRaw] = useState(false)
+  const [ticking, setTicking] = useState(false)
   const [hurt, setHurtRaw] = useState<Exclude<HurtKind, 'red_flag'> | null>(null)
   const [redFlag, setRedFlagRaw] = useState(false)
   // EVERY STEP CHANGE GOES THROUGH ONE OF THESE, so the parent hears about
@@ -131,7 +146,16 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepCha
   if (kitting) {
     return (
       <div className="space-y-2" data-testid="reason-kit">
-        <p className="text-sm">What have you got today?</p>
+        {kit && (
+          ticking
+            ? <div data-testid="reason-kit-ticks"><KitTicks profile={kit.profile} kit={kit.controller} /></div>
+            : (
+              <Button variant="outline" className={CHIP} disabled={busy} data-testid="reason-kit-for-good" onClick={() => { onStepChange?.(); setTicking(true) }}>
+                Update what I have, for good
+              </Button>
+            )
+        )}
+        <p className="text-sm">{kit ? `Or just for the next ${EQUIPMENT_SWITCH_DAYS} days, what have you got?` : 'What have you got today?'}</p>
         {EQUIPMENT_OPTIONS.filter(o => o.value !== currentEquipment).map(o => (
           <Button
             key={o.value}
@@ -154,7 +178,7 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepCha
             </span>
           </Button>
         ))}
-        <Button variant="ghost" size="sm" disabled={busy} onClick={() => setKitting(false)}>Back</Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => { setTicking(false); setKitting(false) }}>Back</Button>
       </div>
     )
   }

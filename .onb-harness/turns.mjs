@@ -333,6 +333,16 @@ await section(8, 'M4 — an edit that opens a new question asks it at the bottom
   await queue({ reply: 'A calibration week it is, then.', actions: [] })
   await tapOption('knowsWorkingLifts', 'Not sure')
   await wait(700)
+  // A NEW EQUIPMENT CHOICE STARTS THE KIT AGAIN (her 9 Oct "Remember what they say", and her 18 Oct "Show ticks
+  // once"): the ticks are asked again, started from the new choice — a home gym assumes all nine.
+  now = await review()
+  const kit = await evj(`__cards('kitTicks')`)
+  check('the kit ticks come back for the new choice, and the summary waits for them', !now.open && kit.length === 1 && kit[0].inView, { open: now.open, kit })
+  const homeTicks = await evj(`[...document.querySelectorAll('[data-slot-card="kitTicks"] button[aria-pressed="true"]')].length`)
+  check('...started from the new choice: a home gym, all nine ticked', homeTicks === 9, homeTicks)
+  await queue({ reply: 'All set.', actions: [] })
+  await tapOption('kitTicks', 'Next')
+  await wait(700)
   now = await review()
   check('once it is answered the summary returns by itself', now.open && /Home gym/.test(now.rows.equipment ?? ''), now.rows)
   check('...with Generate live', now.generate && now.generate.disabled === false, now.generate)
@@ -528,7 +538,7 @@ await section(16, 'M1 — a parked question is kept, counted, and handed over wh
   await ev(`(() => {
     const d = JSON.parse(localStorage.getItem('fitplan_onboarding_draft'))
     const all = { displayName: 'Sam', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate', activityLevel: 'moderate',
-      equipment: 'minimalist', injuries: [], trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '30-45', trainingStyle: 'functional',
+      equipment: 'minimalist', kitTicks: ['dumbbells', 'bench'], injuries: [], trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '30-45', trainingStyle: 'functional',
       conditioningPreference: 'tolerate', recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82', gender: 'male',
       mealsPerDay: 3, dietaryPreferences: [], dislikedFoods: '' }
     d.values = { ...d.values, ...all }; d.confirmedSlots = Object.keys(all)

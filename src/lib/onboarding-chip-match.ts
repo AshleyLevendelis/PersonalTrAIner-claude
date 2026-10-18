@@ -91,6 +91,7 @@ const ASKS: Record<SlotKey, Asks> = {
   // Never asked (no new setup question, 9 Oct 2026); the pattern matches its own
   // catalogue question so the chip matcher stays honest if a model ever asks it.
   kitList: /what kit do you (actually )?(have|own)/i,
+  kitTicks: /which of these do you have|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home/i,
 }
 
 /**

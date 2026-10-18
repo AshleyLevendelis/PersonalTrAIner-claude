@@ -284,6 +284,7 @@
     "verify:tour-real": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/drive-real.mjs",
     "verify:composer": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/composer.mjs",
     "verify:keyboard": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/keyboard.mjs",
+    "verify:setup-kit": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-kit.mjs",
     "verify:onboarding-walk": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/walk-questions.mjs",
     "verify:chat-shell": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-shell.mjs",
     "verify:tap-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tap-targets.mjs",
@@ -439,6 +440,7 @@
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
     "test:layout-revamp": "tsx scripts/test-layout-revamp.ts",
     "test:one-page": "tsx scripts/test-one-page.ts",
+    "test:setup-kit-ticks": "tsx scripts/test-setup-kit-ticks.ts",
     "test:swap-name-fallback": "tsx scripts/test-swap-name-fallback.ts",
     "test:named-food-clash": "tsx scripts/test-named-food-clash.ts",
     "verify:one-page": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-page.mjs",
@@ -456,6 +458,7 @@
     "test:meal-method-check": "tsx scripts/test-meal-method-check.ts",
     "test:food-exclusions": "tsx scripts/test-food-exclusions.ts",
     "verify:swap-unknown-name": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/swap-unknown-name.mjs",
+    "verify:kit-for-good": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kit-for-good.mjs",
     "verify:named-food-clash": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/named-food-clash.mjs",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs"
   },

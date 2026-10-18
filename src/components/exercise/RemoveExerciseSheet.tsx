@@ -36,8 +36,11 @@ export function RemoveExerciseSheet({
   balanceCost,
   onReason,
   onDislike,
+  kit,
 }: {
   target: RemoveTarget | null
+  /** The kit, for good, from "I haven't got the kit" (H34). */
+  kit?: import('./EditReasonStep').EditReasonKit
   onClose: () => void
   /** Drop it. Returns false when the edit was refused, so the sheet can say why. */
   onDrop: (scope: SwapScope) => Promise<string | null>
@@ -123,6 +126,7 @@ export function RemoveExerciseSheet({
             // and under the scope buttons, reading as if THEY had failed.
             onSkip={() => { setError(null); setAsked(true) }}
             onStepChange={() => setError(null)}
+            kit={kit}
           />
         ) : !choosing ? (
           <div className="space-y-2">

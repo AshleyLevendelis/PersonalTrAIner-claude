@@ -80,6 +80,8 @@ interface ExerciseTabProps {
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
   /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
   onRestartPlan?: () => Promise<string | null>
+  /** The one kit controller (kit-change.ts), so "I haven't got the kit" can change the kit for good (H34). */
+  kitController?: import('@/lib/kit-change').KitController | null
 }
 
 export function ExerciseTab({
@@ -110,12 +112,15 @@ export function ExerciseTab({
   onLogsUpdated,
   onCalibrationSessionFinished,
   onRestartPlan,
+  kitController = null,
 }: ExerciseTabProps) {
   const { route } = useAppRoute()
   const { liveWeek } = useActiveSession()
   const isProgramView = route.kind === 'program'
 
   const [swapTarget, setSwapTarget] = useState<SwapTarget | null>(null)
+  // THE KIT, FOR GOOD (H34): the SAVED profile's kit, through the one controller Profile's ticks use.
+  const kit = kitController && storedProfile ? { profile: storedProfile, controller: kitController } : null
   // WHEN "REST OF BLOCK" ENDS, said on the swap (runs 3-4, M40b; her 10 Oct
   // ruling "Keep to the block, say it").
   const todayStr = getLocalDateString(getAppNow(profile?.id))
@@ -286,6 +291,7 @@ export function ExerciseTab({
           onDislike={requestBan}
           blockEndsOn={swapBlockEndsOn}
           today={todayStr}
+          kit={kit}
         /></Suspense>
         {banSheet}
         <ExerciseDetailDialog
@@ -338,6 +344,7 @@ export function ExerciseTab({
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
         onCalibrationSessionFinished={onCalibrationSessionFinished}
         onRestartPlan={onRestartPlan}
+        kit={kit}
       />
       <Suspense fallback={null}><SwapDialog
         target={swapTarget}
@@ -351,6 +358,7 @@ export function ExerciseTab({
         onDislike={requestBan}
         blockEndsOn={swapBlockEndsOn}
         today={todayStr}
+        kit={kit}
       /></Suspense>
       {banSheet}
       <PlateCalculator

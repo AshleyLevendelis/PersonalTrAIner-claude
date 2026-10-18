@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **H34 (runs 7-10, 18 Oct 2026): the kit is what was said; setup shows the ticks once; "I haven't got the
+  kit" fixes it for good.** Sam (adjustable dumbbells to 24 kg and a flat bench ONLY) picked "no barbell or bench"
+  and Profile ticked kettlebell, bands, pull-up bar and bag with the bench unticked; his plan had Banded TKE, Band
+  Tricep Pushdown, Spanish Squat and a heavy kettlebell swing as a main lift; the swap sheet's "I haven't got the
+  kit" offered only the four equipment choices. TRACED: with nothing said, the ticks AND the generator use the
+  choice's guess (minimalist = dumbbells, kettlebell, bands, pull-up bar, bag); setup recorded a kit only if the
+  setup model emitted it in his own words; the swap sheet's choices last 7 days and never touch the kit list. The
+  catalogue was RIGHT (every band move needs a band, both swings a kettlebell; now held by a gate).
+  HER RULING, asked: **"Show ticks once"** (from three: over keeping her 9 Oct "no new setup question", and over
+  assuming dumbbells only) — it partly REVERSES 9 Oct. BUILT: (1) setup asks "Which of these do you have?" once for
+  every home choice, right after injuries (which stays in the opening block), pre-ticked with the guess plus
+  anything already said, the same function Profile's ticks read; what he leaves ticked becomes the first plan's kit
+  (has/hasnt, Profile's shape); left as the guess, no statement, so the plan is what it was before. A new equipment
+  choice, or a kit statement after the ticks, starts them again and shows the card again. (2) The swap and remove
+  sheets' kit step gains "Update what I have, for good", opening Profile's own ticks over the SAVED profile through
+  the one kit controller (shown before Save); the four choices are labelled "Or just for the next 7 days". Mine:
+  that label (it states the 7 days the choice already lasted).
+  CSCS: removes exercises he cannot do (a prescription he cannot perform has no training effect); takes away band and
+  kettlebell work only from people who untick it; patterns kept by the shared rebuild; no floor moved. NOTED, NOT
+  FIXED: on dumbbells and a bench his rebuilt lower body leans on bodyweight (Air Squat, Wall Sit): the pool has few
+  loaded squat-pattern moves for that kit. A catalogue question for the training batch.
+  `test:setup-kit-ticks` (23 checks, 11 mutations caught), `verify:setup-kit` (9 checks, 4 caught — one only after
+  a case for Next with nothing tapped, which would otherwise have saved "owns none of the nine"), `verify:kit-for-good`
+  (14 checks, 4 caught; the saved-vs-pool profile mutation is equivalent on that page, so a source check holds it).
+  Re-anchored, not loosened: `verify:onboarding-turns` §8 now answers the kit ticks a changed equipment choice brings
+  back, and Sam's fixtures answer them. `test:bundle`: measured 2395 -> 2397 kB on a clean worktree, every budget
+  raised with the usual room (her 15 Sep ruling). 123 derived gates and drivers green. Frontend only (the setup
+  question list is sent by the app, so `onboarding-chat` needs no deploy).
 - [x] **H33 (runs 7-10, 18 Oct 2026): a swap to a name the app does not have is answered, never a dead end.** Sam
   asked to swap to "Dumbbell Step-Up" and the WHOLE reply was "I don't have 'Dumbbell Step-Up' in the exercise
   library — try another name for it". TRACED: the catalogue calls it "Step-Ups"; the resolver's strict search misses

@@ -168,8 +168,13 @@ console.log('\n1. The libraries are cached separately from the app')
   // MEASURED through this gate at f82c360b: deploy 328 gz, paint 484 gz, app 1127 raw, total 2372 raw. Each
   // lane raised its own budget against its own base; together they spend more than either. Same room as
   // every move above (her 15 Sep "raise it with room to grow"): 8 kB gz, 23-25 kB raw.
-  headroom('a deploy re-downloads', appGzip, 336, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 336, appGzip)
+  // MOVED 18 Oct 2026, runs 7-10 batch 1 (the allergy refusal, the swap-name answer, the kit ticks in setup and on
+  // the swap sheet). MEASURED through this gate on a clean worktree of 8f4435f8 and on the change:
+  //     before   deploy 333 gz   paint 489 gz   app 1140 raw   total 2395 raw   (3, 3, 10 and 2 kB of room)
+  //     after    deploy 333 gz   paint 490 gz   app 1141 raw   total 2397 raw   (total OVER by 0)
+  // Her 15 Sep ruling, "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
+  headroom('a deploy re-downloads', appGzip, 341, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 341, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -248,9 +253,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // food-db +4.0, ...); the sheets were already split out, so deferring more buys about 3 kB.
   // MOVED 10 Oct 2026: 461 -> 474, the layout pass — see the deploy figure above for both ends.
   // MOVED 11 Oct 2026: 474 -> 484, the allergy ruling — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 492, 'kB gzipped')
+  // MOVED 18 Oct 2026: 492 -> 498, runs 7-10 batch 1 — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 498, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 492, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 498, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -355,7 +361,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 10 Oct 2026: 1,052 -> 1,090 raw, the layout pass — see the deploy figure above for both ends.
   // MOVED 11 Oct 2026: 1,090 -> 1,131 raw, the allergy ruling — see the deploy figure above for both ends.
   // MOVED 12 Oct 2026: 1131 -> 1150, the merged release tree measured 1127 (see the deploy note).
-  const APP_CHUNK_BUDGET_KB = 1150
+  // MOVED 18 Oct 2026: 1150 -> 1166, runs 7-10 batch 1 — see the deploy figure above for both ends.
+  const APP_CHUNK_BUDGET_KB = 1166
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -579,7 +586,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 11 Oct 2026: 2,275 -> 2,360, the allergy ruling (18 kB of it; the base was 42 over) — see the
   // deploy figure above for both ends. 2,360 is 25 above the 2,335 measured.
   // MOVED 12 Oct 2026: 2360 -> 2397, the merged release tree measured 2372 (see the deploy note).
-  const TOTAL_BUDGET_KB = 2397
+  // MOVED 18 Oct 2026: 2397 -> 2422, measured 2397 (see the deploy note, runs 7-10 batch 1).
+  const TOTAL_BUDGET_KB = 2422
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

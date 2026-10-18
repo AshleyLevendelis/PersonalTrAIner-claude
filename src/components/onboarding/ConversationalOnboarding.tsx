@@ -21,6 +21,7 @@ import {
   NEVER_BLOCKING_SLOTS,
   assembleProfile,
   toggleValue,
+  multiSelection,
   numericGroupFor,
   initialSlotValues,
   isStartingFromNothing,
@@ -521,6 +522,13 @@ function applySlot(
   if (wasAnswered && valueChanged) ws.corrected.add(key)
   ws.values = { ...ws.values, [key]: coerced } as OnboardingSlotValues
   ws.confirmed = new Set(ws.confirmed).add(key)
+  // THE KIT TICKS START FROM THE EQUIPMENT CHOICE AND WHAT THEY SAID (18 Oct 2026). A new choice, or something
+  // said about the kit after the ticks were answered, starts them again and shows the card again: ticks answered
+  // against a different starting point would quietly undo what was just said.
+  if ((key === 'equipment' || key === 'kitList') && valueChanged && ws.values.kitTicks !== null) {
+    ws.values = { ...ws.values, kitTicks: null }
+    const c = new Set(ws.confirmed); c.delete('kitTicks'); ws.confirmed = c
+  }
   ws.resolveCards.add(key)
   if (showReceipt && !alreadySame) {
     ws.newMessages.push({
@@ -1515,7 +1523,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   // --- chip interactions -------------------------------------------------
 
   const handleToggleMulti = (key: SlotKey, value: string) => {
-    setValues(v => ({ ...v, [key]: toggleValue((v[key] as string[]) ?? [], value) } as OnboardingSlotValues))
+    setValues(v => ({ ...v, [key]: toggleValue(multiSelection(key, v), value) } as OnboardingSlotValues))
   }
 
   const handleResolveSingle = (key: SlotKey, value: string) => {
@@ -1537,7 +1545,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     const def = getSlotDef(key)
     if (!def) return
     if (!isSlotApplicable(def, values)) return
-    const selected = (values[key] as string[]) ?? []
+    const selected = multiSelection(key, values)
     const ws = makeWorkingState()
     if (!applySlot(ws, key, selected, values, false)) {
       // Belt-and-braces: SlotChipsCard disables Done for a required-empty

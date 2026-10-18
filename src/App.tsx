@@ -3226,6 +3226,7 @@ function App() {
               onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onCalibrationSessionFinished={handleCalibrationSessionFinished}
               onRestartPlan={handleRestartPlan}
+              kitController={kitController}
             />
           </TabsContent>
 

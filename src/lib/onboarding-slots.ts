@@ -130,7 +130,7 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
  * claim, and must name things the tier genuinely lacks.
  */
 import { EQUIPMENT_OPTIONS, INJURY_OPTIONS } from './picker-options'
-import { parseKitSlot, describeKitStatement } from './kit-list'
+import { parseKitSlot, describeKitStatement, KIT_ITEMS, KIT_ITEM_LABELS, kitItemsFor, statementsForTicks, isKitItem, type KitItem, type KitStatement } from './kit-list'
 export { EQUIPMENT_OPTIONS, INJURY_OPTIONS }
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
@@ -454,6 +454,12 @@ export interface OnboardingSlotValues {
    * "only: dumbbells, bench" (kit-list.ts parseKitSlot). Never asked.
    */
   kitList: string
+  /**
+   * THE KIT TICKS, shown ONCE in setup for any home equipment choice (Ashley, 18 Oct 2026, "Show ticks once"):
+   * the nine kit items, pre-ticked with what the choice assumes (and anything they already said), untick what
+   * they don't have. null until the card is answered; the card shows defaultKitTicks meanwhile.
+   */
+  kitTicks: string[] | null
 }
 
 /**
@@ -496,6 +502,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     maxSingleImplementKg: '',
     maxImprovisedKg: '',
     kitList: '',
+    kitTicks: null,
   }
 }
 
@@ -784,6 +791,62 @@ const SNACKS_OPTIONS: SlotOption[] = [
  * question and it was stranded at the very end, seven questions past the last
  * thing it had anything to do with.
  */
+/**
+ * THE KIT TICKS ARE SHOWN for any home equipment choice, once it is made (Ashley, 18 Oct 2026, "Show ticks
+ * once", over keeping her 9 Oct "no new setup question" and over assuming dumbbells only). Sam picked "no barbell
+ * or bench" and was handed the choice's guess — kettlebell, bands, pull-up bar, bag — which put band and
+ * kettlebell work in his plan. A full gym has everything, so it is never asked there.
+ */
+function picksHomeKit(values: OnboardingSlotValues): boolean {
+  return values.equipment != null && values.equipment !== 'full_gym'
+}
+
+const KIT_TICK_ICONS: Record<KitItem, string> = {
+  dumbbells: '🏋️', bench: '🪑', incline_bench: '📐', barbell: '🔩', squat_rack: '🗄️',
+  kettlebell: '🔔', bands: '🎗️', pull_up_bar: '🪜', weighted_bag: '🎒',
+}
+/** The nine kit items as tick options, in the words Profile's ticks use. */
+const KIT_TICK_OPTIONS: readonly SlotOption[] = KIT_ITEMS.map(item => ({ value: item, icon: KIT_TICK_ICONS[item], label: KIT_ITEM_LABELS[item] }))
+
+/** What the kit statement they VOLUNTEERED says, if any (the kitList slot). */
+function saidKit(values: OnboardingSlotValues): KitStatement[] {
+  const s = parseKitSlot(values.kitList)
+  return s ? [s] : []
+}
+
+/**
+ * What the ticks start as: the equipment choice's assumption, with anything they already said applied — the same
+ * function Profile's ticks read (kitItemsFor), so setup and Profile cannot show a different kit.
+ */
+export function defaultKitTicks(values: OnboardingSlotValues): KitItem[] {
+  if (!values.equipment) return []
+  return kitItemsFor({ equipment_access: values.equipment, kit_statements: saidKit(values) })
+}
+
+/** The ticks as they stand: the answer once given, the defaults until then. */
+function kitTicksNow(values: OnboardingSlotValues): KitItem[] {
+  return Array.isArray(values.kitTicks) ? values.kitTicks.filter(isKitItem) : defaultKitTicks(values)
+}
+
+/** A multi card's current selection (the kit ticks start pre-ticked; every other multi starts from its value). */
+export function multiSelection(key: SlotKey, values: OnboardingSlotValues): string[] {
+  if (key === 'kitTicks') return kitTicksNow(values)
+  const v = values[key]
+  return Array.isArray(v) ? (v as string[]) : []
+}
+
+/**
+ * The kit statements the first plan is built from: what they said (kitList), then what the ticks changed relative
+ * to it, in the same has/hasnt shape Profile's ticks save. Nothing for a full gym; nothing when the ticks were left
+ * as the guess.
+ */
+export function kitStatementsFromSetup(values: OnboardingSlotValues): KitStatement[] {
+  if (!picksHomeKit(values)) return saidKit(values)
+  const said = saidKit(values)
+  if (!Array.isArray(values.kitTicks)) return said
+  return [...said, ...statementsForTicks(defaultKitTicks(values), values.kitTicks.filter(isKitItem))]
+}
+
 export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'displayName', question: 'What should I call you?', inputHint: 'Your name…', shortLabel: 'Name', control: 'text', required: false, destination: 'column', validate: v => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= 30 },
   { key: 'fitnessGoal', question: "What's your main goal?", inputHint: 'Tell me your goal…', shortLabel: 'Goal', control: 'single', required: true, options: GOAL_OPTIONS, destination: 'column', validate: isOneOf(GOAL_OPTIONS) },
@@ -806,6 +869,9 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // to type a deadlift number BEFORE they have had a chance to mention their
   // back is the wrong order to ask those two questions in.
   { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
+  // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
+  // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
+  { key: 'kitTicks', question: 'Which of these do you have?', inputHint: "Untick anything you don't have", shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
   { key: 'knowsWorkingLifts', question: 'Do you know your working lifts (squat, bench, deadlift)?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: 'Squat working weight (kg)?',
@@ -1232,7 +1298,8 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // WHAT THEY SAID ABOUT THEIR KIT, if they volunteered it (the kitList
     // slot). Attached the one way a kit reaches a profile, so the FIRST plan
     // is built from it; App then records it as a kit row after the insert.
-    ...(parseKitSlot(data.kitList) ? { kit_statements: [parseKitSlot(data.kitList)!] } : {}),
+    // and the kit ticks (18 Oct 2026), composed by kitStatementsFromSetup.
+    ...(kitStatementsFromSetup(data).length > 0 ? { kit_statements: kitStatementsFromSetup(data) } : {}),
     ...PROFILE_CONSTANTS,
   }
 }
