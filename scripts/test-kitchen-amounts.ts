@@ -197,7 +197,8 @@ console.log('\n4. What she reads')
   const dataForm = /function formatIngredient\([^)]*\)[^{]*\{([\s\S]*?)\n\}/.exec(meal)?.[1] ?? ''
   check('the line handed to the edit builders keeps two decimals (1.25, not 1.3)', /\* 100\) \/ 100/.test(dataForm) && !/formatKitchenQuantity/.test(dataForm), dataForm.slice(0, 200))
   check('...and that string reads back as the same amount', parseIngredientLine('1.25 tsp olive oil').quantity === 1.25 && parseIngredientLine('0.75 tbsp soy sauce').quantity === 0.75)
-  const rows = meal.match(/<span className="tabular-mono text-xs[^>]*>\{([^}]*)\}<\/span>/g) ?? []
+  // The cooked hint (18 Oct 2026, H36) is drawn after the line inside the same span, never inside the line itself.
+  const rows = meal.match(/<span className="tabular-mono text-xs[^>]*>\{([^}]*)\}(?:<CookedHint ing=\{ing\} \/>)?<\/span>/g) ?? []
   check('both ingredient spans on the meal card show the display form', rows.length === 2 && rows.every(r => /displayIngredient\(ing\)/.test(r)), rows)
 }
 

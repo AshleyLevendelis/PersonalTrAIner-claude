@@ -147,7 +147,7 @@ console.log('\n7. In the app\'s own day: plan dishes hold, her own re-plans')
   const shape = { mealsPerDay: 3, includeSnacks: true, batchCooking: false }
   const rot = buildRotation(pools, t, [], shape)
   const dates = Array.from({ length: ROTATION_DAYS }, (_, i) => new Date(Date.UTC(2026, 9, 12 + i)).toISOString().slice(0, 10))
-  let held = 0, kept = 0, replanned = 0, compared = 0
+  let held = 0, kept = 0, replanned = 0, compared = 0, copyHeld = 0, ownCopyReplanned = 0
   const wrong: string[] = []
   for (const date of dates) {
     const before = assembleRotationDay(rot, date, pools, t, [], {})
@@ -162,11 +162,22 @@ console.log('\n7. In the app\'s own day: plan dishes hold, her own re-plans')
     const mine = { ...other, name: `${other.name} (mine)`, tags: ['user-requested'] }
     const own = assembleRotationDay(rot, date, { ...pools, lunch: [...(pools.lunch ?? []), mine] }, t, [], { lunch: mine })
     if (!own.heldAround) replanned++
+    // A PLAN DISH RESIZED TO THIS MEAL by a swap or a move ("X (as lunch)"), saved as her request only so a
+    // regenerate keeps it: still the plan's own, so the day holds (18 Oct 2026, H36; the card's trial always did).
+    const copy = { ...other, name: `${other.name} (as lunch)`, tags: ['user-requested'] }
+    const viaCopy = assembleRotationDay(rot, date, { ...pools, lunch: [...(pools.lunch ?? []), copy] }, t, [], { lunch: copy })
+    if (viaCopy.heldAround) copyHeld++
+    // ...but a resized copy of HER OWN dish is still hers, and re-plans.
+    const ownCopy = { ...mine, name: `${mine.name} (as lunch)` }
+    const viaOwnCopy = assembleRotationDay(rot, date, { ...pools, lunch: [...(pools.lunch ?? []), mine, ownCopy] }, t, [], { lunch: ownCopy })
+    if (!viaOwnCopy.heldAround) ownCopyReplanned++
   }
   check(`all ${ROTATION_DAYS} days were tried`, compared === ROTATION_DAYS, compared)
   check('a swap to one of the plan\'s own dishes holds the day on every date', held === ROTATION_DAYS, held)
   check('...and every other meal keeps its dish, on every date', wrong.length === 0 && kept === ROTATION_DAYS, wrong)
   check('a meal of her own (asked for by name) re-plans the day instead, every time — her 1 Sep rule', replanned === ROTATION_DAYS, replanned)
+  check('a plan dish resized to this meal by a swap ("X (as lunch)", saved as her request) still holds the day, every time', copyHeld === ROTATION_DAYS, copyHeld)
+  check('...while a resized copy of her own dish re-plans it, every time', ownCopyReplanned === ROTATION_DAYS, ownCopyReplanned)
 
   // UNDO REACHES EVERY SURFACE THAT SERVES A DAY: serveDates is the one
   // function the tab, its trials and the shopping list call.
@@ -213,7 +224,7 @@ console.log('\n8. Today\'s fit around what was eaten counts from the dish as pla
 console.log('\n9. The wiring')
 {
   const rotation = code('src/lib/meal-rotation.ts')
-  check('the day function holds only when no pin is her own', /!live\.some\(\(\[, o\]\) => o\.tags\?\.includes\(USER_REQUESTED_TAG\)\)/.test(rotation) && /holdAroundPins\(\{ planned: plannedDay, fixed, targets, keepSizes: opts\.keepHeldSizes \}\)/.test(rotation))
+  check('the day function holds only when no pin is her own (section 7 holds which pins are)', /!live\.some\(\(\[, o\]\) => isHerOwnDish\(o, pools\)\)/.test(rotation) && /holdAroundPins\(\{ planned: plannedDay, fixed, targets, keepSizes: opts\.keepHeldSizes \}\)/.test(rotation))
   check('...and serveDates passes each date\'s Undo through', /keepHeldSizes: kept\.has\(date\)/.test(rotation))
   const grocery = code('src/lib/grocery-store.ts')
   check('the shopping list serves the same Undo dates as the screen', (grocery.match(/readKeptHeldSizes\(input\.profileId\)/g) ?? []).length === 3 && /serveDates\(\{[^}]*keepHeldSizes \}\)/.test(grocery))

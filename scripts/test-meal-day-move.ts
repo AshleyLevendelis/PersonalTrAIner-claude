@@ -896,6 +896,36 @@ async function main() {
       exam.messages.length === 3 && exam.checks.expectsProposalKind.some((c: { turn: number; oneOf: string[] }) => c.turn === 2 && c.oneOf.join() === 'propose_meal_day_move'), exam.checks)
   }
 
+  // ---------------------------------------------------------------------------
+  // THE WHOLE LOOP, THROUGH THE REAL READ (18 Oct 2026, runs 7-10, H36). The
+  // meals are stored, read through readPools (which weighs every line raw or
+  // dry), swapped by the real executor, and read again: the week then served
+  // must be the week the card was read off, cell for cell. Found by the browser
+  // driver, which this reproduces without a browser.
+  // ---------------------------------------------------------------------------
+  console.log('\n[13] Stored, read, swapped and read again: the week is the card\'s')
+  {
+    const { readPools } = await import('../src/lib/meal-store')
+    setDevClockOverride('p1', today)
+    db.meal_plan_picks = []
+    db.meal_plan_slots = (['breakfast', 'lunch', 'dinner'] as Slot[]).flatMap(sl => pools[sl].map((o, i) => ({
+      profile_id: 'p1', slot: sl, pool_index: i, name: o.name, ingredients: o.ingredients,
+      macros: { kcal: o.macros.calories, protein: o.macros.protein, carbs: o.macros.carbs, fat: o.macros.fat }, tags: [], prep: '',
+    })))
+    const read1 = (await readPools('p1')).pools as typeof pools
+    const s1 = servingFor(shapeOn, { pools: read1, rotation: buildRotation(read1, targets, [], shapeOn) })
+    const r = okOf(build(s1, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'breakfast' }))
+    check('the swap of a dinner with the next day\'s breakfast is proposed off the read pools', !!r, r)
+    if (r) await executeMealDayMove('p1', r.payload, { show: () => {}, reloadPools: async () => {} })
+    const read2 = (await readPools('p1')).pools as typeof pools
+    const picksOn = (d: string) => Object.fromEntries(db.meal_plan_picks.filter(p => p.date === d).map(p => [p.slot, p.meal_name]))
+    const pinsByDate = Object.fromEntries(dates.filter(d => d !== today).map(d => [d, pinsFromPicks(picksOn(d) as never, read2)]))
+    const after = serveMealWeek({ ...s1, pools: read2, rotation: buildRotation(read2, targets, [], shapeOn), pinsByDate, todaysPins: pinsFromPicks(picksOn(today) as never, read2) } as Parameters<typeof serveMealWeek>[0])
+    const cell = (w: typeof after, i: number, sl: Slot) => `${w[i]?.day.chosen[sl]?.name}@${Math.round(w[i]?.day.chosen[sl]?.macros.calories ?? -1)}`
+    const differs = after.flatMap((_, i) => (['breakfast', 'lunch', 'dinner'] as Slot[]).filter(sl => cell(after, i, sl) !== cell(r?.after ?? [], i, sl)).map(sl => `${dates[i]}/${sl}: card ${cell(r?.after ?? [], i, sl)}, served ${cell(after, i, sl)}`))
+    check('...and the week served after the real write and the real read is the card\'s, cell for cell', !!r && after.length === 7 && differs.length === 0, differs)
+  }
+
   console.log(failed === 0 ? `\nAll ${ran} meal-day-move checks passed.` : `\n${failed} of ${ran} check(s) failed.`)
   console.log(`${ran} checks ran`)
   if (failed > 0) process.exit(1)

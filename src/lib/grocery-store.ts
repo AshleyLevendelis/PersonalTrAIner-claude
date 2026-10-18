@@ -300,16 +300,16 @@ function categoryForEntry(entry: { name: string; category: FoodCategory; tags: {
  * row's purchase unit up by its name — test:grocery-shopping holds both.
  */
 export const AS_BOUGHT: Record<string, { name: string; perCooked: number; key?: string }> = {
-  'white rice cooked': { name: 'white rice', perCooked: 0.36 },
-  'brown rice cooked': { name: 'brown rice', perCooked: 0.34 },
-  'basmati rice cooked': { name: 'basmati rice', perCooked: 0.34 },
-  'pasta cooked': { name: 'pasta', perCooked: 0.43 },
-  'wholewheat pasta cooked': { name: 'wholewheat pasta', perCooked: 0.43 },
+  'white rice cooked': { name: 'white rice', perCooked: 0.35 },
+  'brown rice cooked': { name: 'brown rice', perCooked: 0.33 },
+  'basmati rice cooked': { name: 'basmati rice', perCooked: 0.32 },
+  'pasta cooked': { name: 'pasta', perCooked: 0.42 },
+  'wholewheat pasta cooked': { name: 'wholewheat pasta', perCooked: 0.4 },
   'gluten free pasta': { name: 'gluten free pasta', perCooked: 0.45 },
-  'couscous cooked': { name: 'couscous', perCooked: 0.30 },
+  'couscous cooked': { name: 'couscous', perCooked: 0.3 },
   'quinoa cooked': { name: 'quinoa', perCooked: 0.33 },
-  'egg noodles cooked': { name: 'egg noodles', perCooked: 0.36 },
-  'rice noodles cooked': { name: 'rice noodles', perCooked: 0.30 },
+  'egg noodles cooked': { name: 'egg noodles', perCooked: 0.35 },
+  'rice noodles cooked': { name: 'rice noodles', perCooked: 0.31 },
   'bulgur wheat cooked': { name: 'bulgur wheat', perCooked: 0.24 },
   'polenta cooked': { name: 'polenta', perCooked: 0.23 },
   'millet cooked': { name: 'millet', perCooked: 0.31 },
@@ -338,6 +338,25 @@ export const AS_BOUGHT: Record<string, { name: string; perCooked: number; key?: 
   'cod raw': { name: 'cod', perCooked: 1, key: 'cod' },
   'haddock raw': { name: 'haddock', perCooked: 1, key: 'haddock' },
   'prawns raw': { name: 'prawns', perCooked: 1, key: 'prawns' },
+  // BOUGHT RAW (18 Oct 2026, runs 7-10, M64): a cooked weight of a food with a raw or dry twin is bought at the
+  // twin's weight by the card's own factor (weighedFactor: the nutrient it holds most of), so the list buys exactly
+  // what the card says to weigh. The grain factors above were re-read from it the same day (rice 0.36 -> 0.35). The list was buying
+  // "potato boiled" and "sweet potato baked 190g", and cooked meat and fish at their cooked weight. Every food with a
+  // raw or dry twin has a row here, held by test:grocery-shopping.
+  'potato boiled': { name: 'potatoes', perCooked: 1.14 },
+  'potato baked': { name: 'potatoes', perCooked: 1.2, key: 'potato boiled' },
+  'potato raw': { name: 'potatoes', perCooked: 1, key: 'potato boiled' },
+  'sweet potato baked': { name: 'sweet potato', perCooked: 1.05 },
+  'sweet potato raw': { name: 'sweet potato', perCooked: 1, key: 'sweet potato baked' },
+  'chicken breast': { name: 'chicken breast', perCooked: 1.38 },
+  'chicken thigh': { name: 'chicken thigh', perCooked: 1.32 },
+  'turkey breast': { name: 'turkey breast', perCooked: 1.22 },
+  'pork loin': { name: 'pork loin', perCooked: 1.24 },
+  'cod': { name: 'cod', perCooked: 1.29 },
+  'haddock': { name: 'haddock', perCooked: 1.4 },
+  'prawns': { name: 'prawns', perCooked: 1.19 },
+  'lentils red': { name: 'lentils red', perCooked: 0.32 },
+  'lentils green': { name: 'lentils green', perCooked: 0.32 },
 }
 
 export function resolveGroceryTarget(name: string): {

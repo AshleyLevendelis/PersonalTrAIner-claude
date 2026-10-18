@@ -2,6 +2,54 @@
 
 Newest first. One line each.
 
+- [x] **H36 / M64 (runs 7-10, 18 Oct 2026): every ingredient is counted, shown and shopped raw or dry.** Sam's
+  Bolognese read 456 kcal at dinner and 818 as the next day's leftover lunch; his list bought "pasta cooked", "white
+  rice cooked", "potato boiled" and "sweet potato baked 190g". TRACED: (1) a dinner whose lines today's table cannot
+  cost well keeps its stored numbers (H32's rule), and its leftover lunch was re-costed from those same lines with no
+  such check, so one dish was counted two ways; (2) meal lines are written cooked by default (the meal writer was told
+  "a weight is the COOKED weight unless the line says otherwise"; 229 of the library's 1,578 lines are), so the card
+  showed cooked weights and the list had to guess; (3) the list had no bag factor for boiled or baked potato or sweet
+  potato and bought cooked meat and fish at their cooked weight. "pasta cooked" / "white rice cooked" on her list
+  cannot come from today's builder (most likely rows saved before 9 Oct, fixed by rebuilding the list).
+  HER RULING, asked: **"Dry, plus cooked hint"** (from two: over the dry weight alone): "70g dry rice (about 200g
+  cooked)". BUILT (`docs/plans/one-state-raw-dry.md`): one conversion (`asWeighed`) turns a cooked line into its raw or
+  dry twin, applied where lines come in (the one read of stored meals, never written back, and every new dish at
+  verification), so the card, the day, the leftovers, the edits and the list see one state; the card draws "(about Ng
+  cooked)" beside the line, never in it; potatoes gained a raw twin (USDA 11352) and sweet potato's raw entry became
+  baked sweet potato's twin ("raw sweet potato" used to cost as baked); the leftover lunch is costed by the dinner's own
+  rule; the list buys every food with a twin by the card's own factor; the meal writer is told to weigh as bought.
+  CHANGED WHILE BUILDING, measured: the plan said "at the same energy". Over all 21 pairs that agrees with the main
+  nutrient within a few percent for 20, but USDA's roasted and raw chicken thigh disagree, and the energy factor turned
+  26 g of protein into 34 g. Cooking moves water, not protein or starch, so the factor is the ratio of the nutrient the
+  food is mostly made of (`weighedFactor`, one function for card, hint and list); thigh's energy is what moves (about
+  24% lower), named in the gate. The list's grain factors moved with it (rice 0.36 -> 0.35, pasta 0.43 -> 0.42).
+  A converted weight is rounded in the app's own kitchen steps (nearest 5 g from 20 g up), as every resized amount is.
+  MEASURED (`measure:one-state`): 229 lines in 168 of 290 library dishes were written cooked; largest change to a
+  dish: calories -15.6% (thigh), protein -6.8%, carbs -3.4%. The library (our own data) was then REWRITTEN raw and dry,
+  so a library dish is weighed as bought from the start and the fit never changes its foods; a gate holds that no
+  library line is written cooked. Her own stored pools: NOT measurable from here (no database); the read converts
+  them regardless.
+  FOUND ON THE WAY, OLDER THAN THIS CHANGE, FIXED: a day swap of two different meals, or a slot move, showed a card
+  whose trial held the rest of the day around the resized copy (her 10 Oct "Plan's own dishes only"), but the SAVED
+  copy is tagged as her own request (so a regenerate keeps it), and a day pinned to her own request is re-planned. So
+  the meals around the swap came out at other sizes than the card said (373 kcal on the card, 509 served), on the
+  committed code too; the browser driver compares dish names only and could not see it until the raw/dry read moved a
+  name. A resized copy ("X (as lunch)") of a plan dish now counts as the plan's own (found by name, as dish identity
+  does); a copy of her own dish still re-plans. `test:meal-day-move` §13 (stored, read, swapped by the real executor,
+  read again: the week is the card's, cell for cell), `test:hold-around-pins` §7 (both copy cases on every date; 3
+  mutations caught).
+  CSCS (population nutrition, mine): what she weighs and what the day counts are now one food in one state; protein,
+  the number a deficit protects, is carried exactly; no band or floor moved. Not clinical.
+  `test:one-state` (47 checks; red at the old code on 9 checks plus 2 for the leftover case, which reproduced her shape:
+  628 kcal against a 420 budget; 26 mutations across the conversion, the factor, the twins, the read, verification,
+  the leftover, the list and the card, all caught, three only after cases where they bind: a name her words would land
+  on the wrong food ("wholemeal pasta"), an unread line in grams, the hint's own guard was redundant and was removed;
+  one equivalent mutant on the leftover recorded, not checked), `verify:meal-costed` extended (15 checks at 390x844:
+  a lunch stored cooked reads "248g raw chicken breast (about 180g cooked)"; 4 mutations caught). Re-anchored with
+  reasons: `test:grocery-shopping` (cooked chicken is bought raw now, the symptom she reported; the factor check reads
+  `weighedFactor`), `test:meals-costed-as-weighed` ("nothing moves that was right" now uses a meal written raw and dry).
+  Deploys: frontend; `chat-gemini` (its food-table copy gains the raw potato and the twins); `generate-meals` (the
+  writer's rule; the read converts either way, so this one is tidiness, not correctness).
 - [~] **M59 (runs 7-10, 18 Oct 2026): "on target" only when every number is inside its band, tighter bands, and the
   miss is named.** Sam's day read "On target" with fat 9 g and carbs 18 g away from target. TRACED: one shared rule
   (`dayWithinTolerance`) decides "on target" for the label, the day search and every card, and its bands were

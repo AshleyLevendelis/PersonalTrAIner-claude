@@ -50,7 +50,7 @@ async function main() {
   const { makeFakeSupabase } = await import('../.tour-harness/fake-supabase')
   const db: Record<string, Record<string, unknown>[]> = { grocery_items: [] }
   setSupabaseClient(makeFakeSupabase(db) as never)
-  const { FOOD_DB, lookupIngredient } = await import('../src/lib/food-db')
+  const { FOOD_DB, lookupIngredient, weighedTwinOf, weighedFactor, stateOf } = await import('../src/lib/food-db')
   const { resolveGroceryTarget, AS_BOUGHT, generateGroceryList, addItemLocal, getAllItems, flushPending } = await import('../src/lib/grocery-store')
   const { GROCERY_AISLE_LABEL, trolleyToast, buildListLabel, formatShoppingQuantity } = await import('../src/lib/grocery-display')
 
@@ -103,13 +103,17 @@ async function main() {
   check('the list was built (8 rows)', rows.length === 8, rows.map(r => r.display_name))
   check('no row is named "... cooked"', rows.length > 0 && !rows.some(r => /cooked/i.test(r.display_name)), rows.map(r => r.display_name))
   check('the rice row is "white rice"', rice?.display_name === 'white rice', rice?.display_name)
-  check('...and asks for the dry weight: 650g cooked is 234g from the bag (x0.36)', rice?.quantity === 234 && rice?.unit === 'g', rice?.quantity)
+  // RE-ANCHORED 18 Oct 2026 (M64): the factor is the card's own (weighedFactor, by the starch it keeps), 0.35 for rice.
+  check('...and asks for the dry weight: 650g cooked is 227g from the bag (x0.35)', rice?.quantity === 227 && rice?.unit === 'g', rice?.quantity)
   check('...which the row shows as about 250g, not 650g', !!rice && formatShoppingQuantity(rice).primary === '~250g', rice && formatShoppingQuantity(rice))
-  check('the pasta row is "pasta", 300g cooked is 129g dry (x0.43)', pasta?.display_name === 'pasta' && pasta?.quantity === 129, [pasta?.display_name, pasta?.quantity])
+  check('the pasta row is "pasta", 300g cooked is 126g dry (x0.42)', pasta?.display_name === 'pasta' && pasta?.quantity === 126, [pasta?.display_name, pasta?.quantity])
   check('quinoa: 200g cooked is 66g dry (x0.33)', quinoa?.display_name === 'quinoa' && quinoa?.quantity === 66, [quinoa?.display_name, quinoa?.quantity])
   check('THE KEY DID NOT CHANGE (it is unique per profile; a new key would duplicate the row)',
     !!rice && !!pasta && !!quinoa && !rows.some(r => ['white rice', 'pasta', 'quinoa'].includes(r.canonical_key)), rows.map(r => r.canonical_key))
-  check('a food that is bought as it is eaten is untouched (150g chicken, 100g blueberries)', byKey('chicken breast')?.quantity === 150 && byKey('blueberries')?.quantity === 100)
+  // RE-ANCHORED 18 Oct 2026 (runs 7-10, M64): cooked chicken was "bought as it is eaten", which is the symptom she
+  // reported (meat bought at its cooked weight). It is bought raw now, at the weight carrying the same energy.
+  check('a food that is bought as it is eaten is untouched (100g blueberries)', byKey('blueberries')?.quantity === 100, byKey('blueberries')?.quantity)
+  check('150g of cooked chicken breast is bought raw: 207g (x1.38)', byKey('chicken breast')?.quantity === 207 && byKey('chicken breast')?.display_name === 'chicken breast', byKey('chicken breast'))
   check('on the real list: eggs and butter are under dairy, tofu is not under meat', byKey('egg')?.category === 'dairy' && byKey('butter')?.category === 'dairy' && byKey('tofu firm')?.category === 'dry_goods',
     [byKey('egg')?.category, byKey('butter')?.category, byKey('tofu firm')?.category])
 
@@ -117,8 +121,8 @@ async function main() {
   await generateGroceryList({ profileId, mealPools: pools as never, targets, startDate: '2026-09-28', days: 1, mealShape: {} as never })
   await flushPending()
   const again = await getAllItems(profileId)
-  check('rebuilding gives the same eight rows and the same 234g of rice (the factor is not applied twice)',
-    again.length === 8 && again.find(r => r.canonical_key === 'white rice cooked')?.quantity === 234, again.map(r => `${r.display_name} ${r.quantity}`))
+  check('rebuilding gives the same eight rows and the same 227g of rice (the factor is not applied twice)',
+    again.length === 8 && again.find(r => r.canonical_key === 'white rice cooked')?.quantity === 227, again.map(r => `${r.display_name} ${r.quantity}`))
 
   // AN AMOUNT SOMEBODY TYPED IS WHAT THEY MEAN TO BUY.
   const typed = addItemLocal({ profileId: 'shop-2', name: 'rice', quantity: 500, unit: 'g', source: 'manual', currentItems: [] })
@@ -139,11 +143,19 @@ async function main() {
   const names = rowTargets.map(t => t.displayName)
   check('no two rows share a shopping name', clash.length === 0, clash)
   const entries = Object.entries(AS_BOUGHT)
-  const cookedBasis = entries.filter(([, v]) => !v.key)
-  const twins = entries.filter(([, v]) => !!v.key)
+  // A ROW'S OWN FOOD IS WEIGHED COOKED, OR RAW OR DRY (18 Oct 2026, M64). A cooked food with a twin is bought at the
+  // twin's weight carrying the same energy; a raw or dry one is bought as written.
+  const isTwin = ([k]: [string, unknown]) => { const e = FOOD_DB.find(f => f.name === k); const st = e ? stateOf(e) : undefined; return st === 'raw' || st === 'dry' }
+  const cookedRows = entries.filter(e => !isTwin(e))
+  const cookedBasis = cookedRows.filter(([k]) => { const e = FOOD_DB.find(f => f.name === k); return !e || !weighedTwinOf(e) || stateOf(weighedTwinOf(e)!) === 'dry' })
+  const twins = entries.filter(isTwin)
   check('every as-bought entry is a food in the database', entries.length >= 12 && entries.every(([k]) => FOOD_DB.some(f => f.name === k)), entries.filter(([k]) => !FOOD_DB.some(f => f.name === k)).map(([k]) => k))
   check('...whose shopping name still finds the food of its ROW (the row looks its food up by that name)', entries.every(([k, v]) => lookupIngredient(v.name)?.name === (v.key ?? k)), entries.filter(([k, v]) => lookupIngredient(v.name)?.name !== (v.key ?? k)).map(([k]) => k))
   check('...with a dry-per-cooked factor a cook would recognise (between a fifth and a half)', cookedBasis.length >= 12 && cookedBasis.every(([, v]) => v.perCooked >= 0.2 && v.perCooked <= 0.5), cookedBasis.filter(([, v]) => !(v.perCooked >= 0.2 && v.perCooked <= 0.5)))
+  const ratioOff = cookedRows.filter(([k, v]) => { const e = FOOD_DB.find(f => f.name === k); const t = e ? weighedTwinOf(e) : null; return !!e && !!t && Math.abs(v.perCooked - (weighedFactor(e, t) ?? -1)) > 0.006 })
+  check('every cooked food with a raw or dry twin is bought by the card\'s own factor (weighedFactor, to the cent)', cookedRows.length >= 25 && ratioOff.length === 0, ratioOff.map(([k, v]) => [k, v.perCooked]))
+  const lacking = FOOD_DB.filter(f => { const t = weighedTwinOf(f); return !!t && (!AS_BOUGHT[f.name] || !AS_BOUGHT[t.name]) }).map(f => f.name)
+  check('every food with a raw or dry twin has a row, and so does its twin (potatoes, meat and fish included)', lacking.length === 0 && FOOD_DB.filter(f => weighedTwinOf(f)).length >= 20, lacking)
   check('a dry or raw twin is bought as written (factor 1) on a row that exists, under that row\'s own name',
     twins.length >= 11 && twins.every(([, v]) => v.perCooked === 1 && FOOD_DB.some(f => f.name === v.key) && resolveGroceryTarget(v.key!).displayName === v.name),
     twins.filter(([, v]) => !(v.perCooked === 1 && FOOD_DB.some(f => f.name === v.key) && resolveGroceryTarget(v.key!).displayName === v.name)))

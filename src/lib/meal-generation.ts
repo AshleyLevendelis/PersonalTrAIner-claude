@@ -31,6 +31,7 @@
 import { checkMethod, type MethodRules } from './meal-method-check'
 import { supabase, resolveEnv } from './supabase'
 import { computeMealMacros, lookupIngredient, type Macros100g } from './food-db'
+import { asWeighedLines } from './as-weighed'
 import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
@@ -509,7 +510,9 @@ export function verifyProposal(
    */
   keepPortions = false,
 ): PoolOption | null {
-  const parsed = parseIngredientLines(proposal.ingredients)
+  // ONE STATE (18 Oct 2026, runs 7-10, H36/M64): every line a new dish carries is weighed raw or dry, at the weight
+  // that carries the same energy, so the card, the day, the leftovers and the list all see the state it is bought in.
+  const parsed = asWeighedLines(parseIngredientLines(proposal.ingredients))
   if (parsed.length === 0) {
     rejectLog.push(`[${slot}] "${proposal.name}": no ingredients parsed`)
     return null

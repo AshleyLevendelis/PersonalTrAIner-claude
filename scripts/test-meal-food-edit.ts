@@ -29,7 +29,8 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
   else { failures++; console.error(`  FAIL: ${label}${extra !== undefined ? ` — ${JSON.stringify(extra).slice(0, 300)}` : ''}`) }
 }
 
-const LINES = ['122g raw chicken breast', '80g white rice', '100g broccoli', '1 tbsp olive oil']
+// Rice written DRY, as every served line now reads (18 Oct 2026, runs 7-10, H36): her edit is to the line she sees.
+const LINES = ['122g raw chicken breast', '30g dry white rice', '100g broccoli', '1 tbsp olive oil']
 const macrosOf = (lines: string[]): MacroTargets => {
   const m = computeMealMacros(parseIngredientLines(lines))
   return { calories: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat } as MacroTargets
@@ -110,11 +111,11 @@ console.log('\n3. Swapping one food for another')
 
 console.log('\n4. Resizing a portion keeps her words')
 {
-  const r = buildMealFoodResizeProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'rice', amount: 40 } })
+  const r = buildMealFoodResizeProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'rice', amount: 15 } })
   check('it is allowed', r.ok === true, r.ok === false ? r.reason : '')
   if (r.ok) {
     const rice = r.payload.option.ingredients.find(i => /rice/i.test(i.name))
-    check('only the number changed', rice?.quantity === 40 && rice?.unit === 'g' && rice?.name === 'white rice', rice)
+    check('only the number changed', rice?.quantity === 15 && rice?.unit === 'g' && rice?.name === 'dry white rice', rice)
     check('...and the carbs came down with it', (row(r, 'Carbs')?.note ?? '').startsWith('-'), row(r, 'Carbs'))
   }
   // THE PARSER NORMALISES UNITS ("slices" -> "slice"), so rebuilding a line

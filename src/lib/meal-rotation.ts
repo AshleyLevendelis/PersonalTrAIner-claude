@@ -33,8 +33,9 @@
 
 import { assembleDay, computeSlotBudgets, VARIETY_MEMORY_DAYS, type AssembledDay, type PoolOption } from './meal-generation'
 import { newFromDate } from './meal-new-from'
-import { computeMealMacros, type Macros100g } from './food-db'
+import type { Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
+import { costStoredMeal } from './meal-costing'
 import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { holdAroundPins } from './hold-around-pins'
 import type { MacroTargets } from './types'
@@ -177,9 +178,6 @@ function extendHistory(
 const asMacros100g = (t: MacroTargets): Macros100g => ({
   kcal: t.calories, protein: t.protein, carbs: t.carbs, fat: t.fat,
 })
-const asTargets = (m: Macros100g): MacroTargets => ({
-  calories: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat),
-})
 
 /**
  * The parts of a profile that decide the SHAPE of a day's meals. One object
@@ -233,14 +231,20 @@ export function leftoverLunchFrom(
   const scaled = scaleToTarget(dinner.ingredients, asMacros100g(dinner.macros), asMacros100g(lunchBudget))
   if (scaled.rejectedReason) return null
 
-  const recomputed = computeMealMacros(scaled.ingredients)
-  if (!meetsProteinFloor(recomputed.protein, lunchBudget.protein)) return null
+  // COSTED BY THE DINNER'S OWN RULE (18 Oct 2026, runs 7-10, H36): from its lines when they cost as well as a new
+  // meal's would, else the dinner's numbers scaled by the same factor. It used to be re-costed from the lines with no
+  // such check while the dinner kept its stored numbers, so one dish read 456 kcal at dinner and 818 as lunch.
+  const f = scaled.scaleFactor
+  const costing = costStoredMeal(scaled.ingredients, {
+    calories: dinner.macros.calories * f, protein: dinner.macros.protein * f, carbs: dinner.macros.carbs * f, fat: dinner.macros.fat * f,
+  })
+  if (!meetsProteinFloor(costing.macros.protein, lunchBudget.protein)) return null
 
   const lunch: PoolOption = {
     ...dinner,
     slot: 'lunch',
     ingredients: scaled.ingredients,
-    macros: asTargets(recomputed),
+    macros: { calories: Math.round(costing.macros.calories), protein: Math.round(costing.macros.protein), carbs: Math.round(costing.macros.carbs), fat: Math.round(costing.macros.fat) },
     leftoverFrom: 'dinner',
   }
   // The dinner's own "cook both portions" line belongs to the dinner. A lunch
@@ -436,7 +440,7 @@ export function assembleRotationDay(
   // rest of my meals". A pin set aside for a restriction is not a pin.
   const live = (Object.entries(pinned) as [MealSlotName, PoolOption | undefined][])
     .filter((e): e is [MealSlotName, PoolOption] => e[1] != null && !e[1].breaksRestriction)
-  if (live.length > 0 && !live.some(([, o]) => o.tags?.includes(USER_REQUESTED_TAG))) {
+  if (live.length > 0 && !live.some(([, o]) => isHerOwnDish(o, pools))) {
     const plannedDay = dayFor({})
     const fixed: Partial<Record<MealSlotName, PoolOption>> = Object.fromEntries(live)
     // A leftover lunch is last night's dinner, already portioned: it stays as
@@ -459,6 +463,23 @@ export function assembleRotationDay(
     return { ...day, chosen: { ...day.chosen, dinner: { ...dinner, reusedTomorrow: true } } }
   }
   return day
+}
+
+/**
+ * Is this pinned dish one she asked for herself (by name, from the fridge, edited), which re-plans the rest of the
+ * day (her 1 Sep ruling), rather than one of the plan's own, which the day holds around (her 10 Oct "Plan's own
+ * dishes only")? A plan dish resized to another meal by a swap or a move ("X (as lunch)") is still the plan's own: it
+ * is tagged as her request only so a regenerate keeps it. FIXED 18 Oct 2026 (runs 7-10, H36): the card's trial held
+ * the day around the untagged copy and the saved, tagged copy re-planned it, so the meals around a swap came out at
+ * other sizes than the card said (test:meal-day-move §13). The copy's dish is found by name, as dish identity does.
+ */
+function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, PoolOption[]>>): boolean {
+  if (!option.tags?.includes(USER_REQUESTED_TAG)) return false
+  const resized = / \(as (?:breakfast|lunch|dinner|snack)\)$/.exec(option.name)
+  if (!resized) return true
+  const baseName = option.name.slice(0, resized.index)
+  const base = Object.values(pools).flatMap(o => o ?? []).find(o => o.name === baseName)
+  return !base || isHerOwnDish(base, pools)
 }
 
 /** One date's meals, and the pool and rotation that served them. */

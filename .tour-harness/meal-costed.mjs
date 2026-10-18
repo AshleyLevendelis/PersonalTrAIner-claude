@@ -107,6 +107,27 @@ await ev(`(() => { const e = document.querySelector('.ds-num-lg'); if (e) e.scro
 await wait(300)
 await shoot('meal-costed-dinner')
 
+// ONE STATE (18 Oct 2026, runs 7-10, H36/M64), her ruling "Dry, plus cooked hint". The dinner is stored raw and dry;
+// the lunch is stored COOKED ("180g chicken breast, 120g basmati rice") and must read raw and dry, with the hint.
+const lineTexts = () => ev(`[...document.querySelectorAll('[data-ingredient-row]')].map(b => ({ row: b.getAttribute('data-ingredient-row'), text: b.innerText.replace(/\\s+/g, ' ').trim(), hint: b.querySelector('[data-testid="ingredient-cooked-hint"]')?.textContent?.trim() ?? null }))`)
+const dinnerLines = await lineTexts()
+const chick = (dinnerLines ?? []).find(l => /raw chicken breast/.test(l.text))
+const cous = (dinnerLines ?? []).find(l => /dry couscous/.test(l.text))
+check('4a. a raw line carries its cooked weight beside it: "177g raw chicken breast (about 130g cooked)"', chick?.text.startsWith('177g raw chicken breast (about 130g cooked)') === true, dinnerLines)
+check('4b. ...and a dry one: "53g dry couscous (about 180g cooked)"', cous?.text.startsWith('53g dry couscous (about 180g cooked)') === true, cous)
+check('4c. the hint is drawn beside the line, never part of the line the edit builders are handed', !!chick && chick.row === '177g raw chicken breast' && !/cooked/.test(chick.row ?? ''), chick)
+check('4d. a food with no cooked twin has no hint (tzatziki, olive oil)', (dinnerLines ?? []).filter(l => /tzatziki|olive oil/.test(l.text)).length === 2 && (dinnerLines ?? []).filter(l => /tzatziki|olive oil/.test(l.text)).every(l => l.hint === null), dinnerLines)
+// Close the dinner, open the lunch.
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /Greek Chicken Souvlaki/.test(x.textContent || '')); if (b) b.click() })()`)
+await wait(500)
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /Chicken, rice and roasted peppers/.test(x.textContent || '')); if (b) { b.scrollIntoView({ block: 'center' }); b.click() } return !!b })()`)
+await wait(700)
+const lunchLines = await lineTexts()
+await shoot('meal-costed-lunch-raw-dry')
+check('5a. a lunch stored cooked reads raw: "250g raw chicken breast (about 180g cooked)"', (lunchLines ?? []).some(l => l.text.startsWith('250g raw chicken breast (about 180g cooked)')), lunchLines)
+check('5b. ...and dry: "40g dry basmati rice (about 120g cooked)"', (lunchLines ?? []).some(l => l.text.startsWith('40g dry basmati rice (about 120g cooked)')), lunchLines)
+check('5c. no line on it is still written cooked', (lunchLines ?? []).length === 2 && !(lunchLines ?? []).some(l => /^\d+g (chicken breast|basmati rice)\b/.test(l.row ?? '')), lunchLines)
+
 console.log(`\n${ran} checks ran, ${failures} failed.`)
 try { chrome.kill() } catch {}
 server.close()

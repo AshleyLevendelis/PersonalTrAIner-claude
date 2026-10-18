@@ -156,7 +156,8 @@ async function main() {
   const chicken = afterGen.find(i => i.canonical_key === 'chicken breast')
   check('oats: 80g x 2 days = 160g', oats?.quantity === 160, oats)
   check('olive oil: (14g tbsp [food-db override] + 10g) x 2 days = 48g — cross-unit AND cross-slot merge in one line', oil?.quantity === 48, oil)
-  check('chicken breast: 150g x 2 days = 300g', chicken?.quantity === 300, chicken)
+  // RE-ANCHORED 18 Oct 2026 (runs 7-10, M64): cooked chicken is bought raw, by the card's own factor (x1.38).
+  check('chicken breast: 150g cooked x 2 days = 414g raw to buy', chicken?.quantity === 414, chicken)
   check('generated rows land in the fake DB via the local-first flush (not just the local merged view)', db.grocery_items.length === 3, db.grocery_items)
 
   // Regression: a chat add with no stated unit landing on an EXISTING

@@ -316,6 +316,9 @@ export const FOOD_DB: FoodEntry[] = [
   f('beetroot', ['beets'], { kcal: 43, protein: 1.6, carbs: 10, fat: 0.2 }, 'veg', {}),
   f('butternut squash', ['squash'], { kcal: 45, protein: 1, carbs: 12, fat: 0.1 }, 'veg', {}),
   f('sweet potato raw', [], { kcal: 86, protein: 1.6, carbs: 20, fat: 0.1 }, 'carb', { is_high_carb: true }),
+  // THE RAW POTATO (18 Oct 2026, runs 7-10, H36/M64): what a potato is weighed and bought as. Boiled and baked potato
+  // are its cooked twins (STATE_TWINS), so a line is counted, shown and shopped raw.
+  f('potato raw', ['raw potato', 'raw potatoes', 'uncooked potato'], { kcal: 77, protein: 2, carbs: 17.5, fat: 0.1 }, 'carb', { is_high_carb: true }), // USDA 11352 potatoes, flesh and skin, raw
   f('rocket', ['arugula'], { kcal: 25, protein: 2.6, carbs: 3.7, fat: 0.7 }, 'veg', {}),
 
   // ===== FRUIT ==========================================================
@@ -868,6 +871,7 @@ const ENTRY_STATE: Record<string, FoodState> = {
   'chickpeas': 'cooked', 'lentils red': 'cooked', 'lentils green': 'cooked', 'brown lentils': 'cooked', 'black beans': 'cooked',
   'kidney beans': 'cooked', 'pinto beans': 'cooked', 'butter beans': 'cooked', 'cannellini beans': 'cooked', 'haricot beans': 'cooked',
   'gluten free pasta': 'cooked', 'oats': 'dry',
+  'potato boiled': 'cooked', 'potato baked': 'cooked', 'sweet potato baked': 'cooked',
   // THE OTHER HALF OF RULE 6 (15 Oct 2026, H32; docs/plans/meals-costed-as-weighed.md):
   // entries whose figures describe ONE state and have no twin for the other.
   // "cooked salmon" was costed with raw salmon's figures and "dried split peas"
@@ -896,6 +900,8 @@ const STATE_TWINS: Record<string, { dry?: string; raw?: string }> = {
   'lentils red': { dry: 'red lentils dry' }, 'lentils green': { dry: 'green lentils dry' },
   'chicken breast': { raw: 'chicken breast raw' }, 'chicken thigh': { raw: 'chicken thigh raw' }, 'turkey breast': { raw: 'turkey breast raw' },
   'pork loin': { raw: 'pork loin raw' }, 'cod': { raw: 'cod raw' }, 'haddock': { raw: 'haddock raw' }, 'prawns': { raw: 'prawns raw' },
+  // Baked before boiled ON PURPOSE: a raw potato's cooked twin is the LAST one listed, and a bare "potato" is boiled.
+  'potato baked': { raw: 'potato raw' }, 'potato boiled': { raw: 'potato raw' }, 'sweet potato baked': { raw: 'sweet potato raw' },
 }
 const COOKED_TWIN_OF: Record<string, string> = {}
 for (const [cooked, twins] of Object.entries(STATE_TWINS)) {
@@ -903,6 +909,32 @@ for (const [cooked, twins] of Object.entries(STATE_TWINS)) {
   if (twins.raw) { ENTRY_STATE[twins.raw] = 'raw'; COOKED_TWIN_OF[twins.raw] = cooked }
 }
 for (const entry of FOOD_DB) if (/\bcooked\b/.test(entry.name) && !ENTRY_STATE[entry.name]) ENTRY_STATE[entry.name] = 'cooked'
+
+/** The raw or dry twin a cooked entry is weighed and bought as, or null when it has none (a tin of beans, a sauce). */
+export function weighedTwinOf(entry: FoodEntry): FoodEntry | null {
+  const twins = STATE_TWINS[entry.name]
+  const name = twins?.dry ?? twins?.raw
+  return name ? FOOD_DB.find(f => f.name === name) ?? null : null
+}
+
+/**
+ * Grams of the raw or dry twin for each gram of the cooked food. Cooking moves water, not protein or starch, so the
+ * factor is the ratio of the nutrient the cooked food holds most of: protein for meat and fish, carbs for grains,
+ * potatoes and lentils. Where the two foods' figures agree this is also the energy ratio to within a few percent;
+ * where they do not (USDA's roasted and raw chicken thigh), it is the one closer to a real cooking yield, and energy
+ * is what moves. One factor for the card, its cooked hint and the shopping list (18 Oct 2026, runs 7-10, H36/M64).
+ */
+export function weighedFactor(cooked: FoodEntry, twin: FoodEntry): number | null {
+  const c = cooked.per100g, t = twin.per100g
+  const main = c.protein >= c.carbs ? 'protein' : 'carbs'
+  return c[main] > 0 && t[main] > 0 ? c[main] / t[main] : null
+}
+
+/** The cooked twin of a raw or dry entry, or null. */
+export function cookedTwinOf(entry: FoodEntry): FoodEntry | null {
+  const name = COOKED_TWIN_OF[entry.name]
+  return name ? FOOD_DB.find(f => f.name === name) ?? null : null
+}
 
 /** The state an entry's figures describe, or undefined when the state word does not change its numbers much. */
 export function stateOf(entry: FoodEntry): FoodState | undefined {

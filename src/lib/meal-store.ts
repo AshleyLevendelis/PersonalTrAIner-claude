@@ -22,6 +22,8 @@ import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
 import type { MacroTargets } from './types'
 import { costStoredMeal } from './meal-costing'
+import { asWeighedLines } from './as-weighed'
+import type { MealIngredientLine } from './food-db'
 // Type-only import — meal-generation.ts only imports MealSlotName (a type)
 // from this module, so this doesn't create a real circular dependency.
 import type { PoolOption } from './meal-generation'
@@ -619,12 +621,15 @@ export async function readPools(profileId: string): Promise<{ pools: Partial<Rec
     // meal's own lines costed today, or, when today's table cannot cost them
     // as well as it would a new meal, the stored numbers whole.
     const stored = { calories: macros.kcal ?? 0, protein: macros.protein ?? 0, carbs: macros.carbs ?? 0, fat: macros.fat ?? 0 }
-    const costing = costStoredMeal(row.ingredients, stored)
+    // ONE STATE (18 Oct 2026, runs 7-10, H36/M64): the lines as they are weighed, raw or dry, worked out again on every
+    // read (never written back). Energy is carried over line by line, so the costing below sees the same meal.
+    const lines = Array.isArray(row.ingredients) ? asWeighedLines(row.ingredients as MealIngredientLine[]) : row.ingredients
+    const costing = costStoredMeal(lines, stored)
     if (!costing.recosted) keptAsStored.push(`${slot}: ${row.name}`)
     const option: PoolOption = {
       slot,
       name: row.name,
-      ingredients: row.ingredients ?? [],
+      ingredients: lines ?? [],
       macros: costing.macros,
       tags: row.tags ?? [],
       // Empty for every pool stored before the column existed, which renders

@@ -36,6 +36,7 @@ import { dayAsShown, eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept 
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
+import { cookedHint } from '@/lib/as-weighed'
 const MealMoveSheet = lazyWithReload(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazyWithReload(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -790,6 +791,15 @@ function displayIngredient(ing: { name: string; quantity: number; unit: string }
   return `${formatKitchenQuantity(ing.quantity, ing.unit)}${ing.unit === 'g' || ing.unit === 'ml' ? ing.unit : ` ${ing.unit}`} ${ing.name}`
 }
 
+/**
+ * Her ruling, 18 Oct 2026 (runs 7-10, H36): "Dry, plus cooked hint" — "71g dry rice (about 200g cooked)". The line is
+ * weighed raw or dry; this is only drawn beside it, never part of the line, so it can never be read as an ingredient.
+ */
+function CookedHint({ ing }: { ing: { name: string; quantity: number; unit: string } }) {
+  const hint = cookedHint(ing)
+  return hint ? <span data-testid="ingredient-cooked-hint" className="text-muted-foreground"> ({hint})</span> : null
+}
+
 function MealSlotRow({
   profileId,
   isFavourite,
@@ -1168,11 +1178,11 @@ function MealSlotRow({
                           aria-expanded={editingLine === i}
                           onClick={() => { setEditNote(null); setEditingLine(prev => (prev === i ? null : i)) }}
                         >
-                          <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}</span>
+                          <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}<CookedHint ing={ing} /></span>
                           <span className="shrink-0 text-[0.625rem] text-muted-foreground">Change</span>
                         </button>
                       ) : (
-                        <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}</span>
+                        <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}<CookedHint ing={ing} /></span>
                       )}
                       {editingLine === i && (() => {
                         const ctx = editContextFor(option)

@@ -189,7 +189,9 @@ async function main() {
   const ownRefused = verifyProposal(withBad, 'dinner', budget, [], logOwn, [], undefined, true)
   check('...also in the user\'s-own-portions mode, where the amounts are facts and nothing re-checks them', ownRefused === null && logOwn.some(l => l.includes('1 knob butter')), logOwn)
   const ownGood = verifyProposal({ ...good, ingredients: ['8 oz chicken breast', '1 cup white rice cooked', '2 carrots'] }, 'dinner', budget, [], [], [], undefined, true)
-  check('...while her own meal in ounces, cups and counts is accepted and costed right: 227 g of chicken, 160 g of rice, two carrots', !!ownGood && ownGood.ingredients.map(i => `${i.quantity}${i.unit}`).join(' ') === '227g 1cup 2whole' && ownGood.macros.protein > 60, ownGood && { ing: ownGood.ingredients, macros: ownGood.macros })
+  // RE-ANCHORED 18 Oct 2026 (runs 7-10, H36): 8 oz (227 g) of cooked chicken and a cup (160 g) of cooked rice read as
+  // what is weighed and bought, 315 g raw chicken and 55 g dry rice (test:one-state holds the conversion).
+  check('...while her own meal in ounces, cups and counts is accepted and costed right: 227 g of chicken (315 g raw), 160 g of rice (55 g dry), two carrots', !!ownGood && ownGood.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`).join(', ') === '315g raw chicken breast, 55g dry white rice, 2whole carrots' && ownGood.macros.protein > 60, ownGood && { ing: ownGood.ingredients, macros: ownGood.macros })
   const demo = computeMealMacros(['150g basmati rice cooked', '8 oz chicken breast', '1 tin tuna', 'a pinch of black pepper', '100g broccoli', '1 tbsp olive oil'].map(parseIngredientLine))
   check('THE MEAL THAT SCORED COVERAGE 0.993 WITH 10 G OF PROTEIN (8 oz chicken, a tin of tuna): it now carries the chicken and the tuna, about 100 g, and every amount is understood', demo.protein > 80 && demo.amountsUnderstood, { protein: demo.protein, coverage: demo.coverage })
   const unmatchedOk = computeMealMacros(['2 sprigs thyme', '1 cup dragonfruit'].map(parseIngredientLine))

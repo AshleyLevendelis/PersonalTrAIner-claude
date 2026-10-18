@@ -464,8 +464,9 @@ const FB1 = await page(`
 `)
 check('her tap builds it from the meals, and the button then reads "Rebuild"', FB1.button === 'Rebuild' && FB1.names.length >= 8, FB1)
 check('no row is named "... cooked"; the rice is "brown rice"', FB1.names.includes('brown rice') && !FB1.names.some(n => /cooked/i.test(n)), FB1.names)
-// 80g of cooked rice a day for seven days is 560g on the plate and 190g from the bag (x0.34).
-check('the rice is the dry weight to buy (190g for the week, not 560g), under its own unchanged key', FB1.rice?.quantity === 190 && FB1.rice?.unit === 'g' && FB1.rice?.display_name === 'brown rice', FB1.rice)
+// 80g of cooked rice a day for seven days is 560g on the plate and 185g from the bag (x0.33), shown as about 190g.
+// RE-ANCHORED 18 Oct 2026 (M64): the card's own factor for brown rice is 0.33 (was 0.34): 560g cooked is 185g dry.
+check('the rice is the dry weight to buy (185g for the week, not 560g), under its own unchanged key', FB1.rice?.quantity === 185 && FB1.rice?.unit === 'g' && FB1.rice?.display_name === 'brown rice', FB1.rice)
 check('...and the row shows it (190g)', /190g/.test(FB1.riceShown || '') && !/560|600/.test(FB1.riceShown || ''), FB1.riceShown)
 check('eggs and butter are under dairy, tofu is in dry goods, chicken is still with the meat', FB1.aisles.egg === 'dairy' && FB1.aisles.butter === 'dairy' && FB1.aisles.tofu === 'dry_goods' && FB1.aisles.chicken === 'meat_fish', FB1.aisles)
 check('...and the aisle is called "Dairy & eggs", on its heading and on its chip', /^Dairy & eggs/.test(FB1.dairyHeading || '') && /^Dairy & eggs\d+$/.test(FB1.dairyChip || ''), [FB1.dairyHeading, FB1.dairyChip])

@@ -191,8 +191,9 @@ async function main() {
     // BOTH KINDS ON ONE CARD: chicken added to Tuesday's breakfast moves one of
     // Tuesday's meals to a different dish and resizes another. (A banana did this
     // under the old 25% bands; under the 10% bands, runs 7-10 M59, it only
-    // resized, so the food was re-measured: the input changed, not the check.)
-    const mixedAdd = addFood(serving, dates[2], 'breakfast', ['100g chicken breast'])
+    // resized, so the food was re-measured: the input changed, not the check. Written raw since 18 Oct, H36, as
+    // every line now reads; re-measured again then.)
+    const mixedAdd = addFood(serving, dates[2], 'breakfast', ['100g raw chicken breast'])
     const mixed = mixedAdd.ok ? trial(serving, dates[2], 'breakfast', mixedAdd.payload.option) : { changes: [], lines: [] } as KnockOn
     const mixedReal = mixedAdd.ok ? reallyApply(serving, dates[2], 'breakfast', mixedAdd.payload.option) : { diff: [] as string[] }
     check('a second case holds both kinds at once: a different dish AND the same dish at a different size', mixed.changes.some(c => c.kind === 'dish') && mixed.changes.some(c => c.kind === 'size'), mixed.changes)

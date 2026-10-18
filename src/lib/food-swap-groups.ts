@@ -64,7 +64,7 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
     'pasta dry', 'wholewheat pasta dry', 'egg noodles dry', 'rice noodles dry'],
   'bread': ['white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant', 'french toast'],
   'wraps and flatbreads': ['tortilla wrap', 'corn tortilla', 'pitta bread', 'naan bread', 'chapati', 'injera flatbread'],
-  'starchy veg': ['potato boiled', 'potato baked', 'mashed potato', 'sweet potato baked', 'sweet potato raw', 'taro root', 'yellow yam', 'plantain', 'parsnip', 'butternut squash'],
+  'starchy veg': ['potato boiled', 'potato baked', 'potato raw', 'mashed potato', 'sweet potato baked', 'sweet potato raw', 'taro root', 'yellow yam', 'plantain', 'parsnip', 'butternut squash'],
   'breakfast cereal': ['oats', 'granola', 'muesli', 'cornflakes', 'weetabix'],
   'crackers and crisp snacks': ['rice cakes', 'chocolate rice cakes', 'crackers', 'rye crispbread', 'popcorn', 'tortilla chips'],
   'flour': ['plain flour', 'cornmeal', 'lupin flour', 'oat flour', 'almond flour', 'coconut flour', 'rice flour'],

@@ -1380,6 +1380,14 @@ menu" stays true when a copy is also left outside it.
   `test:chat-app-reality` (the coach's app map; needs the `chat-gemini` deploy)
 
 ### Her rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
+- **Every ingredient is counted, shown and shopped raw or dry — her ruling 18 Oct 2026 (runs 7-10, H36/M64), "Dry,
+  plus cooked hint"**: "70g dry rice (about 200g cooked)". A cooked line becomes its raw or dry twin at the weight
+  holding the same protein (meat, fish) or starch (grains, potatoes, lentils), in kitchen steps, wherever lines come in
+  (the stored-meal read and verification); the hint is drawn beside the line, never in it; the list buys by the same
+  factor; our own library is written as bought. Energy moves a few percent at most, except chicken thigh, whose USDA
+  cooked and raw figures disagree (named). And a resized copy of a plan dish ("X (as lunch)") is the plan's own for
+  her 10 Oct hold rule. `test:one-state`, `verify:meal-costed`, `test:meal-day-move` §13. Needs the `chat-gemini` and
+  `generate-meals` deploys for the coach's food table and the writer's rule
 - **"On target" means every number inside its band, and the bands are tighter — her rulings 18 Oct 2026 (runs 7-10,
   M59)**, "Tighter meals too" and then, with the measured cost in front of her, "Tighter meals, 10%": carbs and fat
   ±10% (were ±25%), protein 0.95-1.10x (was 1.15x), calories ±5%; protein's floor kept at 0.95. Measured at 100%

@@ -23,7 +23,7 @@
 // calls it), so there is no cycle.
 // ---------------------------------------------------------------------------
 
-import { findFoodsNamedIn, foodTextWords, lookupIngredient, HARMLESS_WORDS } from './food-db'
+import { findFoodsNamedIn, foodTextWords, lookupIngredient, cookedTwinOf, weighedTwinOf, HARMLESS_WORDS } from './food-db'
 import { FORBIDDEN_TAGS, type DietaryPreference } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { ALLERGEN_FOOD_PATTERNS, DIET_WORD_PATTERNS } from './allergen-words'
@@ -102,7 +102,10 @@ export function checkMethod(prep: string | undefined, ingredientNames: readonly 
   // says "basmati rice cooked". A word that ends a longer listed word counts
   // too ("berries" for "blueberries"); it is only ever more lenient about
   // TRUTH, never about a restriction, which section 1 has already decided.
-  const listedEntries = new Set(ingredientNames.map(n => lookupIngredient(n)?.name).filter(Boolean) as string[])
+  // A food in another state is the same food (18 Oct 2026, runs 7-10, H36): a line weighed dry or raw ("70g dry white
+  // rice") is what a step calls "the cooked rice", so a listed line's cooked twin and raw or dry twin are listed too.
+  const listedFoods = ingredientNames.map(n => lookupIngredient(n)).filter((e): e is NonNullable<typeof e> => e != null)
+  const listedEntries = new Set(listedFoods.flatMap(e => [e, cookedTwinOf(e), weighedTwinOf(e)]).filter(e => e != null).map(e => e!.name))
   const listedWords = [...new Set(ingredientNames.flatMap(n => foodTextWords(n, true)))]
   const isListedWord = (w: string) => listedWords.includes(w) || (w.length >= 4 && listedWords.some(l => l.endsWith(w)))
   for (const hit of hits) {

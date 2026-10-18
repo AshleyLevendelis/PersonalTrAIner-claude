@@ -81,7 +81,9 @@ async function main(): Promise<void> {
     const pOwn = computeMealMacros(pasta)
     check('a dry-pasta, raw-thigh dinner reads its own numbers too', p?.calories === pOwn.kcal && p?.carbs === pOwn.carbs, { p, own: pOwn.kcal })
 
-    const fresh = [g('chicken breast', 150), g('white rice cooked', 200), g('olive oil', 10)]
+    // Written raw and dry, as every line now reads (18 Oct 2026, H36: a cooked-written line is weighed as its raw or
+    // dry twin on read, so a meal written cooked moves state by design; test:one-state holds that its energy does not).
+    const fresh = [g('raw chicken breast', 206), g('dry white rice', 71), g('olive oil', 10)]
     const fm = computeMealMacros(fresh)
     rows = [row('lunch', 0, 'Chicken and rice', fresh, { kcal: fm.kcal, protein: fm.protein, carbs: fm.carbs, fat: fm.fat })]
     const f = (await readPools('p')).pools.lunch?.[0]?.macros
