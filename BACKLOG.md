@@ -40,14 +40,23 @@ Newest first. One line each.
   mutations caught).
   CSCS (population nutrition, mine): what she weighs and what the day counts are now one food in one state; protein,
   the number a deficit protects, is carried exactly; no band or floor moved. Not clinical.
-  `test:one-state` (47 checks; red at the old code on 9 checks plus 2 for the leftover case, which reproduced her shape:
-  628 kcal against a 420 budget; 26 mutations across the conversion, the factor, the twins, the read, verification,
+  `test:one-state` (49 checks; red at the old code on 9 checks plus 2 for the leftover case, which reproduced her shape:
+  628 kcal against a 420 budget; 29 mutations across the conversion, the factor, the twins, the read, verification,
   the leftover, the list and the card, all caught, three only after cases where they bind: a name her words would land
   on the wrong food ("wholemeal pasta"), an unread line in grams, the hint's own guard was redundant and was removed;
-  one equivalent mutant on the leftover recorded, not checked), `verify:meal-costed` extended (15 checks at 390x844:
-  a lunch stored cooked reads "248g raw chicken breast (about 180g cooked)"; 4 mutations caught). Re-anchored with
-  reasons: `test:grocery-shopping` (cooked chicken is bought raw now, the symptom she reported; the factor check reads
-  `weighedFactor`), `test:meals-costed-as-weighed` ("nothing moves that was right" now uses a meal written raw and dry).
+  one equivalent mutant on the leftover recorded, not checked; a further check: no library line is written cooked,
+  red on the old library), `verify:meal-costed` extended (15 checks at 390x844: a lunch stored cooked reads "250g raw
+  chicken breast (about 180g cooked)" and "40g dry basmati rice (about 120g cooked)"; 4 mutations caught).
+  Re-anchored with reasons, inputs or the old symptom, never loosened: `test:grocery-shopping` and `test:grocery`
+  (cooked chicken is bought raw now, the symptom she reported; factors read `weighedFactor`, 650 g cooked rice is 227 g
+  dry), `verify:grocery` (560 g cooked brown rice is 185 g dry), `test:meals-costed-as-weighed` ("nothing moves that
+  was right" now uses a meal written raw and dry), `test:ingredient-units` (her 8 oz cooked chicken reads 315 g raw),
+  `test:meal-food-edit` (the edited line is the dry one she sees), `test:meal-knock-on` (the both-kinds food
+  re-measured, 100 g raw chicken), `test:kitchen-amounts` (the card span may carry the hint), `test:food-swaps` (raw
+  potato joins starchy veg), `test:hold-around-pins` (behaviour instead of a pinned line). And the recipe-step check
+  counts a food's states as one food ("the cooked rice" in a step, "70g dry white rice" in the list): 7 library
+  methods would otherwise have been hidden (`test:meal-method-check`, 2 mutations caught). 140 derived gates and
+  drivers run; red only `test:meal-quality` (no database here) and `test:meal-top-up`'s top-up benefit (waits on H35).
   Deploys: frontend; `chat-gemini` (its food-table copy gains the raw potato and the twins); `generate-meals` (the
   writer's rule; the read converts either way, so this one is tidiness, not correctness).
 - [~] **M59 (runs 7-10, 18 Oct 2026): "on target" only when every number is inside its band, tighter bands, and the
