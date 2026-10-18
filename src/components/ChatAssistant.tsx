@@ -293,6 +293,8 @@ interface ChatAssistantProps {
   exerciseExclusions: string[]
   /** Latest daily_metrics weigh-in — keeps the chat's bmr/tdee/weight context in lockstep with the Nutrition tab (living targets, M0). */
   latestWeightKg?: number | null
+  /** The weight the targets are worked out from (App's anchor, M58): the coach's BMR/TDEE read it, so its TDEE and its target agree. */
+  targetWeightKg?: number | null
   onPlanUpdate: (action: PlanAction) => void | Promise<void>
   onLogsUpdated?: () => void
   /**
@@ -466,7 +468,7 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -1717,7 +1719,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // are unavailable rather than being handed a figure computed from a
     // guessed weight — it must not quote a calorie target it cannot stand
     // behind, and it must not invent one to fill the silence.
-    const liveMetrics = resolveBodyMetrics({ ...profile, weight_kg: effectiveWeightKg })
+    // M58: the TDEE is worked out from the same weight as the target it sits beside, not the raw latest weigh-in.
+    const targetBasisKg = targetWeightKg != null && targetWeightKg > 0 ? targetWeightKg : effectiveWeightKg
+    const liveMetrics = resolveBodyMetrics({ ...profile, weight_kg: targetBasisKg })
     const liveBmr = liveMetrics ? computeBMR(liveMetrics) : null
     const liveTdee = liveBmr != null ? computeStaticTDEE(liveBmr, profile.activity_level) : null
 

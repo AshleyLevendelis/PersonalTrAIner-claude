@@ -62,6 +62,12 @@ export interface NutritionDisplayProps {
   exercisePlan?: WorkoutDay[]
   /** Latest daily_metrics weigh-in — overrides the immutable onboarding weight in every displayed number (living targets, M0). */
   latestWeightKg?: number | null
+  /**
+   * THE WEIGHT THE TARGETS ARE WORKED OUT FROM (runs 7-10, M58): App's anchored 7-day weight, the same input
+   * `macros` was computed from. The "how it's set" row and sheet read it, so the target they print is the one at the
+   * top of the screen. The raw latest weigh-in stays a display fact; it never feeds a second target.
+   */
+  targetWeightKg?: number | null
   onMacroModeChange?: (mode: MacroCalculationMode) => void
   /** Macro-accuracy round, Part 2 — fired on any macro-split edit (preset tap or a Custom-mode slider). */
   onMacroSplitChange?: (patch: Partial<UserProfile>) => void
@@ -152,7 +158,7 @@ export interface MealRefitOffer {
 }
 
 export function NutritionDisplay({
-  profile, macros, exercisePlan = [], latestWeightKg, onMacroModeChange, onMacroSplitChange,
+  profile, macros, exercisePlan = [], latestWeightKg, targetWeightKg, onMacroModeChange, onMacroSplitChange,
   profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealsRegeneratingAll = false, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
@@ -164,8 +170,11 @@ export function NutritionDisplay({
   // fitness_profiles columns (computed once at onboarding); they're now
   // derived live from the same effective-weight profile the macros use, so
   // a new weigh-in updates every number on this tab together.
-  const effectiveProfile = latestWeightKg != null && latestWeightKg > 0
-    ? { ...profile, weight_kg: latestWeightKg }
+  // ONE TARGET ON THE SCREEN (M58): the derivation reads the weight `macros` was worked out from (targetWeightKg),
+  // never the raw latest weigh-in, which once printed 1,684 at the bottom under 1,689 at the top.
+  const derivationWeightKg = targetWeightKg != null && targetWeightKg > 0 ? targetWeightKg : latestWeightKg
+  const effectiveProfile = derivationWeightKg != null && derivationWeightKg > 0
+    ? { ...profile, weight_kg: derivationWeightKg }
     : profile
   const mode = profile.macro_calculation_mode || 'STANDARD_STATIC'
   // Turn 10: the derivation always explains the STATIC baseline (BMR → TDEE
@@ -394,7 +403,7 @@ export function NutritionDisplay({
                     </p>
                   </div>
                   <p className="pb-0.5 text-[0.75rem] text-muted-foreground">
-                    <span className="tabular-mono text-foreground" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> of <span className="tabular-mono text-foreground">{Math.round(macros.calories).toLocaleString()}</span>
+                    <span className="tabular-mono text-foreground" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> of <span className="tabular-mono text-foreground" data-testid="kcal-target">{Math.round(macros.calories).toLocaleString()}</span>
                   </p>
                 </div>
                 <MacroBar share={ringShare(eaten.kcal, macros.calories)} color="var(--primary)" height={6} glow className="mt-3.5" testid="kcal-bar" />
@@ -612,7 +621,7 @@ export function NutritionDisplay({
         >
           <SlidersHorizontal aria-hidden className="size-4 shrink-0 text-text-tertiary" />
           <span className="min-w-0 flex-1 truncate text-[0.875rem]">Targets &amp; plan settings</span>
-          <span className="tabular-mono shrink-0 text-[0.75rem] text-muted-foreground" data-testid="target-kcal">{derivation.target.calories} kcal</span>
+          <span className="tabular-mono shrink-0 text-[0.75rem] text-muted-foreground" data-testid="target-kcal">{macros?.calories ?? derivation.target.calories} kcal</span>
           <ChevronRight aria-hidden className="size-4 shrink-0" style={{ color: 'var(--text-dim)' }} />
         </button>
       ) : (

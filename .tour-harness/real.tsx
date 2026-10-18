@@ -231,6 +231,12 @@ const SAM = new URLSearchParams(location.search).get('sam') === '1'
 // the remembered facts with the app's own functions — App's two lines, reproduced, nothing else. With ?sam=1 it is
 // Sam's own setup: the minimalist guess, nothing said about the kit.
 const KIT = new URLSearchParams(location.search).get('kit') === '1'
+// ?weighin=81.7 — THE LATEST WEIGH-IN ISN'T THE WEIGHT THE TARGETS USE (runs 7-10, M58). App works targets out from an
+// anchored 7-day weight that moves only when the average does; the raw reading is a display fact. INPUT only: the
+// anchor stays the profile's 80 kg, as App's would after one heavier morning.
+const WEIGHIN = new URLSearchParams(location.search).get('weighin')
+// ?macromode=dynamic — targets that move with the training day (the app's DYNAMIC_CSCS mode). INPUT only.
+const DYNAMIC_MACROS = new URLSearchParams(location.search).get('macromode') === 'dynamic'
 // ?walker=1 — THE BEGINNER'S WALKING PLAN, the only plan the app generates
 // whose days hold a prescribed ACTIVITY instead of exercises.
 //
@@ -277,7 +283,7 @@ const profile: UserProfile = {
   workout_split_preference: LEG_CURL ? 'push_pull_legs' : SAM ? 'ai_recommendation' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
-  exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
+  exercise_exclusions: [] as unknown as never, macro_calculation_mode: DYNAMIC_MACROS ? 'DYNAMIC_CSCS' : 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: MOBILITY ? 'high' : 'moderate', conditioning_preference: MOBILITY ? 'love' : FINISHER ? 'enjoy' : 'tolerate',
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
@@ -1608,7 +1614,7 @@ function Harness() {
         )}
         {activeTab === 'nutrition' && (
           <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
-            latestWeightKg={80} profileId={PROFILE_ID} date={today} planCreatedAt={profile.created_at}
+            latestWeightKg={WEIGHIN != null ? Number(WEIGHIN) : 80} targetWeightKg={profile.weight_kg} profileId={PROFILE_ID} date={today} planCreatedAt={profile.created_at}
             pools={servablePools as never} chosen={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
             avoidFoods={compileFoodDislikes(AVOID_FACTS)}
             isGeneratingMeals={regenBusy} mealRegenerateError={regenError} mealsRegeneratingAll={mealActions.regeneratingAll}

@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **M58 (runs 7-10, 18 Oct 2026): Nutrition prints ONE calorie target.** Sam saw 1,689 at the top and "1684 kcal ·
+  TDEE 2105 −421" lower down. TRACED: the top is App's targets, worked out from the ANCHORED 7-day weight (it moves
+  only when the average does); the "Targets & plan settings" row and the "how it's set" sheet re-derived the target
+  from the RAW latest weigh-in, and the coach's TDEE did too. Two weights, two targets; rounding was not the cause.
+  FIXED (mechanical): App hands the anchored weight to Nutrition and the coach; the sheet's chain and the coach's
+  BMR/TDEE are worked out from it; the row prints the top number itself, so with targets that move by training day it
+  prints today's. The raw weigh-in stays a display fact. `test:one-calorie-target` (8 checks, 600 of 600 static cases
+  agree, 4 mutations caught), `verify:one-calorie-target` (5 checks at 390x844; 2 mutations caught, one only after a
+  case with day-by-day targets, where the row and the static chain genuinely differ). 131 derived gates and drivers
+  green. Frontend only. NOT PROVEN on her data (her weigh-ins are not readable from here).
 - [x] **H34 (runs 7-10, 18 Oct 2026): the kit is what was said; setup shows the ticks once; "I haven't got the
   kit" fixes it for good.** Sam (adjustable dumbbells to 24 kg and a flat bench ONLY) picked "no barbell or bench"
   and Profile ticked kettlebell, bands, pull-up bar and bag with the bench unticked; his plan had Banded TKE, Band

@@ -3157,6 +3157,7 @@ function App() {
               macros={macros}
               exercisePlan={exercisePlan}
               latestWeightKg={latestWeightKg}
+              targetWeightKg={targetWeightAnchorKg ?? profile?.weight_kg ?? null}
               onMacroModeChange={handleMacroModeChange}
               onMacroSplitChange={handleMacroSplitChange}
               profileId={profile.id}
@@ -3254,6 +3255,7 @@ function App() {
               mealPlan={mealPlan}
               exerciseExclusions={effectiveExclusions}
               latestWeightKg={latestWeightKg}
+              targetWeightKg={targetWeightAnchorKg ?? profile?.weight_kg ?? null}
               onPlanUpdate={handlePlanUpdate}
               onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onWeightLogged={handleWeightLogged}
