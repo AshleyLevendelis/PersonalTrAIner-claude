@@ -785,7 +785,20 @@ export async function generateMealPools(params: {
    * same function, so a dish is never accepted by a route that skips a rule
    * (30 Sep 2026: the loop that used to sit inline in the round below).
    */
-  const considerProposal = (proposal: RawProposal): void => {
+  /**
+   * DOES THIS DISH LAND ONE OF HER DAYS ON TARGET? (19 Oct 2026, runs 7-10, H35.) The fit test the offer itself
+   * counts with (fittingCounts: the dish pinned, the rest chosen by the search, the day it would serve inside the
+   * bands), against what she has now plus what this run has accepted. Null when a meal has nothing to judge with.
+   */
+  const fitsADay = (slot: MealSlotName, option: PoolOption): boolean | null => {
+    const daySlots = Object.keys(budgets) as MealSlotName[]
+    const usable: Partial<Record<MealSlotName, PoolOption[]>> = {}
+    for (const s of daySlots) usable[s] = [...(existingBySlot[s] ?? []), ...(accepted[s] ?? [])].filter(o => !o.breaksRestriction)
+    if (daySlots.some(s => s !== slot && usable[s]!.length === 0)) return null
+    return assembleDay(usable, params.targets, {}, [], { [slot]: option }).withinTolerance
+  }
+
+  const considerProposal = (proposal: RawProposal, mustFit = false): void => {
     const slot = proposal.slot as MealSlotName
     if (!activeSlots.includes(slot)) return
     if ((accepted[slot]?.length ?? 0) >= poolSize) return
@@ -824,6 +837,13 @@ export async function generateMealPools(params: {
       .map(r => r.subject)
     const effectiveDislikes = [...(params.dislikedFoods ?? []), ...slotTimingDislikes]
     const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences)
+    // A LIBRARY DISH IS ADDED ONLY IF IT CAN BE SERVED (19 Oct 2026, H35). Passing the checks is not landing a day:
+    // under the 10% bands a "more options" run could add six dishes and leave the week on the same two. The library
+    // has hundreds to choose from, so one that cannot land her day is passed over; the meal writer fills the rest.
+    if (option && mustFit && fitsADay(slot, option) === false) {
+      rejectionLog.push(`[${slot}] "${proposal.name}": accepted, but no day of hers lands on target with it`)
+      return
+    }
     if (option) {
       accepted[slot]!.push(params.appendToExisting && params.servedFrom
         ? { ...option, tags: tagsNewFrom(option.tags, params.servedFrom) }
@@ -861,7 +881,7 @@ export async function generateMealPools(params: {
           rotation: existing.length,
           budget: budgets[slot],
         })
-        for (const dish of candidates) considerProposal(dish)
+        for (const dish of candidates) considerProposal(dish, true)
       }
     } catch (err) {
       // The library is a convenience. Without it the meal writer is asked for everything, as before.

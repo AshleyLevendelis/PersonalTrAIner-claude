@@ -28,7 +28,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { computeSlotBudgets, type AssembledDay, type PoolOption } from '../src/lib/meal-generation'
+import { computeSlotBudgets, assembleDay, type AssembledDay, type PoolOption } from '../src/lib/meal-generation'
 import { buildRotation, assembleRotationDay, serveDates, addDays, datesFrom, poolsServedOn } from '../src/lib/meal-rotation'
 import { newFromDate, tagsNewFrom, isBookkeepingTag, displayTags, NEW_FROM_TAG_PREFIX } from '../src/lib/meal-new-from'
 import { topUpNeeds, topUpStartDate, topUpStartLabel, runMealTopUp, topUpOffer, topUpPlan, fittingCounts, isTopUpDismissed, dismissTopUp, MIN_FITTING, FITTING_GOAL, MAX_POOL, type TopUpPlan } from '../src/lib/meal-top-up'
@@ -649,7 +649,7 @@ async function main() {
       const rot = buildRotation(pools, t, [], SHAPE8)
       return new Set(WEEK.map(d => assembleRotationDay(rot, d, pools, t, [], {}).chosen.dinner?.name)).size
     }
-    let flagged = 0, unflagged = 0, flaggedSum = 0, unflaggedSum = 0, cleared = 0, afterSum = 0
+    let flagged = 0, unflagged = 0, flaggedSum = 0, unflaggedSum = 0, cleared = 0, afterSum = 0, met = 0, metCleared = 0
     for (let p = 0; p < 150; p++) {
       const rnd = mulberry32(7000 + p)
       const calories = 1700 + Math.round(rnd() * 1300)
@@ -664,23 +664,39 @@ async function main() {
       const dinners = distinctDinners(pools, t)
       if (plan.fewFit.dinner === undefined) { unflagged++; unflaggedSum += dinners; continue }
       flagged++; flaggedSum += dinners
-      const more: Pools = {}
+      const more: Pools = { ...pools }
+      let dinnerMet = false
       for (const slot of ALL) {
-        const extra = Array.from({ length: plan.needs[slot] ?? 0 }, (_, i) => makeDish(rnd, slot, 100 + i, bNow[slot]!)).filter((o): o is PoolOption => o !== null)
-          .map(o => ({ ...o, name: `${o.name} (new)` }))
+        // AS THE RUN NOW ADDS THEM (19 Oct 2026, H35): only a dish that lands one of her days inside the bands is
+        // added, the offer's own fit test, so candidates that cannot are passed over. An input rule, not an output:
+        // the fixture draws candidates and the app's own assembleDay decides which ones serve, judged as the run judges
+        // them, against what she has plus what this ask has already added.
+        const extra: PoolOption[] = []
+        for (let k = 0; k < 200 && extra.length < (plan.needs[slot] ?? 0); k++) {
+          const d = makeDish(rnd, slot, 100 + k, bNow[slot]!)
+          if (d && assembleDay(more, t, {}, [], { [slot]: d }).withinTolerance) extra.push({ ...d, name: `${d.name} (new)` })
+        }
         more[slot] = [...(pools[slot] ?? []), ...extra]
+        if (slot === 'dinner') dinnerMet = extra.length >= (plan.needs.dinner ?? 0)
       }
-      if (topUpPlan(more, ALL, t).fewFit.dinner === undefined) cleared++
+      const nowClear = topUpPlan(more, ALL, t).fewFit.dinner === undefined
+      if (nowClear) cleared++
+      if (dinnerMet) { met++; if (nowClear) metCleared++ }
       afterSum += distinctDinners(more, t)
     }
     const flaggedAvg = flaggedSum / Math.max(1, flagged), unflaggedAvg = unflaggedSum / Math.max(1, unflagged), afterAvg = afterSum / Math.max(1, flagged)
-    console.log(`  measured: ${flagged} flagged serve ${flaggedAvg.toFixed(2)} different dinners a week, ${unflagged} unflagged ${unflaggedAvg.toFixed(2)}; after the ask ${afterAvg.toFixed(2)}, flag cleared on ${cleared}/${flagged}`)
+    console.log(`  measured: ${flagged} flagged serve ${flaggedAvg.toFixed(2)} different dinners a week, ${unflagged} unflagged ${unflaggedAvg.toFixed(2)}; after the ask ${afterAvg.toFixed(2)}, flag cleared on ${cleared}/${flagged}; the ask met in full on ${met}, cleared on ${metCleared} of those`)
     check('the population has both kinds, so the comparison means something', flagged >= 20 && unflagged >= 20, [flagged, unflagged])
     // RE-ANCHORED 18 Oct 2026 (M59, her 10% bands): every week got samier (unflagged 3.50 a week, was about 4), so the
     // gap the flag picks out narrowed from over a dinner to 0.79. The requirement is that the flag picks out the samier
     // weeks, by a margin a person would notice; numbers before 18 Oct are not comparable.
     check('a flagged meal really is a samey week: over half a dinner fewer than the rest', flaggedAvg < unflaggedAvg - 0.5, [flaggedAvg, unflaggedAvg])
-    check('...and adding what it asks ends the flag for nearly all of them', cleared >= flagged * 0.9, [cleared, flagged])
+    // RE-ANCHORED 19 Oct 2026 (H35): the run now adds only dishes that land a day, so where no such dish exists it adds
+    // fewer than asked and says so (the rejection reads "no day of hers lands on target"), rather than adding dishes
+    // that would sit unserved. The claim the sentence makes is about the ask MET: every week given what it asked for
+    // ends the flag. How often it can be met is counted beside it and must stay most of them.
+    check('...and adding what it asks ends the flag every time the ask can be met', met > 0 && metCleared === met, [metCleared, met])
+    check('...and it can be met for most of them', met >= flagged * 0.8, [met, flagged])
     check('...and gives a week with at least half a dinner more', afterAvg > flaggedAvg + 0.5, [afterAvg, flaggedAvg])
   }
 

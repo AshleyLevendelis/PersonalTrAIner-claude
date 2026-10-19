@@ -456,6 +456,7 @@
     "test:meals-costed-as-weighed": "tsx scripts/test-meals-costed-as-weighed.ts",
     "test:one-state": "tsx scripts/test-one-state.ts",
     "measure:one-state": "tsx scripts/measure-one-state.ts",
+    "measure:meal-week": "tsx scripts/measure-meal-week.ts",
     "measure:meals-costed-as-weighed": "tsx scripts/measure-meals-costed-as-weighed.ts",
     "verify:meal-costed": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-costed.mjs",
     "test:meal-method-check": "tsx scripts/test-meal-method-check.ts",

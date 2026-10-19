@@ -23,7 +23,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { MEAL_LIBRARY } from '../src/lib/meal-library-data'
 import { chooseFromLibrary, fitDishToBudget } from '../src/lib/meal-library'
-import { verifyProposal, computeSlotBudgets, methodSafeToShow, checkSlotAppropriate, EXOTIC_CUISINES, type RawProposal } from '../src/lib/meal-generation'
+import { verifyProposal, computeSlotBudgets, methodSafeToShow, checkSlotAppropriate, assembleDay, EXOTIC_CUISINES, type RawProposal, type PoolOption } from '../src/lib/meal-generation'
 import { newFromDate } from '../src/lib/meal-new-from'
 import { parseIngredientLine } from '../src/lib/portion-scaler'
 import { computeMealMacros } from '../src/lib/food-db'
@@ -401,6 +401,9 @@ async function main() {
   const DIET_SETS: string[][] = [[], ['vegetarian'], ['vegan'], ['gluten-free'], ['dairy-free'], ['nut-free'], ['pescatarian']]
   let served4 = 0
   const shortfalls: string[] = []
+  const honestShort: string[] = []
+  const unfit: string[] = []
+  let fitJudged = 0
   const breaches: string[] = []
   for (const p of PROFILES) for (const diet of DIET_SETS) {
     const id = `real-${p.label}-${diet.join('+') || 'none'}`
@@ -410,7 +413,11 @@ async function main() {
     for (const slot of SLOTS) {
       const got = res.accepted[slot] ?? []
       served4 += got.length
-      if (got.length < 4) shortfalls.push(`${id} ${slot} ${got.length}/4`)
+      // SHORT ONLY BECAUSE NOTHING LEFT CAN LAND HER DAY (19 Oct 2026, H35): since then a library dish is added only
+      // if a day of hers lands on target with it. A meal left short must say why in the run's own log; a silent
+      // shortfall would be the library running out.
+      const passedOver = res.rejectionLog.some(l => l.startsWith(`[${slot}]`) && l.includes('no day of hers lands on target'))
+      if (got.length < 4) (passedOver ? honestShort : shortfalls).push(`${id} ${slot} ${got.length}/4`)
       for (const o of got) {
         const b = budgets[slot]!
         const m = computeMealMacros(o.ingredients)
@@ -419,9 +426,24 @@ async function main() {
         if (Math.abs(m.kcal - b.calories) / b.calories > 0.0701 || m.protein < b.protein) breaches.push(`${id} ${slot} "${o.name}" ${m.kcal}kcal/${m.protein}g vs ${b.calories}/${b.protein}`)
       }
     }
-    if (requests !== 0) shortfalls.push(`${id} asked the writer ${requests} times`)
+    if (requests !== 0 && !honestShort.some(h => h.startsWith(`${id} `))) shortfalls.push(`${id} asked the writer ${requests} times`)
+    // A REAL TOP-UP ON TOP OF THAT PLAN: every dish the library adds now can be SERVED, pinned in its meal with the
+    // day landing inside the bands. (The first run starts from nothing, where no day can be judged yet.)
+    const more = await generateMealPools({ profileId: id, targets: p.targets, dietaryPreferences: diet, mealsPerDay: 3, includeSnacks: true, poolSize: 3, appendToExisting: true })
+    const all = await getPools(id) as Partial<Record<MealSlotName, PoolOption[]>>
+    for (const sl of SLOTS) for (const o of more.accepted[sl] ?? []) {
+      if (o.name.startsWith('Writer ')) continue
+      fitJudged++
+      if (!assembleDay(all, p.targets, {}, [], { [sl]: o }).withinTolerance) unfit.push(`${id} ${sl} "${o.name}"`)
+    }
   }
-  check('for three real targets and seven diets, the library alone fills four dishes in every meal', shortfalls.length === 0 && served4 === PROFILES.length * DIET_SETS.length * 16, shortfalls.slice(0, 6))
+  check('for three real targets and seven diets, the library fills four dishes in every meal, or says the rest could not land her day', shortfalls.length === 0, shortfalls.slice(0, 6))
+  // MEASURED 19 Oct 2026: vegan snacks at 2,300 and 3,040 kcal with 160 g protein, and dairy-free at 3,040, are the
+  // only meals the library cannot fill with dishes that land the day inside the 10% bands. A literal, so growing
+  // the gap fails here rather than passing quietly.
+  console.log(`     meals short because nothing left lands the day: ${honestShort.length} (${honestShort.join('; ')})`)
+  check('...and those are at most the three measured (high-protein vegan and dairy-free snacks), with every other meal filled', honestShort.length <= 3 && served4 >= PROFILES.length * DIET_SETS.length * 16 - 8, { honestShort, served4 })
+  check('every dish the library added lands one of her days inside the bands (the fit test the offer counts with)', fitJudged >= 100 && unfit.length === 0, { fitJudged, unfit: unfit.slice(0, 5) })
   check('every dish offered meets the person\'s diet, stays within seven percent of the meal\'s calories and reaches its protein', breaches.length === 0, breaches.slice(0, 4))
   modelOn = true
 
@@ -437,7 +459,7 @@ async function main() {
   check('...and each slot is asked for with that slot\'s own budget, so the dishes are fitted to the meal they are offered for', /budget:\s*budgets\[slot\]/.test(fn.slice(libAt, libAt + 900)), fn.slice(libAt, libAt + 900))
   const askBlock = fn.slice(libAt, libAt + 900)
   check('...and is told what she already has and the exotic cap; considerProposal enforces both as well, so only the order would show a slip, and order is all this pins', /haveNames:\s*existing\.map\(o\s*=>\s*o\.name\)/.test(askBlock) && /exoticCuisines:\s*EXOTIC_CUISINES/.test(askBlock), askBlock)
-  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
+  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish, true\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
   check('...and that function is the only place a proposal is verified', (fn.match(/verifyProposal\(/g) ?? []).length === 1, (fn.match(/verifyProposal\(/g) ?? []).length)
   const chooser = read('src/lib/meal-library.ts')
   check('the chooser is deterministic: no Math.random', !/Math\.random/.test(chooser))
