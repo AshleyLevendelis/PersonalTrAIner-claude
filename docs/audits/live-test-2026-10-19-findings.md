@@ -130,3 +130,74 @@ records "could not be identified" and the card's sentence drops that, so it says
 passed because its yoghurt line is one the list knows. Two fixes, both in the allergen path (a plan first, and the
 wording is Ashley's): say "I can't confirm X is nut-free" for an unidentified line; and add the reviewed names
 (smoked turkey, low-fat / 2% / vanilla Greek yoghurt) with their plain parent's tags, rather than loosening the rule.
+
+---
+
+# Part 2 — five more, same day (setup and coach)
+
+| # | What she saw | Root cause | On this branch already? |
+|---|---|---|---|
+| 11 | "I know my numbers" → "Got those numbers down." → next question, no numbers asked | The three lift boxes are marked "never needed" (so nothing asks for them) and the setup model is told never to bring them up unprompted; the sentence is the model's, and nothing was recorded | No |
+| 12 | Age, height and weight asked in one free-text sentence | A proper three-box card with units already exists, but only appears if the setup model asks for it, and its instructions (written before the card existed) tell it not to | No |
+| 13 | "I don't have bands" → a swap card | The coach picked a one-exercise swap for TODAY when its instructions say a kit statement takes the kit change; nothing in code backs that rule up. The card itself waited for a tap (the receipt shows it was tapped). The card is the big one used for every change | No |
+| 14 | "I did rdl" → "How many sets and reps for Single-Leg RDL (Bodyweight)?" | No short names or aliases anywhere; the only catalogue name containing "rdl" is the single-leg one, so the app took it as certain | No |
+| 15 | Wants "a cardio workout today" / "a functional workout today" | Nothing on either surface changes today's session TYPE or STYLE; "rebuild today" keeps the main lift (her 16 Sep ruling) and swaps like for like | No |
+
+## 11. "I know my numbers"
+
+- The question offers "I know my numbers — Enter my current working weights" (`onboarding-slots.ts`). The three boxes
+  behind it are on the "never blocks" list, so they never reach the list of things still to ask, and the setup
+  model is told such slots must not be raised just because they are empty. A gate (`test:onboarding-slots`, "known-
+  lift numbers never block") holds that absence in place.
+- "Got those numbers down." is not in the app's code anywhere: the setup model wrote it, and it is false.
+- SAFETY HELD: with no numbers, the plan does not skip the calibration week (a backstop added after a measured case
+  where the same path prescribed 2.2x a woman's real loads). So week 1 is safe; the harm is a broken promise and a
+  calibration week she said she didn't need.
+- The lift boxes take kg only; someone typing pounds would be stored as kg.
+
+## 12. Age, height and weight
+
+- The card exists and is good: three labelled boxes, one Save, height as cm or 5'10", weight as kg, lb or stone.
+- It only appears when the setup model asks for it. Two lines of its instructions, written before the card
+  existed, say numbers "have no chips" and the tool should not be used for them. The model grouped the three as
+  prose, as told.
+- Fix: when the question plainly asks age/height/weight, the app shows the card itself, whatever the model did.
+  A labelled box cannot record a wrong answer the way wrong chips can, so this is safe to do in code.
+
+## 13. The swap card after "I don't have bands"
+
+- Nothing auto-applied: the "Swapped … Undo" receipt replaces the card after a tap or a typed yes.
+- The wrong tool: the coach's own rules say "I don't own bands" is about the kit she owns and takes the kit change,
+  which reprices every day; the swap fixed one exercise, today only, and the other band work stays. Nothing in code
+  enforces the rule, and the swap tool skips the "was this a command?" check the others run.
+- The live coach may not have the kit-change tool at all if it was not redeployed after 11 Oct. Worth checking first.
+- The second scope button reads "permanent" (raw), confirmed in the code.
+- Her ask (a text question with a small approve button) touches one component that draws every card, about forty
+  kinds. It partly reverses her 24 Sep line that the Apply cards for changes she ASKS for stay as they are, so it is
+  hers to rule on; and a "smaller" button meets the 44px one-handed tap floor.
+- Her plan day has a trap bar deadlift and chest dips, which Minimalist kit does not allow, so her stored kit may be
+  Home gym or edited. Can't read her profile here.
+
+## 14. "rdl"
+
+Confirmed through the real resolver: "rdl" → Single-Leg RDL (Bodyweight), certain; "dumbbell rdl", "stiff leg
+deadlift" and "ohp" → not recognised. Romanian Deadlifts does not contain the letters "rdl". The follow-up only asks
+for sets and reps, so the wrong name can't be corrected there, and because it is bodyweight it would log her RDL at
+0 kg. Fix (mechanical, mine): one short-name table (rdl, ohp, sldl, db, kb…) gated against the catalogue, and a
+short query matched only by letters is offered as a choice, never taken as certain.
+
+## 15. A different kind of workout today
+
+| Exists | Changes today's type or style? |
+|---|---|
+| Rebuild today (screen and coach) | No: keeps the main lift, swaps the rest like for like |
+| I did something else instead / activity swap | No: records what she did, prescribes nothing |
+| Add a cardio session (coach) | Refused on a day that already has a session |
+| Circuit log | Records a finished circuit |
+| Style change | Lasting, rebuilds the block; the coach is told not to use it for one day |
+
+- Sled push is not in the catalogue at all. Box jumps exist but only as a warm-up move (one per day). For Minimalist
+  or Home gym the cardio pool is jump rope, burpees and mountain climbers; every cardio machine is excluded.
+- Building it collides with her 16 Sep "keep the main lift and rebuild around it". The rule here is to put both in
+  front of her, not pick the newer one. What a one-day conditioning or functional session contains is my call as
+  a CSCS; whether "something different today" may drop the main lift is hers.
