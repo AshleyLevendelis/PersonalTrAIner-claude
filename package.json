@@ -410,6 +410,7 @@
     "verify:meal-method": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-method.mjs",
     "test:cook-once": "tsx scripts/test-cook-once.ts",
     "test:leftovers": "tsx scripts/test-leftovers.ts",
+    "verify:upnext-log": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/upnext-log.mjs",
     "verify:leftovers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/leftovers.mjs",
     "test:meal-favourite": "tsx scripts/test-meal-favourite.ts",
     "verify:meal-favourite": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-favourite.mjs",

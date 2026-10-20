@@ -109,7 +109,7 @@ import { classifyConfirmationReply } from '@/lib/confirmation-reply'
 import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
-import { GROCERY_AISLE_LABEL } from '@/lib/grocery-display'
+import { GROCERY_AISLE_LABEL, chatGroceryAmount } from '@/lib/grocery-display'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
 import { subscribeCardioLogStore, deleteCardioLog } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
@@ -4166,17 +4166,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       preconditions: { slots, from: start.from },
       payload: { slots, needs: mealTopUp.needs, from: start.from, startLabel: start.label },
       diff: {
-        lead: ask(slots.some(s => mealTopUp.fewFit[s] !== undefined) ? MORE_MEALS.leadFit : MORE_MEALS.lead),
+        lead: ask(slots.some(s => mealTopUp.fewFit[s] !== undefined && mealTopUp.fewFit[s]! < (mealTopUp.have[s] ?? 0)) ? MORE_MEALS.leadFit : MORE_MEALS.lead),
         // A meal short on fit reads "2 of 7 fit" to "up to 5 of 10 fit"; one
         // short only on count reads "5 options" to "7 options", as before.
-        rows: slots.map(slot => {
-          const have = mealTopUp.have[slot] ?? 0
-          const fit = mealTopUp.fewFit[slot]
-          const add = mealTopUp.needs[slot] ?? 0
-          return fit !== undefined
-            ? { field: REFIT_SLOT_LABEL[slot], before: MORE_MEALS.fitBefore(fit, have), after: MORE_MEALS.fitAfter(fit + add, have + add) }
-            : { field: REFIT_SLOT_LABEL[slot], before: MORE_MEALS.options(have), after: MORE_MEALS.options(have + add) }
-        }),
+        rows: slots.map(slot => ({ field: REFIT_SLOT_LABEL[slot], ...MORE_MEALS.row(mealTopUp.fewFit[slot], mealTopUp.have[slot] ?? 0, mealTopUp.needs[slot] ?? 0) })),
         unchanged: [MORE_MEALS.unchanged],
         implications: [
           { severity: 'info', text: MORE_MEALS.starts(start.label) },
@@ -4785,10 +4778,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const added: { name: string; row: GroceryItemRow; addedQuantity: number; created: boolean }[] = []
     let workingItems = currentItems
     for (const item of named) {
+      // The add bar's own rule for an amount (L58): never "1g" of kitchen roll, never "1 whole".
+      const amount = chatGroceryAmount({ name: String(item.name).trim(), quantity: item.quantity, unit: typeof item.unit === 'string' ? item.unit : undefined })
       const result = addItemLocal({
-        profileId, name: String(item.name).trim(),
-        quantity: typeof item.quantity === 'number' ? item.quantity : 1,
-        unit: typeof item.unit === 'string' && item.unit.trim() ? item.unit.trim() : 'whole',
+        profileId, name: amount.name, quantity: amount.quantity, unit: amount.unit,
         source: 'chat', currentItems: workingItems,
       })
       added.push({ name: String(item.name).trim(), row: result.row, addedQuantity: result.addedQuantity, created: result.created })

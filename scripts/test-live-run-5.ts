@@ -63,7 +63,7 @@ async function main() {
   setSupabaseClient(makeFakeSupabase(db) as any)
 
   const { homeGreeting, loadDashboardData } = await import('../src/lib/dashboard-data')
-  const { typedGroceryAmount, formatShoppingQuantity, stepQuantity } = await import('../src/lib/grocery-display')
+  const { typedGroceryAmount, chatGroceryAmount, formatShoppingQuantity, stepQuantity } = await import('../src/lib/grocery-display')
   const { parseIngredientLine } = await import('../src/lib/portion-scaler')
   const { calibrationCueText } = await import('../src/components/exercise/CalibrationCue')
   const { shopCardState } = await import('../src/lib/shop-card')
@@ -105,6 +105,16 @@ async function main() {
     formatShoppingQuantity({ display_name: 'bin bags', quantity: 1180, unit: 'g' }).primary)
   const list = strip(read('src/components/GroceryList.tsx'))
   check('the add bar stores what typedGroceryAmount says', /typedGroceryAmount\(parseIngredientLine\(/.test(list) && /name: typed\.name, quantity: typed\.quantity, unit: typed\.unit/.test(list))
+
+  // RUN 7, L58 (20 Oct 2026): "kitchen roll · 1g". The coach's amounts go through the add bar's rule.
+  const roll = chatGroceryAmount({ name: 'kitchen roll', quantity: 1, unit: 'g' })
+  check('L58: the coach adding "1 g" of kitchen roll stores one of it', roll.quantity === 1 && roll.unit === 'item', roll)
+  check('L58: ...a weight on something that is not a food is one of it, whatever the number', JSON.stringify(chatGroceryAmount({ name: 'bin bags', quantity: 500, unit: 'g' })) === JSON.stringify({ name: 'bin bags', quantity: 1, unit: 'item' }), chatGroceryAmount({ name: 'bin bags', quantity: 500, unit: 'g' }))
+  check('L58: ...no amount at all is one of it, never "1 whole"', JSON.stringify(chatGroceryAmount({ name: 'toilet roll' })) === JSON.stringify({ name: 'toilet roll', quantity: 1, unit: 'item' }) && chatGroceryAmount({ name: 'eggs', quantity: 6 }).unit === 'item', chatGroceryAmount({ name: 'toilet roll' }))
+  check('L58: ...while a food keeps its weight ("500 g chicken breast")', JSON.stringify(chatGroceryAmount({ name: 'chicken breast', quantity: 500, unit: 'g' })) === JSON.stringify({ name: 'chicken breast', quantity: 500, unit: 'g' }), chatGroceryAmount({ name: 'chicken breast', quantity: 500, unit: 'g' }))
+  check('L58: ...and a food at under a shoppable gram is one of it', chatGroceryAmount({ name: 'chicken breast', quantity: 2, unit: 'g' }).unit === 'item')
+  const chatSrc = strip(read('src/components/ChatAssistant.tsx'))
+  check('L58: the coach\'s add stores what chatGroceryAmount says', /const amount = chatGroceryAmount\(/.test(chatSrc) && /name: amount\.name, quantity: amount\.quantity, unit: amount\.unit/.test(chatSrc))
 
   // -------------------------------------------------------------------------
   console.log('\n§3 M48 — the calibration cue at the stated limit')

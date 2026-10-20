@@ -434,6 +434,15 @@ async function main() {
     check('...and every failure says nothing has changed', failures.every(f => /nothing has changed/.test(f)), failures)
     check('...a list it could not read is named as that, not as the generator', /shopping list/.test(failures[0]) && /meal generator/.test(failures[1]) && /fit your targets/.test(failures[2]), failures)
 
+    // L47 (20 Oct 2026): the coach card's rows say "N of M fit" only when some do not fit.
+    check('L47: a meal where every dish fits but there are few counts options, not "2 of 2 fit"', JSON.stringify(MORE_MEALS.row(2, 2, 3)) === JSON.stringify({ before: '2 options', after: '5 options' }), MORE_MEALS.row(2, 2, 3))
+    check('L47: ...a meal where some do not fit says how many fit', JSON.stringify(MORE_MEALS.row(2, 7, 3)) === JSON.stringify({ before: '2 of 7 fit', after: 'up to 5 of 10 fit' }), MORE_MEALS.row(2, 7, 3))
+    check('L47: ...and a meal short only on count counts options, one said as one', JSON.stringify(MORE_MEALS.row(undefined, 1, 0)) === JSON.stringify({ before: '1 option', after: '1 option' }), MORE_MEALS.row(undefined, 1, 0))
+    const chatSrc = read('src/components/ChatAssistant.tsx')
+    check('L47: the card builds every row through that one function, and leads with fit only when some do not fit',
+      /rows: slots\.map\(slot => \(\{ field: REFIT_SLOT_LABEL\[slot\], \.\.\.MORE_MEALS\.row\(mealTopUp\.fewFit\[slot\], mealTopUp\.have\[slot\] \?\? 0, mealTopUp\.needs\[slot\] \?\? 0\) \}\)\)/.test(chatSrc)
+      && /mealTopUp\.fewFit\[s\] !== undefined && mealTopUp\.fewFit\[s\]! < \(mealTopUp\.have\[s\] \?\? 0\)\) \? MORE_MEALS\.leadFit/.test(chatSrc))
+
     const app = read('src/App.tsx')
     const grocery = read('src/lib/grocery-store.ts')
     check('the offer counts only the meals she can be served (the marked pools)', /topUpPlan\(mealPools, activeMealSlots, macros\)/.test(app) && /const mealPools = useServablePools\(/.test(app))

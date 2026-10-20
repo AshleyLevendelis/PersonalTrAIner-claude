@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **Runs 7-10, batch 3 screen items (20 Oct 2026).** **M55** ("Log it" left "Up next · Breakfast", easy to log
+  twice): NOT REPRODUCED on Nutrition. The real card, tapped, moves up next on at once and the logged meal is under
+  Eaten; nothing had ever tapped it, so `verify:upnext-log` now does (5 checks; 2 mutations, both caught: logs not
+  counted as eaten, log not read back). Home's next-meal row has no Log it. The "at 8pm up next is still breakfast"
+  half is a question about what the screen says, put to Ashley. **M63** (Home "2 things to buy" while the list
+  showed 43 left): traced, not changed. Home counts only rows still needed for a day ahead (her 11 Oct M44 fix), the
+  list counts every unticked row, so one list has two numbers; how to say it is hers, asked. **L47**: the coach's
+  top-up card read "2 of 2 fit" over dishes that are fine; one row function (`MORE_MEALS.row`) now says "N of M fit"
+  only when some do not fit, else counts options, and the card leads with fit only then (`test:meal-top-up`, 2
+  mutations caught). **L48**: ALREADY FIXED in run 7 (`test:nutrition-layout`, `test:pace-clock` green). **L58**
+  ("kitchen roll · 1g"): the coach's grocery add took the model's amount as given; it now goes through one rule beside
+  the add bar's (`chatGroceryAmount`): a weight on a non-food or under 5 g is one of it, no amount is one of it
+  (was "1 whole"), a food keeps its weight (`test:live-run-5`, 4 mutations caught). Frontend only.
 - [x] **Runs 7-10, M62: new meals arrived a week late, past the strip (20 Oct 2026).** "Get more options" said
   "They start on Sunday 25 October" because the list had just been rebuilt for seven days, and the strip ends on the
   24th, so she could not even see them. Ashley's ruling, 20 Oct 2026, from three options: **"Say it, and offer

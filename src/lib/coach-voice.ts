@@ -263,11 +263,14 @@ export const MORE_MEALS = {
   takesAMoment: 'Finding new meals takes a moment.',
   /** Completes "Do you want me to ..." when a meal has dishes but too few that fit. */
   leadFit: 'add meals that fit your targets, where too few of your dishes do',
-  /** A row's before and after. */
-  options: (n: number) => `${n} option${n === 1 ? '' : 's'}`,
-  /** The same row when it is about fit: what is there now, and what the top-up can reach. */
-  fitBefore: (fitting: number, have: number) => `${fitting} of ${have} fit`,
-  fitAfter: (fitting: number, have: number) => `up to ${fitting} of ${have} fit`,
+  /**
+   * ONE ROW OF THE CARD (run 7, L47, 20 Oct 2026): "N of M fit" only when some do NOT fit. When every dish fits and
+   * there are just few, "2 of your 2 fit" reads as a complaint about dishes that are fine, so the row counts options,
+   * as the screen's offer does ("You only have 2 lunches").
+   */
+  row: (fitting: number | undefined, have: number, add: number) => (fitting !== undefined && fitting < have
+    ? { before: `${fitting} of ${have} fit`, after: `up to ${fitting + add} of ${have + add} fit` }
+    : { before: `${have} option${have === 1 ? '' : 's'}`, after: `${have + add} option${have + add === 1 ? '' : 's'}` }),
   /** No card, and why: the three days the request cannot be met. */
   refusals: {
     full: (size: number) => `Every meal already has at least ${size} options, so there's nothing to add. If the same ones keep coming up, tell me which and I'll swap them.`,

@@ -78,6 +78,20 @@ export function typedGroceryAmount(parsed: { name: string; quantity: number; uni
   return { name: parsed.name, quantity: parsed.quantity, unit: parsed.unit }
 }
 
+/**
+ * WHAT THE COACH ADDS, said as the add bar says it (run 7, L58, 20 Oct 2026): "kitchen roll · 1g". The coach's
+ * amount is the model's, and a weight on something that is not a food, or under a gram's worth anybody shops, is
+ * not an amount: it is one of them. No amount at all is one of them too (was "1 whole").
+ */
+export function chatGroceryAmount(item: { name: string; quantity?: number; unit?: string }): { name: string; quantity: number; unit: string } {
+  const unit = item.unit?.trim().toLowerCase() ?? ''
+  const quantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 0
+  const weighed = unit === 'g' || unit === 'ml' || unit === 'kg' || unit === 'l'
+  if (!unit || !(quantity > 0)) return { name: item.name, quantity: quantity > 0 ? quantity : 1, unit: COUNT_UNIT }
+  if (weighed && (!lookupIngredient(item.name) || (unit === 'g' || unit === 'ml') && quantity < 5)) return { name: item.name, quantity: 1, unit: COUNT_UNIT }
+  return { name: item.name, quantity, unit: item.unit!.trim() }
+}
+
 export function formatQuantity(item: Pick<GroceryItemRow, 'quantity' | 'unit'>): string {
   const qty = Number.isInteger(item.quantity) ? item.quantity : Math.round(item.quantity * 10) / 10
   if (item.unit === COUNT_UNIT) return `${qty}`
